@@ -246,18 +246,17 @@ public static class MetaJsonFormat
             var reqArray = JsonUtils.RequireArray(obj, keyName);
             foreach (var iter in reqArray.EnumerateArray())
             {
-                var reqObject = JsonUtils.RequireObject(iter);
+                // NOTE(p2 fix): the request object must be a JsonObject so requireString binds
+                // the (parent, key) overload like the C++ requireString(reqObject, "uid");
+                // the previous JsonElement form passed "uid" as the error label and rejected
+                // every entry with "uid is not a string"
+                var reqObject = JsonUtils.RequireObject(iter).ToJsonObject();
                 var uid = JsonUtils.RequireString(reqObject, "uid");
-                var equals = MemberOrString(reqObject, "equals");
-                var suggests = MemberOrString(reqObject, "suggests");
+                var equals = reqObject.StringOr("equals");
+                var suggests = reqObject.StringOr("suggests");
                 ptr.Add(new Require { Uid = uid, EqualsVersion = equals, Suggests = suggests });
             }
         }
-    }
-
-    private static string MemberOrString(JsonElement obj, string key)
-    {
-        return obj.TryGetProperty(key, out var value) ? JsonUtils.EnsureString(value) : "";
     }
 
     public static void SerializeRequires(JsonObject obj, RequireSet? ptr, string keyName = "requires")
