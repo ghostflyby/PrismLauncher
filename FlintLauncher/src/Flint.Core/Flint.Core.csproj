@@ -5,4 +5,8 @@
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Flint.Tests" />
+  </ItemGroup>
+
 </Project>

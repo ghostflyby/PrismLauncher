@@ -1,0 +1,52 @@
+Launcher/some/deep/key	QString	STR:7
+UI/mods_Page/Columns	QByteArray	BA:[QUFBQS93PT0=]
+UI/other	QString	STR:plain
+bool_false	QString	STR:false
+bool_true	QString	STR:true
+byte_array_binary	QByteArray	BA:[YmluAQL/2nRhAA==]
+byte_array_empty	QByteArray	BA:[]
+byte_array_text	QByteArray	BA:[aGVsbG8gd29ybGQ=]
+double_plain	QString	STR:3.25
+double_small	QString	STR:0.5
+int_neg	QString	STR:-42
+int_pos	QString	STR:8192
+int_zero	QString	STR:0
+long_long	QString	STR:9223372036854775807
+str_all	QString	STR:val="$INST_JAVA" -jar; ls 
+str_at_bang	QString	STR:@Invalid() lookalike
+str_at_start	QString	STR:@foo
+str_both_space	QString	STR: padded 
+str_braces	QString	STR:{}
+str_colon	QString	STR:a:b
+str_contains_comma	QString	STR:Azul Systems, Inc.
+str_contains_eq	QString	STR:AAAA/w==
+str_contains_quotes	QString	STR:"value2" with quotes
+str_contains_semi	QString	STR:a;b
+str_ctrl	QString	STR:a+
+str_empty	QString	STR:
+str_escapes	QString	STR:a<NL>b<TAB><NL>\\\\\\C:\\Program files\\terrible\\name\\of something\\#thisIsNotAComment
+str_hash	QString	STR:some data#something
+str_json	QString	STR:{"a":true,"b":"x,y=z"}
+str_leading_space	QString	STR: padded
+str_mixed_special	QString	STR:env mesa=true
+str_numberlike	QString	STR:1.0.0
+str_percent	QString	STR:100%
+str_plain	QString	STR:system
+str_semi_list	QString	STR:1;2;3;4
+str_slash	QString	STR:/usr/bin/jvisualvm
+str_space_mid	QString	STR:Cascadia Code
+str_trailing_space	QString	STR:padded 
+str_true_text	QString	STR:true
+str_unicode	QString	STR:中文测试★
+stringlist_empty	invalid	@INVALID
+stringlist_empty_elem	QStringList	STRLIST:[,b]
+stringlist_multi	QStringList	STRLIST:[a,b,c]
+stringlist_needs_quotes	QStringList	STRLIST:[x,y,a;b,c=d,plain,with space]
+stringlist_single	QString	STR:solo
+stringlist_single_quoted_spaces	QString	STR: solo 
+stringlist_single_special	QString	STR:solo,x
+stringlist_trailing_empty	QStringList	STRLIST:[a,]
+uint_val	QString	STR:4294967295
+variantlist_empty	invalid	@INVALID
+variantlist_int	QStringList	STRLIST:[1,2,3,10]
+variantlist_one	QVariantList	VLIST:[42]

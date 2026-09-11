@@ -1,0 +1,13 @@
+Escaped Section/inner/key	QString	STR:slashy
+General/escaped_general_key	QString	STR:works
+UI/Nested/at_bytearray	QByteArray	BA:[AAH/]
+UI/Nested/at_double_at	QString	STR:@literal
+UI/Nested/at_invalid	invalid	@INVALID
+UI/Nested/key/with/backslashes	QString	STR:deep
+UI/Nested/spaces_before_eq	QString	STR:value
+after_quote_junk	QString	STR:abctrailing
+empty_quote	QString	STR:
+no_newline_at_eof	QString	STR:tail
+quoted	QString	STR:  padded  
+quoted_escapes	QString	STR:line1<NL>line2 "q" end
+unquoted_escapes	QString	STR:hello<NL>world<TAB>tabAA
