@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="FlintLauncher/src/Flint.Core/Flint.Core.csproj" />
+  <Project Path="FlintLauncher/src/Flint.Web/Flint.Web.csproj" />
+  <Project Path="FlintLauncher/tests/Flint.Tests/Flint.Tests.csproj" />
+</Solution>

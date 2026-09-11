@@ -1,0 +1,10 @@
+<Project>
+  <!-- Common properties for all Flint projects. See docs/PLAN.md -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+</Project>

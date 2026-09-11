@@ -62,3 +62,12 @@ flatbuild
 
 # Snap
 *.snap
+
+# .NET (Flint)
+bin/
+obj/
+artifacts/
+*.user
+*.binlog
+TestResults/
+dotnet-cover/

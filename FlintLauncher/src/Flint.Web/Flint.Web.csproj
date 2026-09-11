@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <!-- Native AOT is a hard requirement for the Flint core (docs/PLAN.md). -->
+    <PublishAot>true</PublishAot>
+    <!-- Force source-generated JSON only; catch accidental reflection usage at build time. -->
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Flint.Core\Flint.Core.csproj" />
+  </ItemGroup>
+
+</Project>
