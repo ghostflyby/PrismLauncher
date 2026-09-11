@@ -55,7 +55,7 @@ public class SettingsObjectTests : IDisposable
         var globalMaxMem = global.RegisterSetting("MaxMemAlloc", 4096);
 
         var gate = settings.RegisterSetting("OverrideMemory", false);
-        settings.RegisterOverride(globalMaxMem, gate);
+        settings.RegisterOverride(globalMaxMem!, gate!);
 
         // gate off -> falls back to the overridden setting's live value
         Assert.Equal(4096, Variant.AsInt(settings.Get("MaxMemAlloc")));
@@ -82,7 +82,7 @@ public class SettingsObjectTests : IDisposable
 
         var settings = new IniSettingsObject(_path);
         var gate = settings.RegisterSetting("OverrideJavaLocation", false);
-        var passthrough = settings.RegisterPassthrough(otherSetting, gate);
+        var passthrough = settings.RegisterPassthrough(otherSetting!, gate!);
 
         // gate off: reads go through, writes only forward to the other object
         settings.Set("JavaPath", "/usr/bin/java");

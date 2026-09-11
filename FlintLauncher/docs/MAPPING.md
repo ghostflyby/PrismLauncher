@@ -13,22 +13,29 @@
 
 | 原文件 | C# 目标 | 状态 | 备注 |
 |---|---|---|---|
-| `Version.{h,cpp}` | `Flint.Core/Versioning/Version.cs` | todo | Minecraft 版本序比较；对拍 Version_test |
-| `java/JavaVersion.{h,cpp}` | `Flint.Core/Java/JavaVersion.cs` | todo | |
-| `FileSystem.{h,cpp}` | `Flint.Core/IO/FileSystem.cs` | todo | 原子写(PSaveFile)、路径规范化、copy/move 语义 |
-| `GZip.{h,cpp}` | `Flint.Core/IO/GZip.cs` | todo | |
-| `Json.{h,cpp}` | `Flint.Core/Json/JsonUtils.cs` | todo | Qt JSON 容错语义 → STJ + 容错读取助手 |
-| `StringUtils.{h,cpp}` | `Flint.Core/Text/StringUtils.cs` | todo | |
-| `Markdown.{h,cpp}` | `Flint.Core/Text/Markdown.cs` | todo | 仅 HTML 转换用途 |
-| `MMCZip.{h,cpp}` | `Flint.Core/IO/ZipUtils.cs` | todo | ZipArchive；保留目录项/权限位 |
-| `Commandline.{h,cpp}` | `Flint.Core/Text/Commandline.cs` | todo | |
-| `settings/INIFile.{h,cpp}` | `Flint.Core/Settings/IniFile.cs` | todo | QSettings 兼容：读 legacy/1.1/1.2/1.3，写 1.3 |
-| `settings/SettingsObject*` `Setting*` `INISettingsObject` `OverrideSetting` `PassthroughSetting` | `Flint.Core/Settings/*.cs` | todo | gate 覆盖语义 |
-| `tasks/Task*` | `Flint.Core/Tasks/` | todo | async 化；进度/取消/失败聚合 |
-| `net/*` | `Flint.Core/Net/` | todo | Request/Sink/Validator/HttpMetaCache/ApiHeader |
-| `RWStorage.h` | `Flint.Core/RwStorage.cs` | todo | 或用 Channel/TPL 取代，记录决策 |
-| `ExponentialSeries.h` `AssertHelpers.h` `Exception.h` `EnumWrapper.h` `QVariantUtils.h` `QObjectPtr.h` `Usable.h` `SeparatorPrefixTree.h` `Filter.h` `WatchLock.h` `KonamiCode` | 视需要内联或 `n/a` | todo | Qt 设施，多数被 C# 语言设施取代 |
-| `MMCTime.{h,cpp}` | `Flint.Core/Time/MmcTime.cs` | todo | 若仅 GUI 使用则 n/a |
+| `Version.{h,cpp}` | `Flint.Core/Versioning/McVersion.cs` | ported | FlexVer + 空格特例；70 条官方向量全过 |
+| `java/JavaVersion.{h,cpp}` | `Flint.Core/Java/JavaVersion.cs` | ported | |
+| `StringUtils.{h,cpp}` | `Flint.Core/Text/StringUtils.cs` | partial | 仅 NaturalCompare（ordinal 代替 locale）；其余按需补 |
+| `FileSystem.{h,cpp}` | `Flint.Core/IO/FileSystem.cs` | partial | 平台中立子集（copy/move/delete/combine/原子写等）；reflink/trash/desktop 等记录为 skip |
+| `GZip.{h,cpp}` | `Flint.Core/IO/GZip.cs` | ported | System.IO.Compression |
+| `Json.{h,cpp}` | `Flint.Core/Json/JsonUtils.cs` | partial | require/ensure 全家 + to/from list/map；QVariant 部分不适用 |
+| `StringUtils`(其余) `Markdown.{h,cpp}` | `Flint.Core/Text/Markdown.cs` | ported | 手写 cmark 子集 |
+| `Commandline.{h,cpp}` | `Flint.Core/Text/Commandline.cs` | ported | |
+| `MMCZip.{h,cpp}` | `Flint.Core/IO/MMCZip.cs` | partial | extract/compress/merge；createModdedJar 待 Mod 模型；符号链接/权限位未实现 |
+| `settings/INIFile.{h,cpp}` | `Flint.Core/Settings/IniFile.cs` + `QSettingsIniCodec.cs` | ported | 黄金对拍：真 QSettings 6.11 生成 golden 文件，读写字节级一致（tools/qt-ini-golden） |
+| `settings/SettingsObject*` `Setting*` `INISettingsObject` `OverrideSetting` `PassthroughSetting` | `Flint.Core/Settings/*.cs` | ported | QVariant→object?+`Variant` 转换层 |
+| `tasks/Task*` | `Flint.Core/Tasks/*`（Task→FlintTask 改名） | ported | ConcurrentTask 语义：子任务失败不中断兄弟、排空后聚合失败 |
+| `net/Request*` | `Flint.Core/Net/NetRequest.cs` | partial | HttpClient 底座；429/503 自动重试；HeaderProxy 简化为 AddHeader |
+| `net/Sink*` `FileSink` `ByteArraySink` `MetaCacheSink` | `Flint.Core/Net/Sink.cs` `FileSink.cs` | ported | PSaveFile→临时文件+原子替换 |
+| `net/Validator*` `ChecksumValidator` | `Flint.Core/Net/Validator.cs` | ported | IncrementalHash |
+| `net/HttpMetaCache*` | `Flint.Core/Net/HttpMetaCache.cs` | ported | metacache JSON 格式（version "1"）与原版互通 |
+| `net/NetJob*` | `Flint.Core/Net/NetJob.cs` | ported | 共享静态 HttpClient |
+| `net/Mode.h` `ApiRequest.h` `HeaderProxy*` | `Flint.Core/Net/Mode.cs`；头机制简化 | partial | 头注入按需在 P2/P6 恢复 |
+| `net/PasteUpload*` | — | todo | P7 |
+| `RWStorage.h` | — | n/a | 由 C# 并发设施取代 |
+| `ExponentialSeries.h` `AssertHelpers.h` `Exception.h` `EnumWrapper.h` `QVariantUtils.h` `QObjectPtr.h` `Usable.h` `SeparatorPrefixTree.h` `Filter.h` `WatchLock.h` `KonamiCode` | `n/a`（Variant.cs 承接 QVariantUtils 子集） | n/a | Qt 设施，被 C# 语言设施取代 |
+| `PSaveFile.h` | `Flint.Core/IO/FileSystem.cs`（原子写）+ `Net/FileSink.cs` | ported | |
+| `MMCTime.{h,cpp}` | — | todo | 若仅 GUI 使用则 n/a |
 
 ## P2 元数据与版本模型
 

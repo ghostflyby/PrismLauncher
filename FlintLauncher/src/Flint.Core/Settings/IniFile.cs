@@ -265,8 +265,16 @@ public sealed class IniFile
             };
             if (items is not null)
             {
-                var json = System.Text.Json.JsonSerializer.Serialize(items);
-                return IniValue.From(json);
+                var array = new System.Text.Json.Nodes.JsonArray();
+                foreach (var item in items)
+                {
+                    array.Add((System.Text.Json.Nodes.JsonNode?)System.Text.Json.Nodes.JsonValue.Create(item));
+                }
+                return IniValue.From(array.ToJsonString(new System.Text.Json.JsonSerializerOptions
+                {
+                    WriteIndented = false,
+                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                }));
             }
             return value;
         }
