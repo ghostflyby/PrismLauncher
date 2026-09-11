@@ -15,4 +15,9 @@
     <ProjectReference Include="..\..\src\Flint.Core\Flint.Core.csproj" />
   </ItemGroup>
 
+  <!-- Fixtures ported from the original C++ tests (tests/testdata). -->
+  <ItemGroup>
+    <Content Include="TestData\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
