@@ -37,16 +37,28 @@
 | `PSaveFile.h` | `Flint.Core/IO/FileSystem.cs`（原子写）+ `Net/FileSink.cs` | ported | |
 | `MMCTime.{h,cpp}` | — | todo | 若仅 GUI 使用则 n/a |
 
-## P2 元数据与版本模型
+## P2 元数据与版本模型（已完成 2026-09-11）
 
-| 原文件 | C# 目标 | 状态 |
-|---|---|---|
-| `meta/BaseEntity*` `Index` `VersionList` `Version` `JsonFormat*` | `Flint.Core/Meta/` | todo |
-| `minecraft/MojangVersionFormat*` `OneSixVersionFormat*` | `Flint.Core/Minecraft/VersionFormats/` | todo |
-| `minecraft/VersionFile*` `Library*` `GradleSpecifier.h` `MojangDownloadInfo.h` `Rule.*` `LaunchProfile*` | `Flint.Core/Minecraft/` | todo |
-| `minecraft/Component*` `PackProfile*` `ComponentUpdateTask*` | `Flint.Core/Minecraft/Components/` | todo |
-| `minecraft/VersionFilterData*` `ParseUtils.h` `AssetsUtils` | `Flint.Core/Minecraft/` | todo |
-| `minecraft/MinecraftLoadAndCheck*` | `Flint.Core/Minecraft/` | todo |
+| 原文件 | C# 目标 | 状态 | 备注 |
+|---|---|---|---|
+| `meta/JsonFormat*` | `Flint.Core/Meta/MetaJsonFormat.cs` | ported | Require/RequireSet（uid 相等语义） |
+| `meta/BaseEntity*` + BaseEntityLoadTask | `Flint.Core/Meta/MetaEntity.cs` | ported | sha256 校验、本地缓存优先、ParsingValidator 防坏提交；静态共享 HttpMetaCache(base "meta") |
+| `meta/Index*` `VersionList*` `Version*` | `Flint.Core/Meta/Index.cs` `MetaVersionList.cs` `MetaVersion.cs` | ported | recommended/latest 逻辑 |
+| `minecraft/GradleSpecifier.h` | `Flint.Core/Minecraft/GradleSpecifier.cs` | ported | readonly struct 保值拷贝语义 |
+| `minecraft/Rule.*` `RuntimeContext.h` `SysInfo`(部分) | `Flint.Core/Minecraft/Rule.cs` `RuntimeContext.cs` | ported | |
+| `minecraft/MojangDownloadInfo.h` | `Flint.Core/Minecraft/MojangDownloadInfo.cs` | ported | legacy 资产回退 URL 保留 |
+| `minecraft/LaunchProfile*` | `Flint.Core/Minecraft/LaunchProfile.cs` | ported | 库冲突"高版本替换"语义 |
+| `minecraft/VersionFilterData*` | `Flint.Core/Minecraft/VersionFilterData.cs` | ported | 表值逐一复制 |
+| `minecraft/ParseUtils.h` | `Flint.Core/Minecraft/ParseUtils.cs` | ported | S3 时间戳 |
+| `minecraft/Library*` | `Flint.Core/Minecraft/Library.cs` | ported | 构造期零网络（同上游）；此检出版本无 .pack.xz 逻辑（已核实） |
+| `minecraft/VersionFile*` | `Flint.Core/Minecraft/VersionFile.cs` | ported | applyTo 合并含 net.minecraft 特例 |
+| `minecraft/MojangVersionFormat*` `OneSixVersionFormat*` | 同名 .cs | ported | 上游已知 bug（缺空格错误串、jarMods→mods）保留并标注 |
+| `minecraft/Component*` | `Flint.Core/Minecraft/Component.cs` | ported | UpdateAction variant → closed record set |
+| `minecraft/PackProfile*` | `Flint.Core/Minecraft/PackProfile.cs` | ported | mmc-pack.json/patches 字节兼容（Qt 4 空格缩进+键排序）；GUI 模型部分不移植；IPackProfileEnv 解耦 |
+| `minecraft/ComponentUpdateTask*` (+_p.h) | `Flint.Core/Minecraft/ComponentUpdateTask.cs` | ported | Launch/Resolution 模式、依赖注入、trivial-change 阶梯 |
+| `minecraft/ProfileUtils*` | `Flint.Core/Minecraft/ProfileUtils.cs` | ported | readOverrideOrders/不抛异常 JSON 文件 IO |
+| `minecraft/MinecraftLoadAndCheck*` `AssetsUtils` | — | todo | P3/P5（依赖 MinecraftInstance） |
+| `minecraft/ProblemProvider.h` `Agent`(结构) `JavaMetadata`(解析半) | `Flint.Core/Minecraft/ProblemProvider.cs` `Agent.cs` `JavaMetadata.cs` | partial | JavaMetadata 下载半随 P5 java/ |
 
 ## P3 实例域
 
