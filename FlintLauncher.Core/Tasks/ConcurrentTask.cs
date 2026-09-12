@@ -31,6 +31,13 @@ public class ConcurrentTask : FlintTask
     private protected int _totalMaxSize;
     private CancellationToken _runToken;
     private volatile bool _aborting;
+    /// <summary>
+    /// Subtask completions whose bookkeeping is still in flight (between RunSubTaskAsync's yield
+    /// and OnSubTaskFinished returning). The driver loop must not start new work while this is
+    /// non-zero, otherwise it can observe a drained _doing before the completion handler decided
+    /// the outcome and start a subtask that should never have run (SequentialTask fail-fast).
+    /// </summary>
+    private int _pendingCompletions;
 
     public ConcurrentTask(string taskName = "", int maxConcurrent = DefaultMaxConcurrent)
     {
@@ -167,6 +174,14 @@ public class ConcurrentTask : FlintTask
 
                 if (pending is null)
                 {
+                    // Wait for in-flight completion bookkeeping before (re)starting anything, so
+                    // the completion handler's decision (e.g. SequentialTask failing the parent)
+                    // is observed atomically by this loop.
+                    if (Volatile.Read(ref _pendingCompletions) > 0)
+                    {
+                        await Task.Yield();
+                        continue;
+                    }
                     // Either everything drained (FinishLocked decides) or a subtask is between
                     // its reservation and its run task being stored.
                     ExecuteNextSubTask();
@@ -257,9 +272,18 @@ public class ConcurrentTask : FlintTask
 
         // Mirror the C++ Qt::QueuedConnection between a subtask finishing and the parent's
         // bookkeeping; also keeps long chains of synchronous subtasks from recursing deeply.
+        // The completion window is announced so the driver loop does not start new work until
+        // the outcome (success/failure/parent-fail) has been fully applied.
         await Task.Yield();
-
-        OnSubTaskFinished(next);
+        Interlocked.Increment(ref _pendingCompletions);
+        try
+        {
+            OnSubTaskFinished(next);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _pendingCompletions);
+        }
     }
 
     private void OnSubTaskFinished(FlintTask next)
