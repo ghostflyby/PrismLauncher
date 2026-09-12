@@ -161,7 +161,12 @@ public class LaunchController : FlintTask
     {
         if (AccountToUse is null || WantedLaunchMode == LaunchMode.Demo)
         {
-            _actualLaunchMode = LaunchMode.Demo;
+            // Headless extension over C++: the API can request an explicit offline launch
+            // (WantedLaunchMode.Offline) without any account; C++ only ever reaches Offline
+            // as a *downgrade* and otherwise forces Demo when no account exists.
+            _actualLaunchMode = AccountToUse is null && WantedLaunchMode == LaunchMode.Offline
+                ? LaunchMode.Offline
+                : LaunchMode.Demo;
             return LaunchDecision.Continue;
         }
 
@@ -368,7 +373,24 @@ public class LaunchController : FlintTask
 
         _session = new AuthSession();
         _session.LaunchMode = _actualLaunchMode;
-        AccountToUse!.FillSession(_session);
+        if (AccountToUse is null)
+        {
+            // headless extension: an explicit offline launch without any account builds the
+            // session straight from the offline name (AskOfflineName's headless default)
+            var name = OfflineName.Length != 0
+                ? OfflineName
+                : AskOfflineName("Player", LaunchMode.Offline) ?? "";
+            if (name.Length == 0)
+            {
+                EmitAborted();
+                return;
+            }
+            _session.MakeOffline(name);
+            LaunchInstance();
+            return;
+        }
+
+        AccountToUse.FillSession(_session);
 
         if (AccountToUse.AccountType_ != AccountType.Offline)
         {

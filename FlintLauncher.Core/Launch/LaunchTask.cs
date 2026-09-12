@@ -29,6 +29,8 @@ using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Text;
 using static FlintLauncher.Core.Launch.MessageLevelExtensions;
 
+using System.IO;
+
 namespace FlintLauncher.Core.Launch;
 
 public class LaunchTask : FlintTask
@@ -81,6 +83,9 @@ public class LaunchTask : FlintTask
         get => _pid;
         set => _pid = value;
     }
+
+    /// <summary>Port of LaunchTask::isMultiStep(): a launch chain is multi-step by definition.</summary>
+    public override bool IsMultiStep => _steps.Count > 1;
 
     public LogModel GetLogModel()
     {

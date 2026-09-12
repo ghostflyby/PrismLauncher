@@ -14,6 +14,7 @@ using Xunit;
 
 namespace FlintLauncher.Tests;
 
+[Collection("LauncherJars")]
 public class LauncherPartLaunchTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-launchpart-{Guid.NewGuid():N}");
