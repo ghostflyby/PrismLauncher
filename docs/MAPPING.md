@@ -106,22 +106,22 @@
 | `logs/*` `MessageLevel*` | `FlintLauncher.Core/Launch/LogModel.cs` `MessageLevel.cs` | ported | Log4j XML 解析未移植 |
 | `net/PasteUpload*`、SRV | SrvResolver.cs 已移植；PasteUpload | partial | PasteUpload 归 P7 |
 
-## P6 modplatform
+## P6 modplatform（已完成 2026-09-12）
 
-| 原文件 | C# 目标 | 状态 |
-|---|---|---|
-| `modplatform/ModIndex.h` `ResourceAPI.h` | `FlintLauncher.Core/ModPlatform/` | todo |
-| `modplatform/modrinth/*` | `FlintLauncher.Core/ModPlatform/Modrinth/` | todo |
-| `modplatform/flame/*` | `FlintLauncher.Core/ModPlatform/Flame/` | todo |
-| `modplatform/packwiz/*` | `FlintLauncher.Core/ModPlatform/Packwiz/` | todo |
-| `modplatform/atlauncher/*` | `FlintLauncher.Core/ModPlatform/AtLauncher/` | todo |
-| `modplatform/ftb/*` `legacy_ftb/*` `import_ftb/*` | `FlintLauncher.Core/ModPlatform/Ftb*/` | todo |
-| `modplatform/technic/*` | `FlintLauncher.Core/ModPlatform/Technic/` | todo |
-| `modplatform/helpers/*` | `FlintLauncher.Core/ModPlatform/Helpers/` | todo |
-| `libraries/murmur2` | `FlintLauncher.Core/Hashing/Murmur2.cs` | todo |
-| `libraries/qdcss` | 待查用途后登记 | todo |
-| `InstanceImportTask*`（modpack 分发） | P3 已列，此处补 provider 路由 | — |
-| `ResourceDownloadTask*` | `FlintLauncher.Core/ModPlatform/` | todo |
+| 原文件 | C# 目标 | 状态 | 备注 |
+|---|---|---|---|
+| `modplatform/ModIndex.h` `ResourceAPI.h` | `ModPlatform/ModIndex.cs` `ResourceAPI.cs` | ported | |
+| `modplatform/modrinth/*` | `ModPlatform/Modrinth/*` | ported | 搜索/版本/按哈希更新/.mrpack 导入导出往返 |
+| `modplatform/flame/*` | `ModPlatform/Flame/*` | ported | 指纹批量解析、blocked-mods 数据语义、导入导出往返；API key 用户自备 |
+| `modplatform/packwiz/*` + MetadataHandler | `ModPlatform/Packwiz/*` `MetadataHandler.cs` `EnsureMetadataTask.cs` | ported | 自研 MiniToml 子集（上游 Packwiz_test 原样通过） |
+| `modplatform/atlauncher/*` | `ModPlatform/AtLauncher/*` | ported | 可选 mod 选择、per-type 目录布局、组件 patch |
+| `modplatform/technic/*` | `ModPlatform/Technic/*` | ported | ZIP/Solder 双路径 + 三种 flavor 侦测 |
+| `modplatform/ftb/*` `legacy_ftb/*` `import_ftb/*` | `ModPlatform/Ftb*/` | ported | 目标->组件映射、legacy XML 修复规则、FTB App 布局钩子 |
+| `modplatform/helpers/*` | `ModPlatform/Helpers/ExportToModList.cs` `HashUtils.cs` `OverrideUtils.cs` | ported | 五种导出模板字节级对齐 |
+| `libraries/murmur2` | `ModPlatform/Hashing/Murmur2.cs` | ported | 独立参考向量验证 |
+| `libraries/qdcss` | — | n/a | 未发现调用点（此前登记待查） |
+| `InstanceImportTask*`（modpack 分发） | `Instances/InstanceImportTask.cs` | ported | mrpack/Flame/Technic/plain/URL 五路分发 |
+| `ResourceDownloadTask*`、更新既有实例流 | — | partial | 安装期资源下载已覆盖；独立"更新实例"流与 GUI 对话框（optional/blocked 交互）延后为钩子 |
 
 ## P7 周边
 
