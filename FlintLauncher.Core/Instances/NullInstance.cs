@@ -24,7 +24,7 @@ public class NullInstance : BaseInstance
 
     public override string InstanceConfigFolder() => InstanceRoot();
 
-    public override FlintTask? CreateLaunchTask(AuthSession? account, MinecraftTarget? targetToJoin) => null;
+    public override Launch.LaunchTask? CreateLaunchTask(AuthSession? account, MinecraftTarget? targetToJoin) => null;
 
     public override List<FlintTask> CreateUpdateTask() => [];
 

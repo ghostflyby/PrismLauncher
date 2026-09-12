@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Tests for the JavaCheck output parsing, the documented missing-jar failure path and the
-// JavaCommon JVM-args sanity checks. Running a real java binary requires the JavaCheck.jar,
-// which this phase does not build (see JavaCheckJar); the tests assert the stub behaviour.
+// Tests for the JavaCheck output parsing, the missing-jar failure path, the jars/ lookup of
+// JavaCheckJar (docs/tools/newlaunch-build.sh produces the jar) and the JavaCommon JVM-args
+// sanity checks. Running a real java binary requires the JavaCheck.jar; when none is
+// installed the tests assert the graceful failure paths.
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Tasks;
 using Xunit;
@@ -79,13 +80,49 @@ public class JavaCheckerTests
     }
 
     [Fact]
-    public void JavaCheckJar_StubReportsClearMarker()
+    public void JavaCheckJar_ReportsClearMarker_WhenNoJarIsInstalled()
     {
+        if (JavaUtils.GetJavaCheckPath().Length != 0)
+        {
+            // a JavaCheck.jar is installed on this machine — the missing-jar path is not reachable
+            return;
+        }
+
         var extracted = JavaCheckJar.TryExtractTo(Path.Combine(Path.GetTempPath(), "flint-tests-javacheck.jar"), out var error);
 
         Assert.False(extracted);
-        Assert.Contains("P5-a stub", error);
-        Assert.Contains("P5-c", JavaCheckJar.StubReason);
+        Assert.Equal(JavaCheckJar.StubReason, error);
+        Assert.Contains("JavaCheck.jar could not be found", JavaCheckJar.StubReason);
+    }
+
+    [Fact]
+    public void JavaCheckJar_IsFoundInTheLauncherJarsLayout_AndCopiedToTheTarget()
+    {
+        if (!OperatingSystem.IsMacOS() && !OperatingSystem.IsLinux())
+        {
+            return; // the launcher-root lookup layout mirrors the unix install tree
+        }
+        var root = Path.Combine(Path.GetTempPath(), $"flint-javacheck-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(root, "jars"));
+        var savedRoot = JavaUtils.LauncherRootPath;
+        try
+        {
+            var jar = Path.Combine(root, "jars", JavaCheckJar.JarFileName);
+            File.WriteAllText(jar, "dummy jar bytes");
+            JavaUtils.LauncherRootPath = root;
+
+            Assert.Equal(jar, JavaCheckJar.GetInstalledJarPath());
+
+            var target = Path.Combine(root, "extracted", JavaCheckJar.JarFileName);
+            Assert.True(JavaCheckJar.TryExtractTo(target, out var error));
+            Assert.Equal("", error);
+            Assert.Equal("dummy jar bytes", File.ReadAllText(target));
+        }
+        finally
+        {
+            JavaUtils.LauncherRootPath = savedRoot ?? AppContext.BaseDirectory;
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]

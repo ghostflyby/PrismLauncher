@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of libraries/javacheck: upstream compiles JavaCheck.java into a small jar at build time
 // and installs it next to the launcher (Application::getJarPath finds it at runtime). Flint
-// phase P5-a does not build or embed the jar (no build-system wiring exists yet), so
-// extraction always fails with the stub reason below; the parent wires the packaged jar in
-// P5-c. Meanwhile a compiled jar can simply be dropped into <app>/jars/JavaCheck.jar —
-// JavaUtils.GetJavaCheckPath() picks it up like the C++ original does.
+// builds it with docs/tools/newlaunch-build.sh into the same jars/ layout; this helper finds
+// that jar (the same launcher-root/jars lookup as Application::getJarPath) and copies it to
+// the per-user extraction path JavaChecker expects.
 namespace FlintLauncher.Core.Java;
 
 public static class JavaCheckJar
@@ -12,25 +11,65 @@ public static class JavaCheckJar
     /// <summary>The jar file name the C++ build installs (getJarPath("JavaCheck.jar")).</summary>
     public const string JarFileName = "JavaCheck.jar";
 
-    /// <summary>Where an embedded checker would be extracted (per-user temp/cache dir).</summary>
+    /// <summary>Where the checker jar is extracted for JavaChecker (per-user temp/cache dir).</summary>
     public static string DefaultExtractionPath { get; } =
         IO.FileSystem.PathCombine(Path.GetTempPath(), "Flint", JarFileName);
 
-    /// <summary>Why <see cref="TryExtractTo"/> fails in this phase; surfaced by JavaChecker results.</summary>
+    /// <summary>Why <see cref="TryExtractTo"/> failed; surfaced by JavaChecker results.</summary>
     public static string StubReason { get; } =
-        "JavaCheck.jar is not embedded in this build (P5-a stub; the packaged jar is wired in P5-c). " +
-        "Place a compiled JavaCheck.jar into <application dir>/jars/ to enable Java checks.";
+        "JavaCheck.jar could not be found. Please check your installation " +
+        "(build it with docs/tools/newlaunch-build.sh and place it into <launcher root>/jars/).";
 
     /// <summary>
-    /// Port of the (not yet existing) embedded-jar extraction: writes the jar compiled from
-    /// libraries/javacheck/JavaCheck.java to <paramref name="targetPath"/>. Always returns
-    /// false in P5-a with <paramref name="error"/> set to <see cref="StubReason"/>.
+    /// Port of Application::getJarPath(JarFileName) + install: find the compiled JavaCheck.jar
+    /// in the launcher installation layout and copy it to <paramref name="targetPath"/>.
+    /// Returns false (with <paramref name="error"/> set) when the jar is not installed.
     /// </summary>
     public static bool TryExtractTo(string targetPath) => TryExtractTo(targetPath, out _);
 
     public static bool TryExtractTo(string targetPath, out string error)
     {
-        error = StubReason;
-        return false;
+        var jarPath = GetInstalledJarPath();
+        if (jarPath.Length == 0)
+        {
+            error = StubReason;
+            return false;
+        }
+        try
+        {
+            IO.FileSystem.EnsureFilePathExists(targetPath);
+            File.Copy(jarPath, targetPath, overwrite: true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            error = $"Failed to extract {JarFileName} to {targetPath}: {e.Message}";
+            return false;
+        }
+        error = "";
+        return true;
+    }
+
+    /// <summary>Port of Application::getJarPath("JavaCheck.jar") (see LauncherJars.GetJarPath).</summary>
+    public static string GetInstalledJarPath()
+    {
+        var potentialPaths = new List<string>();
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsFreeBSD())
+        {
+            potentialPaths.Add(IO.FileSystem.PathCombine(JavaUtils.LauncherRootPath, "share",
+                FlintConfig.Default.LauncherName));
+        }
+        potentialPaths.Add(IO.FileSystem.PathCombine(JavaUtils.LauncherRootPath, "jars"));
+        potentialPaths.Add(IO.FileSystem.PathCombine(AppContext.BaseDirectory, "jars"));
+        potentialPaths.Add(IO.FileSystem.PathCombine(AppContext.BaseDirectory, "..", "jars")); // from inside build dir, for debugging
+
+        foreach (var p in potentialPaths)
+        {
+            var jarPath = IO.FileSystem.PathCombine(p, JarFileName);
+            if (File.Exists(jarPath))
+            {
+                return jarPath;
+            }
+        }
+        return "";
     }
 }

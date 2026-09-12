@@ -1,11 +1,33 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/launch/MinecraftTarget.{h,cpp}: the "join server / world on
 // launch" target representation.
+//
+// P5 reconciliation: the C++ type is a mutable struct shared through MinecraftTarget::Ptr —
+// the LookupServerAddress step writes the resolved address/port back through the pointer and
+// LauncherPartLaunch reads them afterwards. The draft `record` was immutable, so the port is
+// now a plain mutable class matching the C++ shape (the parse logic is unchanged).
 using System.Globalization;
 namespace FlintLauncher.Core.Instances;
 
-public sealed record MinecraftTarget(string Address, ushort Port, string World)
+public sealed class MinecraftTarget
 {
+    public MinecraftTarget()
+    {
+    }
+
+    public MinecraftTarget(string address, ushort port, string world)
+    {
+        Address = address;
+        Port = port;
+        World = world;
+    }
+
+    public string Address { get; set; } = "";
+
+    public ushort Port { get; set; }
+
+    public string World { get; set; } = "";
+
     public static MinecraftTarget Parse(string fullAddress, bool useWorld)
     {
         if (useWorld)

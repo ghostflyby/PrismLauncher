@@ -137,6 +137,12 @@ public abstract class BaseInstance
 
     // ---------------------------------------------------------------- events (Qt signals)
 
+    /// <summary>Port of the launchTaskChanged() signal (added with the P5 launch pipeline).</summary>
+    public event Action<BaseInstance>? LaunchTaskChanged;
+
+    /// <summary>Raise LaunchTaskChanged (C# events can only be raised by the declaring type).</summary>
+    protected void RaiseLaunchTaskChanged() => LaunchTaskChanged?.Invoke(this);
+
     /// <summary>Signal emitted when properties relevant to the instance view change.</summary>
     public event Action? PropertiesChanged;
 
@@ -512,13 +518,13 @@ public abstract class BaseInstance
     public abstract List<FlintTask> CreateUpdateTask();
 
     /// <summary>
-    /// returns a valid launcher (task container). TODO(P5): returns the LaunchTask once the
-    /// launch pipeline is ported (LaunchTask derives from Task upstream).
+    /// returns a valid launcher (task container). P5: returns the LaunchTask (LaunchTask
+    /// derives from FlintTask, like the C++ LaunchTask derives from Task).
     /// </summary>
-    public abstract FlintTask? CreateLaunchTask(AuthSession? account, MinecraftTarget? targetToJoin);
+    public abstract Launch.LaunchTask? CreateLaunchTask(AuthSession? account, MinecraftTarget? targetToJoin);
 
     /// <summary>returns the current launch task (if any)</summary>
-    public FlintTask? GetLaunchTask() => _launchProcess;
+    public Launch.LaunchTask? GetLaunchTask() => _launchProcess;
 
     /// <summary>Create environment variables for running the instance.</summary>
     public abstract ProcessEnvironment CreateEnvironment();
@@ -643,8 +649,8 @@ public abstract class BaseInstance
     protected readonly string _rootDir;
     protected readonly SettingsObject _settings;
     protected bool _isRunning;
-    /// <summary>std::unique_ptr&lt;LaunchTask&gt; m_launchProcess — the task type arrives with P5.</summary>
-    protected FlintTask? _launchProcess;
+    /// <summary>std::unique_ptr&lt;LaunchTask&gt; m_launchProcess.</summary>
+    protected Launch.LaunchTask? _launchProcess;
     protected DateTimeOffset? _timeStarted;
     // NOTE: struct fields need an explicit construction here or System would stay null
     protected RuntimeContext _runtimeContext = new();

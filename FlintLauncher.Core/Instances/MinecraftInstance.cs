@@ -5,14 +5,17 @@
 //  - Application-singleton reach-ins become injectable hooks: playtimeSettings() ->
 //    <see cref="BaseInstance.PlaytimeSettings"/>; m_detectedOpenALPath/m_detectedGLFWPath/
 //    m_detectedSDLPath -> the Detected*Path properties; APPLICATION->metacache() ->
-//    <see cref="MetaCache"/> (library_directory defaults to "" while unset). The global
-//    settings object (APPLICATION->settings()) is the injected BaseInstance global settings.
+//    <see cref="MetaCache"/> (library_directory defaults to "" while unset); APPLICATION->
+//    icons()->saveIcon -> <see cref="SaveIconHook"/>; the QGuiApplication screen geometry of
+//    the launch script -> <see cref="PrimaryScreenSize"/>. The global settings object
+//    (APPLICATION->settings()) is the injected BaseInstance global settings.
 //  - The Q_OS_* ifdef'ed bits port to OperatingSystem checks. switcherooSetupGPU() (DBus)
 //    and LibraryUtils::findMangoHud() are system-probing process-launch helpers and are
-//    TODO(P5): the discrete-GPU path always applies the open-driver env fallback.
-//  - createUpdateTask()/createLaunchTask()/createLaunchScript() throw: the launch pipeline
-//    (FoldersTask/LibrariesTask/LegacyFMLLibrariesTask/AssetUpdateTask, LaunchTask and the
-//    launch steps) is phase P5.
+//    TODO(P5-c): the discrete-GPU path always applies the open-driver env fallback.
+//  - createUpdateTask()/createLaunchTask()/createLaunchScript() are the P5-b launch pipeline
+//    (Launch/LaunchTask + Launch/Steps/*). The switcheroo/MangoHud capability probing and
+//    the icon save remain hooks (see above).
+//  - The CleanEnviroment() base of createEnvironment() is the P5a JavaUtils.CleanEnvironment().
 //  - The folder models for resource packs, texture packs, shader packs and data packs are
 //    not ported yet (only ModFolderModel/WorldList exist), so resourcePackList()/
 //    texturePackList()/shaderPackList()/dataPackList()/resourceLists() are omitted; the
@@ -288,17 +291,276 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     //////  Launch stuff //////
 
+    /// <summary>
+    /// C++ APPLICATION->icons()->saveIcon(...): the host application copies the instance icon
+    /// to gameRoot/icon.png at launch. Unset skips the copy (headless setups without icons).
+    /// </summary>
+    public static Action<string, string>? SaveIconHook;
+
+    /// <summary>
+    /// C++ QGuiApplication::primaryScreen()->availableSize() (minus main-window frame margins)
+    /// used for the maximized windowParams of the launch script. Unset falls back to the
+    /// configured window size — there is no GUI in the headless core.
+    /// </summary>
+    public static Func<(int Width, int Height)>? PrimaryScreenSize;
+
     // TODO(P5): the C++ assembles FoldersTask, LibrariesTask, LegacyFMLLibrariesTask and
-    // AssetUpdateTask here (the update pipeline).
-    public override List<FlintTask> CreateUpdateTask() => throw new NotImplementedException("Instance update tasks are phase P5.");
+    // AssetUpdateTask here (the update pipeline). Ported in Launch/LaunchController and the
+    // Launch/Steps/* tasks below.
+    public override List<FlintTask> CreateUpdateTask() =>
+    [
+        // create folders
+        new Launch.Steps.FoldersTask(this),
+        // libraries download
+        new Launch.Steps.LibrariesTask(this),
+        // FML libraries download and copy into the instance
+        new Launch.Steps.LegacyFMLLibrariesTask(this),
+        // assets update
+        new Launch.Steps.AssetUpdateTask(this),
+    ];
 
-    // TODO(P5): the launch pipeline (LaunchTask and its steps) is ported in phase P5.
-    public override FlintTask? CreateLaunchTask(AuthSession? account, MinecraftTarget? targetToJoin) =>
-        throw new NotImplementedException("The launch task pipeline is phase P5.");
+    public override Launch.LaunchTask? CreateLaunchTask(AuthSession? session, MinecraftTarget? targetToJoin)
+    {
+        UpdateRuntimeContext();
+        var process = Launch.LaunchTask.Create(this);
 
-    // TODO(P5): the external-launcher script builder is part of the launch pipeline.
-    public string CreateLaunchScript(AuthSession? session, MinecraftTarget? targetToJoin) =>
-        throw new NotImplementedException("The launch script builder is phase P5.");
+        SaveIconHook?.Invoke(IconKey(), FileSystem.PathCombine(GameRoot(), "icon.png"));
+
+        // print a header
+        process.AppendStep(new Launch.Steps.TextPrint(process, "Minecraft folder is:\n  " + GameRoot() + "\n",
+            Launch.MessageLevel.Launcher));
+
+        // create the .minecraft folder and server-resource-packs (workaround for Minecraft bug MCL-3732)
+        process.AppendStep(new Launch.Steps.CreateGameFolders(process));
+
+        if (targetToJoin is null && Variant.AsBool(Settings().Get("JoinServerOnLaunch")))
+        {
+            var fullAddress = Variant.AsString(Settings().Get("JoinServerOnLaunchAddress"));
+            if (fullAddress.Length != 0)
+            {
+                targetToJoin = MinecraftTarget.Parse(fullAddress, false);
+            }
+            else
+            {
+                var world = Variant.AsString(Settings().Get("JoinWorldOnLaunch"));
+                if (world.Length != 0)
+                {
+                    targetToJoin = MinecraftTarget.Parse(world, true);
+                }
+            }
+        }
+
+        if (targetToJoin is not null && targetToJoin.Port == 25565)
+        {
+            // Resolve server address to join on launch
+            var step = new Launch.Steps.LookupServerAddress(process, targetToJoin);
+            step.SetLookupAddress(targetToJoin.Address);
+            process.AppendStep(step);
+        }
+
+        // run pre-load command if that's needed, before the metadata is loaded
+        if (GetPreLoadCommand().Length != 0)
+        {
+            var step = new Launch.Steps.LaunchCommand(process, GetPreLoadCommand(), "Pre-Load");
+            step.SetWorkingDirectory(GameRoot());
+            process.AppendStep(step);
+        }
+
+        // load meta
+        {
+            var mode = session?.LaunchMode != LaunchMode.Offline ? NetMode.Online : NetMode.Offline;
+            process.AppendStep(new Launch.TaskStepWrapper(process, new Launch.Steps.MinecraftLoadAndCheck(this, mode)));
+        }
+
+        // check java
+        {
+            process.AppendStep(new Launch.Steps.AutoInstallJava(process));
+            process.AppendStep(new Launch.Steps.CheckJava(process));
+            // verify that minimum Java requirements are met
+            process.AppendStep(new Launch.Steps.VerifyJavaInstall(process));
+        }
+
+        // run pre-launch command if that's needed
+        if (GetPreLaunchCommand().Length != 0)
+        {
+            var step = new Launch.Steps.LaunchCommand(process, GetPreLaunchCommand(), "Pre-Launch");
+            step.SetWorkingDirectory(GameRoot());
+            process.AppendStep(step);
+        }
+
+        // if we aren't in offline mode
+        if (session?.LaunchMode != LaunchMode.Offline)
+        {
+            process.AppendStep(new Launch.Steps.ClaimAccount(process, session));
+            foreach (var t in CreateUpdateTask())
+            {
+                process.AppendStep(new Launch.TaskStepWrapper(process, t));
+            }
+        }
+        else
+        {
+            process.AppendStep(new Launch.Steps.EnsureOfflineLibraries(process, this));
+        }
+
+        // if there are any jar mods
+        process.AppendStep(new Launch.Steps.ModMinecraftJar(process));
+
+        // Scan mods folders for mods
+        process.AppendStep(new Launch.Steps.ScanModFolders(process));
+
+        // make sure we have enough RAM, warn the user if we don't
+        process.AppendStep(new Launch.Steps.EnsureAvailableMemory(process, this));
+
+        // print some instance info here...
+        process.AppendStep(new Launch.Steps.PrintInstanceInfo(process, session, targetToJoin));
+
+        // extract native jars if needed
+        process.AppendStep(new Launch.Steps.ExtractNatives(process));
+
+        // reconstruct assets if needed
+        process.AppendStep(new Launch.Steps.ReconstructAssets(process));
+
+        {
+            // actually launch the game
+            var step = new Launch.Steps.LauncherPartLaunch(process);
+            step.SetWorkingDirectory(GameRoot());
+            step.SetAuthSession(session);
+            step.SetTargetToJoin(targetToJoin);
+            process.AppendStep(step);
+        }
+
+        // run post-exit command if that's needed
+        if (GetPostExitCommand().Length != 0)
+        {
+            var step = new Launch.Steps.LaunchCommand(process, GetPostExitCommand(), "Post-Launch");
+            step.SetWorkingDirectory(GameRoot());
+            process.AppendStep(step);
+        }
+        if (session is not null)
+        {
+            process.SetCensorFilter(CreateCensorFilterFromSession(session));
+        }
+        if (Variant.AsBool(_settings.Get("QuitAfterGameStop")))
+        {
+            process.AppendStep(new Launch.Steps.QuitAfterGameStop(process));
+        }
+        _launchProcess = process;
+        RaiseLaunchTaskChanged();
+        return process;
+    }
+
+    public string CreateLaunchScript(AuthSession? session, MinecraftTarget? targetToJoin)
+    {
+        var launchScript = "";
+
+        if (_components is null)
+        {
+            return "";
+        }
+        var profile = _components.GetProfile();
+        if (profile is null)
+        {
+            return "";
+        }
+
+        var mainClass = GetMainClass();
+        if (mainClass.Length != 0)
+        {
+            launchScript += "mainClass " + mainClass + "\n";
+        }
+        var appletClass = profile.GetAppletClass();
+        if (appletClass.Length != 0)
+        {
+            launchScript += "appletClass " + appletClass + "\n";
+        }
+
+        if (targetToJoin is not null)
+        {
+            if (targetToJoin.Address.Length != 0)
+            {
+                launchScript += "serverAddress " + targetToJoin.Address + "\n";
+                launchScript += "serverPort " + targetToJoin.Port.ToString(CultureInfo.InvariantCulture) + "\n";
+            }
+            else if (targetToJoin.World.Length != 0)
+            {
+                launchScript += "worldName " + targetToJoin.World + "\n";
+            }
+        }
+
+        // generic minecraft params
+        // When using a launch script, the server parameters are handled by it
+        foreach (var param in ProcessMinecraftArgs(session, null))
+        {
+            launchScript += "param " + param + "\n";
+        }
+
+        // window size, title and state, legacy
+        {
+            string windowParams;
+            if (Variant.AsBool(Settings().Get("LaunchMaximized")))
+            {
+                // FIXME doesn't support maximisation
+                if (!IsLegacy())
+                {
+                    // C++ computes the primary screen's available size shrunk by the main
+                    // window frame margins; the headless core has no screen, so the hook (or
+                    // the configured window size) fills in
+                    var (width, height) = PrimaryScreenSize?.Invoke() ??
+                        (Variant.AsInt(Settings().Get("MinecraftWinWidth")),
+                         Variant.AsInt(Settings().Get("MinecraftWinHeight")));
+                    windowParams = FormattableString.Invariant($"{width}x{height}");
+                }
+                else
+                {
+                    windowParams = "maximized";
+                }
+            }
+            else
+            {
+                windowParams = FormattableString.Invariant(
+                    $"{Variant.AsInt(Settings().Get("MinecraftWinWidth"))}x{Variant.AsInt(Settings().Get("MinecraftWinHeight"))}");
+            }
+            launchScript += "windowTitle " + WindowTitle() + "\n";
+            launchScript += "windowParams " + windowParams + "\n";
+        }
+
+        // launcher info
+        {
+            launchScript += "launcherBrand " + FlintConfig.Default.LauncherDisplayName + "\n";
+            launchScript += "launcherVersion " + PrintableVersionString() + "\n";
+        }
+
+        // instance info
+        {
+            launchScript += "instanceName " + Name() + "\n";
+            launchScript += "instanceIconKey " + Name() + "\n";
+            launchScript += "instanceIconPath icon.png\n"; // we already save a copy here
+        }
+
+        // legacy auth
+        if (session is not null)
+        {
+            launchScript += "userName " + session.PlayerName + "\n";
+            launchScript += "sessionId " + session.Session + "\n";
+        }
+
+        foreach (var trait in profile.GetTraits())
+        {
+            launchScript += "traits " + trait + "\n";
+        }
+
+        if (ShouldApplyOnlineFixes())
+        {
+            launchScript += "onlineFixes true\n";
+        }
+
+        launchScript += "launcher " + GetLauncher() + "\n";
+
+        return launchScript;
+    }
+
+    /// <summary>Port of BuildConfig::printableVersionString() (reduced to the release form).</summary>
+    private static string PrintableVersionString() => FlintConfig.DefaultVersionString;
 
     public override List<string> ExtraArguments()
     {
@@ -499,10 +761,9 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public override ProcessEnvironment CreateEnvironment()
     {
-        // prepare the process environment
-        // TODO(P5): upstream starts from CleanEnviroment() (the sanitized OS environment);
-        // process spawning is phase P5, so the port starts from an empty environment.
-        var env = new ProcessEnvironment();
+        // prepare the process environment (C++ starts from CleanEnviroment(); the sanitized
+        // OS environment is the P5a JavaUtils.CleanEnvironment port)
+        var env = JavaUtils.CleanEnvironment();
 
         // export some infos
         foreach (var (key, value) in GetVariables())

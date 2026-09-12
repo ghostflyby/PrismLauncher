@@ -1,0 +1,274 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Port of launcher/minecraft/launch/AutoInstallJava.{h,cpp}: pick a runtime from the java
+// metadata list matching the profile's compatible java majors (and the OS/arch) and install it
+// through the P5a Java::Manifest/ArchiveDownloadTask machinery.
+//
+// Application-singleton reach-ins become hooks (see the other Launch steps):
+//  - APPLICATION->settings() (global)               -> GlobalSettingsProvider
+//  - APPLICATION->javalist() (the "no download" branch) -> JavaInstallListProvider (null
+//    degrades to the upstream "no compatible Java version was found" warning)
+//  - APPLICATION->javaPath() (settings "JavaDir")   -> JavaUtils.LauncherJavaPath
+//  - APPLICATION->metadataIndex()                   -> MetadataIndexProvider (defaults to the
+//    instance PackProfile's index)
+//
+// Flow deviations from the C++ (documented):
+//  - The C++ starts the java-meta load task and then emits progressReportingRequest() without
+//    ever starting the javalist load task in the "no download" branch (a latent upstream
+//    hang); the port awaits both load tasks inline, so the proceed() gate is not needed here.
+//  - Task/Task::Ptr plumbing (connect succeeded/failed/progress chains) collapses into
+//    await + state inspection.
+using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Java;
+using FlintLauncher.Core.Net;
+using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Settings;
+using FlintLauncher.Core.Tasks;
+
+namespace FlintLauncher.Core.Launch.Steps;
+
+public sealed class AutoInstallJava : LaunchStep
+{
+    /// <summary>C++ APPLICATION->settings(); null treats the global gates as off (which makes
+    /// the step succeed immediately, the same outcome as the gates being disabled).</summary>
+    public static Func<SettingsObject?>? GlobalSettingsProvider { get; set; }
+
+    /// <summary>C++ APPLICATION->javalist(); see header note.</summary>
+    public static Func<JavaInstallList?>? JavaInstallListProvider { get; set; }
+
+    /// <summary>C++ APPLICATION->metadataIndex(); defaults to the instance PackProfile index.</summary>
+    public static Func<MinecraftInstance, Meta.Index>? MetadataIndexProvider { get; set; }
+
+    private readonly MinecraftInstance _instance;
+    private FlintTask? _currentTask;
+    private int _majorJavaVersionIndex;
+    private readonly string _supportedArch;
+
+    public AutoInstallJava(LaunchTask parent) : base(parent)
+    {
+        _instance = Parent.Instance;
+        _supportedArch = SysInfo.GetSupportedJavaArchitecture();
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    {
+        var settings = _instance.Settings();
+        if (!Variant.AsBool(GlobalSettingsProvider?.Invoke()?.Get("AutomaticJavaSwitch")) ||
+            (Variant.AsBool(settings.Get("OverrideJavaLocation")) &&
+             (File.Exists(Variant.AsString(settings.Get("JavaPath"))) || Directory.Exists(Variant.AsString(settings.Get("JavaPath"))))))
+        {
+            EmitSucceeded();
+            return;
+        }
+        var packProfile = _instance.GetPackProfile();
+        if (!Variant.AsBool(GlobalSettingsProvider?.Invoke()?.Get("AutomaticJavaDownload")))
+        {
+            var javas = JavaInstallListProvider?.Invoke();
+            if (javas is not null)
+            {
+                // (upstream connects finished + emits progressReportingRequest without starting
+                //  the task; the port awaits the load instead — see header note)
+                _currentTask = javas.GetLoadTask();
+                await _currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
+                var compatibleMajors = packProfile.GetProfile()?.GetCompatibleJavaMajors() ?? [];
+                for (var i = 0; i < javas.Count; i++)
+                {
+                    var java = javas.At(i);
+                    if (compatibleMajors.Contains(java.Id.Major))
+                    {
+                        if (!java.Is64Bit)
+                        {
+                            EmitLogLine("The automatic Java mechanism detected a 32-bit installation of Java.", MessageLevel.Launcher);
+                        }
+                        SetJavaPath(java.Path);
+                        return;
+                    }
+                }
+            }
+            EmitLogLine("No compatible Java version was found. Using the default one.", MessageLevel.Warning);
+            EmitSucceeded();
+            return;
+        }
+        if (_supportedArch.Length == 0)
+        {
+            EmitLogLine($"Your system ({SysInfo.CurrentSystem()}-{SysInfo.UseQtForArch()}) is not compatible with automatic Java installation. Using the default Java path.",
+                MessageLevel.Warning);
+            EmitSucceeded();
+            return;
+        }
+        var wantedJavaName = packProfile.GetProfile()?.GetCompatibleJavaName() ?? "";
+        if (wantedJavaName.Length == 0)
+        {
+            EmitLogLine("Your meta information is out of date or doesn't have the information necessary to determine what installation of " +
+                        "Java should be used. Using the default Java path.", MessageLevel.Warning);
+            EmitSucceeded();
+            return;
+        }
+        var javaDir = JavaUtils.LauncherJavaPath;
+        var relativeBinary = FileSystem.PathCombine(wantedJavaName, "bin", JavaUtils.JavaExecutable);
+        var wantedJavaPath = FileSystem.PathCombine(javaDir, relativeBinary);
+        if (File.Exists(wantedJavaPath) || Directory.Exists(wantedJavaPath))
+        {
+            SetJavaPathFromPartial();
+            return;
+        }
+
+        // load the "net.minecraft.java" version list, then walk the compatible majors
+        var versionList = MetadataIndex().Get("net.minecraft.java");
+        _currentTask = versionList.LoadTask(NetMode.Online);
+        await _currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
+        if (!_currentTask.WasSuccessful && State == TaskState.Running)
+        {
+            EmitFailed(_currentTask.FailReason);
+            return;
+        }
+        await TryNextMajorJava(cancellationToken).ConfigureAwait(false);
+    }
+
+    private Meta.Index MetadataIndex() =>
+        MetadataIndexProvider?.Invoke(_instance) ?? _instance.GetPackProfile().MetadataIndex;
+
+    private IReadOnlyList<int> MajorJavaVersions() =>
+        _instance.GetPackProfile().GetProfile()?.GetCompatibleJavaMajors() ?? [];
+
+    private void SetJavaPath(string path)
+    {
+        var settings = _instance.Settings();
+        settings.Set("OverrideJavaLocation", true);
+        settings.Set("JavaPath", path);
+        settings.Set("AutomaticJava", true);
+        EmitLogLine($"Compatible Java found at: {path}.", MessageLevel.Launcher);
+        EmitSucceeded();
+    }
+
+    private void SetJavaPathFromPartial()
+    {
+        var packProfile = _instance.GetPackProfile();
+        var javaName = packProfile.GetProfile()?.GetCompatibleJavaName() ?? "";
+        var javaDir = JavaUtils.LauncherJavaPath;
+        // just checking if the executable is there should suffice
+        // but if needed this can be achieved through refreshing the javalist
+        // and retrieving the path that contains the java name
+        var relativeBinary = FileSystem.PathCombine(javaName, "bin", JavaUtils.JavaExecutable);
+        var finalPath = FileSystem.PathCombine(javaDir, relativeBinary);
+        if (File.Exists(finalPath))
+        {
+            SetJavaPath(finalPath);
+        }
+        else
+        {
+            EmitLogLine("No compatible Java version was found (the binary file does not exist). Using the default one.",
+                MessageLevel.Warning);
+            EmitSucceeded();
+        }
+    }
+
+    private async Task DownloadJava(Meta.MetaVersion version, string javaName, CancellationToken cancellationToken)
+    {
+        var runtimes = version.Data()?.Runtimes ?? [];
+        foreach (var java in runtimes)
+        {
+            if (java.RuntimeOs == _supportedArch && java.Name() == javaName)
+            {
+                var javaDir = JavaUtils.LauncherJavaPath;
+                var finalPath = FileSystem.PathCombine(javaDir, java.Name());
+                switch (java.DownloadType)
+                {
+                    case JavaDownloadType.Manifest:
+                        _currentTask = new ManifestDownloadTask(new Uri(java.Url), finalPath, java.ChecksumType, java.ChecksumHash);
+                        break;
+                    case JavaDownloadType.Archive:
+                        _currentTask = new ArchiveDownloadTask(new Uri(java.Url), finalPath, java.ChecksumType, java.ChecksumHash);
+                        break;
+                    case JavaDownloadType.Unknown:
+                    default:
+                        try
+                        {
+                            if (Directory.Exists(finalPath) || File.Exists(finalPath))
+                            {
+                                FileSystem.DeletePath(finalPath);
+                            }
+                        }
+                        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                        {
+                        }
+                        EmitFailed("Could not determine Java download type!");
+                        return;
+                }
+                if (OperatingSystem.IsMacOS())
+                {
+                    var seq = new SequentialTask("Install Java");
+                    seq.AddTask(_currentTask);
+                    seq.AddTask(new SymlinkTask(finalPath));
+                    _currentTask = seq;
+                }
+                await _currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
+                if (_currentTask.WasSuccessful)
+                {
+                    SetJavaPathFromPartial();
+                }
+                else if (IsRunning)
+                {
+                    // the C++ retries with the next major version on failure
+                    await TryNextMajorJava(cancellationToken).ConfigureAwait(false);
+                }
+                return;
+            }
+        }
+        await TryNextMajorJava(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task TryNextMajorJava(CancellationToken cancellationToken)
+    {
+        if (!IsRunning)
+        {
+            return;
+        }
+        var packProfile = _instance.GetPackProfile();
+        var wantedJavaName = packProfile.GetProfile()?.GetCompatibleJavaName() ?? "";
+        var majorJavaVersions = MajorJavaVersions();
+        if (_majorJavaVersionIndex >= majorJavaVersions.Count)
+        {
+            EmitLogLine($"No versions of Java were found for your operating system: {SysInfo.CurrentSystem()}-{SysInfo.UseQtForArch()}",
+                MessageLevel.Warning);
+            EmitLogLine("No compatible version of Java was found. Using the default one.", MessageLevel.Warning);
+            EmitSucceeded();
+            return;
+        }
+        var majorJavaVersion = majorJavaVersions[_majorJavaVersionIndex];
+        _majorJavaVersionIndex++;
+
+        var versionList = MetadataIndex().Get("net.minecraft.java");
+        var javaMajor = versionList.GetVersion($"java{majorJavaVersion}");
+
+        if (javaMajor.IsLoaded())
+        {
+            await DownloadJava(javaMajor, wantedJavaName, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            _currentTask = MetadataIndex().LoadVersion("net.minecraft.java", javaMajor.Version(), NetMode.Online);
+            await _currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
+            if (_currentTask.WasSuccessful)
+            {
+                await DownloadJava(javaMajor, wantedJavaName, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await TryNextMajorJava(cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    public override bool CanAbort() => _currentTask is not null && _currentTask.IsRunning;
+
+    public override bool AbortStep()
+    {
+        if (_currentTask is not null && _currentTask.IsRunning)
+        {
+            _currentTask.Abort();
+            EmitAborted();
+            return true;
+        }
+        return base.AbortStep();
+    }
+}
