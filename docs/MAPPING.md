@@ -60,19 +60,25 @@
 | `minecraft/MinecraftLoadAndCheck*` `AssetsUtils` | — | todo | P3/P5（依赖 MinecraftInstance） |
 | `minecraft/ProblemProvider.h` `Agent`(结构) `JavaMetadata`(解析半) | `FlintLauncher.Core/Minecraft/ProblemProvider.cs` `Agent.cs` `JavaMetadata.cs` | partial | JavaMetadata 下载半随 P5 java/ |
 
-## P3 实例域
+## P3 实例域（已完成 2026-09-12）
 
-| 原文件 | C# 目标 | 状态 |
-|---|---|---|
-| `libraries/libnbtplusplus` | `FlintLauncher.Nbt/`（新项目） | todo |
-| `BaseInstance*` `NullInstance.h` `MinecraftInstance*`(minecraft/) | `FlintLauncher.Core/Instances/` | todo |
-| `InstanceList*` `InstanceCopyPrefs*` `InstanceCopyTask*` `InstanceDirUpdate*` `InstanceTask*` `InstanceImportTask*` | `FlintLauncher.Core/Instances/` | todo |
-| `VanillaInstanceCreationTask` `ProfileUtils*`(minecraft/) | `FlintLauncher.Core/Instances/Creation/` | todo |
-| `minecraft/World*` `WorldList*` `WorldTasks*` | `FlintLauncher.Core/Minecraft/Worlds/` | todo |
-| `minecraft/mod/*`（资源模型/解析：mod, resourcepack, texturepack, shaderpack, datapack, WorldSave） | `FlintLauncher.Core/Minecraft/Resources/` | todo |
-| `minecraft/Op*`（gameoptions） | `FlintLauncher.Core/Minecraft/GameOptions/` | todo |
-| `icons/IconList` `IconUtils`（文件管理部分） | `FlintLauncher.Core/Icons/` | todo |
-| `RecursiveFileSystemWatcher*` `FileIgnoreProxy*` `FastFileIconProvider*` | `FlintLauncher.Core/IO/`（图标相关 GUI-bound） | todo |
+| 原文件 | C# 目标 | 状态 | 备注 |
+|---|---|---|---|
+| `libraries/libnbtplusplus`（launcher 用子集） | `FlintLauncher.Nbt/` | ported | 全 Tag 集、Java modified-UTF-8、gzip/raw 自检、插入序 Compound |
+| `BaseInstance*` `NullInstance.h` | `FlintLauncher.Core/Instances/BaseInstance.cs` `NullInstance.cs` | ported | 设置注册/游玩时长/快捷方式/链接实例；Qt 信号→事件 |
+| `minecraft/MinecraftInstance*` | `FlintLauncher.Core/Instances/MinecraftInstance.cs` | ported | 全部设置组与路径访问器；launch 管线 TODO(P5) |
+| `InstanceList*` | `FlintLauncher.Core/Instances/InstanceList.cs` | ported | instgroups.json 往返、staged commit；QAbstractListModel/Watcher 不移植 |
+| `InstanceCopyPrefs*` `InstanceCopyTask*` `InstanceTask*` | `FlintLauncher.Core/Instances/InstanceCopy*.cs` `InstanceTask.cs` | ported | link/clone 传输清晰报错（上游 create_link/clone 未移植） |
+| `InstanceImportTask*` | — | todo | P6（依赖 modplatform 分发） |
+| `InstanceDirUpdate*` | — | n/a | GUI 对话框耦合；纯文件半已在 BaseInstance/InstanceList |
+| `VanillaInstanceCreationTask`(minecraft/) | `FlintLauncher.Core/Instances/Creation/VanillaInstanceCreationTask.cs` | ported | mmc-pack/instance.cfg 字节兼容 |
+| `ProfileUtils*`(minecraft/) | `FlintLauncher.Core/Minecraft/ProfileUtils.cs` | ported | P2b 已完成；此检出版本无 legacy 导入半 |
+| `minecraft/World*` `WorldList*` `WorldTasks*` | `FlintLauncher.Core/Minecraft/Worlds/` | ported | Qt model 不移植；World::install 上游反向检查 bug 已修 |
+| `LocalWorldSaveParseTask` | `Worlds/WorldSaveIdentification.cs` | ported | |
+| `minecraft/mod/*`（资源模型与解析） | `FlintLauncher.Core/Minecraft/Resources/` | ported | pack_format 表全量；QImage→PNG IHDR 读取（已记录偏差） |
+| `minecraft/Op*`（gameoptions） | — | todo | P7 |
+| `icons/IconList` `IconUtils`（文件部分） | `FlintLauncher.Core/Icons/IconFiles.cs` | ported | Qt 模型/主题不移植 |
+| `RecursiveFileSystemWatcher*` `FileIgnoreProxy*` `FastFileIconProvider*` | — | n/a | GUI/Qt watcher |
 
 ## P4 账户
 
