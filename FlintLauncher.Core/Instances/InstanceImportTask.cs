@@ -1,0 +1,297 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Port of launcher/InstanceImportTask.{h,cpp}: import a modpack zip (local file or URL) by
+// detecting its type from marker files and dispatching to the matching creation task:
+//   modrinth.index.json      -> Modrinth (ModrinthCreationTask)
+//   bin/modpack.jar          -> Technic (deferred, P6-b)
+//   bin/version.json
+//   manifest.json            -> Flame (deferred, P6-b)
+//   */instance.cfg           -> plain MultiMC folder import (NullInstance + rename)
+//
+// Deviations from the C++:
+//  - The platform marker scan runs directly over the zip entries (the ArchiveReader/
+//    ExtractZipTask pair becomes MMCZip.ExtractDir).
+//  - The icon import (IconUtils/IconList application layer) is not ported; the pack icon
+//    detection is skipped and the icon key is passed through unchanged.
+//  - Remote downloads use MetaCache when set (APPLICATION->metacache()), otherwise a plain
+//    file download into the staging folder.
+//  - Technic/Flame branches fail with a clear message for P6-b to fill in.
+using System.IO.Compression;
+using System.Text.RegularExpressions;
+using FlintLauncher.Core.IO;
+using FlintLauncher.Core.ModPlatform.Modrinth;
+using FlintLauncher.Core.Net;
+using FlintLauncher.Core.Tasks;
+
+namespace FlintLauncher.Core.Instances;
+
+public sealed partial class InstanceImportTask : InstanceTask
+{
+    private enum ModpackType : byte
+    {
+        Unknown,
+        MultiMC,
+        Technic,
+        Flame,
+        Modrinth,
+    }
+
+    private readonly Uri _sourceUrl;
+    private readonly bool _trustedSource;
+    private readonly IReadOnlyDictionary<string, string> _extraInfo;
+    private string _archivePath = "";
+    private ModpackType _modpackType = ModpackType.Unknown;
+
+    /// <summary>APPLICATION->metacache() hook; used for the download-from-URL path.</summary>
+    public HttpMetaCache? MetaCache { get; set; }
+
+    public InstanceImportTask(Uri sourceUrl, bool trustedSource,
+                              IReadOnlyDictionary<string, string>? extraInfo = null)
+    {
+        _sourceUrl = sourceUrl;
+        _trustedSource = trustedSource;
+        _extraInfo = extraInfo ?? new Dictionary<string, string>();
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    {
+        if (_sourceUrl.IsFile)
+        {
+            _archivePath = _sourceUrl.LocalPath;
+            await ProcessZipPack(cancellationToken);
+        }
+        else
+        {
+            EmitStatus("Downloading modpack:\n" + _sourceUrl);
+            await DownloadFromUrl(cancellationToken);
+        }
+    }
+
+    private async Task DownloadFromUrl(CancellationToken cancellationToken)
+    {
+        if (MetaCache is not null)
+        {
+            var path = _sourceUrl.Host + '/' + _sourceUrl.AbsolutePath.TrimStart('/');
+
+            var entry = MetaCache.ResolveEntry("general", path);
+            entry.SetStale(true);
+            _archivePath = entry.GetFullPath();
+
+            var filesNetJob = new NetJob("Modpack download");
+            filesNetJob.AddNetRequest(NetRequest.MakeCached(MetaCache, _sourceUrl, entry));
+            await filesNetJob.StartAsync(cancellationToken);
+            if (!filesNetJob.WasSuccessful)
+            {
+                EmitFailed(filesNetJob.FailReason);
+                return;
+            }
+        }
+        else
+        {
+            // headless fallback: plain download into the staging folder
+            _archivePath = FileSystem.PathCombine(StagingPath, Path.GetFileName(_sourceUrl.AbsolutePath));
+            FileSystem.EnsureFilePathExists(_archivePath);
+            var request = NetRequest.MakeFile(_sourceUrl, _archivePath);
+            await request.StartAsync(cancellationToken);
+            if (!request.WasSuccessful)
+            {
+                EmitFailed(request.FailReason);
+                return;
+            }
+        }
+
+        await ProcessZipPack(cancellationToken);
+    }
+
+    private async Task ProcessZipPack(CancellationToken cancellationToken)
+    {
+        EmitStatus("Attempting to determine instance type");
+        var extractDir = StagingPath;
+
+        // open the zip and find relevant files in it
+        // NOTE: Prioritize modpack platforms that aren't searched for recursively.
+        // Especially Flame has a very common filename for its manifest, which may appear
+        // inside overrides for example
+        // https://docs.modrinth.com/docs/modpacks/format_definition/#storage
+        var root = "";
+        try
+        {
+            using var packZip = ZipFile.OpenRead(_archivePath);
+            foreach (var entry in packZip.Entries)
+            {
+                var fileName = entry.FullName.Replace('\\', '/');
+
+                if (fileName == "modrinth.index.json")
+                {
+                    // process as Modrinth pack
+                    _modpackType = ModpackType.Modrinth;
+                    break;
+                }
+                if (fileName is "bin/modpack.jar" or "bin/version.json")
+                {
+                    // process as Technic pack
+                    Directory.CreateDirectory(FileSystem.PathCombine(extractDir, "minecraft"));
+                    extractDir = FileSystem.PathCombine(extractDir, "minecraft");
+                    _modpackType = ModpackType.Technic;
+                    break;
+                }
+                if (fileName == "manifest.json")
+                {
+                    _modpackType = ModpackType.Flame;
+                    break;
+                }
+                if (Path.GetFileName(fileName) == "instance.cfg")
+                {
+                    _modpackType = ModpackType.MultiMC;
+                    root = CleanPath(Path.GetDirectoryName(fileName)?.Replace('\\', '/') ?? "");
+                    break;
+                }
+            }
+        }
+        catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
+                                 or ArgumentException or NotSupportedException)
+        {
+            EmitFailed("Unable to open supplied modpack zip file.");
+            return;
+        }
+
+        if (_modpackType == ModpackType.Unknown)
+        {
+            EmitFailed("Archive does not contain a recognized modpack type.");
+            return;
+        }
+        EmitStatus("Extracting modpack");
+
+        // make sure we extract just the pack
+        var extracted = MMCZip.ExtractDir(_archivePath, root, extractDir);
+        if (extracted is null)
+        {
+            EmitFailed("Failed to extract the modpack zip.");
+            return;
+        }
+
+        await ExtractFinished(cancellationToken);
+    }
+
+    private async Task ExtractFinished(CancellationToken cancellationToken)
+    {
+        switch (_modpackType)
+        {
+            case ModpackType.MultiMC:
+                ProcessMultiMC();
+                return;
+            case ModpackType.Technic:
+                ProcessTechnic();
+                return;
+            case ModpackType.Flame:
+                ProcessFlame();
+                return;
+            case ModpackType.Modrinth:
+                await ProcessModrinth(cancellationToken);
+                return;
+            case ModpackType.Unknown:
+                EmitFailed("Archive does not contain a recognized modpack type.");
+                return;
+        }
+    }
+
+    private void ProcessFlame()
+    {
+        // TODO(P6-b): the Flame creation task.
+        EmitFailed("Flame (CurseForge) modpacks are not supported yet.");
+    }
+
+    private void ProcessTechnic()
+    {
+        // TODO(P6-b): the Technic pack processor.
+        EmitFailed("Technic modpacks are not supported yet.");
+    }
+
+    private void ProcessMultiMC()
+    {
+        var configPath = FileSystem.PathCombine(StagingPath, "instance.cfg");
+        var instanceSettings = new Settings.IniSettingsObject(configPath);
+
+        var instance = new NullInstance(
+            GlobalSettings ?? throw new InvalidOperationException(
+                "InstanceTask requires SetParentSettings before execution."),
+            instanceSettings, StagingPath);
+
+        // reset time played on import... because packs.
+        instance.ResetTimePlayed();
+
+        // UUID is carried over on export, but this is a distinct instance, so give it its own
+        instance.RegenerateUuid();
+
+        // set a new nice name
+        instance.SetName(Name());
+
+        // if the icon was specified by user, use that. otherwise keep the pack's icon key
+        // (the icon file import itself needs the icon list layer and is not ported)
+        if (Icon != "default")
+        {
+            instance.SetIconKey(Icon);
+        }
+
+        EmitSucceeded();
+    }
+
+    private async Task ProcessModrinth(CancellationToken cancellationToken)
+    {
+        string packId = "";
+        string packVersionId = "";
+        if (_extraInfo.Count != 0)
+        {
+            packId = _extraInfo.TryGetValue("pack_id", out var id) ? id : "";
+            packVersionId = _extraInfo.TryGetValue("pack_version_id", out var versionId) ? versionId : "";
+        }
+        else
+        {
+            // FIXME: Find a way to get the ID in directly imported ZIPs
+            var match = SourceUrlPackIdRegex().Match(_sourceUrl.ToString());
+            if (match.Success)
+            {
+                packId = match.Groups[1].Value;
+            }
+        }
+
+        var instCreationTask = new ModrinthCreationTask(StagingPath, _trustedSource, GlobalSettings, packId,
+            packVersionId);
+
+        instCreationTask.SetName(ModifiedName());
+        instCreationTask.SetOriginalName(OriginalName(), Version());
+        // (the icon import from the pack is not ported — see the header note)
+        instCreationTask.SetIcon(Icon);
+        instCreationTask.SetGroup(Group);
+        instCreationTask.SetConfirmUpdate(ShouldConfirmUpdate());
+
+        await instCreationTask.StartAsync(cancellationToken);
+
+        if (instCreationTask.WasSuccessful)
+        {
+            SetOverride(instCreationTask.ShouldOverride, instCreationTask.OriginalInstanceID);
+            EmitSucceeded();
+        }
+        else
+        {
+            EmitFailed(instCreationTask.FailReason);
+        }
+    }
+
+    /// <summary>Port of the cleanPath helper ('.' and './' prefixes are removed).</summary>
+    private static string CleanPath(string path)
+    {
+        if (path == ".")
+        {
+            return "";
+        }
+        var result = path;
+        if (result.StartsWith("./", StringComparison.Ordinal))
+        {
+            result = result[2..];
+        }
+        return result;
+    }
+
+    [GeneratedRegex(@"data\/([^\/]*)\/versions")]
+    private static partial Regex SourceUrlPackIdRegex();
+}

@@ -1,0 +1,411 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Port of modplatform/ModIndex.{h,cpp} (+ modplatform/ResourceType.h) and the data half of
+// modplatform/ResourceAPI.h: the provider-neutral mod metadata models. Pure data layer —
+// the Qt models/signals of the original are not ported.
+//
+// Deviations:
+//  - ModPlatform::ModLoaderType is the one already ported in FlintLauncher.Core.Minecraft
+//    (P2b); QFlags<ModLoaderType> maps to the [Flags] enum itself.
+//  - The EnumWrapper<T> types (SideType/IndexedVersionType/DependencyType) become readonly
+//    record structs over the raw enum + mapping functions. fromString stays case-sensitive
+//    like the C++ (DependencyType upper-cases its input first, exactly like upstream).
+//  - QVariant ids become strings ("" = null QVariant); the Flame write path parses them
+//    back to integers like the C++ toInt() calls.
+namespace FlintLauncher.Core.ModPlatform;
+
+using FlintLauncher.Core.Minecraft;
+
+/// <summary>Port of ModPlatform::ResourceProvider.</summary>
+public enum ResourceProvider : byte
+{
+    MODRINTH = 0,
+    FLAME = 1,
+}
+
+/// <summary>Port of ModPlatform::ResourceType (modplatform/ResourceType.h).</summary>
+public enum ResourceType : byte
+{
+    Mod,
+    ResourcePack,
+    ShaderPack,
+    Modpack,
+    DataPack,
+    World,
+    Screenshots,
+    TexturePack,
+    Unknown,
+}
+
+/// <summary>Port of ModPlatform::DependencyTypeValue (+ the EnumWrapper mapping).</summary>
+public enum DependencyTypeValue : byte
+{
+    REQUIRED,
+    OPTIONAL,
+    INCOMPATIBLE,
+    EMBEDDED,
+    TOOL,
+    INCLUDE,
+    UNKNOWN,
+}
+
+/// <summary>Port of the DependencyType EnumWrapper.</summary>
+public readonly record struct DependencyType
+{
+    public DependencyType(DependencyTypeValue value) => Value = value;
+
+    public DependencyTypeValue Value { get; }
+
+    public static DependencyType Invalid => new(DependencyTypeValue.UNKNOWN);
+
+    public bool IsValid => Value != DependencyTypeValue.UNKNOWN;
+
+    public static string ToString(DependencyTypeValue value) => value switch
+    {
+        DependencyTypeValue.REQUIRED => "REQUIRED",
+        DependencyTypeValue.OPTIONAL => "OPTIONAL",
+        DependencyTypeValue.INCOMPATIBLE => "INCOMPATIBLE",
+        DependencyTypeValue.EMBEDDED => "EMBEDDED",
+        DependencyTypeValue.TOOL => "TOOL",
+        DependencyTypeValue.INCLUDE => "INCLUDE",
+        _ => "UNKNOWN",
+    };
+
+    public override string ToString() => ToString(Value);
+
+    public static DependencyType FromString(string str)
+    {
+        var upper = str.ToUpperInvariant();
+        foreach (DependencyTypeValue value in Enum.GetValues<DependencyTypeValue>())
+        {
+            if (upper == ToString(value))
+            {
+                return new DependencyType(value);
+            }
+        }
+        return Invalid;
+    }
+}
+
+/// <summary>Port of ModPlatform::SideTypeValue.</summary>
+[Flags]
+public enum SideTypeValue : byte
+{
+    NoSide = 0,
+    ClientSide = 1 << 0,
+    ServerSide = 1 << 1,
+    UniversalSide = ClientSide | ServerSide,
+}
+
+/// <summary>Port of the SideType EnumWrapper.</summary>
+public readonly record struct SideType
+{
+    public SideType(SideTypeValue value) => Value = value;
+
+    public SideTypeValue Value { get; }
+
+    public static SideType Invalid => new(SideTypeValue.NoSide);
+
+    public bool IsValid => Value != SideTypeValue.NoSide;
+
+    public static string ToString(SideTypeValue value) => value switch
+    {
+        SideTypeValue.ClientSide => "client",
+        SideTypeValue.ServerSide => "server",
+        SideTypeValue.UniversalSide => "both",
+        _ => "",
+    };
+
+    public override string ToString() => ToString(Value);
+
+    public static SideType FromString(string str)
+    {
+        foreach (SideTypeValue value in Enum.GetValues<SideTypeValue>())
+        {
+            if (str == ToString(value))
+            {
+                return new SideType(value);
+            }
+        }
+        return Invalid;
+    }
+}
+
+/// <summary>Port of ModPlatform::IndexedVersionTypeValue.</summary>
+public enum IndexedVersionTypeValue : byte
+{
+    Unknown = 0,
+    Release = 1,
+    Beta = 2,
+    Alpha = 3,
+}
+
+/// <summary>Port of the IndexedVersionType EnumWrapper.</summary>
+public readonly record struct IndexedVersionType
+{
+    public IndexedVersionType(IndexedVersionTypeValue value) => Value = value;
+
+    public IndexedVersionTypeValue Value { get; }
+
+    public static IndexedVersionType Invalid => new(IndexedVersionTypeValue.Unknown);
+
+    public bool IsValid => Value != IndexedVersionTypeValue.Unknown;
+
+    public static string ToString(IndexedVersionTypeValue value) => value switch
+    {
+        IndexedVersionTypeValue.Release => "Release",
+        IndexedVersionTypeValue.Beta => "Beta",
+        IndexedVersionTypeValue.Alpha => "Alpha",
+        _ => "Unknown",
+    };
+
+    public override string ToString() => ToString(Value);
+
+    public static IndexedVersionType FromString(string str)
+    {
+        foreach (IndexedVersionTypeValue value in Enum.GetValues<IndexedVersionTypeValue>())
+        {
+            if (str == ToString(value))
+            {
+                return new IndexedVersionType(value);
+            }
+        }
+        return Invalid;
+    }
+}
+
+/// <summary>Port of ModPlatform::ProviderCapabilities.</summary>
+public static class ProviderCapabilities
+{
+    public static string Name(ResourceProvider p) => p switch
+    {
+        ResourceProvider.MODRINTH => "modrinth",
+        ResourceProvider.FLAME => "curseforge",
+        _ => "",
+    };
+
+    public static string ReadableName(ResourceProvider p) => p switch
+    {
+        ResourceProvider.MODRINTH => "Modrinth",
+        ResourceProvider.FLAME => "CurseForge",
+        _ => "",
+    };
+
+    public static IReadOnlyList<string> HashType(ResourceProvider p) => p switch
+    {
+        ResourceProvider.MODRINTH => ["sha512", "sha1"],
+        ResourceProvider.FLAME => ["sha1", "md5", "murmur2"], // Try newer formats first, fall back to old format
+        _ => [],
+    };
+}
+
+/// <summary>Port of ModPlatform::ModpackAuthor.</summary>
+public sealed class ModpackAuthor
+{
+    public string Name { get; set; } = "";
+    public string Url { get; set; } = "";
+}
+
+/// <summary>Port of ModPlatform::DonationData.</summary>
+public sealed class DonationData
+{
+    public string Id { get; set; } = "";
+    public string Platform { get; set; } = "";
+    public string Url { get; set; } = "";
+}
+
+/// <summary>Port of ModPlatform::Dependency.</summary>
+public sealed class Dependency
+{
+    /// <summary>QVariant addonId: a string (possibly numeric for Flame) or "" for null.</summary>
+    public string AddonId { get; set; } = "";
+    public DependencyType Type { get; set; } = DependencyType.Invalid;
+    public string Version { get; set; } = "";
+}
+
+/// <summary>Port of ModPlatform::IndexedVersion.</summary>
+public sealed class IndexedVersion
+{
+    public string AddonId { get; set; } = "";
+    public string FileId { get; set; } = "";
+    public string Version { get; set; } = "";
+    public string VersionNumber { get; set; } = "";
+    public IndexedVersionType VersionType { get; set; } = IndexedVersionType.Invalid;
+    public List<string> McVersion { get; set; } = [];
+    public string DownloadUrl { get; set; } = "";
+    public string Date { get; set; } = "";
+    public string FileName { get; set; } = "";
+    public ModLoaderType Loaders { get; set; } = ModLoaderType.None;
+    public string HashType { get; set; } = "";
+    public string Hash { get; set; } = "";
+    public bool IsPreferred { get; set; } = true;
+    public string Changelog { get; set; } = "";
+    public List<Dependency> Dependencies { get; set; } = [];
+    public SideType Side { get; set; } = SideType.Invalid; // this is for flame API
+
+    // For internal use, not provided by APIs
+    public bool IsCurrentlySelected { get; set; }
+
+    public string GetVersionDisplayString()
+    {
+        var releaseType = VersionType.IsValid ? $" [{VersionType}]" : "";
+        var versionStr = !Version.Contains(VersionNumber) ? VersionNumber : "";
+        var gameVersion = "";
+        foreach (var v in McVersion)
+        {
+            if (Version.Contains(v))
+            {
+                gameVersion = "";
+                break;
+            }
+            if (gameVersion.Length == 0)
+            {
+                gameVersion = $" for {v}";
+            }
+        }
+        return $"{Version}{gameVersion} — {versionStr}{releaseType}";
+    }
+}
+
+/// <summary>Port of ModPlatform::ExtraPackData.</summary>
+public sealed class ExtraPackData
+{
+    public List<DonationData> Donate { get; } = [];
+
+    public string IssuesUrl { get; set; } = "";
+    public string SourceUrl { get; set; } = "";
+    public string WikiUrl { get; set; } = "";
+    public string DiscordUrl { get; set; } = "";
+
+    public string Status { get; set; } = "";
+
+    public string Body { get; set; } = "";
+}
+
+/// <summary>Port of ModPlatform::IndexedPack.</summary>
+public sealed class IndexedPack
+{
+    public string AddonId { get; set; } = "";
+    public ResourceProvider Provider { get; set; }
+    public string Name { get; set; } = "";
+    public string Slug { get; set; } = "";
+    public string Description { get; set; } = "";
+    public List<ModpackAuthor> Authors { get; set; } = [];
+    public string LogoName { get; set; } = "";
+    public string LogoUrl { get; set; } = "";
+    public string WebsiteUrl { get; set; } = "";
+    public SideType Side { get; set; } = SideType.Invalid;
+
+    public bool VersionsLoaded { get; set; }
+    public List<IndexedVersion> Versions { get; } = [];
+
+    // Don't load by default, since some modplatform don't have that info
+    public bool ExtraDataLoaded { get; set; } = true;
+    public ExtraPackData ExtraData { get; } = new();
+
+    public ResourceType ResourceType { get; set; } = ResourceType.Unknown;
+
+    // For internal use, not provided by APIs
+    public bool IsVersionSelected(int index)
+    {
+        if (!VersionsLoaded)
+        {
+            return false;
+        }
+        return Versions[index].IsCurrentlySelected;
+    }
+
+    public bool IsAnyVersionSelected()
+    {
+        if (!VersionsLoaded)
+        {
+            return false;
+        }
+        return Versions.Any(v => v.IsCurrentlySelected);
+    }
+}
+
+/// <summary>Port of ModPlatform::OverrideDep.</summary>
+public sealed record OverrideDep(string Quilt, string Fabric, string Slug, ResourceProvider Provider);
+
+public static class ModIndex
+{
+    /// <summary>Port of ModPlatform::getOverrideDeps().</summary>
+    public static List<OverrideDep> GetOverrideDeps() =>
+    [
+        new OverrideDep(Quilt: "634179", Fabric: "306612", Slug: "API", Provider: ResourceProvider.FLAME),
+        new OverrideDep(Quilt: "720410", Fabric: "308769", Slug: "KotlinLibraries", Provider: ResourceProvider.FLAME),
+
+        new OverrideDep(Quilt: "qvIfYCYJ", Fabric: "P7dR8mSH", Slug: "API", Provider: ResourceProvider.MODRINTH),
+        new OverrideDep(Quilt: "lwVhp9o5", Fabric: "Ha28R6CL", Slug: "KotlinLibraries", Provider: ResourceProvider.MODRINTH),
+    ];
+
+    public static string GetMetaURL(ResourceProvider provider, string projectId)
+    {
+        return (provider == ResourceProvider.FLAME ? "https://www.curseforge.com/projects/" : "https://modrinth.com/mod/") + projectId;
+    }
+
+    /// <summary>Port of ModPlatform::getModLoaderAsString.</summary>
+    public static string GetModLoaderAsString(ModLoaderType type) => type switch
+    {
+        ModLoaderType.NeoForge => "neoforge",
+        ModLoaderType.Forge => "forge",
+        ModLoaderType.Cauldron => "cauldron",
+        ModLoaderType.LiteLoader => "liteloader",
+        ModLoaderType.Fabric => "fabric",
+        ModLoaderType.Quilt => "quilt",
+        ModLoaderType.DataPack => "datapack",
+        ModLoaderType.Babric => "babric",
+        ModLoaderType.BTA => "bta-babric",
+        ModLoaderType.LegacyFabric => "legacy-fabric",
+        ModLoaderType.Ornithe => "ornithe",
+        ModLoaderType.Rift => "rift",
+        _ => "",
+    };
+
+    /// <summary>Port of ModPlatform::getModLoaderFromString.</summary>
+    public static ModLoaderType GetModLoaderFromString(string type) => type switch
+    {
+        "neoforge" => ModLoaderType.NeoForge,
+        "forge" => ModLoaderType.Forge,
+        "cauldron" => ModLoaderType.Cauldron,
+        "liteloader" => ModLoaderType.LiteLoader,
+        "fabric" => ModLoaderType.Fabric,
+        "quilt" => ModLoaderType.Quilt,
+        "babric" => ModLoaderType.Babric,
+        "bta-babric" => ModLoaderType.BTA,
+        "legacy-fabric" => ModLoaderType.LegacyFabric,
+        "ornithe" => ModLoaderType.Ornithe,
+        "rift" => ModLoaderType.Rift,
+        _ => ModLoaderType.None,
+    };
+
+    /// <summary>Port of ModPlatform::modLoaderTypesToList (same loader order as the C++ list).</summary>
+    public static List<ModLoaderType> ModLoaderTypesToList(ModLoaderType flags)
+    {
+        ModLoaderType[] loaderList =
+        [
+            ModLoaderType.NeoForge, ModLoaderType.Forge, ModLoaderType.Cauldron, ModLoaderType.LiteLoader, ModLoaderType.Quilt,
+            ModLoaderType.Fabric, ModLoaderType.Babric, ModLoaderType.BTA, ModLoaderType.LegacyFabric, ModLoaderType.Ornithe,
+            ModLoaderType.Rift,
+        ];
+        var flagList = new List<ModLoaderType>();
+        foreach (var flag in loaderList)
+        {
+            if ((flags & flag) != 0)
+            {
+                flagList.Add(flag);
+            }
+        }
+        return flagList;
+    }
+
+    /// <summary>Port of ModPlatform::hasSingleModLoaderSelected.</summary>
+    public static bool HasSingleModLoaderSelected(ModLoaderType l)
+    {
+        var x = (ushort)l;
+        return x != 0 && (x & (x - 1)) == 0;
+    }
+}
+
+/// <summary>Port of ModPlatform::Category.</summary>
+public sealed record Category(string Name, string Id);
