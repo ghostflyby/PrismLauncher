@@ -2,6 +2,8 @@
 // Port of launcher/minecraft/VersionFile.{h,cpp}: the OneSix/Mojang version JSON model plus
 // its application to a LaunchProfile. As in Library.cs, the C++ friend-accessed data members
 // become public properties.
+using FlintLauncher.Core.Java;
+
 namespace FlintLauncher.Core.Minecraft;
 
 public class VersionFile : ProblemContainer
