@@ -1,0 +1,636 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Port of launcher/minecraft/auth/AccountData.{h,cpp}.
+//
+// Deviations from the C++ original:
+//  - Token::extra is a QVariantMap upstream; it stores the Xbox display claims (strings) and,
+//    for the MSA token, the whole token-endpoint response flattened to a variant map (which
+//    mixes strings and the numeric expires_in). To keep the JSON byte shape on saveState()
+//    the port stores <see cref="Token.Extra"/> as Dictionary{string,JsonNode} and re-sorts the
+//    keys on save, reproducing the QVariantMap (QMap = sorted) -> QJsonObject ordering.
+//  - QDateTime validity is expressed through nullable DateTimes (Qt uses an invalid QDateTime).
+//  - QNetworkReply::NetworkError is ported as the int code of the mirrored QtNetworkError enum
+//    (see AuthNetUtils); 0 == NoError.
+//  - profileName()'s tr("No Minecraft profile") placeholder is kept as the English literal
+//    (the launcher core is not localized).
+//  - qWarning()/qDebug() diagnostics are dropped (comment markers where they carried meaning).
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace FlintLauncher.Core.Auth;
+
+public enum Validity
+{
+    None,
+    Assumed,
+    Certain,
+}
+
+/// <summary>Port of AccountData::Token.</summary>
+public sealed class Token
+{
+    /// <summary>QDateTime issueInstant ("iat" when saved, epoch seconds).</summary>
+    public DateTime? IssueInstant;
+
+    /// <summary>QDateTime notAfter ("exp" when saved, epoch seconds).</summary>
+    public DateTime? NotAfter;
+
+    /// <summary>C++ member token (suffixed: a member named Token cannot live in class Token).</summary>
+    public string Token_ = "";
+
+    /// <summary>C++ member refresh_token.</summary>
+    public string RefreshToken = "";
+
+    /// <summary>QVariantMap extra; values are owned JSON nodes (strings/numbers/objects).</summary>
+    public Dictionary<string, JsonNode> Extra = new();
+
+    public Validity Validity = Validity.None;
+
+    public bool Persistent = true;
+
+    public Token Clone()
+    {
+        var copy = new Token
+        {
+            IssueInstant = IssueInstant,
+            NotAfter = NotAfter,
+            Token_ = Token_,
+            RefreshToken = RefreshToken,
+            Validity = Validity,
+            Persistent = Persistent,
+        };
+        foreach (var (key, value) in Extra)
+        {
+            copy.Extra[key] = value.DeepClone();
+        }
+        return copy;
+    }
+}
+
+/// <summary>Port of AccountData::Skin.</summary>
+public sealed class Skin
+{
+    public string Id = "";
+    public string Url = "";
+    public string Variant = "";
+
+    public byte[] Data = [];
+}
+
+/// <summary>Port of AccountData::Cape.</summary>
+public sealed class Cape
+{
+    public string Id = "";
+    public string Url = "";
+    public string Alias = "";
+
+    public byte[] Data = [];
+}
+
+/// <summary>Port of AccountData::MinecraftEntitlement.</summary>
+public sealed class MinecraftEntitlement
+{
+    public bool OwnsMinecraft;
+
+    public bool CanPlayMinecraft;
+
+    public Validity Validity = Validity.None;
+}
+
+/// <summary>Port of AccountData::MinecraftProfile. Capes keep the QMap ordering (sorted by id).</summary>
+public sealed class MinecraftProfile
+{
+    public string Id = "";
+    public string Name = "";
+    public Skin SkinField = new();
+    public string CurrentCape = "";
+    public SortedDictionary<string, Cape> Capes { get; } = new(StringComparer.Ordinal);
+    public Validity Validity = Validity.None;
+}
+
+public enum AccountType
+{
+    MSA,
+    Offline,
+}
+
+public enum AccountState
+{
+    Unchecked,
+    Offline,
+    Working,
+    Online,
+    Disabled,
+    Errored,
+    Expired,
+    Gone,
+}
+
+/// <summary>Port of AccountData.</summary>
+public sealed class AccountData
+{
+    /// <summary>Port of saveState(): the per-account JSON object ("type", "msa-client-id",
+    /// "msa", "utoken", "xrp-mc", "ygg", "profile", "entitlement" keys).</summary>
+    public JsonObject SaveState()
+    {
+        var output = new JsonObject();
+        if (Type == AccountType.MSA)
+        {
+            output["type"] = "MSA";
+            output["msa-client-id"] = JsonValue.Create(MsaClientID);
+            TokenToJSONV3(output, MsaToken, "msa");
+            TokenToJSONV3(output, UserToken, "utoken");
+            TokenToJSONV3(output, MojangServicesToken, "xrp-mc");
+        }
+        else if (Type == AccountType.Offline)
+        {
+            output["type"] = "Offline";
+        }
+
+        TokenToJSONV3(output, YggdrasilToken, "ygg");
+        ProfileToJSONV3(output, MinecraftProfile, "profile");
+        EntitlementToJSONV3(output, MinecraftEntitlement);
+        return output;
+    }
+
+    /// <summary>Port of resumeStateFromV3(QJsonObject): false when the account cannot be parsed.</summary>
+    public bool ResumeStateFromV3(JsonObject data)
+    {
+        var typeV = Get(data, "type");
+        if (typeV is not JsonValue typeVal || !typeVal.TryGetValue(out string? typeS) || typeS is null)
+        {
+            // qWarning() << "Failed to parse account data: type is missing.";
+            return false;
+        }
+        if (typeS == "MSA")
+        {
+            Type = AccountType.MSA;
+        }
+        else if (typeS == "Offline")
+        {
+            Type = AccountType.Offline;
+        }
+        else
+        {
+            // qWarning() << "Failed to parse account data: type is not recognized.";
+            return false;
+        }
+
+        if (Type == AccountType.MSA)
+        {
+            var clientIDV = Get(data, "msa-client-id");
+            if (clientIDV is JsonValue clientIdVal && clientIdVal.TryGetValue(out string? clientId))
+            {
+                MsaClientID = clientId ?? "";
+            } // leave msaClientID empty if it doesn't exist or isn't a string
+            MsaToken = TokenFromJSONV3(data, "msa");
+            UserToken = TokenFromJSONV3(data, "utoken");
+            MojangServicesToken = TokenFromJSONV3(data, "xrp-mc");
+        }
+
+        YggdrasilToken = TokenFromJSONV3(data, "ygg");
+        // versions before 7.2 used "offline" as the offline token
+        if (YggdrasilToken.Token_ == "offline")
+        {
+            YggdrasilToken.Token_ = "0";
+        }
+
+        MinecraftProfile = ProfileFromJSONV3(data, "profile");
+        if (!EntitlementFromJSONV3(data, MinecraftEntitlement))
+        {
+            if (MinecraftProfile.Validity != Validity.None)
+            {
+                MinecraftEntitlement.CanPlayMinecraft = true;
+                MinecraftEntitlement.OwnsMinecraft = true;
+                MinecraftEntitlement.Validity = Validity.Assumed;
+            }
+        }
+
+        Validity_ = MinecraftProfile.Validity;
+        return true;
+    }
+
+    /// <summary>Yggdrasil access token, as passed to the game.</summary>
+    public string AccessToken() => YggdrasilToken.Token_;
+
+    public string ProfileId() => MinecraftProfile.Id;
+
+    public string ProfileName() => MinecraftProfile.Name.Length == 0 ? "No Minecraft profile" : MinecraftProfile.Name;
+
+    public string LastError() => ErrorString;
+
+    public AccountType Type = AccountType.MSA;
+
+    public string MsaClientID = "";
+    public Token MsaToken = new();
+    public Token UserToken = new();
+    public Token MojangServicesToken = new();
+
+    public Token YggdrasilToken = new();
+    public MinecraftProfile MinecraftProfile = new();
+    public MinecraftEntitlement MinecraftEntitlement = new();
+    public Validity Validity_ = Validity.None;
+
+    // runtime only information (not saved with the account)
+    public string InternalId = "";
+    public string ErrorString = "";
+
+    /// <summary>QNetworkReply::NetworkError storage; see AuthNetUtils for the code meanings.</summary>
+    public int NetworkError;
+
+    public AccountState AccountState_ = AccountState.Unchecked;
+
+    // ------------------------------------------------------------------ helpers
+
+    internal static JsonNode? Get(JsonObject obj, string key)
+    {
+        return obj.TryGetPropertyValue(key, out var node) ? node : null;
+    }
+
+    /// <summary>QJsonValue::isDouble() equivalent (missing key -> undefined -> false). Note:
+    /// JsonValue.TryGetValue only matches the stored primitive type, so every numeric storage
+    /// kind is probed (values created via JsonValue.Create(long) must read back as numbers).</summary>
+    internal static bool IsNumber(JsonNode? node)
+    {
+        if (node is not JsonValue value)
+        {
+            return false;
+        }
+        return value.TryGetValue<double>(out _) || value.TryGetValue<long>(out _) ||
+            value.TryGetValue<int>(out _) || value.TryGetValue<decimal>(out _) ||
+            value.TryGetValue<float>(out _) || value.TryGetValue<short>(out _) ||
+            value.TryGetValue<uint>(out _) || value.TryGetValue<ulong>(out _) ||
+            value.TryGetValue<ushort>(out _) || value.TryGetValue<byte>(out _) ||
+            value.TryGetValue<sbyte>(out _);
+    }
+
+    internal static bool IsString(JsonNode? node)
+    {
+        return node is JsonValue value && value.TryGetValue<string>(out _);
+    }
+
+    internal static string GetString(JsonNode? node)
+    {
+        return node is JsonValue value && value.TryGetValue<string>(out var s) && s is not null ? s : "";
+    }
+
+    internal static double GetNumber(JsonNode? node)
+    {
+        if (node is JsonValue value)
+        {
+            if (value.TryGetValue<double>(out var d))
+            {
+                return d;
+            }
+            if (value.TryGetValue<long>(out var l))
+            {
+                return l;
+            }
+            if (value.TryGetValue<int>(out var i))
+            {
+                return i;
+            }
+            if (value.TryGetValue<decimal>(out var m))
+            {
+                return (double)m;
+            }
+            if (value.TryGetValue<float>(out var f))
+            {
+                return f;
+            }
+        }
+        return 0;
+    }
+
+    /// <summary>QJsonValue::toInt() equivalent (0 for anything that is not an integral number).</summary>
+    internal static int EnsureInteger(JsonObject obj, string key)
+    {
+        var node = Get(obj, key);
+        if (IsNumber(node))
+        {
+            var d = GetNumber(node);
+            return (int)d == d ? (int)d : 0;
+        }
+        return 0;
+    }
+
+    // ------------------------------------------------------------- (de)serialization
+
+    internal static void TokenToJSONV3(JsonObject parent, Token t, string tokenName)
+    {
+        if (!t.Persistent)
+        {
+            return;
+        }
+        var outObj = new JsonObject();
+        if (t.IssueInstant is { } issueInstant)
+        {
+            outObj["iat"] = ((DateTimeOffset)issueInstant).ToUnixTimeSeconds();
+        }
+
+        if (t.NotAfter is { } notAfter)
+        {
+            outObj["exp"] = ((DateTimeOffset)notAfter).ToUnixTimeSeconds();
+        }
+
+        var save = false;
+        if (t.Token_.Length != 0)
+        {
+            outObj["token"] = t.Token_;
+            save = true;
+        }
+        if (t.RefreshToken.Length != 0)
+        {
+            outObj["refresh_token"] = t.RefreshToken;
+            save = true;
+        }
+        if (t.Extra.Count != 0)
+        {
+            // QJsonObject::fromVariantMap(QVariantMap): keys sorted like QMap
+            var extra = new JsonObject();
+            foreach (var (key, value) in t.Extra.OrderBy(p => p.Key, StringComparer.Ordinal))
+            {
+                extra[key] = value?.DeepClone();
+            }
+            outObj["extra"] = extra;
+            save = true;
+        }
+        if (save)
+        {
+            parent[tokenName] = outObj;
+        }
+    }
+
+    internal static Token TokenFromJSONV3(JsonObject parent, string tokenName)
+    {
+        var outToken = new Token();
+        var tokenObject = Get(parent, tokenName) as JsonObject;
+        if (tokenObject is null || tokenObject.Count == 0)
+        {
+            return outToken;
+        }
+        var issueInstant = Get(tokenObject, "iat");
+        if (IsNumber(issueInstant))
+        {
+            outToken.IssueInstant = DateTimeOffset.FromUnixTimeMilliseconds((long)GetNumber(issueInstant) * 1000).UtcDateTime;
+        }
+
+        var notAfter = Get(tokenObject, "exp");
+        if (IsNumber(notAfter))
+        {
+            outToken.NotAfter = DateTimeOffset.FromUnixTimeMilliseconds((long)GetNumber(notAfter) * 1000).UtcDateTime;
+        }
+
+        var token = Get(tokenObject, "token");
+        if (IsString(token))
+        {
+            outToken.Token_ = GetString(token);
+            outToken.Validity = Validity.Assumed;
+        }
+
+        var refreshToken = Get(tokenObject, "refresh_token");
+        if (IsString(refreshToken))
+        {
+            outToken.RefreshToken = GetString(refreshToken);
+        }
+
+        var extra = Get(tokenObject, "extra");
+        if (extra is JsonObject extraObj)
+        {
+            foreach (var (key, value) in extraObj)
+            {
+                if (value is not null)
+                {
+                    outToken.Extra[key] = value.DeepClone();
+                }
+            }
+        }
+        return outToken;
+    }
+
+    internal static void ProfileToJSONV3(JsonObject parent, MinecraftProfile p, string tokenName)
+    {
+        if (p.Id.Length == 0)
+        {
+            return;
+        }
+        var outObj = new JsonObject
+        {
+            ["id"] = p.Id,
+            ["name"] = p.Name,
+        };
+        if (p.CurrentCape.Length != 0)
+        {
+            outObj["cape"] = p.CurrentCape;
+        }
+
+        {
+            var skinObj = new JsonObject
+            {
+                ["id"] = p.SkinField.Id,
+                ["url"] = p.SkinField.Url,
+                ["variant"] = p.SkinField.Variant,
+            };
+            if (p.SkinField.Data.Length != 0)
+            {
+                skinObj["data"] = Convert.ToBase64String(p.SkinField.Data);
+            }
+            outObj["skin"] = skinObj;
+        }
+
+        var capesArray = new JsonArray();
+        foreach (var cape in p.Capes.Values)
+        {
+            var capeObj = new JsonObject
+            {
+                ["id"] = cape.Id,
+                ["url"] = cape.Url,
+                ["alias"] = cape.Alias,
+            };
+            if (cape.Data.Length != 0)
+            {
+                capeObj["data"] = Convert.ToBase64String(cape.Data);
+            }
+            capesArray.Add((JsonNode?)capeObj);
+        }
+        outObj["capes"] = capesArray;
+        parent[tokenName] = outObj;
+    }
+
+    /// <summary>The http->https textures rewrite, shared by profile parsing and resume.</summary>
+    internal static string RewriteTextureUrl(string url)
+    {
+        return url.Replace("http://textures.minecraft.net", "https://textures.minecraft.net");
+    }
+
+    internal static MinecraftProfile ProfileFromJSONV3(JsonObject parent, string tokenName)
+    {
+        var outProfile = new MinecraftProfile();
+        var tokenObject = Get(parent, tokenName) as JsonObject;
+        if (tokenObject is null || tokenObject.Count == 0)
+        {
+            return outProfile;
+        }
+        {
+            var idV = Get(tokenObject, "id");
+            var nameV = Get(tokenObject, "name");
+            if (!IsString(idV) || !IsString(nameV))
+            {
+                // qWarning() << "mandatory profile attributes are missing or of unexpected type";
+                return new MinecraftProfile();
+            }
+            outProfile.Name = GetString(nameV);
+            outProfile.Id = GetString(idV);
+        }
+
+        {
+            var skinV = Get(tokenObject, "skin");
+            if (skinV is not JsonObject skinObj)
+            {
+                // qWarning() << "skin is missing";
+                return new MinecraftProfile();
+            }
+            var idV = Get(skinObj, "id");
+            var urlV = Get(skinObj, "url");
+            var variantV = Get(skinObj, "variant");
+            if (!IsString(idV) || !IsString(urlV) || !IsString(variantV))
+            {
+                // qWarning() << "mandatory skin attributes are missing or of unexpected type";
+                return new MinecraftProfile();
+            }
+            outProfile.SkinField.Id = GetString(idV);
+            outProfile.SkinField.Url = RewriteTextureUrl(GetString(urlV));
+            outProfile.SkinField.Variant = GetString(variantV);
+
+            // data for skin is optional
+            var dataV = Get(skinObj, "data");
+            if (IsString(dataV))
+            {
+                // TODO: validate base64
+                outProfile.SkinField.Data = FromBase64(GetString(dataV));
+            }
+            else if (dataV is not null)
+            {
+                // qWarning() << "skin data is something unexpected";
+                return new MinecraftProfile();
+            }
+        }
+
+        {
+            var capesV = Get(tokenObject, "capes");
+            if (capesV is not JsonArray capesArray)
+            {
+                // qWarning() << "capes is not an array!";
+                return new MinecraftProfile();
+            }
+            foreach (var capeV in capesArray)
+            {
+                if (capeV is not JsonObject capeObj)
+                {
+                    // qWarning() << "cape is not an object!";
+                    return new MinecraftProfile();
+                }
+                var idV = Get(capeObj, "id");
+                var urlV = Get(capeObj, "url");
+                var aliasV = Get(capeObj, "alias");
+                if (!IsString(idV) || !IsString(urlV) || !IsString(aliasV))
+                {
+                    // qWarning() << "mandatory skin attributes are missing or of unexpected type";
+                    return new MinecraftProfile();
+                }
+                var cape = new Cape
+                {
+                    Id = GetString(idV),
+                    Url = RewriteTextureUrl(GetString(urlV)),
+                    Alias = GetString(aliasV),
+                };
+
+                // data for cape is optional.
+                var dataV = Get(capeObj, "data");
+                if (IsString(dataV))
+                {
+                    // TODO: validate base64
+                    cape.Data = FromBase64(GetString(dataV));
+                }
+                else if (dataV is not null)
+                {
+                    // qWarning() << "cape data is something unexpected";
+                    return new MinecraftProfile();
+                }
+                outProfile.Capes[cape.Id] = cape;
+            }
+        }
+        // current cape
+        {
+            var capeV = Get(tokenObject, "cape");
+            if (IsString(capeV))
+            {
+                var currentCape = GetString(capeV);
+                if (outProfile.Capes.ContainsKey(currentCape))
+                {
+                    outProfile.CurrentCape = currentCape;
+                }
+            }
+        }
+        outProfile.Validity = Validity.Assumed;
+        return outProfile;
+    }
+
+    /// <summary>QByteArray::fromBase64 (default lenient mode: whitespace/invalid chars skipped).</summary>
+    internal static byte[] FromBase64(string str)
+    {
+        var sb = new System.Text.StringBuilder(str.Length);
+        foreach (var c in str)
+        {
+            if (c is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9' or '+' or '/' or '=')
+            {
+                sb.Append(c);
+            }
+        }
+        return Convert.FromBase64String(sb.ToString());
+    }
+
+    internal static void EntitlementToJSONV3(JsonObject parent, MinecraftEntitlement p)
+    {
+        if (p.Validity == Validity.None)
+        {
+            return;
+        }
+        var outObj = new JsonObject
+        {
+            ["ownsMinecraft"] = p.OwnsMinecraft,
+            ["canPlayMinecraft"] = p.CanPlayMinecraft,
+        };
+        parent["entitlement"] = outObj;
+    }
+
+    internal static bool EntitlementFromJSONV3(JsonObject parent, MinecraftEntitlement outEntitlement)
+    {
+        if (Get(parent, "entitlement") is not JsonObject entitlementObject || entitlementObject.Count == 0)
+        {
+            return false;
+        }
+        {
+            var ownsMinecraftV = Get(entitlementObject, "ownsMinecraft");
+            var canPlayMinecraftV = Get(entitlementObject, "canPlayMinecraft");
+            if (!IsBool(ownsMinecraftV) || !IsBool(canPlayMinecraftV))
+            {
+                // qWarning() << "mandatory attributes are missing or of unexpected type";
+                return false;
+            }
+            outEntitlement.CanPlayMinecraft = EnsureBool(canPlayMinecraftV);
+            outEntitlement.OwnsMinecraft = EnsureBool(ownsMinecraftV);
+            outEntitlement.Validity = Validity.Assumed;
+        }
+        return true;
+    }
+
+    internal static bool IsBool(JsonNode? node)
+    {
+        return node is JsonValue value && value.TryGetValue<bool>(out _);
+    }
+
+    internal static bool EnsureBool(JsonNode? node)
+    {
+        return node is JsonValue value && value.TryGetValue<bool>(out var b) ? b : false;
+    }
+}

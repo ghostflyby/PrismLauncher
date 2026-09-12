@@ -285,7 +285,7 @@ public class NetStackTests : IDisposable
 
         public TestHttpServer(Action<HttpListenerContext> handler)
         {
-            var port = 47000 + Random.Shared.Next(2000);
+            var port = GetFreePort();
             _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
             _listener.Start();
             Url = $"http://127.0.0.1:{port}";
@@ -328,6 +328,16 @@ public class NetStackTests : IDisposable
             catch (ObjectDisposedException)
             {
             }
+        }
+
+        /// <summary>Probe an actually-free port (blind random picks collide under parallel test classes).</summary>
+        private static int GetFreePort()
+        {
+            using var probe = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+            probe.Start();
+            var port = ((IPEndPoint)probe.LocalEndpoint).Port;
+            probe.Stop();
+            return port;
         }
     }
 }
