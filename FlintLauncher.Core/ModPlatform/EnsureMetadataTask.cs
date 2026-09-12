@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Port of modplatform/EnsureMetadataTask.{h,cpp} (Modrinth branch) plus the Modrinth
+// Port of modplatform/EnsureMetadataTask.{h,cpp} (Modrinth + Flame branches) plus the
 // callers' view of minecraft/mod/tasks/LocalResourceUpdateTask.{h,cpp}: make sure every
 // downloaded resource has its .pw.toml metadata written.
 //
 // Deviations:
-//  - The Flame branch is P6-b (the constructor fails the task for it).
 //  - The ConcurrentTask hash-priming pass lives in the callers (HashUtils.HashFile is
 //    synchronous here), so the task takes the hash → resource map directly.
 //  - Resource::setMetadata does not exist yet (the P3b Mod port has no metadata field),
 //    so the freshly created ModStruct is handed to callers through the MetadataReady
 //    event (ModFolderModel re-reads it from disk through its hook).
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
@@ -19,6 +19,7 @@ using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform;
 
+using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 
 public sealed class EnsureMetadataTask : FlintTask
@@ -50,10 +51,9 @@ public sealed class EnsureMetadataTask : FlintTask
             case ResourceProvider.MODRINTH:
                 await ModrinthFlow(cancellationToken);
                 break;
-            default:
-                // TODO(P6-b): the Flame metadata flow (fingerprint matching).
-                EmitFailed("Metadata generation is only implemented for Modrinth in this phase.");
-                return;
+            case ResourceProvider.FLAME:
+                await FlameFlow(cancellationToken);
+                break;
         }
 
         // invalidadeLeftover(): everything that made it this far without metadata failed
@@ -211,6 +211,194 @@ public sealed class EnsureMetadataTask : FlintTask
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Port of EnsureMetadataTask::flameVersionsTask + flameProjectsTask: match the mods by
+    /// murmur2 fingerprint (the hash keys), then load the project metadata and write the
+    /// .pw.toml files through the shared updateMetadata.
+    /// </summary>
+    private async Task FlameFlow(CancellationToken cancellationToken)
+    {
+        // ---------------------------------------------------------- versions task
+        var fingerprints = new List<uint>();
+        foreach (var murmur in _resources.Keys)
+        {
+            if (uint.TryParse(murmur, NumberStyles.None, CultureInfo.InvariantCulture, out var fp))
+            {
+                fingerprints.Add(fp);
+            }
+        }
+
+        var (job, request) = FlameApi.MatchFingerprints(fingerprints);
+        await job.StartAsync(cancellationToken);
+        if (!job.WasSuccessful)
+        {
+            EmitFailed(job.FailReason);
+            return;
+        }
+
+        JsonDocument doc;
+        try
+        {
+            doc = JsonDocument.Parse(request.BodyAsString);
+        }
+        catch (JsonException e)
+        {
+            EmitFailed(e.Message);
+            return;
+        }
+
+        using (doc)
+        {
+            JsonObject entriesObj;
+            try
+            {
+                entriesObj = JsonNode.Parse(doc.RootElement.GetRawText())!.AsObject();
+            }
+            catch (JsonException)
+            {
+                EmitFailed("Fingerprint response is not a JSON object");
+                return;
+            }
+
+            var exactMatches = (entriesObj["data"] as JsonObject)?["exactMatches"] as JsonArray;
+            if (exactMatches is null || exactMatches.Count == 0)
+            {
+                // "No matches found for fingerprint search!" — the leftover invalidation in
+                // ExecuteAsync reports the failures
+                return;
+            }
+
+            foreach (var matchNode in exactMatches)
+            {
+                if (matchNode is not JsonObject matchObj || matchObj["file"] is not JsonObject fileObj)
+                {
+                    // "Fingerprint match is empty!"
+                    return;
+                }
+
+                var fingerprint = FlameJson.Long(fileObj["fileFingerprint"]).ToString(CultureInfo.InvariantCulture);
+                if (!_resources.TryGetValue(fingerprint, out var resource))
+                {
+                    // "Invalid fingerprint from the API response."
+                    continue;
+                }
+
+                EmitStatus($"Parsing API response from CurseForge for '{resource.Name}'...");
+                try
+                {
+                    _tempVersions[fingerprint] = FlameMod.LoadIndexedPackVersion(ToElement(fileObj));
+                }
+                catch (JsonParseException)
+                {
+                    EmitMetadataFailed(resource, "Invalid data returned from the API.");
+                }
+            }
+        }
+
+        // ---------------------------------------------------------- projects task
+        var addonIds = new Dictionary<string, string>(StringComparer.Ordinal); // addonId -> hash
+        foreach (var (hash, data) in _tempVersions)
+        {
+            if (data.AddonId.Length != 0)
+            {
+                addonIds.TryAdd(data.AddonId, hash);
+            }
+        }
+
+        if (addonIds.Count == 0)
+        {
+            // "No addonId found!" — the leftover invalidation in ExecuteAsync reports the failures
+            return;
+        }
+
+        Net.NetJob projectJob;
+        Net.NetRequest projectRequest;
+        bool multiple;
+        if (addonIds.Count == 1)
+        {
+            (projectJob, projectRequest) = FlameApi.Instance.GetProject(addonIds.Keys.First());
+            multiple = false;
+        }
+        else
+        {
+            (projectJob, projectRequest) = FlameApi.Instance.GetProjects(addonIds.Keys.ToList());
+            multiple = true;
+        }
+
+        await projectJob.StartAsync(cancellationToken);
+        if (!projectJob.WasSuccessful)
+        {
+            EmitFailed(projectJob.FailReason);
+            return;
+        }
+
+        JsonDocument projectDoc;
+        try
+        {
+            projectDoc = JsonDocument.Parse(projectRequest.BodyAsString);
+        }
+        catch (JsonException e)
+        {
+            EmitFailed(e.Message);
+            return;
+        }
+
+        using (projectDoc)
+        {
+            JsonElement[] entries;
+            try
+            {
+                var rootObj = JsonUtils.RequireObject(projectDoc);
+                var data = FlameJson.Ptr(rootObj, "data");
+                entries = multiple
+                    ? JsonUtils.RequireArray(data, "'data'").EnumerateArray().ToArray()
+                    : [JsonUtils.RequireObject(data, "'data'")];
+            }
+            catch (JsonParseException)
+            {
+                return;
+            }
+
+            foreach (var entry in entries)
+            {
+                JsonElement entryObj;
+                try
+                {
+                    entryObj = JsonUtils.RequireObject(entry);
+                }
+                catch (JsonParseException)
+                {
+                    continue;
+                }
+
+                var id = FlameJson.RequireInteger(entryObj, "id").ToString(CultureInfo.InvariantCulture);
+                if (!addonIds.TryGetValue(id, out var hash) || !_resources.TryGetValue(hash, out var resource)
+                    || !_tempVersions.TryGetValue(hash, out var version))
+                {
+                    continue;
+                }
+
+                var pack = new IndexedPack();
+                try
+                {
+                    EmitStatus($"Parsing API response from CurseForge for '{resource.Name}'...");
+                    FlameMod.LoadIndexedPack(pack, entryObj);
+                }
+                catch (JsonParseException)
+                {
+                    EmitMetadataFailed(resource, "Invalid data returned from the API.");
+                    continue;
+                }
+                await UpdateMetadata(pack, version, resource, cancellationToken);
+            }
+        }
+    }
+
+    private static JsonElement ToElement(JsonNode node)
+    {
+        return JsonDocument.Parse(node.ToJsonString()).RootElement;
     }
 
     /// <summary>

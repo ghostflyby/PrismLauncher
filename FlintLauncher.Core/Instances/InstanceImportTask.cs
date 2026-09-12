@@ -4,7 +4,7 @@
 //   modrinth.index.json      -> Modrinth (ModrinthCreationTask)
 //   bin/modpack.jar          -> Technic (deferred, P6-b)
 //   bin/version.json
-//   manifest.json            -> Flame (deferred, P6-b)
+//   manifest.json            -> Flame (FlameCreationTask)
 //   */instance.cfg           -> plain MultiMC folder import (NullInstance + rename)
 //
 // Deviations from the C++:
@@ -14,10 +14,11 @@
 //    detection is skipped and the icon key is passed through unchanged.
 //  - Remote downloads use MetaCache when set (APPLICATION->metacache()), otherwise a plain
 //    file download into the staging folder.
-//  - Technic/Flame branches fail with a clear message for P6-b to fill in.
+//  - The Technic branch fails with a clear message for P6-b to fill in.
 using System.IO.Compression;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.IO;
+using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
@@ -183,7 +184,7 @@ public sealed partial class InstanceImportTask : InstanceTask
                 ProcessTechnic();
                 return;
             case ModpackType.Flame:
-                ProcessFlame();
+                await ProcessFlame(cancellationToken);
                 return;
             case ModpackType.Modrinth:
                 await ProcessModrinth(cancellationToken);
@@ -194,10 +195,37 @@ public sealed partial class InstanceImportTask : InstanceTask
         }
     }
 
-    private void ProcessFlame()
+    private async Task ProcessFlame(CancellationToken cancellationToken)
     {
-        // TODO(P6-b): the Flame creation task.
-        EmitFailed("Flame (CurseForge) modpacks are not supported yet.");
+        string packId = "";
+        string packVersionId = "";
+        if (_extraInfo.Count != 0)
+        {
+            packId = _extraInfo.TryGetValue("pack_id", out var id) ? id : "";
+            packVersionId = _extraInfo.TryGetValue("pack_version_id", out var versionId) ? versionId : "";
+        }
+
+        var instCreationTask = new FlameCreationTask(StagingPath, _trustedSource, GlobalSettings, packId,
+            packVersionId);
+
+        instCreationTask.SetName(ModifiedName());
+        instCreationTask.SetOriginalName(OriginalName(), Version());
+        // (the icon import from the pack is not ported — see the header note)
+        instCreationTask.SetIcon(Icon);
+        instCreationTask.SetGroup(Group);
+        instCreationTask.SetConfirmUpdate(ShouldConfirmUpdate());
+
+        await instCreationTask.StartAsync(cancellationToken);
+
+        if (instCreationTask.WasSuccessful)
+        {
+            SetOverride(instCreationTask.ShouldOverride, instCreationTask.OriginalInstanceID);
+            EmitSucceeded();
+        }
+        else
+        {
+            EmitFailed(instCreationTask.FailReason);
+        }
     }
 
     private void ProcessTechnic()

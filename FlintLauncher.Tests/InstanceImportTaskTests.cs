@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Tests for the InstanceImportTask dispatch: modpack type detection by marker file
-// (modrinth.index.json -> Modrinth, manifest.json -> Flame [stubbed failure],
+// (modrinth.index.json -> Modrinth, manifest.json -> Flame (FlameCreationTask, P6-b),
 // bin/modpack.jar -> Technic [stubbed failure], instance.cfg -> plain folder import,
 // unknown -> error), plus the download-from-URL path through the meta cache.
 using System.IO.Compression;
@@ -119,19 +119,28 @@ public class InstanceImportTaskTests : IDisposable
     }
 
     [Fact]
-    public async Task FlameZip_FailsWithNotSupported()
+    public async Task FlameZip_DispatchesToFlameCreation()
     {
+        // the Flame branch now dispatches to FlameCreationTask; this pack has no files, so
+        // the full flow runs without network and creates a vanilla-components instance
         var zipPath = Path.Combine(_root, "flame.zip");
         var dir = Path.Combine(_root, "flame-src");
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "manifest.json"),
-            """{"minecraft":{"version":"1.20.1"},"files":[],"overrides":{}}""");
+            """{"manifestType":"minecraftModpack","manifestVersion":1,"minecraft":{"version":"1.20.1"},"files":[],"overrides":"overrides"}""");
         Assert.True(FlintLauncher.Core.IO.MMCZip.CompressDir(zipPath, dir));
 
         var task = await RunImport(new Uri(zipPath));
 
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("not supported", task.FailReason);
+        Assert.True(task.WasSuccessful, task.FailReason);
+        var instanceDir = Path.Combine(_root, "instances", "Imported");
+        Assert.True(Directory.Exists(instanceDir));
+        Assert.True(File.Exists(Path.Combine(instanceDir, "flame", "manifest.json")));
+        Assert.True(File.Exists(Path.Combine(instanceDir, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(instanceDir, "mmc-pack.json")));
+        Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
+            c => c.GetProperty("uid").GetString() == "net.minecraft"
+                 && c.GetProperty("version").GetString() == "1.20.1");
     }
 
     [Fact]
