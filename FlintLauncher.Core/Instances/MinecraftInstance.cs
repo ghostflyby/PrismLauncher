@@ -1,0 +1,1156 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Port of launcher/minecraft/MinecraftInstance.{h,cpp} (launch/update execution excluded).
+//
+// Deviations from the C++ original:
+//  - Application-singleton reach-ins become injectable hooks: playtimeSettings() ->
+//    <see cref="BaseInstance.PlaytimeSettings"/>; m_detectedOpenALPath/m_detectedGLFWPath/
+//    m_detectedSDLPath -> the Detected*Path properties; APPLICATION->metacache() ->
+//    <see cref="MetaCache"/> (library_directory defaults to "" while unset). The global
+//    settings object (APPLICATION->settings()) is the injected BaseInstance global settings.
+//  - The Q_OS_* ifdef'ed bits port to OperatingSystem checks. switcherooSetupGPU() (DBus)
+//    and LibraryUtils::findMangoHud() are system-probing process-launch helpers and are
+//    TODO(P5): the discrete-GPU path always applies the open-driver env fallback.
+//  - createUpdateTask()/createLaunchTask()/createLaunchScript() throw: the launch pipeline
+//    (FoldersTask/LibrariesTask/LegacyFMLLibrariesTask/AssetUpdateTask, LaunchTask and the
+//    launch steps) is phase P5.
+//  - The folder models for resource packs, texture packs, shader packs and data packs are
+//    not ported yet (only ModFolderModel/WorldList exist), so resourcePackList()/
+//    texturePackList()/shaderPackList()/dataPackList()/resourceLists() are omitted; the
+//    GlobalDataPacksEnabled/Path change hooks that reset the data pack model have nothing
+//    to reset here yet. getJarMods()/verboseDescription() only need the mod lists and are
+//    ported.
+//  - getStatusbarDescription(): upstream kicks off an offline PackProfile reload when the
+//    Minecraft version is missing and re-reads immediately. The port mirrors the reload's
+//    inline (synchronous) part — SaveNow + InvalidateLaunchProfile + Load — and skips only
+//    the asynchronous resolve (ReloadAsync is the awaitable form). The Qt locale short date
+//    format maps to the CurrentCulture "g" format.
+//  - AssetsUtils::getAssetsDir() is ported locally, reduced to the branch the profile
+//    variable mapping needs (which of the virtual/resources paths applies — only the two
+//    booleans of the assets index JSON are consulted).
+//  - The OrSetting class in MinecraftInstance.cpp is dead code upstream (never used in the
+//    revision) and is not ported. getProblems() does not exist on instances upstream.
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Java;
+using FlintLauncher.Core.Json;
+using FlintLauncher.Core.Minecraft;
+using FlintLauncher.Core.Minecraft.Resources;
+using FlintLauncher.Core.Net;
+using FlintLauncher.Core.Settings;
+using FlintLauncher.Core.Tasks;
+using FlintLauncher.Core.Versioning;
+
+namespace FlintLauncher.Core.Instances;
+
+public class MinecraftInstance : BaseInstance, IPackProfileEnv
+{
+    private static readonly Regex TokenRegex = new(@"\$\{(.+?)\}", RegexOptions.CultureInvariant); // InvertedGreediness
+
+    public MinecraftInstance(SettingsObject globalSettings, SettingsObject settings, string rootDir)
+        : base(globalSettings, settings, rootDir)
+    {
+        _components = new PackProfile(this);
+    }
+
+    // Application-singleton hooks (see the file header)
+    /// <summary>C++ APPLICATION->m_detectedOpenALPath; used by extraArguments().</summary>
+    public string DetectedOpenALPath { get; set; } = "";
+
+    /// <summary>C++ APPLICATION->m_detectedGLFWPath; used by extraArguments().</summary>
+    public string DetectedGLFWPath { get; set; } = "";
+
+    /// <summary>C++ APPLICATION->m_detectedSDLPath; used by extraArguments().</summary>
+    public string DetectedSDLPath { get; set; } = "";
+
+    /// <summary>C++ APPLICATION->metacache(); used for the library_directory profile variable.</summary>
+    public HttpMetaCache? MetaCache { get; set; }
+
+    public override void SaveNow()
+    {
+        _components!.SaveNow();
+    }
+
+    public override void LoadSpecificSettings()
+    {
+        if (IsSpecificSettingsLoaded())
+        {
+            return;
+        }
+
+        // Java Settings
+        var locationOverride = _settings.RegisterSetting("OverrideJavaLocation", false);
+        var argsOverride = _settings.RegisterSetting("OverrideJavaArgs", false);
+        _settings.RegisterSetting("AutomaticJava", false);
+        _settings.RegisterSetting("UseLatestMinecraftVersion", false);
+        _settings.RegisterSetting("UseLatestMinecraftVersionType", "release");
+
+        if (GlobalSettings() is { } globalSettings)
+        {
+            _settings.RegisterOverride(globalSettings.GetSetting("JavaPath")!, locationOverride!);
+            _settings.RegisterOverride(globalSettings.GetSetting("JvmArgs")!, argsOverride!);
+            _settings.RegisterOverride(globalSettings.GetSetting("IgnoreJavaCompatibility")!, locationOverride!);
+
+            // special!
+            _settings.RegisterPassthrough(globalSettings.GetSetting("JavaSignature")!, locationOverride!);
+            _settings.RegisterPassthrough(globalSettings.GetSetting("JavaArchitecture")!, locationOverride!);
+            _settings.RegisterPassthrough(globalSettings.GetSetting("JavaRealArchitecture")!, locationOverride!);
+            _settings.RegisterPassthrough(globalSettings.GetSetting("JavaVersion")!, locationOverride!);
+            _settings.RegisterPassthrough(globalSettings.GetSetting("JavaVendor")!, locationOverride!);
+
+            // Window Size
+            var windowSetting = _settings.RegisterSetting("OverrideWindow", false)!;
+            _settings.RegisterOverride(globalSettings.GetSetting("LaunchMaximized")!, windowSetting);
+            _settings.RegisterOverride(globalSettings.GetSetting("MinecraftWinWidth")!, windowSetting);
+            _settings.RegisterOverride(globalSettings.GetSetting("MinecraftWinHeight")!, windowSetting);
+
+            // Memory
+            var memorySetting = _settings.RegisterSetting("OverrideMemory", false)!;
+            _settings.RegisterOverride(globalSettings.GetSetting("MinMemAlloc")!, memorySetting);
+            _settings.RegisterOverride(globalSettings.GetSetting("MaxMemAlloc")!, memorySetting);
+            _settings.RegisterOverride(globalSettings.GetSetting("PermGen")!, memorySetting);
+            _settings.RegisterOverride(globalSettings.GetSetting("LowMemWarning")!, memorySetting);
+
+            // Native library workarounds
+            var nativeLibraryWorkaroundsOverride = _settings.RegisterSetting("OverrideNativeWorkarounds", false)!;
+            _settings.RegisterOverride(globalSettings.GetSetting("UseNativeOpenAL")!, nativeLibraryWorkaroundsOverride);
+            _settings.RegisterOverride(globalSettings.GetSetting("CustomOpenALPath")!, nativeLibraryWorkaroundsOverride);
+            _settings.RegisterOverride(globalSettings.GetSetting("UseNativeGLFW")!, nativeLibraryWorkaroundsOverride);
+            _settings.RegisterOverride(globalSettings.GetSetting("CustomGLFWPath")!, nativeLibraryWorkaroundsOverride);
+            _settings.RegisterOverride(globalSettings.GetSetting("UseNativeSDL")!, nativeLibraryWorkaroundsOverride);
+            _settings.RegisterOverride(globalSettings.GetSetting("CustomSDLPath")!, nativeLibraryWorkaroundsOverride);
+
+            // Performance related options
+            var performanceOverride = _settings.RegisterSetting("OverridePerformance", false)!;
+            _settings.RegisterOverride(globalSettings.GetSetting("EnableFeralGamemode")!, performanceOverride);
+            _settings.RegisterOverride(globalSettings.GetSetting("EnableMangoHud")!, performanceOverride);
+            _settings.RegisterOverride(globalSettings.GetSetting("UseDiscreteGpu")!, performanceOverride);
+            _settings.RegisterOverride(globalSettings.GetSetting("UseZink")!, performanceOverride);
+
+            // Miscellaneous
+            var miscellaneousOverride = _settings.RegisterSetting("OverrideMiscellaneous", false)!;
+            _settings.RegisterOverride(globalSettings.GetSetting("CloseAfterLaunch")!, miscellaneousOverride);
+            _settings.RegisterOverride(globalSettings.GetSetting("QuitAfterGameStop")!, miscellaneousOverride);
+
+            // Legacy-related options
+            var legacySettings = _settings.RegisterSetting("OverrideLegacySettings", false)!;
+            _settings.RegisterOverride(globalSettings.GetSetting("OnlineFixes")!, legacySettings);
+
+            var envSetting = _settings.RegisterSetting("OverrideEnv", false)!;
+            _settings.RegisterOverride(globalSettings.GetSetting("Env")!, envSetting);
+
+            if (Variant.AsString(_settings.Get("InstanceType")) != "OneSix")
+            {
+                _settings.Set("InstanceType", "OneSix");
+            }
+        }
+
+        // Join server on launch, this does not have a global override
+        _settings.RegisterSetting("JoinServerOnLaunch", false);
+        _settings.RegisterSetting("JoinServerOnLaunchAddress", "");
+        _settings.RegisterSetting("JoinWorldOnLaunch", "");
+
+        // Use account for instance, this does not have a global override
+        _settings.RegisterSetting("UseAccountForInstance", false);
+        _settings.RegisterSetting("InstanceAccountId", "");
+
+        _settings.RegisterSetting("ExportName", "");
+        _settings.RegisterSetting("ExportVersion", "1.0.0");
+        _settings.RegisterSetting("ExportSummary", "");
+        _settings.RegisterSetting("ExportAuthor", "");
+        _settings.RegisterSetting("ExportOptionalFiles", true);
+        _settings.RegisterSetting("ExportRecommendedRAM");
+
+        _settings.RegisterSetting("GlobalDataPacksEnabled", false);
+        _settings.RegisterSetting("GlobalDataPacksPath", "");
+        // (upstream connects both settings to reset the data pack folder model; that model is
+        //  not ported yet, so there is nothing to reset here)
+
+        // Join server on launch, this does not have a global override
+        _settings.RegisterSetting("OverrideModDownloadLoaders", false);
+        _settings.RegisterSetting("ModDownloadLoaders", "[]");
+
+        SetSpecificSettingsLoaded(true);
+
+        UpdateRuntimeContext();
+    }
+
+    public override void UpdateRuntimeContext()
+    {
+        // RuntimeContext::updateFromInstanceSettings (the member itself lives on the C++
+        // RuntimeContext struct; the C# struct has no SettingsObject dependency)
+        _runtimeContext.JavaArchitecture = Variant.AsString(_settings.Get("JavaArchitecture"));
+        _runtimeContext.JavaRealArchitecture = Variant.AsString(_settings.Get("JavaRealArchitecture"));
+        _components!.InvalidateLaunchProfile();
+    }
+
+    public PackProfile GetPackProfile() => _components!;
+
+    public override IReadOnlySet<string> Traits()
+    {
+        var components = GetPackProfile();
+        if (components is null)
+        {
+            return new HashSet<string> { "version-incomplete" };
+        }
+        var profile = components.GetProfile();
+        if (profile is null)
+        {
+            return new HashSet<string> { "version-incomplete" };
+        }
+        return profile.GetTraits();
+    }
+
+    public override bool CanEdit() => true;
+
+    public override bool CanExport() => true;
+
+    ////// Directories and files //////
+
+    public string JarModsDir() => QDirAbsolutePath(FileSystem.PathCombine(InstanceRoot(), "jarmods/"));
+
+    public string ResourcePacksDir() => FileSystem.PathCombine(GameRoot(), "resourcepacks");
+
+    public string TexturePacksDir() => FileSystem.PathCombine(GameRoot(), "texturepacks");
+
+    public string ShaderPacksDir() => FileSystem.PathCombine(GameRoot(), "shaderpacks");
+
+    public override string ModsRoot() => FileSystem.PathCombine(GameRoot(), "mods");
+
+    public string CoreModsDir() => FileSystem.PathCombine(GameRoot(), "coremods");
+
+    public string NilModsDir() => FileSystem.PathCombine(GameRoot(), "nilmods");
+
+    public string DataPacksDir()
+    {
+        var relativePath = Variant.AsString(Settings().Get("GlobalDataPacksPath"));
+
+        if (relativePath.Length == 0)
+        {
+            relativePath = "datapacks";
+        }
+
+        return FileSystem.PathCombine(GameRoot(), relativePath);
+    }
+
+    public string ModsCacheLocation() => FileSystem.PathCombine(InstanceRoot(), "mods.cache");
+
+    public string LibDir() => FileSystem.PathCombine(GameRoot(), "lib");
+
+    public string WorldDir() => FileSystem.PathCombine(GameRoot(), "saves");
+
+    public string ResourcesDir() => FileSystem.PathCombine(GameRoot(), "resources");
+
+    /// <summary>QDir::current().absoluteFilePath("libraries").</summary>
+    public string LibrariesPath() => QDirAbsolutePath("libraries");
+
+    public string JarmodsPath() => JarModsDir();
+
+    /// <summary>QDir::current().absoluteFilePath("versions").</summary>
+    public string VersionsPath() => QDirAbsolutePath("versions");
+
+    public override string InstanceConfigFolder() => FileSystem.PathCombine(GameRoot(), "config");
+
+    /// <summary>Path to the instance's minecraft directory.</summary>
+    public override string GameRoot()
+    {
+        var mcDir = FileSystem.PathCombine(InstanceRoot(), "minecraft");
+        var dotMcDir = FileSystem.PathCombine(InstanceRoot(), ".minecraft");
+
+        if (FsExists(dotMcDir) && !FsExists(mcDir))
+        {
+            return dotMcDir;
+        }
+        return mcDir;
+    }
+
+    /// <summary>Path to the instance's minecraft bin directory.</summary>
+    public string BinRoot() => FileSystem.PathCombine(GameRoot(), "bin");
+
+    /// <summary>where to put the natives during/before launch</summary>
+    public string GetNativePath() => QDirAbsolutePath(FileSystem.PathCombine(InstanceRoot(), "natives/"));
+
+    /// <summary>where the instance-local libraries should be</summary>
+    public string GetLocalLibraryPath() => QDirAbsolutePath(FileSystem.PathCombine(InstanceRoot(), "libraries/"));
+
+    /// <summary>Returns whether the instance, with its version, has support for demo mode.</summary>
+    public bool SupportsDemo()
+    {
+        var instanceVer = new McVersion(GetPackProfile().GetComponentVersion("net.minecraft"));
+        // Demo mode was introduced in 1.3.1: https://minecraft.wiki/w/Demo_mode#History
+        // FIXME upstream: Due to Version constraints atm, this can't handle well non-release versions
+        return instanceVer >= new McVersion("1.3.1");
+    }
+
+    //////  Profile management //////
+
+    //////  Launch stuff //////
+
+    // TODO(P5): the C++ assembles FoldersTask, LibrariesTask, LegacyFMLLibrariesTask and
+    // AssetUpdateTask here (the update pipeline).
+    public override List<FlintTask> CreateUpdateTask() => throw new NotImplementedException("Instance update tasks are phase P5.");
+
+    // TODO(P5): the launch pipeline (LaunchTask and its steps) is ported in phase P5.
+    public override FlintTask? CreateLaunchTask(AuthSession? account, MinecraftTarget? targetToJoin) =>
+        throw new NotImplementedException("The launch task pipeline is phase P5.");
+
+    // TODO(P5): the external-launcher script builder is part of the launch pipeline.
+    public string CreateLaunchScript(AuthSession? session, MinecraftTarget? targetToJoin) =>
+        throw new NotImplementedException("The launch script builder is phase P5.");
+
+    public override List<string> ExtraArguments()
+    {
+        var list = base.ExtraArguments();
+        var version = GetPackProfile();
+        if (version is null)
+        {
+            return list;
+        }
+        var jarMods = GetJarMods();
+        if (jarMods.Count != 0)
+        {
+            list.Add("-Dfml.ignoreInvalidMinecraftCertificates=true");
+            list.Add("-Dfml.ignorePatchDiscrepancies=true");
+        }
+        var profile = version.GetProfile();
+        if (profile is not null)
+        {
+            var addn = profile.GetAddnJvmArguments();
+            if (addn.Count != 0)
+            {
+                var tokenMapping = MakeProfileVarMapping(profile);
+
+                foreach (var item in addn)
+                {
+                    list.Add(ReplaceTokensIn(item, tokenMapping));
+                }
+            }
+            foreach (var agent in profile.GetAgents())
+            {
+                var jar = new List<string>();
+                var temp1 = new List<string>();
+                var temp2 = new List<string>();
+                var temp3 = new List<string>();
+                agent.Library.GetApplicableFiles(RuntimeContext, jar, temp1, temp2, temp3, GetLocalLibraryPath());
+                list.Add("-javaagent:" + jar[0] + (agent.Argument.Length == 0 ? "" : "=" + agent.Argument));
+            }
+        }
+
+        {
+            string openALPath = "";
+            string glfwPath = "";
+            string sdlPath = "";
+
+            if (Variant.AsBool(Settings().Get("UseNativeOpenAL")))
+            {
+                openALPath = DetectedOpenALPath;
+                var customPath = Variant.AsString(Settings().Get("CustomOpenALPath"));
+                if (customPath.Length != 0)
+                {
+                    openALPath = customPath;
+                }
+            }
+            if (Variant.AsBool(Settings().Get("UseNativeGLFW")))
+            {
+                glfwPath = DetectedGLFWPath;
+                var customPath = Variant.AsString(Settings().Get("CustomGLFWPath"));
+                if (customPath.Length != 0)
+                {
+                    glfwPath = customPath;
+                }
+            }
+            if (Variant.AsBool(Settings().Get("UseNativeSDL")))
+            {
+                sdlPath = DetectedSDLPath;
+                var customPath = Variant.AsString(Settings().Get("CustomSDLPath"));
+                if (customPath.Length != 0)
+                {
+                    sdlPath = customPath;
+                }
+            }
+
+            if (openALPath.Length != 0 && FsExists(openALPath))
+            {
+                list.Add("-Dorg.lwjgl.openal.libname=" + Path.GetFullPath(openALPath));
+            }
+            if (glfwPath.Length != 0 && FsExists(glfwPath))
+            {
+                list.Add("-Dorg.lwjgl.glfw.libname=" + Path.GetFullPath(glfwPath));
+            }
+            if (sdlPath.Length != 0 && FsExists(sdlPath))
+            {
+                list.Add("-Dorg.lwjgl.sdl.libname=" + Path.GetFullPath(sdlPath));
+            }
+        }
+
+        return list;
+    }
+
+    public List<string> JavaArguments()
+    {
+        var args = new List<string> { "-Duser.language=en" };
+
+        // custom args go first. we want to override them if we have our own here.
+        args.AddRange(ExtraArguments());
+
+        // OSX dock icon and name
+        if (OperatingSystem.IsMacOS())
+        {
+            args.Add("-Xdock:icon=icon.png");
+            args.Add($"-Xdock:name=\"{WindowTitle()}\"");
+        }
+        var instanceTraits = Traits();
+        // HACK: fix issues on macOS with 1.13 snapshots
+        // NOTE: Oracle Java option. if there are alternate jvm implementations, this would be the place to customize this for them
+        if (OperatingSystem.IsMacOS() && instanceTraits.Contains("FirstThreadOnMacOS"))
+        {
+            args.Add("-XstartOnFirstThread");
+        }
+
+        // HACK: Stupid hack for Intel drivers. See: https://mojang.atlassian.net/browse/MCL-767
+        if (OperatingSystem.IsWindows())
+        {
+            args.Add("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump");
+        }
+
+        // LWJGL2 reads `LWJGL_DISABLE_XRANDR` to force disable xrandr usage and fall back to xf86videomode.
+        // It *SHOULD* check for the executable to exist before trying to use it for queries but it doesnt,
+        // so WE can and force disable xrandr if it is not available.
+        if (OperatingSystem.IsLinux() &&
+            _components!.GetComponent("org.lwjgl") is not null &&
+            FindExecutable("xrandr").Length == 0)
+        {
+            args.Add("-DLWJGL_DISABLE_XRANDR=true");
+        }
+
+        var min = Variant.AsInt(Settings().Get("MinMemAlloc"));
+        var max = Variant.AsInt(Settings().Get("MaxMemAlloc"));
+        if (min < max)
+        {
+            args.Add($"-Xms{min}m");
+            args.Add($"-Xmx{max}m");
+        }
+        else
+        {
+            args.Add($"-Xms{max}m");
+            args.Add($"-Xmx{min}m");
+        }
+
+        // No PermGen in newer java.
+        var javaVersion = GetJavaVersion();
+        if (javaVersion.RequiresPermGen())
+        {
+            var permgen = Variant.AsInt(Settings().Get("PermGen"));
+            if (permgen != 64)
+            {
+                args.Add($"-XX:PermSize={permgen}m");
+            }
+        }
+
+        if (javaVersion.IsModular() && ShouldApplyOnlineFixes())
+        {
+            // allow reflective access to java.net - required by the skin fix
+            args.Add("--add-opens");
+            args.Add("java.base/java.net=ALL-UNNAMED");
+        }
+
+        return args;
+    }
+
+    public string GetLauncher()
+    {
+        // use legacy launcher if the traits are set
+        if (IsLegacy())
+        {
+            return "legacy";
+        }
+
+        return "standard";
+    }
+
+    public bool ShouldApplyOnlineFixes()
+    {
+        return Traits().Contains("legacyServices") && Variant.AsBool(Settings().Get("OnlineFixes"));
+    }
+
+    public override SortedDictionary<string, string> GetVariables()
+    {
+        var outVars = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        outVars["INST_NAME"] = Name();
+        outVars["INST_ID"] = Id();
+        outVars["INST_DIR"] = ToNativeSeparators(QDirAbsolutePath(InstanceRoot()));
+        outVars["INST_MC_DIR"] = ToNativeSeparators(QDirAbsolutePath(GameRoot()));
+        outVars["INST_JAVA"] = ToNativeSeparators(QDirAbsolutePath(Variant.AsString(Settings().Get("JavaPath"))));
+        outVars["INST_JAVA_ARGS"] = string.Join(" ", JavaArguments());
+        outVars["NO_COLOR"] = "1";
+        if (OperatingSystem.IsMacOS())
+        {
+            // get library for Steam overlay support
+            var steamDyldInsertLibraries = Environment.GetEnvironmentVariable("STEAM_DYLD_INSERT_LIBRARIES");
+            if (!string.IsNullOrEmpty(steamDyldInsertLibraries))
+            {
+                outVars["DYLD_INSERT_LIBRARIES"] = steamDyldInsertLibraries;
+            }
+        }
+        return outVars;
+    }
+
+    public override ProcessEnvironment CreateEnvironment()
+    {
+        // prepare the process environment
+        // TODO(P5): upstream starts from CleanEnviroment() (the sanitized OS environment);
+        // process spawning is phase P5, so the port starts from an empty environment.
+        var env = new ProcessEnvironment();
+
+        // export some infos
+        foreach (var (key, value) in GetVariables())
+        {
+            env.Insert(key, value);
+        }
+        // custom env
+        InsertCustomEnv(env, Variant.AsString(Settings().Get("Env")));
+        return env;
+    }
+
+    public override ProcessEnvironment CreateLaunchEnvironment()
+    {
+        // prepare the process environment
+        var env = CreateEnvironment();
+
+        if (OperatingSystem.IsLinux())
+        {
+            if (Variant.AsBool(Settings().Get("EnableMangoHud")))
+            {
+                // TODO(P5): the C++ also checks APPLICATION->capabilities() and probes the
+                // MangoHud libraries with LibraryUtils::findMangoHud().
+                var preloadList = new List<string>();
+                var value = env.Value("LD_PRELOAD");
+                if (value.Length != 0)
+                {
+                    preloadList = value.Split(':').ToList();
+                }
+
+                env.Insert("LD_PRELOAD", string.Join(":", preloadList));
+                env.Insert("MANGOHUD", "1");
+            }
+
+            if (Variant.AsBool(Settings().Get("UseDiscreteGpu")))
+            {
+                // TODO(P5): the C++ first tries switcheroo-control via DBus; without it the
+                // open/proprietary driver fallbacks below apply.
+                // Open Source Drivers
+                env.Insert("DRI_PRIME", "1");
+                // Proprietary Nvidia Drivers
+                env.Insert("__NV_PRIME_RENDER_OFFLOAD", "1");
+                env.Insert("__VK_LAYER_NV_optimus", "NVIDIA_only");
+                env.Insert("__GLX_VENDOR_LIBRARY_NAME", "nvidia");
+            }
+
+            if (Variant.AsBool(Settings().Get("UseZink")))
+            {
+                // taken from https://wiki.archlinux.org/title/OpenGL#OpenGL_over_Vulkan_(Zink)
+                env.Insert("__GLX_VENDOR_LIBRARY_NAME", "mesa");
+                env.Insert("MESA_LOADER_DRIVER_OVERRIDE", "zink");
+                env.Insert("GALLIUM_DRIVER", "zink");
+                env.Insert("LIBGL_KOPPER_DRI2", "1");
+            }
+        }
+        return env;
+    }
+
+    public List<string> ProcessMinecraftArgs(AuthSession? session, MinecraftTarget? targetToJoin)
+    {
+        var profile = _components!.GetProfile()!;
+        var args = profile.GetMinecraftArguments()
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .ToList();
+        foreach (var tweaker in profile.GetTweakers())
+        {
+            args.Add("--tweakClass");
+            args.Add(tweaker);
+        }
+
+        if (targetToJoin is not null)
+        {
+            if (targetToJoin.Address.Length != 0)
+            {
+                if (profile.HasTrait("feature:is_quick_play_multiplayer"))
+                {
+                    args.Add("--quickPlayMultiplayer");
+                    args.Add(targetToJoin.Address + ':' + targetToJoin.Port.ToString(CultureInfo.InvariantCulture));
+                }
+                else
+                {
+                    args.Add("--server");
+                    args.Add(targetToJoin.Address);
+                    args.Add("--port");
+                    args.Add(targetToJoin.Port.ToString(CultureInfo.InvariantCulture));
+                }
+            }
+            else if (targetToJoin.World.Length != 0 && profile.HasTrait("feature:is_quick_play_singleplayer"))
+            {
+                args.Add("--quickPlaySingleplayer");
+                args.Add(targetToJoin.World);
+            }
+        }
+
+        var tokenMapping = MakeProfileVarMapping(profile);
+
+        // yggdrasil!
+        if (session is not null)
+        {
+            // token_mapping["auth_username"] = session->username;
+            tokenMapping["auth_session"] = session.Session;
+            tokenMapping["auth_access_token"] = session.AccessToken;
+            tokenMapping["auth_player_name"] = session.PlayerName;
+            tokenMapping["auth_uuid"] = session.Uuid;
+            tokenMapping["user_properties"] = session.SerializeUserProperties();
+            tokenMapping["user_type"] = session.UserType;
+
+            if (session.LaunchMode == LaunchMode.Demo)
+            {
+                args.Add("--demo");
+            }
+        }
+
+        for (var i = 0; i < args.Count; i++)
+        {
+            args[i] = ReplaceTokensIn(args[i], tokenMapping);
+        }
+        return args;
+    }
+
+    public override List<string> VerboseDescription(AuthSession? session, MinecraftTarget? targetToJoin)
+    {
+        const string indent = "  ";
+        const string emptyLine = "";
+
+        var outList = new List<string>();
+
+        outList.Add("Components:");
+        var components = GetPackProfile();
+        for (var i = 0; i < components.Components.Count; ++i)
+        {
+            var component = components.Components[i];
+            outList.Add(indent + FormattableString.Invariant(
+                $"{i + 1}) {component.GetName()} ({component.GetID()}) {component.GetVersion()}"));
+        }
+        outList.Add(emptyLine);
+
+        outList.Add("Launcher: " + GetLauncher());
+        outList.Add("Main class: " + GetMainClass());
+        outList.Add(emptyLine);
+
+        var profile = components.GetProfile();
+
+        // mods and core mods
+        void PrintModList(string label, ModFolderModel model)
+        {
+            if (model.Size != 0)
+            {
+                outList.Add($"{label}:");
+                var modList = model.AllMods();
+                modList.Sort((a, b) =>
+                {
+                    // localeAwareCompare maps to the current-culture comparison
+                    var aName = CompleteBaseName(a.Fileinfo.Name);
+                    var bName = CompleteBaseName(b.Fileinfo.Name);
+                    return string.Compare(aName, bName, StringComparison.CurrentCulture);
+                });
+                foreach (var mod in modList)
+                {
+                    if (mod.Type == ResourceType.Folder)
+                    {
+                        outList.Add("  [🖿] " + CompleteBaseName(mod.Fileinfo.Name) + " (folder)");
+                        continue;
+                    }
+
+                    if (mod.Enabled)
+                    {
+                        outList.Add("  [✔] " + CompleteBaseName(mod.Fileinfo.Name));
+                    }
+                    else
+                    {
+                        outList.Add("  [✘] " + CompleteBaseName(mod.Fileinfo.Name) + " (disabled)");
+                    }
+                }
+                outList.Add(emptyLine);
+            }
+        }
+
+        PrintModList("Mods", LoaderModList());
+        PrintModList("Core Mods", CoreModList());
+
+        // jar mods
+        if (profile is not null)
+        {
+            var jarMods = profile.GetJarMods();
+            if (jarMods.Count != 0)
+            {
+                outList.Add("Jar Mods:");
+                foreach (var jarmod in jarMods)
+                {
+                    var displayname = jarmod.DisplayName(RuntimeContext);
+                    var realname = jarmod.Filename(RuntimeContext);
+                    outList.Add(displayname != realname
+                        ? indent + displayname + " (" + realname + ")"
+                        : indent + realname);
+                }
+                outList.Add(emptyLine);
+            }
+        }
+
+        // traits
+        var allTraits = Traits();
+        if (allTraits.Count != 0)
+        {
+            outList.Add("Traits:");
+            foreach (var trait in allTraits)
+            {
+                outList.Add(indent + trait);
+            }
+            outList.Add(emptyLine);
+        }
+
+        // native libraries
+        var settings = Settings();
+        var nativeOpenAL = Variant.AsBool(settings.Get("UseNativeOpenAL"));
+        var nativeGLFW = Variant.AsBool(settings.Get("UseNativeGLFW"));
+        var nativeSDL = Variant.AsBool(settings.Get("UseNativeSDL"));
+        if (nativeOpenAL || nativeGLFW || nativeSDL)
+        {
+            if (nativeOpenAL)
+            {
+                outList.Add("Using system OpenAL.");
+            }
+            if (nativeGLFW)
+            {
+                outList.Add("Using system GLFW.");
+            }
+            if (nativeSDL)
+            {
+                outList.Add("Using system SDL.");
+            }
+            outList.Add(emptyLine);
+        }
+
+        // libraries and class path.
+        if (profile is not null)
+        {
+            outList.Add("Libraries:");
+            var jars = new List<string>();
+            var nativeJars = new List<string>();
+            profile.GetLibraryFiles(RuntimeContext, jars, nativeJars, GetLocalLibraryPath(), BinRoot());
+            foreach (var file in jars)
+            {
+                outList.Add(indent + file);
+            }
+            outList.Add(emptyLine);
+            outList.Add("Native libraries:");
+            foreach (var file in nativeJars)
+            {
+                outList.Add(indent + file);
+            }
+            outList.Add(emptyLine);
+        }
+
+        outList.Add("Natives path:");
+        outList.Add(indent + GetNativePath());
+        outList.Add(emptyLine);
+
+        // minecraft arguments
+        var params_ = ProcessMinecraftArgs(null, targetToJoin);
+        outList.Add("Minecraft arguments:");
+        outList.Add(indent + string.Join(' ', params_));
+        outList.Add(emptyLine);
+
+        // window size
+        string windowParams;
+        if (Variant.AsBool(settings.Get("LaunchMaximized")))
+        {
+            // NOTE: the launch-script builder (P5) computes a screen-size form; the verbose
+            // description only ever prints the "max (if available)" placeholder upstream.
+            windowParams = "max (if available)";
+        }
+        else
+        {
+            windowParams = FormattableString.Invariant(
+                $"{Variant.AsInt(settings.Get("MinecraftWinWidth"))} x {Variant.AsInt(settings.Get("MinecraftWinHeight"))}");
+        }
+        outList.Add("Window size: " + windowParams);
+        outList.Add(emptyLine);
+
+        // environment variables
+        var env = Variant.AsString(settings.Get("Env"));
+        var envMap = JsonUtils.ToMap(env);
+        if (envMap.Count != 0)
+        {
+            outList.Add("Custom environment variables:");
+            foreach (var (key, value) in envMap)
+            {
+                outList.Add(indent + key + "=" + value);
+            }
+            outList.Add(emptyLine);
+        }
+
+        return outList;
+    }
+
+    protected SortedDictionary<string, string> CreateCensorFilterFromSession(AuthSession? session)
+    {
+        var filter = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        if (session is null)
+        {
+            return filter;
+        }
+        void AddToFilter(string key, string value)
+        {
+            if (key.Trim().Length != 0)
+            {
+                filter[key] = value;
+            }
+        }
+        if (session.Session != "-")
+        {
+            AddToFilter(session.Session, "<SESSION ID>");
+        }
+        if (session.AccessToken != "0")
+        {
+            AddToFilter(session.AccessToken, "<ACCESS TOKEN>");
+        }
+        AddToFilter(session.Uuid, "<PROFILE ID>");
+
+        return filter;
+    }
+
+    protected SortedDictionary<string, string> MakeProfileVarMapping(LaunchProfile profile)
+    {
+        var result = new SortedDictionary<string, string>(StringComparer.Ordinal);
+
+        result["profile_name"] = Name();
+        result["version_name"] = profile.GetMinecraftVersion();
+        result["version_type"] = profile.GetMinecraftVersionType();
+
+        var absRootDir = QDirAbsolutePath(GameRoot());
+        result["game_directory"] = absRootDir;
+        var absAssetsDir = QDirAbsolutePath("assets/");
+        var assets = profile.GetMinecraftAssets();
+        result["game_assets"] = GetAssetsDir(assets.Id, ResourcesDir());
+
+        // 1.7.3+ assets tokens
+        result["assets_root"] = absAssetsDir;
+        result["assets_index_name"] = assets.Id;
+
+        result["library_directory"] = MetaCache?.GetBasePath("libraries") ?? "";
+
+        return result;
+    }
+
+    public override IReadOnlyList<string> GetLogFileSearchPaths()
+    {
+        return
+        [
+            FileSystem.PathCombine(GameRoot(), "crash-reports"),
+            FileSystem.PathCombine(GameRoot(), "logs"),
+            GameRoot(),
+        ];
+    }
+
+    public override string GetStatusbarDescription()
+    {
+        var traitsList = new List<string>();
+        if (HasVersionBroken)
+        {
+            traitsList.Add("broken");
+        }
+
+        var mcVersion = _components!.GetComponentVersion("net.minecraft");
+        if (mcVersion.Length == 0)
+        {
+            // Load component info if needed. Upstream calls PackProfile::reload(Offline): its
+            // inline (synchronous) part is saveNow + invalidateLaunchProfile + load, only the
+            // resolve is a task — mirror the synchronous part and re-read immediately.
+            _components.SaveNow();
+            _components.InvalidateLaunchProfile();
+            _components.Load();
+            mcVersion = _components.GetComponentVersion("net.minecraft");
+        }
+
+        var description = $"Minecraft {mcVersion}";
+        if (Variant.AsBool(_settings.Get("ShowGameTime")))
+        {
+            var withoutDays = GlobalSettings() is { } appSettings &&
+                              Variant.AsBool(appSettings.Get("ShowGameTimeWithoutDays"));
+            if (LastTimePlayed() > 0 && LastLaunch() > 0)
+            {
+                var lastLaunchTime = DateTimeOffset.FromUnixTimeMilliseconds(LastLaunch()).LocalDateTime;
+                description += $", last played on {lastLaunchTime.ToString("g", CultureInfo.CurrentCulture)} for " +
+                               PrettifyDuration(LastTimePlayed(), withoutDays);
+            }
+
+            if (TotalTimePlayed() > 0)
+            {
+                description += ", total played for " + PrettifyDuration(TotalTimePlayed(), withoutDays);
+            }
+        }
+        if (HasCrashed)
+        {
+            description += ", has crashed.";
+        }
+        return description;
+    }
+
+    // FIXME upstream: remove (the launch pipeline rebuilds these from the profile)
+    public List<string> GetClassPath()
+    {
+        var jars = new List<string>();
+        var nativeJars = new List<string>();
+        var profile = _components!.GetProfile()!;
+        profile.GetLibraryFiles(RuntimeContext, jars, nativeJars, GetLocalLibraryPath(), BinRoot());
+        return jars;
+    }
+
+    public List<string> GetNativeJars()
+    {
+        var jars = new List<string>();
+        var nativeJars = new List<string>();
+        var profile = _components!.GetProfile()!;
+        profile.GetLibraryFiles(RuntimeContext, jars, nativeJars, GetLocalLibraryPath(), BinRoot());
+        return nativeJars;
+    }
+
+    public string GetMainClass()
+    {
+        var profile = _components!.GetProfile()!;
+        return profile.GetMainClass();
+    }
+
+    public JavaVersion GetJavaVersion()
+    {
+        return new JavaVersion(Variant.AsString(Settings().Get("JavaVersion")));
+    }
+
+    //////  Mod Lists //////
+
+    public ModFolderModel LoaderModList()
+    {
+        if (_loaderModList is null)
+        {
+            var isIndexed = GlobalSettings() is not { } appSettings ||
+                            !Variant.AsBool(appSettings.Get("ModMetadataDisabled"));
+            _loaderModList = new ModFolderModel(ModsRoot(), isIndexed, createDir: true);
+        }
+        return _loaderModList;
+    }
+
+    public ModFolderModel CoreModList()
+    {
+        if (_coreModList is null)
+        {
+            var isIndexed = GlobalSettings() is not { } appSettings ||
+                            !Variant.AsBool(appSettings.Get("ModMetadataDisabled"));
+            _coreModList = new ModFolderModel(CoreModsDir(), isIndexed, createDir: true);
+        }
+        return _coreModList;
+    }
+
+    public ModFolderModel NilModList()
+    {
+        if (_nilModList is null)
+        {
+            var isIndexed = GlobalSettings() is not { } appSettings ||
+                            !Variant.AsBool(appSettings.Get("ModMetadataDisabled"));
+            // NOTE: upstream does not create the folder for the nil mod list (4th arg false)
+            _nilModList = new ModFolderModel(NilModsDir(), isIndexed, createDir: false);
+        }
+        return _nilModList;
+    }
+
+    // (resourcePackList()/texturePackList()/shaderPackList()/dataPackList()/resourceLists()/
+    //  worldList() arrive with the remaining P3b folder models; only ModFolderModel and
+    //  WorldList are ported so far. WorldList can be constructed from WorldDir() when needed.)
+
+    public List<Mod> GetJarMods()
+    {
+        var profile = _components!.GetProfile()!;
+        var mods = new List<Mod>();
+        foreach (var jarmod in profile.GetJarMods())
+        {
+            var jar = new List<string>();
+            var temp1 = new List<string>();
+            var temp2 = new List<string>();
+            var temp3 = new List<string>();
+            jarmod.GetApplicableFiles(RuntimeContext, jar, temp1, temp2, temp3, JarModsDir());
+            mods.Add(new Mod(new FileInfo(jar[0])));
+        }
+        return mods;
+    }
+
+    // ------------------------------------------------------------------ IPackProfileEnv
+
+    string IPackProfileEnv.InstanceRoot => InstanceRoot();
+
+    string IPackProfileEnv.InstanceName => Name();
+
+    RuntimeContext IPackProfileEnv.RuntimeContext => _runtimeContext;
+
+    // ------------------------------------------------------------------------ helpers
+
+    private static void InsertCustomEnv(ProcessEnvironment env, string value)
+    {
+        var envMap = JsonUtils.ToMap(value);
+        if (envMap.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var (key, varValue) in envMap)
+        {
+            env.Insert(key, varValue);
+        }
+    }
+
+    private static string ReplaceTokensIn(string text, IReadOnlyDictionary<string, string> with)
+    {
+        // TODO upstream: does this still work??
+        var result = new StringBuilder();
+        var lastCapturedEnd = 0;
+        foreach (Match match in TokenRegex.Matches(text))
+        {
+            result.Append(text, lastCapturedEnd, match.Index - lastCapturedEnd);
+            var key = match.Groups[1].Value;
+            if (with.TryGetValue(key, out var replacement))
+            {
+                result.Append(replacement);
+            }
+            lastCapturedEnd = match.Index + match.Length;
+        }
+        result.Append(text[lastCapturedEnd..]);
+        return result.ToString();
+    }
+
+    /// <summary>
+    /// Port of AssetsUtils::getAssetsDir reduced to the branch the profile variable mapping
+    /// needs (only the index's "virtual" and "mapToResources" booleans are consulted).
+    /// </summary>
+    private static string GetAssetsDir(string assetsId, string resourcesFolder)
+    {
+        var assetsDir = QDirAbsolutePath("assets/");
+        var indexPath = FileSystem.PathCombine(assetsDir, "indexes", assetsId + ".json");
+        var virtualRoot = FileSystem.PathCombine(assetsDir, "virtual", assetsId);
+
+        if (!File.Exists(indexPath))
+        {
+            // (upstream logs qCritical here)
+            return virtualRoot;
+        }
+        bool isVirtual;
+        bool mapToResources;
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(indexPath));
+            isVirtual = doc.RootElement.ValueKind == JsonValueKind.Object &&
+                        doc.RootElement.TryGetProperty("virtual", out var virtualProp) &&
+                        virtualProp.ValueKind is JsonValueKind.True or JsonValueKind.False &&
+                        virtualProp.GetBoolean();
+            mapToResources = doc.RootElement.ValueKind == JsonValueKind.Object &&
+                             doc.RootElement.TryGetProperty("mapToResources", out var mapProp) &&
+                             mapProp.ValueKind is JsonValueKind.True or JsonValueKind.False &&
+                             mapProp.GetBoolean();
+        }
+        catch (Exception e) when (e is JsonException or IOException)
+        {
+            // (upstream logs qCritical here)
+            return virtualRoot;
+        }
+
+        if (isVirtual)
+        {
+            return virtualRoot;
+        }
+        if (mapToResources)
+        {
+            return resourcesFolder;
+        }
+        return virtualRoot;
+    }
+
+    /// <summary>QStandardPaths::findExecutable: locate `name` on PATH; "" when not found.</summary>
+    private static string FindExecutable(string name)
+    {
+        var pathEnv = Environment.GetEnvironmentVariable("PATH");
+        if (string.IsNullOrEmpty(pathEnv))
+        {
+            return "";
+        }
+        var suffix = OperatingSystem.IsWindows() ? ".exe" : "";
+        foreach (var dir in pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var candidate = Path.Combine(dir, name + suffix);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+        return "";
+    }
+
+    /// <summary>QFileInfo::completeBaseName(): the file name up to the last dot.</summary>
+    private static string CompleteBaseName(string fileName)
+    {
+        var dot = fileName.LastIndexOf('.');
+        return dot > 0 ? fileName[..dot] : fileName;
+    }
+
+    /// <summary>QDir::toNativeSeparators.</summary>
+    private static string ToNativeSeparators(string path) =>
+        Path.DirectorySeparatorChar != '/' ? path.Replace('/', Path.DirectorySeparatorChar) : path;
+
+    /// <summary>QDir(path).absolutePath(): relative paths anchor at the current directory.</summary>
+    private static string QDirAbsolutePath(string path)
+    {
+        if (path.Length == 0)
+        {
+            return FileSystem.PathCombine(Directory.GetCurrentDirectory(), "");
+        }
+        if (path.StartsWith('/') || (path.Length >= 2 && path[1] == ':'))
+        {
+            return FileSystem.PathCombine(path, "");
+        }
+        return FileSystem.PathCombine(Directory.GetCurrentDirectory(), path);
+    }
+
+    /// <summary>QFileInfo::exists(): file or directory.</summary>
+    private static bool FsExists(string path) => File.Exists(path) || Directory.Exists(path);
+
+    /// <summary>Port of Time::prettifyDuration (MMCTime.cpp) for the status bar text.</summary>
+    private static string PrettifyDuration(long duration, bool noDays)
+    {
+        var seconds = (int)(duration % 60);
+        duration /= 60;
+        var minutes = (int)(duration % 60);
+        duration /= 60;
+        var hours = (int)(noDays ? duration : duration % 24);
+        var days = (int)(noDays ? 0 : duration / 24);
+        if (hours == 0 && days == 0)
+        {
+            return $"{minutes}min {seconds}s";
+        }
+        if (days == 0)
+        {
+            return $"{hours}h {minutes}min";
+        }
+        return $"{days}d {hours}h {minutes}min";
+    }
+
+    // ------------------------------------------------------------------------ data
+
+    protected readonly PackProfile? _components; // unique_ptr<PackProfile> m_components (set in ctor)
+    private ModFolderModel? _loaderModList;
+    private ModFolderModel? _coreModList;
+    private ModFolderModel? _nilModList;
+    // (the resource pack / texture pack / shader pack / data pack models and the world list
+    //  arrive with the remaining P3b folder-model ports)
+}
