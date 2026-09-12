@@ -1,0 +1,59 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Port of the FTB App root-path discovery of ui/pages/modplatform/import_ftb/ListModel.cpp
+// (getFTBRoot/getDynamicPath): the FTB App root is ~/.ftba (macOS: under Library/
+// Application Support) and the instances folder comes from the "instanceLocation" key of
+// storage/settings.json (fallback bin/settings.json).
+//
+// Deviation: RootPath is a settable static hook (the launcher-wide "FTBAppInstancesPath"
+// setting and the QProcessEnvironment lookups of the original are UI concerns); tests
+// restore it.
+using System.Text.Json;
+using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Json;
+
+namespace FlintLauncher.Core.ModPlatform.FtbApp;
+
+public static class FtbAppPaths
+{
+    /// <summary>The FTB App root (getFTBRoot()); settable for tests.</summary>
+    public static string RootPath { get; set; } = DefaultRoot();
+
+    /// <summary>Port of getFTBRoot: ~/.ftba, under Library/Application Support on macOS.</summary>
+    public static string DefaultRoot()
+    {
+        var partialPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (OperatingSystem.IsMacOS())
+        {
+            partialPath = FileSystem.PathCombine(partialPath, "Library/Application Support");
+        }
+        return FileSystem.PathCombine(partialPath, ".ftba");
+    }
+
+    /// <summary>Port of getDynamicPath: the "instanceLocation" value of the FTB App
+    /// settings.json (storage/, then bin/); "" when neither file exists or cannot be
+    /// parsed.</summary>
+    public static string GetDynamicInstancesPath()
+    {
+        var settingsPath = FileSystem.PathCombine(RootPath, "storage", "settings.json");
+        if (!File.Exists(settingsPath))
+        {
+            settingsPath = FileSystem.PathCombine(RootPath, "bin", "settings.json");
+        }
+        if (!File.Exists(settingsPath))
+        {
+            return "";
+        }
+        try
+        {
+            using var doc = JsonUtils.RequireDocumentFromFile(settingsPath, "FTB App settings file");
+            var root = doc.RootElement;
+            return root.TryGetProperty("instanceLocation", out var location)
+                && location.ValueKind == JsonValueKind.String
+                ? location.GetString() ?? "" : "";
+        }
+        catch (Exception e) when (e is JsonParseException or JsonException)
+        {
+            return "";
+        }
+    }
+}
