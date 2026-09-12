@@ -1,0 +1,333 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Tests for the Net stack: sinks/validators offline, HttpMetaCache persistence (Prism-compatible
+// JSON index), and live requests against a local HTTP server (304 revalidation, checksums, retry).
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
+using FlintLauncher.Core.Net;
+using FlintLauncher.Core.Tasks;
+using Xunit;
+
+namespace FlintLauncher.Tests;
+
+public class NetStackTests : IDisposable
+{
+    private readonly string _dir = Path.Combine(Path.GetTempPath(), $"flint-net-{Guid.NewGuid():N}");
+
+    public void Dispose()
+    {
+        try
+        {
+            Directory.Delete(_dir, recursive: true);
+        }
+        catch (DirectoryNotFoundException)
+        {
+        }
+    }
+
+    private string TempPath(string name) => Path.Combine(_dir, name);
+
+    // ---------------------------------------------------------------- sinks/validators
+
+    [Fact]
+    public void ChecksumValidator_Matches_And_Mismatches()
+    {
+        var data = "hello world"u8.ToArray();
+        var expected = Convert.ToHexString(SHA1.HashData(data)).ToLowerInvariant();
+
+        var ok = ChecksumValidator.FromHex(HashAlgorithmName.SHA1, expected);
+        var spec = new NetRequestSpec { Url = new Uri("https://example.invalid/x") };
+        Assert.True(ok.Init(spec));
+        Assert.True(ok.Write(data));
+        Assert.True(ok.Validate(new NetResponseInfo { Url = spec.Url, StatusCode = 200 }));
+
+        var bad = ChecksumValidator.FromHex(HashAlgorithmName.SHA1, new string('0', 40));
+        Assert.True(bad.Init(spec));
+        Assert.True(bad.Write(data));
+        Assert.False(bad.Validate(new NetResponseInfo { Url = spec.Url, StatusCode = 200 }));
+    }
+
+    [Fact]
+    public void ByteArraySink_StoresData()
+    {
+        var sink = new ByteArraySink();
+        var spec = new NetRequestSpec { Url = new Uri("https://example.invalid/x") };
+        Assert.True(sink.Init(spec));
+        Assert.True(sink.Write("chunk1 "u8.ToArray()));
+        Assert.True(sink.Write("chunk2"u8.ToArray()));
+        Assert.Equal("chunk1 chunk2", sink.DataAsString);
+        Assert.True(sink.HasLocalData());
+    }
+
+    // ---------------------------------------------------------------- HttpMetaCache
+
+    [Fact]
+    public void MetaCache_SaveLoad_RoundTrip()
+    {
+        var indexPath = TempPath("metacache");
+        var basePath = TempPath("cache-root");
+        Directory.CreateDirectory(basePath);
+
+        long timestamp;
+        {
+            using var cache = new HttpMetaCache(indexPath);
+            cache.AddBase("META", basePath);
+
+            var file = Path.Combine(basePath, "net.minecraft/index.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+            File.WriteAllText(file, "{}");
+
+            var entry = cache.ResolveEntry("META", "net.minecraft/index.json");
+            Assert.True(entry.IsStale);
+
+            timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            entry.SetStale(false);
+            entry.Etag = "\"abc123\"";
+            entry.Md5Sum = Convert.ToHexString(MD5.HashData("{}"u8.ToArray())).ToLowerInvariant();
+            entry.LocalChangedTimestamp = timestamp;
+            entry.RemoteChangedTimestamp = "Tue, 01 Jan 2030 00:00:00 GMT";
+            entry.IsEternal = true;
+            Assert.True(cache.UpdateEntry(entry));
+            cache.SaveNow();
+        }
+
+        // the persisted JSON must look like Prism's metacache format
+        var json = File.ReadAllText(indexPath);
+        Assert.Contains("\"version\":\"1\"", json);
+        Assert.Contains("\"base\":\"META\"", json);
+        Assert.Contains("\"path\":\"net.minecraft/index.json\"", json);
+        Assert.Contains("\"etag\":\"\\\"abc123\\\"\"", json);
+
+        using var cache2 = new HttpMetaCache(indexPath);
+        cache2.AddBase("META", basePath);
+        cache2.Load();
+
+        var resolved = cache2.ResolveEntry("META", "net.minecraft/index.json", "\"abc123\"");
+        Assert.False(resolved.IsStale);
+        Assert.Equal("\"abc123\"", resolved.Etag);
+        Assert.Equal(timestamp, resolved.LocalChangedTimestamp);
+    }
+
+    [Fact]
+    public void MetaCache_DisownsOnEtagMismatch()
+    {
+        var indexPath = TempPath("metacache");
+        var basePath = TempPath("cache-root2");
+        Directory.CreateDirectory(basePath);
+        var file = Path.Combine(basePath, "f.json");
+        File.WriteAllText(file, "{}");
+
+        using var cache = new HttpMetaCache(indexPath);
+        cache.AddBase("general", basePath);
+        var entry = cache.ResolveEntry("general", "f.json");
+        entry.SetStale(false);
+        entry.Etag = "\"old\"";
+        entry.Md5Sum = Convert.ToHexString(MD5.HashData("{}"u8.ToArray())).ToLowerInvariant();
+        entry.LocalChangedTimestamp = new DateTimeOffset(File.GetLastWriteTimeUtc(file)).ToUnixTimeMilliseconds();
+        entry.IsEternal = true;
+        Assert.True(cache.UpdateEntry(entry));
+
+        var mismatched = cache.ResolveEntry("general", "f.json", "\"new\"");
+        Assert.True(mismatched.IsStale);
+
+        // C++ semantics: an etag mismatch DISOWNS the entry (removes it from the map), so even
+        // a later resolve with the correct etag returns a fresh stale entry; recovery happens
+        // through a re-download + UpdateEntry.
+        var matched = cache.ResolveEntry("general", "f.json", "\"old\"");
+        Assert.True(matched.IsStale);
+    }
+
+    // ---------------------------------------------------------------- live requests
+
+    [Fact]
+    public async Task NetRequest_DownloadsToFile_WithChecksum()
+    {
+        using var server = new TestHttpServer(ctx =>
+        {
+            var body = "file-content-0123456789"u8.ToArray();
+            ctx.Response.StatusCode = 200;
+            ctx.Response.ContentLength64 = body.Length;
+            ctx.Response.OutputStream.Write(body);
+        });
+
+        var target = TempPath("download.bin");
+        var request = NetRequest.MakeFile(new Uri(server.Url + "/file"), target);
+        request.AddValidator(ChecksumValidator.FromHex(
+            HashAlgorithmName.SHA1,
+            Convert.ToHexString(SHA1.HashData("file-content-0123456789"u8.ToArray())).ToLowerInvariant()));
+
+        await request.StartAsync();
+
+        Assert.Equal(TaskState.Succeeded, request.State);
+        Assert.Equal("file-content-0123456789", await File.ReadAllTextAsync(target));
+    }
+
+    [Fact]
+    public async Task NetRequest_MetaCacheSink_Uses304Revalidation()
+    {
+        var servedBody = "cached-body"u8.ToArray();
+        var requestCount = 0;
+        using var server = new TestHttpServer(ctx =>
+        {
+            requestCount++;
+            var etag = "\"v1\"";
+            if (ctx.Request.Headers["If-None-Match"] == etag)
+            {
+                ctx.Response.StatusCode = 304;
+                return;
+            }
+            ctx.Response.StatusCode = 200;
+            ctx.Response.Headers["ETag"] = etag;
+            ctx.Response.ContentLength64 = servedBody.Length;
+            ctx.Response.OutputStream.Write(servedBody);
+        });
+
+        var indexPath = TempPath("metacache");
+        var basePath = TempPath("cache");
+        Directory.CreateDirectory(basePath);
+        var cache = new HttpMetaCache(indexPath);
+        cache.AddBase("general", basePath);
+
+        // first fetch: downloads and records the entry
+        var entry = cache.ResolveEntry("general", "thing.txt");
+        var first = NetRequest.MakeCached(cache, new Uri(server.Url + "/thing.txt"), entry, RequestOptions.MakeEternal);
+        await first.StartAsync();
+        Assert.Equal(TaskState.Succeeded, first.State);
+        Assert.Equal(1, requestCount);
+        Assert.Equal("cached-body", await File.ReadAllTextAsync(entry.GetFullPath()));
+        Assert.Equal("\"v1\"", entry.Etag);
+
+        // second fetch: server answers 304, local data is used (no rewrite)
+        var entry2 = cache.ResolveEntry("general", "thing.txt", "");
+        Assert.False(entry2.IsStale);
+        var second = NetRequest.MakeCached(cache, new Uri(server.Url + "/thing.txt"), entry2);
+        await second.StartAsync();
+        Assert.Equal(TaskState.Succeeded, second.State);
+        Assert.Equal(2, requestCount);
+        Assert.Equal("cached-body", await File.ReadAllTextAsync(entry2.GetFullPath()));
+    }
+
+    [Fact]
+    public async Task NetRequest_AutoRetry_On429()
+    {
+        var attempts = 0;
+        using var server = new TestHttpServer(ctx =>
+        {
+            attempts++;
+            if (attempts < 3)
+            {
+                ctx.Response.StatusCode = 429;
+                ctx.Response.Headers["Retry-After"] = "0";
+                return;
+            }
+            ctx.Response.StatusCode = 200;
+            var body = "ok"u8.ToArray();
+            ctx.Response.ContentLength64 = body.Length;
+            ctx.Response.OutputStream.Write(body);
+        });
+
+        var request = NetRequest.MakeByteArray(new Uri(server.Url + "/x"), RequestOptions.AutoRetry);
+        await request.StartAsync();
+
+        Assert.Equal(TaskState.Succeeded, request.State);
+        Assert.Equal(3, attempts);
+        Assert.Equal("ok", request.BodyAsString);
+    }
+
+    [Fact]
+    public async Task NetRequest_Fails_On404_WithStatus()
+    {
+        using var server = new TestHttpServer(ctx =>
+        {
+            ctx.Response.StatusCode = 404;
+        });
+
+        var request = NetRequest.MakeByteArray(new Uri(server.Url + "/missing"));
+        await request.StartAsync();
+
+        Assert.Equal(TaskState.Failed, request.State);
+        Assert.Contains("404", request.FailReason);
+    }
+
+    [Fact]
+    public async Task NetJob_RunsManyRequests()
+    {
+        using var server = new TestHttpServer(ctx =>
+        {
+            var body = Encoding.UTF8.GetBytes(ctx.Request.Url!.AbsolutePath);
+            ctx.Response.StatusCode = 200;
+            ctx.Response.ContentLength64 = body.Length;
+            ctx.Response.OutputStream.Write(body);
+        });
+
+        var job = new NetJob("test-job");
+        var requests = new List<NetRequest>();
+        for (var i = 0; i < 5; i++)
+        {
+            var request = NetRequest.MakeByteArray(new Uri($"{server.Url}/item{i}"));
+            requests.Add(request);
+            job.AddNetRequest(request);
+        }
+
+        await job.StartAsync();
+
+        Assert.Equal(TaskState.Succeeded, job.State);
+        foreach (var (request, i) in requests.Select((r, i) => (r, i)))
+        {
+            Assert.Equal(TaskState.Succeeded, request.State);
+            Assert.Equal($"/item{i}", request.BodyAsString);
+        }
+    }
+
+    private sealed class TestHttpServer : IDisposable
+    {
+        private readonly HttpListener _listener = new();
+
+        public TestHttpServer(Action<HttpListenerContext> handler)
+        {
+            var port = 47000 + Random.Shared.Next(2000);
+            _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+            _listener.Start();
+            Url = $"http://127.0.0.1:{port}";
+            _ = Task.Run(async () =>
+            {
+                while (_listener.IsListening)
+                {
+                    try
+                    {
+                        var context = await _listener.GetContextAsync();
+                        try
+                        {
+                            handler(context);
+                        }
+                        finally
+                        {
+                            context.Response.Close();
+                        }
+                    }
+                    catch (HttpListenerException)
+                    {
+                        break;
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        break;
+                    }
+                }
+            });
+        }
+
+        public string Url { get; }
+
+        public void Dispose()
+        {
+            try
+            {
+                _listener.Close();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
+    }
+}
