@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Tests for the InstanceImportTask dispatch: modpack type detection by marker file
 // (modrinth.index.json -> Modrinth, manifest.json -> Flame (FlameCreationTask, P6-b),
-// bin/modpack.jar -> Technic [stubbed failure], instance.cfg -> plain folder import,
-// unknown -> error), plus the download-from-URL path through the meta cache.
+// bin/modpack.jar -> Technic (TechnicPackProcessor, P6-b), instance.cfg -> plain folder
+// import, unknown -> error), plus the download-from-URL path through the meta cache.
 using System.IO.Compression;
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
@@ -144,9 +144,38 @@ public class InstanceImportTaskTests : IDisposable
     }
 
     [Fact]
-    public async Task TechnicZip_FailsWithNotSupported()
+    public async Task TechnicZip_DispatchesToTechnicPackProcessor()
     {
+        // the Technic branch now runs the TechnicPackProcessor; a bin/version.json marker
+        // makes this the plain modded flavor, so the flow is fully offline
         var zipPath = Path.Combine(_root, "technic.zip");
+        var dir = Path.Combine(_root, "technic-src");
+        Directory.CreateDirectory(Path.Combine(dir, "bin"));
+        Directory.CreateDirectory(Path.Combine(dir, "modpack"));
+        File.WriteAllText(Path.Combine(dir, "bin", "version.json"),
+            """{"inheritsFrom":"1.20.1","id":"technic-test","libraries":[]}""");
+        File.WriteAllText(Path.Combine(dir, "modpack", "options.txt"), "keepMe=1\n");
+        Assert.True(FlintLauncher.Core.IO.MMCZip.CompressDir(zipPath, dir));
+
+        var task = await RunImport(new Uri(zipPath));
+
+        Assert.True(task.WasSuccessful, task.FailReason);
+        var instanceDir = Path.Combine(_root, "instances", "Imported");
+        Assert.True(Directory.Exists(instanceDir));
+        // the pack contents landed in minecraft/ and the version.json flavor set the component
+        Assert.True(File.Exists(Path.Combine(instanceDir, "minecraft", "modpack", "options.txt")));
+        Assert.Contains("name=Imported", File.ReadAllText(Path.Combine(instanceDir, "instance.cfg")));
+        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(instanceDir, "mmc-pack.json")));
+        Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
+            c => c.GetProperty("uid").GetString() == "net.minecraft"
+                 && c.GetProperty("version").GetString() == "1.20.1");
+    }
+
+    [Fact]
+    public async Task TechnicZip_WithCorruptModpackJar_Fails()
+    {
+        // a bin/modpack.jar marker that is not a zip fails the pack processor
+        var zipPath = Path.Combine(_root, "technic-bad.zip");
         using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
         {
             var entry = zip.CreateEntry("bin/modpack.jar");
@@ -158,7 +187,7 @@ public class InstanceImportTaskTests : IDisposable
         var task = await RunImport(new Uri(zipPath));
 
         Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("not supported", task.FailReason);
+        Assert.Contains("bin/modpack.jar", task.FailReason);
     }
 
     [Fact]

@@ -14,12 +14,13 @@
 //    detection is skipped and the icon key is passed through unchanged.
 //  - Remote downloads use MetaCache when set (APPLICATION->metacache()), otherwise a plain
 //    file download into the staging folder.
-//  - The Technic branch fails with a clear message for P6-b to fill in.
+//  - The Technic branch runs the TechnicPackProcessor (P6-b).
 using System.IO.Compression;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
+using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 
@@ -181,7 +182,7 @@ public sealed partial class InstanceImportTask : InstanceTask
                 ProcessMultiMC();
                 return;
             case ModpackType.Technic:
-                ProcessTechnic();
+                await ProcessTechnic(cancellationToken);
                 return;
             case ModpackType.Flame:
                 await ProcessFlame(cancellationToken);
@@ -228,10 +229,23 @@ public sealed partial class InstanceImportTask : InstanceTask
         }
     }
 
-    private void ProcessTechnic()
+    private async Task ProcessTechnic(CancellationToken cancellationToken)
     {
-        // TODO(P6-b): the Technic pack processor.
-        EmitFailed("Technic modpacks are not supported yet.");
+        // Port of InstanceImportTask::processTechnic: the marker-detected Technic zip has no
+        // separate minecraft version (that only the Solder/zip install tasks know), so the
+        // pack processor runs with an empty version — a modpack.jar without version.json
+        // therefore fails like upstream.
+        var failure = TechnicPackProcessor.Run(
+            GlobalSettings ?? throw new InvalidOperationException(
+                "InstanceTask requires SetParentSettings before execution."),
+            Name(), Icon, StagingPath);
+        if (failure is not null)
+        {
+            EmitFailed(failure);
+            return;
+        }
+
+        EmitSucceeded();
     }
 
     private void ProcessMultiMC()
