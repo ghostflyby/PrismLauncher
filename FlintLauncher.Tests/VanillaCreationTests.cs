@@ -1,0 +1,175 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Tests for the VanillaCreationTask port: folder layout, instance.cfg keys and the initial
+// mmc-pack.json, verified through the real PackProfile loader.
+using System.Text.Json;
+using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Instances.Creation;
+using FlintLauncher.Core.Minecraft;
+using Xunit;
+
+namespace Flint.Tests;
+
+public class VanillaCreationTests : IDisposable
+{
+    private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-vanilla-{Guid.NewGuid():N}");
+    private readonly string _instancesDir;
+    private readonly string _groupFile;
+    private readonly TestGlobalSettings _global = new();
+
+    public VanillaCreationTests()
+    {
+        Directory.CreateDirectory(_root);
+        _instancesDir = Path.Combine(_root, "instances");
+        Directory.CreateDirectory(_instancesDir);
+        _groupFile = Path.Combine(_root, "instgroups.json");
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            Directory.Delete(_root, recursive: true);
+        }
+        catch (DirectoryNotFoundException)
+        {
+        }
+    }
+
+    private InstanceList CreateList() => new(_global, [_instancesDir]) { GroupFilePath = _groupFile };
+
+    private VanillaCreationTask CreateTask(string version, string name)
+    {
+        var task = new VanillaCreationTask(version);
+        // what NewInstanceDialog submits
+        task.SetName(name);
+        task.SetIcon("flint-icon");
+        task.SetGroup("Vanilla");
+        task.SetParentSettings(_global);
+        return task;
+    }
+
+    [Fact]
+    public async Task Create_WritesFolderInstanceCfgAndMmcPack()
+    {
+        var list = CreateList();
+        // probe the (empty) list first — like the launcher's startup scan — so the commit
+        // can persist the group into instgroups.json
+        Assert.Equal(InstListError.NoError, list.LoadList());
+
+        var task = CreateTask("1.20.1", "Test Instance");
+
+        await list.WrapInstanceTask(task).StartAsync();
+        Assert.True(task.WasSuccessful);
+
+        var dir = Path.Combine(_instancesDir, "Test Instance");
+        Assert.True(Directory.Exists(dir));
+
+        // instance.cfg: name/iconKey/uuid written by the instance shell
+        var cfgPath = Path.Combine(dir, "instance.cfg");
+        Assert.True(File.Exists(cfgPath));
+        var cfg = File.ReadAllText(cfgPath);
+        Assert.Contains("name=Test Instance", cfg);
+        Assert.Contains("iconKey=flint-icon", cfg);
+        Assert.Contains("uuid=", cfg);
+
+        // mmc-pack.json: the initial net.minecraft component
+        using (var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "mmc-pack.json"))))
+        {
+            var root = doc.RootElement;
+            Assert.Equal(1, root.GetProperty("formatVersion").GetInt32());
+            var components = root.GetProperty("components");
+            var arr = components.EnumerateArray().ToList();
+            var entry = Assert.Single(arr);
+            Assert.Equal("net.minecraft", entry.GetProperty("uid").GetString());
+            Assert.Equal("1.20.1", entry.GetProperty("version").GetString());
+            Assert.True(entry.GetProperty("important").GetBoolean());
+        }
+
+        // reload from disk: the created folder is discoverable and loadable
+        list.LoadList();
+        var inst = Assert.IsType<FlintLauncher.Core.Instances.MinecraftInstance>(list.GetInstanceById("Test Instance"));
+        Assert.Equal("Test Instance", inst.Name());
+        Assert.Equal("Vanilla", list.GetInstanceGroup("Test Instance"));
+
+        // PackProfile.Load finds the net.minecraft component with the version
+        var profile = inst.GetPackProfile();
+        Assert.True(profile.Load());
+        var component = profile.GetComponent("net.minecraft");
+        Assert.NotNull(component);
+        Assert.Equal("1.20.1", component!.Version);
+        Assert.True(component.Important);
+    }
+
+    [Fact]
+    public async Task Create_WithLoader_AddsLoaderComponent()
+    {
+        var list = CreateList();
+        var task = new VanillaCreationTask("1.20.1", "net.fabricmc.fabric-loader", "0.15.0");
+        task.SetName("Fab");
+        task.SetIcon("default");
+        task.SetParentSettings(_global);
+
+        await list.WrapInstanceTask(task).StartAsync();
+        Assert.True(task.WasSuccessful);
+
+        using var doc = JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(_instancesDir, "Fab", "mmc-pack.json")));
+        var uids = doc.RootElement.GetProperty("components").EnumerateArray()
+            .Select(c => c.GetProperty("uid").GetString()!).ToList();
+        Assert.Equal(["net.minecraft", "net.fabricmc.fabric-loader"], uids);
+
+        var fabric = doc.RootElement.GetProperty("components").EnumerateArray().Last();
+        Assert.Equal("0.15.0", fabric.GetProperty("version").GetString());
+        // only net.minecraft is marked important
+        Assert.False(fabric.TryGetProperty("important", out _));
+    }
+
+    [Fact]
+    public async Task Create_NameCollisionGetsFreshFolder()
+    {
+        var list = CreateList();
+        var first = CreateTask("1.20.1", "Test Instance");
+        await list.WrapInstanceTask(first).StartAsync();
+        Assert.True(first.WasSuccessful);
+
+        var second = CreateTask("1.20.1", "Test Instance");
+        await list.WrapInstanceTask(second).StartAsync();
+        Assert.True(second.WasSuccessful);
+
+        Assert.True(Directory.Exists(Path.Combine(_instancesDir, "Test Instance(1)")));
+
+        list.LoadList();
+        Assert.Equal(2, list.Count);
+        Assert.NotNull(list.GetInstanceById("Test Instance"));
+        Assert.NotNull(list.GetInstanceById("Test Instance(1)"));
+    }
+
+    [Fact]
+    public async Task Create_WithoutParentSettings_FailsTheTask()
+    {
+        var task = new VanillaCreationTask("1.20.1");
+        task.SetName("Orphan");
+        task.StagingPath = Path.Combine(_root, "orphan");
+        Directory.CreateDirectory(task.StagingPath);
+
+        await task.StartAsync();
+        Assert.Equal(FlintLauncher.Core.Tasks.TaskState.Failed, task.State);
+    }
+
+    [Fact]
+    public async Task Create_StagingFolderIsConsumed()
+    {
+        var list = CreateList();
+        var task = CreateTask("1.21.4", "Consumed");
+
+        await list.WrapInstanceTask(task).StartAsync();
+        Assert.True(task.WasSuccessful);
+
+        var tempRoot = Path.Combine(_instancesDir, ".tmp");
+        Assert.True(Directory.Exists(tempRoot));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(tempRoot));
+
+        // the staging folder itself became the instance folder
+        Assert.True(File.Exists(Path.Combine(_instancesDir, "Consumed", "instance.cfg")));
+    }
+}

@@ -81,7 +81,7 @@ public class InstanceTests : IDisposable
     [Fact]
     public void CommandOverrides_ResolveThroughGate()
     {
-        _global.Set("PreLaunchCommand", "echo global");
+        _global.StubSet("PreLaunchCommand", "echo global");
         var instance = CreateInstance();
 
         // gate off -> global value
@@ -192,7 +192,7 @@ public class InstanceTests : IDisposable
     [Fact]
     public void Playtime_SkippedWhenRecordingDisabled()
     {
-        _global.Set("RecordGameTime", false);
+        _global.StubSet("RecordGameTime", false);
         var instance = CreateInstance();
         instance.SetMinecraftRunning(true);
         instance.SetMinecraftRunning(false);
@@ -206,7 +206,7 @@ public class InstanceTests : IDisposable
         var instance = CreateInstance();
         instance.Settings().Set("AutomaticJava", true);
         instance.Settings().Set("OverrideJavaLocation", true);
-        _global.Set("AutomaticJavaSwitch", true);
+        _global.StubSet("AutomaticJavaSwitch", true);
 
         instance.SetManagedPack("modrinth", "id1", "Pack", "vid", "1.0.0");
 
@@ -284,7 +284,7 @@ public class InstanceTests : IDisposable
 
         private void Register(string id, object? def) => RegisterSetting(id, def);
 
-        public void Set(string id, object? value) => _values[id] = value;
+        public void StubSet(string id, object? value) => _values[id] = value;
 
         protected override void ChangeSetting(Setting setting, object? value) => _values[setting.Id] = value;
 

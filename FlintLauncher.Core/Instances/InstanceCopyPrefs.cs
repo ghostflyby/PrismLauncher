@@ -1,0 +1,99 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Port of launcher/InstanceCopyPrefs.{h,cpp}: the checkbox set of the "copy instance" flow
+// and the exclusion-filter builder fed to the copy task.
+//
+// Deviation: the C++ getter/setter pairs (isCopySavesEnabled()/enableCopySaves() etc.)
+// collapse into plain auto-properties with the same defaults. The C++ enableAllActions()
+// mentioned in older revisions does not exist here; AllTrue() is the aggregate used
+// upstream. Note that the link-related switches do not gate AllTrue() (they are transport
+// modes, not content choices) — exactly like the C++.
+namespace FlintLauncher.Core.Instances;
+
+public sealed class InstanceCopyPrefs
+{
+    public bool CopySaves { get; set; } = true;
+    public bool KeepPlaytime { get; set; } = true;
+    public bool CopyGameOptions { get; set; } = true;
+    public bool CopyResourcePacks { get; set; } = true;
+    public bool CopyShaderPacks { get; set; } = true;
+    public bool CopyServers { get; set; } = true;
+    public bool CopyMods { get; set; } = true;
+    public bool CopyScreenshots { get; set; } = true;
+    public bool UseSymLinks { get; set; }
+    public bool LinkRecursively { get; set; }
+    public bool UseHardLinks { get; set; }
+    public bool DontLinkSaves { get; set; }
+    public bool UseClone { get; set; }
+
+    /// <summary>Port of InstanceCopyPrefs::allTrue.</summary>
+    public bool AllTrue()
+    {
+        return CopySaves && KeepPlaytime && CopyGameOptions && CopyResourcePacks && CopyShaderPacks && CopyServers &&
+               CopyMods && CopyScreenshots;
+    }
+
+    /// <summary>Port of getSelectedFiltersAsRegex().</summary>
+    public string GetSelectedFiltersAsRegex() => GetSelectedFiltersAsRegex([]);
+
+    /// <summary>
+    /// Port of getSelectedFiltersAsRegex(additionalFilters): a single regex string of the
+    /// selected folders/files to filter out, e.g. ".minecraft/saves|.minecraft/server.dat".
+    /// </summary>
+    public string GetSelectedFiltersAsRegex(IReadOnlyList<string> additionalFilters)
+    {
+        var filters = new List<string>();
+
+        if (!CopySaves)
+        {
+            filters.Add("saves");
+        }
+
+        if (!CopyGameOptions)
+        {
+            filters.Add("options.txt");
+        }
+
+        if (!CopyResourcePacks)
+        {
+            filters.Add("resourcepacks");
+            filters.Add("texturepacks");
+        }
+
+        if (!CopyShaderPacks)
+        {
+            filters.Add("shaderpacks");
+        }
+
+        if (!CopyServers)
+        {
+            filters.Add("servers.dat");
+            filters.Add("servers.dat_old");
+            filters.Add("server-resource-packs");
+        }
+
+        if (!CopyMods)
+        {
+            filters.Add("coremods");
+            filters.Add("mods");
+            filters.Add("config");
+        }
+
+        if (!CopyScreenshots)
+        {
+            filters.Add("screenshots");
+        }
+
+        filters.AddRange(additionalFilters);
+
+        // If we have any filters to add, join them as a single regex string to return:
+        if (filters.Count != 0)
+        {
+            const string McRoot = "[.]?minecraft/";
+            // Ensure the first filter starts with the root, then join the others with an OR
+            // regex before the root (ex: ".minecraft/saves|.minecraft/mods"):
+            return McRoot + string.Join("|" + McRoot, filters);
+        }
+
+        return "";
+    }
+}
