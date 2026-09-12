@@ -93,17 +93,18 @@
 | Katabasis(libraries) | `Auth/MsaInteractiveStep.cs`（回环回调+换码）+ `MSADeviceCodeStep.cs` | ported | 自定义协议回退处理延后 |
 | 后台 token 刷新调度（QTimer 循环） | — | todo | P5（LaunchController 消费） |
 
-## P5 启动
+## P5 启动（已完成 2026-09-12）
 
-| 原文件 | C# 目标 | 状态 |
-|---|---|---|
-| `launch/*`（LaunchTask/LaunchStep/TaskStepWrapper/LogModel/steps） | `FlintLauncher.Core/Launch/` | todo |
-| `minecraft/launch/*`（各 MC 步骤 + MinecraftTarget） | `FlintLauncher.Core/Launch/Steps/` | todo |
-| `LaunchController*` `LaunchMode.h` `LoggedProcess*` `JavaCommon*` | `FlintLauncher.Core/Launch/` | todo |
-| `java/JavaUtils*` `JavaChecker*` `JavaInstallList*` `JavaInstall.h` `JavaMetadata*` `java/download/*` | `FlintLauncher.Core/Java/` | todo |
-| `libraries/launcher`（NewLaunch java 源码） | 原样复用，编译 jar 内嵌资源 | todo |
-| `MinecraftInstance::createLaunchTask/createLaunchScript/createEnvironment` | `FlintLauncher.Core/Instances/MinecraftInstance.Launch.cs` | todo |
-| `logs/*` | `FlintLauncher.Core/Logs/` | todo |
+| 原文件 | C# 目标 | 状态 | 备注 |
+|---|---|---|---|
+| `launch/*`（LaunchTask/LaunchStep/TaskStepWrapper/LogModel/steps） | `FlintLauncher.Core/Launch/` | ported | proceed 双门（ReadyForLaunch+RequestProgress）语义保留 |
+| `minecraft/launch/*`（全部 23 步骤 + MinecraftTarget） | `FlintLauncher.Core/Launch/Steps/` | ported | 含 ExtractNatives/ReconstructAssets/ModMinecraftJar(createModdedJar)/AssetUpdate |
+| `LaunchController*` `LaunchMode.h` `LoggedProcess*` `JavaCommon*` | `FlintLauncher.Core/Launch/` | ported | 无头扩展：WantedLaunchMode=Offline 直达离线会话（已记录） |
+| `java/JavaUtils*` `JavaChecker*` `JavaInstallList*` `JavaInstall.h` `JavaMetadata*` `java/download/*` | `FlintLauncher.Core/Java/` | ported | macOS 发现实测；tar.gz 自研 ustar；Windows 注册表跳过 |
+| `libraries/launcher` + `javacheck` | `docs/tools/newlaunch-build.sh` → build/jars/*.jar | ported | javac --release 8；产物不入库 |
+| `MinecraftInstance::createLaunchTask/createLaunchScript/createEnvironment` | `FlintLauncher.Core/Instances/MinecraftInstance.cs` | ported | 全链冒烟通过（fake-java + stdin 协议 + PostExit） |
+| `logs/*` `MessageLevel*` | `FlintLauncher.Core/Launch/LogModel.cs` `MessageLevel.cs` | ported | Log4j XML 解析未移植 |
+| `net/PasteUpload*`、SRV | SrvResolver.cs 已移植；PasteUpload | partial | PasteUpload 归 P7 |
 
 ## P6 modplatform
 
