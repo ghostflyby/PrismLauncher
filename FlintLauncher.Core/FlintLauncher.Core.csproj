@@ -9,4 +9,9 @@
     <InternalsVisibleTo Include="FlintLauncher.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Worlds layer (Minecraft/Worlds) is built on the standalone NBT library. -->
+    <ProjectReference Include="..\FlintLauncher.Nbt\FlintLauncher.Nbt.csproj" />
+  </ItemGroup>
+
 </Project>

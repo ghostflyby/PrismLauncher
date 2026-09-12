@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FlintLauncher.Core\FlintLauncher.Core.csproj" />
+    <ProjectReference Include="..\FlintLauncher.Nbt\FlintLauncher.Nbt.csproj" />
   </ItemGroup>
 
   <!-- Fixtures ported from the original C++ tests (tests/testdata). -->
