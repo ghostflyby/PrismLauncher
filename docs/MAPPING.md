@@ -80,13 +80,18 @@
 | `icons/IconList` `IconUtils`（文件部分） | `FlintLauncher.Core/Icons/IconFiles.cs` | ported | Qt 模型/主题不移植 |
 | `RecursiveFileSystemWatcher*` `FileIgnoreProxy*` `FastFileIconProvider*` | — | n/a | GUI/Qt watcher |
 
-## P4 账户
+## P4 账户（已完成 2026-09-12）
 
-| 原文件 | C# 目标 | 状态 |
-|---|---|---|
-| `minecraft/auth/*`（AccountList/AccountData/MinecraftAccount/AuthFlow/steps/Parsers） | `FlintLauncher.Core/Auth/` | todo |
-| `minecraft/skins/*`（SkinUpload/SkinDelete/CapeChange/SkinList） | `FlintLauncher.Core/Skins/` | todo |
-| Katabasis(libraries) | `FlintLauncher.Core/Auth/OAuth/`（device-code + 授权码） | todo |
+| 原文件 | C# 目标 | 状态 | 备注 |
+|---|---|---|---|
+| `minecraft/auth/AccountData*` | `FlintLauncher.Core/Auth/AccountData.cs` | ported | v3 键布局逐字节对齐；legacy 迁移与 entitlement 回退 |
+| `minecraft/auth/AccountList*` | `FlintLauncher.Core/Auth/AccountList.cs` | ported | accounts.json 与真实文件互通（只读 smoke 实测） |
+| `minecraft/auth/MinecraftAccount*` `AuthFlow*` `AuthStep.h` `AuthSession*` | `Auth/MinecraftAccount.cs` `AuthFlow.cs` `AuthStep.cs`；AuthSession 在 Instances/（P3c1 已对齐） | ported | |
+| `minecraft/auth/steps/*` | `Auth/` 各 Step | ported | 端点经 AuthEndpoints 可注入（默认值与上游逐字一致）；device-code 轮询/XErr 阶梯逐条移植 |
+| `minecraft/auth/Parsers*` | `Auth/Parsers.cs` | ported | |
+| `minecraft/skins/*` | `FlintLauncher.Core/Skins/` | partial | SkinUpload/SkinDelete/CapeChange/SkinModel 持久化半；Qt 模型与预览不移植 |
+| Katabasis(libraries) | `Auth/MsaInteractiveStep.cs`（回环回调+换码）+ `MSADeviceCodeStep.cs` | ported | 自定义协议回退处理延后 |
+| 后台 token 刷新调度（QTimer 循环） | — | todo | P5（LaunchController 消费） |
 
 ## P5 启动
 
