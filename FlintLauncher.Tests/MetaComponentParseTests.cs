@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of tests/MetaComponentParse_test.cpp. Upstream this exercises
 // DataPackUtils::processComponent (the JSON chat component renderer) on fixtures under
-// tests/testdata/MetaComponentParse — the ported renderer lives in FlintLauncher.Core/Minecraft.
+// tests/testdata/MetaComponentParse — the ported renderer lives in
+// FlintLauncher.Core/Minecraft/Resources (moved there from Minecraft/ in P3-b).
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Minecraft;
+using FlintLauncher.Core.Minecraft.Resources;
 using Xunit;
 
 namespace FlintLauncher.Tests;
