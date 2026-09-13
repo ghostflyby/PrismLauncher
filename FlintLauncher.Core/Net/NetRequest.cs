@@ -81,7 +81,10 @@ public sealed class NetRequest : FlintTask
     public static NetRequest MakeCached(HttpMetaCache cache, Uri url, MetaEntry entry, RequestOptions options = RequestOptions.NoOptions)
     {
         var checksum = new ChecksumValidator(HashAlgorithmName.MD5, entry.Md5Sum.Length == 0 ? null : Convert.FromHexString(entry.Md5Sum));
-        var sink = new MetaCacheSink(entry, checksum, isEternal: options.HasFlag(RequestOptions.MakeEternal));
+        var sink = new MetaCacheSink(entry, checksum, isEternal: options.HasFlag(RequestOptions.MakeEternal))
+        {
+            MetaCache = cache,
+        };
         var request = new NetRequest(url, options | RequestOptions.AcceptLocalFiles)
         {
             RequestSink = sink,

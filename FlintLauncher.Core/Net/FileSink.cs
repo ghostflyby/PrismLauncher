@@ -9,6 +9,8 @@ public class FileSink : Sink
 {
     private readonly string _filename;
     private bool _wroteAnyData;
+    /// <summary>Writable by MetaCacheSink (C++: protected member access).</summary>
+    private protected bool WroteAnyData => _wroteAnyData;
     private string? _tempFile;
 
     public FileSink(string filename)
@@ -160,6 +162,10 @@ public class FileSink : Sink
 /// </summary>
 public sealed class MetaCacheSink : FileSink
 {
+    /// <summary>The owning cache; when set, the entry is re-registered after finalize
+    /// (C++: APPLICATION->metacache()->updateEntry).</summary>
+    public HttpMetaCache? MetaCache { get; init; }
+
     private readonly MetaEntry _entry;
     private readonly ChecksumValidator _md5Node;
     private readonly bool _isEternal;
@@ -198,27 +204,62 @@ public sealed class MetaCacheSink : FileSink
 
     protected override bool FinalizeCache(NetResponseInfo response)
     {
-        if (response.StatusCode is 304 or 200 or 203)
+        // Port of MetaCacheSink::finalizeCache (full cache-lifetime semantics): md5 only when
+        // data was written, etag/last-modified/max-age/Age bookkeeping, always succeeds.
+        if (WroteAnyData)
         {
-            string hashHex;
-            if (_entry.Md5Sum.Length > 0 && response.StatusCode == 304)
+            var hash = _md5Node.Hash();
+            if (hash.Length > 0)
             {
-                hashHex = _entry.Md5Sum;
+                _entry.Md5Sum = Convert.ToHexString(hash).ToLowerInvariant();
             }
-            else
-            {
-                var hash = _md5Node.Hash();
-                if (hash.Length == 0)
-                {
-                    return false;
-                }
-                hashHex = Convert.ToHexString(hash).ToLowerInvariant();
-            }
-            _entry.Md5Sum = hashHex;
-            _entry.Etag = response.Headers.GetValueOrDefault("ETag", "");
-            _entry.SetStale(false);
-            _entry.IsEternal = _isEternal;
         }
+
+        _entry.Etag = response.Headers.GetValueOrDefault("ETag", "");
+
+        if (response.Headers.TryGetValue("Last-Modified", out var lastModified))
+        {
+            _entry.RemoteChangedTimestamp = lastModified;
+        }
+
+        var fullPath = _entry.GetFullPath();
+        _entry.LocalChangedTimestamp = File.Exists(fullPath)
+            ? new DateTimeOffset(File.GetLastWriteTimeUtc(fullPath)).ToUnixTimeMilliseconds()
+            : 0;
+
+        if (_isEternal)
+        {
+            _entry.IsEternal = true;
+        }
+        else if (response.Headers.TryGetValue("Cache-Control", out var cacheControl))
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(cacheControl, "max-age=([0-9]+)");
+            if (match.Success)
+            {
+                _entry.MaxAge = long.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+            }
+        }
+        else if (response.Headers.TryGetValue("Expires", out var expiresHeader))
+        {
+            if (DateTimeOffset.TryParse(expiresHeader, System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal, out var expires))
+            {
+                _entry.MaxAge = expires.ToUnixTimeSeconds() - DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            }
+        }
+        else
+        {
+            // MetaCacheSink.cpp: #define MAX_TIME_TO_EXPIRE 1 * 7 * 24 * 60 * 60
+            _entry.MaxAge = 7 * 24 * 60 * 60;
+        }
+
+        _entry.CurrentAge = response.Headers.TryGetValue("Age", out var ageHeader)
+            && long.TryParse(ageHeader, out var age)
+            ? age
+            : 0;
+
+        _entry.SetStale(false);
+        MetaCache?.UpdateEntry(_entry);
         return true;
     }
 }

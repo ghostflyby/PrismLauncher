@@ -1,0 +1,267 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Port of launcher/DataMigrationTask.{h,cpp} plus the data-level half of
+// Application::handleDataMigration (the file/dir inventory, the "_nomigrate.txt" marker and the
+// idempotency rules): migrate existing data from other MMC-like launchers into the Flint data
+// directory.
+//
+// Deviations:
+//  - The C++ task drives FS::copy on a thread pool with a dry run first; the port performs the
+//    same dry-run-then-copy walk inline (counting matched files, then copying with per-file
+//    status/progress), preserving FS::copy's matcher/whitelist semantics.
+//  - Application::handleDataMigration's QMessageBox question is not ported; DataMigration
+//    exposes the decision inputs (old config present? marker present? current config present?)
+//    so a host can ask the user itself, and the C++ decision order is encoded in
+//    DataMigration.Decide().
+//  - The migration inventory is the exact filter list from Application::handleDataMigration;
+//    the launcher's own config file name comes from FlintConfig ("flint.cfg", Prism's
+//    "prismlauncher.cfg").
+using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Tasks;
+
+namespace FlintLauncher.Core.Migration;
+
+/// <summary>Port of launcher/Filter.h (Filter = std::function&lt;bool(const QString&amp;)&gt; and the
+/// Filters combinators), specialized to the relative-path predicates used by the migration.</summary>
+public static class Filters
+{
+    public static Func<string, bool> Inverse(Func<string, bool> filter) => src => !filter(src);
+
+    public static Func<string, bool> Any(IReadOnlyList<Func<string, bool>> filters) =>
+        src =>
+        {
+            foreach (var filter in filters)
+            {
+                if (filter(src))
+                {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+    public static Func<string, bool> Equals_(string pattern) => src => src == pattern;
+
+    public static Func<string, bool> EqualsAny(IReadOnlyList<string> patterns) =>
+        src => patterns.Count == 0 || patterns.Contains(src);
+
+    public static Func<string, bool> EqualsOrEmpty(string pattern) => src => src.Length == 0 || src == pattern;
+
+    public static Func<string, bool> Contains(string pattern) => src => src.Contains(pattern);
+
+    public static Func<string, bool> StartsWith(string pattern) => src => src.StartsWith(pattern, StringComparison.Ordinal);
+
+    public static Func<string, bool> Regexp(System.Text.RegularExpressions.Regex pattern) =>
+        src => pattern.IsMatch(src);
+}
+
+/// <summary>
+/// Port of DataMigrationTask: copies everything the whitelist matcher accepts from
+/// <paramref name="sourcePath"/> into <paramref name="targetPath"/> (relative paths preserved,
+/// destination files are not overwritten), after a dry run that counts the files for the
+/// progress bar.
+/// </summary>
+public sealed class DataMigrationTask : FlintTask
+{
+    private readonly string _sourcePath;
+    private readonly string _targetPath;
+    private readonly Func<string, bool> _pathMatcher;
+
+    public DataMigrationTask(string sourcePath, string targetPath, Func<string, bool> pathMatcher)
+    {
+        _sourcePath = sourcePath;
+        _targetPath = targetPath;
+        _pathMatcher = pathMatcher;
+    }
+
+    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    {
+        EmitStatus("Scanning files...");
+
+        // 1. Scan — dry run to collect the amount of files.
+        if (!Walk(out var files))
+        {
+            EmitFailed("Failed to scan source path.");
+            return Task.CompletedTask;
+        }
+
+        var toCopy = files.Count;
+
+        // 2. Copy — actually copy all files now.
+        var copied = 0;
+        var failed = false;
+        foreach (var relative in files)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            copied++;
+            var shortenedName = relative;
+            // shorten the filename to hopefully fit into one line
+            if (shortenedName.Length > 50)
+            {
+                shortenedName = relative[..20] + "…" + relative[^29..];
+            }
+            SetProgress(copied, toCopy);
+            EmitStatus($"Copying {shortenedName}…");
+            if (!CopyFile(relative))
+            {
+                // C++ collects per-file failures (fs::copy err), keeps copying the remaining
+                // files, and fails the whole task at the end with this message.
+                failed = true;
+            }
+        }
+
+        if (failed)
+        {
+            EmitFailed("Some paths could not be copied!");
+            return Task.CompletedTask;
+        }
+
+        EmitSucceeded();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>The FS::copy dry run: files (including hidden ones) below the source
+    /// directory, matched against the whitelist on the '/'-separated relative path. A missing
+    /// source directory fails the walk, like FS::copy returning false.</summary>
+    private bool Walk(out List<string> matched)
+    {
+        matched = [];
+        if (!Directory.Exists(_sourcePath))
+        {
+            return false;
+        }
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = true,
+            AttributesToSkip = FileAttributes.ReparsePoint,
+        };
+        foreach (var file in Directory.EnumerateFiles(_sourcePath, "*", options))
+        {
+            var relative = System.IO.Path.GetRelativePath(_sourcePath, file).Replace('\\', '/');
+            if (_pathMatcher(relative))
+            {
+                matched.Add(relative);
+            }
+        }
+        return true;
+    }
+
+    private bool CopyFile(string relative)
+    {
+        var dstPath = FileSystem.PathCombine(_targetPath, relative);
+        if (!FileSystem.EnsureFilePathExists(dstPath))
+        {
+            return false;
+        }
+        var srcPath = FileSystem.PathCombine(_sourcePath, relative);
+        try
+        {
+            File.Copy(srcPath, dstPath, overwrite: false);
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
+                                 or NotSupportedException)
+        {
+            return false;
+        }
+    }
+}
+
+/// <summary>
+/// Data-level port of Application::handleDataMigration: which legacy launcher directories can
+/// be migrated, the exact inventory copied, and the "already migrated"/"declined" marker that
+/// makes the migration a one-shot decision per legacy launcher.
+/// </summary>
+public static class DataMigration
+{
+    /// <summary>The marker file name: name + "_nomigrate.txt" (created empty).</summary>
+    public static string NoMigrateMarkerName(string name) => name + "_nomigrate.txt";
+
+    /// <summary>The marker file path inside the current data directory.</summary>
+    public static string NoMigrateMarkerPath(string currentData, string name) =>
+        FileSystem.PathCombine(currentData, NoMigrateMarkerName(name));
+
+    /// <summary>Config candidates looked for in the old data directory: the legacy launcher's
+    /// own config first, then the Prism/Flint one ("it's possible that we already used that
+    /// directory before").</summary>
+    public static IReadOnlyList<string> OldConfigCandidates(string oldData, string configFile, string launcherConfigFile) =>
+    [
+        FileSystem.PathCombine(oldData, configFile),
+        FileSystem.PathCombine(oldData, launcherConfigFile),
+    ];
+
+    /// <summary>
+    /// The exact whitelist inventory of Application::handleDataMigration (in order): the legacy
+    /// config, the launcher config, logs/, accounts.json, accounts/, assets/, icons/,
+    /// instances/, libraries/, mods/, themes/.
+    /// </summary>
+    public static Func<string, bool> BuildFilter(string configFile, string launcherConfigFile)
+    {
+        var filters = new List<Func<string, bool>>
+        {
+            Filters.Equals_(configFile),
+            Filters.Equals_(launcherConfigFile), // it's possible that we already used that directory before
+            Filters.StartsWith("logs/"),
+            Filters.Equals_("accounts.json"),
+            Filters.StartsWith("accounts/"),
+            Filters.StartsWith("assets/"),
+            Filters.StartsWith("icons/"),
+            Filters.StartsWith("instances/"),
+            Filters.StartsWith("libraries/"),
+            Filters.StartsWith("mods/"),
+            Filters.StartsWith("themes/"),
+        };
+        return Filters.Any(filters);
+    }
+
+    [Flags]
+    public enum MigrationDecision
+    {
+        /// <summary>No legacy config at the old location (no migration needed).</summary>
+        NoOldConfig = 0,
+        /// <summary>The "name_nomigrate.txt" marker exists — declined or already migrated.</summary>
+        MarkerPresent = 1,
+        /// <summary>The current data directory already has its own launcher config.</summary>
+        CurrentDataExists = 2,
+        /// <summary>Set (alone) when a migration would run.</summary>
+        ReadyToMigrate = 4,
+    }
+
+    /// <summary>Port of the handleDataMigration decision tree (without the dialog): a migration
+    /// runs only when an old config exists, the marker does not, and the current directory has
+    /// no launcher config yet.</summary>
+    public static MigrationDecision Decide(string currentData, string oldData, string name, string configFile,
+        string launcherConfigFile)
+    {
+        var nomigratePath = NoMigrateMarkerPath(currentData, name);
+
+        var configExists = false;
+        foreach (var configPath in OldConfigCandidates(oldData, configFile, launcherConfigFile))
+        {
+            configExists |= File.Exists(configPath);
+        }
+
+        if (!configExists || File.Exists(nomigratePath))
+        {
+            return configExists ? MigrationDecision.MarkerPresent : MigrationDecision.NoOldConfig;
+        }
+
+        var currentExists = File.Exists(FileSystem.PathCombine(currentData, launcherConfigFile));
+        return currentExists ? MigrationDecision.CurrentDataExists : MigrationDecision.ReadyToMigrate;
+    }
+
+    /// <summary>Port of setDoNotMigrate(): create the (empty) marker file.</summary>
+    public static void SetDoNotMigrate(string currentData, string name)
+    {
+        var nomigratePath = NoMigrateMarkerPath(currentData, name);
+        try
+        {
+            File.WriteAllBytes(nomigratePath, []);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
+                                 or NotSupportedException or System.Security.SecurityException)
+        {
+            // qWarning in the C++: failure to write the marker is not fatal.
+        }
+    }
+}
