@@ -136,7 +136,7 @@
 | `tools/*` | `Tools/Profilers.cs` | ported | 注册表 + argv 构建（无进程派生） |
 | `translations/*` 下载逻辑 | — | deferred | 无头核心价值低，需要时再补 |
 | `updater/*` | GUI-bound / 进程外 | n/a | |
-| `Application*` `main.cpp` `ApplicationMessage*` `LocalPeer` | `FlintLauncher.Web/Program.cs` + 宿主服务 | partial | P7-b 补齐 Web API 面 |
+| `Application*` `main.cpp` `ApplicationMessage*` `LocalPeer` | `FlintLauncher.Web/WebHostBuilder.cs` + Services/* | ported | v1 API：instances CRUD/settings/launch/tasks+日志+SSE/accounts(含 MSA 设备码)/java/news/modplatform 搜索；数据目录注入+CWD 切换；LocalPeer→进程单例语义由宿主承担 |
 | `HardwareInfo*` `SysInfo*` | `Launch/HardwareInfo.cs` `SysInfo.cs` | ported | P5 已带出 |
 | `DesktopServices*` | n/a（打开文件/URL 语义按需暴露） | n/a | |
 | `ui/**` `icons`(渲染) `ui/themes` `translations`(UI) | — | GUI-bound | |
