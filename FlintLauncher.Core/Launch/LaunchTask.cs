@@ -76,6 +76,13 @@ public class LaunchTask : FlintTask
     /// <summary>Diagnostics/test hook for the internal LaunchState state machine.</summary>
     internal LaunchState CurrentState => _state;
 
+    /// <summary>
+    /// Port of the C++ LaunchTask "Waiting" state observable: the launch preparations are
+    /// done and ReadyForLaunch is outstanding — Proceed() will start the game. Used by the
+    /// headless host (API) to surface the proceed gate without the internal enum.
+    /// </summary>
+    public bool IsWaitingForProceed => _state == LaunchState.Waiting;
+
     public MinecraftInstance Instance => _instance;
 
     public long Pid
