@@ -125,19 +125,21 @@
 
 ## P7 周边
 
-| 原文件 | C# 目标 | 状态 |
-|---|---|---|
-| `screenshots/*` | `FlintLauncher.Core/Screenshots/` | todo |
-| `news/*` | `FlintLauncher.Core/News/` | todo |
-| `net/PasteUpload*` | `FlintLauncher.Core/Net/PasteUpload.cs` | todo |
-| `DataMigrationTask*` | `FlintLauncher.Core/Migration/DataMigration.cs` | todo |
-| `tools/*` | `FlintLauncher.Core/Tools/` | todo |
-| `translations/*` 下载逻辑 | 视需求 | todo |
-| `updater/*` | GUI-bound / 进程外 | n/a |
-| `Application*` `main.cpp` `ApplicationMessage*` `LocalPeer`(libraries) | `FlintLauncher.Web/Program.cs` + 宿主服务 | partial（P0 起） |
-| `HardwareInfo*` `SysInfo*` | `FlintLauncher.Core/System/` | todo |
-| `DesktopServices*` | n/a（打开文件/URL 语义按需暴露） | n/a |
-| `ui/**` `icons`(渲染) `ui/themes` `translations`(UI) | — | GUI-bound |
+| 原文件 | C# 目标 | 状态 | 备注 |
+|---|---|---|---|
+| `screenshots/*` | `FlintLauncher.Core/Screenshots/` | ported | Imgur 上传/相册（Client-ID + multipart） |
+| `news/*` | `FlintLauncher.Core/News/` | ported | RSS 下载缓存 + Atom 解析 |
+| `net/PasteUpload*` + `logs/AnonymizeLog*` | `Net/PasteUpload.cs` | ported | 四 provider + 日志匿名化 |
+| `logs/LogParser*` | `Launch/LogParser.cs` | ported | Log4j XML/纯文本拆分；前导文本被吞语义保留 |
+| `minecraft/GameOptions*`(Op*) | `Minecraft/GameOptions/GameOptions.cs` | ported | options.txt 读写与转义 |
+| `DataMigrationTask*` | `Migration/DataMigration.cs` | ported | 文件清单/marker 幂等/聚合失败语义 |
+| `tools/*` | `Tools/Profilers.cs` | ported | 注册表 + argv 构建（无进程派生） |
+| `translations/*` 下载逻辑 | — | deferred | 无头核心价值低，需要时再补 |
+| `updater/*` | GUI-bound / 进程外 | n/a | |
+| `Application*` `main.cpp` `ApplicationMessage*` `LocalPeer` | `FlintLauncher.Web/Program.cs` + 宿主服务 | partial | P7-b 补齐 Web API 面 |
+| `HardwareInfo*` `SysInfo*` | `Launch/HardwareInfo.cs` `SysInfo.cs` | ported | P5 已带出 |
+| `DesktopServices*` | n/a（打开文件/URL 语义按需暴露） | n/a | |
+| `ui/**` `icons`(渲染) `ui/themes` `translations`(UI) | — | GUI-bound | |
 | `filelink/*` | Windows 反射链接助手 | todo（P5+，可延后） |
 | `macsandbox/*` | GUI-bound(macOS 沙箱) | n/a |
 
