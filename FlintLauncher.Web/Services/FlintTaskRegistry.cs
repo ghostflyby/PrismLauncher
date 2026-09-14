@@ -32,6 +32,11 @@ public sealed class FlintTaskRegistry
         /// (e.g. a staged instance commit -> InstanceList.LoadList()).</summary>
         public Action? OnFinished { get; init; }
 
+        /// <summary>Optional terminal payload exposed through the task view (flag: currently
+        /// only the mods-update task publishes its found/applied updates here; null = absent,
+        /// and the field is omitted from the JSON entirely).</summary>
+        public TaskResultView? Result { get; set; }
+
         // log buffering (see the file header)
         public readonly object LogLock = new();
         public readonly List<LogLineDto> LogBuffer = [];
@@ -120,7 +125,8 @@ public sealed class FlintTaskRegistry
             status,
             new TaskProgressDto(entry.Task.CurrentProgress, entry.Task.TotalProgress),
             FailReasonOf(entry),
-            entry.InstanceId);
+            entry.InstanceId,
+            entry.Result);
     }
 
     public string StateOf(Entry entry)

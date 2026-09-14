@@ -75,6 +75,12 @@ public sealed record LaunchRequest(string Mode, string? OfflineName, string? Acc
 
 public sealed record TaskProgressDto(long Current, long Total);
 
+/// <summary>One applied/found mod update, exposed through TaskView.Result (mods-update).</summary>
+public sealed record ModUpdateEntryView(string File, string From, string To, string Provider);
+
+/// <summary>Optional terminal payload of a task (flag: only the mods-update task sets it).</summary>
+public sealed record TaskResultView(IReadOnlyList<ModUpdateEntryView> Updates);
+
 public sealed record TaskView(
     string Id,
     string Kind,
@@ -82,7 +88,9 @@ public sealed record TaskView(
     string Status,
     TaskProgressDto Progress,
     string? FailReason,
-    string? InstanceId);
+    string? InstanceId,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    TaskResultView? Result = null);
 
 public sealed record LogLineDto(int Index, string Level, string Line);
 
@@ -115,3 +123,39 @@ public sealed record ModrinthSearchResult(
     string IconUrl,
     string Author,
     long Downloads);
+
+// ------------------------------------------------------------------ modplatform (P6-fix-b)
+
+/// <summary>A CurseForge search hit mapped through FlameMod.LoadIndexedPack.</summary>
+public sealed record FlameSearchResult(
+    string Id,
+    string Slug,
+    string Name,
+    string IconUrl,
+    string Author,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    long? Downloads);
+
+/// <summary>An indexed project version (Modrinth /project/{id}/version or Flame /mods/{id}/files).</summary>
+public sealed record ProviderVersionView(
+    string Id,
+    string VersionNumber,
+    string Date,
+    string Filename,
+    string DownloadUrl,
+    IReadOnlyList<string> Loaders,
+    IReadOnlyList<string> McVersions);
+
+/// <summary>A mod installed in an instance's mods folder.</summary>
+public sealed record InstalledModView(
+    string FileName,
+    string? Name,
+    string? Version,
+    string? Provider,
+    bool Enabled);
+
+/// <summary>POST /instances/{id}/mods/install body entry.</summary>
+public sealed record ModInstallSelection(string Provider, string ProjectId, string? VersionId);
+
+/// <summary>POST /instances/{id}/mods/update optional body (filter by installed file names).</summary>
+public sealed record ModsUpdateRequest(IReadOnlyList<string>? Mods);

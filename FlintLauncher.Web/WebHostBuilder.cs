@@ -72,6 +72,7 @@ public static class WebHostBuilder
         api.MapTasks();
         api.MapAccounts();
         api.MapMisc();
+        api.MapModPlatform();
 
         return app;
     }

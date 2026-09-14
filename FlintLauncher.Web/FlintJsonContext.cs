@@ -34,6 +34,13 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(JavaView))]
 [JsonSerializable(typeof(NewsView))]
 [JsonSerializable(typeof(ModrinthSearchResult))]
+[JsonSerializable(typeof(FlameSearchResult))]
+[JsonSerializable(typeof(ProviderVersionView))]
+[JsonSerializable(typeof(InstalledModView))]
+[JsonSerializable(typeof(ModInstallSelection))]
+[JsonSerializable(typeof(ModsUpdateRequest))]
+[JsonSerializable(typeof(ModUpdateEntryView))]
+[JsonSerializable(typeof(TaskResultView))]
 // collection roots (standalone arrays returned from list endpoints are NOT auto-generated)
 [JsonSerializable(typeof(InstanceSummary[]))]
 [JsonSerializable(typeof(TaskView[]))]
@@ -41,4 +48,7 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(NewsView[]))]
 [JsonSerializable(typeof(ModrinthSearchResult[]))]
 [JsonSerializable(typeof(JavaView[]))]
+[JsonSerializable(typeof(FlameSearchResult[]))]
+[JsonSerializable(typeof(ProviderVersionView[]))]
+[JsonSerializable(typeof(InstalledModView[]))]
 internal sealed partial class FlintJsonContext : JsonSerializerContext;
