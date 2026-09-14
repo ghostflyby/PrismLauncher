@@ -77,6 +77,9 @@ internal sealed class StubFlameServer : IDisposable
     /// <summary>Payloads served per path suffix, e.g. Downloads["mod.bin"] (missing -> 404).</summary>
     public Dictionary<string, byte[]> Downloads { get; } = new(StringComparer.Ordinal);
 
+    /// <summary>"METHOD path" of every request, in order (for endpoint-hit assertions).</summary>
+    public List<string> Requests { get; } = [];
+
     // last request info (single-request tests only)
     public string LastPath { get; private set; } = "";
     public string LastMethod { get; private set; } = "";
@@ -89,6 +92,7 @@ internal sealed class StubFlameServer : IDisposable
         var path = ctx.Request.Url!.PathAndQuery;
         LastPath = ctx.Request.Url.GetComponents(UriComponents.AbsoluteUri, UriFormat.SafeUnescaped);
         LastMethod = ctx.Request.HttpMethod;
+        Requests.Add($"{ctx.Request.HttpMethod} {path}");
         LastHeaders.Clear();
         foreach (var key in ctx.Request.Headers.AllKeys)
         {

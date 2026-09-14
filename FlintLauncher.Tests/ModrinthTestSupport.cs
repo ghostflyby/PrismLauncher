@@ -15,6 +15,8 @@ namespace Flint.Tests;
 ///   POST /version_files          -> {hash: version} for the registered hashes
 ///   POST /version_files/update   -> same map (update check)
 ///   GET  /version_file/{hash}    -> single version (echoes VersionFiles[/hash] or the first)
+///   GET  /version/{id}           -> VersionsById[id] (pinned-version dependency lookup)
+///   GET  /project/{id}/version   -> ProjectVersions[id] (dependency version list)
 ///   GET  /project/{id}           -> Projects[id]
 ///   GET  /search                 -> {"hits":[]}
 ///   GET  /&lt;name&gt;                -> Downloads[name] (e.g. mod.bin)
@@ -24,6 +26,8 @@ internal sealed class StubModrinthServer : IDisposable
     private readonly HttpListener _listener = new();
     private readonly Dictionary<string, string> _versionFiles = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _projects = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _projectVersions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _versionsById = new(StringComparer.Ordinal);
     private readonly Dictionary<string, byte[]> _downloads = new(StringComparer.Ordinal);
 
     public StubModrinthServer()
@@ -66,8 +70,17 @@ internal sealed class StubModrinthServer : IDisposable
 
     public Dictionary<string, string> Projects => _projects;
 
+    /// <summary>Per-project version lists (GET /project/{id}/version), e.g. for dependency lookups.</summary>
+    public Dictionary<string, string> ProjectVersions => _projectVersions;
+
+    /// <summary>Single pinned versions (GET /version/{id}).</summary>
+    public Dictionary<string, string> VersionsById => _versionsById;
+
     /// <summary>Payloads served per path suffix, e.g. Downloads["mod.bin"] (missing -> 404).</summary>
     public Dictionary<string, byte[]> Downloads => _downloads;
+
+    /// <summary>"METHOD path" of every request, in order (for endpoint-hit assertions).</summary>
+    public List<string> Requests { get; } = [];
 
     // last request info (single-request tests only)
     public string LastPath { get; private set; } = "";
@@ -80,6 +93,7 @@ internal sealed class StubModrinthServer : IDisposable
     {
         var path = ctx.Request.Url!.PathAndQuery;
         LastPath = path;
+        Requests.Add($"{ctx.Request.HttpMethod} {path}");
         LastHeaders.Clear();
         foreach (var key in ctx.Request.Headers.AllKeys)
         {
@@ -134,6 +148,20 @@ internal sealed class StubModrinthServer : IDisposable
             body = Encoding.UTF8.GetBytes(_versionFiles.TryGetValue(hash, out var version)
                 ? version
                 : _versionFiles.Values.FirstOrDefault() ?? "{}");
+        }
+        else if (path.Contains("/version/", StringComparison.Ordinal))
+        {
+            // GET /version/{id} (a dependency pinned to a specific version)
+            var id = path[(path.IndexOf("/version/", StringComparison.Ordinal) + "/version/".Length)..].Split('?')[0];
+            body = Encoding.UTF8.GetBytes(_versionsById.TryGetValue(id, out var version) ? version : "{}");
+        }
+        else if (path.Contains("/project/", StringComparison.Ordinal) && path.Contains("/version", StringComparison.Ordinal))
+        {
+            // GET /project/{id}/version (the dependency version list)
+            var marker = "/project/";
+            var id = path[(path.IndexOf(marker, StringComparison.Ordinal) + marker.Length)..]
+                .Split('/')[0].Split('?')[0];
+            body = Encoding.UTF8.GetBytes(_projectVersions.TryGetValue(id, out var versions) ? versions : "[]");
         }
         else if (path.Contains("/project/", StringComparison.Ordinal))
         {
