@@ -121,7 +121,11 @@
 | `libraries/murmur2` | `ModPlatform/Hashing/Murmur2.cs` | ported | 独立参考向量验证 |
 | `libraries/qdcss` | — | n/a | 未发现调用点（此前登记待查） |
 | `InstanceImportTask*`（modpack 分发） | `Instances/InstanceImportTask.cs` | ported | mrpack/Flame/Technic/plain/URL 五路分发 |
-| `ResourceDownloadTask*`、更新既有实例流 | — | partial | 安装期资源下载已覆盖；独立"更新实例"流与 GUI 对话框（optional/blocked 交互）延后为钩子 |
+| `ResourceDownloadTask*` | `ModPlatform/ResourceDownloadTask.cs` | ported | 下载+元数据；NetJob 空任务静默成功的 ctor 缺陷已修 |
+| `minecraft/mod/tasks/GetModDependenciesTask*` | `ModPlatform/Dependencies/GetModDependenciesTask.cs` | ported | 递归依赖解析（required-only/quilt-fabric override/环防护） |
+| `minecraft/mod/tasks/LocalResourceUpdateTask*` | `ModPlatform/Dependencies/LocalResourceUpdateTask.cs` | ported | |
+| 更新应用编排（C++ 在 UI 层） | `ModPlatform/ModUpdateTask.cs` | ported | 失败不中止兄弟、末尾统一失败（C++ 语义） |
+| Web API modplatform 端点 | `FlintLauncher.Web/Endpoints/ModPlatformEndpoints.cs` | ported | 搜索(modrinth/flame)/versions/install/update/mods 列表 |
 
 ## P7 周边
 
