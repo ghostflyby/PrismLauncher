@@ -140,7 +140,7 @@
 | `tools/*` | `Tools/Profilers.cs` | ported | 注册表 + argv 构建（无进程派生） |
 | `translations/*` 下载逻辑 | — | deferred | 无头核心价值低，需要时再补 |
 | `updater/*` | GUI-bound / 进程外 | n/a | |
-| `Application*` `main.cpp` `ApplicationMessage*` `LocalPeer` | `FlintLauncher.Web/WebHostBuilder.cs` + Services/* | ported | v1 API：instances CRUD/settings/launch/tasks+日志+SSE/accounts(含 MSA 设备码)/java/news/modplatform 搜索；数据目录注入+CWD 切换；LocalPeer→进程单例语义由宿主承担 |
+| `Application*` `main.cpp` `ApplicationMessage*` `LocalPeer` | `FlintLauncher.Web/WebHostBuilder.cs` + Services/* | ported | v1 API：instances CRUD/settings/launch/tasks+日志+SSE/accounts(含 MSA 设备码)/java/news/modplatform 搜索+分页+install/update 结果负载+本地 token 鉴权(--api-token/--no-auth)；数据目录注入+CWD 切换；账号后台刷新(FLINT_ACCOUNT_REFRESH_MINUTES, 默认关) |
 | `HardwareInfo*` `SysInfo*` | `Launch/HardwareInfo.cs` `SysInfo.cs` | ported | P5 已带出 |
 | `DesktopServices*` | n/a（打开文件/URL 语义按需暴露） | n/a | |
 | `ui/**` `icons`(渲染) `ui/themes` `translations`(UI) | — | GUI-bound | |
