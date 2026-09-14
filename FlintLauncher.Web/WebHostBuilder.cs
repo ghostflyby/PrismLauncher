@@ -21,6 +21,8 @@ public static class WebHostBuilder
         // library/asset anchors) — the C++ application chdir'd into its data dir at startup.
         Environment.CurrentDirectory = dataDir;
 
+        var apiAuth = Services.ApiAuthService.Resolve(dataDir, args);
+
         var builder = WebApplication.CreateSlimBuilder(args);
 
         builder.Services.ConfigureHttpJsonOptions(options =>
@@ -33,6 +35,8 @@ public static class WebHostBuilder
         builder.Services.AddSingleton<FlintTaskRegistry>();
         builder.Services.AddSingleton<DeviceCodeSessionStore>();
         builder.Services.AddSingleton<JavaScanService>();
+        builder.Services.AddSingleton(apiAuth);
+        builder.Services.AddHostedService<Services.AccountRefreshService>();
 
         var app = builder.Build();
 
@@ -60,6 +64,7 @@ public static class WebHostBuilder
         app.MapGet("/healthz", () => Results.Ok(new Models.HealthResponse("ok")));
 
         var api = app.MapGroup("/api/v1");
+        api.AddApiAuth(apiAuth);
         api.MapGet("/info", (FlintConfig config) => new Models.InfoResponse(
             config.LauncherDisplayName,
             config.PrintableVersionString(),

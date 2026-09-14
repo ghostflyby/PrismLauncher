@@ -20,6 +20,7 @@ using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Web;
+using FlintLauncher.Web.Services;
 using Microsoft.AspNetCore.Builder;
 using Xunit;
 
@@ -32,11 +33,12 @@ internal sealed class FlintApiHost : IAsyncDisposable
     private readonly WebApplication _app;
     private readonly string _previousCwd;
 
-    private FlintApiHost(WebApplication app, HttpClient client, string dataDir, string previousCwd)
+    private FlintApiHost(WebApplication app, HttpClient client, string dataDir, string previousCwd, string token)
     {
         _app = app;
         Client = client;
         DataDir = dataDir;
+        Token = token;
         _previousCwd = previousCwd;
     }
 
@@ -55,9 +57,18 @@ internal sealed class FlintApiHost : IAsyncDisposable
             "--urls", "http://127.0.0.1:0",
         ]);
         await app.StartAsync();
+        var token = File.ReadAllText(Path.Combine(dataDir, ApiAuthService.TokenFileName)).Trim();
         var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
-        return new FlintApiHost(app, client, dataDir, previousCwd);
+        // every API route (except /healthz and /api/v1/info) requires the data-dir token
+        client.DefaultRequestHeaders.Add("X-Api-Token", token);
+        return new FlintApiHost(app, client, dataDir, previousCwd, token);
     }
+
+    /// <summary>A client WITHOUT credentials, for auth-rejection assertions.</summary>
+    public HttpClient CreateUnauthorizedClient() =>
+        new() { BaseAddress = new Uri(Client.BaseAddress!.ToString()) };
+
+    public string Token { get; } = "";
 
     public async Task<HttpResponseMessage> GetAsync(string path) => await Client.GetAsync(path);
 
@@ -524,6 +535,8 @@ public class FlintApiIntegrationTests
             ]);
             await app.StartAsync();
             using var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
+            client.DefaultRequestHeaders.Add("X-Api-Token",
+                File.ReadAllText(Path.Combine(dataDir, ApiAuthService.TokenFileName)).Trim());
             Environment.CurrentDirectory = dataDir;
 
             // instance visible with its display name -----------------------------------
@@ -759,8 +772,11 @@ public class FlintApiModrinthSearchTests : IDisposable
     private static string HitsJson =>
         """{"hits":[{"project_id":"proj1","slug":"jei","title":"Just Enough Items","icon_url":"https://cdn.test/jei.png","author":"mezz","downloads":12345}]}""";
 
+    public static string? LastSearchQuery { get; private set; }
+
     private static async Task ServeSearch(HttpListenerContext ctx)
     {
+        LastSearchQuery = ctx.Request.Url!.Query;
         var bytes = Encoding.UTF8.GetBytes(HitsJson);
         ctx.Response.ContentType = "application/json";
         await ctx.Response.OutputStream.WriteAsync(bytes);
@@ -784,8 +800,9 @@ public class FlintApiModrinthSearchTests : IDisposable
         await using var host = await FlintApiHost.StartAsync();
 
         var response = await host.GetAsync(
-            "/api/v1/modplatform/modrinth/search?query=jei&version=1.20.1&loader=fabric&index=downloads");
+            "/api/v1/modplatform/modrinth/search?query=jei&version=1.20.1&loader=fabric&index=downloads&offset=40");
         response.EnsureSuccessStatusCode();
+        Assert.Contains("offset=40", LastSearchQuery);
         var hits = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
         Assert.Equal(1, hits.GetArrayLength());
         Assert.Equal("proj1", hits[0].GetProperty("id").GetString());
@@ -794,5 +811,72 @@ public class FlintApiModrinthSearchTests : IDisposable
         Assert.Equal("https://cdn.test/jei.png", hits[0].GetProperty("iconUrl").GetString());
         Assert.Equal("mezz", hits[0].GetProperty("author").GetString());
         Assert.Equal(12345L, hits[0].GetProperty("downloads").GetInt64());
+    }
+}
+
+// ------------------------------------------------------- API token auth
+
+[Collection("LauncherJars")]
+public class ApiAuthTests
+{
+    [Fact]
+    public async Task Requests_Without_Token_Are_Rejected_With_The_Error_Envelope()
+    {
+        await using var host = await FlintApiHost.StartAsync();
+        using var client = host.CreateUnauthorizedClient();
+
+        var response = await client.GetAsync("/api/v1/instances");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal("unauthorized", body.GetProperty("error").GetProperty("code").GetString());
+
+        // info + healthz stay open for discovery
+        Assert.True((await host.CreateUnauthorizedClient().GetAsync("/healthz")).IsSuccessStatusCode);
+        Assert.True((await host.CreateUnauthorizedClient().GetAsync("/api/v1/info")).IsSuccessStatusCode);
+    }
+
+    [Fact]
+    public async Task Wrong_Token_Is_Rejected_Right_Token_Is_Accepted_On_Both_Header_Forms()
+    {
+        await using var host = await FlintApiHost.StartAsync();
+
+        using var wrong = host.CreateUnauthorizedClient();
+        wrong.DefaultRequestHeaders.Add("Authorization", "Bearer nope");
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await wrong.GetAsync("/api/v1/instances")).StatusCode);
+
+        using var bearer = host.CreateUnauthorizedClient();
+        bearer.DefaultRequestHeaders.Add("Authorization", $"Bearer {host.Token}");
+        Assert.True((await bearer.GetAsync("/api/v1/instances")).IsSuccessStatusCode);
+
+        using var headerToken = host.CreateUnauthorizedClient();
+        headerToken.DefaultRequestHeaders.Add("X-Api-Token", host.Token);
+        Assert.True((await headerToken.GetAsync("/api/v1/instances")).IsSuccessStatusCode);
+    }
+
+    [Fact]
+    public async Task NoAuth_Flag_Disables_The_Gate()
+    {
+        var dataDir = Path.Combine(Path.GetTempPath(), $"flint-api-noauth-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dataDir);
+        var previousCwd = Environment.CurrentDirectory;
+        try
+        {
+            var app = WebHostBuilder.BuildWebApplication(
+            [
+                "--data-dir", dataDir,
+                "--urls", "http://127.0.0.1:0",
+                "--no-auth",
+            ]);
+            await app.StartAsync();
+            using var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
+            Assert.True((await client.GetAsync("/api/v1/instances")).IsSuccessStatusCode);
+        }
+        finally
+        {
+            Environment.CurrentDirectory = previousCwd;
+            await File.WriteAllTextAsync(Path.Combine(dataDir, "disposed"), "");
+            Directory.Delete(dataDir, recursive: true);
+        }
     }
 }

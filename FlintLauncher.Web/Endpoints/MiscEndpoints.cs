@@ -50,12 +50,13 @@ public static class MiscEndpoints
             string? query,
             string? version,
             string? loader,
-            string? index) =>
+            string? index,
+            int offset = 0) =>
         {
             var args = new SearchArgs
             {
                 Type = ResourceType.Mod,
-                Offset = 0,
+                Offset = offset < 0 ? 0 : offset,
                 Search = string.IsNullOrWhiteSpace(query) ? null : query,
                 Versions = string.IsNullOrWhiteSpace(version) ? null : [new McVersion(version)],
                 Loaders = string.IsNullOrWhiteSpace(loader)

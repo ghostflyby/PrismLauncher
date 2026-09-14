@@ -78,8 +78,18 @@ public sealed record TaskProgressDto(long Current, long Total);
 /// <summary>One applied/found mod update, exposed through TaskView.Result (mods-update).</summary>
 public sealed record ModUpdateEntryView(string File, string From, string To, string Provider);
 
-/// <summary>Optional terminal payload of a task (flag: only the mods-update task sets it).</summary>
-public sealed record TaskResultView(IReadOnlyList<ModUpdateEntryView> Updates);
+public sealed record ModInstallEntryView(
+    string File,
+    string Provider,
+    string ProjectId,
+    string Version,
+    bool IsDependency,
+    string? RequiredBy);
+
+/// <summary>Optional terminal payload of a task (mods-update sets Updates, mods-install sets Installed).</summary>
+public sealed record TaskResultView(
+    IReadOnlyList<ModUpdateEntryView>? Updates,
+    IReadOnlyList<ModInstallEntryView>? Installed);
 
 public sealed record TaskView(
     string Id,

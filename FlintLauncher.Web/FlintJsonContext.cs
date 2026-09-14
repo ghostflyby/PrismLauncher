@@ -38,6 +38,7 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(ProviderVersionView))]
 [JsonSerializable(typeof(InstalledModView))]
 [JsonSerializable(typeof(ModInstallSelection))]
+[JsonSerializable(typeof(List<ModInstallSelection>))]
 [JsonSerializable(typeof(ModsUpdateRequest))]
 [JsonSerializable(typeof(ModUpdateEntryView))]
 [JsonSerializable(typeof(TaskResultView))]

@@ -304,6 +304,10 @@ public sealed class ModInstallTask : FlintTask
     private readonly McVersion _mcVersion;
     private readonly ModLoaderType _loaders;
     private readonly List<ModLoaderType> _loaderList;
+    private readonly List<ModInstallEntryView> _installed = [];
+
+    /// <summary>The entries for the task view's optional result payload.</summary>
+    public TaskResultView BuildResult() => new(null, _installed);
 
     public ModInstallTask(MinecraftInstance instance, ModFolderModel folder,
         IReadOnlyList<ModInstallRequest> selections, string mcVersion, ModLoaderType loaders)
@@ -353,8 +357,19 @@ public sealed class ModInstallTask : FlintTask
 
         var dependencies = dependencyTask.GetDependencies();
         var extraInfo = dependencyTask.GetExtraInfo();
+        void RecordInstalled(GetModDependenciesTask.PackDependency entry, bool isDependency, string? requiredBy)
+        {
+            _installed.Add(new ModInstallEntryView(
+                entry.Version.FileName,
+                ModPlatformTasks.ProviderKey(entry.Pack.Provider),
+                entry.Pack.AddonId.ToString(),
+                entry.Version.Version,
+                isDependency,
+                requiredBy));
+        }
 
         EmitStatus("Downloading mods...");
+        var planned = new List<(GetModDependenciesTask.PackDependency Entry, bool IsDependency, string? RequiredBy)>();
         var downloads = new SequentialTask("Download mods");
         foreach (var entry in selected.Concat(dependencies))
         {
@@ -365,6 +380,7 @@ public sealed class ModInstallTask : FlintTask
             {
                 requiredBy = extra.RequiredByIds[0];
             }
+            planned.Add((entry, isDependency, requiredBy));
 
             if (entry.Version.DownloadUrl.Length == 0)
             {
@@ -387,6 +403,11 @@ public sealed class ModInstallTask : FlintTask
         {
             EmitFailed(downloads.FailReason.Length != 0 ? downloads.FailReason : "the mod download failed");
             return;
+        }
+        // only entries whose download actually succeeded reach the result payload
+        foreach (var (entry, isDependency, requiredBy) in planned)
+        {
+            RecordInstalled(entry, isDependency, requiredBy);
         }
         SetProgress(_selections.Count + 2, _selections.Count + 2);
         EmitSucceeded();
@@ -416,7 +437,7 @@ public sealed class ModsUpdateTask : FlintTask
     }
 
     /// <summary>The update entries for the task view's optional result payload.</summary>
-    public TaskResultView BuildResult() => new(_updates.Select(u => u.View).ToArray());
+    public TaskResultView BuildResult() => new(_updates.Select(u => u.View).ToArray(), null);
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {

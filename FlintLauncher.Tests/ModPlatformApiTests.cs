@@ -470,10 +470,13 @@ public class FlintApiModsTests : IDisposable
         Assert.Equal("2.0.0", updates[0].GetProperty("to").GetString());
         Assert.Equal("modrinth", updates[0].GetProperty("provider").GetString());
 
-        // the plain task view of non-modplatform tasks has no result payload
+        // the mods-install task now publishes its own result payload (installed entries)
         var installTask = JsonDocument.Parse(
             await (await host.GetAsync($"/api/v1/tasks/{installTaskId}")).Content.ReadAsStringAsync()).RootElement;
-        Assert.False(installTask.TryGetProperty("result", out _));
+        var installResult = installTask.GetProperty("result");
+        Assert.Equal(1, installResult.GetProperty("installed").GetArrayLength());
+        Assert.Equal("test.jar", installResult.GetProperty("installed")[0].GetProperty("file").GetString());
+        Assert.False(installResult.TryGetProperty("updates", out var updatesProp) && updatesProp.ValueKind == JsonValueKind.Array);
     }
 
     [Fact]

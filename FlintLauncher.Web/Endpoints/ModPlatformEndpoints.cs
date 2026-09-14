@@ -27,7 +27,8 @@ public static class ModPlatformEndpoints
             string? query,
             string? version,
             string? loader,
-            string? index) =>
+            string? index,
+            int offset = 0) =>
         {
             var loaders = string.IsNullOrWhiteSpace(loader)
                 ? (ModLoaderType?)null
@@ -42,7 +43,7 @@ public static class ModPlatformEndpoints
             var args = new SearchArgs
             {
                 Type = ResourceType.Mod,
-                Offset = 0,
+                Offset = offset < 0 ? 0 : offset,
                 Search = string.IsNullOrWhiteSpace(query) ? null : query,
                 Versions = string.IsNullOrWhiteSpace(version) ? null : [new McVersion(version)],
                 Loaders = loaders,
@@ -298,6 +299,10 @@ public static class ModPlatformEndpoints
                 var task = new ModInstallTask(instance, instance.LoaderModList(), requests,
                     mcVersion, profile.GetSupportedModLoaders() ?? ModLoaderType.None);
                 var entry = registry.Register("mods-install", task, instanceId: instance.Id());
+                // the result payload lists the installed entries (selected + dependencies);
+                // published on terminal events so a download failure still shows what landed
+                task.Succeeded += _ => entry.Result = task.BuildResult();
+                task.Failed += (_, _) => entry.Result = task.BuildResult();
                 _ = task.StartAsync();
                 return Results.Accepted($"/api/v1/tasks/{entry.Id}", new TaskAcceptedResponse(entry.Id));
             }
