@@ -11,13 +11,14 @@
 
 | Qt 源 | 功能 | API | 状态 |
 |---|---|---|---|
-| MainWindow 实例视图/排序过滤 | 实例枚举 | `GET /instances?search=&group=` | todo（补查询参数） |
+| MainWindow 实例视图/排序过滤 | 实例枚举/分组索引 | `GET /instances?search=&group=`、`GET /instances/groups` | done |
 | AccountListPage | 账号列表/默认/删除 | `GET/DELETE /accounts`、`PUT /accounts/{id}/default` | done |
 | AccountListPage 登录 | MSA 设备码/离线 | `POST /accounts/msa/devicecode(+poll)`、`POST /accounts/offline` | done |
 | JavaPage | Java 列表/扫描 + JavaPath/JvmArgs 等键 | `GET/POST /java`；键经 `/settings` | done/todo(键分组) |
 | LauncherPage | 行为键（并发任务/下载数/重试/超时/更新通道） | `PUT /settings {keys}` | todo(键分组) |
 | MinecraftPage | 全局 MC 默认（内存/窗口/命令行等） | 同上 | todo(键分组) |
 | APIPage | FlameKeyOverride/ModrinthToken/MetaURLOverride | 同上 | todo(键分组) |
+| 鉴权（P7 收口新增） | 本地 token | `Authorization: Bearer`/`X-Api-Token` 门（--no-auth 可关） | done |
 | ExternalToolsPage | JsonEditor/JProfilerPath/JVisualVMPath/MCEditPath | 同上 | todo(键分组) |
 | ProxyPage | ProxyType/Addr/Port/User/Pass | 同上 | todo(键分组) |
 | LanguagePage / AppearancePage | 语言键可留（翻译加载不做）；外观 GUI-bound | `PUT /settings {Language}` | partial |
@@ -30,20 +31,20 @@
 | Qt 源 | 功能 | API | 状态 |
 |---|---|---|---|
 | NewInstanceDialog | 原版创建/URL 导入 | `POST /instances/vanilla`、`POST /instances/import` | done |
-| CopyInstanceDialog | 选择性复制 | `POST /instances/{id}/copy {name, groups?, prefs}` | todo |
+| CopyInstanceDialog | 选择性复制 | `POST /instances/{id}/copy {name, prefs}` | done |
 | MainWindow 重命名/图标/分组/删除 | CRUD | `PATCH/DELETE /instances` | done |
-| IconPickerDialog | 图标库 | `GET /icons`、`PUT /instances/{id}/icon`(上传/选择) | todo |
+| IconPickerDialog | 图标库 | `GET /icons`、`PUT /instances/{id}/icon` | todo |
 | NotesPage | 实例备注 | `PATCH /instances/{id} {notes}` | done |
 | InstanceSettingsPage | 覆盖设置 | `GET/PUT /instances/{id}/settings` | done |
 | **VersionPage** | 组件栈管理（见下） | `/instances/{id}/components` | todo |
 | ModFolderPage | mods 列表/启停/删除/安装/更新 | `/instances/{id}/mods` + install/update | done（补 enable/disable） |
-| ResourcePack/TexturePack/ShaderPack/DataPackPage | 各资源类型列表/启停/删除 | `/instances/{id}/resources/{type}` | todo |
-| WorldListPage | 世界列表/删除/改名/上传 | `/instances/{id}/worlds` | todo |
-| ServersPage | servers.dat CRUD + 状态 ping | `/instances/{id}/servers`、`POST .../servers/ping` | todo |
-| ScreenshotsPage | 截图列表/Imgur 上传/删除 | `/instances/{id}/screenshots` | todo |
+| ResourcePack/TexturePack/ShaderPack/DataPackPage | 各资源类型列表/启停/删除 | `/instances/{id}/resources/{type}` | done |
+| WorldListPage | 世界列表/安装/改名/删除 | `/instances/{id}/worlds` | done |
+| ServersPage | servers.dat CRUD + 状态 ping | `/instances/{id}/servers(+/{i}/ping)` | done |
+| ScreenshotsPage | 截图列表/Imgur 上传/删除 | `/instances/{id}/screenshots(+upload)` | done |
 | LogPage（运行日志） | 任务日志 | `GET /tasks/{id}/log`、`/stream` | done |
 | OtherLogsPage | 历史/崩溃日志文件 | `GET /instances/{id}/logs` | todo |
-| GameOptionsPage | options.txt | `/instances/{id}/gameoptions` | todo |
+| GameOptionsPage | options.txt | `GET/PUT /instances/{id}/gameoptions` | done |
 | ManagedPackPage | 托管包信息/更新检查 | `GET /instances/{id}/managedpack` | todo |
 | ExportInstanceDialog / ExportPackDialog | mrpack/CF 导出 | `POST /instances/{id}/export` | todo |
 | ExportToModListDialog | 模组清单 | `POST /instances/{id}/modlist?format=` | todo |
