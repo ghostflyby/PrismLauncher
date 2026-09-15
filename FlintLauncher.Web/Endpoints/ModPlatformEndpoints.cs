@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Modplatform endpoints (phase P6-fix-b): the CurseForge search pass-through, the per-provider
-// indexed version lists, and the per-instance mods surface (list / tracked install / tracked
-// update). The install/update flows run as registered tasks (202 + taskId) like launch/import;
-// the update task additionally publishes its found updates through the task view's optional
-// result payload.
+// Modplatform endpoints (phase P6-fix-b + UI-API mapping Wave B): the merged per-provider
+// search pass-through (provider = modrinth|flame), the per-provider indexed version lists,
+// and the per-instance mods surface (list / tracked install / tracked update plus the
+// enable/disable/uninstall renames). The install/update flows run as registered tasks
+// (202 + taskId) like launch/import; the update task additionally publishes its found
+// updates through the task view's optional result payload.
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft;
@@ -21,96 +22,24 @@ public static class ModPlatformEndpoints
 {
     public static void MapModPlatform(this IEndpointRouteBuilder api)
     {
-        // ------------------------------------------------------ modplatform/flame
-        api.MapGet("/modplatform/flame/search", async Task<IResult> (
-            LauncherRuntime runtime,
+        // ------------------------------------------------ modplatform/{provider}/search
+        // the merged search route of the two former /modplatform/{modrinth,flame}/search
+        // endpoints; each provider keeps its own header hooks and hit mapping
+        api.MapGet("/modplatform/{provider}/search", async Task<IResult> (
+            string provider,
             string? query,
             string? version,
             string? loader,
             string? index,
             int offset = 0) =>
         {
-            var loaders = string.IsNullOrWhiteSpace(loader)
-                ? (ModLoaderType?)null
-                : ModIndex.GetModLoaderFromString(loader.ToLowerInvariant());
-            // the CurseForge search URL builder never rejects loaders (unlike the Modrinth
-            // one), so validate the parsed loader against Flame's supported set here
-            if (loaders is { } parsed && parsed != 0 && !FlameApi.ValidateModLoaders(parsed))
+            if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
             {
-                return ApiJson.Error("invalid_loader", $"loader '{loader}' is not supported by CurseForge", 400);
+                return ApiJson.Error("unknown_provider", "provider must be 'modrinth' or 'flame'", 400);
             }
-
-            var args = new SearchArgs
-            {
-                Type = ResourceType.Mod,
-                Offset = offset < 0 ? 0 : offset,
-                Search = string.IsNullOrWhiteSpace(query) ? null : query,
-                Versions = string.IsNullOrWhiteSpace(version) ? null : [new McVersion(version)],
-                Loaders = loaders,
-                Sorting = FlameSorting(index),
-            };
-
-            var url = FlameApi.Instance.GetSearchURL(args);
-            if (url is null)
-            {
-                return ApiJson.Error("invalid_loader", $"loader '{loader}' is not supported by CurseForge", 400);
-            }
-
-            // pass-through of the core CurseForge search: run the net request and map the hits
-            // (the x-api-key header is attached through the FlameConfig provider hook)
-            var request = NetRequest.MakeByteArray(new Uri(url));
-            FlameApi.AddApiKeyHeader(request);
-            await request.StartAsync();
-            if (request.State != Core.Tasks.TaskState.Succeeded)
-            {
-                return ApiJson.Error("flame_unavailable",
-                    $"curseforge search failed: {request.FailReason}", 502);
-            }
-
-            JsonDocument doc;
-            try
-            {
-                doc = JsonDocument.Parse(request.BodyAsString);
-            }
-            catch (JsonException)
-            {
-                return ApiJson.Error("flame_invalid_response", "curseforge returned invalid JSON", 502);
-            }
-
-            using (doc)
-            {
-                var results = new List<FlameSearchResult>();
-                if (doc.RootElement.ValueKind == JsonValueKind.Object &&
-                    doc.RootElement.TryGetProperty("data", out var hits) &&
-                    hits.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var hit in hits.EnumerateArray())
-                    {
-                        if (hit.ValueKind != JsonValueKind.Object)
-                        {
-                            continue;
-                        }
-                        // map the hit through the core loader, like the C++ search page does
-                        var pack = new IndexedPack();
-                        try
-                        {
-                            FlameMod.LoadIndexedPack(pack, hit);
-                        }
-                        catch (FlintLauncher.Core.Json.JsonParseException)
-                        {
-                            continue;
-                        }
-                        results.Add(new FlameSearchResult(
-                            pack.AddonId,
-                            pack.Slug,
-                            pack.Name,
-                            pack.LogoUrl,
-                            pack.Authors.Count != 0 ? pack.Authors[0].Name : "",
-                            Downloads(hit)));
-                    }
-                }
-                return Results.Ok(results.ToArray());
-            }
+            return parsedProvider == ResourceProvider.FLAME
+                ? await FlameSearchAsync(query, version, loader, index, offset)
+                : await ModrinthSearchAsync(query, version, loader, index, offset);
         });
 
         // ------------------------------------------------ modplatform/{provider}/versions
@@ -342,6 +271,171 @@ public static class ModPlatformEndpoints
     }
 
     // ----------------------------------------------------------------- helpers
+
+    /// <summary>The CurseForge search pass-through (the x-api-key header is attached through
+    /// the FlameConfig provider hook; hits map through FlameMod.LoadIndexedPack).</summary>
+    private static async Task<IResult> FlameSearchAsync(string? query, string? version, string? loader,
+        string? index, int offset)
+    {
+        var loaders = string.IsNullOrWhiteSpace(loader)
+            ? (ModLoaderType?)null
+            : ModIndex.GetModLoaderFromString(loader.ToLowerInvariant());
+        // the CurseForge search URL builder never rejects loaders (unlike the Modrinth
+        // one), so validate the parsed loader against Flame's supported set here
+        if (loaders is { } parsed && parsed != 0 && !FlameApi.ValidateModLoaders(parsed))
+        {
+            return ApiJson.Error("invalid_loader", $"loader '{loader}' is not supported by CurseForge", 400);
+        }
+
+        var args = new SearchArgs
+        {
+            Type = ResourceType.Mod,
+            Offset = offset < 0 ? 0 : offset,
+            Search = string.IsNullOrWhiteSpace(query) ? null : query,
+            Versions = string.IsNullOrWhiteSpace(version) ? null : [new McVersion(version)],
+            Loaders = loaders,
+            Sorting = FlameSorting(index),
+        };
+
+        var url = FlameApi.Instance.GetSearchURL(args);
+        if (url is null)
+        {
+            return ApiJson.Error("invalid_loader", $"loader '{loader}' is not supported by CurseForge", 400);
+        }
+
+        var request = NetRequest.MakeByteArray(new Uri(url));
+        FlameApi.AddApiKeyHeader(request);
+        await request.StartAsync();
+        if (request.State != Core.Tasks.TaskState.Succeeded)
+        {
+            return ApiJson.Error("flame_unavailable",
+                $"curseforge search failed: {request.FailReason}", 502);
+        }
+
+        JsonDocument doc;
+        try
+        {
+            doc = JsonDocument.Parse(request.BodyAsString);
+        }
+        catch (JsonException)
+        {
+            return ApiJson.Error("flame_invalid_response", "curseforge returned invalid JSON", 502);
+        }
+
+        using (doc)
+        {
+            var results = new List<FlameSearchResult>();
+            if (doc.RootElement.ValueKind == JsonValueKind.Object &&
+                doc.RootElement.TryGetProperty("data", out var hits) &&
+                hits.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var hit in hits.EnumerateArray())
+                {
+                    if (hit.ValueKind != JsonValueKind.Object)
+                    {
+                        continue;
+                    }
+                    // map the hit through the core loader, like the C++ search page does
+                    var pack = new IndexedPack();
+                    try
+                    {
+                        FlameMod.LoadIndexedPack(pack, hit);
+                    }
+                    catch (FlintLauncher.Core.Json.JsonParseException)
+                    {
+                        continue;
+                    }
+                    results.Add(new FlameSearchResult(
+                        pack.AddonId,
+                        pack.Slug,
+                        pack.Name,
+                        pack.LogoUrl,
+                        pack.Authors.Count != 0 ? pack.Authors[0].Name : "",
+                        Downloads(hit)));
+                }
+            }
+            return Results.Ok(results.ToArray());
+        }
+    }
+
+    /// <summary>The Modrinth search pass-through (PAT header through ModrinthApi.AddApiHeaders
+    /// inside the core request builder; facets like the C++ search model builds them).</summary>
+    private static async Task<IResult> ModrinthSearchAsync(string? query, string? version, string? loader,
+        string? index, int offset)
+    {
+        var args = new SearchArgs
+        {
+            Type = ResourceType.Mod,
+            Offset = offset < 0 ? 0 : offset,
+            Search = string.IsNullOrWhiteSpace(query) ? null : query,
+            Versions = string.IsNullOrWhiteSpace(version) ? null : [new McVersion(version)],
+            Loaders = string.IsNullOrWhiteSpace(loader)
+                ? null
+                : ModIndex.GetModLoaderFromString(loader.ToLowerInvariant()),
+            Sorting = new SortingMethod
+            {
+                Index = 1,
+                Name = string.IsNullOrWhiteSpace(index) ? "relevance" : index,
+                ReadableName = "Sort by " + (string.IsNullOrWhiteSpace(index) ? "Relevance" : index),
+            },
+        };
+
+        var url = ModrinthApi.Instance.GetSearchURL(args);
+        if (url is null)
+        {
+            return ApiJson.Error("invalid_loader", $"loader '{loader}' is not supported by Modrinth", 400);
+        }
+
+        var request = NetRequest.MakeByteArray(new Uri(url));
+        await request.StartAsync();
+        if (request.State != Core.Tasks.TaskState.Succeeded)
+        {
+            return ApiJson.Error("modrinth_unavailable",
+                $"modrinth search failed: {request.FailReason}", 502);
+        }
+
+        JsonDocument doc;
+        try
+        {
+            doc = JsonDocument.Parse(request.BodyAsString);
+        }
+        catch (JsonException)
+        {
+            return ApiJson.Error("modrinth_invalid_response", "modrinth returned invalid JSON", 502);
+        }
+
+        using (doc)
+        {
+            var results = new List<ModrinthSearchResult>();
+            if (doc.RootElement.ValueKind == JsonValueKind.Object &&
+                doc.RootElement.TryGetProperty("hits", out var hits) &&
+                hits.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var hit in hits.EnumerateArray())
+                {
+                    results.Add(new ModrinthSearchResult(
+                        Str(hit, "project_id"),
+                        Str(hit, "slug"),
+                        Str(hit, "title"),
+                        Str(hit, "icon_url"),
+                        Str(hit, "author"),
+                        hit.TryGetProperty("downloads", out var downloads) &&
+                        downloads.ValueKind == JsonValueKind.Number
+                            ? downloads.GetInt64()
+                            : 0));
+                }
+            }
+            return Results.Ok(results.ToArray());
+        }
+    }
+
+    /// <summary>A string property of a JSON hit object ("" when absent or of another kind).</summary>
+    private static string Str(JsonElement element, string name) =>
+        element.ValueKind == JsonValueKind.Object &&
+        element.TryGetProperty(name, out var value) &&
+        value.ValueKind == JsonValueKind.String
+            ? value.GetString() ?? ""
+            : "";
 
     /// <summary>The MinecraftInstance for an id (null when missing or not a Minecraft
     /// instance — the mods surface only exists for real instances, like launch).</summary>

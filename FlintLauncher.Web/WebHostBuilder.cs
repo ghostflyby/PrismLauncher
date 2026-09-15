@@ -79,6 +79,10 @@ public static class WebHostBuilder
         api.MapMisc();
         api.MapModPlatform();
         api.MapInstanceContent();
+        api.MapComponents();
+        api.MapExport();
+        api.MapManagedPack();
+        api.MapSettingsAndIcons();
 
         return app;
     }

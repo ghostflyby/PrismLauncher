@@ -715,14 +715,17 @@ public class ResourceApiTests : IAsyncDisposable
         File.WriteAllText(Path.Combine(gameRoot, "resourcepacks", "pack.zip"), "p");
         Directory.CreateDirectory(Path.Combine(gameRoot, "datapacks"));
 
+        // the merge decision: type=mods on the resources family is rejected in favor of the
+        // metadata-rich /mods surface
+        var rejected = await _host.Client.GetAsync(
+            "/api/v1/instances/res-inst/resources/mods");
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+
         var mods = JsonDocument.Parse(await _host.Client.GetStringAsync(
-            "/api/v1/instances/res-inst/resources/mods")).RootElement;
+            "/api/v1/instances/res-inst/mods")).RootElement;
         Assert.Equal(2, mods.GetArrayLength());
         var alpha = mods.EnumerateArray().Single(m => m.GetProperty("fileName").GetString() == "alpha.jar");
         Assert.True(alpha.GetProperty("enabled").GetBoolean());
-        Assert.Equal("alpha", alpha.GetProperty("name").GetString());
-        Assert.Equal("zip", alpha.GetProperty("type").GetString());
-        Assert.True(alpha.GetProperty("modifiedAt").GetInt64() > 0);
         var beta = mods.EnumerateArray().Single(m => m.GetProperty("fileName").GetString() == "beta.jar.disabled");
         Assert.False(beta.GetProperty("enabled").GetBoolean());
 
@@ -737,33 +740,33 @@ public class ResourceApiTests : IAsyncDisposable
 
         // disable: the file gains the .disabled suffix ---------------------------------
         var disable = await _host.PostAsync(
-            "/api/v1/instances/res-inst/resources/mods/alpha.jar/disable", new { });
+            "/api/v1/instances/res-inst/mods/alpha.jar/disable", new { });
         Assert.Equal(HttpStatusCode.NoContent, disable.StatusCode);
         Assert.True(File.Exists(Path.Combine(gameRoot, "mods", "alpha.jar.disabled")));
         Assert.False(File.Exists(Path.Combine(gameRoot, "mods", "alpha.jar")));
 
         // enable (by bare name): the suffix is removed ---------------------------------
         var enable = await _host.PostAsync(
-            "/api/v1/instances/res-inst/resources/mods/beta.jar/enable", new { });
+            "/api/v1/instances/res-inst/mods/beta.jar/enable", new { });
         Assert.Equal(HttpStatusCode.NoContent, enable.StatusCode);
         Assert.True(File.Exists(Path.Combine(gameRoot, "mods", "beta.jar")));
 
         // toggling an already-enabled resource conflicts (409, no change) --------------
         var again = await _host.PostAsync(
-            "/api/v1/instances/res-inst/resources/mods/beta.jar/enable", new { });
+            "/api/v1/instances/res-inst/mods/beta.jar/enable", new { });
         Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
         Assert.Equal("no_change", JsonDocument.Parse(await again.Content.ReadAsStringAsync())
             .RootElement.GetProperty("error").GetProperty("code").GetString());
 
         // delete by bare name ------------------------------------------------------------
         var delete = await _host.Client.DeleteAsync(
-            "/api/v1/instances/res-inst/resources/mods/alpha.jar");
+            "/api/v1/instances/res-inst/mods/alpha.jar");
         Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
         Assert.False(File.Exists(Path.Combine(gameRoot, "mods", "alpha.jar.disabled")));
 
         // errors: unknown resource 404, unknown type 400 --------------------------------
         var missing = await _host.PostAsync(
-            "/api/v1/instances/res-inst/resources/mods/ghost.jar/disable", new { });
+            "/api/v1/instances/res-inst/mods/ghost.jar/disable", new { });
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
         var unknownType = await _host.Client.GetAsync("/api/v1/instances/res-inst/resources/whatnot");
         Assert.Equal(HttpStatusCode.BadRequest, unknownType.StatusCode);

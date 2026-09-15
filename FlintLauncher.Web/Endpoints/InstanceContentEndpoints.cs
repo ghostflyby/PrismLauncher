@@ -22,6 +22,7 @@ public static class InstanceContentEndpoints
         MapWorlds(api);
         MapServers(api);
         MapResources(api);
+        MapMods(api);
         MapScreenshots(api);
         MapGameOptions(api);
     }
@@ -311,6 +312,8 @@ public static class InstanceContentEndpoints
 
     private static void MapResources(IEndpointRouteBuilder api)
     {
+        // NOTE (Wave B audit): the resources family EXCLUDES mods — the metadata-rich
+        // /instances/{id}/mods surface below is the single mods source of truth.
         api.MapGet("/instances/{id}/resources/{type}", async (string id, string type,
             LauncherRuntime runtime) =>
         {
@@ -321,10 +324,15 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+                if (type == "mods")
+                {
+                    return ApiJson.Error("use_mods_endpoint",
+                        "mods are served by /instances/{id}/mods; the resources endpoints do not list them", 400);
+                }
                 if (ResourceFolder(instance, type) is not { } folder)
                 {
                     return ApiJson.Error("unknown_type",
-                        "type must be one of mods|resourcepacks|texturepacks|shaderpacks|datapacks", 400);
+                        "type must be one of resourcepacks|texturepacks|shaderpacks|datapacks", 400);
                 }
                 folder.Update();
                 return Results.Ok(folder.Resources.Select(ToResourceView).ToArray());
@@ -353,10 +361,15 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+                if (type == "mods")
+                {
+                    return ApiJson.Error("use_mods_endpoint",
+                        "mods are served by /instances/{id}/mods; the resources endpoints do not uninstall them", 400);
+                }
                 if (ResourceFolder(instance, type) is not { } folder)
                 {
                     return ApiJson.Error("unknown_type",
-                        "type must be one of mods|resourcepacks|texturepacks|shaderpacks|datapacks", 400);
+                        "type must be one of resourcepacks|texturepacks|shaderpacks|datapacks", 400);
                 }
                 folder.Update();
                 // UninstallResource resolves the ".disabled" suffixed file from the bare name
@@ -381,10 +394,15 @@ public static class InstanceContentEndpoints
             {
                 return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
             }
+            if (type == "mods")
+            {
+                return ApiJson.Error("use_mods_endpoint",
+                    "mods are served by /instances/{id}/mods; the resources endpoints do not toggle them", 400);
+            }
             if (ResourceFolder(instance, type) is not { } folder)
             {
                 return ApiJson.Error("unknown_type",
-                    "type must be one of mods|resourcepacks|texturepacks|shaderpacks|datapacks", 400);
+                    "type must be one of resourcepacks|texturepacks|shaderpacks|datapacks", 400);
             }
             folder.Update();
             var resource = FindResource(folder, name);
@@ -398,6 +416,78 @@ public static class InstanceContentEndpoints
             {
                 return ApiJson.Conflict("no_change",
                     $"resource '{name}' was not {verb} (already {verb}, or its type cannot be toggled)");
+            }
+            folder.Update();
+            return Results.NoContent();
+        }
+        finally
+        {
+            runtime.InstanceLock.Release();
+        }
+    }
+
+    // ------------------------------------------------------------------- mods (metadata-rich)
+
+    /// <summary>The /instances/{id}/mods mutations (Wave B audit: enable/disable/uninstall so
+    /// the mods surface is fully featured without going through the resources family). The
+    /// folder is the instance's cached ModFolderModel — the metadata-aware one, so the
+    /// uninstall also drops the packwiz index entry.</summary>
+    private static void MapMods(IEndpointRouteBuilder api)
+    {
+        api.MapPost("/instances/{id}/mods/{name}/enable", async (string id, string name,
+            LauncherRuntime runtime) =>
+            await SetModEnabled(id, name, EnableAction.Enable, runtime));
+
+        api.MapPost("/instances/{id}/mods/{name}/disable", async (string id, string name,
+            LauncherRuntime runtime) =>
+            await SetModEnabled(id, name, EnableAction.Disable, runtime));
+
+        api.MapDelete("/instances/{id}/mods/{name}", async (string id, string name,
+            LauncherRuntime runtime) =>
+        {
+            await runtime.InstanceLock.WaitAsync();
+            try
+            {
+                if (LookupInstance(runtime, id) is not { } instance)
+                {
+                    return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
+                }
+                var folder = instance.LoaderModList();
+                folder.Update();
+                return folder.UninstallResource(name)
+                    ? Results.NoContent() // the ModFolderModel override also drops the metadata
+                    : ApiJson.NotFound("mod_not_found", $"no mod '{name}'");
+            }
+            finally
+            {
+                runtime.InstanceLock.Release();
+            }
+        });
+    }
+
+    private static async Task<IResult> SetModEnabled(string id, string name, EnableAction action,
+        LauncherRuntime runtime)
+    {
+        await runtime.InstanceLock.WaitAsync();
+        try
+        {
+            if (LookupInstance(runtime, id) is not { } instance)
+            {
+                return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
+            }
+            var folder = instance.LoaderModList();
+            folder.Update();
+            var mod = FindResource(folder, name);
+            if (mod is null)
+            {
+                return ApiJson.NotFound("mod_not_found", $"no mod '{name}'");
+            }
+            // Resource.Enable performs the ".disabled" suffix rename on disk (same rename
+            // semantics as the resources family)
+            var verb = action == EnableAction.Enable ? "enabled" : "disabled";
+            if (!mod.Enable(action))
+            {
+                return ApiJson.Conflict("no_change", $"mod '{name}' was not {verb} (already {verb})");
             }
             folder.Update();
             return Results.NoContent();

@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Java discovery, launcher news and the Modrinth search pass-through.
-using System.Text.Json;
+// Java discovery and launcher news. (The Modrinth search pass-through moved into the merged
+// /modplatform/{provider}/search route of ModPlatformEndpoints, UI-API mapping Wave B.)
 using FlintLauncher.Core.Java;
-using FlintLauncher.Core.ModPlatform;
-using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Versioning;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 
@@ -43,90 +39,7 @@ public static class MiscEndpoints
                 .Select(entry => new NewsView(entry.Title, entry.Content, entry.Link))
                 .ToArray());
         });
-
-        // ------------------------------------------------------ modplatform/modrinth
-        api.MapGet("/modplatform/modrinth/search", async Task<IResult> (
-            LauncherRuntime runtime,
-            string? query,
-            string? version,
-            string? loader,
-            string? index,
-            int offset = 0) =>
-        {
-            var args = new SearchArgs
-            {
-                Type = ResourceType.Mod,
-                Offset = offset < 0 ? 0 : offset,
-                Search = string.IsNullOrWhiteSpace(query) ? null : query,
-                Versions = string.IsNullOrWhiteSpace(version) ? null : [new McVersion(version)],
-                Loaders = string.IsNullOrWhiteSpace(loader)
-                    ? null
-                    : ModIndex.GetModLoaderFromString(loader.ToLowerInvariant()),
-                Sorting = new SortingMethod
-                {
-                    Index = 1,
-                    Name = string.IsNullOrWhiteSpace(index) ? "relevance" : index,
-                    ReadableName = "Sort by " + (string.IsNullOrWhiteSpace(index) ? "Relevance" : index),
-                },
-            };
-
-            var url = ModrinthApi.Instance.GetSearchURL(args);
-            if (url is null)
-            {
-                return ApiJson.Error("invalid_loader", $"loader '{loader}' is not supported by Modrinth", 400);
-            }
-
-            // pass-through of the core Modrinth search: run the net request and map the hits
-            var request = NetRequest.MakeByteArray(new Uri(url));
-            await request.StartAsync();
-            if (request.State != Core.Tasks.TaskState.Succeeded)
-            {
-                return ApiJson.Error("modrinth_unavailable",
-                    $"modrinth search failed: {request.FailReason}", 502);
-            }
-
-            JsonDocument doc;
-            try
-            {
-                doc = JsonDocument.Parse(request.BodyAsString);
-            }
-            catch (JsonException)
-            {
-                return ApiJson.Error("modrinth_invalid_response", "modrinth returned invalid JSON", 502);
-            }
-
-            using (doc)
-            {
-                var results = new List<ModrinthSearchResult>();
-                if (doc.RootElement.ValueKind == JsonValueKind.Object &&
-                    doc.RootElement.TryGetProperty("hits", out var hits) &&
-                    hits.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var hit in hits.EnumerateArray())
-                    {
-                        results.Add(new ModrinthSearchResult(
-                            Str(hit, "project_id"),
-                            Str(hit, "slug"),
-                            Str(hit, "title"),
-                            Str(hit, "icon_url"),
-                            Str(hit, "author"),
-                            hit.TryGetProperty("downloads", out var downloads) &&
-                            downloads.ValueKind == JsonValueKind.Number
-                                ? downloads.GetInt64()
-                                : 0));
-                    }
-                }
-                return Results.Ok(results.ToArray());
-            }
-        });
     }
-
-    private static string Str(JsonElement element, string name) =>
-        element.ValueKind == JsonValueKind.Object &&
-        element.TryGetProperty(name, out var value) &&
-        value.ValueKind == JsonValueKind.String
-            ? value.GetString() ?? ""
-            : "";
 }
 
 /// <summary>Cached java discovery (GET serves the cache, POST re-scans).</summary>

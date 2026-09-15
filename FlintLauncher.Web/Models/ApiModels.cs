@@ -86,10 +86,13 @@ public sealed record ModInstallEntryView(
     bool IsDependency,
     string? RequiredBy);
 
-/// <summary>Optional terminal payload of a task (mods-update sets Updates, mods-install sets Installed).</summary>
+/// <summary>Optional terminal payload of a task (mods-update sets Updates, mods-install sets
+/// Installed, the Wave B export tasks set OutputPath).</summary>
 public sealed record TaskResultView(
     IReadOnlyList<ModUpdateEntryView>? Updates,
-    IReadOnlyList<ModInstallEntryView>? Installed);
+    IReadOnlyList<ModInstallEntryView>? Installed,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? OutputPath = null);
 
 public sealed record TaskView(
     string Id,
@@ -251,3 +254,71 @@ public sealed record GameOptionView(string Key, string Value);
 
 /// <summary>PUT /instances/{id}/gameoptions body: key/values to set (add-or-replace).</summary>
 public sealed record GameOptionsPutRequest(IReadOnlyList<GameOptionView> Options);
+
+// ------------------------------------------------------------------ UI-API Wave B
+
+/// <summary>One problem of a component (GET /instances/{id}/components, the VersionPage
+/// problem column).</summary>
+public sealed record ComponentProblemView(string Severity, string Description);
+
+/// <summary>One row of an instance's component stack (the VersionPage list).</summary>
+public sealed record ComponentView(
+    string Uid,
+    string? Version,
+    string? Name,
+    bool Important,
+    bool Customized,
+    bool Enabled,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    ComponentProblemView[]? Problems);
+
+/// <summary>PATCH /instances/{id}/components/{uid} body: change the pinned version and/or
+/// the important flag.</summary>
+public sealed record ComponentPatchRequest(string? Version, bool? Important);
+
+/// <summary>POST /instances/{id}/components body: install a loader component
+/// (SetComponentVersion with important=true unless the body says otherwise).</summary>
+public sealed record ComponentInstallRequest(string Uid, string? Version, bool? Important);
+
+/// <summary>POST /instances/{id}/components/{uid}/move body: -1 moves up, 1 moves down.</summary>
+public sealed record ComponentMoveRequest(int Delta);
+
+/// <summary>POST /instances/{id}/export body (ExportInstanceDialog/ExportPackDialog/
+/// ExportToModListDialog inputs).</summary>
+public sealed record ExportRequest(
+    string Format,
+    string? Name = null,
+    string? VersionId = null,
+    string? Summary = null,
+    string? Author = null,
+    string? Format2 = null);
+
+/// <summary>One log/crash-report file of an instance (GET /instances/{id}/logs).</summary>
+public sealed record LogFileView(string Name, string Dir, long SizeBytes, long ModifiedAt);
+
+/// <summary>GET /instances/{id}/managedpack response (ManagedPackPage fields).</summary>
+public sealed record ManagedPackView(
+    bool Managed,
+    string Type,
+    string Id,
+    string Name,
+    string VersionId,
+    string VersionName);
+
+/// <summary>POST /instances/{id}/managedpack/update-check response.</summary>
+public sealed record ManagedPackUpdateResponse(string CurrentVersion, string LatestVersion,
+    bool UpdateAvailable);
+
+/// <summary>One icon of the global icon library (GET /api/v1/icons).</summary>
+public sealed record IconView(string Key, string Name);
+
+/// <summary>POST /api/v1/icons response.</summary>
+public sealed record IconInstalledResponse(string Key);
+
+/// <summary>PUT /instances/{id}/icon JSON body (multipart upload is the other variant).</summary>
+public sealed record InstanceIconPutRequest(string IconKey);
+
+/// <summary>PUT /api/v1/settings body: the group plus the typed key/value map to write.</summary>
+public sealed record GlobalSettingsPutRequest(string Group, JsonElement Values);
+
+public sealed record SettingsGroupsResponse(IReadOnlyDictionary<string, object> Groups);
