@@ -244,6 +244,10 @@ public class ExtractNativesTests
         const string assetsId = "testassets";
         var body = Encoding.UTF8.GetBytes("virtual asset payload");
         var hash = Convert.ToHexString(SHA1.HashData(body)).ToLowerInvariant();
+        var previousCwd = Environment.CurrentDirectory;
+        // the redirect symlink lives at BaseDirectory/assets and the task reads "assets/..."
+        // CWD-relative — pin CWD back there so foreign chdir (API hosts) cannot break it
+        Environment.CurrentDirectory = AppContext.BaseDirectory;
         using var assetsRoot = new AssetsRootRedirect();
         // the index marks the assets virtual; the object file exists in assets/objects
         var indexJson = """{"virtual":true,"objects":{"icon.png":{"hash":"HASH","size":LEN}}}"""
@@ -264,6 +268,7 @@ public class ExtractNativesTests
         var rebuilt = Path.Combine(assetsRoot.Root, "virtual", assetsId, "icon.png");
         Assert.True(File.Exists(rebuilt));
         Assert.Equal("virtual asset payload", await File.ReadAllTextAsync(rebuilt));
+        Environment.CurrentDirectory = previousCwd;
     }
 
     [Fact]
@@ -277,6 +282,10 @@ public class ExtractNativesTests
         var indexBody = Encoding.UTF8.GetBytes(indexJson);
         var indexSha = Convert.ToHexString(SHA1.HashData(indexBody)).ToLowerInvariant();
 
+        var previousCwd = Environment.CurrentDirectory;
+        // the redirect symlink lives at BaseDirectory/assets and the task reads "assets/..."
+        // CWD-relative — pin CWD back there so foreign chdir (API hosts) cannot break it
+        Environment.CurrentDirectory = AppContext.BaseDirectory;
         using var assetsRoot = new AssetsRootRedirect();
         using var server = new TestHttpServer(context =>
         {
@@ -331,6 +340,7 @@ public class ExtractNativesTests
         }
         finally
         {
+            Environment.CurrentDirectory = previousCwd;
             AssetUpdateTask.MetaCacheHook = null;
             AssetUpdateTask.ResourceUrlOverride = null;
         }
