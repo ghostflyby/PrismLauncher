@@ -77,13 +77,17 @@ public class NetStackTests : IDisposable
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
             File.WriteAllText(file, "{}");
 
+
             var entry = cache.ResolveEntry("META", "net.minecraft/index.json");
             Assert.True(entry.IsStale);
 
-            timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             entry.SetStale(false);
             entry.Etag = "\"abc123\"";
             entry.Md5Sum = Convert.ToHexString(MD5.HashData("{}"u8.ToArray())).ToLowerInvariant();
+            // mirror ResolveEntry: the stored timestamp must equal the file's mtime or the
+            // next resolve re-hashes (1ms UtcNow-vs-mtime rounding makes that flaky)
+            timestamp = new DateTimeOffset(File.GetLastWriteTimeUtc(
+                Path.Combine(basePath, "net.minecraft/index.json"))).ToUnixTimeMilliseconds();
             entry.LocalChangedTimestamp = timestamp;
             entry.RemoteChangedTimestamp = "Tue, 01 Jan 2030 00:00:00 GMT";
             entry.IsEternal = true;

@@ -94,7 +94,7 @@ public static class SettingsAndIconsEndpoints
 
         api.MapPut("/settings", (LauncherRuntime runtime, GlobalSettingsPutRequest? body) =>
         {
-            if (body is null || !Groups.ContainsKey(body.Group ?? ""))
+            if (body is null || body.Group is null || !Groups.ContainsKey(body.Group))
             {
                 return ApiJson.Error("invalid_request",
                     $"'group' must be one of: {string.Join(", ", Groups.Keys)}", 400);
