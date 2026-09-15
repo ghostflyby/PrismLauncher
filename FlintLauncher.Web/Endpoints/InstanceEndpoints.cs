@@ -15,12 +15,57 @@ public static class InstanceEndpoints
 {
     public static void MapInstances(this IEndpointRouteBuilder api)
     {
-        api.MapGet("/instances", async (LauncherRuntime runtime) =>
+        api.MapGet("/instances", async (LauncherRuntime runtime, string? search, string? group) =>
         {
             await runtime.InstanceLock.WaitAsync();
             try
             {
-                return Results.Ok(runtime.Instances.Instances.Select(inst => Summary(inst, runtime.Instances)).ToArray());
+                // MainWindow's instance-view filter: name contains + group equals (both
+                // case-insensitive; the group match is exact except for casing)
+                IEnumerable<InstanceSummary> summaries = runtime.Instances.Instances
+                    .Select(inst => Summary(inst, runtime.Instances));
+                if (!string.IsNullOrEmpty(search))
+                {
+                    summaries = summaries.Where(summary =>
+                        summary.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
+                }
+                if (!string.IsNullOrEmpty(group))
+                {
+                    summaries = summaries.Where(summary =>
+                        string.Equals(summary.Group, group, StringComparison.OrdinalIgnoreCase));
+                }
+                return Results.Ok(summaries.ToArray());
+            }
+            finally
+            {
+                runtime.InstanceLock.Release();
+            }
+        });
+
+        // the group index of the instance list (MainWindow's group view)
+        api.MapGet("/instances/groups", async (LauncherRuntime runtime) =>
+        {
+            await runtime.InstanceLock.WaitAsync();
+            try
+            {
+                var byGroup = new SortedDictionary<string, List<string>>(StringComparer.Ordinal);
+                foreach (var inst in runtime.Instances.Instances)
+                {
+                    var group = runtime.Instances.GetInstanceGroup(inst.Id());
+                    if (group.Length == 0)
+                    {
+                        continue; // ungrouped instances are not a group
+                    }
+                    if (!byGroup.TryGetValue(group, out var ids))
+                    {
+                        ids = new List<string>();
+                        byGroup[group] = ids;
+                    }
+                    ids.Add(inst.Id());
+                }
+                return Results.Ok(byGroup.Select(pair =>
+                    new InstanceGroupView(pair.Key, pair.Value.OrderBy(id => id, StringComparer.Ordinal)
+                        .ToArray())).ToArray());
             }
             finally
             {
@@ -130,6 +175,76 @@ public static class InstanceEndpoints
                     }
                 }));
                 _ = wrapped.StartAsync(); // 202: downloads/modpack processing run in background
+                return Results.Accepted($"/api/v1/tasks/{entry.Id}", new TaskAcceptedResponse(entry.Id));
+            }
+            finally
+            {
+                runtime.InstanceLock.Release();
+            }
+        });
+
+        // CopyInstanceDialog: a selective copy runs as a staged instance task (the copy is
+        // committed into instances/ on success) and is tracked like import
+        api.MapPost("/instances/{id}/copy", async (string id, CopyInstanceRequest request,
+            LauncherRuntime runtime, FlintTaskRegistry registry) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Name))
+            {
+                return ApiJson.Error("invalid_body", "'name' is required", 400);
+            }
+
+            await runtime.InstanceLock.WaitAsync();
+            try
+            {
+                var original = runtime.Instances.GetInstanceById(id);
+                if (original is null)
+                {
+                    return ApiJson.NotFound("instance_not_found", $"no instance '{id}'");
+                }
+
+                // the dialog checkboxes; unspecified flags keep the InstanceCopyPrefs defaults
+                var prefs = new InstanceCopyPrefs
+                {
+                    CopySaves = request.CopySaves ?? true,
+                    KeepPlaytime = request.KeepPlaytime ?? true,
+                    CopyGameOptions = request.CopyGameOptions ?? true,
+                    CopyResourcePacks = request.CopyResourcePacks ?? true,
+                    CopyShaderPacks = request.CopyShaderPacks ?? true,
+                    CopyServers = request.CopyServers ?? true,
+                    CopyMods = request.CopyMods ?? true,
+                    CopyScreenshots = request.CopyScreenshots ?? true,
+                    UseSymLinks = request.UseSymLinks ?? false,
+                    LinkRecursively = request.LinkRecursively ?? false,
+                    UseHardLinks = request.UseHardLinks ?? false,
+                    DontLinkSaves = request.DontLinkSaves ?? false,
+                    UseClone = request.UseClone ?? false,
+                };
+
+                var task = new InstanceCopyTask(original, prefs)
+                {
+                    TargetDir = "",
+                    Group = request.Group ?? "",
+                };
+                task.SetName(request.Name);
+                // the dialog copies the original's icon when none was picked (and the copy
+                // carries the original's iconKey inside instance.cfg either way)
+                task.Icon = request.IconKey ?? original.IconKey();
+
+                var wrapped = runtime.Instances.WrapInstanceTask(task);
+                var entry = registry.Register("copy", wrapped, instanceId: id,
+                    onFinished: () => _ = Task.Run(() =>
+                    {
+                        runtime.InstanceLock.Wait();
+                        try
+                        {
+                            runtime.Instances.LoadList();
+                        }
+                        finally
+                        {
+                            runtime.InstanceLock.Release();
+                        }
+                    }));
+                _ = wrapped.StartAsync(); // 202: the folder copy + commit run in the background
                 return Results.Accepted($"/api/v1/tasks/{entry.Id}", new TaskAcceptedResponse(entry.Id));
             }
             finally

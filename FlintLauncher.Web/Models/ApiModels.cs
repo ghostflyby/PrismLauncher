@@ -169,3 +169,85 @@ public sealed record ModInstallSelection(string Provider, string ProjectId, stri
 
 /// <summary>POST /instances/{id}/mods/update optional body (filter by installed file names).</summary>
 public sealed record ModsUpdateRequest(IReadOnlyList<string>? Mods);
+
+// ------------------------------------------------------------------ UI-API Wave A
+
+/// <summary>One named group of the instance list (GET /instances/groups).</summary>
+public sealed record InstanceGroupView(string Name, IReadOnlyList<string> InstanceIds);
+
+/// <summary>POST /instances/{id}/copy body: the display name plus the CopyInstanceDialog
+/// checkbox set (null = keep the InstanceCopyPrefs default).</summary>
+public sealed record CopyInstanceRequest(
+    string Name,
+    string? Group = null,
+    string? IconKey = null,
+    bool? CopySaves = null,
+    bool? KeepPlaytime = null,
+    bool? CopyGameOptions = null,
+    bool? CopyResourcePacks = null,
+    bool? CopyShaderPacks = null,
+    bool? CopyServers = null,
+    bool? CopyMods = null,
+    bool? CopyScreenshots = null,
+    bool? UseSymLinks = null,
+    bool? LinkRecursively = null,
+    bool? UseHardLinks = null,
+    bool? DontLinkSaves = null,
+    bool? UseClone = null);
+
+/// <summary>One world of an instance's saves folder (GET /instances/{id}/worlds).</summary>
+public sealed record WorldView(
+    string Name,
+    string FolderName,
+    long LastPlayed,
+    string GameType,
+    string ContainerPath,
+    long SizeBytes);
+
+/// <summary>POST /instances/{id}/worlds/{folderName}/rename body.</summary>
+public sealed record WorldRenameRequest(string NewName);
+
+/// <summary>One entry of the instance's servers.dat (GET /instances/{id}/servers).</summary>
+public sealed record ServerEntryView(
+    int Index,
+    string Name,
+    string Address,
+    string AcceptsTextures,
+    bool HasIcon);
+
+/// <summary>POST /instances/{id}/servers body.</summary>
+public sealed record ServerAddRequest(string Name, string Address);
+
+/// <summary>POST /instances/{id}/servers/{index}/ping response: the SRV/A resolution outcome
+/// plus the fields the status handshake extracts from the server's JSON.</summary>
+public sealed record ServerPingView(
+    string Host,
+    int Port,
+    string ResolvedIp,
+    int ResolvedPort,
+    int OnlinePlayers,
+    int MaxPlayers,
+    string? Version,
+    string? Motd,
+    long LatencyMs);
+
+/// <summary>One resource of an instance resource folder (GET /instances/{id}/resources/{type}).</summary>
+public sealed record ResourceView(
+    string FileName,
+    string Name,
+    bool Enabled,
+    string Type,
+    long SizeBytes,
+    long ModifiedAt);
+
+/// <summary>One screenshot file of an instance's screenshots folder.</summary>
+public sealed record ScreenshotView(string Name, long SizeBytes, long ModifiedAt);
+
+/// <summary>POST /instances/{id}/screenshots/upload body (file names of the listing).</summary>
+public sealed record ScreenshotUploadRequest(IReadOnlyList<string> Names);
+
+/// <summary>One options.txt entry (GET /instances/{id}/gameoptions).</summary>
+public sealed record GameOptionView(string Key, string Value);
+
+/// <summary>PUT /instances/{id}/gameoptions body: key/values to set (add-or-replace).</summary>
+public sealed record GameOptionsPutRequest(IReadOnlyList<GameOptionView> Options);

@@ -78,6 +78,7 @@ public static class WebHostBuilder
         api.MapAccounts();
         api.MapMisc();
         api.MapModPlatform();
+        api.MapInstanceContent();
 
         return app;
     }
