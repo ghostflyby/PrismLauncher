@@ -231,6 +231,21 @@ public sealed class ModrinthApi : ResourceApi
 
     public List<Category> LoadModCategories(string response) => LoadCategories(response, "mod");
 
+    /// <summary>Port of the GET /project/{id}/description endpoint: the project body as
+    /// plain text (Modrinth has no per-file changelog endpoint — changelogs ride on the
+    /// version objects). Returns "" when the request fails, like the Flame API helpers.</summary>
+    public static async Task<string> GetProjectDescription(string projectId,
+        CancellationToken cancellationToken = default)
+    {
+        var request = MakeByteArrayRequest($"{BaseUrl}/project/{projectId}/description");
+        await request.StartAsync(cancellationToken);
+        if (!request.WasSuccessful)
+        {
+            return "";
+        }
+        return request.BodyAsString;
+    }
+
     // ------------------------------------------------------------------ URL builders
 
     public static string GetAuthorURL(string name) => "https://modrinth.com/user/" + name;

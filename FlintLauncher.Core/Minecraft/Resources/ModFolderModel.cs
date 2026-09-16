@@ -12,6 +12,13 @@
 // Installed and exposes the metadata through GetMetadata (the Mod object itself has no
 // metadata field in this port). UninstallResource removes the index entry like the C++
 // resource->destroy(index_dir, ...) call.
+//
+// Fix-1 metadata hook: upstream's background resolver (ResourceFolderModel::resolveResource
+// + LocalModParseTask + onParseSucceeded) fills each Mod's ModDetails after the scan; this
+// port runs the ModUtils parse synchronously at the end of Update() for every mod that
+// still ShouldResolve (the freshly scanned / changed / added ones, exactly the set the C++
+// resolve pass targets). The parse is best-effort: a failing jar keeps filename-only
+// details, like an upstream parse task that finishes with an empty result.
 using FlintLauncher.Core.ModPlatform;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
@@ -56,7 +63,29 @@ public class ModFolderModel : ResourceFolderModel
     {
         var updated = base.Update();
         LoadMetadataIndex();
+        ResolveMods();
         return updated;
+    }
+
+    /// <summary>
+    /// Port of the ResourceFolderModel resolver (resolveResource + LocalModParseTask +
+    /// onParseSucceeded): run the LocalModParseTask pass synchronously for every mod that
+    /// still needs details, then finish the resolution with the parsed ModDetails (empty
+    /// details on a parse failure — the task always succeeds, mirroring the C++ event flow).
+    /// </summary>
+    private void ResolveMods()
+    {
+        foreach (var mod in AllMods())
+        {
+            if (!mod.ShouldResolve)
+            {
+                continue;
+            }
+
+            mod.SetResolving(true, mod.ResolutionTicket);
+            ModUtils.Process(mod);
+            mod.FinishResolvingWithDetails(mod.Details);
+        }
     }
 
     public override bool UninstallResource(string fileName, bool preserveMetadata = false)

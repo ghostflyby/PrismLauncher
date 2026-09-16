@@ -151,8 +151,15 @@ public sealed class FlameApi : ResourceApi
     /// <summary>Port of FlameAPI::getCategories (GET /categories?gameId=432&classId=...).</summary>
     public static (NetJob Job, NetRequest Request) GetCategories(ResourceType type)
     {
+        return GetCategoriesForClassId(GetClassId(type));
+    }
+
+    /// <summary>The raw-classId variant the categories endpoint uses (search hits carry a
+    /// CurseForge classId that may not have a ResourceType in the map above).</summary>
+    public static (NetJob Job, NetRequest Request) GetCategoriesForClassId(int classId)
+    {
         var netJob = new NetJob("Flame::GetCategories");
-        var request = MakeByteArrayRequest($"{FlameConfig.BaseUrl}/categories?gameId=432&classId={GetClassId(type)}");
+        var request = MakeByteArrayRequest($"{FlameConfig.BaseUrl}/categories?gameId=432&classId={classId}");
         netJob.AddNetRequest(request);
         return (netJob, request);
     }

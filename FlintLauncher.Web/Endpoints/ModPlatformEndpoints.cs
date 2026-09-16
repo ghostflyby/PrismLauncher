@@ -24,22 +24,155 @@ public static class ModPlatformEndpoints
     {
         // ------------------------------------------------ modplatform/{provider}/search
         // the merged search route of the two former /modplatform/{modrinth,flame}/search
-        // endpoints; each provider keeps its own header hooks and hit mapping
+        // endpoints; each provider keeps its own header hooks and hit mapping. The `type`
+        // query param (default mods, back-compat) selects the searched resource type.
         api.MapGet("/modplatform/{provider}/search", async Task<IResult> (
             string provider,
             string? query,
             string? version,
             string? loader,
             string? index,
+            string? type,
             int offset = 0) =>
         {
             if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
             {
                 return ApiJson.Error("unknown_provider", "provider must be 'modrinth' or 'flame'", 400);
             }
+            if (!TryParseSearchType(type, out var resourceType, out var typeError))
+            {
+                return ApiJson.Error("invalid_type", typeError!, 400);
+            }
+            resourceType = NormalizeSearchType(resourceType, parsedProvider, out var unsupportedReason);
+            if (unsupportedReason is not null)
+            {
+                return ApiJson.Error("invalid_type", unsupportedReason, 400);
+            }
             return parsedProvider == ResourceProvider.FLAME
-                ? await FlameSearchAsync(query, version, loader, index, offset)
-                : await ModrinthSearchAsync(query, version, loader, index, offset);
+                ? await FlameSearchAsync(resourceType, query, version, loader, index, offset)
+                : await ModrinthSearchAsync(resourceType, query, version, loader, index, offset);
+        });
+
+        // ----------------------------------------------------- modplatform/{provider}/categories
+        // GET /categories?gameId=432&classId=... (Flame) or GET /tag/category filtered by
+        // project_type (Modrinth), mapped to [{id, name, icon}]. An explicit numeric classId
+        // wins over `type` on Flame (search hits carry the raw CurseForge class id).
+        api.MapGet("/modplatform/{provider}/categories", async Task<IResult> (
+            string provider, string? type, string? classId) =>
+        {
+            if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
+            {
+                return ApiJson.Error("unknown_provider", "provider must be 'modrinth' or 'flame'", 400);
+            }
+
+            if (parsedProvider == ResourceProvider.FLAME)
+            {
+                int effectiveClassId;
+                if (!string.IsNullOrWhiteSpace(classId))
+                {
+                    if (!int.TryParse(classId, out effectiveClassId))
+                    {
+                        return ApiJson.Error("invalid_request", "'classId' must be a number", 400);
+                    }
+                }
+                else
+                {
+                    if (!TryParseSearchType(type, out var resourceType, out var typeError))
+                    {
+                        return ApiJson.Error("invalid_type", typeError!, 400);
+                    }
+                    resourceType = NormalizeSearchType(resourceType, parsedProvider, out var unsupported);
+                    if (unsupported is not null)
+                    {
+                        return ApiJson.Error("invalid_type", unsupported, 400);
+                    }
+                    effectiveClassId = FlameApi.GetClassId(resourceType);
+                }
+
+                var (_, flameRequest) = FlameApi.GetCategoriesForClassId(effectiveClassId);
+                FlameApi.AddApiKeyHeader(flameRequest);
+                await flameRequest.StartAsync();
+                if (flameRequest.State != Core.Tasks.TaskState.Succeeded)
+                {
+                    return ApiJson.Error("flame_unavailable",
+                        $"curseforge categories failed: {flameRequest.FailReason}", 502);
+                }
+
+                return Results.Ok(ParseFlameCategories(flameRequest.BodyAsString).ToArray());
+            }
+
+            if (!TryParseSearchType(type, out var modrinthType, out var modrinthTypeError))
+            {
+                return ApiJson.Error("invalid_type", modrinthTypeError!, 400);
+            }
+            var projectType = ModrinthProjectType(modrinthType, out var unsupportedType);
+            if (unsupportedType is not null)
+            {
+                return ApiJson.Error("invalid_type", unsupportedType, 400);
+            }
+
+            var (_, modrinthRequest) = ModrinthApi.Instance.GetModCategories();
+            await modrinthRequest.StartAsync();
+            if (modrinthRequest.State != Core.Tasks.TaskState.Succeeded)
+            {
+                return ApiJson.Error("modrinth_unavailable",
+                    $"modrinth categories failed: {modrinthRequest.FailReason}", 502);
+            }
+
+            return Results.Ok(ParseModrinthCategories(modrinthRequest.BodyAsString, projectType).ToArray());
+        });
+
+        // --------------------------------------------------- modplatform/{provider}/mods/{projectId}/description
+        api.MapGet("/modplatform/{provider}/mods/{projectId}/description",
+            async Task<IResult> (string provider, string projectId) =>
+        {
+            if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
+            {
+                return ApiJson.Error("unknown_provider", "provider must be 'modrinth' or 'flame'", 400);
+            }
+
+            string body;
+            if (parsedProvider == ResourceProvider.FLAME)
+            {
+                if (!int.TryParse(projectId, out var modId))
+                {
+                    return ApiJson.Error("invalid_request", "'projectId' must be a CurseForge project id", 400);
+                }
+                body = await FlameApi.GetModDescription(modId);
+            }
+            else
+            {
+                // the Modrinth body endpoint answers with plain text
+                body = await ModrinthApi.GetProjectDescription(projectId);
+            }
+            return Results.Ok(new ProviderBodyView(body));
+        });
+
+        // ------------------------------------------------ modplatform/{provider}/mods/{projectId}/changelog
+        api.MapGet("/modplatform/{provider}/mods/{projectId}/changelog",
+            async Task<IResult> (string provider, string projectId, string? fileId) =>
+        {
+            if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
+            {
+                return ApiJson.Error("unknown_provider", "provider must be 'modrinth' or 'flame'", 400);
+            }
+            if (parsedProvider != ResourceProvider.FLAME)
+            {
+                // Modrinth has no per-file changelog endpoint (changelogs ride on versions)
+                return ApiJson.Error("invalid_request",
+                    "'changelog' is only supported by CurseForge", 400);
+            }
+            if (string.IsNullOrWhiteSpace(fileId) || !int.TryParse(fileId, out var fileIdNum))
+            {
+                return ApiJson.Error("invalid_request", "'fileId' is required", 400);
+            }
+            if (!int.TryParse(projectId, out var modId))
+            {
+                return ApiJson.Error("invalid_request", "'projectId' must be a CurseForge project id", 400);
+            }
+
+            var body = await FlameApi.GetModFileChangelog(modId, fileIdNum);
+            return Results.Ok(new ProviderBodyView(body));
         });
 
         // ------------------------------------------------ modplatform/{provider}/versions
@@ -272,10 +405,157 @@ public static class ModPlatformEndpoints
 
     // ----------------------------------------------------------------- helpers
 
+    /// <summary>
+    /// The search `type` query param → the ResourceType wired into SearchArgs.Type (the
+    /// value set mirrors the C++ resource-type search surfaces; default mods/back-compat):
+    /// mods | resourcepacks | texturepacks | shaderpacks | datapacks | modpacks | worlds.
+    /// </summary>
+    private static bool TryParseSearchType(string? type, out ResourceType resourceType, out string? error)
+    {
+        resourceType = ResourceType.Mod;
+        error = null;
+        if (string.IsNullOrWhiteSpace(type))
+        {
+            return true; // default mods, like the C++ mod search pages
+        }
+        resourceType = type.Trim().ToLowerInvariant() switch
+        {
+            "mods" => ResourceType.Mod,
+            "resourcepacks" => ResourceType.ResourcePack,
+            "texturepacks" => ResourceType.TexturePack,
+            "shaderpacks" => ResourceType.ShaderPack,
+            "datapacks" => ResourceType.DataPack,
+            "modpacks" => ResourceType.Modpack,
+            "worlds" => ResourceType.World,
+            _ => ResourceType.Unknown,
+        };
+        if (resourceType == ResourceType.Unknown)
+        {
+            error = $"type '{type}' must be one of mods, resourcepacks, texturepacks, shaderpacks, datapacks, modpacks, worlds";
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Provider-specific search type resolution (mirrors the C++ search URL builders):
+    /// texture packs share the resource-pack class/type on both providers (the C++
+    /// texture-pack models derive from the resource-pack ones), and Modrinth has no world
+    /// project type (the facet builder would emit an empty project_type).
+    /// </summary>
+    private static ResourceType NormalizeSearchType(ResourceType type, ResourceProvider provider, out string? error)
+    {
+        error = null;
+        if (type == ResourceType.TexturePack)
+        {
+            return ResourceType.ResourcePack;
+        }
+        if (provider == ResourceProvider.MODRINTH && type == ResourceType.World)
+        {
+            error = "type 'worlds' is not supported by modrinth";
+        }
+        return type;
+    }
+
+    /// <summary>The Modrinth project_type facet value for a search type ("" = unsupported;
+    /// the C++ resourceTypeParameter map is mod/resourcepack/shader/datapack/modpack).</summary>
+    private static string ModrinthProjectType(ResourceType type, out string? error)
+    {
+        error = null;
+        if (type == ResourceType.TexturePack)
+        {
+            type = ResourceType.ResourcePack; // normalized like the search pass
+        }
+        var projectType = type switch
+        {
+            ResourceType.Mod => "mod",
+            ResourceType.ResourcePack => "resourcepack",
+            ResourceType.ShaderPack => "shader",
+            ResourceType.DataPack => "datapack",
+            ResourceType.Modpack => "modpack",
+            _ => "",
+        };
+        if (projectType.Length == 0)
+        {
+            error = $"type '{type}' is not supported by modrinth";
+        }
+        return projectType;
+    }
+
+    /// <summary>The Flame /categories response mapped to [{id, name, icon}] (missing icons
+    /// become "").</summary>
+    private static List<ProviderCategoryView> ParseFlameCategories(string response)
+    {
+        var result = new List<ProviderCategoryView>();
+        JsonDocument doc;
+        try
+        {
+            doc = JsonDocument.Parse(response);
+        }
+        catch (JsonException)
+        {
+            return result;
+        }
+
+        using (doc)
+        {
+            if (doc.RootElement.ValueKind == JsonValueKind.Object &&
+                doc.RootElement.TryGetProperty("data", out var data) &&
+                data.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var entry in data.EnumerateArray())
+                {
+                    if (entry.ValueKind != JsonValueKind.Object)
+                    {
+                        continue;
+                    }
+                    var id = entry.TryGetProperty("id", out var idNode) && idNode.ValueKind == JsonValueKind.Number
+                        ? idNode.GetInt64().ToString(System.Globalization.CultureInfo.InvariantCulture)
+                        : "";
+                    result.Add(new ProviderCategoryView(id, Str(entry, "name"), Str(entry, "icon")));
+                }
+            }
+        }
+        return result;
+    }
+
+    /// <summary>The Modrinth /tag/category response filtered by project_type and mapped to
+    /// [{id, name, icon}] (the Modrinth category id is its name, like LoadCategories).</summary>
+    private static List<ProviderCategoryView> ParseModrinthCategories(string response, string projectType)
+    {
+        var result = new List<ProviderCategoryView>();
+        JsonDocument doc;
+        try
+        {
+            doc = JsonDocument.Parse(response);
+        }
+        catch (JsonException)
+        {
+            return result;
+        }
+
+        using (doc)
+        {
+            if (doc.RootElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var entry in doc.RootElement.EnumerateArray())
+                {
+                    if (entry.ValueKind != JsonValueKind.Object || Str(entry, "project_type") != projectType)
+                    {
+                        continue;
+                    }
+                    var name = Str(entry, "name");
+                    result.Add(new ProviderCategoryView(name, name, Str(entry, "icon")));
+                }
+            }
+        }
+        return result;
+    }
+
     /// <summary>The CurseForge search pass-through (the x-api-key header is attached through
     /// the FlameConfig provider hook; hits map through FlameMod.LoadIndexedPack).</summary>
-    private static async Task<IResult> FlameSearchAsync(string? query, string? version, string? loader,
-        string? index, int offset)
+    private static async Task<IResult> FlameSearchAsync(ResourceType resourceType, string? query, string? version,
+        string? loader, string? index, int offset)
     {
         var loaders = string.IsNullOrWhiteSpace(loader)
             ? (ModLoaderType?)null
@@ -289,7 +569,7 @@ public static class ModPlatformEndpoints
 
         var args = new SearchArgs
         {
-            Type = ResourceType.Mod,
+            Type = resourceType,
             Offset = offset < 0 ? 0 : offset,
             Search = string.IsNullOrWhiteSpace(query) ? null : query,
             Versions = string.IsNullOrWhiteSpace(version) ? null : [new McVersion(version)],
@@ -360,12 +640,12 @@ public static class ModPlatformEndpoints
 
     /// <summary>The Modrinth search pass-through (PAT header through ModrinthApi.AddApiHeaders
     /// inside the core request builder; facets like the C++ search model builds them).</summary>
-    private static async Task<IResult> ModrinthSearchAsync(string? query, string? version, string? loader,
-        string? index, int offset)
+    private static async Task<IResult> ModrinthSearchAsync(ResourceType resourceType, string? query, string? version,
+        string? loader, string? index, int offset)
     {
         var args = new SearchArgs
         {
-            Type = ResourceType.Mod,
+            Type = resourceType,
             Offset = offset < 0 ? 0 : offset,
             Search = string.IsNullOrWhiteSpace(query) ? null : query,
             Versions = string.IsNullOrWhiteSpace(version) ? null : [new McVersion(version)],

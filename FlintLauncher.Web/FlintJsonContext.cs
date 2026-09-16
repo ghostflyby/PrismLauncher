@@ -44,6 +44,8 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(ModsUpdateRequest))]
 [JsonSerializable(typeof(ModUpdateEntryView))]
 [JsonSerializable(typeof(TaskResultView))]
+[JsonSerializable(typeof(ProviderCategoryView))]
+[JsonSerializable(typeof(ProviderBodyView))]
 // Wave A (UI-API mapping): instance content surface
 [JsonSerializable(typeof(InstanceGroupView))]
 [JsonSerializable(typeof(CopyInstanceRequest))]
@@ -87,6 +89,7 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(FlameSearchResult[]))]
 [JsonSerializable(typeof(ProviderVersionView[]))]
 [JsonSerializable(typeof(InstalledModView[]))]
+[JsonSerializable(typeof(ProviderCategoryView[]))]
 [JsonSerializable(typeof(ComponentView[]))]
 [JsonSerializable(typeof(LogFileView[]))]
 [JsonSerializable(typeof(IconView[]))]

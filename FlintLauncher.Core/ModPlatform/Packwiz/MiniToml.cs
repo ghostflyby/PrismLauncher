@@ -4,6 +4,7 @@
 // writer in Packwiz.cs) use:
 //   - comments (# to end of line), blank lines
 //   - tables: [table] and dotted [table.subtable] headers
+//   - arrays of tables: [[table]] and dotted [[table.subtable]] headers (appended in order)
 //   - key = value pairs with bare keys (letters, digits, '_', '-'; dotted keys supported)
 //   - basic strings "..." with the standard escape set (\\, \", \b, \t, \n, \f, \r,
 //     \uXXXX, \UXXXXXXXX) and literal strings '...'
@@ -11,9 +12,8 @@
 //   - booleans
 //   - arrays of any value, possibly spanning multiple lines, with an optional trailing comma
 //   - inline tables { key = value, key = value }
-// Everything else (floats, datetimes, multiline strings, [[array tables]], nested
-// brackets in keys, ...) is rejected with a parse error, like the C++ callers would see
-// from toml++'s parse_error.
+// Everything else (floats, datetimes, multiline strings, nested brackets in keys, ...)
+// is rejected with a parse error, like the C++ callers would see from toml++'s parse_error.
 namespace FlintLauncher.Core.ModPlatform.Packwiz;
 
 /// <summary>Port of toml++'s parse_error for the subset parser.</summary>
@@ -35,6 +35,9 @@ public sealed class TomlTable
     public bool ContainsKey(string key) => _entries.ContainsKey(key);
 
     public bool TryGetValue(string key, out object? value) => _entries.TryGetValue(key, out value);
+
+    /// <summary>The keys of the table, in insertion order (toml++ table iteration).</summary>
+    public IReadOnlyCollection<string> Keys() => _entries.Keys;
 
     public void Set(string key, object? value) => _entries[key] = value;
 
@@ -157,7 +160,14 @@ public static class MiniToml
                 var c = Peek();
                 if (c == '[')
                 {
-                    ParseTableHeader();
+                    if (Peek(1) == '[')
+                    {
+                        ParseArrayTableHeader();
+                    }
+                    else
+                    {
+                        ParseTableHeader();
+                    }
                 }
                 else
                 {
@@ -252,6 +262,70 @@ public static class MiniToml
                 throw new TomlParseException($"Duplicate table definition: [{header}]");
             }
             _current = table;
+        }
+
+        /// <summary>
+        /// [[array of tables]] header: append a fresh table to the (array) value at the
+        /// dotted path, creating intermediate tables, and make it the current table.
+        /// Repeated [[header]]s are legal (unlike [header]), so the duplicate-table check
+        /// does not apply here.
+        /// </summary>
+        private void ParseArrayTableHeader()
+        {
+            Expect('[');
+            Expect('[');
+            var path = new List<string>();
+            while (true)
+            {
+                SkipInlineWhitespace();
+                path.Add(ParseKeyPart());
+                SkipInlineWhitespace();
+                if (Peek() == '.')
+                {
+                    Advance();
+                    continue;
+                }
+                Expect(']');
+                Expect(']');
+                break;
+            }
+
+            // walk/create the intermediate tables
+            var parent = _root;
+            for (var i = 0; i < path.Count - 1; i++)
+            {
+                var existing = parent.GetTable(path[i]);
+                if (existing is null)
+                {
+                    if (parent.TryGetValue(path[i], out var clash))
+                    {
+                        throw new TomlParseException($"Key '{path[i]}' is not a table");
+                    }
+                    existing = new TomlTable();
+                    parent.Set(path[i], existing);
+                }
+                parent = existing;
+            }
+
+            var lastKey = path[^1];
+            List<object?>? array;
+            if (parent.TryGetValue(lastKey, out var existingValue))
+            {
+                if (existingValue is not List<object?> existingList)
+                {
+                    throw new TomlParseException($"Key '{lastKey}' is not an array of tables");
+                }
+                array = existingList;
+            }
+            else
+            {
+                array = [];
+                parent.Set(lastKey, array);
+            }
+
+            var element = new TomlTable();
+            array.Add(element);
+            _current = element;
         }
 
         private void ParseKeyValue(TomlTable table, bool inline = false)

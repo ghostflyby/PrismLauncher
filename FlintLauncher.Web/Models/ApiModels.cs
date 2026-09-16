@@ -173,6 +173,13 @@ public sealed record ModInstallSelection(string Provider, string ProjectId, stri
 /// <summary>POST /instances/{id}/mods/update optional body (filter by installed file names).</summary>
 public sealed record ModsUpdateRequest(IReadOnlyList<string>? Mods);
 
+/// <summary>A provider category (Flame /categories or Modrinth /tag/category; Modrinth has
+/// no numeric ids, so the id is the category name like the core LoadCategories mapping).</summary>
+public sealed record ProviderCategoryView(string Id, string Name, string Icon);
+
+/// <summary>The plain-text body of a project description / file changelog.</summary>
+public sealed record ProviderBodyView(string Body);
+
 // ------------------------------------------------------------------ UI-API Wave A
 
 /// <summary>One named group of the instance list (GET /instances/groups).</summary>
