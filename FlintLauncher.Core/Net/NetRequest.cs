@@ -2,6 +2,7 @@
 // Port of launcher/net/Request.{h,cpp} (HTTP methods, sinks, validators, 429/503 auto-retry)
 // on top of HttpClient instead of QNetworkAccessManager.
 using System.Diagnostics;
+using System.Net;
 using System.Security.Cryptography;
 using FlintLauncher.Core.Tasks;
 
@@ -130,157 +131,208 @@ public sealed class NetRequest : FlintTask
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
+        // Port of the NetJob manual-retry gate (NumberOfManualRetries): a request that failed
+        // on the network level (connection refused/reset, DNS, the RequestTimeout idle timeout)
+        // is retried up to Http.ManualRetries times before it finally fails. HTTP error
+        // statuses are not retried here (the AutoRetry option covers 429/503 like the C++).
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                await ExecuteOnceAsync(cancellationToken).ConfigureAwait(false);
+                return;
+            }
+            catch (HttpRequestException e) when (attempt < Http.ManualRetries &&
+                                                 !cancellationToken.IsCancellationRequested)
+            {
+                EmitStatus($"Network error ({e.Message}); retrying ({Http.ManualRetries - attempt} tries left)");
+            }
+        }
+    }
+
+    private async Task ExecuteOnceAsync(CancellationToken cancellationToken)
+    {
         var spec = new NetRequestSpec { Url = _url };
         foreach (var (name, value) in _headers)
         {
             spec.Headers[name] = value;
         }
 
-        HttpResponseMessage response;
-        var effectiveSink = _sink;
-        while (true)
+        // RequestTimeout port (QNetworkReply::setTransferTimeout): a one-shot inactivity timer
+        // cancelling the linked token; rearmed before every await that can transfer data.
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var idleTimer = new Timer(_ => timeoutSource.Cancel());
+
+        void ArmIdleTimer()
         {
-            if (effectiveSink is not null && !effectiveSink.Init(spec))
+            try
             {
-                EmitFailed(effectiveSink.FailReason);
-                return;
+                _ = idleTimer.Change(Http.RequestTimeout, Timeout.InfiniteTimeSpan);
             }
-
-            using var message = new HttpRequestMessage(ToHttpMethod(_method), _url);
-            foreach (var (name, value) in spec.Headers)
+            catch (ObjectDisposedException)
             {
-                message.Headers.TryAddWithoutValidation(name, value);
+                // the request finished while a re-arm was queued; nothing to do
             }
-            if (_postData is not null)
-            {
-                message.Content = new ByteArrayContent(_postData);
-            }
-
-            response = await Http.Client.SendAsync(
-                message,
-                HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken).ConfigureAwait(false);
-
-            // automatically handle HTTP 429 Too Many Requests / 503 errors and retry
-            var statusCode = (int)response.StatusCode;
-            if (_options.HasFlag(RequestOptions.AutoRetry) &&
-                statusCode is 429 or 503 &&
-                _retryCount < MaxAutoRetries)
-            {
-                _retryCount++;
-                var delay = TimeSpan.Zero;
-                if (response.Headers.RetryAfter?.Delta is { } delta)
-                {
-                    delay = delta;
-                }
-                else if (response.Headers.RetryAfter?.Date is { } date)
-                {
-                    delay = date - DateTimeOffset.Now;
-                }
-                if (delay < TimeSpan.Zero)
-                {
-                    delay = TimeSpan.Zero;
-                }
-                response.Dispose();
-                EmitStatus($"HTTP {statusCode}, retrying in {delay.TotalSeconds} seconds");
-                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-                continue;
-            }
-            break;
         }
 
-        using (response)
+        try
         {
-            var responseInfo = new NetResponseInfo
+            HttpResponseMessage response;
+            var effectiveSink = _sink;
+            while (true)
             {
-                Url = _url,
-                StatusCode = (int)response.StatusCode,
-            };
-            foreach (var header in response.Headers)
-            {
-                responseInfo.Headers[header.Key] = string.Join(", ", header.Value);
-            }
-            foreach (var header in response.Content.Headers)
-            {
-                responseInfo.Headers[header.Key] = string.Join(", ", header.Value);
-            }
-
-            var statusCode = (int)response.StatusCode;
-            if (statusCode == 304 && (effectiveSink?.HasLocalData() ?? false))
-            {
-                // not modified: local data still valid, finalize without writing
-                if (!effectiveSink.Finalize(responseInfo))
+                if (effectiveSink is not null && !effectiveSink.Init(spec))
                 {
                     EmitFailed(effectiveSink.FailReason);
                     return;
                 }
-                EmitSucceeded();
-                return;
-            }
 
-            if (statusCode is not 200 and not 201 and not 202 and not 203 and not 206)
-            {
-                var body = "";
-                try
+                using var message = new HttpRequestMessage(ToHttpMethod(_method), _url);
+                foreach (var (name, value) in spec.Headers)
                 {
-                    body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    message.Headers.TryAddWithoutValidation(name, value);
                 }
-                catch (IOException)
+                if (_postData is not null)
                 {
+                    message.Content = new ByteArrayContent(_postData);
                 }
-                if (body.Length > 4096)
-                {
-                    body = body[..4096];
-                }
-                EmitFailed($"HTTP status {statusCode} for {_url}\n{body}");
-                return;
-            }
 
-            // stream the body into the sink with progress reporting
-            var totalBytes = response.Content.Headers.ContentLength ?? -1;
-            var receivedBytes = 0L;
-            var lastProgressTime = Stopwatch.StartNew();
-            var buffer = new byte[64 * 1024];
-            await using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
-            {
-                while (true)
+                ArmIdleTimer();
+                response = await Http.Client.SendAsync(
+                    message,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    timeoutSource.Token).ConfigureAwait(false);
+
+                // automatically handle HTTP 429 Too Many Requests / 503 errors and retry
+                var statusCode = (int)response.StatusCode;
+                if (_options.HasFlag(RequestOptions.AutoRetry) &&
+                    statusCode is 429 or 503 &&
+                    _retryCount < MaxAutoRetries)
                 {
-                    var read = await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
-                    if (read == 0)
+                    _retryCount++;
+                    var delay = TimeSpan.Zero;
+                    if (response.Headers.RetryAfter?.Delta is { } delta)
                     {
-                        break;
+                        delay = delta;
                     }
-                    if (effectiveSink is not null && !effectiveSink.Write(buffer[..read]))
+                    else if (response.Headers.RetryAfter?.Date is { } date)
+                    {
+                        delay = date - DateTimeOffset.Now;
+                    }
+                    if (delay < TimeSpan.Zero)
+                    {
+                        delay = TimeSpan.Zero;
+                    }
+                    response.Dispose();
+                    EmitStatus($"HTTP {statusCode}, retrying in {delay.TotalSeconds} seconds");
+                    await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+                break;
+            }
+
+            using (response)
+            {
+                var responseInfo = new NetResponseInfo
+                {
+                    Url = _url,
+                    StatusCode = (int)response.StatusCode,
+                };
+                foreach (var header in response.Headers)
+                {
+                    responseInfo.Headers[header.Key] = string.Join(", ", header.Value);
+                }
+                foreach (var header in response.Content.Headers)
+                {
+                    responseInfo.Headers[header.Key] = string.Join(", ", header.Value);
+                }
+
+                var statusCode = (int)response.StatusCode;
+                if (statusCode == 304 && (effectiveSink?.HasLocalData() ?? false))
+                {
+                    // not modified: local data still valid, finalize without writing
+                    if (!effectiveSink.Finalize(responseInfo))
                     {
                         EmitFailed(effectiveSink.FailReason);
                         return;
                     }
-                    receivedBytes += read;
-                    // throttle progress emission a bit, like the C++ downloadProgress path
-                    if (lastProgressTime.ElapsedMilliseconds > 100 || receivedBytes == totalBytes)
+                    EmitSucceeded();
+                    return;
+                }
+
+                if (statusCode is not 200 and not 201 and not 202 and not 203 and not 206)
+                {
+                    var body = "";
+                    try
                     {
-                        lastProgressTime.Restart();
-                        EmitProgress(new TaskStepProgress(Uid)
+                        body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (IOException)
+                    {
+                    }
+                    if (body.Length > 4096)
+                    {
+                        body = body[..4096];
+                    }
+                    EmitFailed($"HTTP status {statusCode} for {_url}\n{body}");
+                    return;
+                }
+
+                // stream the body into the sink with progress reporting
+                var totalBytes = response.Content.Headers.ContentLength ?? -1;
+                var receivedBytes = 0L;
+                var lastProgressTime = Stopwatch.StartNew();
+                var buffer = new byte[64 * 1024];
+                await using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    while (true)
+                    {
+                        ArmIdleTimer();
+                        var read = await stream.ReadAsync(buffer, timeoutSource.Token).ConfigureAwait(false);
+                        if (read == 0)
                         {
-                            Current = receivedBytes,
-                            Total = totalBytes,
-                            State = TaskStepState.Running,
-                        });
+                            break;
+                        }
+                        if (effectiveSink is not null && !effectiveSink.Write(buffer[..read]))
+                        {
+                            EmitFailed(effectiveSink.FailReason);
+                            return;
+                        }
+                        receivedBytes += read;
+                        // throttle progress emission a bit, like the C++ downloadProgress path
+                        if (lastProgressTime.ElapsedMilliseconds > 100 || receivedBytes == totalBytes)
+                        {
+                            lastProgressTime.Restart();
+                            EmitProgress(new TaskStepProgress(Uid)
+                            {
+                                Current = receivedBytes,
+                                Total = totalBytes,
+                                State = TaskStepState.Running,
+                            });
+                        }
                     }
                 }
-            }
 
-            if (effectiveSink is not null && !effectiveSink.Finalize(responseInfo))
-            {
-                EmitFailed(effectiveSink.FailReason);
-                return;
+                if (effectiveSink is not null && !effectiveSink.Finalize(responseInfo))
+                {
+                    EmitFailed(effectiveSink.FailReason);
+                    return;
+                }
+                // like Net::Download::downloadFinished: re-register the cache entry after success
+                if (MetaCache is not null && CachedEntry is not null)
+                {
+                    _ = MetaCache.UpdateEntry(CachedEntry);
+                }
+                EmitSucceeded();
             }
-            // like Net::Download::downloadFinished: re-register the cache entry after success
-            if (MetaCache is not null && CachedEntry is not null)
-            {
-                _ = MetaCache.UpdateEntry(CachedEntry);
-            }
-            EmitSucceeded();
+        }
+        catch (OperationCanceledException) when (timeoutSource.IsCancellationRequested &&
+                                                 !cancellationToken.IsCancellationRequested)
+        {
+            // our inactivity timer fired: surface as a network error so the manual-retry gate
+            // sees it (the C++ setTransferTimeout surfaces as OperationCanceledError too)
+            throw new HttpRequestException(
+                $"transfer timed out: no data for {Http.RequestTimeout.TotalSeconds:F0} seconds (RequestTimeout)");
         }
     }
 
@@ -298,13 +350,64 @@ public sealed class NetRequest : FlintTask
     };
 }
 
-/// <summary>Shared HttpClient for all Flint network activity (replaces QNetworkAccessManager).</summary>
+/// <summary>Shared HttpClient for all Flint network activity (replaces QNetworkAccessManager).
+/// The proxy/timeout/retry settings the C++ application reads from the global settings
+/// (Application::updateProxySettings, NumberOfManualRetries, RequestTimeout) reach this class
+/// through <see cref="Configure"/> — the host calls it at startup and after every settings
+/// write (Services.RuntimeNetConfig).</summary>
 public static class Http
 {
-    // NOTE: declared before Client so CreateClient() sees the configured user agent.
     public static string UserAgent { get; set; } = "Flint/0.1.0";
 
-    public static HttpClient Client { get; } = CreateClient();
+    /// <summary>Port of the NumberOfManualRetries setting: how often a request that failed on
+    /// the network level is retried (NetJob::executeNextStylesheet gate). Consumed by
+    /// <see cref="NetRequest"/>.</summary>
+    public static int ManualRetries { get; set; } = 1;
+
+    /// <summary>Port of the RequestTimeout setting (QNetworkReply::setTransferTimeout): the
+    /// transfer is aborted when no data flows for this long (an inactivity timeout, not a
+    /// total-duration cap, so large steady downloads keep working).</summary>
+    public static TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(60);
+
+    private static (string Type, string Host, int Port, string User, string Pass) _proxy =
+        ("None", "", 0, "", "");
+
+    private static (string Ua, string Type, string Host, int Port, string User, string Pass)? _applied;
+
+    /// <summary>The proxy configuration currently baked into <see cref="Client"/>
+    /// (Application::updateProxySettings state; diagnostics/tests).</summary>
+    public static (string Type, string Host, int Port, string User, string Pass) ProxyConfig => _proxy;
+
+    private static volatile HttpClient _client = CreateClient();
+
+    public static HttpClient Client => _client;
+
+    /// <summary>Port of Application::updateProxySettings (+ the UserAgent the client is built
+    /// with): rebuild the shared client so the proxy/user-agent take effect. Proxy semantics
+    /// match the C++ ProxyPage combo: "SOCKS5" and "HTTP" build an explicit proxy, "None"
+    /// disables proxying and anything else uses the system configuration. Idempotent: an
+    /// unchanged configuration does not rebuild the client.</summary>
+    public static void Configure(string userAgent, string proxyType, string addr, int port,
+        string user, string pass)
+    {
+        var ua = userAgent ?? UserAgent;
+        var type = string.IsNullOrWhiteSpace(proxyType) ? "None" : proxyType.Trim();
+        var host = addr ?? "";
+        // an HTTP/SOCKS proxy without a host cannot be used — fall back to "no proxy"
+        if (type is "HTTP" or "SOCKS5" && host.Length == 0)
+        {
+            type = "None";
+        }
+        var next = (ua, type, host, port, user ?? "", pass ?? "");
+        if (_applied is { } applied && applied.Equals(next))
+        {
+            return;
+        }
+        _applied = next;
+        UserAgent = ua;
+        _proxy = (type, host, port, user ?? "", pass ?? "");
+        _client = CreateClient();
+    }
 
     private static HttpClient CreateClient()
     {
@@ -312,10 +415,32 @@ public static class Http
         {
             AutomaticDecompression = System.Net.DecompressionMethods.All,
             PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+            Proxy = BuildProxy(),
         };
         var client = new HttpClient(handler, disposeHandler: true);
-        client.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
+        // user-supplied user-agent overrides may not be valid product tokens; ignore those
+        _ = client.DefaultRequestHeaders.UserAgent.TryParseAdd(UserAgent);
         client.Timeout = TimeSpan.FromMinutes(10);
         return client;
+    }
+
+    private static IWebProxy? BuildProxy() => _proxy.Type switch
+    {
+        "HTTP" => NamedProxy(new Uri($"http://{_proxy.Host}:{_proxy.Port}")),
+        "SOCKS5" => NamedProxy(new Uri($"socks5://{_proxy.Host}:{_proxy.Port}")),
+        // explicit "no proxy"
+        "None" => null,
+        // C++ "DefaultProxy": the system proxy configuration
+        _ => HttpClient.DefaultProxy,
+    };
+
+    private static WebProxy NamedProxy(Uri uri)
+    {
+        var proxy = new WebProxy(uri);
+        if (_proxy.User.Length != 0)
+        {
+            proxy.Credentials = new System.Net.NetworkCredential(_proxy.User, _proxy.Pass);
+        }
+        return proxy;
     }
 }

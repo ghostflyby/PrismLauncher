@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Java discovery and launcher news. (The Modrinth search pass-through moved into the merged
-// /modplatform/{provider}/search route of ModPlatformEndpoints, UI-API mapping Wave B.)
+// Java discovery, launcher news, the static /about identity (fix-4), the paste upload
+// (fix-4: GuiUtil's "upload log" flow over the core PasteUpload) and the metadata-cache
+// eviction endpoint.
+using FlintLauncher.Core;
 using FlintLauncher.Core.Java;
+using FlintLauncher.Core.Net;
+using FlintLauncher.Core.Settings;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 
@@ -39,6 +43,77 @@ public static class MiscEndpoints
                 .Select(entry => new NewsView(entry.Title, entry.Content, entry.Link))
                 .ToArray());
         });
+
+        // --------------------------------------------------------------- about
+        // the static identity of the launcher (BuildConfig); no dynamic state
+        api.MapGet("/about", (FlintConfig config) => new AboutResponse(
+            config.LauncherDisplayName,
+            config.PrintableVersionString(),
+            config.LauncherCopyright,
+            config.MatrixUrl,
+            config.DiscordUrl,
+            config.SubredditUrl,
+            config.BugTrackerUrl));
+
+        // --------------------------------------------------------------- paste
+        // GuiUtil::uploadPaste: either the raw content or a finished task's buffered log goes
+        // to the configured paste provider (PastebinType + PastebinCustomAPIBase global
+        // settings, provider default = mclo.gs). Paste bodies are small; this runs synchronously.
+        api.MapPost("/paste", async (PasteRequest? request, LauncherRuntime runtime,
+            FlintTaskRegistry registry) =>
+        {
+            if (request is null ||
+                (!string.IsNullOrWhiteSpace(request.TaskId) && request.Content is not null) ||
+                (string.IsNullOrWhiteSpace(request.TaskId) && string.IsNullOrEmpty(request.Content)))
+            {
+                return ApiJson.Error("invalid_body",
+                    "body must be {\"content\": ...} or {\"taskId\": ...} (exactly one)", 400);
+            }
+
+            string content;
+            if (!string.IsNullOrWhiteSpace(request.TaskId))
+            {
+                var entry = registry.Get(request.TaskId!);
+                if (entry is null)
+                {
+                    return ApiJson.NotFound("task_not_found", $"no task '{request.TaskId}'");
+                }
+                content = string.Join("\n", registry.ReadLog(entry, 0).Select(l => l.Line));
+                if (content.Length == 0)
+                {
+                    return ApiJson.Error("empty_paste",
+                        $"task '{request.TaskId}' has no log lines to paste", 400);
+                }
+            }
+            else
+            {
+                content = request.Content!;
+            }
+
+            var settings = runtime.GlobalSettings;
+            var typeIndex = Variant.AsInt(settings.Get("PastebinType"));
+            var pasteType = typeIndex >= 0 && typeIndex < PasteUpload.PasteTypes.Length
+                ? (PasteUpload.PasteType)typeIndex
+                : PasteUpload.PasteType.Mclogs;
+            var upload = new PasteUpload(content, Variant.AsString(settings.Get("PastebinCustomAPIBase")),
+                pasteType);
+            await upload.StartAsync();
+            return upload.WasSuccessful && upload.PasteLink.Length > 0
+                ? Results.Created("/api/v1/paste", new PasteCreatedResponse(upload.PasteLink))
+                : ApiJson.Error("paste_failed",
+                    upload.WasSuccessful
+                        ? "the paste server returned no link"
+                        : upload.FailReason, 502);
+        });
+
+        // --------------------------------------------------------------- meta cache
+        // evict every cached download (index entries + cached files at the base roots);
+        // subsequent fetches re-download like a cold cache
+        api.MapDelete("/meta-cache", (LauncherRuntime runtime) =>
+            runtime.MetaCache.EvictAll()
+                ? Results.NoContent()
+                : ApiJson.Error("meta_cache_evict_failed",
+                    "some cached files could not be deleted", 500));
     }
 }
 

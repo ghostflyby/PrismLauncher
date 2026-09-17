@@ -17,10 +17,13 @@
 //  - abort() before start(): the C++ emits aborted() immediately from abort(); the port
 //    records the Aborted state and emits it when StartAsync() runs (deferred by one call —
 //    the observable outcome is the same terminal AbortedByUser state).
-//  - The log4j XML event parser (LaunchTask::parseXmlLogs + LogParser) is not ported; game
-//    output lines (StdOut/StdErr) still go through the level-detection heuristics — the
-//    "!![LEVEL]!" prefix (MessageLevel::takeFromLine) followed by the LogParser::guessLevel
-//    rules with the previous-entry level as the fallback for continuation lines.
+//  - parseXmlLogs(): the log4j XML event parser IS ported (LogParser) and wired like the C++
+//    LaunchTask::onLogLine — but behind the <see cref="XmlParsingEnabled"/> opt-in gate, since
+//    the C++ had no off switch and pure-core consumers should keep the simple path. When
+//    enabled, StdOut/StdErr lines feed the per-level LogParser instances first: complete
+//    log4j events become structured "[HH:mm:ss] [thread/LEVEL] [logger]: message" entries,
+//    everything else falls through the same level-detection heuristics as before. The Web
+//    host enables it at startup (WebHostBuilder).
 //  - censorPrivateInfo() applies the session censor filter; the QMap iteration order (sorted
 //    by key) is preserved via the SortedDictionary the instance filter is built into.
 using System.Text.RegularExpressions;
@@ -49,8 +52,17 @@ public class LaunchTask : FlintTask
     private static readonly Regex SettingUserRegex = new(".*Setting user.+",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+    /// <summary>
+    /// Opt-in gate for the port of LaunchTask::parseXmlLogs (the C++ runs it unconditionally):
+    /// when true, StdOut/StdErr lines feed the per-level <see cref="LogParser"/> instances
+    /// before the level-detection heuristics. The Web host enables it at startup.
+    /// </summary>
+    public static bool XmlParsingEnabled { get; set; }
+
     private readonly MinecraftInstance _instance;
     private readonly List<LaunchStep> _steps = [];
+    private readonly LogParser _stdoutParser = new();
+    private readonly LogParser _stderrParser = new();
     private SortedDictionary<string, string> _censorFilter = new(StringComparer.Ordinal);
     private int _currentStep = -1;
     private LaunchState _state = LaunchState.NotStarted;
@@ -313,13 +325,17 @@ public class LaunchTask : FlintTask
         }
     }
 
-    /// <summary>Port of the onLogLine slot (with the plain-text half of parseXmlLogs inlined;
-    /// the log4j XML event parser is not ported — see the header note).</summary>
+    /// <summary>Port of the onLogLine slot: the XML parse gate first, then the plain-text path.</summary>
     public void OnLogLine(string line, MessageLevel level = MessageLevel.Launcher)
     {
+        if (ParseXmlLogs(line, level))
+        {
+            return;
+        }
+
         if (level is MessageLevel.StdOut or MessageLevel.StdErr)
         {
-            // PlainText branch of parseXmlLogs: first the "!![LEVEL]!" prefix, then the
+            // PlainText branch of the old inlined path: first the "!![LEVEL]!" prefix, then the
             // guessLevel heuristics with the previous entry's level for continuation lines.
             var newLevel = level.TakeFromLine(ref line);
             if (newLevel == MessageLevel.Unknown)
@@ -334,6 +350,77 @@ public class LaunchTask : FlintTask
         // censor private user info
         line = CensorPrivateInfo(line);
         GetLogModel().Append(level, line);
+    }
+
+    /// <summary>
+    /// Port of LaunchTask::parseXmlLogs: StdOut/StdErr lines feed the per-level LogParser
+    /// instances. Complete log4j events become structured "[HH:mm:ss] [thread/LEVEL] [logger]:
+    /// message" entries (censor-filtered like every other path); a parse error surfaces as an
+    /// Error entry and the line falls back to the plain-text heuristics. Returns true when the
+    /// line was consumed by the parser (or buffered as a partial event).
+    /// </summary>
+    private bool ParseXmlLogs(string line, MessageLevel level)
+    {
+        if (!XmlParsingEnabled)
+        {
+            return false;
+        }
+        LogParser? parser;
+        switch (level)
+        {
+            case MessageLevel.StdErr:
+                parser = _stderrParser;
+                break;
+            case MessageLevel.StdOut:
+                parser = _stdoutParser;
+                break;
+            default:
+                return false;
+        }
+
+        parser.AppendLine(line);
+        var items = parser.ParseAvailable();
+        if (parser.GetError() is { } err)
+        {
+            GetLogModel().Append(MessageLevel.Error,
+                $"[Log4j Parse Error] Failed to parse log4j log event: {err.ErrMessage}");
+            return false;
+        }
+
+        if (items.Count == 0)
+        {
+            return true; // buffered as a partial event, nothing to show yet
+        }
+
+        var model = GetLogModel();
+        foreach (var item in items)
+        {
+            if (item is LogParser.LogEntry entry)
+            {
+                // the C++ formats the local time as HH:mm:ss; an invalid (missing) timestamp
+                // formats as the empty string
+                var timestamp = entry.Timestamp is { } ts
+                    ? ts.ToLocalTime().ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)
+                    : "";
+                var msg = $"[{timestamp}] [{entry.Thread}/{entry.LevelText}] [{entry.Logger}]: {entry.Message}";
+                msg = CensorPrivateInfo(msg);
+                model.Append(entry.Level, msg);
+            }
+            else if (item is LogParser.PlainText text)
+            {
+                var msg = text.Message;
+                var newLevel = level.TakeFromLine(ref msg);
+                if (newLevel == MessageLevel.Unknown)
+                {
+                    newLevel = level.GuessLevel(line, model.PreviousLevel());
+                }
+                msg = CensorPrivateInfo(msg);
+                model.Append(newLevel, msg);
+            }
+            // (Partial items never leave ParseAvailable.)
+        }
+
+        return true;
     }
 
     /// <summary>Port of emitSucceeded(): the instance is no longer running.</summary>

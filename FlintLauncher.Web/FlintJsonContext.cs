@@ -69,6 +69,8 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(CopyInstanceRequest))]
 [JsonSerializable(typeof(WorldView))]
 [JsonSerializable(typeof(WorldRenameRequest))]
+[JsonSerializable(typeof(WorldCopyRequest))]
+[JsonSerializable(typeof(WorldDetailView))]
 [JsonSerializable(typeof(ServerEntryView))]
 [JsonSerializable(typeof(ServerAddRequest))]
 [JsonSerializable(typeof(ServerPingView))]
@@ -91,6 +93,11 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(IconInstalledResponse))]
 [JsonSerializable(typeof(InstanceIconPutRequest))]
 [JsonSerializable(typeof(GlobalSettingsPutRequest))]
+// fix-3/fix-4: launch join targets, paste, about
+[JsonSerializable(typeof(LaunchJoinServer))]
+[JsonSerializable(typeof(PasteRequest))]
+[JsonSerializable(typeof(PasteCreatedResponse))]
+[JsonSerializable(typeof(AboutResponse))]
 // collection roots (standalone arrays returned from list endpoints are NOT auto-generated)
 [JsonSerializable(typeof(InstanceSummary[]))]
 [JsonSerializable(typeof(InstanceGroupView[]))]

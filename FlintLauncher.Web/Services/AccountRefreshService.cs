@@ -2,6 +2,12 @@
 // Opt-in background account refresh: on startup (after a small delay) and on a fixed interval,
 // re-run the auth flow for every account whose token is stale (MinecraftAccount.ShouldRefresh).
 // Disabled by default for C++ parity — enable with FLINT_ACCOUNT_REFRESH_MINUTES=<n>.
+//
+// fix-3 decision (coverage review item 8): this service is the accepted replacement for the
+// C++ AccountList fillQueue/tryNext refresh queue — the full queue (activity counting, the
+// per-account scheduled slots) is GUI-era machinery and is NOT ported. The per-launch refresh
+// path (LaunchController.DecideLaunchMode -> MinecraftAccount.Refresh) stays the primary
+// correctness net; this service only pre-warms tokens for long-running hosts.
 using FlintLauncher.Core.Auth;
 
 namespace FlintLauncher.Web.Services;

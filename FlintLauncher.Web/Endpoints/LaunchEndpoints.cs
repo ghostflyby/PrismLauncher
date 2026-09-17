@@ -30,6 +30,35 @@ public static class LaunchEndpoints
                 return ApiJson.Error("invalid_mode", "'mode' must be normal, offline or demo", 400);
             }
 
+            // direct join target (LaunchController.setTargetToJoin): bypasses the instance
+            // JoinServerOnLaunch setting; 'server' and 'world' are mutually exclusive
+            MinecraftTarget? targetToJoin = null;
+            if (request.Server is not null && !string.IsNullOrWhiteSpace(request.World))
+            {
+                return ApiJson.Error("invalid_request",
+                    "'server' and 'world' are mutually exclusive join targets", 400);
+            }
+            if (request.Server is not null)
+            {
+                if (string.IsNullOrWhiteSpace(request.Server.Address))
+                {
+                    return ApiJson.Error("invalid_request", "'server.address' is required", 400);
+                }
+                if (request.Server.Port is { } port && port is < 0 or > 65535)
+                {
+                    return ApiJson.Error("invalid_request", "'server.port' must be 0-65535", 400);
+                }
+                // MinecraftTarget.Parse(fullAddress): "host:port" parsing with the 25565 default
+                targetToJoin = MinecraftTarget.Parse(
+                    request.Server.Port is { } p ? $"{request.Server.Address}:{p}" : request.Server.Address,
+                    useWorld: false);
+            }
+            else if (!string.IsNullOrWhiteSpace(request.World))
+            {
+                // a world join target carries only the world name (port 0, like the C++)
+                targetToJoin = MinecraftTarget.Parse(request.World, useWorld: true);
+            }
+
             await runtime.InstanceLock.WaitAsync();
             try
             {
@@ -73,6 +102,7 @@ public static class LaunchEndpoints
                     AccountToUse = account,
                     AccountsProvider = () => runtime.Accounts,
                     AutoProceed = false,
+                    TargetToJoin = targetToJoin,
                 };
                 // static hook (C++ APPLICATION->settings()); set per built app in the tests
                 LaunchController.GlobalSettingsProvider = () => runtime.GlobalSettings;

@@ -72,7 +72,13 @@ public sealed record SettingsPutRequest(
 
 // ------------------------------------------------------------------ launch / tasks
 
-public sealed record LaunchRequest(string Mode, string? OfflineName, string? AccountProfileId);
+public sealed record LaunchRequest(string Mode, string? OfflineName, string? AccountProfileId,
+    LaunchJoinServer? Server = null, string? World = null);
+
+/// <summary>POST /instances/{id}/launch optional direct join target ("server": {address,
+/// port?}): bypasses the instance JoinServerOnLaunch setting (LaunchController.setTargetToJoin).
+/// port omitted = Minecraft's address parsing default (25565, with SRV lookup).</summary>
+public sealed record LaunchJoinServer(string Address, int? Port = null);
 
 public sealed record TaskProgressDto(long Current, long Total);
 
@@ -218,6 +224,23 @@ public sealed record WorldView(
 /// <summary>POST /instances/{id}/worlds/{folderName}/rename body.</summary>
 public sealed record WorldRenameRequest(string NewName);
 
+/// <summary>POST /instances/{id}/worlds/{folderName}/copy body (the WorldPage "copy" dialog
+/// name): the copy is placed inside the same saves folder and renamed on disk.</summary>
+public sealed record WorldCopyRequest(string Name);
+
+/// <summary>GET /instances/{id}/worlds/{folderName}: the WorldView fields plus the parsed
+/// level.dat seed (WorldGenSettings.seed / RandomSeed, 0 when absent) and the icon.png path
+/// (empty when the world has no icon).</summary>
+public sealed record WorldDetailView(
+    string Name,
+    string FolderName,
+    long LastPlayed,
+    string GameType,
+    string ContainerPath,
+    long SizeBytes,
+    long Seed,
+    string IconPath);
+
 /// <summary>One entry of the instance's servers.dat (GET /instances/{id}/servers).</summary>
 public sealed record ServerEntryView(
     int Index,
@@ -330,6 +353,25 @@ public sealed record InstanceIconPutRequest(string IconKey);
 public sealed record GlobalSettingsPutRequest(string Group, JsonElement Values);
 
 public sealed record SettingsGroupsResponse(IReadOnlyDictionary<string, object> Groups);
+
+// ------------------------------------------------------------------ paste / about / meta cache
+
+/// <summary>POST /api/v1/paste body: either the raw "content" or a "taskId" whose buffered
+/// task log becomes the paste body (the GuiUtil "upload log" flow).</summary>
+public sealed record PasteRequest(string? Content, string? TaskId);
+
+/// <summary>POST /api/v1/paste response.</summary>
+public sealed record PasteCreatedResponse(string Url);
+
+/// <summary>GET /api/v1/about: the static launcher identity (BuildConfig port).</summary>
+public sealed record AboutResponse(
+    string Name,
+    string Version,
+    string Copyright,
+    string MatrixUrl,
+    string DiscordUrl,
+    string SubredditUrl,
+    string BugTrackerUrl);
 
 // ----------------------------------------------------------------- ATLauncher (fix-2)
 

@@ -2,8 +2,10 @@
 // Settings groups (the global settings pages of the C++ UI collapse into named key groups
 // over the same flint.cfg-backed IniSettingsObject) and the global icon library endpoints
 // (IconPickerDialog). UI-API mapping Wave B.
+using FlintLauncher.Core;
 using FlintLauncher.Core.Icons;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using System.Text.Json;
 using FlintLauncher.Web.Models;
@@ -13,7 +15,10 @@ namespace FlintLauncher.Web.Endpoints;
 
 public static class SettingsAndIconsEndpoints
 {
-    /// <summary>group -> (key -> typed default) — the keys each C++ settings page owns.</summary>
+    /// <summary>group -> (key -> typed default) — the keys each C++ settings page owns.
+    /// Defaults mirror Application::registerSettings (fix-3: the table and
+    /// GlobalSettingsRegistration carry the same values; GET prefers the registered value,
+    /// the table supplies the type and the pre-registration fallback).</summary>
     public static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, object?>> Groups =
         new Dictionary<string, IReadOnlyDictionary<string, object?>>(StringComparer.Ordinal)
         {
@@ -27,12 +32,26 @@ public static class SettingsAndIconsEndpoints
                 ["CloseAfterLaunch"] = false,
                 ["QuitAfterGameStop"] = false,
                 ["AutoCloseConsole"] = false,
+                // LauncherPage (instance list + console behavior)
+                ["InstSortMode"] = "Name",
+                ["InstRenamingMode"] = "AskEverytime",
+                ["ShowConsole"] = false,
+                ["ShowConsoleOnError"] = true,
+                ["LogPrePostOutput"] = true,
+                ["ConsoleMaxLines"] = 100000,
+                ["ConsoleOverflowStop"] = true,
+                // java wizard / modpack flow switches owned by the launcher pages
+                ["IgnoreJavaWizard"] = false,
+                ["ModDependenciesDisabled"] = false,
+                ["SkipModpackUpdatePrompt"] = false,
+                ["DownloadGameFilesDuringInstanceCreation"] = true,
+                ["ShowModIncompat"] = false,
             },
             ["minecraft"] = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
                 ["MinMemAlloc"] = 512,
-                ["MaxMemAlloc"] = 4096,
-                ["PermGen"] = 192,
+                ["MaxMemAlloc"] = GlobalSettingsRegistration.DefaultMaxMemAlloc,
+                ["PermGen"] = 128,
                 ["MinecraftWinWidth"] = 854,
                 ["MinecraftWinHeight"] = 480,
                 ["LaunchMaximized"] = false,
@@ -40,20 +59,69 @@ public static class SettingsAndIconsEndpoints
                 ["PostExitCommand"] = "",
                 ["WrapperCommand"] = "",
                 ["Env"] = "{}",
+                // game time (MinecraftPage "game time" section)
+                ["ShowGameTime"] = true,
+                ["ShowGlobalGameTime"] = true,
+                ["RecordGameTime"] = true,
+                ["ShowGameTimeWithoutDays"] = false,
+                // native library workarounds + performance (MinecraftPage "workarounds")
+                ["UseNativeOpenAL"] = false,
+                ["CustomOpenALPath"] = "",
+                ["UseNativeGLFW"] = false,
+                ["CustomGLFWPath"] = "",
+                ["UseNativeSDL"] = false,
+                ["CustomSDLPath"] = "",
+                ["EnableFeralGamemode"] = false,
+                ["EnableMangoHud"] = false,
+                ["UseDiscreteGpu"] = false,
+                ["UseZink"] = false,
+                ["LowMemWarning"] = true,
+                ["OnlineFixes"] = false,
             },
             ["java"] = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["JavaPath"] = "java",
+                // C++ default is the empty path: the automatic-java machinery fills it
+                ["JavaPath"] = "",
                 ["JvmArgs"] = "",
                 ["IgnoreJavaCompatibility"] = false,
-                ["AutomaticJava"] = false,
-                ["AutomaticJavaDownload"] = false,
-                ["AutomaticJavaSwitch"] = false,
+                // legacy table key kept writable (AutoInstallJava writes it on the instance
+                // settings; the C++ derive their defaults from JavaPath being empty)
+                ["AutomaticJava"] = true,
+                ["AutomaticJavaDownload"] = true,
+                ["AutomaticJavaSwitch"] = true,
+            },
+            ["dirs"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                // LauncherPage folders (relative to the data dir like the C++ defaults;
+                // InstanceDir itself is structural in the host and stays unwritable)
+                ["CentralModsDir"] = "mods",
+                ["IconsDir"] = "icons",
+                ["DownloadsDir"] = GlobalSettingsRegistration.DefaultDownloadsDir,
+                ["DownloadsDirWatchRecursive"] = false,
+                ["MoveModsFromDownloadsDir"] = false,
+                ["SkinsDir"] = "skins",
+                ["JavaDir"] = "java",
+            },
+            ["language"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                // LanguagePage
+                ["Language"] = "",
+                ["UseSystemLocale"] = false,
+            },
+            ["meta"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                // custom mirrors: MetaURLOverride feeds the metadata index, ResourceURLOverride
+                // the AssetUpdateTask and LegacyFMLLibsURLOverride the LegacyFMLLibrariesTask
+                // (read hooks already live in the core launch steps)
+                ["MetaURLOverride"] = "",
+                ["ResourceURLOverride"] = "",
+                ["LegacyFMLLibsURLOverride"] = "",
             },
             ["proxy"] = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
+                // ProxyPage: written values reach Http.Configure through RuntimeNetConfig
                 ["ProxyType"] = "None",
-                ["ProxyAddr"] = "",
+                ["ProxyAddr"] = "127.0.0.1",
                 ["ProxyPort"] = 8080,
                 ["ProxyUser"] = "",
                 ["ProxyPass"] = "",
@@ -63,6 +131,11 @@ public static class SettingsAndIconsEndpoints
                 ["FlameKeyOverride"] = "",
                 ["ModrinthToken"] = "",
                 ["MetaURLOverride"] = "",
+                ["MSAClientIDOverride"] = "",
+                ["UserAgentOverride"] = "",
+                // paste providers (the registerSettings "HACK" block; the paste endpoint reads them)
+                ["PastebinType"] = (int)PasteUpload.PasteType.Mclogs,
+                ["PastebinCustomAPIBase"] = "",
             },
             ["tools"] = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
@@ -110,6 +183,9 @@ public static class SettingsAndIconsEndpoints
                 runtime.GlobalSettings.Set(prop.Name, TypedValue(
                     prop.Value.ValueKind == JsonValueKind.Null ? "" : (object?)prop.Value.Clone(), def));
             }
+            // proxy / retries / timeout / user-agent take effect immediately (Application
+            // re-runs updateProxySettings from the ProxyPage the same way)
+            RuntimeNetConfig.Apply(runtime);
             return Results.NoContent();
         });
 
@@ -198,13 +274,36 @@ public static class SettingsAndIconsEndpoints
     }
 
     /// <summary>Coerce the incoming JSON value to the declared default's kind, like the
-    /// instance settings endpoint.</summary>
-    private static object TypedValue(object? raw, object? def) => def switch
+    /// instance settings endpoint. The incoming value is a boxed JsonElement (the body's
+    /// raw values); unwrap it to managed primitives first, otherwise it would fall through
+    /// every Variant pattern (numbers became 0, booleans became false).</summary>
+    private static object TypedValue(object? raw, object? def)
     {
-        bool => Variant.AsBool(raw),
-        int => Variant.AsInt(raw),
-        long => Variant.AsLong(raw),
-        double => Variant.AsDouble(raw),
-        _ => Variant.AsString(raw),
-    };
+        var value = UnwrapJson(raw);
+        return def switch
+        {
+            bool => Variant.AsBool(value),
+            int => Variant.AsInt(value),
+            long => Variant.AsLong(value),
+            double => Variant.AsDouble(value),
+            _ => Variant.AsString(value),
+        };
+    }
+
+    private static object? UnwrapJson(object? raw)
+    {
+        if (raw is not JsonElement element)
+        {
+            return raw;
+        }
+        return element.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Number => element.TryGetInt64(out var l) ? l : element.GetDouble(),
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Null => "",
+            _ => element.ToString(),
+        };
+    }
 }

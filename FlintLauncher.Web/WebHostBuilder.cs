@@ -30,8 +30,9 @@ public static class WebHostBuilder
             options.SerializerOptions.TypeInfoResolverChain.Insert(0, FlintJsonContext.Default);
         });
 
+        var runtime = new LauncherRuntime(dataDir);
         builder.Services.AddSingleton(FlintConfig.Default);
-        builder.Services.AddSingleton(new LauncherRuntime(dataDir));
+        builder.Services.AddSingleton(runtime);
         builder.Services.AddSingleton<FlintTaskRegistry>();
         builder.Services.AddSingleton<DeviceCodeSessionStore>();
         builder.Services.AddSingleton<JavaScanService>();
@@ -39,6 +40,14 @@ public static class WebHostBuilder
         builder.Services.AddHostedService<Services.AccountRefreshService>();
 
         var app = builder.Build();
+
+        // fix-3: the C++ LaunchTask always parses log4j XML events out of the game output
+        // (LaunchTask::parseXmlLogs); the port keeps it behind an opt-in gate for pure-core
+        // consumers and the host turns it on.
+        Core.Launch.LaunchTask.XmlParsingEnabled = true;
+        // fix-3: proxy / NumberOfManualRetries / RequestTimeout / UserAgentOverride reach the
+        // shared Http stack (also re-applied after every settings write)
+        Services.RuntimeNetConfig.Apply(runtime);
 
         // uniform {"error":{...}} body for unhandled faults
         app.Use(async (context, next) =>

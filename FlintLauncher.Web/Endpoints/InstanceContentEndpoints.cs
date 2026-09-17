@@ -79,6 +79,88 @@ public static class InstanceContentEndpoints
             }
         });
 
+        // world detail: the listing view plus the parsed seed and the icon.png path
+        // (WorldPage's info pane / "reset icon" target)
+        api.MapGet("/instances/{id}/worlds/{folderName}", async (string id, string folderName,
+            LauncherRuntime runtime) =>
+        {
+            await runtime.InstanceLock.WaitAsync();
+            try
+            {
+                if (LookupInstance(runtime, id) is not { } instance)
+                {
+                    return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
+                }
+                var list = new WorldList(instance.WorldDir());
+                list.Update();
+                var index = IndexOfFolder(list, folderName);
+                if (index < 0)
+                {
+                    return ApiJson.NotFound("world_not_found", $"no world '{folderName}'");
+                }
+                var world = list[index];
+                world.LoadMetadata();
+                world.SetSize(WorldList.CalculateWorldSize(world.ContainerPath));
+                return Results.Ok(new WorldDetailView(
+                    world.Name,
+                    world.FolderName,
+                    world.LastPlayed.ToUnixTimeMilliseconds(),
+                    world.GameType.ToLogString(),
+                    world.ContainerPath,
+                    world.Size,
+                    world.Seed,
+                    world.IconFile));
+            }
+            finally
+            {
+                runtime.InstanceLock.Release();
+            }
+        });
+
+        // world copy (WorldPage's "copy" action -> CopyWorldTask): the copy lands in the same
+        // saves folder under the given name (folder rename + level.dat LevelName rewrite)
+        api.MapPost("/instances/{id}/worlds/{folderName}/copy", async (string id, string folderName,
+            WorldCopyRequest request, LauncherRuntime runtime) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Name))
+            {
+                return ApiJson.Error("invalid_body", "'name' is required", 400);
+            }
+            await runtime.InstanceLock.WaitAsync();
+            try
+            {
+                if (LookupInstance(runtime, id) is not { } instance)
+                {
+                    return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
+                }
+                var list = new WorldList(instance.WorldDir());
+                list.Update();
+                var index = IndexOfFolder(list, folderName);
+                if (index < 0)
+                {
+                    return ApiJson.NotFound("world_not_found", $"no world '{folderName}'");
+                }
+                if (!await list.CopyWorldAsync(index, request.Name))
+                {
+                    return ApiJson.Error("world_copy_failed",
+                        $"world '{folderName}' could not be copied", 500);
+                }
+                // CopyWorldAsync refreshed the list; the copy carries the new name both in
+                // level.dat (World::rename rewrote it) and as its (sanitized) folder name
+                var copy = list.Worlds.FirstOrDefault(w =>
+                    string.Equals(w.Name, request.Name, StringComparison.Ordinal) ||
+                    string.Equals(w.FolderName, request.Name, StringComparison.Ordinal));
+                return copy is null
+                    ? Results.NoContent()
+                    : Results.Created($"/api/v1/instances/{Uri.EscapeDataString(id)}/worlds/{Uri.EscapeDataString(copy.FolderName)}",
+                        ToWorldView(copy));
+            }
+            finally
+            {
+                runtime.InstanceLock.Release();
+            }
+        });
+
         api.MapPost("/instances/{id}/worlds/{folderName}/rename", async (string id, string folderName,
             WorldRenameRequest request, LauncherRuntime runtime) =>
         {
