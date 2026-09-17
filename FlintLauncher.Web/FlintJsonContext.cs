@@ -50,6 +50,14 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(AtLauncherPackView))]
 [JsonSerializable(typeof(AtLauncherPackVersionView))]
 [JsonSerializable(typeof(AtLauncherInstallRequest))]
+// FTB (fix-2 step 2): modpacks.ch surface + install request
+[JsonSerializable(typeof(FtbPackIndexResponse))]
+[JsonSerializable(typeof(FtbPackIndexEntry))]
+[JsonSerializable(typeof(FtbPackView))]
+[JsonSerializable(typeof(FtbPackVersionView))]
+[JsonSerializable(typeof(FtbPackArtView))]
+[JsonSerializable(typeof(FtbPackAuthorView))]
+[JsonSerializable(typeof(FtbInstallRequest))]
 // Wave A (UI-API mapping): instance content surface
 [JsonSerializable(typeof(InstanceGroupView))]
 [JsonSerializable(typeof(CopyInstanceRequest))]
@@ -100,4 +108,8 @@ namespace FlintLauncher.Web;
 // collection roots for the ATLauncher list endpoints (standalone arrays are NOT auto-generated)
 [JsonSerializable(typeof(AtLauncherPackView[]))]
 [JsonSerializable(typeof(AtLauncherPackVersionView[]))]
+// collection roots for the FTB list endpoints (standalone arrays are NOT auto-generated)
+[JsonSerializable(typeof(FtbPackVersionView[]))]
+[JsonSerializable(typeof(FtbPackArtView[]))]
+[JsonSerializable(typeof(FtbPackAuthorView[]))]
 internal sealed partial class FlintJsonContext : JsonSerializerContext;

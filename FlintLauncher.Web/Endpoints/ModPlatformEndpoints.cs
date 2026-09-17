@@ -26,6 +26,11 @@ public static class ModPlatformEndpoints
         // the ATLauncher surface (packsnew.json pass-through + staged pack install)
         api.MapAtLauncher();
 
+        // -------------------------------------------------------- modplatform/ftb/*
+        // the FTB App API surface (/modpack/all + /modpack/{id} pass-throughs + staged
+        // pack install)
+        api.MapFtb();
+
         // ------------------------------------------------ modplatform/{provider}/search
         // the merged search route of the two former /modplatform/{modrinth,flame}/search
         // endpoints; each provider keeps its own header hooks and hit mapping. The `type`

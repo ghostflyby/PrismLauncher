@@ -347,3 +347,51 @@ public sealed record AtLauncherPackView(string Name, string SafeName, string Des
 public sealed record AtLauncherInstallRequest(string Name, string Version, string? Group = null,
     string? IconKey = null, Dictionary<string, bool>? OptionalMods = null,
     string? ChooseLoaderVersion = null, string? ServerUrl = null);
+
+// ----------------------------------------------------------------- FTB (fix-2b)
+
+/// <summary>One /modpack/all index entry — the index payload only carries pack ids.</summary>
+public sealed record FtbPackIndexEntry(int Id);
+
+/// <summary>GET /modplatform/ftb/packs response: the id list of the /modpack/all index.</summary>
+public sealed record FtbPackIndexResponse(IReadOnlyList<FtbPackIndexEntry> Packs);
+
+/// <summary>One pack version (GET /modplatform/ftb/packs/{id}[/versions]).</summary>
+public sealed record FtbPackVersionView(int Id, string Name, string Type, long Updated);
+
+/// <summary>One pack art entry (the square/square-2x logo entries of the description).</summary>
+public sealed record FtbPackArtView(string Url, string Type, int Width, int Height);
+
+/// <summary>One pack author (GET /modplatform/ftb/packs/{id}).</summary>
+public sealed record FtbPackAuthorView(string Name, string Type, string Website);
+
+/// <summary>The /modpack/{id} description mapped through FtbPackManifest.LoadModpack
+/// (safeName is the normalized pack *image* name, "&lt;safe&gt;.png"; tags are flattened to
+/// their names).</summary>
+public sealed record FtbPackView(
+    int Id,
+    string Name,
+    string Synopsis,
+    string Description,
+    string Type,
+    bool Featured,
+    int Installs,
+    int Plays,
+    long Updated,
+    string SafeName,
+    IReadOnlyList<FtbPackArtView> Art,
+    IReadOnlyList<FtbPackAuthorView> Authors,
+    IReadOnlyList<FtbPackVersionView> Versions,
+    IReadOnlyList<string> Tags);
+
+/// <summary>POST /modplatform/ftb/install body: the pack/version to install plus the new
+/// instance's metadata. versionId omitted = the pack's latest (first-listed) version;
+/// serverUrl overrides the FTB API base static for the duration of the call (tests /
+/// mirrors).</summary>
+public sealed record FtbInstallRequest(
+    int PackId,
+    int? VersionId = null,
+    string? Name = null,
+    string? IconKey = null,
+    string? Group = null,
+    string? ServerUrl = null);
