@@ -58,6 +58,12 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(FtbPackArtView))]
 [JsonSerializable(typeof(FtbPackAuthorView))]
 [JsonSerializable(typeof(FtbInstallRequest))]
+// Technic (fix-2c): platform search/trending/metadata surface + install request
+[JsonSerializable(typeof(TechnicSearchResultView))]
+[JsonSerializable(typeof(TechnicPackView))]
+[JsonSerializable(typeof(TechnicInstallRequest))]
+// skins (fix-2c): the account skin surface
+[JsonSerializable(typeof(AccountSkinView))]
 // Wave A (UI-API mapping): instance content surface
 [JsonSerializable(typeof(InstanceGroupView))]
 [JsonSerializable(typeof(CopyInstanceRequest))]
@@ -112,4 +118,6 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(FtbPackVersionView[]))]
 [JsonSerializable(typeof(FtbPackArtView[]))]
 [JsonSerializable(typeof(FtbPackAuthorView[]))]
+// collection roots for the Technic list endpoints (standalone arrays are NOT auto-generated)
+[JsonSerializable(typeof(TechnicSearchResultView[]))]
 internal sealed partial class FlintJsonContext : JsonSerializerContext;

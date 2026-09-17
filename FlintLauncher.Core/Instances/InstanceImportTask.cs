@@ -46,6 +46,14 @@ public sealed partial class InstanceImportTask : InstanceTask
     /// <summary>APPLICATION->metacache() hook; used for the download-from-URL path.</summary>
     public HttpMetaCache? MetaCache { get; set; }
 
+    /// <summary>
+    /// The optional-mods selection (fix-2d) handed to the Modrinth/Flame creation tasks
+    /// (Modrinth: manifest paths, Flame: relative target paths; see the tasks' property
+    /// notes). Unselected/unknown optional files keep the ".disabled" install behavior.
+    /// </summary>
+    public IReadOnlyDictionary<string, bool> OptionalModsSelection { get; set; } =
+        new Dictionary<string, bool>();
+
     public InstanceImportTask(Uri sourceUrl, bool trustedSource,
                               IReadOnlyDictionary<string, string>? extraInfo = null)
     {
@@ -207,7 +215,10 @@ public sealed partial class InstanceImportTask : InstanceTask
         }
 
         var instCreationTask = new FlameCreationTask(StagingPath, _trustedSource, GlobalSettings, packId,
-            packVersionId);
+            packVersionId)
+        {
+            OptionalModsSelection = OptionalModsSelection,
+        };
 
         instCreationTask.SetName(ModifiedName());
         instCreationTask.SetOriginalName(OriginalName(), Version());
@@ -297,7 +308,10 @@ public sealed partial class InstanceImportTask : InstanceTask
         }
 
         var instCreationTask = new ModrinthCreationTask(StagingPath, _trustedSource, GlobalSettings, packId,
-            packVersionId);
+            packVersionId)
+        {
+            OptionalModsSelection = OptionalModsSelection,
+        };
 
         instCreationTask.SetName(ModifiedName());
         instCreationTask.SetOriginalName(OriginalName(), Version());

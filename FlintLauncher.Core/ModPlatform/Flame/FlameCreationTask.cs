@@ -86,6 +86,28 @@ public sealed partial class FlameCreationTask : InstanceTask
     /// </summary>
     public Func<BlockedMod, string?>? BlockedModLocalFileResolver { get; set; }
 
+    /// <summary>
+    /// Headless stand-in for the optional-mods dialog selection (fix-2d): keys are the
+    /// resolved file's relative path ("&lt;targetFolder&gt;/&lt;fileName&gt;", separators
+    /// normalized), values the selected flag. Selected optional files install enabled,
+    /// everything else keeps the non-dialog behavior (".disabled" suffix). Flagged Core
+    /// addition: the C++ gets this from the dialog, so the property does not exist upstream.
+    /// </summary>
+    public IReadOnlyDictionary<string, bool> OptionalModsSelection { get; set; } =
+        new Dictionary<string, bool>();
+
+    /// <summary>The optional-mods selection check for a relative file path (the private
+    /// dialog-result list OR the headless selection map, '/'-normalized).</summary>
+    private bool IsOptionalSelected(string relPath)
+    {
+        if (_selectedOptionalMods.Contains(relPath))
+        {
+            return true;
+        }
+        var normalized = relPath.Replace('\\', '/');
+        return OptionalModsSelection.TryGetValue(normalized, out var selected) && selected;
+    }
+
     /// <summary>Stand-in for the "recommended" loader-version lookup over the meta index:
     /// (loader uid, loader type, mc version) -> version descriptor.</summary>
     public static Func<string, string, string, string?>? RecommendedVersionLookup { get; set; }
@@ -416,7 +438,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                 };
                 var fileName = FileSystem.RemoveInvalidPathChars(result.Version.FileName);
                 var relpath = FileSystem.PathCombine(result.TargetFolder, fileName);
-                blockedMod.Disabled = !result.Required && !_selectedOptionalMods.Contains(relpath);
+                blockedMod.Disabled = !result.Required && !IsOptionalSelected(relpath);
 
                 blockedMods.Add(blockedMod);
                 anyBlocked = true;
@@ -463,7 +485,7 @@ public sealed partial class FlameCreationTask : InstanceTask
             var fileName = FileSystem.RemoveInvalidPathChars(result.Version.FileName);
             var relpath = FileSystem.PathCombine(result.TargetFolder, fileName);
 
-            if (!result.Required && !_selectedOptionalMods.Contains(relpath))
+            if (!result.Required && !IsOptionalSelected(relpath))
             {
                 relpath += ".disabled";
             }

@@ -10,6 +10,11 @@ public static class AccountEndpoints
 {
     public static void MapAccounts(this IEndpointRouteBuilder api)
     {
+        // ---------------------------------------------------- accounts/{id}/skin + cape
+        // the AccountPage/SkinManageDialog skin surface (read/upload/delete + cape
+        // equip/remove; see SkinEndpoints for the mapping)
+        api.MapSkins();
+
         api.MapGet("/accounts", (LauncherRuntime runtime) =>
             Results.Ok(Enumerable.Range(0, runtime.Accounts.Count)
                 .Select(i => View(runtime.Accounts.At(i), runtime.Accounts))

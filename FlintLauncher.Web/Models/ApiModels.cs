@@ -54,7 +54,8 @@ public sealed record VanillaCreateRequest(
 
 public sealed record InstanceCreatedResponse(string Id, string Name);
 
-public sealed record ImportRequest(string Url, string? Name = null);
+public sealed record ImportRequest(string Url, string? Name = null,
+    Dictionary<string, bool>? OptionalMods = null);
 
 public sealed record TaskAcceptedResponse(string TaskId);
 
@@ -395,3 +396,59 @@ public sealed record FtbInstallRequest(
     string? IconKey = null,
     string? Group = null,
     string? ServerUrl = null);
+
+// ----------------------------------------------------------------- Technic (fix-2c)
+
+/// <summary>One search/trending hit mapped through TechnicApi.LoadSearchResults (id is the
+/// slug; displayName is only set by the single-pack mode, where the API distinguishes the
+/// slug "name" from the "displayName"; iconUrl is null for the "null" logo placeholder).</summary>
+public sealed record TechnicSearchResultView(
+    string Id,
+    string Name,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? DisplayName,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? IconUrl);
+
+/// <summary>GET /modplatform/technic/modpack/{slug}: the Platform metadata merged with the
+/// Solder build listing. isSolder marks the Solder detection (the "solder" field presence);
+/// url is the zip download URL for zip packs and the stripped Solder base for Solder packs;
+/// versions/recommended/latest come from the Solder listing (zip packs only have the
+/// platform's "version" field).</summary>
+public sealed record TechnicPackView(
+    string Slug,
+    string Name,
+    bool IsSolder,
+    string Url,
+    string MinecraftVersion,
+    string WebsiteUrl,
+    string Author,
+    string Description,
+    string CurrentVersion,
+    IReadOnlyList<string> Versions,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? Recommended,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? Latest);
+
+/// <summary>POST /modplatform/technic/install body — two shapes: {url, minecraftVersion?}
+/// (zip pack download) or {solder, slug, build?} (Solder instance; build omitted = the
+/// listing's recommended/latest build). name/iconKey/group follow the other install
+/// endpoints; serverUrl overrides the Technic API base static for the duration of the
+/// call (tests / mirrors).</summary>
+public sealed record TechnicInstallRequest(
+    string? Url = null,
+    string? Solder = null,
+    string? Slug = null,
+    string? Build = null,
+    string? MinecraftVersion = null,
+    string? Name = null,
+    string? IconKey = null,
+    string? Group = null,
+    string? ServerUrl = null);
+
+// ----------------------------------------------------------------- skins (fix-2c)
+
+/// <summary>GET /accounts/{profileId}/skin: the profile skin data the login flow stored on
+/// the account (variant is the API's CLASSIC/SLIM spelling; empty when unknown).</summary>
+public sealed record AccountSkinView(string Url, string Variant);

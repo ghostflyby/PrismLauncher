@@ -31,6 +31,11 @@ public static class ModPlatformEndpoints
         // pack install)
         api.MapFtb();
 
+        // ---------------------------------------------------- modplatform/technic/*
+        // the Technic Platform surface (search/trending pass-through, pack metadata with
+        // solder detection + staged zip/Solder pack install)
+        api.MapTechnic();
+
         // ------------------------------------------------ modplatform/{provider}/search
         // the merged search route of the two former /modplatform/{modrinth,flame}/search
         // endpoints; each provider keeps its own header hooks and hit mapping. The `type`

@@ -82,6 +82,16 @@ public sealed class ModrinthCreationTask : InstanceTask
     /// <summary>The untrusted files reported when TrustedSource is false (see header note).</summary>
     public IReadOnlyList<string> UntrustedMods { get; private set; } = [];
 
+    /// <summary>
+    /// Headless stand-in for the OptionalModDialog selection (fix-2d): keys are the manifest
+    /// file paths ("mods/..."), values the selected flag. Selected optional files install
+    /// enabled (like the C++ dialog's "required" upgrade), everything else keeps the
+    /// non-dialog behavior (".disabled" suffix). Flagged Core addition: the C++ gets this
+    /// from the dialog, so the property does not exist upstream.
+    /// </summary>
+    public IReadOnlyDictionary<string, bool> OptionalModsSelection { get; set; } =
+        new Dictionary<string, bool>();
+
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         // (upstream checks for an existing instance to update here — deferred, see header)
@@ -338,7 +348,16 @@ public sealed class ModrinthCreationTask : InstanceTask
                     }
                     foreach (var file in optionalFiles)
                     {
-                        file.Path += ".disabled";
+                        if (OptionalModsSelection.TryGetValue(file.Path, out var selected) && selected)
+                        {
+                            // the OptionalModDialog's selection: selected optional files are
+                            // upgraded to required (installed under their real path)
+                            file.Required = true;
+                        }
+                        else
+                        {
+                            file.Path += ".disabled";
+                        }
                         files.Add(file);
                     }
                 }

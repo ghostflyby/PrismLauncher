@@ -151,6 +151,9 @@ public static class InstanceEndpoints
                 var importTask = new InstanceImportTask(uri, trustedSource: true)
                 {
                     MetaCache = runtime.MetaCache,
+                    // the OptionalModDialog answers for mrpack/CurseForge packs (fix-2d):
+                    // keys are the manifest file paths, unselected files install disabled
+                    OptionalModsSelection = request.OptionalMods ?? new Dictionary<string, bool>(),
                 };
                 // optional display name: without one the committed folder cannot be derived
                 // (the C++ always has the pack name from the import dialog)
