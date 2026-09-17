@@ -22,6 +22,10 @@ public static class ModPlatformEndpoints
 {
     public static void MapModPlatform(this IEndpointRouteBuilder api)
     {
+        // ------------------------------------------------ modplatform/atlauncher/*
+        // the ATLauncher surface (packsnew.json pass-through + staged pack install)
+        api.MapAtLauncher();
+
         // ------------------------------------------------ modplatform/{provider}/search
         // the merged search route of the two former /modplatform/{modrinth,flame}/search
         // endpoints; each provider keeps its own header hooks and hit mapping. The `type`

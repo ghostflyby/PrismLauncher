@@ -329,3 +329,21 @@ public sealed record InstanceIconPutRequest(string IconKey);
 public sealed record GlobalSettingsPutRequest(string Group, JsonElement Values);
 
 public sealed record SettingsGroupsResponse(IReadOnlyDictionary<string, object> Groups);
+
+// ----------------------------------------------------------------- ATLauncher (fix-2)
+
+/// <summary>One packsnew.json index version (GET /modplatform/atlauncher/packs[/versions]).</summary>
+public sealed record AtLauncherPackVersionView(string Version, string Minecraft);
+
+/// <summary>One packsnew.json index pack, mapped through AtLauncherPackIndex.LoadIndexedPack
+/// (safeName is the normalized pack *image* name, "&lt;safe&gt;.png").</summary>
+public sealed record AtLauncherPackView(string Name, string SafeName, string Description, string Type,
+    IReadOnlyList<AtLauncherPackVersionView> Versions);
+
+/// <summary>POST /modplatform/atlauncher/install body: the pack to install (name+version),
+/// the new instance's metadata and the pre-set dialog answers (optional-mod selection and
+/// the loader "choose" mode's version). serverUrl overrides the ATL download-server static
+/// for the duration of the call (tests / mirrors).</summary>
+public sealed record AtLauncherInstallRequest(string Name, string Version, string? Group = null,
+    string? IconKey = null, Dictionary<string, bool>? OptionalMods = null,
+    string? ChooseLoaderVersion = null, string? ServerUrl = null);

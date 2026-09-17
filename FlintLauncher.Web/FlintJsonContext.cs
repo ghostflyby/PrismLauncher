@@ -46,6 +46,10 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(TaskResultView))]
 [JsonSerializable(typeof(ProviderCategoryView))]
 [JsonSerializable(typeof(ProviderBodyView))]
+// ATLauncher (fix-2 step 1): packsnew.json surface + install request
+[JsonSerializable(typeof(AtLauncherPackView))]
+[JsonSerializable(typeof(AtLauncherPackVersionView))]
+[JsonSerializable(typeof(AtLauncherInstallRequest))]
 // Wave A (UI-API mapping): instance content surface
 [JsonSerializable(typeof(InstanceGroupView))]
 [JsonSerializable(typeof(CopyInstanceRequest))]
@@ -93,4 +97,7 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(ComponentView[]))]
 [JsonSerializable(typeof(LogFileView[]))]
 [JsonSerializable(typeof(IconView[]))]
+// collection roots for the ATLauncher list endpoints (standalone arrays are NOT auto-generated)
+[JsonSerializable(typeof(AtLauncherPackView[]))]
+[JsonSerializable(typeof(AtLauncherPackVersionView[]))]
 internal sealed partial class FlintJsonContext : JsonSerializerContext;
