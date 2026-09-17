@@ -41,6 +41,6 @@ GUI 表现层（主题/猫包/3D 预览/QAIM 模型/ watcher）、LocalPeer/IPC�
 ## 建议排期（后续波次）
 
 - **fix-1（高影响）✅ 2026-09-16 完成**：LocalModParseTask + ModFolderModel 接线；provider search 的资源类型参数；categories/changelog/description 端点。（commit bcb793b1c，902 测试）
-- **fix-2（高影响）**：provider 路由扩展到 ATL/FTB/Technic 的包安装 + 可选 mod 选择输入 + 皮肤端点。
+- **fix-2（高影响）✅ 2026-09-16 完成**：provider 路由扩展到 ATL/FTB/Technic 的包安装（含浏览/搜索）+ 可选 mod 选择输入（含导入流）+ 皮肤端点。（commit 228166d9c，945 测试）
 - **fix-3（中）**：settings 白名单补全 + 默认值对齐 + 代理/并发设置生效 + parseXmlLogs 接线 + AccountList 刷新队列下沉 Core。
 - **fix-4（低）**：world 补充操作、servers 排序、launch join 目标参数、paste/about/cache-evict 端点、Utils 补零。
