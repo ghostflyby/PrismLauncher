@@ -427,13 +427,16 @@ public sealed class ModsUpdateTask : FlintTask
     private readonly MinecraftInstance _instance;
     private readonly ModFolderModel _folder;
     private readonly IReadOnlyList<string>? _filter;
+    private readonly IReadOnlyList<IndexedVersionType>? _releaseTypes;
     private readonly List<PendingUpdate> _updates = [];
 
-    public ModsUpdateTask(MinecraftInstance instance, ModFolderModel folder, IReadOnlyList<string>? filter)
+    public ModsUpdateTask(MinecraftInstance instance, ModFolderModel folder, IReadOnlyList<string>? filter,
+        IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     {
         _instance = instance;
         _folder = folder;
         _filter = filter;
+        _releaseTypes = releaseTypes;
     }
 
     /// <summary>The update entries for the task view's optional result payload.</summary>
@@ -455,13 +458,15 @@ public sealed class ModsUpdateTask : FlintTask
                                                wanted.Contains(m.GetOriginalFileName()));
         }
 
-        // the check passes refuse metadata-less resources; the API simply skips them
+        // the check passes refuse metadata-less resources; the API simply skips them.
+        // Locked resources (metadata lockUpdate) are skipped too — the data-level half of
+        // ResourceUpdateDialog::onMetadataEnsured's `!metadata() || lockUpdate()` guard.
         var modrinth = new List<Resource>();
         var flame = new List<Resource>();
         foreach (var mod in candidates)
         {
             var metadata = _folder.GetMetadata(mod);
-            if (metadata is null)
+            if (metadata is null || metadata.LockUpdate)
             {
                 continue;
             }
@@ -478,7 +483,8 @@ public sealed class ModsUpdateTask : FlintTask
         if (modrinth.Count != 0)
         {
             EmitStatus("Checking Modrinth updates...");
-            var check = new ModrinthCheckUpdate(modrinth, gameVersions, loadersList, resource => _folder.GetMetadata(resource));
+            var check = new ModrinthCheckUpdate(modrinth, gameVersions, loadersList,
+                resource => _folder.GetMetadata(resource), _releaseTypes);
             await check.StartAsync(cancellationToken);
             if (!check.WasSuccessful)
             {
@@ -498,7 +504,8 @@ public sealed class ModsUpdateTask : FlintTask
         if (flame.Count != 0)
         {
             EmitStatus("Checking CurseForge updates...");
-            var check = new FlameCheckUpdate(flame, gameVersions, loadersList, resource => _folder.GetMetadata(resource));
+            var check = new FlameCheckUpdate(flame, gameVersions, loadersList,
+                resource => _folder.GetMetadata(resource), _releaseTypes);
             await check.StartAsync(cancellationToken);
             if (!check.WasSuccessful)
             {

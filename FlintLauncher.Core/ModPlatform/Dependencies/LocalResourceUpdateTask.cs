@@ -22,14 +22,17 @@ public sealed class LocalResourceUpdateTask : FlintTask
     private readonly string _indexDir;
     private readonly IndexedPack _project;
     private readonly IndexedVersion _version;
+    private readonly bool _lockUpdate;
 
-    public LocalResourceUpdateTask(string indexDir, IndexedPack project, IndexedVersion version)
+    public LocalResourceUpdateTask(string indexDir, IndexedPack project, IndexedVersion version,
+        bool lockUpdate = false)
     {
         _indexDir = indexDir;
         // The C++ takes the project by value, so the slug rescue below must not leak into
         // the caller's pack: work on a shallow copy.
         _project = ClonePack(project);
         _version = version;
+        _lockUpdate = lockUpdate;
     }
 
     /// <summary>Port of the hasOldResource(name, filename) signal.</summary>
@@ -61,6 +64,7 @@ public sealed class LocalResourceUpdateTask : FlintTask
         var pwMod = MetadataHandler.Create(_indexDir, _project, _version);
         if (pwMod.IsValid)
         {
+            pwMod.LockUpdate = _lockUpdate;
             MetadataHandler.Update(_indexDir, pwMod);
             EmitSucceeded();
         }

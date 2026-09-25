@@ -162,14 +162,55 @@ public readonly record struct IndexedVersionType
 
     public static IndexedVersionType FromString(string str)
     {
+        // case-insensitive since #3404 (IndexedVersionType::fromString)
         foreach (IndexedVersionTypeValue value in Enum.GetValues<IndexedVersionTypeValue>())
         {
-            if (str == ToString(value))
+            if (string.Equals(str, ToString(value), StringComparison.OrdinalIgnoreCase))
             {
                 return new IndexedVersionType(value);
             }
         }
         return Invalid;
+    }
+
+    /// <summary>Port of IndexedVersionType::fromStringList: the invalid entries are dropped.</summary>
+    public static List<IndexedVersionType> FromStringList(IEnumerable<string> list)
+    {
+        var result = new List<IndexedVersionType>();
+        foreach (var str in list)
+        {
+            var type = FromString(str);
+            if (type.IsValid)
+            {
+                result.Add(type);
+            }
+        }
+        return result;
+    }
+
+    /// <summary>Port of IndexedVersionType::toModrinth: the Modrinth version_type spelling
+    /// ("" for the invalid/unknown entry).</summary>
+    public string ToModrinth() => Value switch
+    {
+        IndexedVersionTypeValue.Release => "release",
+        IndexedVersionTypeValue.Beta => "beta",
+        IndexedVersionTypeValue.Alpha => "alpha",
+        _ => "",
+    };
+
+    /// <summary>Port of IndexedVersionType::toModrinthList: the empty spellings are dropped.</summary>
+    public static List<string> ToModrinthList(IReadOnlyList<IndexedVersionType> types)
+    {
+        var result = new List<string>();
+        foreach (var type in types)
+        {
+            var s = type.ToModrinth();
+            if (s.Length != 0)
+            {
+                result.Add(s);
+            }
+        }
+        return result;
     }
 }
 

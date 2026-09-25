@@ -43,6 +43,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
     private readonly IReadOnlyList<McVersion> _gameVersions;
     private readonly List<Minecraft.ModLoaderType> _loadersList;
     private readonly Func<Resource, MetadataHandler.ModStruct?> _metadataLookup;
+    private readonly IReadOnlyList<IndexedVersionType> _releaseTypes;
 
     private readonly string _hashType = ProviderCapabilities.HashType(ResourceProvider.MODRINTH)[0];
     private readonly Dictionary<string, Resource> _mappings = new(StringComparer.Ordinal); // hash -> resource
@@ -54,12 +55,14 @@ public sealed class ModrinthCheckUpdate : FlintTask
     public ModrinthCheckUpdate(IReadOnlyList<Resource> resources,
                                IReadOnlyList<McVersion> mcVersions,
                                IReadOnlyList<Minecraft.ModLoaderType> loadersList,
-                               Func<Resource, MetadataHandler.ModStruct?> metadataLookup)
+                               Func<Resource, MetadataHandler.ModStruct?> metadataLookup,
+                               IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     {
         _resources = resources;
         _gameVersions = mcVersions;
         _loadersList = [.. loadersList];
         _metadataLookup = metadataLookup;
+        _releaseTypes = releaseTypes ?? [];
 
         if (_loadersList.Count != 0)
         { // this is for mods so append all the other posible loaders to the initial list
@@ -136,7 +139,8 @@ public sealed class ModrinthCheckUpdate : FlintTask
             return;
         }
 
-        var (job, request) = ModrinthApi.Instance.LatestVersions(hashes, _hashType, _gameVersions, loader);
+        var (job, request) = ModrinthApi.Instance.LatestVersions(hashes, _hashType, _gameVersions, loader,
+            _releaseTypes);
         await job.StartAsync(cancellationToken);
         if (!job.WasSuccessful)
         {

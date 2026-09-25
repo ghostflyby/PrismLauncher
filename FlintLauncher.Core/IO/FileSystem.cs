@@ -485,6 +485,16 @@ public static class FileSystem
     /// </summary>
     public static string DirNameFromString(string str, string inDir = ".")
     {
+        return DirNameFromString(str, [inDir]);
+    }
+
+    /// <summary>
+    /// Port of FS::DirNameFromString(string, QStringList inDirs): derive a directory name
+    /// that clashes with none of the given dirs (#6110 dedupes instance folder names across
+    /// every configured instances directory).
+    /// </summary>
+    public static string DirNameFromString(string str, IReadOnlyList<string> inDirs)
+    {
         var num = 0;
         var baseName = RemoveInvalidFilenameChars(str, '-');
         string dirName;
@@ -504,7 +514,7 @@ public static class FileSystem
                 return "";
             }
             num++;
-        } while (Directory.Exists(PathCombine(inDir, dirName)) || File.Exists(PathCombine(inDir, dirName)));
+        } while (inDirs.Any(dir => Directory.Exists(PathCombine(dir, dirName)) || File.Exists(PathCombine(dir, dirName))));
         return dirName;
     }
 

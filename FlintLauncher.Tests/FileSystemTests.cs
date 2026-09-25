@@ -274,6 +274,23 @@ public class FileSystemTests
     }
 
     [Fact]
+    public void DirNameFromString_DedupesAcrossDirectoryLists()
+    {
+        // #6110: DirNameFromString(string, QStringList) avoids clashes against every given
+        // dir, so instance folder names stay unique across all configured instance roots
+        using var tempDirScope = new TempDirScope();
+        var otherDir = Path.Combine(tempDirScope.Path, "second-root");
+        Directory.CreateDirectory(otherDir);
+        Directory.CreateDirectory(Path.Combine(otherDir, "My Instance-"));
+
+        var dirs = new[] { tempDirScope.Path, otherDir };
+        // "My Instance-" clashes inside second-root even though first-root is empty
+        Assert.Equal("My Instance-(1)", FileSystem.DirNameFromString("My Instance!", dirs));
+        // and the single-dir overload still only considers its own dir
+        Assert.Equal("My Instance-", FileSystem.DirNameFromString("My Instance!", tempDirScope.Path));
+    }
+
+    [Fact]
     public void GetUniqueResourceName()
     {
         using var tempDirScope = new TempDirScope();

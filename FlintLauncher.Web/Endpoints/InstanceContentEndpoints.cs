@@ -635,16 +635,15 @@ public static class InstanceContentEndpoints
                 var baseUrl = Environment.GetEnvironmentVariable("FLINT_IMGUR_BASE_URL");
                 var clientId = Environment.GetEnvironmentVariable("FLINT_IMGUR_CLIENT_ID");
 
+                // ImgurAPI::makeUpload per file; more than one also runs ImgurAPI::makeAlbum
                 var task = new SequentialTask("Uploading screenshots");
                 foreach (var shot in shots)
                 {
-                    task.AddTask(new ImgurUpload(shot, baseUrl, clientId));
+                    task.AddTask(ImgurApi.MakeUpload(shot, baseUrl, clientId));
                 }
                 if (shots.Count > 1)
                 {
-                    // ImgurAlbumCreation groups the uploaded images into one album
-                    task.AddTask(new ImgurAlbumCreation(new ImgurAlbumCreation.Result(), shots,
-                        baseUrl, clientId));
+                    task.AddTask(ImgurApi.MakeAlbum(new ImgurApi.AlbumResult(), shots, baseUrl, clientId));
                 }
 
                 var entry = registry.Register("screenshots-upload", task, instanceId: instance.Id());

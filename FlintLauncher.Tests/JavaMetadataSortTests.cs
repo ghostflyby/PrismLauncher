@@ -80,6 +80,27 @@ public class JavaMetadataSortTests
         Assert.Equal(new JavaVersion().ToString(), meta.Version.ToString());
     }
 
+    [Fact]
+    public void ParseJavaMeta_VersionSubFieldsAreOptional()
+    {
+        // #6143/#6159: the meta "version" object's members may be missing; they fall back to
+        // the QJsonValue defaults ("", 0) instead of failing the whole parse
+        var meta = JavaMetadata.ParseJavaMeta(new JsonObject
+        {
+            ["name"] = "java",
+            ["version"] = new JsonObject(),
+        });
+        Assert.Equal("0", meta.Version.ToString()); // all-numeric defaults (major=0)
+        Assert.Equal("java", meta.Name());
+
+        var partial = JavaMetadata.ParseJavaMeta(new JsonObject
+        {
+            ["name"] = "java",
+            ["version"] = new JsonObject { ["major"] = 17 },
+        });
+        Assert.Equal("17", partial.Version.ToString());
+    }
+
     [Theory]
     [InlineData("manifest", JavaDownloadType.Manifest)]
     [InlineData("archive", JavaDownloadType.Archive)]

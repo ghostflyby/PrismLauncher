@@ -113,6 +113,32 @@ public class ModrinthApiTests : IDisposable
     }
 
     [Fact]
+    public void SearchUrl_GivesEachCategoryItsOwnFacetArray()
+    {
+        // #6099: categories are OR-ed within one facet array, AND-ed across arrays — every
+        // search category gets an array of its own
+        var args = new SearchArgs
+        {
+            Type = ResourceType.Mod,
+            CategoryIds = ["adventure", "technology", "utility"],
+        };
+
+        var url = ModrinthApi.Instance.GetSearchURL(args);
+        Assert.NotNull(url);
+
+        var urlText = Uri.UnescapeDataString(url);
+        var facetsText = urlText[(urlText.IndexOf("facets=", StringComparison.Ordinal) + "facets=".Length)..];
+        var groups = JsonDocument.Parse(facetsText).RootElement.EnumerateArray()
+            .Select(g => g.EnumerateArray().Select(v => v.GetString()!).ToList()).ToList();
+
+        Assert.Contains(groups, g => g.SequenceEqual(["categories:adventure"]));
+        Assert.Contains(groups, g => g.SequenceEqual(["categories:technology"]));
+        Assert.Contains(groups, g => g.SequenceEqual(["categories:utility"]));
+        // no group merges two categories anymore
+        Assert.DoesNotContain(groups, g => g.Count > 1 && g.Any(c => c.StartsWith("categories:", StringComparison.Ordinal)));
+    }
+
+    [Fact]
     public void SearchUrl_RejectsUnsupportedLoaders()
     {
         var args = new SearchArgs { Type = ResourceType.Mod };
@@ -176,6 +202,58 @@ public class ModrinthApiTests : IDisposable
         var hashes = body.GetProperty("hashes").EnumerateArray().Select(h => h.GetString()).ToList();
         Assert.Equal(["hash1", "hash2"], hashes);
         Assert.Equal("sha512", body.GetProperty("algorithm").GetString());
+    }
+
+    // ------------------------------------------------- modrinth://modpack links (#5528)
+
+    [Theory]
+    [InlineData("modrinth://modpack/fabulously-optimized", "fabulously-optimized")]
+    [InlineData("modrinth://modpack/fabulously-optimized/", "fabulously-optimized")]
+    [InlineData("modrinth://MODPACK/fo", "fo")]
+    public void GetModpackIdFromUrl_ParsesModpackLinks(string link, string slug)
+    {
+        Assert.Equal(slug, ModrinthApi.GetModpackIdFromUrl(link));
+    }
+
+    [Theory]
+    [InlineData("https://modrinth.com/modpack/fabulously-optimized")] // wrong scheme
+    [InlineData("modrinth://modpack/")]                              // missing slug
+    [InlineData("modrinth://mod/sodium")]                            // unsupported resource
+    [InlineData("modrinth://modpack/fabulously-optimized/version/latest")] // extra path
+    public void GetModpackIdFromUrl_RejectsInvalidLinks(string link)
+    {
+        Assert.Equal("", ModrinthApi.GetModpackIdFromUrl(link));
+    }
+
+    // ----------------------------------------------------- release channels (#3404)
+
+    [Fact]
+    public async Task LatestVersions_PostsReleaseTypes()
+    {
+        var (job, _) = ModrinthApi.Instance.LatestVersions(["hash1"], "sha512", null, null,
+        [
+            new IndexedVersionType(IndexedVersionTypeValue.Release),
+            new IndexedVersionType(IndexedVersionTypeValue.Beta),
+        ]);
+        await job.StartAsync();
+
+        Assert.Equal(TaskState.Succeeded, job.State);
+        Assert.EndsWith("/version_files/update", _server.LastPath);
+
+        var body = JsonDocument.Parse(Encoding.UTF8.GetString(_server.LastBody!)).RootElement;
+        var versionTypes = body.GetProperty("version_types").EnumerateArray().Select(v => v.GetString()).ToList();
+        Assert.Equal(["release", "beta"], versionTypes);
+    }
+
+    [Fact]
+    public async Task LatestVersions_OmitsVersionTypesByDefault()
+    {
+        var (job, _) = ModrinthApi.Instance.LatestVersions(["hash1"], "sha512", null, null);
+        await job.StartAsync();
+
+        Assert.Equal(TaskState.Succeeded, job.State);
+        var body = JsonDocument.Parse(Encoding.UTF8.GetString(_server.LastBody!)).RootElement;
+        Assert.False(body.TryGetProperty("version_types", out _));
     }
 
     [Fact]

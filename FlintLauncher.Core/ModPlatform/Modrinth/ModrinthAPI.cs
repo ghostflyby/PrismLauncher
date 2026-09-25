@@ -82,6 +82,41 @@ public sealed class ModrinthApi : ResourceApi
 
     // ------------------------------------------------------------------ requests
 
+    /// <summary>
+    /// Port of ModrinthAPI::getModpackIdFromUrl: the slug of a modrinth://modpack/&lt;slug&gt;
+    /// link. The scheme and host compare case-insensitively; the (percent-decoded) path must
+    /// hold exactly one segment. Any other link yields "".
+    /// </summary>
+    public static string GetModpackIdFromUrl(string url)
+    {
+        Uri? uri;
+        try
+        {
+            uri = new Uri(url);
+        }
+        catch (UriFormatException)
+        {
+            return "";
+        }
+
+        // QUrl::scheme()/host() are case-insensitive comparisons in the C++
+        if (!string.Equals(uri.Scheme, "modrinth", StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(uri.Host, "modpack", StringComparison.OrdinalIgnoreCase))
+        {
+            return "";
+        }
+
+        // QUrl::fromPercentEncoding + split('/', SkipEmptyParts)
+        var decoded = Uri.UnescapeDataString(uri.AbsolutePath);
+        var segments = decoded.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Length != 1)
+        {
+            return "";
+        }
+
+        return segments[0].Trim();
+    }
+
     /// <summary>Port of ModrinthAPI::currentVersion (GET /version_file/{hash}?algorithm=).</summary>
     public static (NetJob Job, NetRequest Request) CurrentVersion(string hash, string hashFormat)
     {
@@ -106,11 +141,13 @@ public sealed class ModrinthApi : ResourceApi
         return (netJob, request);
     }
 
-    /// <summary>Port of ModrinthAPI::latestVersion (POST /version_file/{hash}/update).</summary>
+    /// <summary>Port of ModrinthAPI::latestVersion (POST /version_file/{hash}/update); the
+    /// optional release types become the body's "version_types" list (#3404).</summary>
     public (NetJob Job, NetRequest Request) LatestVersion(string hash,
                                                            string hashFormat,
                                                            IReadOnlyList<McVersion>? mcVersions,
-                                                           Minecraft.ModLoaderType? loaders)
+                                                           Minecraft.ModLoaderType? loaders,
+                                                           IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     {
         var netJob = new NetJob("Modrinth::GetLatestVersion");
 
@@ -124,6 +161,7 @@ public sealed class ModrinthApi : ResourceApi
             JsonUtils.WriteStringList(bodyObj, "game_versions",
                 mcVersions.Select(MapMcVersionToModrinth).ToList());
         }
+        AddVersionTypes(bodyObj, releaseTypes);
 
         var bodyRaw = System.Text.Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
 
@@ -132,11 +170,13 @@ public sealed class ModrinthApi : ResourceApi
         return (netJob, request);
     }
 
-    /// <summary>Port of ModrinthAPI::latestVersions (POST /version_files/update).</summary>
+    /// <summary>Port of ModrinthAPI::latestVersions (POST /version_files/update); the
+    /// optional release types become the body's "version_types" list (#3404).</summary>
     public (NetJob Job, NetRequest Request) LatestVersions(IReadOnlyList<string> hashes,
                                                            string hashFormat,
                                                            IReadOnlyList<McVersion>? mcVersions,
-                                                           Minecraft.ModLoaderType? loaders)
+                                                           Minecraft.ModLoaderType? loaders,
+                                                           IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     {
         var netJob = new NetJob("Modrinth::GetLatestVersions");
 
@@ -152,12 +192,28 @@ public sealed class ModrinthApi : ResourceApi
             JsonUtils.WriteStringList(bodyObj, "game_versions",
                 mcVersions.Select(MapMcVersionToModrinth).ToList());
         }
+        AddVersionTypes(bodyObj, releaseTypes);
 
         var bodyRaw = System.Text.Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
 
         var request = MakeByteArrayRequest($"{BaseUrl}/version_files/update", bodyRaw);
         netJob.AddNetRequest(request);
         return (netJob, request);
+    }
+
+    /// <summary>Port of the addVersionTypes helper: write "version_types" when the release
+    /// types carry at least one valid entry.</summary>
+    private static void AddVersionTypes(JsonObject bodyObj, IReadOnlyList<IndexedVersionType>? releaseTypes)
+    {
+        if (releaseTypes is not { Count: > 0 })
+        {
+            return;
+        }
+        var versionTypes = IndexedVersionType.ToModrinthList(releaseTypes);
+        if (versionTypes.Count != 0)
+        {
+            JsonUtils.WriteStringList(bodyObj, "version_types", versionTypes);
+        }
     }
 
     /// <summary>Port of ModrinthAPI::getProjects (GET /projects?ids=[...]).</summary>
@@ -278,12 +334,6 @@ public sealed class ModrinthApi : ResourceApi
         return string.Join(",", l);
     }
 
-    /// <summary>Port of ModrinthAPI::getCategoriesFilters.</summary>
-    public static string GetCategoriesFilters(IReadOnlyList<string> categories)
-    {
-        return string.Join(",", categories.Select(cat => $"\"categories:{cat}\""));
-    }
-
     /// <summary>Port of ModrinthAPI::getSideFilters.</summary>
     public static string GetSideFilters(SideType side) => side.Value switch
     {
@@ -356,7 +406,12 @@ public sealed class ModrinthApi : ResourceApi
         }
         if (args.CategoryIds is { } categoryIds && categoryIds.Count != 0)
         {
-            facetsList.Add($"[{GetCategoriesFilters(categoryIds)}]");
+            // #6099: every search category gets a facet array of its own (a category list is
+            // an OR within one array; separate arrays AND them together like the UI expects)
+            foreach (var category in categoryIds)
+            {
+                facetsList.Add($"[\"categories:{category}\"]");
+            }
         }
         foreach (var d in args.ExcludeDisclosureTypes)
         {

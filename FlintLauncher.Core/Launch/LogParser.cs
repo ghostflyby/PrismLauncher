@@ -309,7 +309,7 @@ public sealed class LogParser
                             _error = new ParseError("log4j:Event Missing required attribute: timestamp");
                             return null;
                         }
-                        entry = entry with { Timestamp = FromSecsSinceEpoch(value) };
+                        entry = entry with { Timestamp = FromMSecsSinceEpoch(value) };
                         break;
                     case "level":
                         entry = entry with { LevelText = value, Level = MessageLevel.Launcher.FromName(value) };
@@ -329,17 +329,19 @@ public sealed class LogParser
         return entry with { Logger = logger };
     }
 
-    private static DateTime? FromSecsSinceEpoch(string value)
+    /// <summary>Port of the timestamp attribute read: log4j's XMLLayout reports the event
+    /// time in milliseconds (upstream switched from fromSecsSinceEpoch).</summary>
+    private static DateTime? FromMSecsSinceEpoch(string value)
     {
         // value.trimmed().toLongLong() — 0 on failure
         if (!long.TryParse(value, NumberStyles.AllowLeadingWhite | NumberStyles.AllowLeadingSign,
-                CultureInfo.InvariantCulture, out var secs))
+                CultureInfo.InvariantCulture, out var msecs))
         {
-            secs = 0;
+            msecs = 0;
         }
         try
         {
-            return DateTimeOffset.FromUnixTimeSeconds(secs).UtcDateTime;
+            return DateTimeOffset.FromUnixTimeMilliseconds(msecs).UtcDateTime;
         }
         catch (ArgumentOutOfRangeException)
         {
@@ -347,16 +349,26 @@ public sealed class LogParser
         }
     }
 
-    /// <summary>Port of isPotentialLog4JStart.</summary>
+    /// <summary>
+    /// Port of isPotentialLog4JStart. Data reaches the parser one whole line at a time and
+    /// log4j's XMLLayout never splits the "&lt;log4j:Event" start tag across lines, so a slice
+    /// that is merely a *prefix* of the tag can never be completed by later input: accepting
+    /// such a prefix used to tear a lone '&lt;' (as in the emoticon "&gt;w&lt;") off the end of
+    /// its line and hold it back until the next line arrived. After the full tag name, only a
+    /// name terminator keeps it one of ours ("&lt;log4j:Eventually" is a different element).
+    /// </summary>
     private static bool IsPotentialLog4JStart(string buffer)
     {
-        if (buffer.Length == 0 || buffer[0] != '<')
+        if (!buffer.StartsWith(TargetStart, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
-        var bufLower = buffer.ToLowerInvariant();
-        return TargetStart.StartsWith(bufLower, StringComparison.Ordinal) ||
-               bufLower.StartsWith(TargetStart, StringComparison.Ordinal);
+        if (buffer.Length == TargetStart.Length)
+        {
+            return true; // the name is complete, whatever follows it is on the next line
+        }
+        var next = buffer[TargetStart.Length];
+        return char.IsWhiteSpace(next) || next == '>' || next == '/';
     }
 
     private static bool MatchesEvent(string name) => name.Equals("log4j:Event", StringComparison.OrdinalIgnoreCase);

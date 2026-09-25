@@ -28,12 +28,20 @@ public sealed class EnsureMetadataTask : FlintTask
     private readonly string _indexDir;
     private readonly ResourceProvider _provider;
     private readonly Dictionary<string, IndexedVersion> _tempVersions = new(StringComparer.Ordinal);
+    private bool _lockUpdate;
 
     public EnsureMetadataTask(Dictionary<string, Resource> resources, string indexDir, ResourceProvider provider)
     {
         _resources = resources;
         _indexDir = indexDir;
         _provider = provider;
+    }
+
+    /// <summary>Port of EnsureMetadataTask::setUpdateLock: whether the metadata written by
+    /// this pass locks updates for the resource.</summary>
+    public void SetUpdateLock(bool lockUpdate)
+    {
+        _lockUpdate = lockUpdate;
     }
 
     /// <summary>Port of the metadataReady(resource) signal, carrying the fresh metadata.</summary>
@@ -437,6 +445,7 @@ public sealed class EnsureMetadataTask : FlintTask
         var pwMod = MetadataHandler.Create(_indexDir, pack, ver);
         if (pwMod.IsValid)
         {
+            pwMod.LockUpdate = _lockUpdate;
             MetadataHandler.Update(_indexDir, pwMod);
             MetadataReady?.Invoke(resource, pwMod);
         }

@@ -127,6 +127,9 @@ public class InstanceList
 
     public string PrimaryDir() => _instDirs.Count == 0 ? "" : _instDirs[0];
 
+    /// <summary>Port of InstanceList::instanceDirs (all configured instance roots).</summary>
+    public IReadOnlyList<string> InstanceDirs() => _instDirs;
+
     /// <summary>C++ m_instances (in list order).</summary>
     public IReadOnlyList<BaseInstance> Instances => _instances;
 
@@ -471,7 +474,7 @@ public class InstanceList
         }
         else
         {
-            instId = FileSystem.DirNameFromString(instanceTask.ModifiedName(), targetDir);
+            instId = FileSystem.DirNameFromString(instanceTask.ModifiedName(), _instDirs);
         }
 
         if (instId.Length == 0)

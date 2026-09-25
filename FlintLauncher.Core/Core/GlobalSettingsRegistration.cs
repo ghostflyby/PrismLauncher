@@ -102,6 +102,8 @@ public static class GlobalSettingsRegistration
             ("SkipModpackUpdatePrompt", false),
             ("ShowModIncompat", false),
             ("DownloadGameFilesDuringInstanceCreation", true),
+            // release channels allowed for mod updates (#3404); a JSON string list like the C++
+            ("ModUpdateReleaseTypes", "[]"),
             // commands
             ("PreLoadCommand", ""),
             ("PreLaunchCommand", ""),

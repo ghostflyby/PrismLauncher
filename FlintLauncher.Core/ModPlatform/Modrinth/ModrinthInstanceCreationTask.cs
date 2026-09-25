@@ -419,6 +419,8 @@ public sealed class ModrinthCreationTask : InstanceTask
     {
         var folder = FileSystem.PathCombine(newInstance.ModsRoot(), ".index");
         var ensureMetadataTask = new EnsureMetadataTask(_resources, folder, ResourceProvider.MODRINTH);
+        // setUpdateLock(true): updates for mods coming from an installed modpack are locked
+        ensureMetadataTask.SetUpdateLock(lockUpdate: true);
         ensureMetadataTask.MetadataFailed += (_, reason) => EmitStatus(reason);
         EmitStatus("Generating metadata for mods...");
         await ensureMetadataTask.StartAsync(cancellationToken);

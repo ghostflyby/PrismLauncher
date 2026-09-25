@@ -182,6 +182,34 @@ public class PackwizTests
         var dep = Assert.Single(loaded.Dependencies);
         Assert.Equal("P7dR8mSH", dep.AddonId);
         Assert.Equal(new DependencyType(DependencyTypeValue.REQUIRED), dep.Type);
+        // the update lock defaults to false and round-trips (x-prismlauncher-lock-update)
+        Assert.False(loaded.LockUpdate);
+    }
+
+    [Fact]
+    public void UpdateModIndex_LockUpdate_RoundTrips()
+    {
+        // #3404's update lock: x-prismlauncher-lock-update = true survives the TOML round trip
+        var dir = Path.Combine(Path.GetTempPath(), $"flint-packwiz-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+
+        var (pack, version) = ModrinthSample();
+        var mod = Packwiz.CreateModFormat(pack, version);
+        mod.LockUpdate = true;
+        Packwiz.UpdateModIndex(dir, mod);
+
+        var toml = File.ReadAllText(Path.Combine(dir, "borderless-mining.pw.toml"));
+        Assert.Contains("x-prismlauncher-lock-update = true", toml);
+
+        var loaded = Packwiz.GetIndexForMod(dir, "borderless-mining");
+        Assert.True(loaded.IsValid);
+        Assert.True(loaded.LockUpdate);
+
+        // and unlocking it writes false again
+        loaded.LockUpdate = false;
+        Packwiz.UpdateModIndex(dir, loaded);
+        Assert.Contains("x-prismlauncher-lock-update = false",
+            File.ReadAllText(Path.Combine(dir, "borderless-mining.pw.toml")));
     }
 
     [Fact]

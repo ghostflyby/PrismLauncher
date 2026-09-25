@@ -47,6 +47,7 @@ public sealed class FlameCheckUpdate : FlintTask
     private readonly IReadOnlyList<McVersion> _gameVersions;
     private readonly List<ModLoaderType> _loadersList;
     private readonly Func<Resource, MetadataHandler.ModStruct?> _metadataLookup;
+    private readonly IReadOnlyList<IndexedVersionType> _releaseTypes;
 
     private readonly Dictionary<Resource, string> _blocked = new();
 
@@ -55,12 +56,14 @@ public sealed class FlameCheckUpdate : FlintTask
     public FlameCheckUpdate(IReadOnlyList<Resource> resources,
                             IReadOnlyList<McVersion> mcVersions,
                             IReadOnlyList<ModLoaderType> loadersList,
-                            Func<Resource, MetadataHandler.ModStruct?> metadataLookup)
+                            Func<Resource, MetadataHandler.ModStruct?> metadataLookup,
+                            IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     {
         _resources = resources;
         _gameVersions = mcVersions;
         _loadersList = [.. loadersList];
         _metadataLookup = metadataLookup;
+        _releaseTypes = releaseTypes ?? [];
     }
 
     public IReadOnlyList<Update> GetUpdates() => _updates;
@@ -155,7 +158,7 @@ public sealed class FlameCheckUpdate : FlintTask
         }
 
         var latestVer = FlameApi.GetLatestVersion(pack.Versions, _loadersList, metadata.Loaders,
-            checkLoaders: _loadersList.Count != 0);
+            checkLoaders: _loadersList.Count != 0, _releaseTypes);
 
         EmitStatus($"Parsing the API response from CurseForge for '{resource.Name}'...");
 

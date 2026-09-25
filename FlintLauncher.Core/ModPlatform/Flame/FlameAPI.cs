@@ -206,11 +206,13 @@ public sealed class FlameApi : ResourceApi
     // ------------------------------------------------------------------ helpers
 
     /// <summary>Port of FlameAPI::getLatestVersion: pick the newest file for the instance's
-    /// loaders (with the no-loader and stale-unspecified-loader tie-breaks of the C++).</summary>
+    /// loaders (with the no-loader and stale-unspecified-loader tie-breaks of the C++); when
+    /// release types are given, files on other channels are skipped (#3404).</summary>
     public static IndexedVersion? GetLatestVersion(IReadOnlyList<IndexedVersion> versions,
                                                    IReadOnlyList<ModLoaderType> instanceLoaders,
                                                    ModLoaderType fallback,
-                                                   bool checkLoaders)
+                                                   bool checkLoaders,
+                                                   IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     {
         const ModLoaderType noLoader = ModLoaderType.None;
         if (!checkLoaders)
@@ -218,6 +220,10 @@ public sealed class FlameApi : ResourceApi
             IndexedVersion? ver = null;
             foreach (var fileTmp in versions)
             {
+                if (releaseTypes is { Count: > 0 } && !releaseTypes.Contains(fileTmp.VersionType))
+                {
+                    continue;
+                }
                 if (ver is null || string.CompareOrdinal(fileTmp.Date, ver.Date) > 0)
                 {
                     ver = fileTmp;
@@ -244,6 +250,10 @@ public sealed class FlameApi : ResourceApi
 
         foreach (var fileTmp in versions)
         {
+            if (releaseTypes is { Count: > 0 } && !releaseTypes.Contains(fileTmp.VersionType))
+            {
+                continue;
+            }
             var loaders = ModIndex.ModLoaderTypesToList(fileTmp.Loaders);
             if (loaders.Count == 0)
             {

@@ -13,7 +13,7 @@ public class LogParserTests
     private static string Event(
         string logger = "net.minecraft.server",
         string level = "INFO",
-        string timestamp = "1700000000",
+        string timestamp = "1700000000000", // milliseconds since the epoch
         string thread = "Server thread",
         string message = "Starting minecraft server") =>
         $"""
@@ -70,7 +70,9 @@ public class LogParserTests
         Assert.Equal("net.minecraft.server", entry.Logger);
         Assert.Equal(MessageLevel.Info, entry.Level);
         Assert.Equal("INFO", entry.LevelText);
-        Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1700000000).UtcDateTime, entry.Timestamp);
+        // the timestamp attribute is milliseconds since the epoch (upstream switched from
+        // seconds; the Event() default below carries 13 digits accordingly)
+        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1_700_000_000_000).UtcDateTime, entry.Timestamp);
         Assert.Equal("Server thread", entry.Thread);
         Assert.Equal("Starting minecraft server", entry.Message);
     }
@@ -287,12 +289,18 @@ public class LogParserTests
     // ---------------------------------------------------------------- timestamp handling
 
     [Fact]
-    public void Timestamp_Is_Seconds_Since_Epoch_Utc()
+    public void Timestamp_Is_Milliseconds_Since_Epoch_Utc()
     {
+        // log4j's XMLLayout reports the event time in milliseconds (upstream switched from
+        // fromSecsSinceEpoch to fromMSecsSinceEpoch)
         var parser = new LogParser();
         parser.AppendLine(Event(timestamp: "0", thread: "t"));
         var entry = Assert.IsType<LogParser.LogEntry>(Assert.Single(parser.ParseAvailable()));
         Assert.Equal(DateTime.UnixEpoch, entry.Timestamp);
+
+        parser.AppendLine(Event(timestamp: "1700000000000", thread: "t"));
+        var msecs = Assert.IsType<LogParser.LogEntry>(Assert.Single(parser.ParseAvailable()));
+        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1_700_000_000_000).UtcDateTime, msecs.Timestamp);
     }
 
     [Fact]
@@ -303,5 +311,22 @@ public class LogParserTests
         parser.AppendLine(Event(timestamp: "junk"));
         var entry = Assert.IsType<LogParser.LogEntry>(Assert.Single(parser.ParseAvailable()));
         Assert.Equal(DateTime.UnixEpoch, entry.Timestamp);
+    }
+
+    [Fact]
+    public void PlainText_TrailingAngleBracket_IsNotHeldBackAsPartialEvent()
+    {
+        // "<log4j:event" prefix matching must not swallow a lone '<' at the end of a plain
+        // line (the ">w<" emoticon case): the line is emitted as plain text at once
+        var parser = new LogParser();
+        parser.AppendLine("chat >w<");
+        var text = Assert.IsType<LogParser.PlainText>(Assert.Single(parser.ParseAvailable()));
+        Assert.Equal("chat >w<", text.Message);
+
+        // a different element whose name merely starts the same is not a log4j event either
+        var other = new LogParser();
+        other.AppendLine("<log4j:Eventually>later");
+        var otherText = Assert.IsType<LogParser.PlainText>(Assert.Single(other.ParseAvailable()));
+        Assert.Contains("later", otherText.Message);
     }
 }

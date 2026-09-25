@@ -302,9 +302,16 @@ public class FlameApiTests : IDisposable
 
     // --------------------------------------------------------- latest-version logic
 
-    private static IndexedVersion Ver(string fileId, string date, ModLoaderType loaders = ModLoaderType.None)
+    private static IndexedVersion Ver(string fileId, string date, ModLoaderType loaders = ModLoaderType.None,
+        IndexedVersionType? versionType = null)
     {
-        return new IndexedVersion { FileId = fileId, Date = date, Loaders = loaders };
+        return new IndexedVersion
+        {
+            FileId = fileId,
+            Date = date,
+            Loaders = loaders,
+            VersionType = versionType ?? IndexedVersionType.Invalid,
+        };
     }
 
     [Fact]
@@ -366,6 +373,62 @@ public class FlameApiTests : IDisposable
         ];
         latest = FlameApi.GetLatestVersion(versions, [ModLoaderType.Forge], ModLoaderType.None, checkLoaders: true);
         Assert.Equal("plain", latest!.FileId);
+    }
+
+    [Fact]
+    public void GetLatestVersion_ReleaseChannelFilter_SkipsOtherChannels()
+    {
+        // #3404: with a release channel list, files on other channels never win
+        var versions = new List<IndexedVersion>
+        {
+            Ver("beta1", "2024-01-01T00:00:00Z", versionType: new IndexedVersionType(IndexedVersionTypeValue.Beta)),
+            Ver("release1", "2023-01-01T00:00:00Z", versionType: new IndexedVersionType(IndexedVersionTypeValue.Release)),
+        };
+
+        // no filter: the newest file (the beta) wins
+        var latest = FlameApi.GetLatestVersion(versions, [], ModLoaderType.None, checkLoaders: false);
+        Assert.Equal("beta1", latest!.FileId);
+
+        // release-only: the beta is skipped in both the no-loader and loader-checked passes
+        var releases = new List<IndexedVersionType> { new(IndexedVersionTypeValue.Release) };
+        latest = FlameApi.GetLatestVersion(versions, [], ModLoaderType.None, checkLoaders: false, releases);
+        Assert.Equal("release1", latest!.FileId);
+
+        latest = FlameApi.GetLatestVersion(versions, [ModLoaderType.Forge], ModLoaderType.None,
+            checkLoaders: true, releases);
+        Assert.Equal("release1", latest!.FileId);
+
+        // alpha-only filter with no alpha files: no version at all
+        var alphas = new List<IndexedVersionType> { new(IndexedVersionTypeValue.Alpha) };
+        Assert.Null(FlameApi.GetLatestVersion(versions, [], ModLoaderType.None, checkLoaders: false, alphas));
+    }
+
+    [Fact]
+    public void IndexedVersionType_ReleaseChannelHelpers()
+    {
+        // IndexedVersionType::fromString is case-insensitive since #3404
+        Assert.Equal(IndexedVersionTypeValue.Release, IndexedVersionType.FromString("release").Value);
+        Assert.Equal(IndexedVersionTypeValue.Beta, IndexedVersionType.FromString("BETA").Value);
+        Assert.Equal(IndexedVersionTypeValue.Alpha, IndexedVersionType.FromString("Alpha").Value);
+        Assert.False(IndexedVersionType.FromString("unknown-channel").IsValid);
+
+        // toModrinth / fromStringList / toModrinthList
+        Assert.Equal("release", new IndexedVersionType(IndexedVersionTypeValue.Release).ToModrinth());
+        Assert.Equal("", IndexedVersionType.Invalid.ToModrinth());
+
+        var parsed = IndexedVersionType.FromStringList(["Release", "beta", "nope", "Alpha"]);
+        Assert.Equal(
+        [
+            IndexedVersionTypeValue.Release, IndexedVersionTypeValue.Beta, IndexedVersionTypeValue.Alpha,
+        ], parsed.Select(t => t.Value));
+        // invalid entries are dropped, so the Modrinth body list never carries empties
+        Assert.Equal(["release", "beta", "alpha"], IndexedVersionType.ToModrinthList(
+        [
+            new IndexedVersionType(IndexedVersionTypeValue.Release),
+            IndexedVersionType.Invalid,
+            new IndexedVersionType(IndexedVersionTypeValue.Beta),
+            new IndexedVersionType(IndexedVersionTypeValue.Alpha),
+        ]));
     }
 
     // ---------------------------------------------------------- file resolution

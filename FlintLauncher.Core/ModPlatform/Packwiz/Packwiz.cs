@@ -42,6 +42,10 @@ public static class Packwiz
 
         public List<Dependency> Dependencies { get; } = [];
 
+        // "x-prismlauncher-lock-update": updates for the resource are locked (#3404's
+        // update-lock column)
+        public bool LockUpdate { get; set; }
+
         // This is a totally heuristic, but should work for now.
         public bool IsValid => Slug.Length != 0 && ProjectId.Length != 0;
 
@@ -194,6 +198,7 @@ public static class Packwiz
         toml.Append("x-prismlauncher-release-type = ").AppendLine(T(IndexedVersionType.ToString(mod.ReleaseType.Value)));
         toml.Append("x-prismlauncher-version-number = ").AppendLine(T(mod.VersionNumber));
         toml.Append("x-prismlauncher-dependencies = ").AppendLine(deps.ToString());
+        toml.Append("x-prismlauncher-lock-update = ").AppendLine(mod.LockUpdate ? "true" : "false");
         toml.AppendLine("[download]");
         toml.Append("mode = ").AppendLine(T(mod.Mode));
         toml.Append("url = ").AppendLine(T(mod.Url));
@@ -277,6 +282,7 @@ public static class Packwiz
             mod.McVersions.Sort(SortMcVersions);
         }
         mod.VersionNumber = table.GetString("x-prismlauncher-version-number");
+        mod.LockUpdate = table.GetBoolean("x-prismlauncher-lock-update");
 
         // [download] info
         {

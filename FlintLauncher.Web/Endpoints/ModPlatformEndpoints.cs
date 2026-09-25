@@ -7,6 +7,7 @@
 // updates through the task view's optional result payload.
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
@@ -401,7 +402,15 @@ public static class ModPlatformEndpoints
 
                 ModPlatformTasks.EnsureProfileLoaded(instance);
 
-                var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods);
+                // release channels (#3404): the request's explicit list wins; otherwise the
+                // global ModUpdateReleaseTypes setting (the ResourceUpdateDialog fallback)
+                IReadOnlyList<IndexedVersionType> releaseTypes =
+                    filter?.ReleaseTypes is { Count: > 0 } requested
+                        ? IndexedVersionType.FromStringList(requested)
+                        : IndexedVersionType.FromStringList(JsonUtils.ToStringList(
+                            runtime.GlobalSettings.Get("ModUpdateReleaseTypes")?.ToString() ?? "[]"));
+
+                var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, releaseTypes);
                 var entry = registry.Register("mods-update", task, instanceId: instance.Id());
                 // the result payload carries the found/applied updates; it is published once
                 // the task reaches a terminal state (the check pass fills it before applying)

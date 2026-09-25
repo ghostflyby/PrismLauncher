@@ -177,8 +177,11 @@ public sealed record InstalledModView(
 /// <summary>POST /instances/{id}/mods/install body entry.</summary>
 public sealed record ModInstallSelection(string Provider, string ProjectId, string? VersionId);
 
-/// <summary>POST /instances/{id}/mods/update optional body (filter by installed file names).</summary>
-public sealed record ModsUpdateRequest(IReadOnlyList<string>? Mods);
+/// <summary>POST /instances/{id}/mods/update optional body (filter by installed file names).
+/// ReleaseTypes are the channels allowed for this run ("Release"/"Beta"/"Alpha",
+/// case-insensitive); when omitted the global ModUpdateReleaseTypes setting applies.</summary>
+public sealed record ModsUpdateRequest(IReadOnlyList<string>? Mods,
+    IReadOnlyList<string>? ReleaseTypes = null);
 
 /// <summary>A provider category (Flame /categories or Modrinth /tag/category; Modrinth has
 /// no numeric ids, so the id is the category name like the core LoadCategories mapping).</summary>
