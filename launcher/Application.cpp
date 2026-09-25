@@ -133,6 +133,9 @@
 #ifdef Q_OS_LINUX
 #include <dlfcn.h>
 #include "LibraryUtils.h"
+#endif
+
+#if defined(Q_OS_LINUX) && defined(ENABLE_GAMEMODE)
 #include "gamemode_client.h"
 #endif
 
@@ -262,7 +265,11 @@ void appDebugOutput(QtMsgType type, const QMessageLogContext& context, const QSt
 
 std::tuple<QDateTime, QString, QString, QString, QString> readLockFile(const QString& path)
 {
-    auto contents = QString(FS::read(path));
+    auto res = FS::read(path);
+    if (!res) {
+        qFatal("Failed to read lock file: %s", res.error().toUtf8().constData());
+    }
+    auto contents = QString(res.value());
     auto lines = contents.split('\n');
 
     QDateTime timestamp;
@@ -789,6 +796,7 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
         m_settings->registerSetting("SkipModpackUpdatePrompt", false);
         m_settings->registerSetting("ShowModIncompat", false);
         m_settings->registerSetting("DownloadGameFilesDuringInstanceCreation", true);
+        m_settings->registerSetting("ModUpdateReleaseTypes", "[]");
 
         // Minecraft offline player name
         m_settings->registerSetting("LastOfflinePlayerName", "");
@@ -847,14 +855,14 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
         // HACK: This code feels so stupid is there a less stupid way of doing this?
         {
             m_settings->registerSetting("PastebinURL", "");
-            m_settings->registerSetting("PastebinType", PasteUpload::PasteType::Mclogs);
+            m_settings->registerSetting("PastebinType", static_cast<int>(PasteUpload::Type::Mclogs));
             m_settings->registerSetting("PastebinCustomAPIBase", "");
 
             QString pastebinURL = m_settings->get("PastebinURL").toString();
 
             bool userHadDefaultPastebin = pastebinURL == "https://0x0.st";
             if (!pastebinURL.isEmpty() && !userHadDefaultPastebin) {
-                m_settings->set("PastebinType", PasteUpload::PasteType::NullPointer);
+                m_settings->set("PastebinType", static_cast<int>(PasteUpload::Type::NullPointer));
                 m_settings->set("PastebinCustomAPIBase", pastebinURL);
                 m_settings->reset("PastebinURL");
             }
@@ -862,7 +870,7 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
             bool ok = false;
             int pasteType = m_settings->get("PastebinType").toInt(&ok);
             // If PastebinType is invalid then reset the related settings.
-            if (!ok || pasteType < PasteUpload::PasteType::First || pasteType > PasteUpload::PasteType::Last) {
+            if (!ok || !PasteUpload::Type(pasteType).isValid()) {
                 m_settings->reset("PastebinType");
                 m_settings->reset("PastebinCustomAPIBase");
             }
@@ -891,6 +899,8 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
         m_settings->registerSetting("QuitAfterGameStop", false);
 
         m_settings->registerSetting("Env", "{}");
+
+        m_settings->registerSetting("WorldTools", "{}");
 
         // Custom Microsoft Authentication Client ID
         m_settings->registerSetting("MSAClientIDOverride", "");
@@ -1102,7 +1112,11 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
             auto msgBox = QMessageBox(QMessageBox::Warning, tr("Update In Progress"), infoMsg, QMessageBox::Ignore | QMessageBox::Abort);
             msgBox.setDefaultButton(QMessageBox::Abort);
             msgBox.setModal(true);
-            msgBox.setDetailedText(FS::read(updateLogPath));
+            auto maybeRes = FS::read(updateLogPath);
+            if (!maybeRes) {
+                qFatal("Failed to read update log: %s", maybeRes.error().toUtf8().constData());
+            }
+            msgBox.setDetailedText(maybeRes.value());
             msgBox.setMinimumWidth(460);
             msgBox.adjustSize();
             auto res = msgBox.exec();
@@ -1134,7 +1148,11 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
             auto msgBox = QMessageBox(QMessageBox::Warning, tr("Update Failed"), infoMsg, QMessageBox::Ignore | QMessageBox::Abort);
             msgBox.setDefaultButton(QMessageBox::Abort);
             msgBox.setModal(true);
-            msgBox.setDetailedText(FS::read(updateLogPath));
+            auto maybeRes = FS::read(updateLogPath);
+            if (!maybeRes) {
+                qFatal("Failed to read update log: %s", maybeRes.error().toUtf8().constData());
+            }
+            msgBox.setDetailedText(maybeRes.value());
             msgBox.setMinimumWidth(460);
             msgBox.adjustSize();
             auto res = msgBox.exec();
@@ -1165,7 +1183,11 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
                                .arg(updateLogPath);
             auto* msgBox = new QMessageBox(QMessageBox::Information, tr("Update Succeeded"), infoMsg, QMessageBox::Ok);
             msgBox->setDefaultButton(QMessageBox::Ok);
-            msgBox->setDetailedText(FS::read(updateLogPath));
+            auto res = FS::read(updateLogPath);
+            if (!res) {
+                qFatal("Failed to read update log: %s", res.error().toUtf8().constData());
+            }
+            msgBox->setDetailedText(res.value());
             msgBox->setAttribute(Qt::WA_DeleteOnClose);
             msgBox->setMinimumWidth(460);
             msgBox->adjustSize();
@@ -1214,11 +1236,10 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
         installEventFilter(new ToolTipFilter);
     }
 
-    if (createSetupWizard()) {
-        return;
+    // the setup wizard applies the selected theme itself before it is shown
+    if (!createSetupWizard()) {
+        m_themeManager->applyCurrentlySelectedTheme(true);
     }
-
-    m_themeManager->applyCurrentlySelectedTheme(true);
     performMainStartupAction();
 }
 
@@ -1269,33 +1290,34 @@ bool Application::createSetupWizard()
 
         m_themeManager->applyCurrentlySelectedTheme(true);
 
-        m_setupWizard = new SetupWizard(nullptr);
+        SetupWizard setupWizard;
         if (languageRequired) {
-            m_setupWizard->addPage(new LanguageWizardPage(m_setupWizard));
+            setupWizard.addPage(new LanguageWizardPage(&setupWizard));
         }
 
         if (javaRequired) {
-            m_setupWizard->addPage(new JavaWizardPage(m_setupWizard));
+            setupWizard.addPage(new JavaWizardPage(&setupWizard));
         } else if (askjava) {
-            m_setupWizard->addPage(new AutoJavaWizardPage(m_setupWizard));
+            setupWizard.addPage(new AutoJavaWizardPage(&setupWizard));
         }
 
         if (pasteInterventionRequired) {
-            m_setupWizard->addPage(new PasteWizardPage(m_setupWizard));
+            setupWizard.addPage(new PasteWizardPage(&setupWizard));
         }
 
         if (themeInterventionRequired) {
-            m_setupWizard->addPage(new ThemeWizardPage(m_setupWizard));
+            setupWizard.addPage(new ThemeWizardPage(&setupWizard));
         }
 
         if (login) {
-            m_setupWizard->addPage(new LoginWizardPage(m_setupWizard));
+            setupWizard.addPage(new LoginWizardPage(&setupWizard));
         }
-        connect(m_setupWizard, &QDialog::finished, this, &Application::setupWizardFinished);
-        m_setupWizard->show();
+        if (setupWizard.exec() != QDialog::Accepted) {
+            qWarning() << "Setup wizard was not completed; continuing with the current settings";
+        }
     }
 
-    return wizardRequired || login;
+    return wizardRequired;
 }
 
 bool Application::updaterEnabled()
@@ -1340,12 +1362,6 @@ bool Application::event(QEvent* event)
     }
 
     return QApplication::event(event);
-}
-
-void Application::setupWizardFinished(int status)
-{
-    qDebug() << "Wizard result =" << status;
-    performMainStartupAction();
 }
 
 void Application::performMainStartupAction()
@@ -1437,7 +1453,11 @@ Application::~Application()
 void Application::messageReceived(const QByteArray& message)
 {
     ApplicationMessage received;
-    received.parse(message);
+    auto res = received.parse(message);
+    if (!res) {
+        qWarning() << "Received invalid message:" << res.error();
+        return;
+    }
 
     auto& command = received.command;
 
@@ -1865,9 +1885,11 @@ void Application::updateCapabilities()
     }
 
 #ifdef Q_OS_LINUX
+#ifdef ENABLE_GAMEMODE
     if (gamemode_query_status() >= 0) {
         m_capabilities |= SupportsGameMode;
     }
+#endif
 
     if (!LibraryUtils::findMangoHud().isEmpty()) {
         m_capabilities |= SupportsMangoHud;
@@ -1892,7 +1914,11 @@ QString Application::getJarPath(const QString& jarFile)
         FS::PathCombine(m_rootPath, "share", BuildConfig.LAUNCHER_NAME),
 #endif
         FS::PathCombine(m_rootPath, "jars"), FS::PathCombine(applicationDirPath(), "jars"),
+#if defined(Q_OS_MACOS)
+        FS::PathCombine(applicationDirPath(), "../../../..", "jars")  // from inside build dir, for debuging
+#else
         FS::PathCombine(applicationDirPath(), "..", "jars")  // from inside build dir, for debuging
+#endif
     };
     for (const auto& p : potentialPaths) {
         QString jarPath = FS::PathCombine(p, jarFile);

@@ -35,7 +35,6 @@
  */
 
 #include "ModrinthPage.h"
-#include "Version.h"
 #include "modplatform/ModIndex.h"
 #include "modplatform/modrinth/ModrinthAPI.h"
 #include "ui/dialogs/CustomMessageBox.h"
@@ -63,8 +62,6 @@ ModrinthPage::ModrinthPage(NewInstanceDialog* dialog, QWidget* parent)
     m_ui->setupUi(this);
     createFilterWidget();
 
-    m_ui->searchEdit->installEventFilter(this);
-
     m_ui->packView->setModel(m_model);
 
     m_ui->versionSelectionBox->view()->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
@@ -74,6 +71,13 @@ ModrinthPage::ModrinthPage(NewInstanceDialog* dialog, QWidget* parent)
     m_searchTimer.setSingleShot(true);
 
     connect(&m_searchTimer, &QTimer::timeout, this, &ModrinthPage::triggerSearch);
+
+    connect(m_ui->searchEdit, &QLineEdit::textEdited, this, [this] {
+        if (m_searchTimer.isActive()) {
+            m_searchTimer.stop();
+        }
+        m_searchTimer.start(350);
+    });
 
     m_fetchProgress.hideIfInactive(true);
     m_fetchProgress.setFixedHeight(24);
@@ -110,24 +114,6 @@ void ModrinthPage::openedImpl()
     BasePage::openedImpl();
     suggestCurrent();
     triggerSearch();
-}
-
-bool ModrinthPage::eventFilter(QObject* watched, QEvent* event)
-{
-    if (watched == m_ui->searchEdit && event->type() == QEvent::KeyPress) {
-        auto* keyEvent = static_cast<QKeyEvent*>(event);
-        if (keyEvent->key() == Qt::Key_Return) {
-            this->triggerSearch();
-            keyEvent->accept();
-            return true;
-        }
-        if (m_searchTimer.isActive()) {
-            m_searchTimer.stop();
-        }
-
-        m_searchTimer.start(350);
-    }
-    return QObject::eventFilter(watched, event);
 }
 
 void ModrinthPage::onSelectionChanged(QModelIndex curr, [[maybe_unused]] QModelIndex prev)
@@ -342,8 +328,27 @@ void ModrinthPage::triggerSearch()
     m_ui->packDescription->clear();
     m_ui->versionSelectionBox->clear();
     bool filterChanged = m_filterWidget->changed();
-    m_model->searchWithTerm(m_ui->searchEdit->text(), m_ui->sortByBox->currentIndex(), m_filterWidget->getFilter(), filterChanged);
+    const auto searchTerm = m_ui->searchEdit->text();
+    m_model->searchWithTerm(searchTerm, m_ui->sortByBox->currentIndex(), m_filterWidget->getFilter(), filterChanged);
     m_fetchProgress.watch(m_model->activeSearchJob().get());
+
+    if (searchTerm.startsWith('#') && !searchTerm.mid(1).trimmed().isEmpty()) {
+        const auto selectProject = [this, searchTerm] {
+            if (m_ui->searchEdit->text() != searchTerm || m_model->rowCount({}) != 1) {
+                return;
+            }
+
+            const auto index = m_model->index(0, 0);
+            m_ui->packView->setCurrentIndex(index);
+            m_ui->packView->scrollTo(index);
+        };
+
+        if (m_model->hasActiveSearchJob()) {
+            connect(m_model->activeSearchJob().get(), &Task::finished, this, selectProject);
+        } else {
+            selectProject();
+        }
+    }
 }
 
 void ModrinthPage::onVersionSelectionChanged(int index)
