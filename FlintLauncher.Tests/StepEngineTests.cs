@@ -6,6 +6,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Tasks;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -183,20 +184,34 @@ public class StepEngineTests
         var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         task.ReadyForLaunch += () => ready.TrySetResult();
 
-        var run = task.StartAsync();
-        await ready.Task; // the launch preparations are done
+        var sink = FlintLogTest.Attach();
+        try
+        {
+            var run = task.StartAsync();
+            await ready.Task; // the launch preparations are done
 
-        Assert.Equal(LaunchTask.LaunchState.Waiting, task.CurrentState);
-        Assert.True(task.CanAbort());
+            Assert.Equal(LaunchTask.LaunchState.Waiting, task.CurrentState);
+            Assert.True(task.CanAbort());
 
-        task.Proceed();
-        await run;
+            task.Proceed();
+            await run;
 
-        Assert.Equal(TaskState.Succeeded, task.State);
-        Assert.True(gate.Proceeded);
-        // the opened gate must stop reporting "waiting" (the API turns a duplicate proceed
-        // into an explicit 409 instead of a silent no-op)
-        Assert.False(task.IsWaitingForProceed);
+            Assert.Equal(TaskState.Succeeded, task.State);
+            Assert.True(gate.Proceeded);
+            // the opened gate must stop reporting "waiting" (the API turns a duplicate proceed
+            // into an explicit 409 instead of a silent no-op)
+            Assert.False(task.IsWaitingForProceed);
+            // and both gate edges are visible in the diagnostics channel
+            var launchCategory = Core.Diagnostics.FlintLog.Categories.Launch;
+            Assert.True(sink.Has(LogLevel.Information, launchCategory, "ReadyForLaunch gate open"),
+                "gate opening should be logged");
+            Assert.True(sink.Has(LogLevel.Information, launchCategory, "Proceed routed to step GatedStep"),
+                "proceed consumption should be logged");
+        }
+        finally
+        {
+            FlintLogTest.Detach();
+        }
     }
 
     private sealed class GatedStep : LaunchStep

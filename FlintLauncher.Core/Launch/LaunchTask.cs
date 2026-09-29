@@ -31,6 +31,7 @@
 //  - censorPrivateInfo() applies the session censor filter; the QMap iteration order (sorted
 //    by key) is preserved via the SortedDictionary the instance filter is built into.
 using System.Text.RegularExpressions;
+using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Text;
@@ -167,6 +168,8 @@ public class LaunchTask : FlintTask
     internal void OnReadyForLaunch()
     {
         _state = LaunchState.Waiting;
+        FlintLog.For(FlintLog.Categories.Launch)
+            .ReadyForLaunch(StepName(_currentStep));
         ReadyForLaunch?.Invoke();
     }
 
@@ -174,6 +177,8 @@ public class LaunchTask : FlintTask
     internal void OnProgressReportingRequested()
     {
         _state = LaunchState.Waiting;
+        FlintLog.For(FlintLog.Categories.Launch)
+            .ProgressGate(StepName(_currentStep));
         RequestProgress?.Invoke(_steps[_currentStep]);
     }
 
@@ -202,6 +207,8 @@ public class LaunchTask : FlintTask
         }
 
         var step = _steps[_currentStep];
+        FlintLog.For(FlintLog.Categories.Launch)
+            .StepFinished(StepName(_currentStep), step.WasSuccessful, step.FailReason);
         if (step.WasSuccessful)
         {
             // end?
@@ -223,8 +230,15 @@ public class LaunchTask : FlintTask
 
     private void StartStep(LaunchStep step)
     {
+        FlintLog.For(FlintLog.Categories.Launch)
+            .StepStarted(_currentStep + 1, _steps.Count, StepName(_currentStep));
         _ = step.StartAsync(); // the step reports its terminal state through the events
     }
+
+    /// <summary>Stable engine-side identity of a step (class name — LaunchStep has no
+    /// user-facing name of its own; the user-facing description goes to the launch console
+    /// via TextPrint / PrintInstanceInfo).</summary>
+    private string StepName(int index) => _steps[index].GetType().Name;
 
     /// <summary>Port of finalizeSteps(): finalize from the current step backwards, then emit.</summary>
     private void FinalizeSteps(bool successful, string error)
@@ -254,8 +268,12 @@ public class LaunchTask : FlintTask
     {
         if (_state != LaunchState.Waiting)
         {
+            FlintLog.For(FlintLog.Categories.Launch)
+                .ProceedIgnored(_state.ToString());
             return;
         }
+        FlintLog.For(FlintLog.Categories.Launch)
+            .ProceedRouted(StepName(_currentStep));
         _steps[_currentStep].Proceed();
         _state = LaunchState.Running;
     }

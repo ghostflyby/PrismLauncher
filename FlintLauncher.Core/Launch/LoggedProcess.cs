@@ -25,8 +25,13 @@
 //  - setDetachable: the C++ uses it so the QProcess destructor does not reap the game process
 //    when the launch step is destroyed; the port only records the flag (System.Diagnostics
 //    Process objects do not kill children on finalize).
+//  - diagnostics: the C++ only qDebug's a state anomaly (LoggedProcess.cpp:162); the port
+//    additionally traces spawn command line, stdin writes, every state change and the exit
+//    through the FlintLog "flint.process" category — these were the exact blind spots of the
+//    first real-launch investigation.
 using System.Diagnostics;
 using System.Text;
+using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Instances;
 
 namespace FlintLauncher.Core.Launch;
@@ -137,6 +142,10 @@ public sealed class LoggedProcess : IDisposable
         {
             startInfo.ArgumentList.Add(arg);
         }
+        // full command line into the diagnostics channel, like the upstream qDebug in
+        // LauncherPartLaunch.cpp:131 (session tokens travel via the stdin script, not args)
+        var log = FlintLog.For(FlintLog.Categories.Process);
+        log.Starting(program, string.Join(' ', args));
 
         lock (_lock)
         {
@@ -155,6 +164,7 @@ public sealed class LoggedProcess : IDisposable
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
         {
             ErrorString = e.Message;
+            log.FailedToStart(ErrorString);
             Log?.Invoke([$"The process failed to start: {ErrorString}"], MessageLevel.Fatal);
             ChangeState(LoggedProcessState.FailedToStart);
             return false;
@@ -183,19 +193,34 @@ public sealed class LoggedProcess : IDisposable
         return true;
     }
 
-    /// <summary>Port of QProcess::write(): write to the child's stdin.</summary>
+    /// <summary>Port of QProcess::write(): write to the child's stdin. The write (and any
+    /// failure — the C++ QProcess drops failed writes silently too, but we need the failure
+    /// visible: a dropped "launch" line leaves the game waiting on stdin forever).</summary>
     public void Write(string text)
     {
+        var log = FlintLog.For(FlintLog.Categories.Process);
         try
         {
             var stream = _process.StandardInput;
             stream.Write(text);
             stream.Flush();
+            log.StdinWrite(text.Length);
+            log.StdinWritePreview(Preview(text));
         }
         catch (Exception e) when (e is IOException or InvalidOperationException or ObjectDisposedException)
         {
             // the process is gone; QProcess would queue the write and drop it silently too
+            log.StdinWriteFailed(e.GetType().Name + ": " + e.Message);
         }
+    }
+
+    /// <summary>Single-line excerpt of a stdin write for the Trace preview.</summary>
+    private static string Preview(string text)
+    {
+        var singleLine = text.Replace("\r", "").Replace("\n", "\\n");
+        return singleLine.Length <= 200
+            ? singleLine
+            : singleLine[..200] + $"… ({text.Length} chars total)";
     }
 
     /// <summary>Port of the kill() slot: equivalent to kill -9.</summary>
@@ -365,11 +390,13 @@ public sealed class LoggedProcess : IDisposable
         // based on state, send signals
         if (!_isAborting)
         {
+            FlintLog.For(FlintLog.Categories.Process).Exited(exitCode);
             Log?.Invoke([$"Process exited with code {exitCode}."], MessageLevel.Launcher);
             ChangeState(LoggedProcessState.Finished);
         }
         else
         {
+            FlintLog.For(FlintLog.Categories.Process).Killed();
             Log?.Invoke(["Process was killed by user."], MessageLevel.Error);
             ChangeState(LoggedProcessState.Aborted);
         }
@@ -383,6 +410,7 @@ public sealed class LoggedProcess : IDisposable
             return;
         }
         _state = state;
+        FlintLog.For(FlintLog.Categories.Process).StateChanged(state.ToString());
         StateChanged?.Invoke(state);
     }
 }

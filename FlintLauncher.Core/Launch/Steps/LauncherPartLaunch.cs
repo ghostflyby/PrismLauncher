@@ -17,6 +17,7 @@
 //    C++: the Running state arms `mayProceed` and emits ReadyForLaunch; Proceed() writes
 //    "launch\n", AbortStep() writes "abort\n" (or kills).
 using System.Text;
+using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Settings;
 
@@ -201,6 +202,10 @@ public sealed class LauncherPartLaunch : LaunchStep
                 Parent.Pid = _process.ProcessId;
                 // send the launch script to the launcher part
                 _process.Write(_launchScript);
+                // the script write and the gate below are the two events a "game never
+                // started" investigation turns on — surface them in both channels
+                FlintLog.For(FlintLog.Categories.Launch).ScriptWritten(_launchScript.Length);
+                EmitLogLine($"Launch script piped to stdin ({_launchScript.Length} chars).", MessageLevel.Launcher);
 
                 _mayProceed = true;
                 EmitReadyForLaunch();
@@ -221,6 +226,12 @@ public sealed class LauncherPartLaunch : LaunchStep
             const string launchString = "launch\n";
             _process.Write(launchString);
             _mayProceed = false;
+            FlintLog.For(FlintLog.Categories.Launch).LaunchSignalSent();
+            EmitLogLine("Launch signal ('launch') sent to the game process.", MessageLevel.Launcher);
+        }
+        else
+        {
+            FlintLog.For(FlintLog.Categories.Launch).GateNotArmed();
         }
     }
 

@@ -102,6 +102,7 @@
 | `LaunchController*` `LaunchMode.h` `LoggedProcess*` `JavaCommon*` | `FlintLauncher.Core/Launch/` | ported | 无头扩展：WantedLaunchMode=Offline 直达离线会话（已记录） |
 | `java/JavaUtils*` `JavaChecker*` `JavaInstallList*` `JavaInstall.h` `JavaMetadata*` `java/download/*` | `FlintLauncher.Core/Java/` | ported | macOS 发现实测；tar.gz 自研 ustar；Windows 注册表跳过 |
 | `libraries/launcher` + `javacheck` | MSBuild 目标 `BuildJavaJars`（javac/jar 直入 Exec）→ build/jars/*.jar 嵌入 FlintLauncher.Core | ported | javac --release 8；产物不入库 |
+| `Application::appDebugOutput` + `Application::init` 日志文件初始化（Application.cpp:236-264/513-528） | `FlintLauncher.Core/Diagnostics/FlintLog.cs`（静态门面+Categories）+ `FlintLauncher.Web/Logging/RollingFileLoggerProvider.cs` + WebHostBuilder 级别解析/请求日志中间件 | ported | 诊断通道与启动控制台(LogModel)分离如上游；滚动 `<dataDir>/logs/Flint-{0..4}.log` 每次启动顺移一代；级别 `--log-level`/`FLINT_LOG_LEVEL` 取代 qtlogging.ini 规则文件；Core 经静态门面共用宿主 ILoggerFactory（Core 无 DI 的文档化偏差）；[LoggerMessage] 源生成保证 AOT |
 | `MinecraftInstance::createLaunchTask/createLaunchScript/createEnvironment` | `FlintLauncher.Core/Instances/MinecraftInstance.cs` | ported | 全链冒烟通过（fake-java + stdin 协议 + PostExit） |
 | `logs/*` `MessageLevel*` | `FlintLauncher.Core/Launch/LogModel.cs` `MessageLevel.cs` | ported | Log4j XML 解析未移植 |
 | `net/PasteUpload*`、SRV | SrvResolver.cs 已移植；PasteUpload | partial | PasteUpload 归 P7 |

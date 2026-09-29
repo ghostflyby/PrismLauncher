@@ -31,6 +31,7 @@
 //    UI-facing and are not ported.
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Settings;
@@ -432,6 +433,11 @@ public class LaunchController : FlintTask
             EmitFailed("Couldn't instantiate a launcher.");
             return;
         }
+        FlintLog.For(FlintLog.Categories.Controller).LaunchStarted(
+            Instance.Id(),
+            _actualLaunchMode.ToString(),
+            _session?.PlayerName ?? "(none)",
+            TargetToJoin?.ToString() ?? "(instance default)");
 
         _launcher.ReadyForLaunch += ReadyForLaunch;
         _launcher.Succeeded += OnLauncherSucceeded;
@@ -476,9 +482,17 @@ public class LaunchController : FlintTask
         }
     }
 
-    private void OnLauncherSucceeded(FlintTask task) => EmitSucceeded();
+    private void OnLauncherSucceeded(FlintTask task)
+    {
+        FlintLog.For(FlintLog.Categories.Controller).LaunchFinished("succeeded");
+        EmitSucceeded();
+    }
 
-    private void OnLauncherFailed(FlintTask task, string reason) => EmitFailed(reason);
+    private void OnLauncherFailed(FlintTask task, string reason)
+    {
+        FlintLog.For(FlintLog.Categories.Controller).LaunchFinished("failed: " + reason);
+        EmitFailed(reason);
+    }
 
     /// <summary>Port of onProgressRequested(): the progress dialog collapses into a proceed().</summary>
     private void OnProgressRequested(FlintTask task) => _launcher?.Proceed();

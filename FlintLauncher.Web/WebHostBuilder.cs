@@ -4,10 +4,16 @@
 // built (the meta cache and several core paths are CWD-relative), wires the core singletons
 // and maps the /api/v1 endpoints. Program.cs is a one-line wrapper around this factory so
 // integration tests can host the exact same app in-process.
+using System.Diagnostics;
 using FlintLauncher.Core;
+using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Web.Endpoints;
+using FlintLauncher.Web.Logging;
 using FlintLauncher.Web.Services;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.Extensions.Logging;
+// extension-method log events (HttpLog.Request/Probe) live in the Core Diagnostics namespace
+using static FlintLauncher.Core.Diagnostics.HttpLog;
 
 namespace FlintLauncher.Web;
 
@@ -25,6 +31,12 @@ public static class WebHostBuilder
 
         var builder = WebApplication.CreateSlimBuilder(args);
 
+        // diagnostics channel (Application.cpp:513-528 parity): level from --log-level /
+        // FLINT_LOG_LEVEL (default Information), default console provider plus the rolling
+        // data-dir file; the Core static facade (FlintLog) shares this exact factory
+        builder.Logging.SetMinimumLevel(ResolveLogLevel(args));
+        builder.Logging.AddProvider(new RollingFileLoggerProvider(Path.Combine(dataDir, "logs")));
+
         builder.Services.ConfigureHttpJsonOptions(options =>
         {
             options.SerializerOptions.TypeInfoResolverChain.Insert(0, FlintJsonContext.Default);
@@ -40,6 +52,27 @@ public static class WebHostBuilder
         builder.Services.AddHostedService<Services.AccountRefreshService>();
 
         var app = builder.Build();
+        FlintLog.Initialize(app.Services.GetRequiredService<ILoggerFactory>());
+
+        // request log, outermost so the status is final (the error middleware below may
+        // rewrite it to 500); health probes log at Debug to keep the default view readable
+        app.Use(async (context, next) =>
+        {
+            var start = Stopwatch.GetTimestamp();
+            await next(context);
+            var path = context.Request.Path.Value ?? "";
+            var log = FlintLog.For(FlintLog.Categories.Http);
+            if (path == "/healthz")
+            {
+                log.Probe(context.Request.Method, path, context.Response.StatusCode,
+                    Stopwatch.GetElapsedTime(start).TotalMilliseconds);
+            }
+            else
+            {
+                log.Request(context.Request.Method, path, context.Response.StatusCode,
+                    Stopwatch.GetElapsedTime(start).TotalMilliseconds);
+            }
+        });
 
         // fix-3: the C++ LaunchTask always parses log4j XML events out of the game output
         // (LaunchTask::parseXmlLogs); the port keeps it behind an opt-in gate for pure-core
@@ -132,5 +165,37 @@ public static class WebHostBuilder
             ? Path.Combine(home, ".local", "share")
             : xdgDataHome;
         return Path.Combine(baseDir, "Flint");
+    }
+
+    /// <summary>--log-level &lt;level&gt; (or --log-level=&lt;level&gt;) wins, then
+    /// FLINT_LOG_LEVEL, then Information. Accepts the LogLevel names plus the common
+    /// aliases info/warn; an unrecognized value falls back to Information silently (the
+    /// alternative — refusing to start over a logging flag — hurts more than it helps).</summary>
+    public static LogLevel ResolveLogLevel(string[] args)
+    {
+        string? raw = null;
+        for (var i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--log-level" && i + 1 < args.Length)
+            {
+                raw = args[i + 1];
+            }
+            else if (args[i].StartsWith("--log-level=", StringComparison.Ordinal))
+            {
+                raw = args[i]["--log-level=".Length..];
+            }
+        }
+        raw ??= Environment.GetEnvironmentVariable("FLINT_LOG_LEVEL");
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return LogLevel.Information;
+        }
+        raw = raw.Trim() switch
+        {
+            "info" or "INFO" => nameof(LogLevel.Information),
+            "warn" or "WARN" => nameof(LogLevel.Warning),
+            _ => raw.Trim(),
+        };
+        return Enum.TryParse<LogLevel>(raw, ignoreCase: true, out var level) ? level : LogLevel.Information;
     }
 }

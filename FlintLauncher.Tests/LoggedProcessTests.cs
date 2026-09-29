@@ -3,6 +3,7 @@
 // output), state transitions, exit codes, kill/abort, stdin writes and working directory
 // handling. Unix-only fixtures (/bin/sh + coreutils); skipped trivially on other hosts.
 using FlintLauncher.Core.Launch;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -170,6 +171,60 @@ public class LoggedProcessTests
 
         Assert.Equal(["hello stdin"], collector.LinesOf(MessageLevel.StdOut));
         Assert.Equal(LoggedProcessState.Finished, process.State);
+    }
+
+    [Fact]
+    public async Task Diagnostics_Events_AreEmitted()
+    {
+        if (!IsUnix)
+        {
+            return;
+        }
+        var sink = FlintLogTest.Attach();
+        try
+        {
+            using var process = new LoggedProcess();
+            var completion = RunAsync(process, "/bin/sh", "-c", "read line; echo \"$line\"");
+            await Task.Delay(200);
+            process.Write("hello diag\n");
+            await completion;
+
+            var processCategory = Core.Diagnostics.FlintLog.Categories.Process;
+            Assert.True(sink.Has(LogLevel.Debug, processCategory, "Starting process /bin/sh"),
+                "spawn command line should be logged");
+            Assert.True(sink.Has(LogLevel.Debug, processCategory, "State -> Running"),
+                "state transitions should be logged");
+            Assert.True(sink.Has(LogLevel.Debug, processCategory, "Stdin write:"),
+                "stdin writes should be logged");
+            Assert.True(sink.Has(LogLevel.Trace, processCategory, "hello diag"),
+                "stdin content preview should appear at Trace");
+            Assert.True(sink.Has(LogLevel.Information, processCategory, "exited with code 0"),
+                "exit code should be logged");
+        }
+        finally
+        {
+            FlintLogTest.Detach();
+        }
+    }
+
+    [Fact]
+    public void Stdin_Write_Failure_IsLogged()
+    {
+        var sink = FlintLogTest.Attach();
+        try
+        {
+            using var process = new LoggedProcess();
+            // deterministic failure: StandardInput is not available before Start(); the real
+            // world case (child died, broken pipe) throws IOException the same way
+            process.Write("never started\n");
+
+            Assert.True(sink.Has(LogLevel.Warning, Core.Diagnostics.FlintLog.Categories.Process,
+                "Stdin write failed"), "a dropped stdin write must be logged as Warning");
+        }
+        finally
+        {
+            FlintLogTest.Detach();
+        }
     }
 
     [Fact]

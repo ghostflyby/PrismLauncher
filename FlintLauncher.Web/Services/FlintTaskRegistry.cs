@@ -15,6 +15,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
+using static FlintLauncher.Core.Diagnostics.TasksLog;
 
 namespace FlintLauncher.Web.Services;
 
@@ -74,8 +75,13 @@ public sealed class FlintTaskRegistry
                 // host bookkeeping must never break the task machinery
             }
         }
-        void OnTerminal(FlintTask _) => RunHook();
-        void OnTerminalFailed(FlintTask _, string __) => RunHook();
+        void OnTerminal(FlintTask finishedTask)
+        {
+            Core.Diagnostics.FlintLog.For(Core.Diagnostics.FlintLog.Categories.Tasks)
+                .Finished(entry.Id, finishedTask.State.ToString());
+            RunHook();
+        }
+        void OnTerminalFailed(FlintTask finishedTask, string _) => OnTerminal(finishedTask);
         task.Succeeded += OnTerminal;
         task.Failed += OnTerminalFailed;
         task.Aborted += OnTerminal;
@@ -84,6 +90,7 @@ public sealed class FlintTaskRegistry
         {
             _entries[entry.Id] = entry;
         }
+        Core.Diagnostics.FlintLog.For(Core.Diagnostics.FlintLog.Categories.Tasks).Registered(entry.Id, kind);
         return entry;
     }
 
