@@ -17,9 +17,11 @@
 
   <!--
     Build the Java launcher jars (NewLaunch/NewLaunchLegacy/JavaCheck) directly with javac/jar
-    (mirroring libraries/launcher+CMakeLists.txt and libraries/javacheck) and embed them into
-    the assembly. Incremental via Inputs/Outputs per jar. Set FlintSkipJarBuild=true to bypass
-    (e.g. machines without a JDK, when prebuilt jars are already in place).
+    (mirroring libraries/launcher + libraries/javacheck CMakeLists) and embed them into the
+    assembly. Incremental via Inputs/Outputs per jar; FlintSkipJarBuild=true bypasses.
+    EmbeddedResource items are declared INSIDE the target: a static declaration made CSC read
+    the jars before this target ran on clean trees (CS1566) — the in-target ItemGroup is the
+    standard generate-and-embed fix.
   -->
   <PropertyGroup>
     <JarOutputDir>$(MSBuildThisFileDirectory)../build/jars/</JarOutputDir>
@@ -28,13 +30,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- NewLaunch.jar sources: everything under org/prismlauncher EXCEPT the legacy/ tree,
-         plus legacy/LegacyProxy.java (both are in the CMake SRC list). -->
+    <!-- NewLaunch.jar sources: org/prismlauncher EXCEPT legacy/, plus legacy/LegacyProxy.java
+         (both in the upstream CMake SRC list). -->
     <NewLaunchSource Include="$(LauncherSourceDir)/org/prismlauncher/**/*.java" />
     <NewLaunchSource Remove="$(LauncherSourceDir)/org/prismlauncher/legacy/**/*.java" />
     <NewLaunchSource Include="$(LauncherSourceDir)/org/prismlauncher/legacy/LegacyProxy.java" />
     <NewLaunchLegacySource Include="$(LauncherSourceDir)/legacy/**/*.java" />
-    <JavaCheckSourceItem Include="$(JavaCheckSource)" />
   </ItemGroup>
 
   <Target Name="NewLaunchJar"
@@ -46,8 +47,8 @@
     <Exec Command="jar --create --file &quot;$(JarOutputDir)NewLaunch.jar&quot; --main-class org.prismlauncher.EntryPoint -C &quot;$(JarOutputDir)classes/newlaunch&quot; ." />
   </Target>
 
-  <!-- UseJava's INCLUDE_JARS(NewLaunch): legacy compiles against NewLaunch.jar and its
-       manifest gets a matching Class-Path entry. -->
+  <!-- UseJava INCLUDE_JARS(NewLaunch): legacy compiles against NewLaunch.jar, manifest
+       carries the matching Class-Path. -->
   <Target Name="NewLaunchLegacyJar"
           DependsOnTargets="NewLaunchJar"
           Inputs="@(NewLaunchLegacySource);$(JarOutputDir)NewLaunch.jar"
@@ -59,7 +60,7 @@
     <Exec Command="jar --create --file &quot;$(JarOutputDir)NewLaunchLegacy.jar&quot; --main-class org.prismlauncher.EntryPoint --manifest &quot;$(JarOutputDir)classes/legacy.mf&quot; -C &quot;$(JarOutputDir)classes/legacy&quot; ." />
   </Target>
 
-  <Target Name="JavaCheckJar"
+  <Target Name="JavaCheckJarBuild"
           Inputs="$(JavaCheckSource)"
           Outputs="$(JarOutputDir)JavaCheck.jar"
           Condition="'$(FlintSkipJarBuild)' != 'true'">
@@ -68,12 +69,10 @@
     <Exec Command="jar --create --file &quot;$(JarOutputDir)JavaCheck.jar&quot; --main-class JavaCheck -C &quot;$(JarOutputDir)classes/javacheck&quot; ." />
   </Target>
 
-  <!--
-    EmbeddedResource items are created INSIDE the target (standard generate-and-embed pattern):
-    static declaration would make CSC read the jars before this target has run on a clean tree.
-  -->
+  <!-- EmbeddedResource items are created INSIDE the target (generate-and-embed pattern):
+       a static declaration made CSC read the jars before this target ran on clean trees. -->
   <Target Name="BuildJavaJars"
-          DependsOnTargets="NewLaunchJar;NewLaunchLegacyJar;JavaCheckJar"
+          DependsOnTargets="NewLaunchJar;NewLaunchLegacyJar;JavaCheckJarBuild"
           BeforeTargets="PrepareForBuild">
     <ItemGroup>
       <EmbeddedResource Include="$(JarOutputDir)NewLaunch.jar" Link="jars/NewLaunch.jar"
