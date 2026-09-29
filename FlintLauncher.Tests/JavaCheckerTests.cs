@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Tests for the JavaCheck output parsing, the missing-jar failure path, the jars/ lookup of
-// JavaCheckJar (docs/tools/newlaunch-build.sh produces the jar) and the JavaCommon JVM-args
+// JavaCheckJar (the BuildJavaJars MSBuild target produces the jar) and the JavaCommon JVM-args
 // sanity checks. Running a real java binary requires the JavaCheck.jar; when none is
 // installed the tests assert the graceful failure paths.
 using FlintLauncher.Core.Java;

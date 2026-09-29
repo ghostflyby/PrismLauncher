@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // On-demand extraction of the embedded launcher jars (NewLaunch/NewLaunchLegacy/JavaCheck,
-// built by docs/tools/newlaunch-build.sh via the BuildJavaJars MSBuild target and embedded
+// built by the BuildJavaJars MSBuild target (javac/jar via Exec) via the BuildJavaJars MSBuild target and embedded
 // into this assembly). Extracted to the per-user temp cache so JavaUtils/LauncherJars/JavaCheck
 // find them without any external installation layout.
 using FlintLauncher.Core.Launch;

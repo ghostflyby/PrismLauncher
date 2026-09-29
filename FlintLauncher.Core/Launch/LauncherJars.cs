@@ -5,7 +5,7 @@
 //
 // The jar layout matches the C++ original: jars live in <launcher root>/jars (with the
 // Linux "share/<launcher name>" variant) next to the application directory — the jars are
-// build outputs produced by docs/tools/newlaunch-build.sh and are NOT committed.
+// build outputs produced by the BuildJavaJars MSBuild target (javac/jar via Exec) and are NOT committed.
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Java;
 

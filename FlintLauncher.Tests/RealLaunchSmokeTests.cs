@@ -43,7 +43,7 @@ public class RealLaunchSmokeTests
         instance.Settings().Set("JavaRealArchitecture", "arm64");
         instance.Settings().Set("JavaVendor", "smoke");
 
-        // Resolve the REAL NewLaunch.jar/JavaCheck.jar built by docs/tools/newlaunch-build.sh
+        // Resolve the REAL NewLaunch.jar/JavaCheck.jar built by the BuildJavaJars MSBuild target
         // (the fake java ignores the classpath; CheckJava requires JavaCheck.jar to exist).
         var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
         var launcherRoot = Path.Combine(repoRoot, "build");

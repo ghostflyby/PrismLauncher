@@ -101,7 +101,7 @@
 | `minecraft/launch/*`（全部 23 步骤 + MinecraftTarget） | `FlintLauncher.Core/Launch/Steps/` | ported | 含 ExtractNatives/ReconstructAssets/ModMinecraftJar(createModdedJar)/AssetUpdate |
 | `LaunchController*` `LaunchMode.h` `LoggedProcess*` `JavaCommon*` | `FlintLauncher.Core/Launch/` | ported | 无头扩展：WantedLaunchMode=Offline 直达离线会话（已记录） |
 | `java/JavaUtils*` `JavaChecker*` `JavaInstallList*` `JavaInstall.h` `JavaMetadata*` `java/download/*` | `FlintLauncher.Core/Java/` | ported | macOS 发现实测；tar.gz 自研 ustar；Windows 注册表跳过 |
-| `libraries/launcher` + `javacheck` | `docs/tools/newlaunch-build.sh` → build/jars/*.jar | ported | javac --release 8；产物不入库 |
+| `libraries/launcher` + `javacheck` | MSBuild 目标 `BuildJavaJars`（javac/jar 直入 Exec）→ build/jars/*.jar 嵌入 FlintLauncher.Core | ported | javac --release 8；产物不入库 |
 | `MinecraftInstance::createLaunchTask/createLaunchScript/createEnvironment` | `FlintLauncher.Core/Instances/MinecraftInstance.cs` | ported | 全链冒烟通过（fake-java + stdin 协议 + PostExit） |
 | `logs/*` `MessageLevel*` | `FlintLauncher.Core/Launch/LogModel.cs` `MessageLevel.cs` | ported | Log4j XML 解析未移植 |
 | `net/PasteUpload*`、SRV | SrvResolver.cs 已移植；PasteUpload | partial | PasteUpload 归 P7 |

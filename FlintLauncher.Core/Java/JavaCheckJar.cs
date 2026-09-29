@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of libraries/javacheck: upstream compiles JavaCheck.java into a small jar at build time
 // and installs it next to the launcher (Application::getJarPath finds it at runtime). Flint
-// builds it with docs/tools/newlaunch-build.sh into the same jars/ layout; this helper finds
+// builds it with the BuildJavaJars MSBuild target (javac/jar via Exec) into the same jars/ layout; this helper finds
 // that jar (the same launcher-root/jars lookup as Application::getJarPath) and copies it to
 // the per-user extraction path JavaChecker expects.
 namespace FlintLauncher.Core.Java;
