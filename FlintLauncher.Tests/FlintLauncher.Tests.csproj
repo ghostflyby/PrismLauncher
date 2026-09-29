@@ -3,12 +3,20 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <IsAotCompatible>false</IsAotCompatible>
+    <!-- xunit.v3 test projects are executables: the framework's source generator emits the
+         entry point that hosts its Microsoft.Testing.Platform runner, which the .NET 10
+         SDK's dotnet test drives natively (enabled by "test.runner" in global.json). The
+         VSTest stack (Microsoft.NET.Test.Sdk, xunit.runner.visualstudio) is gone with the
+         v3 migration — the SDK refuses a project that mixes VSTest with MTP. -->
+    <OutputType>Exe</OutputType>
+    <!-- xUnit1051 asks every HttpClient call site to thread TestContext.Current.CancellationToken
+         through; with 500+ call sites that is churn without payoff for a 40s serial suite that
+         only ever runs to completion. Revisit if the suite ever needs interactive cancellation. -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
-    <PackageReference Include="xunit" Version="2.9.*" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.*" />
+    <PackageReference Include="xunit.v3" Version="4.0.0" />
   </ItemGroup>
 
   <ItemGroup>

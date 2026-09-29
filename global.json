@@ -1,0 +1,15 @@
+{
+  // Pins the SDK so local builds and CI run the same toolchain. latestFeature accepts any
+  // installed 10.0.x feature band at or above this floor, so a patch release never forces
+  // a bump here.
+  "sdk": {
+    "version": "10.0.100",
+    "rollForward": "latestFeature",
+    "allowPrerelease": false
+  },
+  // Opts dotnet test into its .NET 10 MTP mode, which is how the xunit.v3 test project runs
+  // (the legacy VSTest mode refuses MTP projects on the .NET 10 SDK).
+  "test": {
+    "runner": "Microsoft.Testing.Platform"
+  }
+}
