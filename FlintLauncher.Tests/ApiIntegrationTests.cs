@@ -585,6 +585,14 @@ public class FlintApiIntegrationTests
 
             var done = await PollTaskState(client, taskId, "succeeded", TimeSpan.FromSeconds(30));
 
+            // a duplicate proceed is an explicit 409: LaunchTask.Proceed() no-ops outside
+            // Waiting, so the endpoint surfaces it instead of silently dropping the call
+            var dupe = await client.PostAsJsonAsync($"/api/v1/tasks/{taskId}/proceed", new { });
+            Assert.Equal(HttpStatusCode.Conflict, dupe.StatusCode);
+            Assert.Equal("launch_not_waiting", JsonDocument.Parse(
+                await dupe.Content.ReadAsStringAsync())
+                .RootElement.GetProperty("error").GetProperty("code").GetString());
+
             // the launch script reached the fake EntryPoint and came back via the log --
             var log = JsonDocument.Parse(
                 await client.GetStringAsync($"/api/v1/tasks/{taskId}/log?since=0")).RootElement;

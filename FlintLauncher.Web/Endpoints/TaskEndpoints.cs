@@ -53,6 +53,13 @@ public static class TaskEndpoints
             {
                 return ApiJson.Conflict("launch_not_ready", "the launch task has not armed a launcher yet");
             }
+            // a premature or duplicate POST must be observable: LaunchTask.Proceed() no-ops
+            // outside the Waiting state (matching the C++), and a silently dropped proceed
+            // leaves the game waiting on its stdin "launch" line forever
+            if (!entry.Controller.Launcher.IsWaitingForProceed)
+            {
+                return ApiJson.Conflict("launch_not_waiting", $"task '{id}' is not waiting at a proceed gate");
+            }
             registry.Proceed(entry);
             return Results.Ok(registry.View(entry));
         });

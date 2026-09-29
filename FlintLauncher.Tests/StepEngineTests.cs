@@ -194,6 +194,9 @@ public class StepEngineTests
 
         Assert.Equal(TaskState.Succeeded, task.State);
         Assert.True(gate.Proceeded);
+        // the opened gate must stop reporting "waiting" (the API turns a duplicate proceed
+        // into an explicit 409 instead of a silent no-op)
+        Assert.False(task.IsWaitingForProceed);
     }
 
     private sealed class GatedStep : LaunchStep

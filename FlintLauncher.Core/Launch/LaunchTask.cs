@@ -13,7 +13,11 @@
 //    only emits finished() once the LauncherPartLaunch step sees the game exit).
 //  - proceed() gating: the ReadyForLaunch event plus the Proceed() method map 1:1 to the C++
 //    readyForLaunch()/proceed() pair. AbortProceed() is the C#-side shorthand for aborting
-//    while the engine is Waiting (the C++ UI calls abort() for this).
+//    while the engine is Waiting (the C++ UI calls abort() for this). One deliberate
+//    deviation: Proceed() restores LaunchState.Running after the step consumes the gate —
+//    the C++ stays Waiting forever (its GUI never re-reads the state), while this API
+//    reports the state to clients, who would otherwise see "waiting" during the whole game
+//    session with no signal that the gate was already opened.
 //  - abort() before start(): the C++ emits aborted() immediately from abort(); the port
 //    records the Aborted state and emits it when StartAsync() runs (deferred by one call —
 //    the observable outcome is the same terminal AbortedByUser state).
@@ -242,7 +246,10 @@ public class LaunchTask : FlintTask
 
     // ------------------------------------------------------------- launch confirmation
 
-    /// <summary>Port of proceed(): launch the armed instance (the current step gates on this).</summary>
+    /// <summary>Port of proceed(): launch the armed instance (the current step gates on this).
+    /// Restores the Running state afterwards so IsWaitingForProceed only reports a genuinely
+    /// open gate — see the header deviation note (a no-op Proceed outside Waiting is the
+    /// caller's signal to check the state instead of silently retrying).</summary>
     public void Proceed()
     {
         if (_state != LaunchState.Waiting)
@@ -250,6 +257,7 @@ public class LaunchTask : FlintTask
             return;
         }
         _steps[_currentStep].Proceed();
+        _state = LaunchState.Running;
     }
 
     /// <summary>C#-side shorthand for aborting while Waiting (documented addition).</summary>
