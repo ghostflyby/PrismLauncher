@@ -40,6 +40,13 @@ public static class LauncherJars
                 return jarPath;
             }
         }
+
+        // nothing installed: extract the embedded copy to the per-user cache
+        if (jarFile is NewLaunchJarName or NewLaunchLegacyJarName or Java.JavaCheckJar.JarFileName)
+        {
+            var extracted = Java.EmbeddedJars.EnsureExtracted(jarFile);
+            return File.Exists(extracted) ? extracted : "";
+        }
         return "";
     }
 

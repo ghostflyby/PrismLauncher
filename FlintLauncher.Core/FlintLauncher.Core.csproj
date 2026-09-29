@@ -14,4 +14,32 @@
     <ProjectReference Include="..\FlintLauncher.Nbt\FlintLauncher.Nbt.csproj" />
   </ItemGroup>
 
+
+  <!--
+    Build the Java launcher jars (NewLaunch/NewLaunchLegacy/JavaCheck) from libraries/ via
+    docs/tools/newlaunch-build.sh and embed them into the assembly. Incremental: rebuilds only
+    when a source or the script changes. Set FlintSkipJarBuild=true to bypass (e.g. machines
+    without a JDK, when prebuilt jars are already in place).
+  -->
+  <PropertyGroup>
+    <JarOutputDir>$(MSBuildThisFileDirectory)../build/jars/</JarOutputDir>
+    <JavaSourcesDir>$(MSBuildThisFileDirectory)../libraries/launcher</JavaSourcesDir>
+    <JavaCheckSource>$(MSBuildThisFileDirectory)../libraries/javacheck/JavaCheck.java</JavaCheckSource>
+    <JarBuildScript>$(MSBuildThisFileDirectory)../docs/tools/newlaunch-build.sh</JarBuildScript>
+  </PropertyGroup>
+  <Target Name="BuildJavaJars"
+          BeforeTargets="PrepareForBuild"
+          Inputs="$(JarBuildScript);$(JavaSourcesDir)org/prismlauncher/**/*.java;$(JavaSourcesDir)legacy/**/*.java;$(JavaCheckSource)"
+          Outputs="$(JarOutputDir)NewLaunch.jar;$(JarOutputDir)NewLaunchLegacy.jar;$(JarOutputDir)JavaCheck.jar"
+          Condition="'$(FlintSkipJarBuild)' != 'true'">
+    <Exec Command="bash &quot;$(JarBuildScript)&quot; &quot;$(JarOutputDir)&quot;"
+          WorkingDirectory="$(MSBuildThisFileDirectory).." />
+  </Target>
+
+  <ItemGroup>
+    <EmbeddedResource Include="$(JarOutputDir)NewLaunch.jar" Link="jars/NewLaunch.jar" />
+    <EmbeddedResource Include="$(JarOutputDir)NewLaunchLegacy.jar" Link="jars/NewLaunchLegacy.jar" />
+    <EmbeddedResource Include="$(JarOutputDir)JavaCheck.jar" Link="jars/JavaCheck.jar" />
+  </ItemGroup>
+
 </Project>

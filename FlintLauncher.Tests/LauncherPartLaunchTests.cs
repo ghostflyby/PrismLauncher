@@ -158,8 +158,11 @@ public class LauncherPartLaunchTests : IDisposable
     }
 
     [Fact]
-    public async Task MissingLauncherJar_FailsTheStep()
+    public async Task MissingLauncherRoot_FallsBackToEmbeddedJars()
     {
+        // Since the jars are embedded in the assembly (extracted to the per-user cache on
+        // demand), an empty/broken launcher root no longer fails the launch: the fallback
+        // serves the embedded copies. Only a truly absent embedded resource fails.
         if (!IsUnix)
         {
             return;
@@ -170,15 +173,15 @@ public class LauncherPartLaunchTests : IDisposable
         try
         {
             var javaPath = WriteFakeJava();
-            var task = BuildLaunchTask(fixture, instance, javaPath, out _);
+            var task = BuildLaunchTask(fixture, instance, javaPath, out var step);
+            step.SetAuthSession(fixture.OfflineSession("Steve"));
+            task.ReadyForLaunch += () => task.Proceed();
 
             await task.StartAsync();
 
-            Assert.Equal(TaskState.Failed, task.State);
-            Assert.Contains("Launcher library could not be found", task.FailReason);
+            Assert.Equal(TaskState.Succeeded, task.State);
             var lines = task.GetLogModel().Entries;
-            Assert.Contains(lines, e => e.Level == MessageLevel.Fatal &&
-                                        e.Line.Contains("Launcher library could not be found"));
+            Assert.Contains(lines, e => e.Line == "launcher standard");
         }
         finally
         {

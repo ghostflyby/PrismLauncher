@@ -18,7 +18,7 @@ public static class JavaCheckJar
     /// <summary>Why <see cref="TryExtractTo"/> failed; surfaced by JavaChecker results.</summary>
     public static string StubReason { get; } =
         "JavaCheck.jar could not be found. Please check your installation " +
-        "(build it with docs/tools/newlaunch-build.sh and place it into <launcher root>/jars/).";
+        "(the embedded copy is missing — rebuild FlintLauncher.Core).";
 
     /// <summary>
     /// Port of Application::getJarPath(JarFileName) + install: find the compiled JavaCheck.jar
@@ -70,6 +70,9 @@ public static class JavaCheckJar
                 return jarPath;
             }
         }
-        return "";
+
+        // nothing installed: extract the embedded copy to the per-user cache (fix-2 wave)
+        var extracted = EmbeddedJars.EnsureExtracted(JarFileName);
+        return File.Exists(extracted) ? extracted : "";
     }
 }
