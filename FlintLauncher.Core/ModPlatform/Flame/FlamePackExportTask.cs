@@ -237,31 +237,30 @@ public sealed class FlamePackExportTask : FlintTask
         {
             try
             {
-                var docObj = JsonUtils.RequireObject(doc);
+                var docObj = JsonUtils.RequireObject(JsonUtils.ToNode(doc.RootElement));
                 var dataObj = JsonUtils.RequireObject(FlameJson.Ptr(docObj, "data"), "'data'");
                 var dataArr = JsonUtils.RequireArray(FlameJson.Ptr(dataObj, "exactMatches"), "'exactMatches'");
 
-                if (dataArr.GetArrayLength() == 0)
+                if (dataArr.Count == 0)
                 {
                     // "No matches found for fingerprint search!"
                     return;
                 }
-                foreach (var match in dataArr.EnumerateArray())
+                foreach (var matchObj in dataArr)
                 {
-                    if (match.ValueKind != JsonValueKind.Object)
+                    if (matchObj is not JsonObject)
                     {
                         // "Fingerprint match is empty!"
                         return;
                     }
-                    var matchObj = match;
                     var fileObj = FlameJson.Ptr(matchObj, "file");
-                    if (fileObj.ValueKind != JsonValueKind.Object)
+                    if (fileObj is not JsonObject)
                     {
                         // "Fingerprint match is empty!"
                         return;
                     }
 
-                    var fingerprint = FlameJson.Long(fileObj.GetProperty("fileFingerprint"))
+                    var fingerprint = FlameJson.Long(fileObj["fileFingerprint"])
                         .ToString(CultureInfo.InvariantCulture);
                     if (!_pendingHashes.TryGetValue(fingerprint, out var mod))
                     {
@@ -270,8 +269,8 @@ public sealed class FlamePackExportTask : FlintTask
                     }
 
                     EmitStatus($"Parsing API response from CurseForge for '{mod.Name}'...");
-                    var isAvailable = fileObj.TryGetProperty("isAvailable", out var available)
-                        && available.ValueKind == JsonValueKind.True;
+                    var isAvailable = fileObj["isAvailable"] is JsonValue { } available
+                        && available.TryGetValue<bool>(out var flag) && flag;
                     if (isAvailable)
                     {
                         _resolvedFiles[mod.Path] = new ResolvedFile
@@ -339,21 +338,20 @@ public sealed class FlamePackExportTask : FlintTask
         {
             try
             {
-                var rootObj = JsonUtils.RequireObject(doc);
+                var rootObj = JsonUtils.RequireObject(JsonUtils.ToNode(doc.RootElement));
                 var data = FlameJson.Ptr(rootObj, "data");
-                JsonElement[] entries;
+                List<JsonNode> entries;
                 if (single)
                 {
                     entries = [JsonUtils.RequireObject(data, "'data'")];
                 }
                 else
                 {
-                    entries = JsonUtils.RequireArray(data, "'data'").EnumerateArray().ToArray();
+                    entries = [.. JsonUtils.RequireArray(data, "'data'")];
                 }
 
-                foreach (var entry in entries)
+                foreach (var entryObj in entries)
                 {
-                    var entryObj = JsonUtils.RequireObject(entry);
 
                     try
                     {

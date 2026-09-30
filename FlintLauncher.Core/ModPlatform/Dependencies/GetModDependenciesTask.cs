@@ -193,8 +193,7 @@ public class GetModDependenciesTask : SequentialTask
     {
         if (provider == ResourceProvider.FLAME)
         {
-            // phase-2 seam: the Flame loaders are still on the element read model
-            FlameMod.LoadIndexedPack(pack, JsonUtils.ToOwnedElement(obj));
+            FlameMod.LoadIndexedPack(pack, obj);
         }
         else
         {
@@ -206,7 +205,7 @@ public class GetModDependenciesTask : SequentialTask
     private static IndexedVersion LoadIndexedPackVersion(ResourceProvider provider, JsonNode obj)
     {
         return provider == ResourceProvider.FLAME
-            ? FlameMod.LoadIndexedPackVersion(JsonUtils.ToOwnedElement(obj))
+            ? FlameMod.LoadIndexedPackVersion(obj)
             : ModrinthPackIndex.LoadIndexedPackVersion(obj);
     }
 
@@ -243,10 +242,8 @@ public class GetModDependenciesTask : SequentialTask
                     // Flame nests the project under "data" (the C++
                     // Json::requireObject(Json::requireObject(doc), "data") form; the string
                     // argument is a KEY there, which FlameJson.RequireObject mirrors)
-                    // phase-2 seam: the Flame reader is still on the element model
                     JsonNode obj = provider == ResourceProvider.FLAME
-                        // phase-2 seam: element read (FlameJson) bridged back to node
-                        ? JsonUtils.ToNode(FlameJson.RequireObject(JsonUtils.ToOwnedElement(root), "data"))
+                        ? FlameJson.RequireObject(root, "data")
                         : root;
 
                     LoadIndexedPack(provider, pDep.Pack, obj);

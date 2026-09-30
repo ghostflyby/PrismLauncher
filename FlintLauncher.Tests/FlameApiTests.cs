@@ -104,8 +104,8 @@ public class FlameApiTests : IDisposable
         Assert.Equal(TaskState.Succeeded, job.State);
         Assert.Equal(_baseUrl + "/fingerprints", _server.LastPath);
 
-        var body = JsonDocument.Parse(Encoding.UTF8.GetString(_server.LastBody!)).RootElement;
-        var fingerprints = body.GetProperty("fingerprints").EnumerateArray().Select(f => f.GetString()).ToList();
+        var body = JsonNode.Parse(Encoding.UTF8.GetString(_server.LastBody!));
+        var fingerprints = ((JsonArray?)body["fingerprints"])!.Select(f => f!.GetValue<string>()).ToList();
         // the C++ sends the fingerprints as JSON strings
         Assert.Equal(["123456789", "42"], fingerprints);
         _ = request;
@@ -120,8 +120,8 @@ public class FlameApiTests : IDisposable
         Assert.Equal(TaskState.Succeeded, job.State);
         Assert.Equal(_baseUrl + "/mods/files", _server.LastPath);
 
-        var body = JsonDocument.Parse(Encoding.UTF8.GetString(_server.LastBody!)).RootElement;
-        var fileIds = body.GetProperty("fileIds").EnumerateArray().Select(f => f.GetString()).ToList();
+        var body = JsonNode.Parse(Encoding.UTF8.GetString(_server.LastBody!));
+        var fileIds = ((JsonArray?)body["fileIds"])!.Select(f => f!.GetValue<string>()).ToList();
         Assert.Equal(["456", "789"], fileIds);
     }
 
@@ -134,8 +134,8 @@ public class FlameApiTests : IDisposable
         Assert.Equal(TaskState.Succeeded, job.State);
         Assert.Equal(_baseUrl + "/mods", _server.LastPath);
 
-        var body = JsonDocument.Parse(Encoding.UTF8.GetString(_server.LastBody!)).RootElement;
-        var modIds = body.GetProperty("modIds").EnumerateArray().Select(f => f.GetString()).ToList();
+        var body = JsonNode.Parse(Encoding.UTF8.GetString(_server.LastBody!));
+        var modIds = ((JsonArray?)body["modIds"])!.Select(f => f!.GetValue<string>()).ToList();
         Assert.Equal(["123", "222"], modIds);
     }
 
@@ -244,7 +244,7 @@ public class FlameApiTests : IDisposable
             gameVersions: """["1.18.2", "1.18.1", "forge", "client"]""",
             sha1: "abc123",
             dependencies: """[{"modId": 999, "relationType": 3}]""");
-        var obj = JsonDocument.Parse(json).RootElement;
+        var obj = JsonNode.Parse(json);
 
         var version = FlameMod.LoadIndexedPackVersion(obj);
 
@@ -267,8 +267,8 @@ public class FlameApiTests : IDisposable
     [Fact]
     public void LoadIndexedPack_LoadsProjectFields()
     {
-        var obj = JsonDocument.Parse(FlamePayloads.ProjectJson(
-            id: 123, name: "Test Mod", slug: "test-mod")).RootElement;
+        var obj = JsonNode.Parse(FlamePayloads.ProjectJson(
+            id: 123, name: "Test Mod", slug: "test-mod"));
 
         var pack = new IndexedPack();
         FlameMod.LoadIndexedPack(pack, obj);
@@ -290,10 +290,10 @@ public class FlameApiTests : IDisposable
     {
         var older = FlamePayloads.FileJson(_server.Url, fileId: 1, fileDate: "2023-01-01T00:00:00Z");
         var newer = FlamePayloads.FileJson(_server.Url, fileId: 2, fileDate: "2024-01-01T00:00:00Z");
-        var arr = JsonDocument.Parse($"[{older},{newer}]").RootElement;
+        var arr = JsonNode.Parse($"[{older},{newer}]");
 
         var pack = new IndexedPack { AddonId = "123" };
-        FlameMod.LoadIndexedPackVersions(pack, arr);
+        FlameMod.LoadIndexedPackVersions(pack, (JsonArray)arr!);
 
         Assert.True(pack.VersionsLoaded);
         Assert.Equal(["2", "1"], pack.Versions.Select(v => v.FileId));

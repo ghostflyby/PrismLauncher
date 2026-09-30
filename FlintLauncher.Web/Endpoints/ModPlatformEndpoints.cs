@@ -6,6 +6,7 @@
 // (202 + taskId) like launch/import; the update task additionally publishes its found
 // updates through the task view's optional result payload.
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
@@ -261,7 +262,7 @@ public static class ModPlatformEndpoints
                             data.ValueKind == JsonValueKind.Array)
                         {
                             // loads + validates every file, sorted newest first
-                            FlameMod.LoadIndexedPackVersions(pack, data);
+                            FlameMod.LoadIndexedPackVersions(pack, (JsonArray)(JsonUtils.ToNode(data) ?? new JsonArray()));
                         }
                     }
                     else if (doc.RootElement.ValueKind == JsonValueKind.Array)
@@ -645,7 +646,7 @@ public static class ModPlatformEndpoints
                     var pack = new IndexedPack();
                     try
                     {
-                        FlameMod.LoadIndexedPack(pack, hit);
+                        FlameMod.LoadIndexedPack(pack, JsonUtils.ToNode(hit));
                     }
                     catch (FlintLauncher.Core.Json.JsonParseException)
                     {

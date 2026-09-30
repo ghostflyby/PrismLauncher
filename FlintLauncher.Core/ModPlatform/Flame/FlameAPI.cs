@@ -184,26 +184,24 @@ public sealed class FlameApi : ResourceApi
     public List<Category> LoadModCategories(string response)
     {
         var categories = new List<Category>();
-        JsonDocument doc;
+        JsonNode? doc;
         try
         {
-            doc = JsonDocument.Parse(response);
+            doc = JsonNode.Parse(response);
         }
         catch (JsonException)
         {
             return categories;
         }
 
-        using (doc)
         {
             try
             {
                 var obj = JsonUtils.RequireObject(doc);
                 var arr = JsonUtils.RequireArray(FlameJson.Ptr(obj, "data"), "'data'");
 
-                foreach (var val in arr.EnumerateArray())
+                foreach (var cat in arr)
                 {
-                    var cat = JsonUtils.RequireObject(val);
                     var id = FlameJson.RequireInteger(cat, "id");
                     var name = FlameJson.RequireString(cat, "name");
                     categories.Add(new Category(name, id.ToString(CultureInfo.InvariantCulture)));
@@ -466,14 +464,14 @@ public sealed class FlameApi : ResourceApi
     // --------------------------------------------------------- response loading
 
     /// <summary>Port of ResourceAPI::documentToArray for Flame (the "data" array).</summary>
-    public static JsonElement DocumentToArray(JsonDocument obj) => FlameJson.Arr(JsonUtils.RequireObject(obj), "data");
+    public static JsonArray DocumentToArray(JsonNode obj) => FlameJson.Arr(obj, "data");
 
     /// <summary>Port of the FlameAPI::loadIndexedPack override.</summary>
-    public void LoadIndexedPack(IndexedPack pack, JsonElement obj) => FlameMod.LoadIndexedPack(pack, obj);
+    public void LoadIndexedPack(IndexedPack pack, JsonNode obj) => FlameMod.LoadIndexedPack(pack, obj);
 
     /// <summary>Port of the FlameAPI::loadIndexedPackVersion override (with the texture-pack
     /// client-side version filter of the C++).</summary>
-    public IndexedVersion LoadIndexedPackVersion(JsonElement obj, ResourceType resourceType)
+    public IndexedVersion LoadIndexedPackVersion(JsonNode obj, ResourceType resourceType)
     {
         var arr = FlameMod.LoadIndexedPackVersion(obj);
         if (resourceType != ResourceType.TexturePack)

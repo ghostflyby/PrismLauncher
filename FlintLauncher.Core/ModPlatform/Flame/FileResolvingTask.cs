@@ -81,12 +81,13 @@ public sealed class FileResolvingTask : FlintTask
     {
         SetProgress(1, 3);
         // job to check modrinth for blocked projects
-        JsonDocument doc;
-        JsonElement array;
+        JsonNode doc;
+        JsonArray array;
         try
         {
-            doc = JsonUtils.RequireDocument(responseBody, "Document");
-            array = JsonUtils.RequireArray(FlameJson.Ptr(JsonUtils.RequireObject(doc), "data"), "'data'");
+            doc = JsonUtils.RequireObject(JsonNode.Parse(responseBody)
+                ?? throw new JsonParseException("Document: empty response"), "Document");
+            array = FlameJson.RequireArray(doc, "data");
         }
         catch (JsonParseException)
         {
@@ -95,10 +96,9 @@ public sealed class FileResolvingTask : FlintTask
             return;
         }
 
-        using (doc)
         {
             var hashes = new List<string>();
-            foreach (var file in array.EnumerateArray())
+            foreach (var file in array)
             {
                 try
                 {
@@ -144,10 +144,10 @@ public sealed class FileResolvingTask : FlintTask
         await modrinthJob.StartAsync(cancellationToken);
         if (modrinthJob.WasSuccessful)
         {
-            JsonDocument? doc = null;
+            JsonNode? doc = null;
             try
             {
-                doc = JsonDocument.Parse(modrinthResponse.BodyAsString);
+                doc = JsonNode.Parse(modrinthResponse.BodyAsString);
             }
             catch (JsonException)
             {
@@ -155,19 +155,18 @@ public sealed class FileResolvingTask : FlintTask
             }
             if (doc is not null)
             {
-                using (doc)
                 {
                     if (FallbackMRBlockedMods)
                     {
                         try
                         {
-                            var entries = JsonNode.Parse(doc.RootElement.GetRawText())!.AsObject();
+                            var entries = doc;
                             foreach (var outFile in _manifest.Files.Values)
                             {
                                 var urlValid = Uri.TryCreate(outFile.Version.DownloadUrl, UriKind.Absolute, out _);
                                 if (!urlValid && "sha1" == outFile.Version.HashType
                                     && outFile.Version.Hash.Length != 0
-                                    && entries.TryGetPropertyValue(outFile.Version.Hash, out var entryNode)
+                                    && entries[outFile.Version.Hash] is { } entryNode
                                     && entryNode is not null)
                                 {
                                     try
@@ -207,10 +206,10 @@ public sealed class FileResolvingTask : FlintTask
         }
 
         // (the C++ only logs parse problems in this step and still succeeds)
-        JsonDocument? doc = null;
+        JsonNode? doc = null;
         try
         {
-            doc = JsonDocument.Parse(response.BodyAsString);
+            doc = JsonNode.Parse(response.BodyAsString);
         }
         catch (JsonException)
         {
@@ -218,16 +217,13 @@ public sealed class FileResolvingTask : FlintTask
 
         if (doc is not null)
         {
-            using (doc)
             {
                 try
                 {
-                    var entries = JsonUtils.RequireArray(
-                        FlameJson.Ptr(JsonUtils.RequireObject(doc), "data"), "'data'");
+                    var entries = FlameJson.RequireArray(doc, "data");
 
-                    foreach (var entry in entries.EnumerateArray())
+                    foreach (var entryObj in entries)
                     {
-                        var entryObj = JsonUtils.RequireObject(entry);
                         var id = FlameJson.RequireInteger(entryObj, "id");
                         var file = _manifest.Files.Values.FirstOrDefault(f => f.ProjectId == id);
                         if (file is null)

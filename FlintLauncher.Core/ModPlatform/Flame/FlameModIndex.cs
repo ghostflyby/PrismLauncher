@@ -18,26 +18,20 @@ using FlintLauncher.Core.Json;
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
 /// <summary>Small QJsonObject-style accessors shared by the Flame loaders (explicit calls,
-/// to stay unambiguous next to the Modrinth extension methods).</summary>
+/// to stay unambiguous next to the Modrinth extension methods). JsonNode-based — the single
+/// read model; see the JsonUtils node family for the semantics contract.</summary>
 internal static class FlameJson
 {
-    /// <summary>obj["key"] equivalent: null element when missing.</summary>
-    public static JsonElement Ptr(JsonElement element, string name)
-    {
-        if (element.ValueKind != JsonValueKind.Object)
-        {
-            return JsonUtils.NullElement;
-        }
-        return element.TryGetProperty(name, out var value) ? value : JsonUtils.NullElement;
-    }
+    /// <summary>obj["key"] equivalent: null node when missing.</summary>
+    public static JsonNode? Ptr(JsonNode? element, string name) => element is JsonObject obj ? obj[name] : null;
 
     /// <summary>obj["key"].toString(default) equivalent.</summary>
-    public static string Str(JsonElement element, string name, string def = "")
+    public static string Str(JsonNode? element, string name, string def = "")
     {
         return JsonUtils.EnsureString(Ptr(element, name), def);
     }
 
-    public static int Int(JsonElement element, string name, int def = 0)
+    public static int Int(JsonNode? element, string name, int def = 0)
     {
         return JsonUtils.EnsureInteger(Ptr(element, name), def);
     }
@@ -45,37 +39,35 @@ internal static class FlameJson
     /// <summary>QJsonValue::toInteger() equivalent over a raw node.</summary>
     public static long Long(JsonNode? node)
     {
-        return node is JsonValue value && value.TryGetValue<double>(out var d) ? (long)d : 0;
+        return JsonUtils.EnsureLong(node);
     }
 
-    /// <summary>QJsonValue::toInteger() equivalent over an element.</summary>
-    public static long Long(JsonElement element)
+    /// <summary>obj["key"].asString() equivalent for string-typed sub-reads.</summary>
+    public static string? AsString(JsonNode? node)
     {
-        return element.ValueKind == JsonValueKind.Number ? (long)element.GetDouble() : 0;
+        return node is JsonValue value && value.TryGetValue<string>(out var s) ? s : null;
     }
 
-    public static JsonElement Obj(JsonElement element, string name)
+    public static JsonObject Obj(JsonNode? element, string name)
     {
-        var value = Ptr(element, name);
-        return value.ValueKind == JsonValueKind.Object ? value : JsonUtils.EmptyObjectElement;
+        return Ptr(element, name) as JsonObject ?? new JsonObject();
     }
 
-    public static JsonElement Arr(JsonElement element, string name)
+    public static JsonArray Arr(JsonNode? element, string name)
     {
-        var value = Ptr(element, name);
-        return value.ValueKind == JsonValueKind.Array ? value : JsonUtils.EmptyArrayElement;
+        return Ptr(element, name) as JsonArray ?? new JsonArray();
     }
 
-    public static string RequireString(JsonElement parent, string key)
+    public static string RequireString(JsonNode? parent, string key)
         => JsonUtils.RequireString(Ptr(parent, key), "'" + key + "'");
 
-    public static int RequireInteger(JsonElement parent, string key)
+    public static int RequireInteger(JsonNode? parent, string key)
         => JsonUtils.RequireInteger(Ptr(parent, key), "'" + key + "'");
 
-    public static JsonElement RequireObject(JsonElement parent, string key)
+    public static JsonObject RequireObject(JsonNode? parent, string key)
         => JsonUtils.RequireObject(Ptr(parent, key), "'" + key + "'");
 
-    public static JsonElement RequireArray(JsonElement parent, string key)
+    public static JsonArray RequireArray(JsonNode? parent, string key)
         => JsonUtils.RequireArray(Ptr(parent, key), "'" + key + "'");
 }
 
@@ -83,7 +75,7 @@ internal static class FlameJson
 public static class FlameMod
 {
     /// <summary>Port of FlameMod::loadIndexedPack.</summary>
-    public static void LoadIndexedPack(IndexedPack pack, JsonElement obj)
+    public static void LoadIndexedPack(IndexedPack pack, JsonNode obj)
     {
         pack.AddonId = FlameJson.RequireInteger(obj, "id").ToString(CultureInfo.InvariantCulture);
         pack.Provider = ResourceProvider.FLAME;
@@ -101,12 +93,11 @@ public static class FlameMod
         }
 
         var authors = FlameJson.Arr(obj, "authors");
-        if (authors.GetArrayLength() != 0)
+        if (authors.Count != 0)
         {
             pack.Authors.Clear();
-            foreach (var authorIter in authors.EnumerateArray())
+            foreach (var author in authors)
             {
-                var author = JsonUtils.RequireObject(authorIter);
                 pack.Authors.Add(new ModpackAuthor
                 {
                     Name = FlameJson.RequireString(author, "name"),
@@ -121,7 +112,7 @@ public static class FlameMod
     }
 
     /// <summary>Port of FlameMod::loadURLs.</summary>
-    public static void LoadURLs(IndexedPack pack, JsonElement obj)
+    public static void LoadURLs(IndexedPack pack, JsonNode obj)
     {
         var linksObj = FlameJson.Obj(obj, "links");
 
@@ -158,12 +149,13 @@ public static class FlameMod
     };
 
     /// <summary>Port of FlameMod::loadIndexedPackVersions (sorts by file date, newest first).</summary>
-    public static void LoadIndexedPackVersions(IndexedPack pack, JsonElement arr)
+    public static void LoadIndexedPackVersions(IndexedPack pack, JsonArray arr)
     {
         var unsortedVersions = new List<IndexedVersion>();
-        foreach (var versionIter in arr.EnumerateArray())
+        foreach (var versionIter in arr)
         {
-            var obj = JsonUtils.RequireObject(versionIter);
+            var obj = versionIter as JsonObject
+                ?? throw new JsonParseException("file entry is not an object");
 
             var file = LoadIndexedPackVersion(obj);
             if (file.AddonId.Length == 0)
@@ -186,14 +178,14 @@ public static class FlameMod
     }
 
     /// <summary>Port of FlameMod::loadIndexedPackVersion.</summary>
-    public static IndexedVersion LoadIndexedPackVersion(JsonElement obj)
+    public static IndexedVersion LoadIndexedPackVersion(JsonNode obj)
     {
         var versionArray = FlameJson.RequireArray(obj, "gameVersions");
 
         var file = new IndexedVersion();
-        foreach (var mcVer in versionArray.EnumerateArray())
+        foreach (var mcVer in versionArray)
         {
-            var str = mcVer.GetString() ?? "";
+            var str = FlameJson.AsString(mcVer) ?? "";
 
             if (str.Contains('.'))
             {
@@ -257,9 +249,8 @@ public static class FlameMod
         };
 
         var hashList = FlameJson.Arr(obj, "hashes");
-        foreach (var h in hashList.EnumerateArray())
+        foreach (var hashEntry in hashList)
         {
-            var hashEntry = JsonUtils.RequireObject(h);
             var hashTypes = ProviderCapabilities.HashType(ResourceProvider.FLAME);
             var hashAlgo = EnumToString(FlameJson.Int(hashEntry, "algo", 1));
             if (hashTypes.Contains(hashAlgo))
@@ -271,9 +262,8 @@ public static class FlameMod
         }
 
         var dependencies = FlameJson.Arr(obj, "dependencies");
-        foreach (var d in dependencies.EnumerateArray())
+        foreach (var dep in dependencies)
         {
-            var dep = JsonUtils.RequireObject(d);
             var dependency = new Dependency
             {
                 AddonId = FlameJson.RequireInteger(dep, "modId").ToString(CultureInfo.InvariantCulture),

@@ -124,10 +124,10 @@ public sealed class FlameCheckUpdate : FlintTask
     private async Task GetLatestVersionCallback(Resource resource, MetadataHandler.ModStruct metadata,
         string responseBody, CancellationToken cancellationToken)
     {
-        JsonDocument doc;
+        JsonNode? doc;
         try
         {
-            doc = JsonDocument.Parse(responseBody);
+            doc = JsonNode.Parse(responseBody);
         }
         catch (JsonException e)
         {
@@ -144,12 +144,11 @@ public sealed class FlameCheckUpdate : FlintTask
             AddonId = metadata.ProjectId,
             Provider = ResourceProvider.FLAME,
         };
-        using (doc)
         {
             try
             {
                 var obj = JsonUtils.RequireObject(doc);
-                var arr = JsonUtils.RequireArray(FlameJson.Ptr(obj, "data"), "'data'");
+                var arr = FlameJson.RequireArray(obj, "data");
 
                 FlameMod.LoadIndexedPackVersions(pack, arr);
             }
@@ -247,10 +246,10 @@ public sealed class FlameCheckUpdate : FlintTask
         await projJob.StartAsync(cancellationToken);
         if (projJob.WasSuccessful)
         {
-            JsonDocument? doc;
+            JsonNode? doc;
             try
             {
-                doc = JsonDocument.Parse(projRequest.BodyAsString);
+                doc = JsonNode.Parse(projRequest.BodyAsString);
             }
             catch (JsonException)
             {
@@ -259,25 +258,23 @@ public sealed class FlameCheckUpdate : FlintTask
 
             if (doc is not null)
             {
-                using (doc)
                 {
                     try
                     {
                         var rootObj = JsonUtils.RequireObject(doc);
                         var data = FlameJson.Ptr(rootObj, "data");
-                        JsonElement[] entries;
+                        List<JsonNode> entries;
                         if (single)
                         {
                             entries = [JsonUtils.RequireObject(data, "'data'")];
                         }
                         else
                         {
-                            entries = JsonUtils.RequireArray(data, "'data'").EnumerateArray().ToArray();
+                            entries = [.. JsonUtils.RequireArray(data, "'data'")];
                         }
 
-                        foreach (var entry in entries)
+                        foreach (var entryObj in entries)
                         {
-                            var entryObj = JsonUtils.RequireObject(entry);
 
                             var id = FlameJson.RequireInteger(entryObj, "id").ToString(CultureInfo.InvariantCulture);
                             if (!quickSearch.TryGetValue(id, out var resource))

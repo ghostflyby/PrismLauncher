@@ -280,7 +280,7 @@ public sealed class EnsureMetadataTask : FlintTask
                 EmitStatus($"Parsing API response from CurseForge for '{resource.Name}'...");
                 try
                 {
-                    _tempVersions[fingerprint] = FlameMod.LoadIndexedPackVersion(ToElement(fileObj));
+                    _tempVersions[fingerprint] = FlameMod.LoadIndexedPackVersion(fileObj);
                 }
                 catch (JsonParseException)
                 {
@@ -326,10 +326,10 @@ public sealed class EnsureMetadataTask : FlintTask
             return;
         }
 
-        JsonDocument projectDoc;
+        JsonNode? projectDoc;
         try
         {
-            projectDoc = JsonDocument.Parse(projectRequest.BodyAsString);
+            projectDoc = JsonNode.Parse(projectRequest.BodyAsString);
         }
         catch (JsonException e)
         {
@@ -337,15 +337,14 @@ public sealed class EnsureMetadataTask : FlintTask
             return;
         }
 
-        using (projectDoc)
         {
-            JsonElement[] entries;
+            List<JsonNode> entries;
             try
             {
                 var rootObj = JsonUtils.RequireObject(projectDoc);
                 var data = FlameJson.Ptr(rootObj, "data");
                 entries = multiple
-                    ? JsonUtils.RequireArray(data, "'data'").EnumerateArray().ToArray()
+                    ? [.. JsonUtils.RequireArray(data, "'data'")]
                     : [JsonUtils.RequireObject(data, "'data'")];
             }
             catch (JsonParseException)
@@ -355,7 +354,7 @@ public sealed class EnsureMetadataTask : FlintTask
 
             foreach (var entry in entries)
             {
-                JsonElement entryObj;
+                JsonNode entryObj;
                 try
                 {
                     entryObj = JsonUtils.RequireObject(entry);
