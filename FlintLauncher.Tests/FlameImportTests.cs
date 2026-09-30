@@ -276,6 +276,35 @@ public class FlameImportTests : IDisposable
     }
 
     [Fact]
+    public async Task Overrides_PathTraversal_IsRejected()
+    {
+        // upstream #6183: the manifest is untrusted — an overrides path escaping the staging
+        // root must abort the import, not move arbitrary directories
+        var pack = FlamePackBuilder.Create();
+        RegisterResolvedMod();
+        var manifestObj = JsonObject.Parse(pack.ManifestJson)!.AsObject();
+        manifestObj["overrides"] = "../outside";
+        var staging = TempPath("staging-traversal");
+        Directory.CreateDirectory(staging);
+        File.WriteAllText(Path.Combine(staging, "manifest.json"), manifestObj.ToJsonString());
+
+        var outsideMarker = TempPath("outside");
+        Directory.CreateDirectory(outsideMarker);
+        File.WriteAllText(Path.Combine(outsideMarker, "sentinel.txt"), "must stay");
+
+        var task = new FlameCreationTask(staging, trustedSource: true, _global);
+        task.SetName("Traversal");
+        await task.StartAsync();
+
+        Assert.Equal(TaskState.Failed, task.State);
+        Assert.Contains("security risk", task.FailReason);
+        // the targeted directory was not touched
+        Assert.True(Directory.Exists(outsideMarker));
+        Assert.True(File.Exists(Path.Combine(outsideMarker, "sentinel.txt")));
+        Assert.False(Directory.Exists(Path.Combine(staging, "minecraft")));
+    }
+
+    [Fact]
     public async Task RecommendedLoaderVersion_WithoutLookupHook_Fails()
     {
         var pack = FlamePackBuilder.Create(loader: "forge-recommended");

@@ -154,6 +154,14 @@ public sealed partial class FlameCreationTask : InstanceTask
         if (_pack.Overrides.Length != 0)
         {
             var overridePath = FileSystem.PathCombine(StagingPath, _pack.Overrides);
+            // upstream #6183: the manifest is untrusted input — an override path that escapes
+            // the staging root (absolute path or .. segments) is a security risk, abort
+            if (!IsParentOf(StagingPath, overridePath))
+            {
+                EmitFailed($"The overrides has a path that leads to an arbitrary location ({_pack.Overrides}). " +
+                           "This is a security risk and isn't allowed.");
+                return;
+            }
             if (File.Exists(overridePath) || Directory.Exists(overridePath))
             {
                 // Create a list of overrides in "overrides.txt" inside flame/
@@ -709,6 +717,17 @@ public sealed partial class FlameCreationTask : InstanceTask
         // (upstream calls downloadFiles(m_newInstance.get()) here — the P5 update pipeline;
         //  like the other creation tasks, creation succeeds without fetching game files)
         EmitSucceeded();
+    }
+
+    /// <summary>QUrl::fromLocalFile(root).isParentOf(QUrl::fromLocalFile(child)) for real
+    /// filesystem paths: both are fully resolved, then containment is lexical (the child must
+    /// live under root, not in a sibling whose name shares the prefix).</summary>
+    private static bool IsParentOf(string root, string child)
+    {
+        var rootFull = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var childFull = Path.GetFullPath(child).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return childFull.StartsWith(rootFull + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+            || childFull.StartsWith(rootFull + Path.AltDirectorySeparatorChar, StringComparison.Ordinal);
     }
 
     [GeneratedRegex(@"[.]+$")]

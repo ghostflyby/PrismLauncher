@@ -429,7 +429,7 @@ public static partial class ModUtils
             // toml++ skips a leading UTF-8 BOM, like the JSON reader above
             tomlData = MiniToml.Parse(contents.TrimStart('\uFEFF'));
         }
-        catch (TomlParseException)
+        catch (Exception) // upstream #6047: malformed mod metadata must not crash the scan
         {
             return new ModDetails();
         }

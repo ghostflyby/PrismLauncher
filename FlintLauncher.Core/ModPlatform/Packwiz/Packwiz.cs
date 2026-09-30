@@ -257,7 +257,7 @@ public static class Packwiz
         {
             table = MiniToml.ParseFile(path);
         }
-        catch (TomlParseException e)
+        catch (Exception e) // upstream #6047: any failure here means "no usable metadata", not a crash
         {
             // "Could not open file {name}!" + reason
             _ = e;
