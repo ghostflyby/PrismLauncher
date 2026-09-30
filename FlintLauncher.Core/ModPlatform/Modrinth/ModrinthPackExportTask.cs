@@ -176,10 +176,10 @@ public sealed class ModrinthPackExportTask : FlintTask
 
     private void ParseApiResponse(string response)
     {
-        JsonDocument doc;
+        JsonNode entries;
         try
         {
-            doc = JsonDocument.Parse(response);
+            entries = JsonNode.Parse(response) ?? throw new JsonException("empty response");
         }
         catch (JsonException e)
         {
@@ -187,39 +187,32 @@ public sealed class ModrinthPackExportTask : FlintTask
             return;
         }
 
-        using (doc)
+        foreach (var (relative, sha512) in _pendingHashes)
         {
-            var entries = JsonNode.Parse(doc.RootElement.GetRawText())!.AsObject();
-
-            foreach (var (relative, sha512) in _pendingHashes)
+            if (entries[sha512] is not { } obj)
             {
-                if (!entries.TryGetPropertyValue(sha512, out var objNode) || objNode is null)
-                {
-                    continue;
-                }
-                var obj = JsonUtils.ToOwnedElement(objNode);
+                continue;
+            }
 
-                var filesArray = obj.GetPropertySafe("files");
-                if (filesArray.ValueKind != JsonValueKind.Array)
+            if (obj.GetPropertySafe("files") is not JsonArray filesArray)
+            {
+                continue;
+            }
+            foreach (var file in filesArray)
+            {
+                var hash = file.GetPropertySafe("hashes").GetPropertySafe("sha512").AsString();
+                if (hash != sha512)
                 {
                     continue;
                 }
-                foreach (var file in filesArray.EnumerateArray())
-                {
-                    var hash = file.GetPropertySafe("hashes").GetPropertySafe("sha512").GetString();
-                    if (hash != sha512)
-                    {
-                        continue;
-                    }
-                    // map the file to the url
-                    _resolvedFiles[relative] = new ResolvedFile(
-                        Sha1: file.GetPropertySafe("hashes").GetPropertySafe("sha1").GetString() ?? "",
-                        Sha512: sha512,
-                        Url: file.GetPropertySafe("url").GetString() ?? "",
-                        Size: file.GetPropertySafe("size").GetInt64(),
-                        Side: SideType.Invalid);
-                    break;
-                }
+                // map the file to the url
+                _resolvedFiles[relative] = new ResolvedFile(
+                    Sha1: file.GetPropertySafe("hashes").GetPropertySafe("sha1").AsString() ?? "",
+                    Sha512: sha512,
+                    Url: file.GetPropertySafe("url").AsString() ?? "",
+                    Size: JsonUtils.EnsureLong(file.GetPropertySafe("size")),
+                    Side: SideType.Invalid);
+                break;
             }
         }
         _pendingHashes.Clear();

@@ -28,6 +28,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using System.Text.Json.Nodes;
 using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.ModPlatform.Dependencies;
@@ -188,11 +189,12 @@ public class GetModDependenciesTask : SequentialTask
     }
 
     /// <summary>Port of the per-provider loadIndexedPack virtual.</summary>
-    private static void LoadIndexedPack(ResourceProvider provider, IndexedPack pack, JsonElement obj)
+    private static void LoadIndexedPack(ResourceProvider provider, IndexedPack pack, JsonNode obj)
     {
         if (provider == ResourceProvider.FLAME)
         {
-            FlameMod.LoadIndexedPack(pack, obj);
+            // phase-2 seam: the Flame loaders are still on the element read model
+            FlameMod.LoadIndexedPack(pack, JsonUtils.ToOwnedElement(obj));
         }
         else
         {
@@ -201,10 +203,10 @@ public class GetModDependenciesTask : SequentialTask
     }
 
     /// <summary>Port of the per-provider loadIndexedPackVersion virtual (Mod resource type).</summary>
-    private static IndexedVersion LoadIndexedPackVersion(ResourceProvider provider, JsonElement obj)
+    private static IndexedVersion LoadIndexedPackVersion(ResourceProvider provider, JsonNode obj)
     {
         return provider == ResourceProvider.FLAME
-            ? FlameMod.LoadIndexedPackVersion(obj)
+            ? FlameMod.LoadIndexedPackVersion(JsonUtils.ToOwnedElement(obj))
             : ModrinthPackIndex.LoadIndexedPackVersion(obj);
     }
 
@@ -222,10 +224,11 @@ public class GetModDependenciesTask : SequentialTask
 
         job.Succeeded += _ =>
         {
-            JsonDocument doc;
+            JsonNode root;
             try
             {
-                doc = JsonDocument.Parse(request.BodyAsString);
+                root = JsonNode.Parse(request.BodyAsString)
+                    ?? throw new JsonException("empty response");
             }
             catch (JsonException)
             {
@@ -234,16 +237,16 @@ public class GetModDependenciesTask : SequentialTask
                 return;
             }
 
-            using (doc)
             {
                 try
                 {
                     // Flame nests the project under "data" (the C++
                     // Json::requireObject(Json::requireObject(doc), "data") form; the string
                     // argument is a KEY there, which FlameJson.RequireObject mirrors)
-                    var root = JsonUtils.RequireObject(doc);
-                    var obj = provider == ResourceProvider.FLAME
-                        ? FlameJson.RequireObject(root, "data")
+                    // phase-2 seam: the Flame reader is still on the element model
+                    JsonNode obj = provider == ResourceProvider.FLAME
+                        // phase-2 seam: element read (FlameJson) bridged back to node
+                        ? JsonUtils.ToNode(FlameJson.RequireObject(JsonUtils.ToOwnedElement(root), "data"))
                         : root;
 
                     LoadIndexedPack(provider, pDep.Pack, obj);
@@ -302,10 +305,10 @@ public class GetModDependenciesTask : SequentialTask
         job.Succeeded += _ =>
         {
             IndexedVersion bestMatch;
-            JsonDocument doc;
+            JsonNode root;
             try
             {
-                doc = JsonDocument.Parse(request.BodyAsString);
+                root = JsonNode.Parse(request.BodyAsString) ?? throw new JsonException("empty response");
             }
             catch (JsonException)
             {
@@ -314,22 +317,21 @@ public class GetModDependenciesTask : SequentialTask
                 return;
             }
 
-            using (doc)
             {
-                List<JsonElement> arr;
-                if (dep.Version.Length != 0 && doc.RootElement.ValueKind == JsonValueKind.Object)
+                List<JsonNode> arr;
+                if (dep.Version.Length != 0 && root is JsonObject)
                 {
-                    arr = [doc.RootElement];
+                    arr = [root];
                 }
-                else if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                else if (root is JsonObject)
                 {
                     // the Flame {"data": [...]} shape; anything else parses to an empty list
-                    var data = doc.RootElement.GetPropertySafe("data");
-                    arr = data.ValueKind == JsonValueKind.Array ? [.. data.EnumerateArray()] : [];
+                    var data = root["data"];
+                    arr = data is JsonArray dataArray ? [.. dataArray] : [];
                 }
-                else if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                else if (root is JsonArray rootArray)
                 {
-                    arr = [.. doc.RootElement.EnumerateArray()];
+                    arr = [.. rootArray];
                 }
                 else
                 {
@@ -339,7 +341,7 @@ public class GetModDependenciesTask : SequentialTask
                 var versions = new List<IndexedVersion>();
                 foreach (var entry in arr)
                 {
-                    if (entry.ValueKind != JsonValueKind.Object)
+                    if (entry is not JsonObject)
                     {
                         continue;
                     }

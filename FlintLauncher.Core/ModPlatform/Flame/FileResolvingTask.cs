@@ -172,8 +172,7 @@ public sealed class FileResolvingTask : FlintTask
                                 {
                                     try
                                     {
-                                        var entry = JsonUtils.ToOwnedElement(entryNode);
-                                        var file = ModrinthPackIndex.LoadIndexedPackVersion(entry);
+                                        var file = ModrinthPackIndex.LoadIndexedPackVersion(entryNode);
                                         outFile.Version.DownloadUrl = file.DownloadUrl;
                                     }
                                     catch (JsonParseException)

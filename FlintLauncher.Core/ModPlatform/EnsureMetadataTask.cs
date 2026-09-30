@@ -90,37 +90,26 @@ public sealed class EnsureMetadataTask : FlintTask
             return;
         }
 
-        JsonDocument doc;
+        JsonObject entriesObj;
         try
         {
-            doc = JsonDocument.Parse(versionRequest.BodyAsString);
+            entriesObj = JsonUtils.RequireObject(
+                JsonNode.Parse(versionRequest.BodyAsString), "version response");
         }
-        catch (JsonException e)
+        catch (JsonException)
         {
-            EmitFailed(e.Message);
+            EmitFailed("Version response is not a JSON object");
             return;
         }
 
-        using (doc)
         {
-            JsonObject entriesObj;
-            try
-            {
-                // QJsonObject-style access through the JsonObject-based JsonUtils helpers
-                entriesObj = JsonNode.Parse(doc.RootElement.GetRawText())!.AsObject();
-            }
-            catch (JsonException)
-            {
-                EmitFailed("Version response is not a JSON object");
-                return;
-            }
 
             foreach (var hash in _resources.Keys)
             {
                 var resource = _resources[hash];
                 try
                 {
-                    var entry = JsonUtils.RequireObject(entriesObj, hash);
+                    var entry = JsonUtils.RequireObject(entriesObj[hash], hash);
 
                     EmitStatus($"Parsing API response from Modrinth for '{resource.Name}'...");
                     _tempVersions[hash] = ModrinthPackIndex.LoadIndexedPackVersion(entry);
@@ -173,10 +162,11 @@ public sealed class EnsureMetadataTask : FlintTask
             return;
         }
 
-        JsonDocument projectDoc;
+        JsonNode projectDoc;
         try
         {
-            projectDoc = JsonDocument.Parse(projectRequest.BodyAsString);
+            projectDoc = JsonNode.Parse(projectRequest.BodyAsString)
+                ?? throw new JsonException("empty response");
         }
         catch (JsonException e)
         {
@@ -184,16 +174,15 @@ public sealed class EnsureMetadataTask : FlintTask
             return;
         }
 
-        using (projectDoc)
         {
             var entries = multiple
-                ? JsonUtils.RequireArray(projectDoc).EnumerateArray().ToList()
-                : [projectDoc.RootElement];
+                ? JsonUtils.RequireArray(projectDoc).ToList()
+                : [projectDoc];
 
             foreach (var entry in entries)
             {
                 IndexedPack pack;
-                JsonElement entryObj;
+                JsonNode entryObj;
                 try
                 {
                     entryObj = JsonUtils.RequireObject(entry);
@@ -251,29 +240,19 @@ public sealed class EnsureMetadataTask : FlintTask
             return;
         }
 
-        JsonDocument doc;
+        JsonObject entriesObj;
         try
         {
-            doc = JsonDocument.Parse(request.BodyAsString);
+            entriesObj = JsonUtils.RequireObject(
+                JsonNode.Parse(request.BodyAsString), "fingerprint response");
         }
-        catch (JsonException e)
+        catch (JsonException)
         {
-            EmitFailed(e.Message);
+            EmitFailed("Fingerprint response is not a JSON object");
             return;
         }
 
-        using (doc)
         {
-            JsonObject entriesObj;
-            try
-            {
-                entriesObj = JsonNode.Parse(doc.RootElement.GetRawText())!.AsObject();
-            }
-            catch (JsonException)
-            {
-                EmitFailed("Fingerprint response is not a JSON object");
-                return;
-            }
 
             var exactMatches = (entriesObj["data"] as JsonObject)?["exactMatches"] as JsonArray;
             if (exactMatches is null || exactMatches.Count == 0)
@@ -411,6 +390,7 @@ public sealed class EnsureMetadataTask : FlintTask
 
     private static JsonElement ToElement(JsonNode node)
     {
+        // phase-2 seam: the Flame loaders are still on the element read model
         return JsonUtils.ToOwnedElement(node);
     }
 

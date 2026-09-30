@@ -274,7 +274,8 @@ public static class ModPlatformEndpoints
                             }
                             try
                             {
-                                var version = ModrinthPackIndex.LoadIndexedPackVersion(entry);
+                                // entry is kind-checked as an object above: ToNode cannot yield null
+                                var version = ModrinthPackIndex.LoadIndexedPackVersion(JsonUtils.ToNode(entry)!);
                                 if (version.FileId.Length != 0)
                                 {
                                     pack.Versions.Add(version);

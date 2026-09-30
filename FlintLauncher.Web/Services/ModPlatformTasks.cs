@@ -17,6 +17,7 @@
 //  - ModsUpdateTask skips mods without packwiz metadata (the C++ update dialog reports them
 //    as an error row; the API surface has no per-resource error channel yet).
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
@@ -137,7 +138,9 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             {
                 try
                 {
-                    ModrinthPackIndex.LoadIndexedPack(pack, doc.RootElement);
+                    ModrinthPackIndex.LoadIndexedPack(pack,
+                        JsonUtils.ToNode(doc.RootElement)
+                        ?? throw new ModResolveException($"the Modrinth project {projectId} is not a JSON object"));
                 }
                 catch (JsonParseException e)
                 {
@@ -191,7 +194,9 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
                 throw new ModResolveException($"fetching the Modrinth version {versionId} failed: {pinnedRequest.FailReason}");
             }
             using var pinnedDoc = ParseBody(pinnedRequest.BodyAsString, $"the Modrinth version {versionId}");
-            return ModrinthPackIndex.LoadIndexedPackVersion(pinnedDoc.RootElement);
+            return ModrinthPackIndex.LoadIndexedPackVersion(
+                JsonUtils.ToNode(pinnedDoc.RootElement)
+                ?? throw new ModResolveException($"the Modrinth version {versionId} is not a JSON object"));
         }
         catch (JsonParseException e)
         {
@@ -263,7 +268,8 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
                 IndexedVersion file;
                 try
                 {
-                    file = ModrinthPackIndex.LoadIndexedPackVersion(entry);
+                    // entry is kind-checked as an object above: ToNode cannot yield null
+                    file = ModrinthPackIndex.LoadIndexedPackVersion(JsonUtils.ToNode(entry)!);
                 }
                 catch (JsonParseException)
                 {
@@ -278,6 +284,20 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         }
         versions.Sort((a, b) => string.CompareOrdinal(b.Date, a.Date));
         return versions.Count != 0 ? versions[0] : null;
+    }
+
+    /// <summary>Node-side parse for the Modrinth flows (single-DOM read model); the Flame
+    /// flows keep the element variant until their phase.</summary>
+    private static JsonNode? ParseBodyNode(string body, string what)
+    {
+        try
+        {
+            return JsonNode.Parse(body);
+        }
+        catch (JsonException e)
+        {
+            throw new ModResolveException($"{what} is invalid: {e.Message}");
+        }
     }
 
     private static JsonDocument ParseBody(string body, string what)

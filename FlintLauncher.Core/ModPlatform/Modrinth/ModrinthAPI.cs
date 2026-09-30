@@ -256,33 +256,30 @@ public sealed class ModrinthApi : ResourceApi
     public static List<Category> LoadCategories(string response, string projectType)
     {
         var categories = new List<Category>();
-        JsonDocument doc;
+        JsonArray? arr;
         try
         {
-            doc = JsonDocument.Parse(response);
+            arr = JsonNode.Parse(response) as JsonArray;
         }
         catch (JsonException)
         {
             return categories;
         }
 
-        using (doc)
+        if (arr is null)
         {
-            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+            return categories;
+        }
+        foreach (var cat in arr)
+        {
+            if (cat is not JsonObject)
             {
-                return categories;
+                continue;
             }
-            foreach (var cat in doc.RootElement.EnumerateArray())
+            var name = JsonUtils.EnsureString(cat.GetPropertySafe("name"));
+            if (cat.GetPropertySafe("project_type").AsString() == projectType)
             {
-                if (cat.ValueKind != JsonValueKind.Object)
-                {
-                    continue;
-                }
-                var name = JsonUtils.EnsureString(cat.GetPropertySafe("name"));
-                if (cat.GetPropertySafe("project_type").GetString() == projectType)
-                {
-                    categories.Add(new Category(name, name));
-                }
+                categories.Add(new Category(name, name));
             }
         }
         return categories;
@@ -554,45 +551,47 @@ public sealed class ModrinthApi : ResourceApi
     }
 
     /// <summary>Port of ResourceAPI::documentToArray for Modrinth (the "hits" array).</summary>
-    public static JsonElement DocumentToArray(JsonDocument obj) => JsonUtils.RequireObject(obj).GetPropertySafe("hits");
+    public static JsonArray DocumentToArray(JsonNode obj) => JsonUtils.RequireArray(obj["hits"], "hits");
 }
 
-/// <summary>Small QJsonObject-style accessor helpers shared by the Modrinth loaders.</summary>
+/// <summary>Small QJsonObject-style accessor helpers shared by the Modrinth loaders
+/// (JsonNode-based: the read side of the single-DOM model — see JsonUtils node family).</summary>
 internal static class ModrinthJsonExtensions
 {
-    /// <summary>obj["key"] equivalent: Undefined (empty) element when missing.</summary>
-    public static JsonElement GetPropertySafe(this JsonElement element, string name)
-    {
-        if (element.ValueKind != JsonValueKind.Object)
-        {
-            return JsonUtils.NullElement;
-        }
-        return element.TryGetProperty(name, out var value) ? value : JsonUtils.NullElement;
-    }
+    public static JsonNode? GetPropertySafe(this JsonNode? node, string name) => node is JsonObject obj ? obj[name] : null;
 
-    /// <summary>Port of the Json::requireX(parent, key) pattern over a JsonElement parent.</summary>
-    private static JsonElement Child(JsonElement parent, string key)
-    {
-        var localWhat = "'" + key + "'";
-        if (parent.ValueKind != JsonValueKind.Object || !parent.TryGetProperty(key, out var value))
-        {
-            throw new JsonParseException(localWhat + "s parent does not contain " + localWhat);
-        }
-        return value;
-    }
+    public static string? AsString(this JsonNode? node) =>
+        node is JsonValue value && value.TryGetValue<string>(out var s) ? s : null;
 
-    public static string RequireString(this JsonElement parent, string key)
-        => JsonUtils.RequireString(Child(parent, key), "'" + key + "'");
+    public static string RequireString(this JsonNode parent, string key)
+        => JsonUtils.RequireString(parent[key], "'" + key + "'");
 
-    public static bool RequireBoolean(this JsonElement parent, string key)
-        => JsonUtils.RequireBoolean(Child(parent, key), "'" + key + "'");
+    public static bool RequireBoolean(this JsonNode parent, string key)
+        => JsonUtils.RequireBoolean(parent[key], "'" + key + "'");
 
-    public static int RequireInteger(this JsonElement parent, string key)
-        => JsonUtils.RequireInteger(Child(parent, key), "'" + key + "'");
+    public static int RequireInteger(this JsonNode parent, string key)
+        => JsonUtils.RequireInteger(parent[key], "'" + key + "'");
 
-    public static JsonElement RequireObject(this JsonElement parent, string key)
-        => JsonUtils.RequireObject(Child(parent, key), "'" + key + "'");
+    public static JsonObject RequireObject(this JsonNode parent, string key)
+        => JsonUtils.RequireObject(parent[key], "'" + key + "'");
 
-    public static JsonElement RequireArray(this JsonElement parent, string key)
-        => JsonUtils.RequireArray(Child(parent, key), "'" + key + "'");
+    public static JsonArray RequireArray(this JsonNode parent, string key)
+        => JsonUtils.RequireArray(parent[key], "'" + key + "'");
+
+    // key + explicit what variants (the index parser labels every requirement with the file)
+
+    public static string RequireString(this JsonNode? parent, string key, string what)
+        => JsonUtils.RequireString(parent?[key], what);
+
+    public static bool RequireBoolean(this JsonNode? parent, string key, string what)
+        => JsonUtils.RequireBoolean(parent?[key], what);
+
+    public static int RequireInteger(this JsonNode? parent, string key, string what)
+        => JsonUtils.RequireInteger(parent?[key], what);
+
+    public static JsonObject RequireObject(this JsonNode? parent, string key, string what)
+        => JsonUtils.RequireObject(parent?[key], what);
+
+    public static JsonArray RequireArray(this JsonNode? parent, string key, string what)
+        => JsonUtils.RequireArray(parent?[key], what);
 }

@@ -80,6 +80,21 @@ public static class JsonUtils
         return RequireDocument(Encoding.UTF8.GetString(FileSystem.Read(filename)), what);
     }
 
+    /// <summary>Node-side RequireDocumentFromFile: same parse-error wrapping, no owned
+    /// document to dispose (the returned root is the single-DOM read model).</summary>
+    public static JsonNode RequireNodeFromFile(string filename, string what = "Document")
+    {
+        try
+        {
+            return JsonNode.Parse(Encoding.UTF8.GetString(FileSystem.Read(filename)))
+                ?? throw new JsonParseException(what + ": Error parsing JSON: document is null");
+        }
+        catch (JsonException e)
+        {
+            throw new JsonParseException(what + ": Error parsing JSON: " + e.Message);
+        }
+    }
+
     /// <summary>Port of Json::requireObject(QJsonDocument, what).</summary>
     public static JsonElement RequireObject(JsonDocument doc, string what = "Document")
     {
@@ -494,6 +509,15 @@ public static class JsonUtils
         return doc.RootElement.Clone();
     }
 
+    /// <summary>A JsonNode view of an element subtree (AOT-safe: text round-trip through
+    /// GetRawText/Parse — the only reflection-free route; inverse of ToOwnedElement).</summary>
+    public static JsonNode? ToNode(JsonElement element)
+    {
+        return element.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null
+            ? null
+            : JsonNode.Parse(element.GetRawText());
+    }
+
     /// <summary>A standalone JsonElement for a JsonNode subtree: parses into an owned
     /// document that is disposed immediately, returning a Clone that outlives it
     /// (AOT-safe; the former inline Parse(...).RootElement leaked the document).</summary>
@@ -613,6 +637,150 @@ public static class JsonUtils
     public static int EnsureInteger(JsonElement value, int def = 0)
     {
         return value.ValueKind == JsonValueKind.Number ? (int)value.GetDouble() : def;
+    }
+
+    // ------------------------------------------------- node-side family (single-DOM read model)
+    //
+    // The JsonNode mirrors of the Require*/Ensure* family above: same messages, same fallback
+    // and truncation semantics, so parsers can move from JsonElement to JsonNode (and off the
+    // element<->node conversion seams) without behavior drift. Number reads go through the
+    // underlying JsonElement when the value is parsed-backed and fall back to the typed
+    // primitives when a node was created in code — both routes agree with the element family
+    // for parsed documents.
+    //
+    // MIGRATION RULE: keep receiver variables typed **JsonNode**, never JsonObject. A
+    // JsonObject-typed receiver resolves to the (JsonObject, key, what) element-bridge
+    // overloads below (identity conversion beats the JsonNode upcast) and silently drags the
+    // parse back onto the element model.
+
+    /// <summary>Port of requireIsType&lt;QString&gt;.</summary>
+    public static string RequireString(JsonNode? value, string what = "Value")
+    {
+        return AsString(value) ?? throw new JsonParseException(what + " is not a string");
+    }
+
+    /// <summary>Port of requireIsType&lt;bool&gt;.</summary>
+    public static bool RequireBoolean(JsonNode? value, string what = "Value")
+    {
+        return AsBoolean(value) ?? throw new JsonParseException(what + " is not a bool");
+    }
+
+    /// <summary>Port of requireIsType&lt;double&gt;.</summary>
+    public static double RequireDouble(JsonNode? value, string what = "Value")
+    {
+        return AsNumber(value) ?? throw new JsonParseException(what + " is not a double");
+    }
+
+    /// <summary>Port of requireIsType&lt;int&gt; (integral check via fmod).</summary>
+    public static int RequireInteger(JsonNode? value, string what = "Value")
+    {
+        var doubl = RequireDouble(value, what);
+        if (doubl % 1 != 0)
+        {
+            throw new JsonParseException(what + " is not an integer");
+        }
+        return (int)doubl;
+    }
+
+    /// <summary>Port of requireIsType&lt;QJsonObject&gt;.</summary>
+    public static JsonObject RequireObject(JsonNode? value, string what = "Value")
+    {
+        return value as JsonObject ?? throw new JsonParseException(what + " is not an object");
+    }
+
+    /// <summary>Port of requireIsType&lt;QJsonArray&gt;.</summary>
+    public static JsonArray RequireArray(JsonNode? value, string what = "Value")
+    {
+        return value as JsonArray ?? throw new JsonParseException(what + " is not an array");
+    }
+
+    /// <summary>QJsonValue::toString(defaultValue) equivalent.</summary>
+    public static string EnsureString(JsonNode? value, string def = "")
+    {
+        return AsString(value) ?? def;
+    }
+
+    /// <summary>QJsonValue::toBool(defaultValue) equivalent.</summary>
+    public static bool EnsureBoolean(JsonNode? value, bool def = false)
+    {
+        return AsBoolean(value) ?? def;
+    }
+
+    /// <summary>QJsonValue::toDouble(defaultValue) equivalent.</summary>
+    public static double EnsureDouble(JsonNode? value, double def = 0)
+    {
+        return AsNumber(value) ?? def;
+    }
+
+    /// <summary>QJsonValue::toInt(defaultValue) equivalent (Qt truncates like a C cast).</summary>
+    public static int EnsureInteger(JsonNode? value, int def = 0)
+    {
+        return AsNumber(value) is { } number ? (int)number : def;
+    }
+
+    /// <summary>64-bit variant of EnsureInteger (file sizes, timestamps in ms).</summary>
+    public static long EnsureLong(JsonNode? value, long def = 0)
+    {
+        return AsNumber(value) is { } number ? (long)number : def;
+    }
+
+    // (parent, key, what) forms — the static invocation convention the parsers use
+    // (JsonUtils.RequireX(parent, key, what)); without these the JsonObject-keyed element
+    // overloads would silently win overload resolution for JsonNode parents
+
+    public static string RequireString(JsonNode? parent, string key, string what)
+        => RequireString(parent?[key], what);
+
+    public static bool RequireBoolean(JsonNode? parent, string key, string what)
+        => RequireBoolean(parent?[key], what);
+
+    public static double RequireDouble(JsonNode? parent, string key, string what)
+        => RequireDouble(parent?[key], what);
+
+    public static int RequireInteger(JsonNode? parent, string key, string what)
+        => RequireInteger(parent?[key], what);
+
+    public static JsonObject RequireObject(JsonNode? parent, string key, string what)
+        => RequireObject(parent?[key], what);
+
+    public static JsonArray RequireArray(JsonNode? parent, string key, string what)
+        => RequireArray(parent?[key], what);
+
+    private static string? AsString(JsonNode? node) =>
+        node is JsonValue value && value.TryGetValue<string>(out var s) ? s : null;
+
+    private static bool? AsBoolean(JsonNode? node)
+    {
+        if (node is not JsonValue value)
+        {
+            return null;
+        }
+        if (value.TryGetValue<bool>(out var b))
+        {
+            return b;
+        }
+        if (value.TryGetValue<JsonElement>(out var el) &&
+            el.ValueKind is JsonValueKind.True or JsonValueKind.False)
+        {
+            return el.GetBoolean();
+        }
+        return null;
+    }
+
+    private static double? AsNumber(JsonNode? node)
+    {
+        // Deliberately NOT TryGetValue<T>: its behavior differs between parsed-backed and
+        // created-primitive JsonValues (a parsed "42" refused TryGetValue<double> at
+        // runtime). The raw token text via ToJsonString is deterministic for every backing;
+        // non-number tokens simply fail the parse.
+        if (node is not JsonValue value)
+        {
+            return null;
+        }
+        return double.TryParse(
+            value.ToJsonString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var number)
+            ? number
+            : null;
     }
 
     // ------------------------------------------------------ settings helpers

@@ -158,10 +158,10 @@ public sealed class ModrinthCheckUpdate : FlintTask
     {
         EmitStatus("Parsing the API response from Modrinth...");
 
-        JsonDocument doc;
+        JsonNode entries;
         try
         {
-            doc = JsonDocument.Parse(response);
+            entries = JsonNode.Parse(response) ?? throw new JsonException("empty response");
         }
         catch (JsonException e)
         {
@@ -169,16 +169,13 @@ public sealed class ModrinthCheckUpdate : FlintTask
             return;
         }
 
-        using (doc)
         {
-            var entries = JsonNode.Parse(doc.RootElement.GetRawText())!.AsObject();
-
             var processed = new List<string>();
             foreach (var (hash, resource) in _mappings)
             {
                 // If the returned project is empty, but we have Modrinth metadata,
                 // it means this specific version is not available
-                if (!entries.TryGetPropertyValue(hash, out var projectNode) || projectNode is null)
+                if (entries[hash] is not { } projectNode)
                 {
                     // stays in the mappings for the next loader pass
                     continue;
@@ -203,8 +200,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
                 //   (explicit) usage of the loader_filter
                 // - The version reported by the JAR is different from the version reported by the
                 //   indexed version (it's usually the case)
-                var projectVer = ModrinthPackIndex.LoadIndexedPackVersion(
-                    JsonUtils.ToOwnedElement(projectNode), _hashType, loaderFilter);
+                var projectVer = ModrinthPackIndex.LoadIndexedPackVersion(projectNode, _hashType, loaderFilter);
                 if (projectVer.DownloadUrl.Length == 0)
                 {
                     // "Modrinth mod without download url!"

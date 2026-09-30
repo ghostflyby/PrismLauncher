@@ -264,9 +264,10 @@ public sealed class ModrinthCreationTask : InstanceTask
     {
         try
         {
-            using var doc = JsonUtils.RequireDocumentFromFile(indexPath, "modrinth.index.json");
-            JsonUtils.RequireObject(doc, "modrinth.index.json");
-            var obj = JsonNode.Parse(doc.RootElement.GetRawText())!.AsObject();
+            // JsonNode-typed on purpose: the JsonObject-keyed overloads would otherwise win
+            // the overload resolution and drag the parse back onto the element bridge
+            JsonNode obj = JsonUtils.RequireObject(
+                JsonUtils.RequireNodeFromFile(indexPath, "modrinth.index.json"), "modrinth.index.json");
             var formatVersion = JsonUtils.RequireInteger(obj, "formatVersion", "modrinth.index.json");
             if (formatVersion == 1)
             {
@@ -287,7 +288,7 @@ public sealed class ModrinthCreationTask : InstanceTask
 
                 var jsonFiles = JsonUtils.RequireArray(obj, "files", "modrinth.index.json");
                 var optionalFiles = new List<File>();
-                foreach (var modInfo in jsonFiles.EnumerateArray())
+                foreach (JsonNode modInfo in jsonFiles)
                 {
                     var file = new File
                     {
@@ -295,7 +296,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                     };
 
                     // 'env' field is optional
-                    if (modInfo.TryGetProperty("env", out var env) && env.ValueKind == JsonValueKind.Object && env.EnumerateObject().Any())
+                    if (modInfo.GetPropertySafe("env") is JsonObject { Count: > 0 } env)
                     {
                         var support = JsonUtils.EnsureString(env.GetPropertySafe("client"), "unsupported");
                         if (support == "unsupported")
@@ -315,9 +316,9 @@ public sealed class ModrinthCreationTask : InstanceTask
                     // Do not use a strict URL parser (the C++ uses QUrl's default TolerantMode,
                     // as Modrinth seems to incorrectly handle spaces)
                     var downloadArr = modInfo.GetPropertySafe("downloads");
-                    if (downloadArr.ValueKind == JsonValueKind.Array)
+                    if (downloadArr is JsonArray)
                     {
-                        var downloadList = downloadArr.EnumerateArray().Select(d => d.GetString() ?? "").ToList();
+                        var downloadList = ((JsonArray)downloadArr).Select(d => d.AsString() ?? "").ToList();
                         for (var i = 0; i < downloadList.Count; i++)
                         {
                             var isLast = i == downloadList.Count - 1;
@@ -367,28 +368,27 @@ public sealed class ModrinthCreationTask : InstanceTask
                 if (setInternalData)
                 {
                     var dependencies = JsonUtils.RequireObject(obj, "dependencies", "modrinth.index.json");
-                    foreach (var dependency in dependencies.EnumerateObject())
+                    foreach (var (name, dependency) in dependencies)
                     {
-                        var name = dependency.Name;
                         if (name == "minecraft")
                         {
-                            _minecraftVersion = JsonUtils.RequireString(dependency.Value, "Minecraft version");
+                            _minecraftVersion = JsonUtils.RequireString(dependency, "Minecraft version");
                         }
                         else if (name == "fabric-loader")
                         {
-                            _fabricVersion = JsonUtils.RequireString(dependency.Value, "Fabric Loader version");
+                            _fabricVersion = JsonUtils.RequireString(dependency, "Fabric Loader version");
                         }
                         else if (name == "quilt-loader")
                         {
-                            _quiltVersion = JsonUtils.RequireString(dependency.Value, "Quilt Loader version");
+                            _quiltVersion = JsonUtils.RequireString(dependency, "Quilt Loader version");
                         }
                         else if (name == "forge")
                         {
-                            _forgeVersion = JsonUtils.RequireString(dependency.Value, "Forge version");
+                            _forgeVersion = JsonUtils.RequireString(dependency, "Forge version");
                         }
                         else if (name == "neoforge")
                         {
-                            _neoForgeVersion = JsonUtils.RequireString(dependency.Value, "NeoForge version");
+                            _neoForgeVersion = JsonUtils.RequireString(dependency, "NeoForge version");
                         }
                         else
                         {
@@ -415,6 +415,13 @@ public sealed class ModrinthCreationTask : InstanceTask
     private static string ObjString(JsonObject obj, string key)
     {
         return obj.TryGetPropertyValue(key, out var node) && node is JsonValue value
+            && value.TryGetValue<string>(out var s) ? s : "";
+    }
+
+    /// <summary>ObjString over the node read model (ParseManifest works on JsonNode).</summary>
+    private static string ObjString(JsonNode? obj, string key)
+    {
+        return obj is JsonObject o && o.TryGetPropertyValue(key, out var node) && node is JsonValue value
             && value.TryGetValue<string>(out var s) ? s : "";
     }
 
