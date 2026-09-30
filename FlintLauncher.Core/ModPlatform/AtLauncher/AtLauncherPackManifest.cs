@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of modplatform/atlauncher/ATLPackManifest.{h,cpp}: the per-pack/version Configs.json
 // model (loader, libraries, mods incl. optional flags, configs checksum, keeps/deletes,
-// mainClass/extraArguments) with the exact fields the C++ loadVersion() reads.
+// mainClass/extraArguments) with the exact fields the C++ loadVersion() reads. Reads go
+// through the JsonNode model (single-DOM, the JsonUtils node-side family).
 using System.Text.Json.Nodes;
+using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.ModPlatform.AtLauncher;
 
@@ -175,6 +177,9 @@ public sealed class PackVersion
 
 public static class AtLauncherPackManifest
 {
+    /// <summary>QJsonObject::contains(key) equivalent: true even when the member holds JSON null.</summary>
+    private static bool Has(JsonNode? node, string key) => node is JsonObject map && map.ContainsKey(key);
+
     private static DownloadType ParseDownloadType(string rawType) => rawType switch
     {
         "server" => DownloadType.Server,
@@ -210,58 +215,58 @@ public static class AtLauncherPackManifest
 
     // ------------------------------------------------------------------ loaders
 
-    private static void LoadVersionLoader(VersionLoader p, JsonObject obj)
+    private static void LoadVersionLoader(VersionLoader p, JsonNode obj)
     {
-        p.Type = AtLauncherJson.RequireString(obj, "type");
-        p.Choose = AtLauncherJson.OptBool(obj, "choose");
+        p.Type = JsonUtils.RequireString(obj, "type", "'type'");
+        p.Choose = JsonUtils.EnsureBoolean(obj["choose"]);
 
-        var metadata = AtLauncherJson.RequireObject(obj, "metadata");
-        p.Latest = AtLauncherJson.OptBool(metadata, "latest");
-        p.Recommended = AtLauncherJson.OptBool(metadata, "recommended");
+        var metadata = (JsonNode)JsonUtils.RequireObject(obj, "metadata", "'metadata'");
+        p.Latest = JsonUtils.EnsureBoolean(metadata["latest"]);
+        p.Recommended = JsonUtils.EnsureBoolean(metadata["recommended"]);
 
         // Minecraft Forge
         if (p.Type == "forge" || p.Type == "neoforge")
         {
-            p.Version = AtLauncherJson.OptString(metadata, "version");
+            p.Version = JsonUtils.EnsureString(metadata["version"]);
         }
 
         // Fabric Loader
         if (p.Type == "fabric")
         {
-            p.Version = AtLauncherJson.OptString(metadata, "loader");
+            p.Version = JsonUtils.EnsureString(metadata["loader"]);
         }
     }
 
-    private static void LoadVersionLibrary(VersionLibrary p, JsonObject obj)
+    private static void LoadVersionLibrary(VersionLibrary p, JsonNode obj)
     {
-        p.Url = AtLauncherJson.RequireString(obj, "url");
-        p.File = AtLauncherJson.RequireString(obj, "file");
-        p.Md5 = AtLauncherJson.RequireString(obj, "md5");
+        p.Url = JsonUtils.RequireString(obj, "url", "'url'");
+        p.File = JsonUtils.RequireString(obj, "file", "'file'");
+        p.Md5 = JsonUtils.RequireString(obj, "md5", "'md5'");
 
-        p.DownloadRaw = AtLauncherJson.RequireString(obj, "download");
+        p.DownloadRaw = JsonUtils.RequireString(obj, "download", "'download'");
         p.Download = ParseDownloadType(p.DownloadRaw);
 
-        p.Server = AtLauncherJson.OptString(obj, "server");
+        p.Server = JsonUtils.EnsureString(obj["server"]);
     }
 
-    private static void LoadVersionConfigs(VersionConfigs p, JsonObject obj)
+    private static void LoadVersionConfigs(VersionConfigs p, JsonNode obj)
     {
-        p.Filesize = AtLauncherJson.OptInteger(obj, "filesize");
-        p.Sha1 = AtLauncherJson.RequireString(obj, "sha1");
+        p.Filesize = JsonUtils.EnsureInteger(obj["filesize"]);
+        p.Sha1 = JsonUtils.RequireString(obj, "sha1", "'sha1'");
     }
 
-    private static void LoadVersionMod(VersionMod p, JsonObject obj)
+    private static void LoadVersionMod(VersionMod p, JsonNode obj)
     {
-        p.Name = AtLauncherJson.RequireString(obj, "name");
-        p.ModVersion = AtLauncherJson.RequireString(obj, "version");
-        p.Url = AtLauncherJson.RequireString(obj, "url");
-        p.File = AtLauncherJson.RequireString(obj, "file");
-        p.Md5 = AtLauncherJson.OptString(obj, "md5");
+        p.Name = JsonUtils.RequireString(obj, "name", "'name'");
+        p.ModVersion = JsonUtils.RequireString(obj, "version", "'version'");
+        p.Url = JsonUtils.RequireString(obj, "url", "'url'");
+        p.File = JsonUtils.RequireString(obj, "file", "'file'");
+        p.Md5 = JsonUtils.EnsureString(obj["md5"]);
 
-        p.DownloadRaw = AtLauncherJson.RequireString(obj, "download");
+        p.DownloadRaw = JsonUtils.RequireString(obj, "download", "'download'");
         p.Download = ParseDownloadType(p.DownloadRaw);
 
-        p.TypeRaw = AtLauncherJson.RequireString(obj, "type");
+        p.TypeRaw = JsonUtils.RequireString(obj, "type", "'type'");
         p.Type = ParseModType(p.TypeRaw);
 
         // This contributes to the Minecraft Forge detection, where we rely on mod.type being "Forge"
@@ -274,73 +279,73 @@ public static class AtLauncherPackManifest
             p.Type = ModType.Forge;
         }
 
-        if (obj.ContainsKey("extractTo"))
+        if (Has(obj, "extractTo"))
         {
-            p.ExtractToRaw = AtLauncherJson.RequireString(obj, "extractTo");
+            p.ExtractToRaw = JsonUtils.RequireString(obj, "extractTo", "'extractTo'");
             p.ExtractTo = ParseModType(p.ExtractToRaw);
-            p.ExtractFolder = AtLauncherJson.OptString(obj, "extractFolder").Replace("%s%", "/");
+            p.ExtractFolder = JsonUtils.EnsureString(obj["extractFolder"]).Replace("%s%", "/");
         }
 
-        if (obj.ContainsKey("decompType"))
+        if (Has(obj, "decompType"))
         {
-            p.DecompTypeRaw = AtLauncherJson.RequireString(obj, "decompType");
+            p.DecompTypeRaw = JsonUtils.RequireString(obj, "decompType", "'decompType'");
             p.DecompType = ParseModType(p.DecompTypeRaw);
-            p.DecompFile = AtLauncherJson.RequireString(obj, "decompFile");
+            p.DecompFile = JsonUtils.RequireString(obj, "decompFile", "'decompFile'");
         }
 
-        p.Description = AtLauncherJson.OptString(obj, "description");
-        p.Optional = AtLauncherJson.OptBool(obj, "optional");
-        p.Recommended = AtLauncherJson.OptBool(obj, "recommended");
-        p.Selected = AtLauncherJson.OptBool(obj, "selected");
-        p.Hidden = AtLauncherJson.OptBool(obj, "hidden");
-        p.Library = AtLauncherJson.OptBool(obj, "library");
-        p.Group = AtLauncherJson.OptString(obj, "group");
-        if (obj.ContainsKey("depends"))
+        p.Description = JsonUtils.EnsureString(obj["description"]);
+        p.Optional = JsonUtils.EnsureBoolean(obj["optional"]);
+        p.Recommended = JsonUtils.EnsureBoolean(obj["recommended"]);
+        p.Selected = JsonUtils.EnsureBoolean(obj["selected"]);
+        p.Hidden = JsonUtils.EnsureBoolean(obj["hidden"]);
+        p.Library = JsonUtils.EnsureBoolean(obj["library"]);
+        p.Group = JsonUtils.EnsureString(obj["group"]);
+        if (Has(obj, "depends"))
         {
-            var dependsArr = AtLauncherJson.RequireArray(obj, "depends");
+            var dependsArr = JsonUtils.RequireArray(obj, "depends", "'depends'");
             foreach (var depends in dependsArr)
             {
-                p.Depends.Add(AtLauncherJson.RequireString(depends));
+                p.Depends.Add(JsonUtils.RequireString(depends));
             }
         }
-        p.Colour = AtLauncherJson.OptString(obj, "colour");
-        p.Warning = AtLauncherJson.OptString(obj, "warning");
+        p.Colour = JsonUtils.EnsureString(obj["colour"]);
+        p.Warning = JsonUtils.EnsureString(obj["warning"]);
 
-        p.Client = AtLauncherJson.OptBool(obj, "client");
+        p.Client = JsonUtils.EnsureBoolean(obj["client"]);
 
         // computed
         p.EffectivelyHidden = p.Hidden || p.Library;
     }
 
-    private static void LoadVersionMessages(VersionMessages m, JsonObject obj)
+    private static void LoadVersionMessages(VersionMessages m, JsonNode obj)
     {
-        m.Install = AtLauncherJson.OptString(obj, "install");
-        m.Update = AtLauncherJson.OptString(obj, "update");
+        m.Install = JsonUtils.EnsureString(obj["install"]);
+        m.Update = JsonUtils.EnsureString(obj["update"]);
     }
 
-    private static void LoadVersionMainClass(PackVersionMainClass m, JsonObject obj)
+    private static void LoadVersionMainClass(PackVersionMainClass m, JsonNode obj)
     {
-        m.MainClass = AtLauncherJson.OptString(obj, "mainClass");
-        m.Depends = AtLauncherJson.OptString(obj, "depends");
+        m.MainClass = JsonUtils.EnsureString(obj["mainClass"]);
+        m.Depends = JsonUtils.EnsureString(obj["depends"]);
     }
 
-    private static void LoadVersionExtraArguments(PackVersionExtraArguments a, JsonObject obj)
+    private static void LoadVersionExtraArguments(PackVersionExtraArguments a, JsonNode obj)
     {
-        a.Arguments = AtLauncherJson.OptString(obj, "arguments");
-        a.Depends = AtLauncherJson.OptString(obj, "depends");
+        a.Arguments = JsonUtils.EnsureString(obj["arguments"]);
+        a.Depends = JsonUtils.EnsureString(obj["depends"]);
     }
 
-    private static void LoadVersionKeep(VersionKeep k, JsonObject obj)
+    private static void LoadVersionKeep(VersionKeep k, JsonNode obj)
     {
-        k.Base = AtLauncherJson.RequireString(obj, "base");
-        k.Target = AtLauncherJson.RequireString(obj, "target");
+        k.Base = JsonUtils.RequireString(obj, "base", "'base'");
+        k.Target = JsonUtils.RequireString(obj, "target", "'target'");
     }
 
-    private static void LoadVersionKeeps(VersionKeeps k, JsonObject obj)
+    private static void LoadVersionKeeps(VersionKeeps k, JsonNode obj)
     {
-        if (obj.ContainsKey("files"))
+        if (Has(obj, "files"))
         {
-            foreach (var keepRaw in AtLauncherJson.RequireArray(obj, "files"))
+            foreach (var keepRaw in JsonUtils.RequireArray(obj, "files", "'files'"))
             {
                 var keep = new VersionKeep();
                 LoadVersionKeep(keep, AtLauncherJson.Object(keepRaw));
@@ -348,9 +353,9 @@ public static class AtLauncherPackManifest
             }
         }
 
-        if (obj.ContainsKey("folders"))
+        if (Has(obj, "folders"))
         {
-            foreach (var keepRaw in AtLauncherJson.RequireArray(obj, "folders"))
+            foreach (var keepRaw in JsonUtils.RequireArray(obj, "folders", "'folders'"))
             {
                 var keep = new VersionKeep();
                 LoadVersionKeep(keep, AtLauncherJson.Object(keepRaw));
@@ -359,17 +364,17 @@ public static class AtLauncherPackManifest
         }
     }
 
-    private static void LoadVersionDelete(VersionDelete d, JsonObject obj)
+    private static void LoadVersionDelete(VersionDelete d, JsonNode obj)
     {
-        d.Base = AtLauncherJson.RequireString(obj, "base");
-        d.Target = AtLauncherJson.RequireString(obj, "target");
+        d.Base = JsonUtils.RequireString(obj, "base", "'base'");
+        d.Target = JsonUtils.RequireString(obj, "target", "'target'");
     }
 
-    private static void LoadVersionDeletes(VersionDeletes d, JsonObject obj)
+    private static void LoadVersionDeletes(VersionDeletes d, JsonNode obj)
     {
-        if (obj.ContainsKey("files"))
+        if (Has(obj, "files"))
         {
-            foreach (var deleteRaw in AtLauncherJson.RequireArray(obj, "files"))
+            foreach (var deleteRaw in JsonUtils.RequireArray(obj, "files", "'files'"))
             {
                 var versionDelete = new VersionDelete();
                 LoadVersionDelete(versionDelete, AtLauncherJson.Object(deleteRaw));
@@ -377,9 +382,9 @@ public static class AtLauncherPackManifest
             }
         }
 
-        if (obj.ContainsKey("folders"))
+        if (Has(obj, "folders"))
         {
-            foreach (var deleteRaw in AtLauncherJson.RequireArray(obj, "folders"))
+            foreach (var deleteRaw in JsonUtils.RequireArray(obj, "folders", "'folders'"))
             {
                 var versionDelete = new VersionDelete();
                 LoadVersionDelete(versionDelete, AtLauncherJson.Object(deleteRaw));
@@ -389,30 +394,30 @@ public static class AtLauncherPackManifest
     }
 
     /// <summary>Port of ATLauncher::loadVersion.</summary>
-    public static void LoadVersion(PackVersion v, JsonObject obj)
+    public static void LoadVersion(PackVersion v, JsonNode obj)
     {
-        v.Version = AtLauncherJson.RequireString(obj, "version");
-        v.Minecraft = AtLauncherJson.RequireString(obj, "minecraft");
-        v.NoConfigs = AtLauncherJson.OptBool(obj, "noConfigs");
+        v.Version = JsonUtils.RequireString(obj, "version", "'version'");
+        v.Minecraft = JsonUtils.RequireString(obj, "minecraft", "'minecraft'");
+        v.NoConfigs = JsonUtils.EnsureBoolean(obj["noConfigs"]);
 
-        if (obj.ContainsKey("mainClass"))
+        if (Has(obj, "mainClass"))
         {
-            LoadVersionMainClass(v.MainClass, AtLauncherJson.RequireObject(obj, "mainClass"));
+            LoadVersionMainClass(v.MainClass, JsonUtils.RequireObject(obj, "mainClass", "'mainClass'"));
         }
 
-        if (obj.ContainsKey("extraArguments"))
+        if (Has(obj, "extraArguments"))
         {
-            LoadVersionExtraArguments(v.ExtraArguments, AtLauncherJson.RequireObject(obj, "extraArguments"));
+            LoadVersionExtraArguments(v.ExtraArguments, JsonUtils.RequireObject(obj, "extraArguments", "'extraArguments'"));
         }
 
-        if (obj.ContainsKey("loader"))
+        if (Has(obj, "loader"))
         {
-            LoadVersionLoader(v.Loader, AtLauncherJson.RequireObject(obj, "loader"));
+            LoadVersionLoader(v.Loader, JsonUtils.RequireObject(obj, "loader", "'loader'"));
         }
 
-        if (obj.ContainsKey("libraries"))
+        if (Has(obj, "libraries"))
         {
-            foreach (var libraryRaw in AtLauncherJson.RequireArray(obj, "libraries"))
+            foreach (var libraryRaw in JsonUtils.RequireArray(obj, "libraries", "'libraries'"))
             {
                 var target = new VersionLibrary();
                 LoadVersionLibrary(target, AtLauncherJson.Object(libraryRaw));
@@ -420,9 +425,9 @@ public static class AtLauncherPackManifest
             }
         }
 
-        if (obj.ContainsKey("mods"))
+        if (Has(obj, "mods"))
         {
-            foreach (var modRaw in AtLauncherJson.RequireArray(obj, "mods"))
+            foreach (var modRaw in JsonUtils.RequireArray(obj, "mods", "'mods'"))
             {
                 var mod = new VersionMod();
                 LoadVersionMod(mod, AtLauncherJson.Object(modRaw));
@@ -430,38 +435,38 @@ public static class AtLauncherPackManifest
             }
         }
 
-        if (obj.ContainsKey("configs"))
+        if (Has(obj, "configs"))
         {
-            LoadVersionConfigs(v.Configs, AtLauncherJson.RequireObject(obj, "configs"));
+            LoadVersionConfigs(v.Configs, JsonUtils.RequireObject(obj, "configs", "'configs'"));
         }
 
-        if (obj.TryGetPropertyValue("colours", out var coloursNode) && coloursNode is JsonObject colourObj)
+        if (obj["colours"] is JsonObject colourObj)
         {
             foreach (var (key, value) in colourObj)
             {
-                v.Colours[key] = AtLauncherJson.OptString(value);
+                v.Colours[key] = JsonUtils.EnsureString(value);
             }
         }
 
-        if (obj.TryGetPropertyValue("warnings", out var warningsNode) && warningsNode is JsonObject warningObj)
+        if (obj["warnings"] is JsonObject warningObj)
         {
             foreach (var (key, value) in warningObj)
             {
-                v.Warnings[key] = AtLauncherJson.OptString(value);
+                v.Warnings[key] = JsonUtils.EnsureString(value);
             }
         }
 
-        if (obj.TryGetPropertyValue("messages", out var messagesNode) && messagesNode is JsonObject messages)
+        if (obj["messages"] is JsonObject messages)
         {
             LoadVersionMessages(v.Messages, messages);
         }
 
-        if (obj.TryGetPropertyValue("keeps", out var keepsNode) && keepsNode is JsonObject keeps)
+        if (obj["keeps"] is JsonObject keeps)
         {
             LoadVersionKeeps(v.Keeps, keeps);
         }
 
-        if (obj.TryGetPropertyValue("deletes", out var deletesNode) && deletesNode is JsonObject deletes)
+        if (obj["deletes"] is JsonObject deletes)
         {
             LoadVersionDeletes(v.Deletes, deletes);
         }

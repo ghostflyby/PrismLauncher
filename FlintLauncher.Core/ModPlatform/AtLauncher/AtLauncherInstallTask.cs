@@ -49,18 +49,24 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
         Update,
     }
 
-    public AtLauncherPackInstallTask(string packName, string version, InstallMode installMode = InstallMode.Install)
+    public AtLauncherPackInstallTask(string packName, string version,
+        InstallMode installMode = InstallMode.Install, AtLauncherApi? api = null)
     {
         PackName = packName;
         PackSafeName = AtLauncherPackIndex.SafePackName(packName);
         VersionName = version;
         InstallModeValue = installMode;
+        _api = api ?? new AtLauncherApi();
     }
 
     public string PackName { get; }
     public string PackSafeName { get; }
     public string VersionName { get; }
     public InstallMode InstallModeValue { get; }
+
+    /// <summary>The injected ATLauncher client (URL builders + the net stack the pack's
+    /// requests ride; per-instance since the DownloadServerUrl de-singletoning).</summary>
+    private readonly AtLauncherApi _api;
 
     /// <summary>APPLICATION->metacache() hook ("ATLauncherPacks" base); null = plain downloads.</summary>
     public HttpMetaCache? MetaCache { get; set; }
@@ -111,7 +117,8 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
         EmitStatus("Fetching pack version...");
 
         var netJob = new NetJob("ATLauncher::VersionFetch");
-        var request = NetRequest.MakeByteArray(new Uri(AtLauncherApi.PackConfigsUrl(PackSafeName, VersionName)));
+        var request = NetRequest.MakeByteArray(new Uri(_api.PackConfigsUrl(PackSafeName, VersionName)),
+            stack: _api.Net);
         netJob.AddNetRequest(request);
         await netJob.StartAsync(cancellationToken);
         if (!netJob.WasSuccessful)
@@ -126,8 +133,8 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
     {
         try
         {
-            using var doc = JsonUtils.RequireDocument(response, "JSON response from ATLauncher");
-            AtLauncherPackManifest.LoadVersion(_version, AtLauncherJson.Object(doc.RootElement));
+            var root = AtLauncherJson.RequireDocument(response, "JSON response from ATLauncher");
+            AtLauncherPackManifest.LoadVersion(_version, AtLauncherJson.Object(root));
         }
         catch (JsonParseException e)
         {
@@ -496,7 +503,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
             switch (lib.Download)
             {
                 case DownloadType.Server:
-                    library.SetAbsoluteUrl(AtLauncherApi.DownloadServerUrl + lib.Url);
+                    library.SetAbsoluteUrl(_api.DownloadServerUrl + lib.Url);
                     break;
                 case DownloadType.Direct:
                     library.SetAbsoluteUrl(lib.Url);
@@ -636,20 +643,20 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
         EmitStatus("Downloading configs...");
 
         var path = $"Configs/{PackSafeName}/{VersionName}.zip";
-        var url = AtLauncherApi.PackConfigsZipUrl(PackSafeName, VersionName);
+        var url = _api.PackConfigsZipUrl(PackSafeName, VersionName);
 
         NetRequest dl;
         if (MetaCache is not null)
         {
             var entry = MetaCache.ResolveEntry("ATLauncherPacks", path);
             entry.SetStale(true);
-            dl = NetRequest.MakeCached(MetaCache, new Uri(url), entry);
+            dl = NetRequest.MakeCached(MetaCache, new Uri(url), entry, stack: _api.Net);
             _archivePath = entry.GetFullPath();
         }
         else
         {
             _archivePath = TempCachePath(path);
-            dl = NetRequest.MakeFile(new Uri(url), _archivePath);
+            dl = NetRequest.MakeFile(new Uri(url), _archivePath, stack: _api.Net);
         }
 
         if (_version.Configs.Sha1.Length != 0)
@@ -730,7 +737,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
             switch (mod.Download)
             {
                 case DownloadType.Server:
-                    url = AtLauncherApi.DownloadServerUrl + mod.Url;
+                    url = _api.DownloadServerUrl + mod.Url;
                     break;
                 case DownloadType.Browser:
                     {
@@ -913,12 +920,12 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
             var entry = MetaCache.ResolveEntry("ATLauncherPacks", cacheName);
             entry.SetStale(true);
             cachePath = entry.GetFullPath();
-            dl = NetRequest.MakeCached(MetaCache, new Uri(url), entry);
+            dl = NetRequest.MakeCached(MetaCache, new Uri(url), entry, stack: _api.Net);
         }
         else
         {
             cachePath = TempCachePath(cacheName);
-            dl = NetRequest.MakeFile(new Uri(url), cachePath);
+            dl = NetRequest.MakeFile(new Uri(url), cachePath, stack: _api.Net);
         }
 
         if (mod.Md5.Length != 0)

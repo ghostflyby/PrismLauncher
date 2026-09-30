@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of modplatform/atlauncher/ATLPackIndex.{h,cpp}: the packsnew.json index model
 // (IndexedPack/IndexedVersion) and its parser. The safeName is the C++ normalized pack
-// image name ("[^A-Za-z0-9]" stripped, lowercased, ".png" appended).
+// image name ("[^A-Za-z0-9]" stripped, lowercased, ".png" appended). Reads go through the
+// JsonNode model (single-DOM, the JsonUtils node-side family).
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.ModPlatform.AtLauncher;
 
@@ -28,30 +30,30 @@ public sealed class IndexedPack
 
 public static partial class AtLauncherPackIndex
 {
-    private static void LoadIndexedVersion(IndexedVersion v, JsonObject obj)
+    private static void LoadIndexedVersion(IndexedVersion v, JsonNode obj)
     {
-        v.Version = AtLauncherJson.RequireString(obj, "version");
-        v.Minecraft = AtLauncherJson.RequireString(obj, "minecraft");
+        v.Version = JsonUtils.RequireString(obj, "version", "'version'");
+        v.Minecraft = JsonUtils.RequireString(obj, "minecraft", "'minecraft'");
     }
 
     /// <summary>Port of ATLauncher::loadIndexedPack.</summary>
-    public static void LoadIndexedPack(IndexedPack m, JsonObject obj)
+    public static void LoadIndexedPack(IndexedPack m, JsonNode obj)
     {
-        m.Id = AtLauncherJson.RequireInteger(obj, "id");
-        m.Position = AtLauncherJson.RequireInteger(obj, "position");
-        m.Name = AtLauncherJson.RequireString(obj, "name");
-        m.Type = AtLauncherJson.RequireString(obj, "type") == "private" ? PackType.Private : PackType.Public;
-        var versionsArr = AtLauncherJson.RequireArray(obj, "versions");
+        m.Id = JsonUtils.RequireInteger(obj, "id", "'id'");
+        m.Position = JsonUtils.RequireInteger(obj, "position", "'position'");
+        m.Name = JsonUtils.RequireString(obj, "name", "'name'");
+        m.Type = JsonUtils.RequireString(obj, "type", "'type'") == "private" ? PackType.Private : PackType.Public;
+        var versionsArr = JsonUtils.RequireArray(obj, "versions", "'versions'");
         foreach (var versionRaw in versionsArr)
         {
             var version = new IndexedVersion();
             LoadIndexedVersion(version, AtLauncherJson.Object(versionRaw));
             m.Versions.Add(version);
         }
-        m.System = AtLauncherJson.OptBool(obj, "system");
-        m.Description = AtLauncherJson.OptString(obj, "description");
+        m.System = JsonUtils.EnsureBoolean(obj["system"]);
+        m.Description = JsonUtils.EnsureString(obj["description"]);
 
-        m.SafeName = SafePackName(AtLauncherJson.RequireString(obj, "name")).ToLowerInvariant() + ".png";
+        m.SafeName = SafePackName(JsonUtils.RequireString(obj, "name", "'name'")).ToLowerInvariant() + ".png";
     }
 
     /// <summary>The "[^A-Za-z0-9]" -> "" replacement shared with the install task's packSafeName.</summary>

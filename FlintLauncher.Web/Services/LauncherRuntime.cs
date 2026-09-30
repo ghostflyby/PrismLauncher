@@ -7,6 +7,7 @@ using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Net;
+using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.ModPlatform.Technic;
@@ -30,6 +31,8 @@ public sealed class LauncherRuntime
     public FlameApi Flame { get; }
     /// <summary>The Technic client — same injection story as Modrinth/Flame.</summary>
     public TechnicApi Technic { get; }
+    /// <summary>The ATLauncher client — same injection story as Modrinth/Flame/Technic.</summary>
+    public AtLauncherApi AtLauncher { get; }
     public IniSettingsObject GlobalSettings { get; }
     public InstanceList Instances { get; }
     public AccountList Accounts { get; }
@@ -37,13 +40,14 @@ public sealed class LauncherRuntime
     public NewsChecker News { get; }
 
     public LauncherRuntime(FlintPaths paths, NetStack? net = null, ModrinthApi? modrinth = null,
-        FlameApi? flame = null, TechnicApi? technic = null)
+        FlameApi? flame = null, TechnicApi? technic = null, AtLauncherApi? atlauncher = null)
     {
         Paths = paths;
         Net = net ?? NetStack.Default;
         Modrinth = modrinth ?? new ModrinthApi(Net);
         Flame = flame ?? new FlameApi(Net);
         Technic = technic ?? new TechnicApi(Net);
+        AtLauncher = atlauncher ?? new AtLauncherApi(Net);
         var dataDir = paths.DataDir;
 
         // global config: flint.cfg first, importing an existing Prism/PolyMC config like the

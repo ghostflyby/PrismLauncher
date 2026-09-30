@@ -5,9 +5,8 @@
 // AtLauncherPackInstallTask the core tests drive directly) and the failure surface
 // (unknown pack -> 500 creation_failed with the task's FailReason, validation -> 400).
 //
-// [Collection("AtLauncherApi")] matches AtLauncherTests: the ATL download-server/API URL
-// hooks are process-global statics, so every suite that touches them must not run in
-// parallel (the endpoint under test also saves/restores them around the install call).
+// Every host gets its own AtLauncherApi client pointed at the stub (DownloadServerUrl/
+// ApiBaseUrl are per-instance state now, so no [Collection] serialization is needed).
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -18,22 +17,23 @@ using Xunit;
 
 namespace Flint.Tests;
 
-[Collection("AtLauncherApi")]
 public class AtLauncherApiEndpointsTests : IDisposable
 {
     private readonly StubAtlServer _server = new();
+    private readonly AtLauncherApi _api;
 
     public AtLauncherApiEndpointsTests()
     {
         // both URL hooks point at the stub (note the trailing slash like the C++ defaults)
-        AtLauncherApi.DownloadServerUrl = _server.Url + "/";
-        AtLauncherApi.ApiBaseUrl = _server.Url + "/";
+        _api = new AtLauncherApi
+        {
+            DownloadServerUrl = _server.Url + "/",
+            ApiBaseUrl = _server.Url + "/",
+        };
     }
 
     public void Dispose()
     {
-        AtLauncherApi.DownloadServerUrl = FlintLauncher.Core.FlintConfig.Default.AtlDownloadServerUrl;
-        AtLauncherApi.ApiBaseUrl = FlintLauncher.Core.FlintConfig.Default.AtlApiBaseUrl;
         _server.Dispose();
     }
 
@@ -68,7 +68,7 @@ public class AtLauncherApiEndpointsTests : IDisposable
     public async Task Packs_PassThrough_Index()
     {
         _server.PacksNewJson = PacksNewJson;
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(atlauncher: _api);
 
         var response = await host.GetAsync("/api/v1/modplatform/atlauncher/packs");
         response.EnsureSuccessStatusCode();
@@ -93,7 +93,7 @@ public class AtLauncherApiEndpointsTests : IDisposable
     public async Task Pack_Versions_FromIndex()
     {
         _server.PacksNewJson = PacksNewJson;
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(atlauncher: _api);
 
         var response = await host.GetAsync(
             "/api/v1/modplatform/atlauncher/packs/" + Uri.EscapeDataString("Public Pack") + "/versions");
@@ -116,7 +116,7 @@ public class AtLauncherApiEndpointsTests : IDisposable
     {
         var fixture = AtlPackFixture.Create();
         fixture.Register(_server);
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(atlauncher: _api);
 
         var post = await host.PostAsync("/api/v1/modplatform/atlauncher/install", new
         {
@@ -166,7 +166,7 @@ public class AtLauncherApiEndpointsTests : IDisposable
         var fixture = AtlPackFixture.Create(
             """{"type":"fabric","choose":true,"metadata":{"loader":"","latest":false,"recommended":false}}""");
         fixture.Register(_server);
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(atlauncher: _api);
 
         var post = await host.PostAsync("/api/v1/modplatform/atlauncher/install", new
         {
@@ -187,15 +187,14 @@ public class AtLauncherApiEndpointsTests : IDisposable
     }
 
     [Fact]
-    public async Task Install_ServerUrlOverride_IsHonored_AndHooksAreRestored()
+    public async Task Install_ServerUrlOverride_IsHonored_WithoutTouchingTheClient()
     {
         var fixture = AtlPackFixture.Create();
         fixture.Register(_server);
-        await using var host = await FlintApiHost.StartAsync();
-
-        // a dead static forces the request's serverUrl override to be the only working route
-        AtLauncherApi.DownloadServerUrl = "http://127.0.0.1:9/";
-        var previous = AtLauncherApi.DownloadServerUrl;
+        // a dead base on the injected client forces the request's serverUrl override to be
+        // the only working route
+        var api = new AtLauncherApi { DownloadServerUrl = "http://127.0.0.1:9/" };
+        await using var host = await FlintApiHost.StartAsync(atlauncher: api);
 
         var post = await host.PostAsync("/api/v1/modplatform/atlauncher/install", new
         {
@@ -205,8 +204,8 @@ public class AtLauncherApiEndpointsTests : IDisposable
         });
         Assert.Equal(HttpStatusCode.Created, post.StatusCode);
 
-        // the static hooks were restored after the call (the bogus value is still in place)
-        Assert.Equal(previous, AtLauncherApi.DownloadServerUrl);
+        // the override is a per-request derived client: the injected client's base is untouched
+        Assert.Equal("http://127.0.0.1:9/", api.DownloadServerUrl);
         Assert.True(File.Exists(Path.Combine(host.DataDir, "instances", fixture.PackName,
             "minecraft", "mods", "required.jar")));
     }
@@ -214,7 +213,7 @@ public class AtLauncherApiEndpointsTests : IDisposable
     [Fact]
     public async Task Install_UnknownPack_ReturnsCreationFailed_WithTaskMessage()
     {
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(atlauncher: _api);
 
         var post = await host.PostAsync("/api/v1/modplatform/atlauncher/install", new
         {
@@ -235,7 +234,7 @@ public class AtLauncherApiEndpointsTests : IDisposable
     [Fact]
     public async Task Install_Validation_Errors()
     {
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(atlauncher: _api);
 
         var missingVersion = await host.PostAsync("/api/v1/modplatform/atlauncher/install",
             new { name = "Test Pack" });

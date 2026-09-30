@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of modplatform/atlauncher/ATLShareCode.{h,cpp}: the {AtlApiBaseUrl}share-codes/{code}
-// response model (the optional-mod selection encoded by the ATLauncher website).
+// response model (the optional-mod selection encoded by the ATLauncher website). Reads go
+// through the JsonNode model (single-DOM, the JsonUtils node-side family).
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 
@@ -29,19 +30,19 @@ public sealed class ShareCodeResponse
 
 public static class AtLauncherShareCode
 {
-    private static void LoadShareCodeMod(ShareCodeMod m, JsonObject obj)
+    private static void LoadShareCodeMod(ShareCodeMod m, JsonNode obj)
     {
-        m.Selected = JsonUtils.RequireBoolean(obj, "selected");
-        m.Name = JsonUtils.RequireString(obj, "name");
+        m.Selected = JsonUtils.RequireBoolean(obj, "selected", "'selected'");
+        m.Name = JsonUtils.RequireString(obj, "name", "'name'");
     }
 
-    private static void LoadShareCode(ShareCode c, JsonObject obj)
+    private static void LoadShareCode(ShareCode c, JsonNode obj)
     {
-        c.Pack = JsonUtils.RequireString(obj, "pack");
-        c.Version = JsonUtils.RequireString(obj, "version");
+        c.Pack = JsonUtils.RequireString(obj, "pack", "'pack'");
+        c.Version = JsonUtils.RequireString(obj, "version", "'version'");
 
-        var mods = AtLauncherJson.RequireObject(obj, "mods");
-        var optional = AtLauncherJson.RequireArray(mods, "optional");
+        var mods = (JsonNode)JsonUtils.RequireObject(obj, "mods", "'mods'");
+        var optional = JsonUtils.RequireArray(mods, "optional", "'optional'");
         foreach (var modRaw in optional)
         {
             var mod = new ShareCodeMod();
@@ -51,20 +52,20 @@ public static class AtLauncherShareCode
     }
 
     /// <summary>Port of ATLauncher::loadShareCodeResponse.</summary>
-    public static void LoadShareCodeResponse(ShareCodeResponse r, JsonObject obj)
+    public static void LoadShareCodeResponse(ShareCodeResponse r, JsonNode obj)
     {
-        r.Error = JsonUtils.RequireBoolean(obj, "error");
-        r.Code = JsonUtils.RequireInteger(obj, "code");
+        r.Error = JsonUtils.RequireBoolean(obj, "error", "'error'");
+        r.Code = JsonUtils.RequireInteger(obj, "code", "'code'");
 
-        if (obj.ContainsKey("message") && obj["message"] is not null
-            && obj["message"]!.GetValueKind() != System.Text.Json.JsonValueKind.Null)
+        if (obj["message"] is JsonValue messageValue
+            && messageValue.GetValueKind() != System.Text.Json.JsonValueKind.Null)
         {
-            r.Message = JsonUtils.RequireString(obj, "message");
+            r.Message = JsonUtils.RequireString(obj, "message", "'message'");
         }
 
         if (!r.Error)
         {
-            var dataRaw = AtLauncherJson.RequireObject(obj, "data");
+            var dataRaw = JsonUtils.RequireObject(obj, "data", "'data'");
             LoadShareCode(r.Data, dataRaw);
         }
     }
