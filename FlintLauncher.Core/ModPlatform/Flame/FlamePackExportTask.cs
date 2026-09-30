@@ -345,7 +345,7 @@ public sealed class FlamePackExportTask : FlintTask
                 }
                 else
                 {
-                    entries = [.. JsonUtils.RequireArray(data, "'data'")];
+                    entries = JsonUtils.ToNodeList(JsonUtils.RequireArray(data, "'data'"));
                 }
 
                 foreach (var entryObj in entries)

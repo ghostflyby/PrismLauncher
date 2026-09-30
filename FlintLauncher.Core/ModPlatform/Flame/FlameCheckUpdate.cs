@@ -270,7 +270,7 @@ public sealed class FlameCheckUpdate : FlintTask
                         }
                         else
                         {
-                            entries = [.. JsonUtils.RequireArray(data, "'data'")];
+                            entries = JsonUtils.ToNodeList(JsonUtils.RequireArray(data, "'data'"));
                         }
 
                         foreach (var entryObj in entries.Where(e => e is not null))

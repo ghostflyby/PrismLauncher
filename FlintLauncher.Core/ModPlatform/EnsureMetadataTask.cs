@@ -344,7 +344,7 @@ public sealed class EnsureMetadataTask : FlintTask
                 var rootObj = JsonUtils.RequireObject(projectDoc);
                 var data = FlameJson.Ptr(rootObj, "data");
                 entries = multiple
-                    ? [.. JsonUtils.RequireArray(data, "'data'")]
+                    ? JsonUtils.ToNodeList(JsonUtils.RequireArray(data, "'data'"))
                     : [JsonUtils.RequireObject(data, "'data'")];
             }
             catch (JsonParseException)

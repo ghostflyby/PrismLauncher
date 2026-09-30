@@ -324,11 +324,11 @@ public class GetModDependenciesTask : SequentialTask
                 {
                     // the Flame {"data": [...]} shape; anything else parses to an empty list
                     var data = root["data"];
-                    arr = data is JsonArray dataArray ? [.. dataArray] : [];
+                    arr = data is JsonArray dataArray ? JsonUtils.ToNodeList(dataArray) : [];
                 }
                 else if (root is JsonArray rootArray)
                 {
-                    arr = [.. rootArray];
+                    arr = JsonUtils.ToNodeList(rootArray);
                 }
                 else
                 {

@@ -223,8 +223,12 @@ public sealed class FileResolvingTask : FlintTask
                 {
                     var entries = FlameJson.RequireArray(doc, "data");
 
-                    foreach (var entryObj in entries)
+                    foreach (var entry in entries)
                     {
+                        if (entry is not JsonObject entryObj)
+                        {
+                            continue;
+                        }
                         var id = FlameJson.RequireInteger(entryObj, "id");
                         var file = _manifest.Files.Values.FirstOrDefault(f => f.ProjectId == id);
                         if (file is null)

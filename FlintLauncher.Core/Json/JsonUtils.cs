@@ -509,6 +509,14 @@ public static class JsonUtils
         return doc.RootElement.Clone();
     }
 
+    /// <summary>Materialize a JsonArray as a list of non-null nodes (JSON null entries are
+    /// junk for every reader here and are dropped, matching the element kind checks that
+    /// used to reject them downstream).</summary>
+    public static List<JsonNode> ToNodeList(JsonArray array)
+    {
+        return array.Where(n => n is not null).Select(n => n!).ToList();
+    }
+
     /// <summary>A JsonNode view of an element subtree (AOT-safe: text round-trip through
     /// GetRawText/Parse — the only reflection-free route; inverse of ToOwnedElement).</summary>
     public static JsonNode? ToNode(JsonElement element)

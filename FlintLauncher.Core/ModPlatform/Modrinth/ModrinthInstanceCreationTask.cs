@@ -288,8 +288,12 @@ public sealed class ModrinthCreationTask : InstanceTask
 
                 var jsonFiles = JsonUtils.RequireArray(obj, "files", "modrinth.index.json");
                 var optionalFiles = new List<File>();
-                foreach (JsonNode modInfo in jsonFiles)
+                foreach (var modInfoNode in jsonFiles)
                 {
+                    if (modInfoNode is not JsonObject modInfo)
+                    {
+                        throw new JsonParseException("modrinth.index.json: files entry is not an object");
+                    }
                     var file = new File
                     {
                         Path = modInfo.RequireString("path").Replace("\\", "/"),
