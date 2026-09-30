@@ -90,36 +90,36 @@ public sealed class CheckJava : LaunchStep
         switch (result.Validity)
         {
             case JavaChecker.Validity.Errored:
-            {
-                // Error message displayed if java can't start
-                EmitLogLine("Could not start java:", MessageLevel.Error);
-                EmitLogLines(result.ErrorLog.Split('\n'), MessageLevel.Error);
-                EmitLogLine("\nCheck your Java settings.", MessageLevel.Launcher);
-                EmitFailed("Could not start java!");
-                return;
-            }
+                {
+                    // Error message displayed if java can't start
+                    EmitLogLine("Could not start java:", MessageLevel.Error);
+                    EmitLogLines(result.ErrorLog.Split('\n'), MessageLevel.Error);
+                    EmitLogLine("\nCheck your Java settings.", MessageLevel.Launcher);
+                    EmitFailed("Could not start java!");
+                    return;
+                }
             case JavaChecker.Validity.ReturnedInvalidData:
-            {
-                EmitLogLine("Java checker returned some invalid data we don't understand:", MessageLevel.Error);
-                EmitLogLines(result.OutLog.Split('\n'), MessageLevel.Warning);
-                EmitLogLine("\nMinecraft might not start properly.", MessageLevel.Launcher);
-                Parent.Instance.UpdateRuntimeContext();
-                EmitSucceeded();
-                return;
-            }
+                {
+                    EmitLogLine("Java checker returned some invalid data we don't understand:", MessageLevel.Error);
+                    EmitLogLines(result.OutLog.Split('\n'), MessageLevel.Warning);
+                    EmitLogLine("\nMinecraft might not start properly.", MessageLevel.Launcher);
+                    Parent.Instance.UpdateRuntimeContext();
+                    EmitSucceeded();
+                    return;
+                }
             case JavaChecker.Validity.Valid:
-            {
-                var instance = Parent.Instance;
-                PrintJavaInfo(result.JavaVersion.ToString(), result.MojangPlatform, result.RealPlatform, result.JavaVendor);
-                instance.Settings().Set("JavaVersion", result.JavaVersion.ToString());
-                instance.Settings().Set("JavaArchitecture", result.MojangPlatform);
-                instance.Settings().Set("JavaRealArchitecture", result.RealPlatform);
-                instance.Settings().Set("JavaVendor", result.JavaVendor);
-                instance.Settings().Set("JavaSignature", _javaSignature);
-                Parent.Instance.UpdateRuntimeContext();
-                EmitSucceeded();
-                return;
-            }
+                {
+                    var instance = Parent.Instance;
+                    PrintJavaInfo(result.JavaVersion.ToString(), result.MojangPlatform, result.RealPlatform, result.JavaVendor);
+                    instance.Settings().Set("JavaVersion", result.JavaVersion.ToString());
+                    instance.Settings().Set("JavaArchitecture", result.MojangPlatform);
+                    instance.Settings().Set("JavaRealArchitecture", result.RealPlatform);
+                    instance.Settings().Set("JavaVendor", result.JavaVendor);
+                    instance.Settings().Set("JavaSignature", _javaSignature);
+                    Parent.Instance.UpdateRuntimeContext();
+                    EmitSucceeded();
+                    return;
+                }
             default:
                 return;
         }

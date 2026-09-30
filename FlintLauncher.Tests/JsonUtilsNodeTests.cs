@@ -98,4 +98,53 @@ public class JsonUtilsNodeTests
         // cloned stand-ins stay usable across many reads (they outlive their documents)
         Assert.Equal("", JsonUtils.EnsureString(JsonUtils.NullElement));
     }
+
+    [Fact]
+    public void RequireBooleanAndDouble_KindChecked()
+    {
+        JsonNode obj = Object("""{"b":true, "d":1.5, "n":42, "s":"x", "z":null}""");
+        Assert.True(JsonUtils.RequireBoolean(obj["b"], "b"));
+        Assert.Equal(1.5, JsonUtils.RequireDouble(obj["d"], "d"));
+        Assert.Throws<JsonParseException>(() => JsonUtils.RequireBoolean(obj["n"], "n"));
+        Assert.Throws<JsonParseException>(() => JsonUtils.RequireDouble(obj["s"], "s"));
+        Assert.Throws<JsonParseException>(() => JsonUtils.RequireBoolean(obj["z"], "z"));
+        Assert.Throws<JsonParseException>(() => JsonUtils.RequireDouble(missing(obj), "nope"));
+
+        static JsonNode? missing(JsonNode o) => o["nope"];
+    }
+
+    [Fact]
+    public void EnsureLong_And_EnsureDouble_MirrorElementSemantics()
+    {
+        JsonNode obj = Object("""{"big":9007199254740992, "d":2.75, "s":"1", "z":null}""");
+        Assert.Equal(9007199254740992, JsonUtils.EnsureLong(obj["big"])); // 2^53: beyond GetDouble precision, same as element family
+        Assert.Equal(2.75, JsonUtils.EnsureDouble(obj["d"]));
+        Assert.Equal(0, JsonUtils.EnsureDouble(obj["s"]));
+        Assert.Equal(0L, JsonUtils.EnsureLong(obj["z"]));
+        Assert.Equal(4L, JsonUtils.EnsureLong(null, 4));
+    }
+
+    [Fact]
+    public void CreatedPrimitives_ReadLikeParsedNumbers()
+    {
+        // a node created in code (not parsed) must satisfy the same numeric reads
+        JsonNode created = JsonValue.Create(42);
+        Assert.Equal(42, JsonUtils.RequireInteger(created, "n"));
+        Assert.Equal(42, JsonUtils.EnsureInteger(created));
+        Assert.Equal(42.0, JsonUtils.EnsureDouble(created));
+        Assert.Equal(42L, JsonUtils.EnsureLong(created));
+    }
+
+    [Fact]
+    public void MissingKey_KeepsDoesNotContainMessage()
+    {
+        JsonNode obj = Object("""{"n":null}""");
+        // missing key -> "does not contain" (element-family contract); JSON null -> kind error
+        var missing = Assert.Throws<JsonParseException>(() => JsonUtils.RequireInteger(obj, "nope", "index"));
+        Assert.Contains("does not contain", missing.Message);
+        var nullValue = Assert.Throws<JsonParseException>(() => JsonUtils.RequireInteger(obj, "n", "index"));
+        Assert.Equal("index is not a double", nullValue.Message);
+    }
+
+    private static JsonNode? missing(JsonNode o) => o["nope"];
 }

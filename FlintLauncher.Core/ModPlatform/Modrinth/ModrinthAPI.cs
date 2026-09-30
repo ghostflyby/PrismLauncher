@@ -550,8 +550,6 @@ public sealed class ModrinthApi : ResourceApi
         return request;
     }
 
-    /// <summary>Port of ResourceAPI::documentToArray for Modrinth (the "hits" array).</summary>
-    public static JsonArray DocumentToArray(JsonNode obj) => JsonUtils.RequireArray(obj["hits"], "hits");
 }
 
 /// <summary>Small QJsonObject-style accessor helpers shared by the Modrinth loaders
@@ -563,20 +561,20 @@ internal static class ModrinthJsonExtensions
     public static string? AsString(this JsonNode? node) =>
         node is JsonValue value && value.TryGetValue<string>(out var s) ? s : null;
 
-    public static string RequireString(this JsonNode parent, string key)
-        => JsonUtils.RequireString(parent[key], "'" + key + "'");
+    public static string RequireString(this JsonNode? parent, string key)
+        => JsonUtils.RequireString(parent, key, "'" + key + "'");
 
-    public static bool RequireBoolean(this JsonNode parent, string key)
-        => JsonUtils.RequireBoolean(parent[key], "'" + key + "'");
+    public static bool RequireBoolean(this JsonNode? parent, string key)
+        => JsonUtils.RequireBoolean(parent, key, "'" + key + "'");
 
-    public static int RequireInteger(this JsonNode parent, string key)
-        => JsonUtils.RequireInteger(parent[key], "'" + key + "'");
+    public static int RequireInteger(this JsonNode? parent, string key)
+        => JsonUtils.RequireInteger(parent, key, "'" + key + "'");
 
-    public static JsonObject RequireObject(this JsonNode parent, string key)
-        => JsonUtils.RequireObject(parent[key], "'" + key + "'");
+    public static JsonObject RequireObject(this JsonNode? parent, string key)
+        => JsonUtils.RequireObject(parent, key, "'" + key + "'");
 
-    public static JsonArray RequireArray(this JsonNode parent, string key)
-        => JsonUtils.RequireArray(parent[key], "'" + key + "'");
+    public static JsonArray RequireArray(this JsonNode? parent, string key)
+        => JsonUtils.RequireArray(parent, key, "'" + key + "'");
 
     // key + explicit what variants (the index parser labels every requirement with the file)
 

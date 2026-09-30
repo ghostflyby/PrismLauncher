@@ -729,22 +729,35 @@ public static class JsonUtils
     // overloads would silently win overload resolution for JsonNode parents
 
     public static string RequireString(JsonNode? parent, string key, string what)
-        => RequireString(parent?[key], what);
+        => RequireString(GetPropertyNode(parent, key, what), what);
 
     public static bool RequireBoolean(JsonNode? parent, string key, string what)
-        => RequireBoolean(parent?[key], what);
+        => RequireBoolean(GetPropertyNode(parent, key, what), what);
 
     public static double RequireDouble(JsonNode? parent, string key, string what)
-        => RequireDouble(parent?[key], what);
+        => RequireDouble(GetPropertyNode(parent, key, what), what);
 
     public static int RequireInteger(JsonNode? parent, string key, string what)
-        => RequireInteger(parent?[key], what);
+        => RequireInteger(GetPropertyNode(parent, key, what), what);
 
     public static JsonObject RequireObject(JsonNode? parent, string key, string what)
-        => RequireObject(parent?[key], what);
+        => RequireObject(GetPropertyNode(parent, key, what), what);
 
     public static JsonArray RequireArray(JsonNode? parent, string key, string what)
-        => RequireArray(parent?[key], what);
+        => RequireArray(GetPropertyNode(parent, key, what), what);
+
+    /// <summary>Element-family GetProperty semantics for the node world: a non-object
+    /// parent or a missing key throws "does not contain" (a JSON null value falls through
+    /// as a null node and fails the kind check downstream, like the element family).</summary>
+    private static JsonNode? GetPropertyNode(JsonNode? parent, string key, string what)
+    {
+        var localWhat = LocalWhat(key, what);
+        if (parent is not JsonObject obj || !obj.TryGetPropertyValue(key, out var node))
+        {
+            throw new JsonParseException(localWhat + "s parent does not contain " + localWhat);
+        }
+        return node;
+    }
 
     private static string? AsString(JsonNode? node) =>
         node is JsonValue value && value.TryGetValue<string>(out var s) ? s : null;

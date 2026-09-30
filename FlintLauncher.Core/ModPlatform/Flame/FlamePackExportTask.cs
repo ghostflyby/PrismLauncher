@@ -223,21 +223,20 @@ public sealed class FlamePackExportTask : FlintTask
 
     private void ParseApiResponse(string responseBody)
     {
-        JsonDocument doc;
+        JsonNode? doc;
         try
         {
-            doc = JsonDocument.Parse(responseBody);
+            doc = JsonNode.Parse(responseBody);
         }
         catch (JsonException)
         {
             return;
         }
 
-        using (doc)
         {
             try
             {
-                var docObj = JsonUtils.RequireObject(JsonUtils.ToNode(doc.RootElement));
+                var docObj = JsonUtils.RequireObject(doc);
                 var dataObj = JsonUtils.RequireObject(FlameJson.Ptr(docObj, "data"), "'data'");
                 var dataArr = JsonUtils.RequireArray(FlameJson.Ptr(dataObj, "exactMatches"), "'exactMatches'");
 
@@ -323,10 +322,10 @@ public sealed class FlamePackExportTask : FlintTask
             return;
         }
 
-        JsonDocument doc;
+        JsonNode? doc;
         try
         {
-            doc = JsonDocument.Parse(projRequest.BodyAsString);
+            doc = JsonNode.Parse(projRequest.BodyAsString);
         }
         catch (JsonException e)
         {
@@ -334,11 +333,10 @@ public sealed class FlamePackExportTask : FlintTask
             return;
         }
 
-        using (doc)
         {
             try
             {
-                var rootObj = JsonUtils.RequireObject(JsonUtils.ToNode(doc.RootElement));
+                var rootObj = JsonUtils.RequireObject(doc);
                 var data = FlameJson.Ptr(rootObj, "data");
                 List<JsonNode> entries;
                 if (single)

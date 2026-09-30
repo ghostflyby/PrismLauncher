@@ -733,17 +733,17 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
                     url = AtLauncherApi.DownloadServerUrl + mod.Url;
                     break;
                 case DownloadType.Browser:
-                {
-                    blockedMods.Add((mod, new Flame.BlockedMod
                     {
-                        Name = mod.File,
-                        WebsiteUrl = mod.Url,
-                        Hash = mod.Md5,
-                        Matched = false,
-                        LocalPath = "",
-                    }));
-                    continue;
-                }
+                        blockedMods.Add((mod, new Flame.BlockedMod
+                        {
+                            Name = mod.File,
+                            WebsiteUrl = mod.Url,
+                            Hash = mod.Md5,
+                            Matched = false,
+                            LocalPath = "",
+                        }));
+                        continue;
+                    }
                 case DownloadType.Direct:
                     url = mod.Url;
                     break;

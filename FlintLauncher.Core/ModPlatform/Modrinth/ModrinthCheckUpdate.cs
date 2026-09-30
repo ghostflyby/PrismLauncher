@@ -175,7 +175,9 @@ public sealed class ModrinthCheckUpdate : FlintTask
             {
                 // If the returned project is empty, but we have Modrinth metadata,
                 // it means this specific version is not available
-                if (entries[hash] is not { } projectNode)
+                // doc.value()[hash] on a non-object document is undefined upstream: every
+                // mapping just stays unprocessed
+                if (entries is not JsonObject || entries[hash] is not { } projectNode)
                 {
                     // stays in the mappings for the next loader pass
                     continue;

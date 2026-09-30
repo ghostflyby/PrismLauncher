@@ -179,10 +179,10 @@ public static class ModrinthPackIndex
         // Find correct file (needed in cases where one version may have multiple files)
         // Will default to the last one if there's no primary (though I think Modrinth requires that
         // at least one file is primary, idk)
-        var parent = files[fileCount - 1]!;
+        var parent = files[fileCount - 1];
         for (var i = 0; i < fileCount - 1; i++)
         {
-            var candidate = files[i]!;
+            var candidate = files[i];
             var fileName = candidate.RequireString("filename");
 
             if (preferredFileName.Length != 0 && fileName.Contains(preferredFileName, StringComparison.Ordinal))

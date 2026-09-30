@@ -646,7 +646,7 @@ public static class ModPlatformEndpoints
                     var pack = new IndexedPack();
                     try
                     {
-                        FlameMod.LoadIndexedPack(pack, JsonUtils.ToNode(hit));
+                        FlameMod.LoadIndexedPack(pack, JsonUtils.ToNode(hit)!);
                     }
                     catch (FlintLauncher.Core.Json.JsonParseException)
                     {

@@ -273,7 +273,7 @@ public sealed class FlameCheckUpdate : FlintTask
                             entries = [.. JsonUtils.RequireArray(data, "'data'")];
                         }
 
-                        foreach (var entryObj in entries)
+                        foreach (var entryObj in entries.Where(e => e is not null))
                         {
 
                             var id = FlameJson.RequireInteger(entryObj, "id").ToString(CultureInfo.InvariantCulture);

@@ -96,7 +96,7 @@ public sealed class EnsureMetadataTask : FlintTask
             entriesObj = JsonUtils.RequireObject(
                 JsonNode.Parse(versionRequest.BodyAsString), "version response");
         }
-        catch (JsonException)
+        catch (Exception e) when (e is JsonException or JsonParseException)
         {
             EmitFailed("Version response is not a JSON object");
             return;
@@ -246,7 +246,7 @@ public sealed class EnsureMetadataTask : FlintTask
             entriesObj = JsonUtils.RequireObject(
                 JsonNode.Parse(request.BodyAsString), "fingerprint response");
         }
-        catch (JsonException)
+        catch (Exception e) when (e is JsonException or JsonParseException)
         {
             EmitFailed("Fingerprint response is not a JSON object");
             return;
@@ -385,12 +385,6 @@ public sealed class EnsureMetadataTask : FlintTask
                 await UpdateMetadata(pack, version, resource, cancellationToken);
             }
         }
-    }
-
-    private static JsonElement ToElement(JsonNode node)
-    {
-        // phase-2 seam: the Flame loaders are still on the element read model
-        return JsonUtils.ToOwnedElement(node);
     }
 
     /// <summary>

@@ -114,7 +114,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
                 }
                 try
                 {
-                    FlameMod.LoadIndexedPack(pack, JsonUtils.ToNode(data));
+                    FlameMod.LoadIndexedPack(pack, JsonUtils.ToNode(data)!);
                 }
                 catch (JsonParseException e)
                 {
@@ -183,7 +183,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
                 {
                     throw new ModResolveException($"the CurseForge file response for {versionId} has no data object");
                 }
-                return FlameMod.LoadIndexedPackVersion(JsonUtils.ToNode(data));
+                return FlameMod.LoadIndexedPackVersion(JsonUtils.ToNode(data)!);
             }
 
             var pinnedUrl = $"{_modrinth.BaseUrl}/version/{versionId}";

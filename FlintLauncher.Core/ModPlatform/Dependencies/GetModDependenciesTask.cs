@@ -14,7 +14,7 @@
 //    become the provider dispatch helpers below.
 //  - The C++ `m_failed.remove(...)` calls on the two NetJob::failed handlers are no-ops in
 //    this port (they erase the NetJob from the *parent* ConcurrentTask's failure map even
-    //    though the direct subtask is the wrapping SequentialTask, so upstream still fails);
+//    though the direct subtask is the wrapping SequentialTask, so upstream still fails);
 //    the observable behavior (removePack + parent failure through the SequentialTask
 //    chain) is preserved.
 //  - instance->resourceLists() (shader/resource-pack/texture-pack metadata sweeps) is not

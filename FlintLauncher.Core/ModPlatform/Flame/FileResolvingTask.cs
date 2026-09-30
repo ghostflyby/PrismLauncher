@@ -89,9 +89,10 @@ public sealed class FileResolvingTask : FlintTask
                 ?? throw new JsonParseException("Document: empty response"), "Document");
             array = FlameJson.RequireArray(doc, "data");
         }
-        catch (JsonParseException)
+        catch (Exception e) when (e is JsonException or JsonParseException)
         {
-            // "Non-JSON data returned from the CF API"
+            // "Non-JSON data returned from the CF API" (covers both the syntax error from
+            // JsonNode.Parse and the kind error from RequireObject)
             EmitFailed("Invalid data returned from the API.");
             return;
         }
