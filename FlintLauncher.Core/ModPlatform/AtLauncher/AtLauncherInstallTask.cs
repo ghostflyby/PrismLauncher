@@ -596,7 +596,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
             // first condition is only true for a doubled prefix; the "--tweakClass
             // <class>" two-argument form does the real work (upstream quirk, ported).
             var arg = rawArg.Replace("--tweakClass=", "");
-            if (arg.StartsWith("--tweakClass=") || previous == "--tweakClass")
+            if (arg.StartsWith("--tweakClass=", StringComparison.Ordinal) || previous == "--tweakClass")
             {
                 if (!tweakers.Contains(arg))
                 {

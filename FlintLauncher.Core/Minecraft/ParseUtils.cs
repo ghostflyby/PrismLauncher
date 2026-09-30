@@ -14,10 +14,12 @@ public static class ParseUtils
     public static DateTimeOffset? TimeFromS3Time(string str)
     {
         // QDateTime::fromString(str, Qt::ISODate): offset form "+hh:mm"/"-hh:mm", a plain
-        // local timestamp, or "Z" (accepted by Qt's ISO parser as +00:00).
+        // local timestamp, or "Z" (accepted by Qt's ISO parser as +00:00). K accepts all
+        // three in one pattern (the literal "Z" variant relied on .NET's quirk of marking
+        // Z-terminated input as Utc — verified equivalent, K just says what it means).
         if (DateTimeOffset.TryParseExact(
                 str,
-                ["yyyy-MM-ddTHH:mm:sszzz", "yyyy-MM-ddTHH:mm:ssZ", "yyyy-MM-ddTHH:mm:ss", "yyyy-MM-dd"],
+                ["yyyy-MM-ddTHH:mm:sszzz", "yyyy-MM-ddTHH:mm:ssK", "yyyy-MM-ddTHH:mm:ss", "yyyy-MM-dd"],
                 CultureInfo.InvariantCulture,
                 DateTimeStyles.None,
                 out var time))

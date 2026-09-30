@@ -197,7 +197,7 @@ public sealed class ModrinthPackExportTask : FlintTask
                 {
                     continue;
                 }
-                var obj = JsonDocument.Parse(objNode.ToJsonString()).RootElement;
+                var obj = JsonUtils.ToOwnedElement(objNode);
 
                 var filesArray = obj.GetPropertySafe("files");
                 if (filesArray.ValueKind != JsonValueKind.Array)

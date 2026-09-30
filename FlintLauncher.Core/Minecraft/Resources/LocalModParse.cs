@@ -132,7 +132,7 @@ public static partial class ModUtils
 
                     // some mods use ${projectversion} in their build.gradle, causing this mess to show up in MANIFEST.MF
                     // also keep with forge's behavior of setting the version to "NONE" if none is found
-                    if (manifestVersion.Contains("task ':jar' property 'archiveVersion'") || manifestVersion.Length == 0)
+                    if (manifestVersion.Contains("task ':jar' property 'archiveVersion'", StringComparison.Ordinal) || manifestVersion.Length == 0)
                     {
                         manifestVersion = "NONE";
                     }

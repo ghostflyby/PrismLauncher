@@ -289,11 +289,11 @@ public sealed class IndexedVersion
     public string GetVersionDisplayString()
     {
         var releaseType = VersionType.IsValid ? $" [{VersionType}]" : "";
-        var versionStr = !Version.Contains(VersionNumber) ? VersionNumber : "";
+        var versionStr = !Version.Contains(VersionNumber, StringComparison.Ordinal) ? VersionNumber : "";
         var gameVersion = "";
         foreach (var v in McVersion)
         {
-            if (Version.Contains(v))
+            if (Version.Contains(v, StringComparison.Ordinal))
             {
                 gameVersion = "";
                 break;

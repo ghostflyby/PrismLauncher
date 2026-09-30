@@ -211,7 +211,7 @@ public sealed class MetaCacheSink : FileSink
             var hash = _md5Node.Hash();
             if (hash.Length > 0)
             {
-                _entry.Md5Sum = Convert.ToHexString(hash).ToLowerInvariant();
+                _entry.Md5Sum = Convert.ToHexStringLower(hash);
             }
         }
 

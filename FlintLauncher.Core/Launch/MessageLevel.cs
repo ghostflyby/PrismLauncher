@@ -121,20 +121,20 @@ public static class MessageLevelExtensions
         }
 
         // Old style forge logs
-        if (line.Contains("[INFO]") || line.Contains("[CONFIG]") || line.Contains("[FINE]") || line.Contains("[FINER]") ||
-            line.Contains("[FINEST]"))
+        if (line.Contains("[INFO]", StringComparison.Ordinal) || line.Contains("[CONFIG]", StringComparison.Ordinal) || line.Contains("[FINE]", StringComparison.Ordinal) || line.Contains("[FINER]", StringComparison.Ordinal) ||
+            line.Contains("[FINEST]", StringComparison.Ordinal))
         {
             return MessageLevel.Info;
         }
-        if (line.Contains("[SEVERE]") || line.Contains("[STDERR]"))
+        if (line.Contains("[SEVERE]", StringComparison.Ordinal) || line.Contains("[STDERR]", StringComparison.Ordinal))
         {
             return MessageLevel.Error;
         }
-        if (line.Contains("[WARNING]"))
+        if (line.Contains("[WARNING]", StringComparison.Ordinal))
         {
             return MessageLevel.Warning;
         }
-        if (line.Contains("[DEBUG]"))
+        if (line.Contains("[DEBUG]", StringComparison.Ordinal))
         {
             return MessageLevel.Debug;
         }

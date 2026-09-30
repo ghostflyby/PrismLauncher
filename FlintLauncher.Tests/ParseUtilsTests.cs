@@ -29,4 +29,20 @@ public class ParseUtilsTests
 
         Assert.Equal(timestamp, timeSerialized);
     }
+
+    [Fact]
+    public void ZuluSuffix_ParsesAsUtc_NotLocal()
+    {
+        // Qt::ISODate treats a trailing Z as +00:00. .NET honors that too (Z-terminated
+        // input gets Kind=Utc even when the format matched Z as a literal); the test pins
+        // that behavior against regressions.
+        var parsed = ParseUtils.TimeFromS3Time("2016-02-17T15:23:19Z");
+
+        Assert.NotNull(parsed);
+        Assert.Equal(TimeSpan.Zero, parsed.Value.Offset);
+        Assert.Equal(2016, parsed.Value.Year);
+        Assert.Equal(2, parsed.Value.Month);
+        Assert.Equal(17, parsed.Value.Day);
+        Assert.Equal(15, parsed.Value.Hour);
+    }
 }

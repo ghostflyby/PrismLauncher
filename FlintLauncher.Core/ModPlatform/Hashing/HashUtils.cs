@@ -90,10 +90,10 @@ public static class HashUtils
     /// </summary>
     private static string ComputeHash(byte[] data, Algorithm type) => type switch
     {
-        Algorithm.Sha1 => Convert.ToHexString(SHA1.HashData(data)).ToLowerInvariant(),
-        Algorithm.Sha256 => Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant(),
-        Algorithm.Sha512 => Convert.ToHexString(SHA512.HashData(data)).ToLowerInvariant(),
-        _ => Convert.ToHexString(MD5.HashData(data)).ToLowerInvariant(), // Md4 (see note) and Md5
+        Algorithm.Sha1 => Convert.ToHexStringLower(SHA1.HashData(data)),
+        Algorithm.Sha256 => Convert.ToHexStringLower(SHA256.HashData(data)),
+        Algorithm.Sha512 => Convert.ToHexStringLower(SHA512.HashData(data)),
+        _ => Convert.ToHexStringLower(MD5.HashData(data)), // Md4 (see note) and Md5
     };
 
     public static string Hash(byte[] data, string type) => Hash(data, AlgorithmFromString(type));

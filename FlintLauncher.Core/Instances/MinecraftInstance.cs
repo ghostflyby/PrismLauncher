@@ -495,10 +495,9 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
         // generic minecraft params
         // When using a launch script, the server parameters are handled by it
-        foreach (var param in ProcessMinecraftArgs(session, null))
-        {
-            launchScript += "param " + param + "\n";
-        }
+        // (Join over the mapped lines, not a += loop — .NET strings are immutable,
+        //  unlike the QString += this replaced)
+        launchScript += string.Join("", ProcessMinecraftArgs(session, null).Select(p => "param " + p + "\n"));
 
         // window size, title and state, legacy
         {
@@ -550,10 +549,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             launchScript += "sessionId " + session.Session + "\n";
         }
 
-        foreach (var trait in profile.GetTraits())
-        {
-            launchScript += "traits " + trait + "\n";
-        }
+        launchScript += string.Join("", profile.GetTraits().Select(t => "traits " + t + "\n"));
 
         if (ShouldApplyOnlineFixes())
         {

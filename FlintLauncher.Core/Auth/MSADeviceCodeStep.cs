@@ -149,8 +149,10 @@ public sealed class MSADeviceCodeStep : AuthStep
         _expirationUtc = null;
         Data.MsaClientID = _clientId;
         Data.MsaToken.IssueInstant = DateTime.UtcNow;
-        // NOTE: upstream uses QDateTime::currentDateTime() (local time) here
-        Data.MsaToken.NotAfter = DateTime.Now.AddSeconds(rsp.ExpiresIn);
+        // upstream writes QDateTime::currentDateTime() (local time) here, but the consumers
+        // (MinecraftAccount refresh check, MsaInteractiveStep) compare against UtcNow — a
+        // local-kind DateTime silently shifts the expiry by the zone offset, so store UTC
+        Data.MsaToken.NotAfter = DateTime.UtcNow.AddSeconds(rsp.ExpiresIn);
         Data.MsaToken.Extra = rsp.Extra;
         Data.MsaToken.RefreshToken = rsp.RefreshToken;
         Data.MsaToken.Token_ = rsp.AccessToken;

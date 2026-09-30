@@ -161,10 +161,8 @@ public static class FileSystem
     /// </summary>
     public static bool EnsureFolderPathExists(string folderPathName)
     {
-        if (Directory.Exists(folderPathName))
-        {
-            return true;
-        }
+        // no Directory.Exists pre-check: CreateDirectory is idempotent and thread-safe, the
+        // pre-check only added an extra syscall before the identical outcome
         try
         {
             Directory.CreateDirectory(folderPathName);
@@ -530,7 +528,7 @@ public static class FileSystem
     public static string GetUniqueResourceName(string filePath)
     {
         var newFileName = filePath;
-        if (!newFileName.EndsWith(".disabled"))
+        if (!newFileName.EndsWith(".disabled", StringComparison.Ordinal))
         {
             return newFileName; // prioritize enabled mods
         }

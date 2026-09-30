@@ -59,7 +59,7 @@ public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<J
     private void Parse()
     {
         // Same patterns as the C++ port: unanchored first match, like QRegularExpression::match.
-        var pattern = _string.StartsWith("1.") ? WithOne() : WithoutOne();
+        var pattern = _string.StartsWith("1.", StringComparison.Ordinal) ? WithOne() : WithoutOne();
         var match = pattern.Match(_string);
         _parseable = match.Success;
         Major = GetCapturedInteger(match, "major");

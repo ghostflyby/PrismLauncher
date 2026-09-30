@@ -133,7 +133,7 @@ public sealed class JVisualVMFactory : ProfilerFactory
             return false;
         }
         // QFileInfo::isExecutable() && fileName().contains("visualvm")
-        if (!IsExecutable(path) || !System.IO.Path.GetFileName(path).Contains("visualvm"))
+        if (!IsExecutable(path) || !System.IO.Path.GetFileName(path).Contains("visualvm", StringComparison.Ordinal))
         {
             error = "Invalid path to VisualVM";
             return false;

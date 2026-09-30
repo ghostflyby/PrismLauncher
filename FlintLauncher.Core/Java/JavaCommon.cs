@@ -29,8 +29,8 @@ public static partial class JavaCommon
     /// </summary>
     public static string? JvmArgsWarning(string jvmargs)
     {
-        if (jvmargs.Contains("-XX:PermSize=") || MemRegex().IsMatch(jvmargs) || jvmargs.Contains("-XX-MaxHeapSize") ||
-            jvmargs.Contains("-XX:InitialHeapSize"))
+        if (jvmargs.Contains("-XX:PermSize=", StringComparison.Ordinal) || MemRegex().IsMatch(jvmargs) || jvmargs.Contains("-XX-MaxHeapSize", StringComparison.Ordinal) ||
+            jvmargs.Contains("-XX:InitialHeapSize", StringComparison.Ordinal))
         {
             return "You tried to manually set a JVM memory option (using \"-XX:PermSize\", \"-XX-MaxHeapSize\", \"-XX:InitialHeapSize\", \"-Xmx\" " +
                    "or \"-Xms\").\n" +

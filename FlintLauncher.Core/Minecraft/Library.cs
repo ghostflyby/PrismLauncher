@@ -224,7 +224,7 @@ public class Library
         var rawStorage = StorageSuffix(runtimeContext);
         if (IsNative())
         {
-            if (rawStorage.Contains("${arch}"))
+            if (rawStorage.Contains("${arch}", StringComparison.Ordinal))
             {
                 var nat32Storage = rawStorage.Replace("${arch}", "32");
                 var nat64Storage = rawStorage.Replace("${arch}", "64");
@@ -313,7 +313,7 @@ public class Library
                 var nativeClassifier = GetCompatibleNative(runtimeContext);
                 if (nativeClassifier is not null)
                 {
-                    if (nativeClassifier.Contains("${arch}"))
+                    if (nativeClassifier.Contains("${arch}", StringComparison.Ordinal))
                     {
                         var nat32Classifier = nativeClassifier.Replace("${arch}", "32");
                         var nat64Classifier = nativeClassifier.Replace("${arch}", "64");
@@ -368,7 +368,7 @@ public class Library
             }
 
             var rawDl = RawDl();
-            if (rawStorage.Contains("${arch}"))
+            if (rawStorage.Contains("${arch}", StringComparison.Ordinal))
             {
                 AddDownload(rawStorage.Replace("${arch}", "32"), rawDl.Replace("${arch}", "32"), "");
                 AddDownload(rawStorage.Replace("${arch}", "64"), rawDl.Replace("${arch}", "64"), "");

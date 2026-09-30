@@ -411,7 +411,7 @@ public sealed class EnsureMetadataTask : FlintTask
 
     private static JsonElement ToElement(JsonNode node)
     {
-        return JsonDocument.Parse(node.ToJsonString()).RootElement;
+        return JsonUtils.ToOwnedElement(node);
     }
 
     /// <summary>

@@ -26,9 +26,9 @@ internal static class FlameJson
     {
         if (element.ValueKind != JsonValueKind.Object)
         {
-            return JsonDocument.Parse("null").RootElement;
+            return JsonUtils.NullElement;
         }
-        return element.TryGetProperty(name, out var value) ? value : JsonDocument.Parse("null").RootElement;
+        return element.TryGetProperty(name, out var value) ? value : JsonUtils.NullElement;
     }
 
     /// <summary>obj["key"].toString(default) equivalent.</summary>
@@ -57,13 +57,13 @@ internal static class FlameJson
     public static JsonElement Obj(JsonElement element, string name)
     {
         var value = Ptr(element, name);
-        return value.ValueKind == JsonValueKind.Object ? value : JsonDocument.Parse("{}").RootElement;
+        return value.ValueKind == JsonValueKind.Object ? value : JsonUtils.EmptyObjectElement;
     }
 
     public static JsonElement Arr(JsonElement element, string name)
     {
         var value = Ptr(element, name);
-        return value.ValueKind == JsonValueKind.Array ? value : JsonDocument.Parse("[]").RootElement;
+        return value.ValueKind == JsonValueKind.Array ? value : JsonUtils.EmptyArrayElement;
     }
 
     public static string RequireString(JsonElement parent, string key)

@@ -41,7 +41,7 @@ public sealed class MinecraftTarget
         // The logic below replicates the exact logic minecraft uses for parsing server addresses.
         // While the conversion is not lossless and eats errors, it ensures the same behavior
         // within Minecraft and Prism Launcher when entering server addresses.
-        if (fullAddress.StartsWith("["))
+        if (fullAddress.StartsWith("[", StringComparison.Ordinal))
         {
             var bracket = fullAddress.IndexOf(']');
             if (bracket > 0)
@@ -49,7 +49,7 @@ public sealed class MinecraftTarget
                 var ipv6 = fullAddress[1..bracket];
                 var port = fullAddress[(bracket + 1)..].Trim();
 
-                if (port.StartsWith(":") && ipv6.Length != 0)
+                if (port.StartsWith(":", StringComparison.Ordinal) && ipv6.Length != 0)
                 {
                     split = [ipv6, port[1..]];
                 }

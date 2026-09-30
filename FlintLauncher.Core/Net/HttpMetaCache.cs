@@ -131,7 +131,7 @@ public sealed class HttpMetaCache : IDisposable
             try
             {
                 using var stream = File.OpenRead(realPath);
-                md5Sum = Convert.ToHexString(System.Security.Cryptography.MD5.HashData(stream)).ToLowerInvariant();
+                md5Sum = Convert.ToHexStringLower(System.Security.Cryptography.MD5.HashData(stream));
             }
             catch (IOException)
             {

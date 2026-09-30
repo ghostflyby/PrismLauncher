@@ -352,7 +352,7 @@ public sealed class ModrinthApi : ResourceApi
     public static string MapMcVersionFromModrinth(string v)
     {
         const string preString = " Pre-Release ";
-        var pre = v.Contains("-pre");
+        var pre = v.Contains("-pre", StringComparison.Ordinal);
         if (pre)
         {
             v = v.Replace("-pre", preString);
@@ -565,9 +565,9 @@ internal static class ModrinthJsonExtensions
     {
         if (element.ValueKind != JsonValueKind.Object)
         {
-            return JsonDocument.Parse("null").RootElement;
+            return JsonUtils.NullElement;
         }
-        return element.TryGetProperty(name, out var value) ? value : JsonDocument.Parse("null").RootElement;
+        return element.TryGetProperty(name, out var value) ? value : JsonUtils.NullElement;
     }
 
     /// <summary>Port of the Json::requireX(parent, key) pattern over a JsonElement parent.</summary>

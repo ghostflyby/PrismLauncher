@@ -137,7 +137,7 @@ public sealed class CheckJava : LaunchStep
         var timestampBytes = System.Text.Encoding.ASCII.GetBytes(javaUnixTime.ToString(System.Globalization.CultureInfo.InvariantCulture));
         var pathBytes = System.Text.Encoding.UTF8.GetBytes(javaPath);
         var hash = SHA1.HashData([.. timestampBytes, .. pathBytes]);
-        return Convert.ToHexString(hash).ToLowerInvariant();
+        return Convert.ToHexStringLower(hash);
     }
 
     public override bool CanAbort() => false;

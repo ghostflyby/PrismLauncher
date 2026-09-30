@@ -185,7 +185,7 @@ public abstract class MetaEntity
                     {
                         EmitStatus("Loading local file");
                         fileData = FileSystem.Read(fname);
-                        _entity.FileSha256 = Convert.ToHexString(SHA256.HashData(fileData)).ToLowerInvariant();
+                        _entity.FileSha256 = Convert.ToHexStringLower(SHA256.HashData(fileData));
                     }
 
                     // on online the hash needs to match

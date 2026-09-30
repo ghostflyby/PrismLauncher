@@ -225,7 +225,7 @@ public static class ExportEndpoints
     private static string? ResolveLogFile(string dir, string name)
     {
         if (string.IsNullOrWhiteSpace(name) ||
-            name.Contains('/') || name.Contains('\\') || name.Contains(".."))
+            name.Contains('/') || name.Contains('\\') || name.Contains("..", StringComparison.Ordinal))
         {
             return null;
         }

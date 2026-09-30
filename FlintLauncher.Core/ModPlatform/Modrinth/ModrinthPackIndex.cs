@@ -185,7 +185,7 @@ public static class ModrinthPackIndex
             var candidate = files[i];
             var fileName = candidate.RequireString("filename");
 
-            if (preferredFileName.Length != 0 && fileName.Contains(preferredFileName))
+            if (preferredFileName.Length != 0 && fileName.Contains(preferredFileName, StringComparison.Ordinal))
             {
                 file.IsPreferred = true;
                 parent = candidate;

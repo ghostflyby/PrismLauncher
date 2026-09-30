@@ -46,7 +46,7 @@ public static class Filters
 
     public static Func<string, bool> EqualsOrEmpty(string pattern) => src => src.Length == 0 || src == pattern;
 
-    public static Func<string, bool> Contains(string pattern) => src => src.Contains(pattern);
+    public static Func<string, bool> Contains(string pattern) => src => src.Contains(pattern, StringComparison.Ordinal);
 
     public static Func<string, bool> StartsWith(string pattern) => src => src.StartsWith(pattern, StringComparison.Ordinal);
 

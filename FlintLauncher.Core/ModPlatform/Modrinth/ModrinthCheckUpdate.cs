@@ -204,7 +204,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
                 // - The version reported by the JAR is different from the version reported by the
                 //   indexed version (it's usually the case)
                 var projectVer = ModrinthPackIndex.LoadIndexedPackVersion(
-                    JsonDocument.Parse(projectNode.ToJsonString()).RootElement, _hashType, loaderFilter);
+                    JsonUtils.ToOwnedElement(projectNode), _hashType, loaderFilter);
                 if (projectVer.DownloadUrl.Length == 0)
                 {
                     // "Modrinth mod without download url!"

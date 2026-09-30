@@ -482,16 +482,34 @@ public static class JsonUtils
         return what.Replace("__placeholder__", "'" + key + "'");
     }
 
+    /// <summary>Shared stand-ins for the QJsonValue Undefined/Null default. Cloned so they
+    /// outlive their one-shot parse documents (AOT-safe: no serializer reflection).</summary>
+    internal static readonly JsonElement NullElement = CreateCachedElement("null");
+    internal static readonly JsonElement EmptyObjectElement = CreateCachedElement("{}");
+    internal static readonly JsonElement EmptyArrayElement = CreateCachedElement("[]");
+
+    private static JsonElement CreateCachedElement(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.Clone();
+    }
+
+    /// <summary>A standalone JsonElement for a JsonNode subtree: parses into an owned
+    /// document that is disposed immediately, returning a Clone that outlives it
+    /// (AOT-safe; the former inline Parse(...).RootElement leaked the document).</summary>
+    public static JsonElement ToOwnedElement(JsonNode node)
+    {
+        using var doc = JsonDocument.Parse(node.ToJsonString());
+        return doc.RootElement.Clone();
+    }
+
     private static JsonElement GetProperty(JsonObject parent, string key, string localWhat)
     {
         if (!parent.TryGetPropertyValue(key, out var node))
         {
             throw new JsonParseException(localWhat + "s parent does not contain " + localWhat);
         }
-        // a JSON null is surfaced as a null node reference
-        return node is null
-            ? JsonDocument.Parse("null").RootElement
-            : JsonDocument.Parse(node.ToJsonString()).RootElement;
+        return node is null ? NullElement : ToOwnedElement(node);
     }
 
     /// <summary>Port of require&lt;String&gt;(parent, key).</summary>

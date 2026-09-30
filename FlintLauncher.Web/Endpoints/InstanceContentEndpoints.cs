@@ -878,7 +878,7 @@ public static class InstanceContentEndpoints
     private static string? ResolveScreenshotPath(string dir, string name)
     {
         if (string.IsNullOrWhiteSpace(name) ||
-            name.Contains('/') || name.Contains('\\') || name.Contains(".."))
+            name.Contains('/') || name.Contains('\\') || name.Contains("..", StringComparison.Ordinal))
         {
             return null;
         }
