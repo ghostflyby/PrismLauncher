@@ -9,9 +9,10 @@
 //    multipart Content-Type must be set on the content headers, which NetRequest cannot do.
 //  - QHttpMultiPart generates a random boundary of a different shape — any legal boundary is
 //    equivalent, so the port uses a "flint-<32 hex>" one.
-//  - The endpoint base goes through AuthEndpoints.MinecraftServices (defaults byte-identical to
-//    the hardcoded upstream URL) so tests can stub it.
+//  - The endpoint base goes through the injected AuthEndpointsOptions.MinecraftServices
+//    (defaults byte-identical to the hardcoded upstream URL) so tests can stub it.
 using System.Text;
+using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 
@@ -22,24 +23,26 @@ public sealed class SkinUpload : FlintTask
     private readonly string _token;
     private readonly byte[] _skinData;
     private readonly string _variant;
+    private readonly AuthEndpointsOptions _auth;
 
-    private SkinUpload(string token, byte[] skinData, string variant)
+    private SkinUpload(string token, byte[] skinData, string variant, AuthEndpointsOptions? auth)
     {
         _token = token;
         _skinData = skinData;
         _variant = variant;
+        _auth = auth ?? new AuthEndpointsOptions();
     }
 
     /// <summary>Port of SkinUpload::make(token, path, variant) — the file is read eagerly.</summary>
-    public static SkinUpload Make(string token, string path, string variant)
+    public static SkinUpload Make(string token, string path, string variant, AuthEndpointsOptions? auth = null)
     {
-        return Make(token, File.ReadAllBytes(path), variant);
+        return Make(token, File.ReadAllBytes(path), variant, auth);
     }
 
     /// <summary>Body-bytes variant (FS::read(m_path) upstream).</summary>
-    public static SkinUpload Make(string token, byte[] skinData, string variant)
+    public static SkinUpload Make(string token, byte[] skinData, string variant, AuthEndpointsOptions? auth = null)
     {
-        return new SkinUpload(token, skinData, variant);
+        return new SkinUpload(token, skinData, variant, auth);
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -49,7 +52,7 @@ public sealed class SkinUpload : FlintTask
 
         EmitStatus("Uploading skin");
         using var message = new HttpRequestMessage(HttpMethod.Post,
-            new Uri(Auth.AuthEndpoints.MinecraftServices.TrimEnd('/') + "/minecraft/profile/skins"));
+            new Uri(_auth.MinecraftServices.TrimEnd('/') + "/minecraft/profile/skins"));
         message.Headers.TryAddWithoutValidation("Authorization", $"Bearer {_token}");
         message.Content = new ByteArrayContent(body);
         message.Content.Headers.TryAddWithoutValidation("Content-Type", "multipart/form-data; boundary=" + boundary);

@@ -7,8 +7,9 @@
 // that own the hooks):
 //  - the main class joins "LauncherJars" — the e2e launch test mutates
 //    JavaUtils.LauncherRootPath exactly like RealLaunchSmokeTests/LauncherPartLaunchTests;
-//  - the device-code class joins "AuthEndpoints" (AuthEndpoints.* are static hooks);
 //  - the Modrinth search class joins "ModrinthApi" (ModrinthApi.BaseUrl is a static hook).
+// The device-code class needs no collection anymore: it redirects the endpoints through a
+// stub-pointed AuthEndpointsOptions handed to its own host.
 // Environment.CurrentDirectory is process-global too: every host sets it (core paths are
 // CWD-relative) and restores it on dispose.
 using System.Net;
@@ -51,7 +52,8 @@ internal sealed class FlintApiHost : IAsyncDisposable
     public string DataDir { get; }
 
     public static async Task<FlintApiHost> StartAsync(ModrinthApi? modrinth = null, FlameApi? flame = null,
-        TechnicApi? technic = null, AtLauncherApi? atlauncher = null, FtbApi? ftb = null)
+        TechnicApi? technic = null, AtLauncherApi? atlauncher = null, FtbApi? ftb = null,
+        AuthEndpointsOptions? auth = null)
     {
         var dataDir = Path.Combine(Path.GetTempPath(), $"flint-api-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dataDir);
@@ -60,7 +62,7 @@ internal sealed class FlintApiHost : IAsyncDisposable
         [
             "--data-dir", dataDir,
             "--urls", "http://127.0.0.1:0",
-        ], modrinth, flame, technic, atlauncher, ftb);
+        ], modrinth, flame, technic, atlauncher, ftb, auth);
         await app.StartAsync();
         var token = File.ReadAllText(Path.Combine(dataDir, ApiAuthService.TokenFileName)).Trim();
         var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
@@ -698,10 +700,10 @@ public class FlintApiIntegrationTests
 
 // ------------------------------------------------------- MSA device-code endpoints
 
-[Collection("AuthEndpoints")]
 public class FlintApiDeviceCodeTests : IDisposable
 {
     private readonly ApiStubServer _server;
+    private readonly AuthEndpointsOptions _auth = new();
     private readonly string _msaDeviceCode;
     private string _msaToken;
 
@@ -723,20 +725,19 @@ public class FlintApiDeviceCodeTests : IDisposable
             ctx.Response.Close();
         });
 
-        AuthEndpoints.MsaDeviceCode = _server.Url + "/devicecode";
-        AuthEndpoints.MsaToken = _server.Url + "/token";
+        _auth.MsaDeviceCode = _server.Url + "/devicecode";
+        _auth.MsaToken = _server.Url + "/token";
     }
 
     public void Dispose()
     {
-        AuthEndpoints.ResetToDefaults();
         _server.Dispose();
     }
 
     [Fact]
     public async Task DeviceCode_Start_Poll_Pending_Expired()
     {
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(auth: _auth);
 
         // start: 202 with the code triplet and an internal correlation id
         var start = await host.PostAsync("/api/v1/accounts/msa/devicecode", new { });

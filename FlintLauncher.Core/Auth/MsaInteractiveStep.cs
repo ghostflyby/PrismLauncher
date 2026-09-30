@@ -29,15 +29,17 @@ namespace FlintLauncher.Core.Auth;
 public sealed class MsaInteractiveStep : AuthStep
 {
     private readonly bool _silent;
+    private readonly AuthEndpointsOptions _auth;
     private string _clientId = "";
     private LoopbackListener? _listener;
 
     /// <summary>Port of the authorizeWithBrowser(const QUrl&amp;) signal.</summary>
     public event Action<string>? AuthorizeWithBrowser;
 
-    public MsaInteractiveStep(AccountData data, bool silent = false) : base(data)
+    public MsaInteractiveStep(AccountData data, bool silent = false, AuthEndpointsOptions? auth = null) : base(data)
     {
         _silent = silent;
+        _auth = auth ?? new AuthEndpointsOptions();
     }
 
     public override string Describe() => "Logging in with Microsoft account.";
@@ -50,7 +52,7 @@ public sealed class MsaInteractiveStep : AuthStep
 
     public override async Task PerformAsync(CancellationToken cancellationToken)
     {
-        _clientId = AuthEndpoints.MsaClientId;
+        _clientId = _auth.MsaClientId;
         if (_silent)
         {
             if (Data.MsaClientID != _clientId)
@@ -96,7 +98,7 @@ public sealed class MsaInteractiveStep : AuthStep
             ("refresh_token", Data.MsaToken.RefreshToken));
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
         {
-            Url = new Uri(AuthEndpoints.MsaToken),
+            Url = new Uri(_auth.MsaToken),
             Body = payload,
             Headers = FormHeaders,
         }, cancellationToken).ConfigureAwait(false);
@@ -131,7 +133,7 @@ public sealed class MsaInteractiveStep : AuthStep
         var redirectUri = _listener.Start();
 
         // QOAuth2AuthorizationCodeFlow::buildAuthenticateUrl() + modifyParametersFunction(prompt)
-        var authorizeUrl = AuthEndpoints.MsaAuthorize +
+        var authorizeUrl = _auth.MsaAuthorize +
             "?response_type=code" +
             "&client_id=" + Uri.EscapeDataString(_clientId) +
             "&scope=" + Uri.EscapeDataString("XboxLive.SignIn XboxLive.offline_access") +
@@ -185,7 +187,7 @@ public sealed class MsaInteractiveStep : AuthStep
             ("redirect_uri", redirectUri));
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
         {
-            Url = new Uri(AuthEndpoints.MsaToken),
+            Url = new Uri(_auth.MsaToken),
             Body = payload,
             Headers = FormHeaders,
         }, cancellationToken).ConfigureAwait(false);

@@ -21,30 +21,33 @@ public sealed class AuthFlow : Tasks.FlintTask
     private readonly List<AuthStep> _steps = [];
     private AuthStep? _currentStep;
 
-    public AuthFlow(AccountData data, AuthFlowAction action = AuthFlowAction.Refresh)
+    public AuthFlow(AccountData data, AuthFlowAction action = AuthFlowAction.Refresh,
+        AuthEndpointsOptions? auth = null)
     {
         Data = data;
+        var endpoints = auth ?? new AuthEndpointsOptions();
         if (data.Type == AccountType.MSA)
         {
             if (action == AuthFlowAction.DeviceCode)
             {
-                var oauthStep = new MSADeviceCodeStep(data);
+                var oauthStep = new MSADeviceCodeStep(data, endpoints);
                 oauthStep.AuthorizeWithBrowser += (url, code, expiresIn) =>
                     AuthorizeWithBrowserWithExtra?.Invoke(url, code, expiresIn);
                 _steps.Add(oauthStep);
             }
             else
             {
-                var oauthStep = new MsaInteractiveStep(data, silent: action == AuthFlowAction.Refresh);
+                var oauthStep = new MsaInteractiveStep(data, silent: action == AuthFlowAction.Refresh,
+                    auth: endpoints);
                 oauthStep.AuthorizeWithBrowser += url => AuthorizeWithBrowser?.Invoke(url);
                 _steps.Add(oauthStep);
             }
-            _steps.Add(new XboxUserStep(data));
+            _steps.Add(new XboxUserStep(data, endpoints));
             _steps.Add(new XboxAuthorizationStep(data, token => data.MojangServicesToken = token,
-                "rp://api.minecraftservices.com/", "Mojang"));
-            _steps.Add(new LauncherLoginStep(data));
-            _steps.Add(new EntitlementsStep(data));
-            _steps.Add(new MinecraftProfileStep(data));
+                "rp://api.minecraftservices.com/", "Mojang", endpoints));
+            _steps.Add(new LauncherLoginStep(data, endpoints));
+            _steps.Add(new EntitlementsStep(data, endpoints));
+            _steps.Add(new MinecraftProfileStep(data, endpoints));
             _steps.Add(new GetSkinStep(data));
         }
         ChangeState(AccountTaskState.Created);

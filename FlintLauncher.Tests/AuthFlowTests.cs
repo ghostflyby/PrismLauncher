@@ -2,7 +2,8 @@
 // Auth flow tests against a local stub server: full device-code MSA run (all 7 steps), the XSTS
 // XErr child-account path, profile 404/500 handling, the device-code expired_token path, the
 // offline no-op flow, the interactive loopback listener exchange and the silent refresh flow.
-// All endpoint URLs are redirected through AuthEndpoints, so no real network is involved.
+// All endpoint URLs are redirected through a stub-pointed AuthEndpointsOptions passed into the
+// flow, so no real network is involved.
 using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Auth;
@@ -12,34 +13,32 @@ using Xunit;
 
 namespace Flint.Tests;
 
-[Collection("AuthEndpoints")]
 public class AuthFlowTests : IDisposable
 {
     private readonly AuthStubServer _server = new();
+    private readonly AuthEndpointsOptions _auth = new();
+
+    public AuthFlowTests()
+    {
+        _auth.MsaDeviceCode = _server.BaseUrl + "/devicecode";
+        _auth.MsaToken = _server.BaseUrl + "/token";
+        _auth.MsaAuthorize = _server.BaseUrl + "/authorize";
+        _auth.XboxUserAuth = _server.BaseUrl + "/user/authenticate";
+        _auth.XboxXstsAuthorize = _server.BaseUrl + "/xsts/authorize";
+        _auth.MinecraftServices = _server.BaseUrl;
+        _auth.MsaClientId = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
+    }
 
     public void Dispose()
     {
         _server.Dispose();
-        AuthEndpoints.ResetToDefaults();
-    }
-
-    private void RedirectEndpoints()
-    {
-        AuthEndpoints.MsaDeviceCode = _server.BaseUrl + "/devicecode";
-        AuthEndpoints.MsaToken = _server.BaseUrl + "/token";
-        AuthEndpoints.MsaAuthorize = _server.BaseUrl + "/authorize";
-        AuthEndpoints.XboxUserAuth = _server.BaseUrl + "/user/authenticate";
-        AuthEndpoints.XboxXstsAuthorize = _server.BaseUrl + "/xsts/authorize";
-        AuthEndpoints.MinecraftServices = _server.BaseUrl;
-        AuthEndpoints.MsaClientId = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
     }
 
     [Fact]
     public async Task Device_Code_MSA_Flow_Succeeds_End_To_End()
     {
-        RedirectEndpoints();
         var account = MinecraftAccount.CreateBlankMSA();
-        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode);
+        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
         var browserEvents = new List<(string url, string code, int expiresIn)>();
         flow.AuthorizeWithBrowserWithExtra += (url, code, expiresIn) => browserEvents.Add((url, code, expiresIn));
 
@@ -138,11 +137,10 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task Xsts_Child_Account_Error_Surfaces_Upstream_Message()
     {
-        RedirectEndpoints();
         _server.XErr = 2148916238;
 
         var account = MinecraftAccount.CreateBlankMSA();
-        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode);
+        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
         await flow.StartAsync();
 
         Assert.Equal(TaskState.Failed, flow.State);
@@ -158,11 +156,10 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task Xsts_Missing_Xbox_Profile_Error_Message()
     {
-        RedirectEndpoints();
         _server.XErr = 2148916233;
 
         var account = MinecraftAccount.CreateBlankMSA();
-        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode);
+        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
         await flow.StartAsync();
 
         Assert.Equal(TaskState.Failed, flow.State);
@@ -174,11 +171,10 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task Xsts_Unrecognized_Error_Message()
     {
-        RedirectEndpoints();
         _server.XErr = 2148916999;
 
         var account = MinecraftAccount.CreateBlankMSA();
-        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode);
+        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
         await flow.StartAsync();
 
         Assert.Equal(TaskState.Failed, flow.State);
@@ -188,11 +184,10 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task Profile_404_Is_A_Valid_Account_State()
     {
-        RedirectEndpoints();
         _server.ProfileStatus = 404;
 
         var account = MinecraftAccount.CreateBlankMSA();
-        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode);
+        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
         await flow.StartAsync();
 
         // NOTE (upstream): Succeed even if we do not have a profile. This is a valid account state.
@@ -207,11 +202,10 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task Profile_Server_Error_Maps_To_Offline_State()
     {
-        RedirectEndpoints();
         _server.ProfileStatus = 500;
 
         var account = MinecraftAccount.CreateBlankMSA();
-        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode);
+        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
         await flow.StartAsync();
 
         Assert.Equal(TaskState.Failed, flow.State);
@@ -223,11 +217,10 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task Device_Code_Expired_Surfaces_Upstream_Message()
     {
-        RedirectEndpoints();
         _server.TokenMode = AuthStubServer.DeviceCodeTokenMode.AlwaysExpired;
 
         var account = MinecraftAccount.CreateBlankMSA();
-        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode);
+        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
         await flow.StartAsync();
 
         Assert.Equal(TaskState.Failed, flow.State);
@@ -242,11 +235,10 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task Abort_During_Device_Code_Poll_Routes_To_Aborted()
     {
-        RedirectEndpoints();
         _server.PendingTokenResponses = 10; // keep the flow polling
 
         var account = MinecraftAccount.CreateBlankMSA();
-        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode);
+        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
         var runTask = flow.StartAsync();
 
         // wait until the device code was fetched and the flow started polling
@@ -279,11 +271,10 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task Interactive_Login_Exchanges_Code_Via_Loopback_Listener()
     {
-        RedirectEndpoints();
         _server.PendingTokenResponses = 0;
 
         var account = MinecraftAccount.CreateBlankMSA();
-        var flow = new AuthFlow(account.AccountData, AuthFlowAction.Login);
+        var flow = new AuthFlow(account.AccountData, AuthFlowAction.Login, _auth);
         var authorizeUrl = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         flow.AuthorizeWithBrowser += url => authorizeUrl.TrySetResult(url);
 
@@ -324,11 +315,10 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task Interactive_Login_Surfaces_OAuth_Error_From_Redirect()
     {
-        RedirectEndpoints();
         _server.PendingTokenResponses = 0;
 
         var account = MinecraftAccount.CreateBlankMSA();
-        var flow = new AuthFlow(account.AccountData, AuthFlowAction.Login);
+        var flow = new AuthFlow(account.AccountData, AuthFlowAction.Login, _auth);
         var authorizeUrl = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         flow.AuthorizeWithBrowser += url => authorizeUrl.TrySetResult(url);
 
@@ -350,7 +340,6 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task Silent_Refresh_Exchanges_The_Refresh_Token()
     {
-        RedirectEndpoints();
         _server.PendingTokenResponses = 0;
 
         var account = MinecraftAccount.CreateBlankMSA();
@@ -358,7 +347,7 @@ public class AuthFlowTests : IDisposable
         account.AccountData.MsaToken.RefreshToken = "EXISTING_REFRESH";
         account.AccountData.YggdrasilToken.Token_ = "STALE_YGG";
 
-        var flow = new AuthFlow(account.AccountData, AuthFlowAction.Refresh);
+        var flow = new AuthFlow(account.AccountData, AuthFlowAction.Refresh, _auth);
         await flow.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, flow.State);
@@ -375,13 +364,12 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task Silent_Refresh_With_Changed_Client_Id_Is_Disabled()
     {
-        RedirectEndpoints();
 
         var account = MinecraftAccount.CreateBlankMSA();
         account.AccountData.MsaClientID = "another-client-id";
         account.AccountData.MsaToken.RefreshToken = "EXISTING_REFRESH";
 
-        var flow = new AuthFlow(account.AccountData, AuthFlowAction.Refresh);
+        var flow = new AuthFlow(account.AccountData, AuthFlowAction.Refresh, _auth);
         await flow.StartAsync();
 
         Assert.Equal(TaskState.Failed, flow.State);
@@ -394,12 +382,11 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task Silent_Refresh_With_Empty_Refresh_Token_Is_Disabled()
     {
-        RedirectEndpoints();
 
         var account = MinecraftAccount.CreateBlankMSA();
         account.AccountData.MsaClientID = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
 
-        var flow = new AuthFlow(account.AccountData, AuthFlowAction.Refresh);
+        var flow = new AuthFlow(account.AccountData, AuthFlowAction.Refresh, _auth);
         await flow.StartAsync();
 
         Assert.Equal(TaskState.Failed, flow.State);
@@ -410,7 +397,6 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task MinecraftAccount_Login_Hard_Failure_Clears_Msa_Tokens()
     {
-        RedirectEndpoints();
         _server.TokenMode = AuthStubServer.DeviceCodeTokenMode.AlwaysExpired;
 
         var account = MinecraftAccount.CreateBlankMSA();
@@ -418,7 +404,7 @@ public class AuthFlowTests : IDisposable
         account.AccountData.MsaToken.RefreshToken = "OLD_REFRESH";
         account.AccountData.Validity_ = Validity.Assumed;
 
-        var flow = account.Login(useDeviceCode: true);
+        var flow = account.Login(useDeviceCode: true, _auth);
         await flow!.StartAsync();
 
         Assert.Equal(TaskState.Failed, flow.State);
@@ -432,11 +418,10 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task MinecraftAccount_Offline_Refresh_Succeeds_And_Fills_Session()
     {
-        RedirectEndpoints();
 
         var account = MinecraftAccount.CreateOffline("Notch");
         // offline accounts have no steps: the flow completes immediately
-        var flow = account.Refresh();
+        var flow = account.Refresh(_auth);
         await flow!.StartAsync();
         Assert.Equal(TaskState.Succeeded, flow.State);
         Assert.Null(account.CurrentTask);

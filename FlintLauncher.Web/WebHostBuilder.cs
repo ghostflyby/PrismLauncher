@@ -24,7 +24,8 @@ public static class WebHostBuilder
         Core.ModPlatform.Flame.FlameApi? flame = null,
         Core.ModPlatform.Technic.TechnicApi? technic = null,
         Core.ModPlatform.AtLauncher.AtLauncherApi? atlauncher = null,
-        Core.ModPlatform.Ftb.FtbApi? ftb = null)
+        Core.ModPlatform.Ftb.FtbApi? ftb = null,
+        Core.Auth.AuthEndpointsOptions? auth = null)
     {
         var paths = FlintPaths.FromDataDir(ResolveDataDir(args));
         Directory.CreateDirectory(paths.DataDir);
@@ -47,7 +48,7 @@ public static class WebHostBuilder
         });
 
         var runtime = new LauncherRuntime(paths, modrinth: modrinth, flame: flame, technic: technic,
-            atlauncher: atlauncher, ftb: ftb);
+            atlauncher: atlauncher, ftb: ftb, auth: auth);
         builder.Services.AddSingleton(FlintConfig.Default);
         builder.Services.AddSingleton(runtime);
         builder.Services.AddSingleton<FlintTaskRegistry>();

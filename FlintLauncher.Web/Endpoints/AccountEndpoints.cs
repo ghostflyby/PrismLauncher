@@ -58,7 +58,7 @@ public static class AccountEndpoints
         api.MapPost("/accounts/msa/devicecode", async (DeviceCodeSessionStore store,
                                                        LauncherRuntime runtime) =>
         {
-            var session = store.Start();
+            var session = store.Start(runtime.Auth);
             // wait (bounded) for Microsoft to hand out the device/user code pair
             var issued = await store.WaitForCodeAsync(session, TimeSpan.FromSeconds(10));
             if (!issued)

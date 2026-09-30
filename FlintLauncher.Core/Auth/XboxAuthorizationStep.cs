@@ -10,13 +10,16 @@ public sealed class XboxAuthorizationStep : AuthStep
     private readonly Action<Token> _assignToken;
     private readonly string _relyingParty;
     private readonly string _authorizationKind;
+    private readonly AuthEndpointsOptions _auth;
 
-    public XboxAuthorizationStep(AccountData data, Action<Token> assignToken, string relyingParty, string authorizationKind)
+    public XboxAuthorizationStep(AccountData data, Action<Token> assignToken, string relyingParty,
+        string authorizationKind, AuthEndpointsOptions? auth = null)
         : base(data)
     {
         _assignToken = assignToken;
         _relyingParty = relyingParty;
         _authorizationKind = authorizationKind;
+        _auth = auth ?? new AuthEndpointsOptions();
     }
 
     public override string Describe() => $"Getting authorization to access {_authorizationKind} services.";
@@ -46,7 +49,7 @@ public sealed class XboxAuthorizationStep : AuthStep
 
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
         {
-            Url = new Uri(AuthEndpoints.XboxXstsAuthorize),
+            Url = new Uri(_auth.XboxXstsAuthorize),
             Body = xboxAuthData,
             Headers = Headers,
             AutoRetry = true,

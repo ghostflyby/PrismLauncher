@@ -4,8 +4,11 @@ namespace FlintLauncher.Core.Auth;
 
 public sealed class MinecraftProfileStep : AuthStep
 {
-    public MinecraftProfileStep(AccountData data) : base(data)
+    private readonly AuthEndpointsOptions _auth;
+
+    public MinecraftProfileStep(AccountData data, AuthEndpointsOptions? auth = null) : base(data)
     {
+        _auth = auth ?? new AuthEndpointsOptions();
     }
 
     public override string Describe() => "Fetching the Minecraft profile.";
@@ -18,7 +21,7 @@ public sealed class MinecraftProfileStep : AuthStep
 
     public override async Task PerformAsync(CancellationToken cancellationToken)
     {
-        var url = AuthEndpoints.MinecraftServices.TrimEnd('/') + "/minecraft/profile";
+        var url = _auth.MinecraftServices.TrimEnd('/') + "/minecraft/profile";
         var headers = new List<KeyValuePair<string, string>>(Headers)
         {
             new("Authorization", $"Bearer {Data.YggdrasilToken.Token_}"),

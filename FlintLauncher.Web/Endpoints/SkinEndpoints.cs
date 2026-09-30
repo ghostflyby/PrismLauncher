@@ -9,8 +9,8 @@
 //                                          a bare DELETE of capes/active (cape removal)
 // The upload/delete/change requests are single-round-trip Minecraft services calls, so they
 // run synchronously: 204 on success, 400 with the task/request FailReason otherwise. They go
-// through the AuthEndpoints.MinecraftServices static hook (defaults byte-identical to the
-// hardcoded upstream URL; tests redirect it — hence the "AuthEndpoints" collection).
+// through the injected AuthEndpointsOptions (runtime.Auth; defaults byte-identical to the
+// hardcoded upstream URL; tests construct a runtime pointed at their stub).
 //
 // Cape equip by id is the whole upstream capability: neither the Mojang API nor the ported
 // CapeChange accepts a cape *file*, so a file-only PUT body is rejected (a file part may
@@ -70,7 +70,7 @@ public static class SkinEndpoints
 
             using var body = new MemoryStream();
             await file.CopyToAsync(body);
-            var upload = SkinUpload.Make(account.AccessToken(), body.ToArray(), model);
+            var upload = SkinUpload.Make(account.AccessToken(), body.ToArray(), model, runtime.Auth);
             await upload.StartAsync();
             return upload.WasSuccessful
                 ? Results.NoContent()
@@ -87,7 +87,7 @@ public static class SkinEndpoints
                 return notFound!;
             }
 
-            var request = SkinDelete.Make(account.AccessToken());
+            var request = SkinDelete.Make(account.AccessToken(), runtime.Auth);
             await request.StartAsync();
             return request.WasSuccessful
                 ? Results.NoContent()
@@ -114,7 +114,7 @@ public static class SkinEndpoints
                     "a 'capeId' form field is required (capes cannot be uploaded as files)", 400);
             }
 
-            var change = CapeChange.Make(account.AccessToken(), capeId);
+            var change = CapeChange.Make(account.AccessToken(), capeId, runtime.Auth);
             await change.StartAsync();
             return change.WasSuccessful
                 ? Results.NoContent()
@@ -133,7 +133,7 @@ public static class SkinEndpoints
                 return notFound!;
             }
 
-            var change = CapeChange.Make(account.AccessToken(), "");
+            var change = CapeChange.Make(account.AccessToken(), "", runtime.Auth);
             await change.StartAsync();
             return change.WasSuccessful
                 ? Results.NoContent()

@@ -4,8 +4,11 @@ namespace FlintLauncher.Core.Auth;
 
 public sealed class LauncherLoginStep : AuthStep
 {
-    public LauncherLoginStep(AccountData data) : base(data)
+    private readonly AuthEndpointsOptions _auth;
+
+    public LauncherLoginStep(AccountData data, AuthEndpointsOptions? auth = null) : base(data)
     {
+        _auth = auth ?? new AuthEndpointsOptions();
     }
 
     public override string Describe() => "Fetching Minecraft access token";
@@ -18,7 +21,7 @@ public sealed class LauncherLoginStep : AuthStep
 
     public override async Task PerformAsync(CancellationToken cancellationToken)
     {
-        var url = AuthEndpoints.MinecraftServices.TrimEnd('/') + "/launcher/login";
+        var url = _auth.MinecraftServices.TrimEnd('/') + "/launcher/login";
         var uhs = AccountData.GetString(ExtraValue("uhs"));
         var xToken = Data.MojangServicesToken.Token_;
 

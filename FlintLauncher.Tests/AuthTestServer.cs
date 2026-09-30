@@ -2,8 +2,8 @@
 // In-process HttpListener stub for the auth/skin endpoints (same pattern as NetStackTests'
 // TestHttpServer). Every request is recorded (method, path, query, headers, body) and the
 // endpoint behaviour is driven by the knobs, so the whole MSA flow can be exercised without
-// touching the real services. Used by AuthFlowTests and SkinApiTests, which share the
-// "AuthEndpoints" xunit collection to keep the static AuthEndpoints redirection sequential.
+// touching the real services. Used by AuthFlowTests and SkinApiTests, which point their own
+// AuthEndpointsOptions instances at it.
 using System.Net;
 using System.Net.Sockets;
 using System.Text;

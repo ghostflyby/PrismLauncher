@@ -7,8 +7,11 @@ namespace FlintLauncher.Core.Auth;
 
 public sealed class EntitlementsStep : AuthStep
 {
-    public EntitlementsStep(AccountData data) : base(data)
+    private readonly AuthEndpointsOptions _auth;
+
+    public EntitlementsStep(AccountData data, AuthEndpointsOptions? auth = null) : base(data)
     {
+        _auth = auth ?? new AuthEndpointsOptions();
     }
 
     public override string Describe() => "Determining game ownership.";
@@ -24,7 +27,7 @@ public sealed class EntitlementsStep : AuthStep
         // QUuid::createUuid().toString(QUuid::WithoutBraces)
         var entitlementsRequestId = Guid.NewGuid().ToString("D");
 
-        var url = AuthEndpoints.MinecraftServices.TrimEnd('/') + "/entitlements/license?requestId=" + entitlementsRequestId;
+        var url = _auth.MinecraftServices.TrimEnd('/') + "/entitlements/license?requestId=" + entitlementsRequestId;
         var headers = new List<KeyValuePair<string, string>>(Headers)
         {
             new("Authorization", $"Bearer {Data.YggdrasilToken.Token_}"),

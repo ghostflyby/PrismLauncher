@@ -9,16 +9,22 @@ using Xunit;
 
 namespace Flint.Tests;
 
-[Collection("AuthEndpoints")]
 public class SkinApiTests : IDisposable
 {
     private readonly AuthStubServer _server = new();
     private readonly string _dir = Path.Combine(Path.GetTempPath(), $"flint-skins-{Guid.NewGuid():N}");
 
+    /// <summary>The endpoints hook for the requests under test, pointed at the stub.</summary>
+    private readonly AuthEndpointsOptions _auth;
+
+    public SkinApiTests()
+    {
+        _auth = new AuthEndpointsOptions { MinecraftServices = _server.BaseUrl };
+    }
+
     public void Dispose()
     {
         _server.Dispose();
-        AuthEndpoints.ResetToDefaults();
         try
         {
             Directory.Delete(_dir, recursive: true);
@@ -28,21 +34,15 @@ public class SkinApiTests : IDisposable
         }
     }
 
-    private void RedirectEndpoints()
-    {
-        AuthEndpoints.MinecraftServices = _server.BaseUrl;
-    }
-
     [Fact]
     public async Task SkinUpload_Sends_The_Upstream_Multipart_Shape()
     {
-        RedirectEndpoints();
         Directory.CreateDirectory(_dir);
         var skinPath = Path.Combine(_dir, "skin.png");
         var pngBytes = "PNGDATA-0123456789-abcdef"u8.ToArray();
         await File.WriteAllBytesAsync(skinPath, pngBytes);
 
-        var request = SkinUpload.Make("SKIN_TOKEN", skinPath, "classic");
+        var request = SkinUpload.Make("SKIN_TOKEN", skinPath, "classic", _auth);
         await request.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, request.State);
@@ -86,9 +86,7 @@ public class SkinApiTests : IDisposable
     [Fact]
     public async Task SkinDelete_Calls_The_Active_Skin_Endpoint()
     {
-        RedirectEndpoints();
-
-        var request = SkinDelete.Make("SKIN_TOKEN");
+        var request = SkinDelete.Make("SKIN_TOKEN", _auth);
         await request.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, request.State);
@@ -100,9 +98,7 @@ public class SkinApiTests : IDisposable
     [Fact]
     public async Task CapeChange_Puts_The_CapeId()
     {
-        RedirectEndpoints();
-
-        var request = CapeChange.Make("SKIN_TOKEN", "1234-abcd");
+        var request = CapeChange.Make("SKIN_TOKEN", "1234-abcd", _auth);
         await request.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, request.State);
@@ -115,9 +111,7 @@ public class SkinApiTests : IDisposable
     [Fact]
     public async Task CapeChange_With_Empty_Id_Deletes_The_Cape()
     {
-        RedirectEndpoints();
-
-        var request = CapeChange.Make("SKIN_TOKEN", "");
+        var request = CapeChange.Make("SKIN_TOKEN", "", _auth);
         await request.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, request.State);
@@ -130,11 +124,10 @@ public class SkinApiTests : IDisposable
     [Fact]
     public async Task SkinUpload_Server_Error_Fails_The_Request()
     {
-        RedirectEndpoints();
         // the stub answers 404 for unknown paths; point the upload at one
-        AuthEndpoints.MinecraftServices = _server.BaseUrl + "/nowhere";
+        var dead = new AuthEndpointsOptions { MinecraftServices = _server.BaseUrl + "/nowhere" };
 
-        var request = SkinUpload.Make("SKIN_TOKEN", [1, 2, 3], "slim");
+        var request = SkinUpload.Make("SKIN_TOKEN", [1, 2, 3], "slim", dead);
         await request.StartAsync();
 
         Assert.Equal(TaskState.Failed, request.State);

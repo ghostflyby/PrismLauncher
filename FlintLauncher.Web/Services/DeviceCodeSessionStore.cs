@@ -39,10 +39,10 @@ public sealed class DeviceCodeSessionStore
     /// (the HTTP call to Microsoft is in flight); the start endpoint waits briefly for the
     /// code through <see cref="WaitForCodeAsync"/>.
     /// </summary>
-    public Session Start()
+    public Session Start(AuthEndpointsOptions? auth = null)
     {
         var account = MinecraftAccount.CreateBlankMSA();
-        var flow = account.Login(useDeviceCode: true)
+        var flow = account.Login(useDeviceCode: true, auth)
                    ?? throw new InvalidOperationException("could not create the device-code auth flow");
 
         var session = new Session

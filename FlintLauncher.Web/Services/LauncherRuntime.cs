@@ -39,6 +39,9 @@ public sealed class LauncherRuntime
     public FtbApi Ftb { get; }
     /// <summary>The imgur screenshot-upload client — same injection story.</summary>
     public ImgurApi Imgur { get; }
+    /// <summary>The Microsoft/Xbox/Minecraft auth + skins service endpoints (injected into the
+    /// auth flow and the skin/cape calls; tests construct a runtime pointed at their stub).</summary>
+    public AuthEndpointsOptions Auth { get; }
     public IniSettingsObject GlobalSettings { get; }
     public InstanceList Instances { get; }
     public AccountList Accounts { get; }
@@ -47,11 +50,12 @@ public sealed class LauncherRuntime
 
     public LauncherRuntime(FlintPaths paths, NetStack? net = null, ModrinthApi? modrinth = null,
         FlameApi? flame = null, TechnicApi? technic = null, AtLauncherApi? atlauncher = null,
-        FtbApi? ftb = null, ImgurApi? imgur = null)
+        FtbApi? ftb = null, ImgurApi? imgur = null, AuthEndpointsOptions? auth = null)
     {
         Paths = paths;
         Net = net ?? NetStack.Default;
         Modrinth = modrinth ?? new ModrinthApi(Net);
+        Auth = auth ?? new AuthEndpointsOptions();
         Flame = flame ?? new FlameApi(Net);
         Technic = technic ?? new TechnicApi(Net);
         AtLauncher = atlauncher ?? new AtLauncherApi(Net);

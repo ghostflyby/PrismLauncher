@@ -99,19 +99,19 @@ public sealed class MinecraftAccount
     /// <summary>Saves a MinecraftAccount to a JSON object and returns it.</summary>
     public JsonObject SaveToJson() => Data.SaveState();
 
-    public AuthFlow? Login(bool useDeviceCode = false)
+    public AuthFlow? Login(bool useDeviceCode = false, AuthEndpointsOptions? auth = null)
     {
-        return Attach(new AuthFlow(Data, useDeviceCode ? AuthFlowAction.DeviceCode : AuthFlowAction.Login));
+        return Attach(new AuthFlow(Data, useDeviceCode ? AuthFlowAction.DeviceCode : AuthFlowAction.Login, auth));
     }
 
-    public AuthFlow? Refresh()
+    public AuthFlow? Refresh(AuthEndpointsOptions? auth = null)
     {
         if (_currentTask is not null)
         {
             return _currentTask;
         }
 
-        return Attach(new AuthFlow(Data, AuthFlowAction.Refresh));
+        return Attach(new AuthFlow(Data, AuthFlowAction.Refresh, auth));
     }
 
     public AuthFlow? CurrentTask => _currentTask;

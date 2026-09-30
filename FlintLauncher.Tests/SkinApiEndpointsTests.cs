@@ -4,11 +4,10 @@
 // the byte shape of), the skin/cape removals and the CapeChange equip/remove semantics —
 // against the shared AuthStubServer, which records every request.
 //
-// [Collection("AuthEndpoints")] matches SkinApiTests/AuthFlowTests: the skins calls go
-// through the AuthEndpoints.MinecraftServices static hook, so every suite that redirects it
-// must not run in parallel. The host fixture seeds accounts.json BEFORE the app builds (the
-// runtime loads the account list at startup), which gives an MSA-shaped account with real
-// profile skin data plus a token the stub can assert on.
+// The skins calls go through the runtime's injected AuthEndpointsOptions (runtime.Auth), so
+// every host starts with a stub-pointed options instance. The host fixture seeds accounts.json
+// BEFORE the app builds (the runtime loads the account list at startup), which gives an
+// MSA-shaped account with real profile skin data plus a token the stub can assert on.
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -48,7 +47,8 @@ internal sealed class SkinApiHost : IAsyncDisposable
 
     /// <summary>Builds the real app over a data dir pre-seeded with <paramref name="seed"/>
     /// files (relative path -> content), so startup-time loads (accounts.json) see them.</summary>
-    public static async Task<SkinApiHost> StartAsync(IReadOnlyDictionary<string, string>? seed = null)
+    public static async Task<SkinApiHost> StartAsync(IReadOnlyDictionary<string, string>? seed = null,
+        AuthEndpointsOptions? auth = null)
     {
         var dataDir = Path.Combine(Path.GetTempPath(), $"flint-skinapi-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dataDir);
@@ -61,7 +61,7 @@ internal sealed class SkinApiHost : IAsyncDisposable
         [
             "--data-dir", dataDir,
             "--urls", "http://127.0.0.1:0",
-        ]);
+        ], auth: auth);
         await app.StartAsync();
         var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
         client.DefaultRequestHeaders.Add("X-Api-Token",
@@ -94,10 +94,10 @@ internal sealed class SkinApiHost : IAsyncDisposable
 
 // ---------------------------------------------------------------------------------- tests
 
-[Collection("AuthEndpoints")]
 public class SkinApiEndpointsTests : IDisposable
 {
     private readonly AuthStubServer _server = new();
+    private readonly AuthEndpointsOptions _auth = new();
 
     /// <summary>An MSA-shaped account with profile skin + cape data and a stub token; the
     /// profile id is fixed so tests can address it.</summary>
@@ -139,17 +139,16 @@ public class SkinApiEndpointsTests : IDisposable
 
     public SkinApiEndpointsTests()
     {
-        AuthEndpoints.MinecraftServices = _server.BaseUrl;
+        _auth.MinecraftServices = _server.BaseUrl;
     }
 
     public void Dispose()
     {
-        AuthEndpoints.ResetToDefaults();
         _server.Dispose();
     }
 
-    private static Task<SkinApiHost> SeededHost() => SkinApiHost.StartAsync(
-        new Dictionary<string, string> { ["accounts.json"] = AccountsJson });
+    private Task<SkinApiHost> SeededHost() => SkinApiHost.StartAsync(
+        new Dictionary<string, string> { ["accounts.json"] = AccountsJson }, auth: _auth);
 
     private static MultipartFormDataContent Multipart(params (string Name, string Content)[] fields)
     {
@@ -280,27 +279,22 @@ public class SkinApiEndpointsTests : IDisposable
     [Fact]
     public async Task Put_Skin_Server_Failure_Surfaces_The_FailReason()
     {
-        await using var host = await SeededHost();
         // point the Minecraft services hook at a dead path (the stub 404s there)
-        AuthEndpoints.MinecraftServices = _server.BaseUrl + "/nowhere";
-        try
-        {
-            using var form = new MultipartFormDataContent();
-            var fileContent = new ByteArrayContent([1, 2, 3]);
-            fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
-            form.Add(fileContent, "file", "skin.png");
+        var dead = new AuthEndpointsOptions { MinecraftServices = _server.BaseUrl + "/nowhere" };
+        await using var host = await SkinApiHost.StartAsync(
+            new Dictionary<string, string> { ["accounts.json"] = AccountsJson }, auth: dead);
 
-            var response = await host.Client.PutAsync($"/api/v1/accounts/{ProfileId}/skin", form);
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            var error = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement
-                .GetProperty("error");
-            Assert.Equal("skin_upload_failed", error.GetProperty("code").GetString());
-            Assert.Contains("404", error.GetProperty("message").GetString());
-        }
-        finally
-        {
-            AuthEndpoints.MinecraftServices = _server.BaseUrl;
-        }
+        using var form = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent([1, 2, 3]);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        form.Add(fileContent, "file", "skin.png");
+
+        var response = await host.Client.PutAsync($"/api/v1/accounts/{ProfileId}/skin", form);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement
+            .GetProperty("error");
+        Assert.Equal("skin_upload_failed", error.GetProperty("code").GetString());
+        Assert.Contains("404", error.GetProperty("message").GetString());
     }
 
     // ----------------------------------------------------------------- skin delete

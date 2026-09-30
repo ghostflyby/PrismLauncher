@@ -2,6 +2,7 @@
 // Port of launcher/minecraft/skins/CapeChange.{h,cpp}: PUT minecraft/profile/capes/active with
 // {"capeId":"<id>"}; an empty cape id becomes a DELETE (cape removal).
 using System.Text;
+using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.Skins;
@@ -9,9 +10,9 @@ namespace FlintLauncher.Core.Skins;
 public static class CapeChange
 {
     /// <summary>Port of CapeChange::make(token, capeId).</summary>
-    public static NetRequest Make(string token, string capeId)
+    public static NetRequest Make(string token, string capeId, AuthEndpointsOptions? auth = null)
     {
-        var url = Auth.AuthEndpoints.MinecraftServices.TrimEnd('/') + "/minecraft/profile/capes/active";
+        var url = (auth ?? new AuthEndpointsOptions()).MinecraftServices.TrimEnd('/') + "/minecraft/profile/capes/active";
         NetRequest request;
         if (capeId.Length == 0)
         {

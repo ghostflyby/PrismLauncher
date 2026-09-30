@@ -15,9 +15,12 @@ namespace FlintLauncher.Core.Auth;
 
 public sealed class MSADeviceCodeStep : AuthStep
 {
+    private readonly AuthEndpointsOptions _auth;
+
     // https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-device-code
-    public MSADeviceCodeStep(AccountData data) : base(data)
+    public MSADeviceCodeStep(AccountData data, AuthEndpointsOptions? auth = null) : base(data)
     {
+        _auth = auth ?? new AuthEndpointsOptions();
     }
 
     public override string Describe() => "Logging in with Microsoft account(device code).";
@@ -39,7 +42,7 @@ public sealed class MSADeviceCodeStep : AuthStep
 
     public override async Task PerformAsync(CancellationToken cancellationToken)
     {
-        _clientId = AuthEndpoints.MsaClientId;
+        _clientId = _auth.MsaClientId;
         await RequestDeviceAuthorization(cancellationToken).ConfigureAwait(false);
         while (!_isAborted && _expirationUtc is { } expiration)
         {
@@ -64,7 +67,7 @@ public sealed class MSADeviceCodeStep : AuthStep
         var payload = FormEncode(("client_id", _clientId), ("scope", "XboxLive.SignIn XboxLive.offline_access"));
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
         {
-            Url = new Uri(AuthEndpoints.MsaDeviceCode),
+            Url = new Uri(_auth.MsaDeviceCode),
             Body = payload,
             Headers = FormHeaders,
             AutoRetry = true,
@@ -105,7 +108,7 @@ public sealed class MSADeviceCodeStep : AuthStep
             ("device_code", _deviceCode));
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
         {
-            Url = new Uri(AuthEndpoints.MsaToken),
+            Url = new Uri(_auth.MsaToken),
             Body = payload,
             Headers = FormHeaders,
         }, cancellationToken).ConfigureAwait(false);
