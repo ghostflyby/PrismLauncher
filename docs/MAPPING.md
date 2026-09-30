@@ -159,3 +159,8 @@
 | `rainbow`（颜色工具） | GUI-bound | n/a |
 | `QJsonModel` | GUI-bound | n/a |
 | `qrcodegenerator` | device-code 登录二维码（API 场景可输出 URL，二维码前端事） | n/a（如需可在 Web 层用 SkiaSharp 另议） |
+
+## 迁移注记（2026-10-01，编排工作流批量）
+
+- **JSON 读侧单 DOM**：Modrinth/Flame/Technic/AtLauncher/FTB 家族/Meta/Minecraft 的解析器已统一迁到 JsonNode 读模型（JsonUtils node 侧 Require*/Ensure* 家族）；JsonUtils 的 element 家族保留供未迁移的少数读取点，最终删除待定。
+- **DI 注入进度**：Modrinth/Flame/Technic/AtLauncher/FTB/Imgur 静态类已全部实例化（LauncherRuntime 持有、构造注入 NetStack、可选参数贯穿调用链）；Auth 端点已 AuthEndpointsOptions 注入；启动管线已接 LaunchServices（全部启动钩子静态改实例成员）；FlintLog 静态门面已删除（ILoggerFactory 构造注入）；测试端口分配已收敛 PortAllocator。测试并行保持串行（collections 试验 14 例失败，失败清单记录于提交 e8add2daa 后的编排运行报告，为后续静态清理批次的验收输入）。
