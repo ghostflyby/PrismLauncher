@@ -5,7 +5,6 @@
 // touching the real services. Used by AuthFlowTests and SkinApiTests, which point their own
 // AuthEndpointsOptions instances at it.
 using System.Net;
-using System.Net.Sockets;
 using System.Text;
 
 namespace Flint.Tests;
@@ -16,24 +15,14 @@ internal sealed class AuthStubServer : IDisposable
 
     public AuthStubServer()
     {
-        var port = GetFreePort();
+        // hold a reserved port until the instant this listener takes it over
+        using var lease = PortAllocator.Reserve();
+        var port = lease.Port;
         _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+        lease.Dispose();
         _listener.Start();
         BaseUrl = $"http://127.0.0.1:{port}";
         _ = Task.Run(ListenLoop);
-    }
-
-    /// <summary>
-    /// Probe an actually-free port: a blind random pick can collide with a peer test class
-    /// (xunit parallelizes classes) or an entry in TIME_WAIT, yielding "address already in use".
-    /// </summary>
-    private static int GetFreePort()
-    {
-        using var probe = new TcpListener(IPAddress.Loopback, 0);
-        probe.Start();
-        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
-        probe.Stop();
-        return port;
     }
 
     public string BaseUrl { get; }

@@ -30,8 +30,11 @@ internal sealed class StubFlameServer : IDisposable
 
     public StubFlameServer()
     {
-        var port = GetFreePort();
+        // hold a reserved port until the instant this listener takes it over
+        using var lease = PortAllocator.Reserve();
+        var port = lease.Port;
         _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+        lease.Dispose();
         _listener.Start();
         Url = $"http://127.0.0.1:{port}";
         _ = Task.Run(async () =>
@@ -204,15 +207,6 @@ internal sealed class StubFlameServer : IDisposable
         catch (ObjectDisposedException)
         {
         }
-    }
-
-    private static int GetFreePort()
-    {
-        using var probe = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
-        probe.Start();
-        var port = ((System.Net.IPEndPoint)probe.LocalEndpoint).Port;
-        probe.Stop();
-        return port;
     }
 }
 

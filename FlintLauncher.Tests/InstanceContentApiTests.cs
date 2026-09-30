@@ -14,6 +14,7 @@ using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using Flint.Tests;
 using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Nbt;
 using FlintLauncher.Web;
@@ -602,12 +603,11 @@ public class ServerApiTests : IAsyncDisposable
         public PingStubServer(byte[] reply)
         {
             Reply = reply;
-            var probe = new TcpListener(IPAddress.Loopback, 0);
-            probe.Start();
-            Port = ((IPEndPoint)probe.LocalEndpoint).Port;
-            probe.Stop();
-            _listener = new TcpListener(IPAddress.Loopback, Port);
-            _listener.Start();
+            // take over the allocator's already-listening socket: the port is never
+            // released and rebound, so the old probe-then-rebind window is gone entirely
+            using var lease = PortAllocator.Reserve();
+            _listener = lease.TakeListener();
+            Port = lease.Port;
             _ = Task.Run(AcceptLoopAsync);
         }
 

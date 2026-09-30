@@ -11,9 +11,9 @@
 // xUnit keeps sequential.
 using System.IO.Compression;
 using System.Net;
-using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using Flint.Tests;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Launch;
@@ -460,8 +460,11 @@ internal sealed class TestHttpServer : IDisposable
 
     public TestHttpServer(Action<HttpListenerContext> handler)
     {
-        var port = GetFreePort();
+        // hold a reserved port until the instant this listener takes it over
+        using var lease = PortAllocator.Reserve();
+        var port = lease.Port;
         _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+        lease.Dispose();
         _listener.Start();
         Url = $"http://127.0.0.1:{port}";
         _ = Task.Run(async () =>
@@ -507,15 +510,5 @@ internal sealed class TestHttpServer : IDisposable
         catch (ObjectDisposedException)
         {
         }
-    }
-
-    /// <summary>Probe an actually-free port (blind random picks collide under parallel test classes).</summary>
-    private static int GetFreePort()
-    {
-        using var probe = new TcpListener(IPAddress.Loopback, 0);
-        probe.Start();
-        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
-        probe.Stop();
-        return port;
     }
 }

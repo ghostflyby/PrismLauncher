@@ -16,6 +16,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Flint.Tests;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Java;
@@ -154,8 +155,12 @@ internal sealed class ApiStubServer : IDisposable
     public ApiStubServer(Func<HttpListenerContext, Task> handler)
     {
         Handler = handler;
-        var port = 40000 + Random.Shared.Next(20000);
+        // hold a reserved port until the instant this listener takes it over (a blind random
+        // pick could collide with a peer test class or a foreign process)
+        using var lease = PortAllocator.Reserve();
+        var port = lease.Port;
         _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+        lease.Dispose();
         _listener.Start();
         Url = $"http://127.0.0.1:{port}";
         _loop = Task.Run(ListenLoop);

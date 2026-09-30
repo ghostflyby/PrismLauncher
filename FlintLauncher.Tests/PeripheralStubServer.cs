@@ -4,7 +4,6 @@
 // Every request is recorded with its raw body bytes (multipart bodies are binary) and the
 // response is driven by the Responder delegate.
 using System.Net;
-using System.Net.Sockets;
 using System.Text;
 using Xunit;
 
@@ -16,20 +15,14 @@ internal sealed class PeripheralStubServer : IDisposable
 
     public PeripheralStubServer()
     {
-        var port = GetFreePort();
+        // hold a reserved port until the instant this listener takes it over
+        using var lease = PortAllocator.Reserve();
+        var port = lease.Port;
         _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+        lease.Dispose();
         _listener.Start();
         BaseUrl = $"http://127.0.0.1:{port}";
         _ = Task.Run(ListenLoop);
-    }
-
-    private static int GetFreePort()
-    {
-        using var probe = new TcpListener(IPAddress.Loopback, 0);
-        probe.Start();
-        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
-        probe.Stop();
-        return port;
     }
 
     public string BaseUrl { get; }

@@ -4,6 +4,7 @@
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using Flint.Tests;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using Xunit;
@@ -289,8 +290,11 @@ public class NetStackTests : IDisposable
 
         public TestHttpServer(Action<HttpListenerContext> handler)
         {
-            var port = GetFreePort();
+            // hold a reserved port until the instant this listener takes it over
+            using var lease = PortAllocator.Reserve();
+            var port = lease.Port;
             _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+            lease.Dispose();
             _listener.Start();
             Url = $"http://127.0.0.1:{port}";
             _ = Task.Run(async () =>
@@ -332,16 +336,6 @@ public class NetStackTests : IDisposable
             catch (ObjectDisposedException)
             {
             }
-        }
-
-        /// <summary>Probe an actually-free port (blind random picks collide under parallel test classes).</summary>
-        private static int GetFreePort()
-        {
-            using var probe = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
-            probe.Start();
-            var port = ((IPEndPoint)probe.LocalEndpoint).Port;
-            probe.Stop();
-            return port;
         }
     }
 }
