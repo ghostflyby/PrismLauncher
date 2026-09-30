@@ -37,17 +37,17 @@ public sealed class NetStack
     /// retry, 60s inactivity timeout).</summary>
     public static NetStack CreateDefault() => new();
 
-    public string UserAgent { get; internal set; }
+    public string UserAgent { get; set; }
 
     /// <summary>Port of the NumberOfManualRetries setting: how often a request that failed on
     /// the network level is retried (NetJob::executeNextStylesheet gate). Consumed by
     /// <see cref="NetRequest"/>.</summary>
-    public int ManualRetries { get; internal set; }
+    public int ManualRetries { get; set; }
 
     /// <summary>Port of the RequestTimeout setting (QNetworkReply::setTransferTimeout): the
     /// transfer is aborted when no data flows for this long (an inactivity timeout, not a
     /// total-duration cap, so large steady downloads keep working).</summary>
-    public TimeSpan RequestTimeout { get; internal set; }
+    public TimeSpan RequestTimeout { get; set; }
 
     /// <summary>The proxy configuration currently baked into <see cref="Client"/>
     /// (Application::updateProxySettings state; diagnostics/tests).</summary>
