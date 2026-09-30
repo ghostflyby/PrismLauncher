@@ -38,6 +38,7 @@ public sealed class NetRequest : FlintTask
     private readonly Uri _url;
     private readonly byte[]? _postData;
     private readonly RequestOptions _options;
+    private readonly NetStack _stack;
 
     private readonly List<(string name, string value)> _headers = [];
     private Sink? _sink;
@@ -53,12 +54,14 @@ public sealed class NetRequest : FlintTask
         RequestOptions options = RequestOptions.NoOptions,
         HttpMethodValue method = HttpMethodValue.Get,
         byte[]? postData = null,
-        string? name = null)
+        string? name = null,
+        NetStack? stack = null)
     {
         _url = url;
         _options = options;
         _method = method;
         _postData = postData;
+        _stack = stack ?? NetStack.Default;
         TaskName = name ?? url.ToString();
     }
 
@@ -142,10 +145,10 @@ public sealed class NetRequest : FlintTask
                 await ExecuteOnceAsync(cancellationToken).ConfigureAwait(false);
                 return;
             }
-            catch (HttpRequestException e) when (attempt < Http.ManualRetries &&
+            catch (HttpRequestException e) when (attempt < _stack.ManualRetries &&
                                                  !cancellationToken.IsCancellationRequested)
             {
-                EmitStatus($"Network error ({e.Message}); retrying ({Http.ManualRetries - attempt} tries left)");
+                EmitStatus($"Network error ({e.Message}); retrying ({_stack.ManualRetries - attempt} tries left)");
             }
         }
     }
@@ -167,7 +170,7 @@ public sealed class NetRequest : FlintTask
         {
             try
             {
-                _ = idleTimer.Change(Http.RequestTimeout, Timeout.InfiniteTimeSpan);
+                _ = idleTimer.Change(_stack.RequestTimeout, Timeout.InfiniteTimeSpan);
             }
             catch (ObjectDisposedException)
             {
@@ -198,7 +201,7 @@ public sealed class NetRequest : FlintTask
                 }
 
                 ArmIdleTimer();
-                response = await Http.Client.SendAsync(
+                response = await _stack.Client.SendAsync(
                     message,
                     HttpCompletionOption.ResponseHeadersRead,
                     timeoutSource.Token).ConfigureAwait(false);
@@ -332,7 +335,7 @@ public sealed class NetRequest : FlintTask
             // our inactivity timer fired: surface as a network error so the manual-retry gate
             // sees it (the C++ setTransferTimeout surfaces as OperationCanceledError too)
             throw new HttpRequestException(
-                $"transfer timed out: no data for {Http.RequestTimeout.TotalSeconds:F0} seconds (RequestTimeout)");
+                $"transfer timed out: no data for {_stack.RequestTimeout.TotalSeconds:F0} seconds (RequestTimeout)");
         }
     }
 
@@ -356,7 +359,7 @@ public sealed class NetRequest : FlintTask
 /// consumer at an instance-owned stack; this class is then deleted.</summary>
 public static class Http
 {
-    public static NetStack Default { get; } = NetStack.CreateDefault();
+    public static NetStack Default => NetStack.Default;
 
     public static string UserAgent { get => Default.UserAgent; set => Default.UserAgent = value; }
 

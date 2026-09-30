@@ -89,7 +89,7 @@ public sealed class ImgurUpload : FlintTask
         message.Content = new ByteArrayContent(body);
         message.Content.Headers.TryAddWithoutValidation("Content-Type", "multipart/form-data; boundary=" + boundary);
 
-        using var response = await Http.Client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
+        using var response = await NetStack.Default.Client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
             cancellationToken).ConfigureAwait(false);
         var statusCode = (int)response.StatusCode;
         string responseBody;
@@ -215,7 +215,7 @@ public sealed class ImgurAlbumCreation : FlintTask
         message.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(data));
         message.Content.Headers.TryAddWithoutValidation("Content-Type", "application/x-www-form-urlencoded");
 
-        using var response = await Http.Client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
+        using var response = await NetStack.Default.Client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
             cancellationToken).ConfigureAwait(false);
         var statusCode = (int)response.StatusCode;
         string responseBody;

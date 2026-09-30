@@ -11,6 +11,11 @@ namespace FlintLauncher.Core.Net;
 
 public sealed class NetStack
 {
+    /// <summary>The canonical process-wide stack: the host runtime hands this instance out,
+    /// request plumbing falls back to it when no explicit stack was injected. Tests that need
+    /// isolation construct their own and pass it down the service constructors.</summary>
+    public static NetStack Default { get; } = CreateDefault();
+
     private readonly object _lock = new();
     private (string Type, string Host, int Port, string User, string Pass) _proxy = ("None", "", 0, "", "");
     private (string Ua, string Type, string Host, int Port, string User, string Pass)? _applied;

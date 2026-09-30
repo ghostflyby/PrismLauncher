@@ -95,7 +95,7 @@ public sealed class PasteUpload : FlintTask
         HttpResponseMessage response;
         try
         {
-            response = await Http.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead,
+            response = await NetStack.Default.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken).ConfigureAwait(false);
         }
         catch (HttpRequestException e)

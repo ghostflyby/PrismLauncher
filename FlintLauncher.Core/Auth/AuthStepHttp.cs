@@ -13,6 +13,7 @@
 //  - QNetworkReply::errorString() texts are replaced by plain "HTTP status <code> for <url>" /
 //    exception messages; the user-visible step messages embed them only in generic failures.
 using System.Net;
+using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.Auth;
 
@@ -122,7 +123,7 @@ public static class AuthStepHttp
             HttpResponseMessage response;
             try
             {
-                response = await Net.Http.Client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
+                response = await NetStack.Default.Client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
                     cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

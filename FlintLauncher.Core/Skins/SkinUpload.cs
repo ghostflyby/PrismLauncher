@@ -54,7 +54,7 @@ public sealed class SkinUpload : FlintTask
         message.Content = new ByteArrayContent(body);
         message.Content.Headers.TryAddWithoutValidation("Content-Type", "multipart/form-data; boundary=" + boundary);
 
-        using var response = await Http.Client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
+        using var response = await NetStack.Default.Client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
             cancellationToken).ConfigureAwait(false);
         var statusCode = (int)response.StatusCode;
         if (statusCode is not 200 and not 201 and not 202 and not 203 and not 204 and not 206)

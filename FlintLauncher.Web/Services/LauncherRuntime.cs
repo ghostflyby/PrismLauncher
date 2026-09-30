@@ -17,6 +17,9 @@ public sealed class LauncherRuntime
 {
     public FlintPaths Paths { get; }
     public string DataDir => Paths.DataDir;
+    /// <summary>The network stack this runtime's activity flows through (defaults to the
+    /// canonical process-wide stack; tests may isolate by constructing their own).</summary>
+    public NetStack Net { get; init; } = NetStack.Default;
     public IniSettingsObject GlobalSettings { get; }
     public InstanceList Instances { get; }
     public AccountList Accounts { get; }
