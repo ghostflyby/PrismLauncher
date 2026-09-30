@@ -82,14 +82,14 @@ public sealed class NetRequest : FlintTask
     // ---------------------------------------------------------------- factories
 
     /// <summary>Port of Net::Request::makeCached.</summary>
-    public static NetRequest MakeCached(HttpMetaCache cache, Uri url, MetaEntry entry, RequestOptions options = RequestOptions.NoOptions)
+    public static NetRequest MakeCached(HttpMetaCache cache, Uri url, MetaEntry entry, RequestOptions options = RequestOptions.NoOptions, NetStack? stack = null)
     {
         var checksum = new ChecksumValidator(HashAlgorithmName.MD5, entry.Md5Sum.Length == 0 ? null : Convert.FromHexString(entry.Md5Sum));
         var sink = new MetaCacheSink(entry, checksum, isEternal: options.HasFlag(RequestOptions.MakeEternal))
         {
             MetaCache = cache,
         };
-        var request = new NetRequest(url, options | RequestOptions.AcceptLocalFiles)
+        var request = new NetRequest(url, options | RequestOptions.AcceptLocalFiles, stack: stack)
         {
             RequestSink = sink,
             MetaCache = cache,
@@ -100,26 +100,26 @@ public sealed class NetRequest : FlintTask
     }
 
     /// <summary>Port of Net::Request::makeByteArray; the response lands in <see cref="Body"/>.</summary>
-    public static NetRequest MakeByteArray(Uri url, RequestOptions options = RequestOptions.NoOptions)
+    public static NetRequest MakeByteArray(Uri url, RequestOptions options = RequestOptions.NoOptions, NetStack? stack = null)
     {
         var sink = new ByteArraySink();
-        return new NetRequest(url, options)
+        return new NetRequest(url, options, stack: stack)
         {
             RequestSink = sink,
         };
     }
 
-    public static NetRequest MakeByteArray(Uri url, byte[] postData, RequestOptions options = RequestOptions.NoOptions)
+    public static NetRequest MakeByteArray(Uri url, byte[] postData, RequestOptions options = RequestOptions.NoOptions, NetStack? stack = null)
     {
-        return new NetRequest(url, options, HttpMethodValue.Post, postData)
+        return new NetRequest(url, options, HttpMethodValue.Post, postData, stack: stack)
         {
             RequestSink = new ByteArraySink(),
         };
     }
 
-    public static NetRequest MakeFile(Uri url, string path, RequestOptions options = RequestOptions.NoOptions)
+    public static NetRequest MakeFile(Uri url, string path, RequestOptions options = RequestOptions.NoOptions, NetStack? stack = null)
     {
-        return new NetRequest(url, options)
+        return new NetRequest(url, options, stack: stack)
         {
             RequestSink = new FileSink(path),
         };

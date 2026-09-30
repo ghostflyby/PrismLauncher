@@ -26,16 +26,17 @@ public class GetModDependenciesTaskTests : IDisposable
     private readonly StubModrinthServer _server = new();
     private readonly ModInstallTestEnv _env;
 
+    private readonly ModrinthApi _modrinth = new();
+
     public GetModDependenciesTaskTests()
     {
         Directory.CreateDirectory(_root);
-        ModrinthApi.BaseUrl = _server.Url;
+        _modrinth.BaseUrl = _server.Url;
         _env = new ModInstallTestEnv(_root);
     }
 
     public void Dispose()
     {
-        ModrinthApi.BaseUrl = "https://api.modrinth.com/v2";
         _server.Dispose();
         _env.Dispose();
     }
@@ -156,7 +157,7 @@ public class GetModDependenciesTaskTests : IDisposable
         };
 
         var task = new GetModDependenciesTask(instance, model,
-            [new GetModDependenciesTask.PackDependency(packA, verA)]);
+            [new GetModDependenciesTask.PackDependency(packA, verA)], _modrinth);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -204,7 +205,7 @@ public class GetModDependenciesTaskTests : IDisposable
         };
 
         var task = new GetModDependenciesTask(instance, model,
-            [new GetModDependenciesTask.PackDependency(packA, verA)]);
+            [new GetModDependenciesTask.PackDependency(packA, verA)], _modrinth);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -241,7 +242,7 @@ public class GetModDependenciesTaskTests : IDisposable
         };
 
         var task = new GetModDependenciesTask(instance, model,
-            [new GetModDependenciesTask.PackDependency(packA, verA)]);
+            [new GetModDependenciesTask.PackDependency(packA, verA)], _modrinth);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);

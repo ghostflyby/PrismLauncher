@@ -19,7 +19,8 @@ namespace FlintLauncher.Web;
 
 public static class WebHostBuilder
 {
-    public static WebApplication BuildWebApplication(string[] args)
+    public static WebApplication BuildWebApplication(string[] args,
+        Core.ModPlatform.Modrinth.ModrinthApi? modrinth = null)
     {
         var paths = FlintPaths.FromDataDir(ResolveDataDir(args));
         Directory.CreateDirectory(paths.DataDir);
@@ -41,7 +42,7 @@ public static class WebHostBuilder
             options.SerializerOptions.TypeInfoResolverChain.Insert(0, FlintJsonContext.Default);
         });
 
-        var runtime = new LauncherRuntime(paths);
+        var runtime = new LauncherRuntime(paths, modrinth: modrinth);
         builder.Services.AddSingleton(FlintConfig.Default);
         builder.Services.AddSingleton(runtime);
         builder.Services.AddSingleton<FlintTaskRegistry>();

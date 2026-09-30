@@ -46,7 +46,7 @@ internal sealed class FlintApiHost : IAsyncDisposable
 
     public string DataDir { get; }
 
-    public static async Task<FlintApiHost> StartAsync()
+    public static async Task<FlintApiHost> StartAsync(ModrinthApi? modrinth = null)
     {
         var dataDir = Path.Combine(Path.GetTempPath(), $"flint-api-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dataDir);
@@ -55,7 +55,7 @@ internal sealed class FlintApiHost : IAsyncDisposable
         [
             "--data-dir", dataDir,
             "--urls", "http://127.0.0.1:0",
-        ]);
+        ], modrinth);
         await app.StartAsync();
         var token = File.ReadAllText(Path.Combine(dataDir, ApiAuthService.TokenFileName)).Trim();
         var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
@@ -791,21 +791,22 @@ public class FlintApiModrinthSearchTests : IDisposable
         ctx.Response.Close();
     }
 
+    private readonly ModrinthApi _modrinth = new();
+
     public FlintApiModrinthSearchTests()
     {
-        ModrinthApi.BaseUrl = _server.Url;
+        _modrinth.BaseUrl = _server.Url;
     }
 
     public void Dispose()
     {
-        ModrinthApi.BaseUrl = "https://api.modrinth.com/v2";
         _server.Dispose();
     }
 
     [Fact]
     public async Task Modrinth_Search_Passes_Through_Core_Api()
     {
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(_modrinth);
 
         var response = await host.GetAsync(
             "/api/v1/modplatform/modrinth/search?query=jei&version=1.20.1&loader=fabric&index=downloads&offset=40");

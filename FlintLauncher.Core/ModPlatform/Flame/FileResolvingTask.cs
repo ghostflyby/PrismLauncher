@@ -36,10 +36,12 @@ public sealed class BlockedMod
 public sealed class FileResolvingTask : FlintTask
 {
     private readonly FlameManifest _manifest;
+    private readonly ModrinthApi _modrinth;
 
-    public FileResolvingTask(FlameManifest toProcess)
+    public FileResolvingTask(FlameManifest toProcess, ModrinthApi? modrinth = null)
     {
         _manifest = toProcess;
+        _modrinth = modrinth ?? new ModrinthApi();
     }
 
     public FlameManifest GetResults() => _manifest;
@@ -136,7 +138,7 @@ public sealed class FileResolvingTask : FlintTask
     /// <summary>The Modrinth fallback for blocked files (currentVersions by sha1).</summary>
     private async Task ModrinthFallback(List<string> hashes, CancellationToken cancellationToken)
     {
-        var (modrinthJob, modrinthResponse) = ModrinthApi.CurrentVersions(hashes, "sha1");
+        var (modrinthJob, modrinthResponse) = _modrinth.CurrentVersions(hashes, "sha1");
         await modrinthJob.StartAsync(cancellationToken);
         if (modrinthJob.WasSuccessful)
         {

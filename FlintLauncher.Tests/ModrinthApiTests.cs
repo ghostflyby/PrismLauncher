@@ -34,20 +34,19 @@ public class ModrinthApiTests : IDisposable
     private readonly StubModrinthServer _server = new();
     private readonly string _baseUrl;
 
+    private readonly ModrinthApi _api = new();
+
     public ModrinthApiTests()
     {
         Directory.CreateDirectory(_root);
         _baseUrl = _server.Url;
-        ModrinthApi.BaseUrl = _baseUrl;
+        _api.BaseUrl = _baseUrl;
         // make the download host match the stub so the modrinth-download-meta header path is used
-        ModrinthApi.DownloadHost = "127.0.0.1";
+        _api.DownloadHost = "127.0.0.1";
     }
 
     public void Dispose()
     {
-        ModrinthApi.BaseUrl = "https://api.modrinth.com/v2";
-        ModrinthApi.DownloadHost = "cdn.modrinth.com";
-        ModrinthApi.ApiToken = "";
         _server.Dispose();
         try
         {
@@ -88,7 +87,7 @@ public class ModrinthApiTests : IDisposable
             OpenSource = true,
         };
 
-        var url = ModrinthApi.Instance.GetSearchURL(args);
+        var url = _api.GetSearchURL(args);
 
         Assert.NotNull(url);
         Assert.StartsWith(_baseUrl + "/search?", url);
@@ -123,7 +122,7 @@ public class ModrinthApiTests : IDisposable
             CategoryIds = ["adventure", "technology", "utility"],
         };
 
-        var url = ModrinthApi.Instance.GetSearchURL(args);
+        var url = _api.GetSearchURL(args);
         Assert.NotNull(url);
 
         var urlText = Uri.UnescapeDataString(url);
@@ -143,14 +142,14 @@ public class ModrinthApiTests : IDisposable
     {
         var args = new SearchArgs { Type = ResourceType.Mod };
         args.Loaders = (ModLoaderType)0x8000; // no Modrinth support for unknown loaders
-        Assert.Null(ModrinthApi.Instance.GetSearchURL(args));
+        Assert.Null(_api.GetSearchURL(args));
     }
 
     [Fact]
     public async Task Search_SendsFacetsQueryParam()
     {
         var args = new SearchArgs { Type = ResourceType.Mod, Offset = 0, Search = "jei" };
-        var url = ModrinthApi.Instance.GetSearchURL(args)!;
+        var url = _api.GetSearchURL(args)!;
 
         var request = NetRequest.MakeByteArray(new Uri(url));
         await request.StartAsync();
@@ -169,7 +168,7 @@ public class ModrinthApiTests : IDisposable
     public async Task CurrentVersion_FetchesByHashAndAlgorithm()
     {
         _server.VersionFiles["cafebabecafebabe"] = """{"version_number":"1.2.3","id":"v1","project_id":"p1","date_published":"2023-01-01T00:00:00Z","game_versions":["1.20.1"],"loaders":["fabric"],"name":"n","version_number":"1.2.3","version_type":"release","files":[]}""";
-        var (_, request) = ModrinthApi.CurrentVersion("cafebabecafebabe", "sha1");
+        var (_, request) = _api.CurrentVersion("cafebabecafebabe", "sha1");
         await request.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, request.State);
@@ -181,8 +180,8 @@ public class ModrinthApiTests : IDisposable
     [Fact]
     public async Task ApiToken_IsSentAsAuthorizationHeader()
     {
-        ModrinthApi.ApiToken = "mrpat_token";
-        var (_, request) = ModrinthApi.CurrentVersion("cafebabecafebabe", "sha1");
+        _api.ApiToken = "mrpat_token";
+        var (_, request) = _api.CurrentVersion("cafebabecafebabe", "sha1");
         await request.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, request.State);
@@ -192,7 +191,7 @@ public class ModrinthApiTests : IDisposable
     [Fact]
     public async Task CurrentVersions_PostsHashList()
     {
-        var (job, _) = ModrinthApi.CurrentVersions(["hash1", "hash2"], "sha512");
+        var (job, _) = _api.CurrentVersions(["hash1", "hash2"], "sha512");
         await job.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, job.State);
@@ -230,7 +229,7 @@ public class ModrinthApiTests : IDisposable
     [Fact]
     public async Task LatestVersions_PostsReleaseTypes()
     {
-        var (job, _) = ModrinthApi.Instance.LatestVersions(["hash1"], "sha512", null, null,
+        var (job, _) = _api.LatestVersions(["hash1"], "sha512", null, null,
         [
             new IndexedVersionType(IndexedVersionTypeValue.Release),
             new IndexedVersionType(IndexedVersionTypeValue.Beta),
@@ -248,7 +247,7 @@ public class ModrinthApiTests : IDisposable
     [Fact]
     public async Task LatestVersions_OmitsVersionTypesByDefault()
     {
-        var (job, _) = ModrinthApi.Instance.LatestVersions(["hash1"], "sha512", null, null);
+        var (job, _) = _api.LatestVersions(["hash1"], "sha512", null, null);
         await job.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, job.State);
@@ -285,7 +284,7 @@ public class ModrinthApiTests : IDisposable
 
         UnpackInto(mrpackPath, staging);
 
-        var task = new ModrinthCreationTask(staging, trustedSource: true, _global);
+        var task = new ModrinthCreationTask(staging, trustedSource: true, _global, modrinth: _api);
         task.SetName("Imported Pack");
         await task.StartAsync();
 
@@ -346,7 +345,7 @@ public class ModrinthApiTests : IDisposable
         UnpackInto(mrpackPath, staging);
         _server.VersionFiles[pack.ModSha512] = MrPackBuilder.VersionJson(_server.Url, pack);
 
-        var task = new ModrinthCreationTask(staging, trustedSource: true, _global);
+        var task = new ModrinthCreationTask(staging, trustedSource: true, _global, modrinth: _api);
         task.SetName("Meta Pack");
         await task.StartAsync();
 
@@ -375,7 +374,7 @@ public class ModrinthApiTests : IDisposable
 
         _server.VersionFiles[pack.ModSha512] = MrPackBuilder.VersionJson(_server.Url, pack);
 
-        var task = new ModrinthCreationTask(staging, trustedSource: true, _global);
+        var task = new ModrinthCreationTask(staging, trustedSource: true, _global, modrinth: _api);
         task.SetName("Optional Pack");
         await task.StartAsync();
 
@@ -399,7 +398,7 @@ public class ModrinthApiTests : IDisposable
 
         _server.VersionFiles[pack.ModSha512] = MrPackBuilder.VersionJson(_server.Url, pack);
 
-        var task = new ModrinthCreationTask(staging, trustedSource: true, _global);
+        var task = new ModrinthCreationTask(staging, trustedSource: true, _global, modrinth: _api);
         task.SetName("Bad Pack");
         await task.StartAsync();
 
@@ -420,7 +419,7 @@ public class ModrinthApiTests : IDisposable
 
         _server.VersionFiles[pack.ModSha512] = MrPackBuilder.VersionJson(_server.Url, pack);
 
-        var task = new ModrinthCreationTask(staging, trustedSource: true, _global);
+        var task = new ModrinthCreationTask(staging, trustedSource: true, _global, modrinth: _api);
         task.SetName("Escape Pack");
         await task.StartAsync();
 
@@ -440,7 +439,7 @@ public class ModrinthApiTests : IDisposable
         Assert.True(pack.WriteZip(mrpackPath));
         UnpackInto(mrpackPath, staging);
 
-        var task = new ModrinthCreationTask(staging, trustedSource: true, _global);
+        var task = new ModrinthCreationTask(staging, trustedSource: true, _global, modrinth: _api);
         task.SetName("Dep Pack");
         await task.StartAsync();
 
@@ -464,7 +463,7 @@ public class ModrinthApiTests : IDisposable
         _server.VersionFiles[pack.ModSha512] = MrPackBuilder.VersionJson(_server.Url, pack);
         _server.Projects["projId1"] = MrPackBuilder.ProjectJson();
 
-        var import = new ModrinthCreationTask(staging, trustedSource: true, _global);
+        var import = new ModrinthCreationTask(staging, trustedSource: true, _global, modrinth: _api);
         import.SetName("Round Trip Pack");
         await import.StartAsync();
         Assert.True(import.WasSuccessful, import.FailReason);
@@ -474,7 +473,7 @@ public class ModrinthApiTests : IDisposable
         var instance = new MinecraftInstance(_global, instanceSettings, staging);
         var output = TempPath("exported.mrpack");
         var export = new ModrinthPackExportTask("Round Trip Pack", "1.0.0", "round trip", optionalFiles: true,
-            instance, output);
+            instance, output, modrinth: _api);
         await export.StartAsync();
 
         Assert.True(export.WasSuccessful, export.FailReason);
@@ -549,7 +548,7 @@ public class ModrinthApiTests : IDisposable
 
         var mod = new Mod(jarPath);
         var check = new ModrinthCheckUpdate([mod], [new McVersion("1.20.1")], [ModLoaderType.Fabric],
-            _ => MetadataHandler.Get(Path.Combine(modsDir, ".index"), "test-mod"));
+            _ => MetadataHandler.Get(Path.Combine(modsDir, ".index"), "test-mod"), modrinth: _api);
         await check.StartAsync();
 
         Assert.True(check.WasSuccessful, check.FailReason);
@@ -589,7 +588,7 @@ public class ModrinthApiTests : IDisposable
 
         var mod = new Mod(jarPath);
         var check = new ModrinthCheckUpdate([mod], [new McVersion("1.20.1")], [ModLoaderType.Fabric],
-            _ => MetadataHandler.Get(Path.Combine(modsDir, ".index"), "test-mod"));
+            _ => MetadataHandler.Get(Path.Combine(modsDir, ".index"), "test-mod"), modrinth: _api);
         await check.StartAsync();
 
         Assert.True(check.WasSuccessful, check.FailReason);

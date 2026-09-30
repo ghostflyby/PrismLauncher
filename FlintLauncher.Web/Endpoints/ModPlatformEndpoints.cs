@@ -48,6 +48,7 @@ public static class ModPlatformEndpoints
             string? loader,
             string? index,
             string? type,
+            LauncherRuntime runtime,
             int offset = 0) =>
         {
             if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
@@ -65,7 +66,7 @@ public static class ModPlatformEndpoints
             }
             return parsedProvider == ResourceProvider.FLAME
                 ? await FlameSearchAsync(resourceType, query, version, loader, index, offset)
-                : await ModrinthSearchAsync(resourceType, query, version, loader, index, offset);
+                : await ModrinthSearchAsync(resourceType, query, version, loader, index, offset, runtime);
         });
 
         // ----------------------------------------------------- modplatform/{provider}/categories
@@ -73,7 +74,7 @@ public static class ModPlatformEndpoints
         // project_type (Modrinth), mapped to [{id, name, icon}]. An explicit numeric classId
         // wins over `type` on Flame (search hits carry the raw CurseForge class id).
         api.MapGet("/modplatform/{provider}/categories", async Task<IResult> (
-            string provider, string? type, string? classId) =>
+            string provider, string? type, string? classId, LauncherRuntime runtime) =>
         {
             if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
             {
@@ -126,7 +127,7 @@ public static class ModPlatformEndpoints
                 return ApiJson.Error("invalid_type", unsupportedType, 400);
             }
 
-            var (_, modrinthRequest) = ModrinthApi.Instance.GetModCategories();
+            var (_, modrinthRequest) = runtime.Modrinth.GetModCategories();
             await modrinthRequest.StartAsync();
             if (modrinthRequest.State != Core.Tasks.TaskState.Succeeded)
             {
@@ -139,7 +140,7 @@ public static class ModPlatformEndpoints
 
         // --------------------------------------------------- modplatform/{provider}/mods/{projectId}/description
         api.MapGet("/modplatform/{provider}/mods/{projectId}/description",
-            async Task<IResult> (string provider, string projectId) =>
+            async Task<IResult> (string provider, string projectId, LauncherRuntime runtime) =>
         {
             if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
             {
@@ -158,7 +159,7 @@ public static class ModPlatformEndpoints
             else
             {
                 // the Modrinth body endpoint answers with plain text
-                body = await ModrinthApi.GetProjectDescription(projectId);
+                body = await runtime.Modrinth.GetProjectDescription(projectId);
             }
             return Results.Ok(new ProviderBodyView(body));
         });
@@ -193,7 +194,7 @@ public static class ModPlatformEndpoints
         // ------------------------------------------------ modplatform/{provider}/versions
         api.MapGet("/modplatform/{provider}/versions", async Task<IResult> (
             string provider,
-            string? projectId) =>
+            string? projectId, LauncherRuntime runtime) =>
         {
             if (string.IsNullOrWhiteSpace(projectId))
             {
@@ -209,7 +210,7 @@ public static class ModPlatformEndpoints
                 {
                     Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.FLAME },
                 })
-                : ModrinthApi.Instance.GetVersionsURL(new VersionSearchArgs
+                : runtime.Modrinth.GetVersionsURL(new VersionSearchArgs
                 {
                     Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.MODRINTH },
                 });
@@ -227,7 +228,7 @@ public static class ModPlatformEndpoints
             }
             else
             {
-                ModrinthApi.AddApiHeaders(request);
+                runtime.Modrinth.AddApiHeaders(request);
             }
             await request.StartAsync();
             if (request.State != Core.Tasks.TaskState.Succeeded)
@@ -374,7 +375,7 @@ public static class ModPlatformEndpoints
                 }
 
                 var task = new ModInstallTask(instance, instance.LoaderModList(), requests,
-                    mcVersion, profile.GetSupportedModLoaders() ?? ModLoaderType.None);
+                    mcVersion, profile.GetSupportedModLoaders() ?? ModLoaderType.None, runtime.Modrinth);
                 var entry = registry.Register("mods-install", task, instanceId: instance.Id());
                 // the result payload lists the installed entries (selected + dependencies);
                 // published on terminal events so a download failure still shows what landed
@@ -410,7 +411,7 @@ public static class ModPlatformEndpoints
                         : IndexedVersionType.FromStringList(JsonUtils.ToStringList(
                             runtime.GlobalSettings.Get("ModUpdateReleaseTypes")?.ToString() ?? "[]"));
 
-                var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, releaseTypes);
+                var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, releaseTypes, runtime.Modrinth);
                 var entry = registry.Register("mods-update", task, instanceId: instance.Id());
                 // the result payload carries the found/applied updates; it is published once
                 // the task reaches a terminal state (the check pass fills it before applying)
@@ -664,7 +665,7 @@ public static class ModPlatformEndpoints
     /// <summary>The Modrinth search pass-through (PAT header through ModrinthApi.AddApiHeaders
     /// inside the core request builder; facets like the C++ search model builds them).</summary>
     private static async Task<IResult> ModrinthSearchAsync(ResourceType resourceType, string? query, string? version,
-        string? loader, string? index, int offset)
+        string? loader, string? index, int offset, LauncherRuntime runtime)
     {
         var args = new SearchArgs
         {
@@ -683,7 +684,7 @@ public static class ModPlatformEndpoints
             },
         };
 
-        var url = ModrinthApi.Instance.GetSearchURL(args);
+        var url = runtime.Modrinth.GetSearchURL(args);
         if (url is null)
         {
             return ApiJson.Error("invalid_loader", $"loader '{loader}' is not supported by Modrinth", 400);

@@ -121,15 +121,16 @@ public class FlintApiVersionsTests : IDisposable
     private readonly StubModrinthServer _modrinth = new();
     private readonly StubFlameServer _flame = new();
 
+    private readonly ModrinthApi _modrinthApi = new();
+
     public FlintApiVersionsTests()
     {
-        ModrinthApi.BaseUrl = _modrinth.Url;
+        _modrinthApi.BaseUrl = _modrinth.Url;
         FlameConfig.BaseUrl = _flame.Url;
     }
 
     public void Dispose()
     {
-        ModrinthApi.BaseUrl = "https://api.modrinth.com/v2";
         FlameConfig.BaseUrl = FlintConfig.Default.FlameBaseUrl;
         _modrinth.Dispose();
         _flame.Dispose();
@@ -157,7 +158,7 @@ public class FlintApiVersionsTests : IDisposable
             }),
         }).ToJsonString();
 
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(_modrinthApi);
         var response = await host.GetAsync("/api/v1/modplatform/modrinth/versions?projectId=projId1");
         response.EnsureSuccessStatusCode();
         var versions = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
@@ -183,7 +184,7 @@ public class FlintApiVersionsTests : IDisposable
                 gameVersions: """["1.18.2", "forge"]"""))!),
         }.ToJsonString();
 
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(_modrinthApi);
         var response = await host.GetAsync("/api/v1/modplatform/flame/versions?projectId=123");
         response.EnsureSuccessStatusCode();
         var versions = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
@@ -201,7 +202,7 @@ public class FlintApiVersionsTests : IDisposable
     [Fact]
     public async Task Versions_UnknownProvider_And_MissingProjectId_Are400()
     {
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(_modrinthApi);
 
         var unknown = await host.GetAsync("/api/v1/modplatform/ftb/versions?projectId=x");
         Assert.Equal(System.Net.HttpStatusCode.BadRequest, unknown.StatusCode);
@@ -222,14 +223,15 @@ public class FlintApiModsTests : IDisposable
 {
     private readonly StubModrinthServer _modrinth = new();
 
+    private readonly ModrinthApi _modrinthApi = new();
+
     public FlintApiModsTests()
     {
-        ModrinthApi.BaseUrl = _modrinth.Url;
+        _modrinthApi.BaseUrl = _modrinth.Url;
     }
 
     public void Dispose()
     {
-        ModrinthApi.BaseUrl = "https://api.modrinth.com/v2";
         _modrinth.Dispose();
     }
 
@@ -306,7 +308,7 @@ public class FlintApiModsTests : IDisposable
     [Fact]
     public async Task Mods_List_UnknownInstance_Is404()
     {
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(_modrinthApi);
         var response = await host.GetAsync("/api/v1/instances/ghost/mods");
         Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("instance_not_found", JsonDocument.Parse(await response.Content.ReadAsStringAsync())
@@ -316,7 +318,7 @@ public class FlintApiModsTests : IDisposable
     [Fact]
     public async Task Mods_List_WithoutMetadata_FallsBackToFileName()
     {
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(_modrinthApi);
         var id = await CreateSeededInstanceAsync(host, "Bare Mods");
 
         Directory.CreateDirectory(ModsDir(host, id));
@@ -350,7 +352,7 @@ public class FlintApiModsTests : IDisposable
         _modrinth.ProjectVersions["depProj"] = new JsonArray(JsonNode.Parse(VersionJson(_modrinth.Url,
             "depProj", "depVerId", "0.1.0", "dep.jar", "dep.bin", depBytes))!).ToJsonString();
 
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(_modrinthApi);
         var id = await CreateSeededInstanceAsync(host, "Install Target");
 
         var post = await host.PostAsync($"/api/v1/instances/{Uri.EscapeDataString(id)}/mods/install",
@@ -394,7 +396,7 @@ public class FlintApiModsTests : IDisposable
     [Fact]
     public async Task Mods_Install_UnresolvableProject_FailsTask()
     {
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(_modrinthApi);
         var id = await CreateSeededInstanceAsync(host, "Fail Target");
 
         var post = await host.PostAsync($"/api/v1/instances/{Uri.EscapeDataString(id)}/mods/install",
@@ -411,7 +413,7 @@ public class FlintApiModsTests : IDisposable
     [Fact]
     public async Task Mods_Install_UnknownProvider_Is400()
     {
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(_modrinthApi);
         var id = await CreateSeededInstanceAsync(host, "Bad Provider");
 
         var post = await host.PostAsync($"/api/v1/instances/{Uri.EscapeDataString(id)}/mods/install",
@@ -430,7 +432,7 @@ public class FlintApiModsTests : IDisposable
         _modrinth.Downloads["new.bin"] = newBytes;
         _modrinth.Projects["projId1"] = ProjectJson("projId1", "test-mod", "Test Mod");
 
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(_modrinthApi);
         var id = await CreateSeededInstanceAsync(host, "Update Target");
 
         // 1. install the pinned old version
@@ -482,7 +484,7 @@ public class FlintApiModsTests : IDisposable
     [Fact]
     public async Task Mods_Update_NoMetadata_SucceedsWithEmptyResult()
     {
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(_modrinthApi);
         var id = await CreateSeededInstanceAsync(host, "Update Empty");
 
         Directory.CreateDirectory(ModsDir(host, id));

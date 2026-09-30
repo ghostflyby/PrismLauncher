@@ -85,7 +85,7 @@ public static class ExportEndpoints
                 {
                     case "modrinth":
                         task = new ModrinthPackExportTask(name, versionId, request.Summary ?? "",
-                            optionalFiles: true, instance, output);
+                            optionalFiles: true, instance, output, modrinth: runtime.Modrinth);
                         break;
                     case "flame":
                         task = new FlamePackExportTask(new FlamePackExportTask.Options

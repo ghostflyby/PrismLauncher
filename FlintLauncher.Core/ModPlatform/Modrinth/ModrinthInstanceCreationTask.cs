@@ -53,8 +53,10 @@ public sealed class ModrinthCreationTask : InstanceTask
                                 SettingsObject? globalSettings,
                                 string id = "",
                                 string versionId = "",
-                                string originalInstanceId = "")
+                                string originalInstanceId = "",
+                                ModrinthApi? modrinth = null)
     {
+        _modrinth = modrinth ?? new ModrinthApi();
         StagingPath = stagingPath;
         TrustedSource = trustedSource;
         SetParentSettings(globalSettings ?? throw new ArgumentNullException(nameof(globalSettings)));
@@ -65,6 +67,7 @@ public sealed class ModrinthCreationTask : InstanceTask
 
     public bool TrustedSource { get; }
 
+    private readonly ModrinthApi _modrinth;
     private string _minecraftVersion = "";
     private string _fabricVersion = "";
     private string _quiltVersion = "";
@@ -231,7 +234,7 @@ public sealed class ModrinthCreationTask : InstanceTask
             var meta = new ModrinthApi.DownloadMeta(Reason: "modpack", GameVersion: _minecraftVersion, Loader: loader,
                 DependentOn: _managedId.Length != 0 ? _managedVersionId : "");
 
-            var downloadTask = new ModDownloadTask(file, filePath, meta);
+            var downloadTask = new ModDownloadTask(file, filePath, meta, _modrinth);
             downloadTasks.Add(downloadTask);
             downloadJob.AddTask(downloadTask);
         }
@@ -418,7 +421,7 @@ public sealed class ModrinthCreationTask : InstanceTask
     private async Task EnsureMetaLoop(CancellationToken cancellationToken, MinecraftInstance newInstance)
     {
         var folder = FileSystem.PathCombine(newInstance.ModsRoot(), ".index");
-        var ensureMetadataTask = new EnsureMetadataTask(_resources, folder, ResourceProvider.MODRINTH);
+        var ensureMetadataTask = new EnsureMetadataTask(_resources, folder, ResourceProvider.MODRINTH, _modrinth);
         // setUpdateLock(true): updates for mods coming from an installed modpack are locked
         ensureMetadataTask.SetUpdateLock(lockUpdate: true);
         ensureMetadataTask.MetadataFailed += (_, reason) => EmitStatus(reason);
@@ -451,7 +454,7 @@ public sealed class ModrinthCreationTask : InstanceTask
             foreach (var url in file.Downloads)
             {
                 if (!Uri.TryCreate(url, UriKind.Absolute, out var parsed) || parsed.Scheme != "https"
-                    || parsed.Host != ModrinthApi.DownloadHost)
+                    || parsed.Host != _modrinth.DownloadHost)
                 {
                     untrustedMods.Add(file.Path);
                     break;
@@ -550,12 +553,14 @@ public sealed class ModrinthCreationTask : InstanceTask
         private readonly File _file;
         private readonly string _filePath;
         private readonly ModrinthApi.DownloadMeta _meta;
+        private readonly ModrinthApi _modrinth;
 
-        public ModDownloadTask(File file, string filePath, ModrinthApi.DownloadMeta meta)
+        public ModDownloadTask(File file, string filePath, ModrinthApi.DownloadMeta meta, ModrinthApi modrinth)
         {
             _file = file;
             _filePath = filePath;
             _meta = meta;
+            _modrinth = modrinth;
             TaskName = $"Download {file.Path}";
         }
 
@@ -570,7 +575,7 @@ public sealed class ModrinthCreationTask : InstanceTask
             {
                 var url = _file.Downloads.Dequeue();
                 EmitStatus($"Downloading {_file.Path}...");
-                var dl = ModrinthApi.MakeFileRequest(url, _filePath, _meta);
+                var dl = _modrinth.MakeFileRequest(url, _filePath, _meta);
                 dl.AddValidator(ChecksumValidator.FromHex(hashAlgorithm, _file.Hash));
                 await dl.StartAsync(cancellationToken);
                 if (dl.WasSuccessful)

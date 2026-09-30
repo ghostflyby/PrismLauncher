@@ -31,6 +31,7 @@ public class ResourceDownloadTask : SequentialTask
     private readonly IndexedPack _pack;
     private readonly IndexedVersion _packVersion;
     private readonly ResourceFolderModel _packModel;
+    private readonly ModrinthApi _modrinth;
 
     private NetJob? _filesNetJob;
     private LocalResourceUpdateTask? _updateTask;
@@ -44,11 +45,13 @@ public class ResourceDownloadTask : SequentialTask
                                 bool isIndexed = true,
                                 string downloadReason = "standalone",
                                 string dependentOn = "",
-                                MinecraftInstance? instance = null)
+                                MinecraftInstance? instance = null,
+                                ModrinthApi? modrinth = null)
     {
         _pack = pack;
         _packVersion = version;
         _packModel = packs;
+        _modrinth = modrinth ?? new ModrinthApi();
 
         if (isIndexed)
         {
@@ -61,7 +64,7 @@ public class ResourceDownloadTask : SequentialTask
         _filesNetJob = new NetJob("Resource download");
         EmitStatus($"Downloading resource:\n{_packVersion.DownloadUrl}");
 
-        var action = ModrinthApi.MakeFileRequest(_packVersion.DownloadUrl,
+        var action = _modrinth.MakeFileRequest(_packVersion.DownloadUrl,
             FileSystem.PathCombine(_packModel.Dir, GetFilename()),
             CreateModrinthMeta(instance, downloadReason, dependentOn));
         if (_packVersion.HashType.Length != 0 && _packVersion.Hash.Length != 0)

@@ -27,14 +27,17 @@ public sealed class EnsureMetadataTask : FlintTask
     private readonly Dictionary<string, Resource> _resources; // hash -> resource
     private readonly string _indexDir;
     private readonly ResourceProvider _provider;
+    private readonly ModrinthApi _modrinth;
     private readonly Dictionary<string, IndexedVersion> _tempVersions = new(StringComparer.Ordinal);
     private bool _lockUpdate;
 
-    public EnsureMetadataTask(Dictionary<string, Resource> resources, string indexDir, ResourceProvider provider)
+    public EnsureMetadataTask(Dictionary<string, Resource> resources, string indexDir, ResourceProvider provider,
+                              ModrinthApi? modrinth = null)
     {
         _resources = resources;
         _indexDir = indexDir;
         _provider = provider;
+        _modrinth = modrinth ?? new ModrinthApi();
     }
 
     /// <summary>Port of EnsureMetadataTask::setUpdateLock: whether the metadata written by
@@ -77,7 +80,7 @@ public sealed class EnsureMetadataTask : FlintTask
         var hashType = ProviderCapabilities.HashType(ResourceProvider.MODRINTH)[0];
 
         // ---------------------------------------------------------- versions task
-        var (versionJob, versionRequest) = ModrinthApi.CurrentVersions(_resources.Keys.ToList(), hashType);
+        var (versionJob, versionRequest) = _modrinth.CurrentVersions(_resources.Keys.ToList(), hashType);
         await versionJob.StartAsync(cancellationToken);
         if (!versionJob.WasSuccessful)
         {
@@ -145,7 +148,7 @@ public sealed class EnsureMetadataTask : FlintTask
         bool multiple;
         if (addonIds.Count == 1)
         {
-            var (job, request) = ModrinthApi.Instance.GetProject(addonIds.Keys.First());
+            var (job, request) = _modrinth.GetProject(addonIds.Keys.First());
             if (job is null || request is null)
             {
                 EmitFailed("Could not build the project request");
@@ -157,7 +160,7 @@ public sealed class EnsureMetadataTask : FlintTask
         }
         else
         {
-            (projectJob, projectRequest) = ModrinthApi.Instance.GetProjects(addonIds.Keys.ToList());
+            (projectJob, projectRequest) = _modrinth.GetProjects(addonIds.Keys.ToList());
             multiple = true;
         }
 

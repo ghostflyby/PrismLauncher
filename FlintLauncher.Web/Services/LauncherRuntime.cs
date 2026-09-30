@@ -7,6 +7,7 @@ using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Net;
+using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.News;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Web.Models;
@@ -19,16 +20,21 @@ public sealed class LauncherRuntime
     public string DataDir => Paths.DataDir;
     /// <summary>The network stack this runtime's activity flows through (defaults to the
     /// canonical process-wide stack; tests may isolate by constructing their own).</summary>
-    public NetStack Net { get; init; } = NetStack.Default;
+    public NetStack Net { get; }
+    /// <summary>The Modrinth client (injected into platform tasks/endpoints; tests construct
+    /// a runtime with a client pointed at their stub).</summary>
+    public ModrinthApi Modrinth { get; }
     public IniSettingsObject GlobalSettings { get; }
     public InstanceList Instances { get; }
     public AccountList Accounts { get; }
     public HttpMetaCache MetaCache { get; }
     public NewsChecker News { get; }
 
-    public LauncherRuntime(FlintPaths paths)
+    public LauncherRuntime(FlintPaths paths, NetStack? net = null, ModrinthApi? modrinth = null)
     {
         Paths = paths;
+        Net = net ?? NetStack.Default;
+        Modrinth = modrinth ?? new ModrinthApi(Net);
         var dataDir = paths.DataDir;
 
         // global config: flint.cfg first, importing an existing Prism/PolyMC config like the

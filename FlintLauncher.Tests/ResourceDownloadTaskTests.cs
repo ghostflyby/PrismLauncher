@@ -20,15 +20,16 @@ public class ResourceDownloadTaskTests : IDisposable
 
     private readonly byte[] _jarBytes = "test mod jar content 0123456789"u8.ToArray();
 
+    private readonly ModrinthApi _modrinth = new();
+
     public ResourceDownloadTaskTests()
     {
         Directory.CreateDirectory(_root);
-        ModrinthApi.BaseUrl = _server.Url;
+        _modrinth.BaseUrl = _server.Url;
     }
 
     public void Dispose()
     {
-        ModrinthApi.BaseUrl = "https://api.modrinth.com/v2";
         _server.Dispose();
         try
         {
@@ -84,7 +85,7 @@ public class ResourceDownloadTaskTests : IDisposable
         var (pack, version) = MakeVersion("test.jar", "mod.bin");
         var model = CreateModel();
 
-        var task = new FlintLauncher.Core.ModPlatform.ResourceDownloadTask(pack, version, model);
+        var task = new FlintLauncher.Core.ModPlatform.ResourceDownloadTask(pack, version, model, modrinth: _modrinth);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -138,7 +139,7 @@ public class ResourceDownloadTaskTests : IDisposable
             Slug = "test-mod",
             Name = "Test Mod",
             Provider = ResourceProvider.MODRINTH,
-        }, version, model);
+        }, version, model, modrinth: _modrinth);
         await task.StartAsync();
 
         Assert.False(task.WasSuccessful);
@@ -172,7 +173,7 @@ public class ResourceDownloadTaskTests : IDisposable
         Assert.NotNull(FindMod(model, "old.jar"));
 
         var (pack, version) = MakeVersion("new.jar", "newmod.bin", "brand new jar bytes"u8.ToArray());
-        var task = new FlintLauncher.Core.ModPlatform.ResourceDownloadTask(pack, version, model);
+        var task = new FlintLauncher.Core.ModPlatform.ResourceDownloadTask(pack, version, model, modrinth: _modrinth);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -195,7 +196,7 @@ public class ResourceDownloadTaskTests : IDisposable
         _server.Downloads.Clear();
         var model = CreateModel();
 
-        var task = new FlintLauncher.Core.ModPlatform.ResourceDownloadTask(pack, version, model);
+        var task = new FlintLauncher.Core.ModPlatform.ResourceDownloadTask(pack, version, model, modrinth: _modrinth);
         await task.StartAsync();
 
         Assert.False(task.WasSuccessful);

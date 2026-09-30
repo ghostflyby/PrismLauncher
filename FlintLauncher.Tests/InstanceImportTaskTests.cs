@@ -20,17 +20,17 @@ public class InstanceImportTaskTests : IDisposable
     private readonly TestGlobalSettings _global = new();
     private readonly StubModrinthServer _server = new();
 
+    private readonly ModrinthApi _modrinth = new();
+
     public InstanceImportTaskTests()
     {
         Directory.CreateDirectory(_root);
-        ModrinthApi.BaseUrl = _server.Url;
-        ModrinthApi.DownloadHost = "127.0.0.1";
+        _modrinth.BaseUrl = _server.Url;
+        _modrinth.DownloadHost = "127.0.0.1";
     }
 
     public void Dispose()
     {
-        ModrinthApi.BaseUrl = "https://api.modrinth.com/v2";
-        ModrinthApi.DownloadHost = "cdn.modrinth.com";
         _server.Dispose();
         try
         {
@@ -52,7 +52,7 @@ public class InstanceImportTaskTests : IDisposable
         HttpMetaCache? metaCache = null)
     {
         var list = CreateList();
-        var task = new InstanceImportTask(source, trustedSource: true, extraInfo)
+        var task = new InstanceImportTask(source, trustedSource: true, extraInfo, _modrinth)
         {
             MetaCache = metaCache,
         };

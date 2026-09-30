@@ -42,6 +42,7 @@ public sealed class ModrinthPackExportTask : FlintTask
     private readonly List<string> _files = [];
     private readonly Dictionary<string, string> _pendingHashes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ResolvedFile> _resolvedFiles = new(StringComparer.Ordinal);
+    private readonly ModrinthApi _modrinth;
 
     public ModrinthPackExportTask(string name,
                                   string version,
@@ -49,8 +50,10 @@ public sealed class ModrinthPackExportTask : FlintTask
                                   bool optionalFiles,
                                   MinecraftInstance instance,
                                   string output,
-                                  MMCZip.FilterFunction? filter = null)
+                                  MMCZip.FilterFunction? filter = null,
+                                  ModrinthApi? modrinth = null)
     {
+        _modrinth = modrinth ?? new ModrinthApi();
         _name = name;
         _version = version;
         _summary = summary;
@@ -160,7 +163,7 @@ public sealed class ModrinthPackExportTask : FlintTask
         }
 
         EmitStatus("Finding versions for hashes...");
-        var (_, request) = ModrinthApi.CurrentVersions(_pendingHashes.Values.ToList(), "sha512");
+        var (_, request) = _modrinth.CurrentVersions(_pendingHashes.Values.ToList(), "sha512");
         await request.StartAsync(cancellationToken);
         if (!request.WasSuccessful)
         {

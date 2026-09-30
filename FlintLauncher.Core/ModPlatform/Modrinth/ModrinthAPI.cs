@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of modplatform/modrinth/ModrinthAPI.{h,cpp}: the Modrinth v2 API surface (search
 // with facets, project/version endpoints, hash-based version lookup and updates) on top of
-// the Net stack. The Application-singleton reach-ins become static hooks:
-//  - BuildConfig.MODRINTH_PROD_URL / _STAGING_URL -> BaseUrl / StagingBaseUrl (settable,
-//    see ModrinthApiTests for the [Collection] pattern used to restore it)
+// the Net stack. The Application-singleton reach-ins became injected instance state:
+//  - BuildConfig.MODRINTH_PROD_URL / _STAGING_URL -> BaseUrl / StagingBaseUrl (per-instance,
+//    tests construct their own client pointed at a stub)
 //  - APPLICATION->getModrinthAPIToken() -> ApiToken (optional PAT, sent as Authorization)
 //  - the net/ApiHeaderProxy header logic -> AddApiHeaders (PAT + modrinth-download-meta)
+//  - the QNAM -> the injected NetStack
+// Pure helpers (URL builders, loaders/facets mapping, response shaping) stay static — no
+// configuration behind them.
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
@@ -16,21 +19,21 @@ namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
 public sealed class ModrinthApi : ResourceApi
 {
-    // BuildConfig.MODRINTH_* (settable hooks; tests restore them through [Collection])
-    public static string BaseUrl { get; set; } = "https://api.modrinth.com/v2";
-    public static string StagingBaseUrl { get; set; } = "https://staging-api.modrinth.com/v2";
+    public string BaseUrl { get; set; } = "https://api.modrinth.com/v2";
+    public string StagingBaseUrl { get; set; } = "https://staging-api.modrinth.com/v2";
     public static IReadOnlyList<string> MrpackHosts { get; } = ["cdn.modrinth.com", "github.com", "raw.githubusercontent.com", "gitlab.com"];
-    public static string DownloadHost { get; set; } = "cdn.modrinth.com";
+    public string DownloadHost { get; set; } = "cdn.modrinth.com";
 
     /// <summary>Optional user PAT (APPLICATION->getModrinthAPIToken()); "" disables the header.</summary>
-    public static string ApiToken { get; set; } = "";
+    public string ApiToken { get; set; } = "";
 
-    private ModrinthApi()
+    /// <summary>The network stack this client's requests go through.</summary>
+    public NetStack Net { get; }
+
+    public ModrinthApi(NetStack? net = null)
     {
+        Net = net ?? NetStack.Default;
     }
-
-    private static ModrinthApi? _instance;
-    public static ModrinthApi Instance => _instance ??= new ModrinthApi();
 
     /// <summary>Port of ModrinthDownloadMeta (net/ApiHeaderProxy.h).</summary>
     public readonly record struct DownloadMeta(string Reason, string GameVersion, string Loader, string DependentOn)
@@ -62,7 +65,7 @@ public sealed class ModrinthApi : ResourceApi
     }
 
     /// <summary>Port of the ApiHeaderProxy host checks (PAT + download-meta headers).</summary>
-    public static void AddApiHeaders(NetRequest request, DownloadMeta meta = default)
+    public void AddApiHeaders(NetRequest request, DownloadMeta meta = default)
     {
         var host = request.Url.Host;
         if (host == new Uri(BaseUrl).Host || host == new Uri(StagingBaseUrl).Host)
@@ -118,7 +121,7 @@ public sealed class ModrinthApi : ResourceApi
     }
 
     /// <summary>Port of ModrinthAPI::currentVersion (GET /version_file/{hash}?algorithm=).</summary>
-    public static (NetJob Job, NetRequest Request) CurrentVersion(string hash, string hashFormat)
+    public (NetJob Job, NetRequest Request) CurrentVersion(string hash, string hashFormat)
     {
         var netJob = new NetJob("Modrinth::GetCurrentVersion");
         var request = MakeByteArrayRequest($"{BaseUrl}/version_file/{hash}?algorithm={hashFormat}");
@@ -127,7 +130,7 @@ public sealed class ModrinthApi : ResourceApi
     }
 
     /// <summary>Port of ModrinthAPI::currentVersions (POST /version_files, multiple hashes).</summary>
-    public static (NetJob Job, NetRequest Request) CurrentVersions(IReadOnlyList<string> hashes, string hashFormat)
+    public (NetJob Job, NetRequest Request) CurrentVersions(IReadOnlyList<string> hashes, string hashFormat)
     {
         var netJob = new NetJob("Modrinth::GetCurrentVersions");
 
@@ -290,7 +293,7 @@ public sealed class ModrinthApi : ResourceApi
     /// <summary>Port of the GET /project/{id}/description endpoint: the project body as
     /// plain text (Modrinth has no per-file changelog endpoint — changelogs ride on the
     /// version objects). Returns "" when the request fails, like the Flame API helpers.</summary>
-    public static async Task<string> GetProjectDescription(string projectId,
+    public async Task<string> GetProjectDescription(string projectId,
         CancellationToken cancellationToken = default)
     {
         var request = MakeByteArrayRequest($"{BaseUrl}/project/{projectId}/description");
@@ -459,7 +462,7 @@ public sealed class ModrinthApi : ResourceApi
     public override string? GetInfoURL(string id) => BaseUrl + "/project/" + id;
 
     /// <summary>Port of ModrinthAPI::getMultipleModInfoURL.</summary>
-    public static string GetMultipleModInfoURL(IReadOnlyList<string> ids)
+    public string GetMultipleModInfoURL(IReadOnlyList<string> ids)
     {
         return BaseUrl + $"/projects?ids=[\"{string.Join("\",\"", ids)}\"]";
     }
@@ -528,24 +531,24 @@ public sealed class ModrinthApi : ResourceApi
 
     // ------------------------------------------------------------------ plumbing
 
-    private static NetRequest MakeByteArrayRequest(string url)
+    private NetRequest MakeByteArrayRequest(string url)
     {
-        var request = NetRequest.MakeByteArray(new Uri(url));
+        var request = NetRequest.MakeByteArray(new Uri(url), stack: Net);
         AddApiHeaders(request);
         return request;
     }
 
-    private static NetRequest MakeByteArrayRequest(string url, byte[] postData)
+    private NetRequest MakeByteArrayRequest(string url, byte[] postData)
     {
-        var request = NetRequest.MakeByteArray(new Uri(url), postData);
+        var request = NetRequest.MakeByteArray(new Uri(url), postData, stack: Net);
         AddApiHeaders(request);
         return request;
     }
 
     /// <summary>makeFile() with the Modrinth header proxy applied (downloads from the cdn).</summary>
-    public static NetRequest MakeFileRequest(string url, string path, DownloadMeta meta = default)
+    public NetRequest MakeFileRequest(string url, string path, DownloadMeta meta = default)
     {
-        var request = NetRequest.MakeFile(new Uri(url), path);
+        var request = NetRequest.MakeFile(new Uri(url), path, stack: Net);
         AddApiHeaders(request, meta);
         return request;
     }

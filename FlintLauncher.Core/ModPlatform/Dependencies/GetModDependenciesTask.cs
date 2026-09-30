@@ -53,11 +53,13 @@ public class GetModDependenciesTask : SequentialTask
 
     public sealed record PackDependencyExtraInfo(bool MaybeInstalled, List<string> RequiredByNames, List<string> RequiredByIds);
 
-    public GetModDependenciesTask(MinecraftInstance instance, ModFolderModel folder, List<PackDependency> selected)
+    public GetModDependenciesTask(MinecraftInstance instance, ModFolderModel folder, List<PackDependency> selected,
+                                  ModrinthApi? modrinth = null)
     {
         _selected = selected;
         _version = new McVersion(instance.GetPackProfile().GetComponentVersion("net.minecraft"));
         _loaderType = instance.GetPackProfile().GetSupportedModLoaders() ?? ModLoaderType.None;
+        _modrinth = modrinth ?? new ModrinthApi();
 
         foreach (var mod in folder.AllMods())
         {
@@ -85,14 +87,15 @@ public class GetModDependenciesTask : SequentialTask
 
     private readonly McVersion _version;
     private readonly ModLoaderType _loaderType;
+    private readonly ModrinthApi _modrinth;
 
-    private static ResourceApi GetApi(ResourceProvider provider)
+    private ResourceApi GetApi(ResourceProvider provider)
     {
         if (provider == ResourceProvider.FLAME)
         {
             return FlameApi.Instance;
         }
-        return ModrinthApi.Instance;
+        return _modrinth;
     }
 
     private void Prepare()
@@ -172,14 +175,14 @@ public class GetModDependenciesTask : SequentialTask
     }
 
     /// <summary>Port of ResourceAPI::getProject for both providers.</summary>
-    private static (NetJob? Job, NetRequest? Request) GetProject(ResourceProvider provider, string addonId)
+    private (NetJob? Job, NetRequest? Request) GetProject(ResourceProvider provider, string addonId)
     {
         if (provider == ResourceProvider.FLAME)
         {
             var (job, request) = FlameApi.Instance.GetProject(addonId);
             return (job, request);
         }
-        return ModrinthApi.Instance.GetProject(addonId);
+        return _modrinth.GetProject(addonId);
     }
 
     /// <summary>Port of the per-provider loadIndexedPack virtual.</summary>

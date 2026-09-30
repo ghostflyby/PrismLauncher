@@ -36,6 +36,7 @@ using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.ModPlatform.Hashing;
+using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tasks;
 
@@ -52,8 +53,10 @@ public sealed partial class FlameCreationTask : InstanceTask
                              SettingsObject? globalSettings,
                              string id = "",
                              string versionId = "",
+                             ModrinthApi? modrinth = null,
                              string originalInstanceId = "")
     {
+        _modrinth = modrinth ?? new ModrinthApi();
         StagingPath = stagingPath;
         TrustedSource = trustedSource;
         SetParentSettings(globalSettings ?? throw new ArgumentNullException(nameof(globalSettings)));
@@ -65,6 +68,7 @@ public sealed partial class FlameCreationTask : InstanceTask
     public bool TrustedSource { get; }
 
     private readonly FlameManifest _pack = new();
+    private readonly ModrinthApi _modrinth;
     private readonly string _managedId;
     private readonly string _managedVersionId;
 
@@ -300,7 +304,7 @@ public sealed partial class FlameCreationTask : InstanceTask
         _newInstance.SaveNow();
 
         // ---------------------------------------------------------- resolve + download
-        var modIdResolver = new FileResolvingTask(_pack);
+        var modIdResolver = new FileResolvingTask(_pack, _modrinth);
         EmitStatus("Resolving mod IDs...");
         await modIdResolver.StartAsync(cancellationToken);
         if (!modIdResolver.WasSuccessful)

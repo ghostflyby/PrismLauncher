@@ -21,17 +21,17 @@ public class ImportOptionalModsApiTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-import-api-{Guid.NewGuid():N}");
     private readonly StubModrinthServer _server = new();
 
+    private readonly ModrinthApi _modrinth = new();
+
     public ImportOptionalModsApiTests()
     {
         Directory.CreateDirectory(_root);
-        ModrinthApi.BaseUrl = _server.Url;
-        ModrinthApi.DownloadHost = "127.0.0.1";
+        _modrinth.BaseUrl = _server.Url;
+        _modrinth.DownloadHost = "127.0.0.1";
     }
 
     public void Dispose()
     {
-        ModrinthApi.BaseUrl = "https://api.modrinth.com/v2";
-        ModrinthApi.DownloadHost = "cdn.modrinth.com";
         _server.Dispose();
         try
         {
@@ -73,7 +73,7 @@ public class ImportOptionalModsApiTests : IDisposable
     public async Task Unselected_Optional_Installs_Disabled()
     {
         var url = WriteMrpack();
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(_modrinth);
 
         var instanceDir = await ImportAndAwait(host, url, "Opt Disabled",
             new Dictionary<string, bool> { ["mods/optional.jar"] = false });
@@ -88,7 +88,7 @@ public class ImportOptionalModsApiTests : IDisposable
     public async Task Selected_Optional_Installs_Enabled()
     {
         var url = WriteMrpack();
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(_modrinth);
 
         var instanceDir = await ImportAndAwait(host, url, "Opt Selected",
             new Dictionary<string, bool> { ["mods/optional.jar"] = true });
@@ -103,7 +103,7 @@ public class ImportOptionalModsApiTests : IDisposable
     public async Task Absent_Selection_Keeps_The_Default_Disabled_Install()
     {
         var url = WriteMrpack();
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(_modrinth);
 
         // no optionalMods in the body: unchanged behavior for old callers
         var instanceDir = await ImportAndAwait(host, url, "Opt Absent", null);
