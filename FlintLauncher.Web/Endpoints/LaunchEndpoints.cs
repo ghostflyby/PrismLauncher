@@ -103,9 +103,10 @@ public static class LaunchEndpoints
                     AccountsProvider = () => runtime.Accounts,
                     AutoProceed = false,
                     TargetToJoin = targetToJoin,
+                    // injected launch dependencies (C++ APPLICATION->settings()/logger): built
+                    // by the composition root (WebHostBuilder) for this app
+                    Services = runtime.LaunchServices,
                 };
-                // static hook (C++ APPLICATION->settings()); set per built app in the tests
-                LaunchController.GlobalSettingsProvider = () => runtime.GlobalSettings;
 
                 var entry = registry.Register("launch", controller, instanceId: inst.Id(), controller: controller);
                 _ = controller.StartAsync();

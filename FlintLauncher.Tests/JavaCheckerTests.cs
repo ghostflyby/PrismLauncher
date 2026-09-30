@@ -104,23 +104,21 @@ public class JavaCheckerTests
         }
         var root = Path.Combine(Path.GetTempPath(), $"flint-javacheck-{Guid.NewGuid():N}");
         Directory.CreateDirectory(Path.Combine(root, "jars"));
-        var savedRoot = JavaUtils.LauncherRootPath;
         try
         {
             var jar = Path.Combine(root, "jars", JavaCheckJar.JarFileName);
             File.WriteAllText(jar, "dummy jar bytes");
-            JavaUtils.LauncherRootPath = root;
-
-            Assert.Equal(jar, JavaCheckJar.GetInstalledJarPath());
+            // the install root is an explicit argument now (FlintPaths.InstallRoot through the
+            // LaunchServices — the former JavaUtils.LauncherRootPath static hook)
+            Assert.Equal(jar, JavaCheckJar.GetInstalledJarPath(root));
 
             var target = Path.Combine(root, "extracted", JavaCheckJar.JarFileName);
-            Assert.True(JavaCheckJar.TryExtractTo(target, out var error));
+            Assert.True(JavaCheckJar.TryExtractTo(target, out var error, root));
             Assert.Equal("", error);
             Assert.Equal("dummy jar bytes", File.ReadAllText(target));
         }
         finally
         {
-            JavaUtils.LauncherRootPath = savedRoot ?? AppContext.BaseDirectory;
             Directory.Delete(root, recursive: true);
         }
     }

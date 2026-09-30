@@ -64,8 +64,10 @@ public sealed class JavaChecker : FlintTask
     private readonly int _maxMem;
     private readonly int _permGen;
     private readonly int _id;
+    private readonly string? _installRoot;
 
-    public JavaChecker(string path, string args, int minMem = 0, int maxMem = 0, int permGen = 0, int id = 0)
+    public JavaChecker(string path, string args, int minMem = 0, int maxMem = 0, int permGen = 0, int id = 0,
+        string? installRoot = null)
     {
         _path = path;
         _args = args;
@@ -73,6 +75,7 @@ public sealed class JavaChecker : FlintTask
         _maxMem = maxMem;
         _permGen = permGen;
         _id = id;
+        _installRoot = installRoot;
     }
 
     /// <summary>Port of the checkFinished(const Result&) signal.</summary>
@@ -80,7 +83,7 @@ public sealed class JavaChecker : FlintTask
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        var checkerJar = JavaUtils.GetJavaCheckPath();
+        var checkerJar = JavaUtils.GetJavaCheckPath(_installRoot);
 
         if (checkerJar.Length == 0)
         {

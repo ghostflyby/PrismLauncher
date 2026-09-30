@@ -7,10 +7,10 @@
 // the whole LaunchTask) only finishes when the game exits — exactly the C++ flow.
 //
 // Deviations from the C++ original:
-//  - APPLICATION->getJarPath -> LauncherJars.GetJarPath; APPLICATION->closeAllWindows()/
-//    showMainWindow() (CloseAfterLaunch) -> CloseAfterLaunchHook/ShowMainWindowHook; the
-//    Linux gamemode request (gamemode_request_start_for) is a documented stub (Linux-only,
-//    needs libgamemode).
+//  - APPLICATION->getJarPath -> LauncherJars.GetJarPath against Services.Paths.InstallRoot;
+//    APPLICATION->closeAllWindows()/showMainWindow() (CloseAfterLaunch) ->
+//    Services.Ui.CloseAfterLaunch/ShowMainWindow; the Linux gamemode request
+//    (gamemode_request_start_for) is a documented stub (Linux-only, needs libgamemode).
 //  - Q_OS_WIN local-8bit path mangling (FS::getPathNameInLocal8bit) is not ported (modern
 //    Windows handles UTF-16 command lines; the C++ used it for pre-Windows-10 javaw).
 //  - The readyForLaunch()/proceed() gating is modeled with mayProceed state exactly like the
@@ -20,16 +20,15 @@ using System.Text;
 using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Settings;
+using Microsoft.Extensions.Logging;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class LauncherPartLaunch : LaunchStep
 {
-    /// <summary>C++ APPLICATION->closeAllWindows() when the game logs "Setting user ...".</summary>
-    public static Action? CloseAfterLaunchHook { get; set; }
-
-    /// <summary>C++ APPLICATION->showMainWindow() after a CloseAfterLaunch game exit.</summary>
-    public static Action? ShowMainWindowHook { get; set; }
+    /// <summary>Diagnostics logger (flint.launch category). Resolved per call from the
+    /// injected factory — a disposed host's factory degrades to silence, never throws.</summary>
+    private ILogger Log => Diagnostics.Log.For(Services.LoggerFactory, LogCategories.Launch);
 
     private readonly LoggedProcess _process;
     private readonly bool _closeAfterLaunch;
@@ -44,7 +43,8 @@ public sealed class LauncherPartLaunch : LaunchStep
     {
         _closeAfterLaunch = Variant.AsBool(parent.Instance.Settings().Get("CloseAfterLaunch"));
         _process = new LoggedProcess(
-            parent.Instance.GetJavaVersion().DefaultsToUtf8() ? Encoding.UTF8 : null);
+            parent.Instance.GetJavaVersion().DefaultsToUtf8() ? Encoding.UTF8 : null,
+            parent.Services.LoggerFactory);
 
         _process.Log += OnProcessLog;
         _process.StateChanged += OnState;
@@ -55,7 +55,7 @@ public sealed class LauncherPartLaunch : LaunchStep
         if (_closeAfterLaunch && !_closeAfterLaunchTriggered && Launch.LaunchTask.MatchesCloseAfterLaunch(lines))
         {
             _closeAfterLaunchTriggered = true;
-            CloseAfterLaunchHook?.Invoke();
+            Services.Ui.CloseAfterLaunch?.Invoke();
         }
         EmitLogLines(lines, level);
     }
@@ -68,7 +68,7 @@ public sealed class LauncherPartLaunch : LaunchStep
 
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        var jarPath = LauncherJars.GetJarPath(LauncherJars.NewLaunchJarName);
+        var jarPath = LauncherJars.GetJarPath(LauncherJars.NewLaunchJarName, Services.Paths.InstallRoot);
         if (jarPath.Length == 0)
         {
             const string reason = "Launcher library could not be found. Please check your installation.";
@@ -82,7 +82,7 @@ public sealed class LauncherPartLaunch : LaunchStep
         var legacyJarPath = "";
         if (instance.GetLauncher() == "legacy" || instance.ShouldApplyOnlineFixes())
         {
-            legacyJarPath = LauncherJars.GetJarPath(LauncherJars.NewLaunchLegacyJarName);
+            legacyJarPath = LauncherJars.GetJarPath(LauncherJars.NewLaunchLegacyJarName, Services.Paths.InstallRoot);
             if (legacyJarPath.Length == 0)
             {
                 const string legacyReason = "Legacy launcher library could not be found. Please check your installation.";
@@ -92,7 +92,7 @@ public sealed class LauncherPartLaunch : LaunchStep
             }
         }
 
-        _launchScript = instance.CreateLaunchScript(_session, _targetToJoin);
+        _launchScript = instance.CreateLaunchScript(_session, _targetToJoin, Services);
         var args = instance.JavaArguments();
         var allArgs = string.Join(" ", args);
         EmitLogLine("Java arguments:\n  " + Parent.CensorPrivateInfo(allArgs) + "\n", MessageLevel.Launcher);
@@ -176,7 +176,7 @@ public sealed class LauncherPartLaunch : LaunchStep
 
                 if (_closeAfterLaunch)
                 {
-                    ShowMainWindowHook?.Invoke();
+                    Services.Ui.ShowMainWindow?.Invoke();
                 }
 
                 Parent.Pid = -1;
@@ -204,7 +204,7 @@ public sealed class LauncherPartLaunch : LaunchStep
                 _process.Write(_launchScript);
                 // the script write and the gate below are the two events a "game never
                 // started" investigation turns on — surface them in both channels
-                FlintLog.For(FlintLog.Categories.Launch).ScriptWritten(_launchScript.Length);
+                Log.ScriptWritten(_launchScript.Length);
                 EmitLogLine($"Launch script piped to stdin ({_launchScript.Length} chars).", MessageLevel.Launcher);
 
                 _mayProceed = true;
@@ -226,12 +226,12 @@ public sealed class LauncherPartLaunch : LaunchStep
             const string launchString = "launch\n";
             _process.Write(launchString);
             _mayProceed = false;
-            FlintLog.For(FlintLog.Categories.Launch).LaunchSignalSent();
+            Log.LaunchSignalSent();
             EmitLogLine("Launch signal ('launch') sent to the game process.", MessageLevel.Launcher);
         }
         else
         {
-            FlintLog.For(FlintLog.Categories.Launch).GateNotArmed();
+            Log.GateNotArmed();
         }
     }
 

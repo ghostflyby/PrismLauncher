@@ -24,19 +24,6 @@ public static class JavaUtils
     /// <summary>Port of JavaUtils::javaExecutable ("javaw.exe" on Windows, "java" elsewhere).</summary>
     public static string JavaExecutable => OperatingSystem.IsWindows() ? "javaw.exe" : "java";
 
-    /// <summary>
-    /// The launcher-managed Java directory (C++: the "JavaDir" application setting, default
-    /// "java" relative to the data dir). The host points this at the real data dir; the default
-    /// keeps the C++ cwd-relative behaviour for tests and CLI use.
-    /// </summary>
-    public static string LauncherJavaPath { get; set; } = Path.GetFullPath("java");
-
-    /// <summary>
-    /// The launcher installation root (C++: Application::m_rootPath, used by getJarPath).
-    /// Defaults to the .NET app base directory; the host may override it.
-    /// </summary>
-    public static string LauncherRootPath { get; set; } = AppContext.BaseDirectory;
-
     /// <summary>Port of JavaUtils::MakeJavaPtr.</summary>
     public static JavaInstall MakeJavaPtr(string path, string? id = "unknown", string? arch = "unknown")
     {
@@ -140,8 +127,10 @@ public static class JavaUtils
 
     // --------------------------------------------------------------- discovery
 
-    /// <summary>Port of JavaUtils::FindJavaPaths; dispatches to the platform scan.</summary>
-    public static List<string> FindJavaPaths()
+    /// <summary>Port of JavaUtils::FindJavaPaths; dispatches to the platform scan.
+    /// <paramref name="javaRoot"/> is the launcher-managed java dir (FlintPaths.JavaRoot);
+    /// the default keeps the C++ cwd-relative "java" behaviour for bare fixtures.</summary>
+    public static List<string> FindJavaPaths(string? javaRoot = null)
     {
         List<string> javas;
         if (OperatingSystem.IsWindows())
@@ -163,7 +152,7 @@ public static class JavaUtils
         }
 
         javas.AddRange(GetMinecraftJavaBundle());
-        javas.AddRange(GetPrismJavaBundle());
+        javas.AddRange(GetPrismJavaBundle(javaRoot));
         javas = AddJavasFromEnv(javas);
         return DistinctStable(javas);
     }
@@ -350,15 +339,18 @@ public static class JavaUtils
         return javas;
     }
 
-    /// <summary>Port of JavaUtils::getJavaCheckPath (Application::getJarPath("JavaCheck.jar")).</summary>
-    public static string GetJavaCheckPath()
+    /// <summary>Port of JavaUtils::getJavaCheckPath (Application::getJarPath("JavaCheck.jar")).
+    /// <paramref name="installRoot"/> is the launcher installation root (FlintPaths.InstallRoot);
+    /// the default keeps the .NET app base directory for bare fixtures.</summary>
+    public static string GetJavaCheckPath(string? installRoot = null)
     {
+        var root = installRoot ?? AppContext.BaseDirectory;
         var potentialPaths = new List<string>();
         if (OperatingSystem.IsLinux() || OperatingSystem.IsFreeBSD() || IsOpenBsd())
         {
-            potentialPaths.Add(FileSystem.PathCombine(LauncherRootPath, "share", FlintConfig.Default.LauncherName));
+            potentialPaths.Add(FileSystem.PathCombine(root, "share", FlintConfig.Default.LauncherName));
         }
-        potentialPaths.Add(FileSystem.PathCombine(LauncherRootPath, "jars"));
+        potentialPaths.Add(FileSystem.PathCombine(root, "jars"));
         potentialPaths.Add(FileSystem.PathCombine(AppContext.BaseDirectory, "jars"));
         potentialPaths.Add(FileSystem.PathCombine(AppContext.BaseDirectory, "..", "jars")); // from inside build dir, for debugging
 
@@ -377,7 +369,7 @@ public static class JavaUtils
         {
             return JavaCheckJar.DefaultExtractionPath;
         }
-        if (JavaCheckJar.TryExtractTo(JavaCheckJar.DefaultExtractionPath, out _))
+        if (JavaCheckJar.TryExtractTo(JavaCheckJar.DefaultExtractionPath, out _, installRoot))
         {
             return JavaCheckJar.DefaultExtractionPath;
         }
@@ -437,8 +429,10 @@ public static class JavaUtils
         return javas;
     }
 
-    /// <summary>Port of getPrismJavaBundle: locate the JVMs inside the launcher-managed java dir.</summary>
-    public static List<string> GetPrismJavaBundle()
+    /// <summary>Port of getPrismJavaBundle: locate the JVMs inside the launcher-managed java
+    /// dir (<paramref name="javaRoot"/> = FlintPaths.JavaRoot; default keeps the C++
+    /// cwd-relative "java" behaviour for bare fixtures).</summary>
+    public static List<string> GetPrismJavaBundle(string? javaRoot = null)
     {
         var javas = new List<string>();
 
@@ -460,7 +454,7 @@ public static class JavaUtils
             }
         }
 
-        ScanJavaDir(LauncherJavaPath);
+        ScanJavaDir(javaRoot ?? Path.GetFullPath("java"));
 
         return javas;
     }

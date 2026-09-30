@@ -42,6 +42,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
@@ -105,6 +106,11 @@ public class InstanceList
     /// <summary>Injected metadata cache — stamped onto discovered instances (library and
     /// asset-index download caches, metadata entities).</summary>
     public HttpMetaCache? MetaCache { get; set; }
+
+    /// <summary>Injected launch-pipeline dependencies — stamped onto discovered instances
+    /// (the base LaunchServices their CreateLaunchTask builds from). Set by the composition
+    /// root next to Paths/MetaCache.</summary>
+    public LaunchServices? LaunchServices { get; set; }
 
     // ---------------------------------------------------------------- events (Qt signals)
 
@@ -660,6 +666,7 @@ public class InstanceList
         {
             Paths = Paths,
             MetaCache = MetaCache,
+            LaunchServices = LaunchServices,
         };
         return inst;
     }

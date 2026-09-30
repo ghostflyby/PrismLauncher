@@ -51,66 +51,61 @@ public class RealLaunchSmokeTests
         {
             return; // jars not built on this machine — run docs/tools/newlaunch-build.sh first
         }
-        var previousRoot = JavaUtils.LauncherRootPath;
-        JavaUtils.LauncherRootPath = launcherRoot;
 
         // post-exit command leaves a marker: proves the steps AFTER the game exit ran
         var postExitMarker = Path.Combine(root, "post-exit-ran");
         fixture.Global.StubSet("PostExitCommand", $"/usr/bin/touch '{postExitMarker}'");
 
-        try
+        var controller = new LaunchController
         {
-            var controller = new LaunchController
-            {
-                Instance = instance,
-                WantedLaunchMode = LaunchMode.Offline,
-                OfflineName = "SmokeTester",
-            };
-            // the controller's own run completes when the launcher is started (Login tail);
-            // the game session is covered by the LaunchTask's in-flight StartAsync.
-            var controllerRun = controller.StartAsync();
+            Instance = instance,
+            WantedLaunchMode = LaunchMode.Offline,
+            OfflineName = "SmokeTester",
+            // the jar/jar-check lookups resolve against this install root (the former
+            // JavaUtils.LauncherRootPath static test hook)
+            Services = fixture.CreateServices(installRoot: launcherRoot),
+        };
 
-            var deadline = DateTime.UtcNow.AddSeconds(30);
-            while (controller.Launcher is null)
-            {
-                if (controller.IsFinished || DateTime.UtcNow > deadline)
-                {
-                    throw new Exception($"controller never created a launcher: {controller.State} {controller.FailReason}");
-                }
-                await Task.Delay(50);
-            }
-            var launchTask = controller.Launcher;
-            await launchTask.StartAsync(); // joins the in-flight run
-            await controllerRun;
+        // the controller's own run completes when the launcher is started (Login tail);
+        // the game session is covered by the LaunchTask's in-flight StartAsync.
+        var controllerRun = controller.StartAsync();
 
-            if (launchTask.State != TaskState.Succeeded)
-            {
-                throw new Exception(
-                    "launch failed: " + launchTask.FailReason + " | log: "
-                    + string.Join(" / ", launchTask.GetLogModel().Entries.Select(e => e.Line).TakeLast(12)));
-            }
-            Assert.Equal(TaskState.Succeeded, controller.State);
-
-            // the launch script reached the fake EntryPoint and came back through the log
-            var lines = launchTask.GetLogModel().Entries.Select(e => e.Line).ToList();
-            Assert.Contains("mainClass net.minecraft.client.main.Main", lines);
-            Assert.Contains(lines, l => l == "param --username");
-            Assert.Contains(lines, l => l == "param SmokeTester");
-            Assert.Contains(lines, l => l == "userName SmokeTester");
-            Assert.Contains(lines, l => l == "traits FirstThreadOnMacOS");
-            Assert.Contains(lines, l => l == "launcher standard");
-
-            // game-time bookkeeping happened (setMinecraftRunning(true/false))
-            Assert.True(instance.LastLaunch() > 0);
-            Assert.False(instance.IsRunning);
-
-            // the post-exit command ran after the game exited
-            Assert.True(File.Exists(postExitMarker), "post-exit command did not run");
-        }
-        finally
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (controller.Launcher is null)
         {
-            JavaUtils.LauncherRootPath = previousRoot;
+            if (controller.IsFinished || DateTime.UtcNow > deadline)
+            {
+                throw new Exception($"controller never created a launcher: {controller.State} {controller.FailReason}");
+            }
+            await Task.Delay(50);
         }
+        var launchTask = controller.Launcher;
+        await launchTask.StartAsync(); // joins the in-flight run
+        await controllerRun;
+
+        if (launchTask.State != TaskState.Succeeded)
+        {
+            throw new Exception(
+                "launch failed: " + launchTask.FailReason + " | log: "
+                + string.Join(" / ", launchTask.GetLogModel().Entries.Select(e => e.Line).TakeLast(12)));
+        }
+        Assert.Equal(TaskState.Succeeded, controller.State);
+
+        // the launch script reached the fake EntryPoint and came back through the log
+        var lines = launchTask.GetLogModel().Entries.Select(e => e.Line).ToList();
+        Assert.Contains("mainClass net.minecraft.client.main.Main", lines);
+        Assert.Contains(lines, l => l == "param --username");
+        Assert.Contains(lines, l => l == "param SmokeTester");
+        Assert.Contains(lines, l => l == "userName SmokeTester");
+        Assert.Contains(lines, l => l == "traits FirstThreadOnMacOS");
+        Assert.Contains(lines, l => l == "launcher standard");
+
+        // game-time bookkeeping happened (setMinecraftRunning(true/false))
+        Assert.True(instance.LastLaunch() > 0);
+        Assert.False(instance.IsRunning);
+
+        // the post-exit command ran after the game exited
+        Assert.True(File.Exists(postExitMarker), "post-exit command did not run");
     }
 
     [Fact]

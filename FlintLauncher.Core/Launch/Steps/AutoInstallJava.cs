@@ -3,13 +3,14 @@
 // metadata list matching the profile's compatible java majors (and the OS/arch) and install it
 // through the P5a Java::Manifest/ArchiveDownloadTask machinery.
 //
-// Application-singleton reach-ins become hooks (see the other Launch steps):
-//  - APPLICATION->settings() (global)               -> GlobalSettingsProvider
-//  - APPLICATION->javalist() (the "no download" branch) -> JavaInstallListProvider (null
-//    degrades to the upstream "no compatible Java version was found" warning)
-//  - APPLICATION->javaPath() (settings "JavaDir")   -> JavaUtils.LauncherJavaPath
-//  - APPLICATION->metadataIndex()                   -> MetadataIndexProvider (defaults to the
-//    instance PackProfile's index)
+// Application-singleton reach-ins resolve through the parent LaunchTask's LaunchServices
+// (see the other Launch steps):
+//  - APPLICATION->settings() (global)               -> Services.GlobalSettings
+//  - APPLICATION->javalist() (the "no download" branch) -> Services.JavaInstallListProvider
+//    (null degrades to the upstream "no compatible Java version was found" warning)
+//  - APPLICATION->javaPath() (settings "JavaDir")   -> Services.Paths.JavaRoot
+//  - APPLICATION->metadataIndex()                   -> Services.MetadataIndexProvider
+//    (defaults to the instance PackProfile's index)
 //
 // Flow deviations from the C++ (documented):
 //  - The C++ starts the java-meta load task and then emits progressReportingRequest() without
@@ -28,16 +29,6 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class AutoInstallJava : LaunchStep
 {
-    /// <summary>C++ APPLICATION->settings(); null treats the global gates as off (which makes
-    /// the step succeed immediately, the same outcome as the gates being disabled).</summary>
-    public static Func<SettingsObject?>? GlobalSettingsProvider { get; set; }
-
-    /// <summary>C++ APPLICATION->javalist(); see header note.</summary>
-    public static Func<JavaInstallList?>? JavaInstallListProvider { get; set; }
-
-    /// <summary>C++ APPLICATION->metadataIndex(); defaults to the instance PackProfile index.</summary>
-    public static Func<MinecraftInstance, Meta.Index>? MetadataIndexProvider { get; set; }
-
     private readonly MinecraftInstance _instance;
     private FlintTask? _currentTask;
     private int _majorJavaVersionIndex;
@@ -52,7 +43,7 @@ public sealed class AutoInstallJava : LaunchStep
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         var settings = _instance.Settings();
-        if (!Variant.AsBool(GlobalSettingsProvider?.Invoke()?.Get("AutomaticJavaSwitch")) ||
+        if (!Variant.AsBool(Services.GlobalSettings?.Get("AutomaticJavaSwitch")) ||
             (Variant.AsBool(settings.Get("OverrideJavaLocation")) &&
              (File.Exists(Variant.AsString(settings.Get("JavaPath"))) || Directory.Exists(Variant.AsString(settings.Get("JavaPath"))))))
         {
@@ -60,9 +51,9 @@ public sealed class AutoInstallJava : LaunchStep
             return;
         }
         var packProfile = _instance.GetPackProfile();
-        if (!Variant.AsBool(GlobalSettingsProvider?.Invoke()?.Get("AutomaticJavaDownload")))
+        if (!Variant.AsBool(Services.GlobalSettings?.Get("AutomaticJavaDownload")))
         {
-            var javas = JavaInstallListProvider?.Invoke();
+            var javas = Services.JavaInstallListProvider?.Invoke();
             if (javas is not null)
             {
                 // (upstream connects finished + emits progressReportingRequest without starting
@@ -103,7 +94,7 @@ public sealed class AutoInstallJava : LaunchStep
             EmitSucceeded();
             return;
         }
-        var javaDir = JavaUtils.LauncherJavaPath;
+        var javaDir = Services.Paths.JavaRoot;
         var relativeBinary = FileSystem.PathCombine(wantedJavaName, "bin", JavaUtils.JavaExecutable);
         var wantedJavaPath = FileSystem.PathCombine(javaDir, relativeBinary);
         if (File.Exists(wantedJavaPath) || Directory.Exists(wantedJavaPath))
@@ -125,7 +116,7 @@ public sealed class AutoInstallJava : LaunchStep
     }
 
     private Meta.Index MetadataIndex() =>
-        MetadataIndexProvider?.Invoke(_instance) ?? _instance.GetPackProfile().MetadataIndex;
+        Services.MetadataIndexProvider?.Invoke(_instance) ?? _instance.GetPackProfile().MetadataIndex;
 
     private IReadOnlyList<int> MajorJavaVersions() =>
         _instance.GetPackProfile().GetProfile()?.GetCompatibleJavaMajors() ?? [];
@@ -144,7 +135,7 @@ public sealed class AutoInstallJava : LaunchStep
     {
         var packProfile = _instance.GetPackProfile();
         var javaName = packProfile.GetProfile()?.GetCompatibleJavaName() ?? "";
-        var javaDir = JavaUtils.LauncherJavaPath;
+        var javaDir = Services.Paths.JavaRoot;
         // just checking if the executable is there should suffice
         // but if needed this can be achieved through refreshing the javalist
         // and retrieving the path that contains the java name
@@ -169,7 +160,7 @@ public sealed class AutoInstallJava : LaunchStep
         {
             if (java.RuntimeOs == _supportedArch && java.Name() == javaName)
             {
-                var javaDir = JavaUtils.LauncherJavaPath;
+                var javaDir = Services.Paths.JavaRoot;
                 var finalPath = FileSystem.PathCombine(javaDir, java.Name());
                 switch (java.DownloadType)
                 {

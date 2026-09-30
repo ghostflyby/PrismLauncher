@@ -84,7 +84,7 @@ public class StepEngineTests
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
         var order = new List<string>();
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
         task.AppendStep(new RecordingStep(task, "one", order));
         task.AppendStep(new RecordingStep(task, "two", order));
         task.AppendStep(new RecordingStep(task, "three", order));
@@ -102,7 +102,7 @@ public class StepEngineTests
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
         var order = new List<string>();
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
         task.AppendStep(new RecordingStep(task, "one", order));
         task.AppendStep(new RecordingStep(task, "boom", order, fail: true));
         task.AppendStep(new RecordingStep(task, "never", order));
@@ -122,7 +122,7 @@ public class StepEngineTests
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
         var finalized = new List<string>();
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
 
         task.AppendStep(new RecordingStep(task, "one", [], onFinalize: () => finalized.Add("one")));
         task.AppendStep(new RecordingStep(task, "two", [], onFinalize: () => finalized.Add("two")));
@@ -137,7 +137,7 @@ public class StepEngineTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
         var waiting = new WaitingStep(task, "waiting");
         task.AppendStep(waiting);
 
@@ -163,7 +163,7 @@ public class StepEngineTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
         task.AppendStep(new RecordingStep(task, "never", []));
 
         task.Abort(); // before start: the C++ emits aborted() straight away
@@ -175,18 +175,21 @@ public class StepEngineTests
     [Fact]
     public async Task ProceedGate_ReadyForLaunch_ThenProceed()
     {
-        using var fixture = new LaunchFixture();
-        var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance);
-        var gate = new GatedStep(task);
-        task.AppendStep(gate);
-
-        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        task.ReadyForLaunch += () => ready.TrySetResult();
-
+        // attach first: the logger factory is injected at construction (LaunchServices), so
+        // the task must be built with the sink's factory to observe the gate edges
         var sink = FlintLogTest.Attach();
         try
         {
+            using var fixture = new LaunchFixture();
+            var instance = await fixture.CreateInstance();
+            var task = LaunchTask.Create(instance,
+                fixture.CreateServices(loggerFactory: FlintLogTest.Factory));
+            var gate = new GatedStep(task);
+            task.AppendStep(gate);
+
+            var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            task.ReadyForLaunch += () => ready.TrySetResult();
+
             var run = task.StartAsync();
             await ready.Task; // the launch preparations are done
 
@@ -202,7 +205,7 @@ public class StepEngineTests
             // into an explicit 409 instead of a silent no-op)
             Assert.False(task.IsWaitingForProceed);
             // and both gate edges are visible in the diagnostics channel
-            var launchCategory = Core.Diagnostics.FlintLog.Categories.Launch;
+            var launchCategory = Core.Diagnostics.LogCategories.Launch;
             Assert.True(sink.Has(LogLevel.Information, launchCategory, "ReadyForLaunch gate open"),
                 "gate opening should be logged");
             Assert.True(sink.Has(LogLevel.Information, launchCategory, "Proceed routed to step GatedStep"),
@@ -247,13 +250,13 @@ public class StepEngineTests
 
         // TaskStepWrapper gates on progressReportingRequest; the controller answers with
         // proceed() — mirror the LaunchController.OnProgressRequested behavior here.
-        var success = LaunchTask.Create(instance);
+        var success = LaunchTask.Create(instance, fixture.CreateServices());
         success.RequestProgress += _ => success.Proceed();
         success.AppendStep(new TaskStepWrapper(success, new NoopTask()));
         await success.StartAsync();
         Assert.Equal(TaskState.Succeeded, success.State);
 
-        var failure = LaunchTask.Create(instance);
+        var failure = LaunchTask.Create(instance, fixture.CreateServices());
         failure.RequestProgress += _ => failure.Proceed();
         failure.AppendStep(new TaskStepWrapper(failure, new FailingTask("no libraries today")));
         await failure.StartAsync();
@@ -284,7 +287,7 @@ public class StepEngineTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
 
         // The launch environment builds on the base one: INST_* vars exist in both.
         var baseArgs = task.SubstituteVariables("${INST_ID}");
@@ -303,7 +306,7 @@ public class StepEngineTests
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
         Directory.CreateDirectory(instance.GameRoot()); // normally created by CreateGameFolders
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
         var step = new LaunchCommand(task, "/bin/echo hello-from-echo", "Pre-Load");
         step.SetWorkingDirectory(instance.GameRoot());
         task.AppendStep(step);
@@ -328,7 +331,7 @@ public class StepEngineTests
         }
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
         task.AppendStep(new LaunchCommand(task, "/bin/sh -c 'echo boom >&2; exit 3'", "Pre-Load"));
 
         await task.StartAsync();
@@ -344,7 +347,7 @@ public class StepEngineTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
         task.AppendStep(new LaunchCommand(task, "", "Pre-Load"));
 
         await task.StartAsync();
@@ -358,7 +361,7 @@ public class StepEngineTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
         task.AppendStep(new TextPrint(task, "hello\nworld\n", MessageLevel.Launcher));
 
         await task.StartAsync();

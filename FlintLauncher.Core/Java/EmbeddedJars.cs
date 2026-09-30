@@ -27,12 +27,14 @@ public static class EmbeddedJars
     /// <summary>
     /// Ensures the named jar (e.g. "JavaCheck.jar") is available on disk: installed launcher
     /// roots win, then the per-user cache, then the assembly's embedded copy. Returns the path
-    /// or "" when the jar is neither installed nor embedded.
+    /// or "" when the jar is neither installed nor embedded. <paramref name="installRoot"/> is
+    /// the launcher installation root (FlintPaths.InstallRoot); the default keeps the .NET app
+    /// base directory for bare fixtures.
     /// </summary>
-    public static string EnsureExtracted(string jarFileName)
+    public static string EnsureExtracted(string jarFileName, string? installRoot = null)
     {
         // 1) explicit launcher root / app-local layouts first (host overrides win)
-        var installed = LauncherJarsPath(jarFileName);
+        var installed = LauncherJarsPath(jarFileName, installRoot);
         if (installed.Length != 0)
         {
             return installed;
@@ -61,15 +63,16 @@ public static class EmbeddedJars
         return cached;
     }
 
-    private static string LauncherJarsPath(string jarFileName)
+    private static string LauncherJarsPath(string jarFileName, string? installRoot)
     {
+        var root = installRoot ?? AppContext.BaseDirectory;
         var candidates = new List<string>();
         if (OperatingSystem.IsLinux() || OperatingSystem.IsFreeBSD())
         {
-            candidates.Add(IO.FileSystem.PathCombine(JavaUtils.LauncherRootPath, "share",
+            candidates.Add(IO.FileSystem.PathCombine(root, "share",
                 FlintConfig.Default.LauncherName));
         }
-        candidates.Add(IO.FileSystem.PathCombine(JavaUtils.LauncherRootPath, "jars"));
+        candidates.Add(IO.FileSystem.PathCombine(root, "jars"));
         candidates.Add(IO.FileSystem.PathCombine(AppContext.BaseDirectory, "jars"));
         foreach (var dir in candidates)
         {

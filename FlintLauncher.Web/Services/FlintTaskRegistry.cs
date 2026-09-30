@@ -15,12 +15,22 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
+using Microsoft.Extensions.Logging;
 using static FlintLauncher.Core.Diagnostics.TasksLog;
 
 namespace FlintLauncher.Web.Services;
 
 public sealed class FlintTaskRegistry
 {
+    private readonly ILogger _log;
+
+    public FlintTaskRegistry(ILoggerFactory loggerFactory)
+    {
+        // the host's factory (DI) — the former FlintLog static facade read the same factory
+        // handed over at startup; task lifecycle events land in the same sinks
+        _log = loggerFactory.CreateLogger(Core.Diagnostics.LogCategories.Tasks);
+    }
+
     public sealed class Entry
     {
         public required string Id { get; init; }
@@ -77,8 +87,7 @@ public sealed class FlintTaskRegistry
         }
         void OnTerminal(FlintTask finishedTask)
         {
-            Core.Diagnostics.FlintLog.For(Core.Diagnostics.FlintLog.Categories.Tasks)
-                .Finished(entry.Id, finishedTask.State.ToString());
+            _log.Finished(entry.Id, finishedTask.State.ToString());
             RunHook();
         }
         void OnTerminalFailed(FlintTask finishedTask, string _) => OnTerminal(finishedTask);
@@ -90,7 +99,7 @@ public sealed class FlintTaskRegistry
         {
             _entries[entry.Id] = entry;
         }
-        Core.Diagnostics.FlintLog.For(Core.Diagnostics.FlintLog.Categories.Tasks).Registered(entry.Id, kind);
+        _log.Registered(entry.Id, kind);
         return entry;
     }
 

@@ -30,7 +30,8 @@ public sealed class LookupServerAddress : LaunchStep
         SrvRecord? record;
         try
         {
-            record = await SrvResolver.QueryFirstAsync(dnsName, cancellationToken).ConfigureAwait(false);
+            record = await SrvResolver.QueryFirstAsync(dnsName, Services.SrvServerEndpoint, cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {

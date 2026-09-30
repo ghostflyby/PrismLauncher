@@ -74,7 +74,8 @@ public static class ServerStatusPing
 
         try
         {
-            var record = await SrvResolver.QueryFirstAsync($"_minecraft._tcp.{host}", cancellationToken)
+            var record = await SrvResolver
+                .QueryFirstAsync($"_minecraft._tcp.{host}", serverEndpoint: null, cancellationToken)
                 .ConfigureAwait(false);
             if (record is { } srv)
             {

@@ -10,7 +10,8 @@
 // usable nameserver wins) and server selection reads /etc/resolv.conf (macOS/Linux/FreeBSD);
 // on Windows there is no resolv.conf, so the resolver falls back to the first nameserver of
 // NetworkInterface properties — if that fails, callers treat the lookup as failed exactly
-// like a QDnsLookup error. ServerEndpoint can be overridden for tests (a local UDP stub).
+// like a QDnsLookup error. The queried server can be overridden per launch through the
+// injected LaunchServices.SrvServerEndpoint (tests point it at a local UDP stub).
 using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
@@ -22,15 +23,15 @@ public sealed record SrvRecord(ushort Priority, ushort Weight, ushort Port, stri
 
 public static class SrvResolver
 {
-    /// <summary>Test/override hook: when set, queries go to this server instead of the system one.</summary>
-    public static IPEndPoint? ServerEndpointOverride { get; set; }
-
     public const int DefaultTimeoutMs = 5000;
 
-    /// <summary>Query SRV records; returns an empty list when the name has no SRV records.</summary>
-    public static async Task<List<SrvRecord>> QueryAsync(string name, CancellationToken cancellationToken = default)
+    /// <summary>Query SRV records; returns an empty list when the name has no SRV records.
+    /// <paramref name="serverEndpoint"/> overrides the system nameserver (the injected
+    /// LaunchServices.SrvServerEndpoint — the former test hook).</summary>
+    public static async Task<List<SrvRecord>> QueryAsync(string name, IPEndPoint? serverEndpoint = null,
+        CancellationToken cancellationToken = default)
     {
-        var server = ServerEndpointOverride ?? ResolveSystemNameserver();
+        var server = serverEndpoint ?? ResolveSystemNameserver();
         if (server is null)
         {
             throw new InvalidOperationException("No DNS server available for SRV lookup.");
@@ -54,9 +55,10 @@ public static class SrvResolver
     /// name; null target means "no SRV records / lookup failed" (the caller then falls back to
     /// the original address and the default port).
     /// </summary>
-    public static async Task<SrvRecord?> QueryFirstAsync(string name, CancellationToken cancellationToken = default)
+    public static async Task<SrvRecord?> QueryFirstAsync(string name, IPEndPoint? serverEndpoint = null,
+        CancellationToken cancellationToken = default)
     {
-        var records = await QueryAsync(name, cancellationToken).ConfigureAwait(false);
+        var records = await QueryAsync(name, serverEndpoint, cancellationToken).ConfigureAwait(false);
         return records.Count == 0 ? null : records[0];
     }
 

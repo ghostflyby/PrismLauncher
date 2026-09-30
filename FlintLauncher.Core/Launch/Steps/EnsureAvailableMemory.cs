@@ -3,7 +3,7 @@
 // LowMemWarning setting asks for it, abort) when the system is low on RAM. The macOS path
 // checks the kernel memory-pressure level; the other platforms compare the maximum allocation
 // against the available RAM (70% rule). The C++ QMessageBox prompts become the
-// ConfirmLaunchHandler hook (headless: launch anyway).
+// Services.Ui.ConfirmLaunch hook (headless: launch anyway).
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Settings;
 
@@ -11,9 +11,6 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class EnsureAvailableMemory : LaunchStep
 {
-    /// <summary>The C++ QMessageBox Yes/No prompt; returns true to launch anyway (No aborts).</summary>
-    public static Func<string, bool>? ConfirmLaunchHandler { get; set; }
-
     private readonly MinecraftInstance _instance;
 
     public EnsureAvailableMemory(LaunchTask parent, MinecraftInstance instance) : base(parent)
@@ -49,7 +46,7 @@ public sealed class EnsureAvailableMemory : LaunchStep
             var shouldAbort = false;
             if (Variant.AsBool(_instance.Settings().Get("LowMemWarning")))
             {
-                shouldAbort = ConfirmLaunchHandler?.Invoke(text) == false;
+                shouldAbort = Services.Ui.ConfirmLaunch?.Invoke(text) == false;
             }
 
             const string message = "The system is under high memory pressure";
@@ -87,7 +84,7 @@ public sealed class EnsureAvailableMemory : LaunchStep
                     "There might not be enough free RAM to launch this instance with the current memory settings.\n\n" +
                     $"Maximum allocated: {max} MiB\nFree: {available} MiB (out of {HardwareInfo.TotalRamMiB()} MiB total)\n\n" +
                     "Launch anyway? This may cause slowdowns in the game and your system.";
-                shouldAbort = ConfirmLaunchHandler?.Invoke(dialogText) == false;
+                shouldAbort = Services.Ui.ConfirmLaunch?.Invoke(dialogText) == false;
             }
 
             const string message = "Not enough RAM available to launch this instance";

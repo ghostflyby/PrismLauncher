@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// In-memory Microsoft.Extensions.Logging sink for asserting the diagnostics channel.
-// FlintLog is process-global, so attach/detach must bracket the assertions (the suite runs
-// with collections serialized, see xunit.runner.json).
+// In-memory Microsoft.Extensions.Logging sink for asserting the diagnostics channel. The
+// core receives its ILoggerFactory by constructor injection, so Attach() hands the built
+// factory to the test (inject it into the object under test) and Detach() must bracket the
+// assertions (the suite runs with collections serialized, see xunit.runner.json).
 using Microsoft.Extensions.Logging;
 
 namespace FlintLauncher.Tests;
@@ -47,7 +48,11 @@ public static class FlintLogTest
 {
     private static ILoggerFactory? _factory;
 
-    /// <summary>Point the global FlintLog facade at a fresh in-memory sink (Trace level).</summary>
+    /// <summary>The factory backing the attached sink — inject it into the object under test
+    /// (LoggedProcess, LaunchServices, ...).</summary>
+    public static ILoggerFactory? Factory => _factory;
+
+    /// <summary>Build a fresh in-memory sink factory (Trace level) for direct injection.</summary>
     public static TestLogSink Attach()
     {
         var sink = new TestLogSink();
@@ -56,13 +61,11 @@ public static class FlintLogTest
             builder.SetMinimumLevel(LogLevel.Trace);
             builder.AddProvider(sink);
         });
-        Core.Diagnostics.FlintLog.Initialize(_factory);
         return sink;
     }
 
     public static void Detach()
     {
-        Core.Diagnostics.FlintLog.Reset();
         _factory?.Dispose();
         _factory = null;
     }

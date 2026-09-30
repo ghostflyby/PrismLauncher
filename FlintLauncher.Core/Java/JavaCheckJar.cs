@@ -24,12 +24,14 @@ public static class JavaCheckJar
     /// Port of Application::getJarPath(JarFileName) + install: find the compiled JavaCheck.jar
     /// in the launcher installation layout and copy it to <paramref name="targetPath"/>.
     /// Returns false (with <paramref name="error"/> set) when the jar is not installed.
+    /// <paramref name="installRoot"/> is the launcher installation root
+    /// (FlintPaths.InstallRoot); the default keeps the .NET app base directory.
     /// </summary>
     public static bool TryExtractTo(string targetPath) => TryExtractTo(targetPath, out _);
 
-    public static bool TryExtractTo(string targetPath, out string error)
+    public static bool TryExtractTo(string targetPath, out string error, string? installRoot = null)
     {
-        var jarPath = GetInstalledJarPath();
+        var jarPath = GetInstalledJarPath(installRoot);
         if (jarPath.Length == 0)
         {
             error = StubReason;
@@ -49,16 +51,20 @@ public static class JavaCheckJar
         return true;
     }
 
-    /// <summary>Port of Application::getJarPath("JavaCheck.jar") (see LauncherJars.GetJarPath).</summary>
-    public static string GetInstalledJarPath()
+    /// <summary>Port of Application::getJarPath("JavaCheck.jar") (see LauncherJars.GetJarPath).
+    /// <paramref name="installRoot"/> is the launcher installation root
+    /// (FlintPaths.InstallRoot / LaunchServices.InstallRoot); the default keeps the .NET app
+    /// base directory for bare fixtures.</summary>
+    public static string GetInstalledJarPath(string? installRoot = null)
     {
+        var root = installRoot ?? AppContext.BaseDirectory;
         var potentialPaths = new List<string>();
         if (OperatingSystem.IsLinux() || OperatingSystem.IsFreeBSD())
         {
-            potentialPaths.Add(IO.FileSystem.PathCombine(JavaUtils.LauncherRootPath, "share",
+            potentialPaths.Add(IO.FileSystem.PathCombine(root, "share",
                 FlintConfig.Default.LauncherName));
         }
-        potentialPaths.Add(IO.FileSystem.PathCombine(JavaUtils.LauncherRootPath, "jars"));
+        potentialPaths.Add(IO.FileSystem.PathCombine(root, "jars"));
         potentialPaths.Add(IO.FileSystem.PathCombine(AppContext.BaseDirectory, "jars"));
         potentialPaths.Add(IO.FileSystem.PathCombine(AppContext.BaseDirectory, "..", "jars")); // from inside build dir, for debugging
 

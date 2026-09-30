@@ -47,7 +47,7 @@ public sealed class CheckJava : LaunchStep
 
         EmitLogLine("Java path is:\n  " + _javaPath, MessageLevel.Launcher);
 
-        if (JavaUtils.GetJavaCheckPath().Length == 0)
+        if (JavaUtils.GetJavaCheckPath(Services.Paths.InstallRoot).Length == 0)
         {
             EmitLogLine("Java checker library could not be found. Please check your installation.", MessageLevel.Fatal);
             EmitFailed("Java checker library could not be found. Please check your installation.");
@@ -68,7 +68,7 @@ public sealed class CheckJava : LaunchStep
         if (_javaSignature != storedSignature || storedVersion.Length == 0 || storedArchitecture.Length == 0 ||
             storedRealArchitecture.Length == 0 || storedVendor.Length == 0)
         {
-            _javaChecker = new JavaChecker(realJavaPath, "", 0, 0, 0, 0);
+            _javaChecker = new JavaChecker(realJavaPath, "", 0, 0, 0, 0, Services.Paths.InstallRoot);
             EmitLogLine("Checking Java version...", MessageLevel.Launcher);
             _javaChecker.CheckFinished += CheckJavaFinished;
             _ = _javaChecker.StartAsync(cancellationToken);

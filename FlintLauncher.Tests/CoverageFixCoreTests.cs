@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // fix-3 core-level tests: the C++-aligned GlobalSettingsRegistration defaults, the
-// LaunchTask.parseXmlLogs wiring (LogParser behind the XmlParsingEnabled gate), the
-// Http proxy/timeout hook application (RuntimeNetConfig) and the meta-cache eviction the
+// LaunchTask.parseXmlLogs wiring (LogParser behind the LaunchServices.XmlLogParsing gate),
+// the Http proxy/timeout hook application (RuntimeNetConfig) and the meta-cache eviction the
 // DELETE /api/v1/meta-cache endpoint delegates to.
 //
-// Joins "LauncherJars": Http.Configure/ManualRetries/RequestTimeout and the
-// LaunchTask.XmlParsingEnabled gate are process-global statics — the tests mutate and
-// restore them, so they must not race the API-host suites.
+// Joins "LauncherJars": Http.Configure/ManualRetries/RequestTimeout are process-global
+// statics — the tests mutate and restore them, so they must not race the API-host suites.
 using FlintLauncher.Core;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
@@ -120,86 +119,59 @@ public class CoverageFixCoreTests
     [Fact]
     public async Task XmlParsing_Disabled_Appends_Game_Lines_Raw()
     {
-        // the gate is process-global and the Web host turns it on at startup, so the "off"
-        // behavior is asserted with the gate explicitly cleared (restored below)
-        var previous = LaunchTask.XmlParsingEnabled;
-        LaunchTask.XmlParsingEnabled = false;
-        try
-        {
-            using var fixture = new LaunchFixture();
-            var instance = await fixture.CreateInstance();
-            var task = LaunchTask.Create(instance);
+        // the gate is per-pipeline now (LaunchServices.XmlLogParsing — the Web host turns it
+        // on in the services it builds), so the "off" behavior is the default fixture task
+        using var fixture = new LaunchFixture();
+        var instance = await fixture.CreateInstance();
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
 
-            var xmlEvent = """
-                <log4j:event logger="net.minecraft" timestamp="1700000000" level="INFO" thread="Server thread"><log4j:Message>raw path</log4j:Message></log4j:event>
-                """;
-            task.OnLogLine(xmlEvent, MessageLevel.StdOut);
+        var xmlEvent = """
+            <log4j:event logger="net.minecraft" timestamp="1700000000" level="INFO" thread="Server thread"><log4j:Message>raw path</log4j:Message></log4j:event>
+            """;
+        task.OnLogLine(xmlEvent, MessageLevel.StdOut);
 
-            Assert.Contains(task.GetLogModel().Entries, e => e.Line == xmlEvent);
-        }
-        finally
-        {
-            LaunchTask.XmlParsingEnabled = previous;
-        }
+        Assert.Contains(task.GetLogModel().Entries, e => e.Line == xmlEvent);
     }
 
     [Fact]
     public async Task XmlParsing_Enabled_Structures_Log4j_Events_And_Keeps_Plain_Lines()
     {
-        var previous = LaunchTask.XmlParsingEnabled;
-        LaunchTask.XmlParsingEnabled = true;
-        try
-        {
-            using var fixture = new LaunchFixture();
-            var instance = await fixture.CreateInstance();
-            var task = LaunchTask.Create(instance);
+        using var fixture = new LaunchFixture();
+        var instance = await fixture.CreateInstance();
+        var task = LaunchTask.Create(instance, fixture.CreateServices(xmlLogParsing: true));
 
-            task.OnLogLine("""
-                <log4j:event logger="net.minecraft.server" timestamp="1700000000" level="INFO" thread="Server thread"><log4j:Message>hello xml world</log4j:Message></log4j:event>
-                """, MessageLevel.StdOut);
-            task.OnLogLine("plain game line", MessageLevel.StdOut);
-            task.OnLogLine("launcher side line", MessageLevel.Launcher);
+        task.OnLogLine("""
+            <log4j:event logger="net.minecraft.server" timestamp="1700000000" level="INFO" thread="Server thread"><log4j:Message>hello xml world</log4j:Message></log4j:event>
+            """, MessageLevel.StdOut);
+        task.OnLogLine("plain game line", MessageLevel.StdOut);
+        task.OnLogLine("launcher side line", MessageLevel.Launcher);
 
-            var entries = task.GetLogModel().Entries;
-            // the structured entry: [HH:mm:ss] [thread/LEVEL] [logger]: message, level from the event
-            Assert.Contains(entries, e => e.Level == MessageLevel.Info &&
-                e.Line.Contains("[Server thread/INFO] [net.minecraft.server]: hello xml world"));
-            // plain lines stay separate entries (each line parses on its own)
-            Assert.Contains(entries, e => e.Line == "plain game line");
-            Assert.Contains(entries, e => e.Line == "launcher side line");
-            // the raw XML did not leak into the model
-            Assert.DoesNotContain(entries, e => e.Line.Contains("<log4j:event"));
-        }
-        finally
-        {
-            LaunchTask.XmlParsingEnabled = previous;
-        }
+        var entries = task.GetLogModel().Entries;
+        // the structured entry: [HH:mm:ss] [thread/LEVEL] [logger]: message, level from the event
+        Assert.Contains(entries, e => e.Level == MessageLevel.Info &&
+            e.Line.Contains("[Server thread/INFO] [net.minecraft.server]: hello xml world"));
+        // plain lines stay separate entries (each line parses on its own)
+        Assert.Contains(entries, e => e.Line == "plain game line");
+        Assert.Contains(entries, e => e.Line == "launcher side line");
+        // the raw XML did not leak into the model
+        Assert.DoesNotContain(entries, e => e.Line.Contains("<log4j:event"));
     }
 
     [Fact]
     public async Task XmlParsing_Parse_Error_Falls_Back_To_Plain_Text()
     {
-        var previous = LaunchTask.XmlParsingEnabled;
-        LaunchTask.XmlParsingEnabled = true;
-        try
-        {
-            using var fixture = new LaunchFixture();
-            var instance = await fixture.CreateInstance();
-            var task = LaunchTask.Create(instance);
+        using var fixture = new LaunchFixture();
+        var instance = await fixture.CreateInstance();
+        var task = LaunchTask.Create(instance, fixture.CreateServices(xmlLogParsing: true));
 
-            // missing the required logger attribute -> parse error entry, line re-parsed plain
-            task.OnLogLine("""
-                <log4j:event timestamp="1700000000" level="INFO"><log4j:Message>no logger</log4j:Message></log4j:event>
-                """, MessageLevel.StdOut);
+        // missing the required logger attribute -> parse error entry, line re-parsed plain
+        task.OnLogLine("""
+            <log4j:event timestamp="1700000000" level="INFO"><log4j:Message>no logger</log4j:Message></log4j:event>
+            """, MessageLevel.StdOut);
 
-            var entries = task.GetLogModel().Entries;
-            Assert.Contains(entries, e => e.Level == MessageLevel.Error &&
-                e.Line.StartsWith("[Log4j Parse Error]"));
-        }
-        finally
-        {
-            LaunchTask.XmlParsingEnabled = previous;
-        }
+        var entries = task.GetLogModel().Entries;
+        Assert.Contains(entries, e => e.Level == MessageLevel.Error &&
+            e.Line.StartsWith("[Log4j Parse Error]"));
     }
 
     // --------------------------------------------------- net config application (fix-3)

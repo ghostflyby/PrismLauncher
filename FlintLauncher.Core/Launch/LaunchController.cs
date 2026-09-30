@@ -16,7 +16,7 @@
 //  - askOfflineName(): the name dialog becomes <see cref="AskOfflineNameHandler"/>; the
 //    headless default uses <see cref="OfflineName"/> and falls back to the suggested name.
 //    The C++ stores the choice in APPLICATION->settings() "LastOfflinePlayerName"; the port
-//    mirrors that through <see cref="GlobalSettingsProvider"/> when one is installed.
+//    mirrors that through <see cref="Services.GlobalSettings"/> when one is installed.
 //  - reauthenticateAccount(): the re-login dialog becomes <see cref="ReauthenticateHandler"/>;
 //    unset means the launch aborts (the C++ "No" button).
 //  - the ProfileSetupDialog branch (Normal launch without a profile) aborts the launch —
@@ -36,6 +36,7 @@ using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace FlintLauncher.Core.Launch;
 
@@ -53,8 +54,17 @@ public class LaunchController : FlintTask
     private Launch.LaunchTask? _launcher;
     private LaunchMode _actualLaunchMode = LaunchMode.Normal;
 
-    /// <summary>C++ APPLICATION->settings() (LastOfflinePlayerName storage); null skips it.</summary>
-    public static Func<SettingsObject?>? GlobalSettingsProvider { get; set; }
+    /// <summary>The injected launch dependencies: the controller reads the global settings
+    /// (LastOfflinePlayerName storage, C++ APPLICATION->settings()) from
+    /// <see cref="LaunchServices.GlobalSettings"/>, its diagnostics logger from
+    /// <see cref="LaunchServices.LoggerFactory"/> and hands the services down to the
+    /// LaunchTask it builds. Null keeps the headless defaults (null decides like the former
+    /// unset hooks).</summary>
+    public LaunchServices? Services { get; set; }
+
+    /// <summary>Diagnostics logger (flint.controller category). Resolved per call from the
+    /// injected factory; null/unset or disposed factories degrade to silence.</summary>
+    private ILogger Log => Diagnostics.Log.For(Services?.LoggerFactory, LogCategories.Controller);
 
     public LaunchController()
     {
@@ -326,7 +336,7 @@ public class LaunchController : FlintTask
             }
         }
 
-        var globalSettings = GlobalSettingsProvider?.Invoke();
+        var globalSettings = Services?.GlobalSettings;
         globalSettings?.Set("LastOfflinePlayerName", usedName);
         return usedName;
     }
@@ -427,13 +437,13 @@ public class LaunchController : FlintTask
     /// <summary>Port of launchInstance(): build the LaunchTask, prepend the banner steps, run.</summary>
     private void LaunchInstance()
     {
-        _launcher = Instance!.CreateLaunchTask(_session, TargetToJoin);
+        _launcher = Instance!.CreateLaunchTask(_session, TargetToJoin, Services);
         if (_launcher is null)
         {
             EmitFailed("Couldn't instantiate a launcher.");
             return;
         }
-        FlintLog.For(FlintLog.Categories.Controller).LaunchStarted(
+        Log.LaunchStarted(
             Instance.Id(),
             _actualLaunchMode.ToString(),
             _session?.PlayerName ?? "(none)",
@@ -484,13 +494,13 @@ public class LaunchController : FlintTask
 
     private void OnLauncherSucceeded(FlintTask task)
     {
-        FlintLog.For(FlintLog.Categories.Controller).LaunchFinished("succeeded");
+        Log.LaunchFinished("succeeded");
         EmitSucceeded();
     }
 
     private void OnLauncherFailed(FlintTask task, string reason)
     {
-        FlintLog.For(FlintLog.Categories.Controller).LaunchFinished("failed: " + reason);
+        Log.LaunchFinished("failed: " + reason);
         EmitFailed(reason);
     }
 

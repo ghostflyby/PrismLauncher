@@ -3,7 +3,8 @@
 // the profile's asset version, then fetch the asset objects into assets/objects/<first2>/<hash>.
 //
 // APPLICATION->metacache() reaches the task through the instance (MinecraftInstance.MetaCache,
-// stamped by the composition root); the ResourceURLOverride setting stays a test hook.
+// stamped by the composition root); the ResourceURLOverride setting comes from the
+// instance-stamped LaunchServices (Services.ResourceUrlOverride).
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Net;
 
@@ -14,9 +15,6 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class AssetUpdateTask : FlintTask
 {
-    /// <summary>C++ APPLICATION->settings()->get("ResourceURLOverride").</summary>
-    public static Func<string>? ResourceUrlOverride { get; set; }
-
     private readonly MinecraftInstance _inst;
     private NetJob? _downloadJob;
 
@@ -112,7 +110,7 @@ public sealed class AssetUpdateTask : FlintTask
     /// <summary>Port of resourceUrl().</summary>
     private string ResourceUrl()
     {
-        var urlOverride = ResourceUrlOverride?.Invoke();
+        var urlOverride = _inst.LaunchServices?.ResourceUrlOverride;
         if (!string.IsNullOrEmpty(urlOverride))
         {
             return urlOverride;

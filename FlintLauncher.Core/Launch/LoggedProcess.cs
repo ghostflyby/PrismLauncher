@@ -27,12 +27,13 @@
 //    Process objects do not kill children on finalize).
 //  - diagnostics: the C++ only qDebug's a state anomaly (LoggedProcess.cpp:162); the port
 //    additionally traces spawn command line, stdin writes, every state change and the exit
-//    through the FlintLog "flint.process" category — these were the exact blind spots of the
+//    through the injected "flint.process" logger — these were the exact blind spots of the
 //    first real-launch investigation.
 using System.Diagnostics;
 using System.Text;
 using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Instances;
+using Microsoft.Extensions.Logging;
 
 namespace FlintLauncher.Core.Launch;
 
@@ -68,8 +69,18 @@ public sealed class LoggedProcess : IDisposable
     /// observe a stale Running state (Process.WaitForExitAsync races the exit continuation).</summary>
     private TaskCompletionSource<LoggedProcessState>? _terminatedTcs;
 
-    public LoggedProcess(Encoding? outputEncoding = null)
+    /// <summary>The injected diagnostics factory (the launch pipeline passes the host's
+    /// LaunchServices.LoggerFactory); null keeps the silent-by-default library behavior.</summary>
+    private readonly ILoggerFactory? _loggerFactory;
+
+    /// <summary>Diagnostics logger (flint.process category). Resolved per call from the
+    /// injected factory — a disposed host's factory degrades to silence, never throws.
+    /// Named DiagLog: the Log event above is the process output signal.</summary>
+    private ILogger DiagLog => Diagnostics.Log.For(_loggerFactory, LogCategories.Process);
+
+    public LoggedProcess(Encoding? outputEncoding = null, ILoggerFactory? loggerFactory = null)
     {
+        _loggerFactory = loggerFactory;
         var encoding = outputEncoding ?? Encoding.UTF8;
         _outDecoder = encoding.GetDecoder();
         _errDecoder = encoding.GetDecoder();
@@ -144,7 +155,7 @@ public sealed class LoggedProcess : IDisposable
         }
         // full command line into the diagnostics channel, like the upstream qDebug in
         // LauncherPartLaunch.cpp:131 (session tokens travel via the stdin script, not args)
-        var log = FlintLog.For(FlintLog.Categories.Process);
+        var log = DiagLog;
         log.Starting(program, string.Join(' ', args));
 
         lock (_lock)
@@ -198,7 +209,7 @@ public sealed class LoggedProcess : IDisposable
     /// visible: a dropped "launch" line leaves the game waiting on stdin forever).</summary>
     public void Write(string text)
     {
-        var log = FlintLog.For(FlintLog.Categories.Process);
+        var log = DiagLog;
         try
         {
             var stream = _process.StandardInput;
@@ -390,13 +401,13 @@ public sealed class LoggedProcess : IDisposable
         // based on state, send signals
         if (!_isAborting)
         {
-            FlintLog.For(FlintLog.Categories.Process).Exited(exitCode);
+            DiagLog.Exited(exitCode);
             Log?.Invoke([$"Process exited with code {exitCode}."], MessageLevel.Launcher);
             ChangeState(LoggedProcessState.Finished);
         }
         else
         {
-            FlintLog.For(FlintLog.Categories.Process).Killed();
+            DiagLog.Killed();
             Log?.Invoke(["Process was killed by user."], MessageLevel.Error);
             ChangeState(LoggedProcessState.Aborted);
         }
@@ -410,7 +421,7 @@ public sealed class LoggedProcess : IDisposable
             return;
         }
         _state = state;
-        FlintLog.For(FlintLog.Categories.Process).StateChanged(state.ToString());
+        DiagLog.StateChanged(state.ToString());
         StateChanged?.Invoke(state);
     }
 }

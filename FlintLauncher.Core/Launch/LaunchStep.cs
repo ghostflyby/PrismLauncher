@@ -38,6 +38,11 @@ public abstract class LaunchStep : Tasks.FlintTask
     /// <summary>The LaunchTask this step belongs to (C++ m_parent).</summary>
     public LaunchTask Parent { get; }
 
+    /// <summary>The injected launch dependencies (the parent's LaunchServices): paths, logger
+    /// factory, global settings, UI hooks. Replaces the former APPLICATION-singleton static
+    /// hooks of the C++ steps.</summary>
+    public LaunchServices Services => Parent.Services;
+
     /// <summary>Port of the logLines(QStringList, MessageLevel) signal.</summary>
     public event Action<List<string>, MessageLevel>? LogLines;
 

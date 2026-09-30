@@ -2,10 +2,11 @@
 // Port of launcher/minecraft/update/LegacyFMLLibrariesTask.{h,cpp}: download the extra FML
 // libraries old Forge versions need and copy them into the instance's lib folder.
 //
-// Application-singleton reach-ins become hooks (see Launch/LaunchController.cs for the same
-// pattern): the global settings override (LegacyFMLLibsURLOverride) and the metacache are
-// provided through static delegates; when the metacache hook is unset a throwaway cache is
-// used so instances with the libraries already in place behave identically.
+// Application-singleton reach-ins resolve through the instance (see Launch/LaunchController.cs
+// for the same pattern): the global settings override (LegacyFMLLibsURLOverride) comes from
+// the instance-stamped LaunchServices (Services.LegacyFmllibsUrlOverride) and the metacache
+// from the instance; when the cache is unset a throwaway cache is used so instances with the
+// libraries already in place behave identically.
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Net;
 
@@ -17,9 +18,6 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class LegacyFMLLibrariesTask : FlintTask
 {
-    /// <summary>C++ APPLICATION->settings()->get("LegacyFMLLibsURLOverride").</summary>
-    public static Func<string>? LegacyFmllibsUrlOverride { get; set; }
-
     private readonly MinecraftInstance _inst;
     private readonly List<FmlLib> _fmlLibsToProcess = [];
     private NetJob? _downloadJob;
@@ -103,8 +101,9 @@ public sealed class LegacyFMLLibrariesTask : FlintTask
         FmllibsFinished();
     }
 
-    /// <summary>Port of baseUrl(): the LegacyFMLLibsURLOverride setting or the build default.</summary>
-    private string BaseUrl() => LegacyFmllibsUrlOverride?.Invoke() is { Length: > 0 } urlOverride
+    /// <summary>Port of baseUrl(): the LegacyFMLLibsURLOverride setting (the instance-stamped
+    /// LaunchServices override) or the build default.</summary>
+    private string BaseUrl() => _inst.LaunchServices?.LegacyFmllibsUrlOverride is { Length: > 0 } urlOverride
         ? urlOverride
         : FlintConfig.Default.LegacyFmllibsBaseUrl;
 

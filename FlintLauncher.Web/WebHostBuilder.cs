@@ -25,9 +25,12 @@ public static class WebHostBuilder
         Core.ModPlatform.Technic.TechnicApi? technic = null,
         Core.ModPlatform.AtLauncher.AtLauncherApi? atlauncher = null,
         Core.ModPlatform.Ftb.FtbApi? ftb = null,
-        Core.Auth.AuthEndpointsOptions? auth = null)
+        Core.Auth.AuthEndpointsOptions? auth = null,
+        FlintPaths? paths = null)
     {
-        var paths = FlintPaths.FromDataDir(ResolveDataDir(args));
+        // the data-dir layout; tests override to point InstallRoot (the jars/ lookup) at a
+        // fixture root — the former JavaUtils.LauncherRootPath static test hook
+        paths ??= FlintPaths.FromDataDir(ResolveDataDir(args));
         Directory.CreateDirectory(paths.DataDir);
         // NOTE: the process working directory is NOT touched — every core path is explicit
         // (FlintPaths), so multiple hosts can coexist in one process (integration tests).
@@ -38,7 +41,8 @@ public static class WebHostBuilder
 
         // diagnostics channel (Application.cpp:513-528 parity): level from --log-level /
         // FLINT_LOG_LEVEL (default Information), default console provider plus the rolling
-        // data-dir file; the Core static facade (FlintLog) shares this exact factory
+        // data-dir file; the core services log through this factory by injection
+        // (LaunchServices.LoggerFactory / DI)
         builder.Logging.SetMinimumLevel(ResolveLogLevel(args));
         builder.Logging.AddProvider(new RollingFileLoggerProvider(paths.LogsDir));
 
@@ -58,32 +62,46 @@ public static class WebHostBuilder
         builder.Services.AddHostedService<Services.AccountRefreshService>();
 
         var app = builder.Build();
-        FlintLog.Initialize(app.Services.GetRequiredService<ILoggerFactory>());
+        var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
+
+        // the launch pipeline's dependencies (the C++ APPLICATION singleton's launch half):
+        // logger factory from the app services, paths from the FlintPaths layout, meta cache
+        // and global settings from the runtime. The launch endpoints hand it to the
+        // controller and the instance list stamps it onto (re)discovered instances.
+        runtime.LaunchServices = new Core.Launch.LaunchServices
+        {
+            Paths = paths,
+            LoggerFactory = loggerFactory,
+            MetaCache = runtime.MetaCache,
+            GlobalSettings = runtime.GlobalSettings,
+            InstallRoot = paths.InstallRoot,
+            // the C++ LaunchTask always parses log4j XML events out of the game output
+            // (LaunchTask::parseXmlLogs); the port keeps it behind an opt-in gate for
+            // pure-core consumers and this host turns it on (fix-3)
+            XmlLogParsing = true,
+        };
+        runtime.Instances.LaunchServices = runtime.LaunchServices;
 
         // request log, outermost so the status is final (the error middleware below may
         // rewrite it to 500); health probes log at Debug to keep the default view readable
+        var httpLog = loggerFactory.CreateLogger(Core.Diagnostics.LogCategories.Http);
         app.Use(async (context, next) =>
         {
             var start = Stopwatch.GetTimestamp();
             await next(context);
             var path = context.Request.Path.Value ?? "";
-            var log = FlintLog.For(FlintLog.Categories.Http);
             if (path == "/healthz")
             {
-                log.Probe(context.Request.Method, path, context.Response.StatusCode,
+                httpLog.Probe(context.Request.Method, path, context.Response.StatusCode,
                     Stopwatch.GetElapsedTime(start).TotalMilliseconds);
             }
             else
             {
-                log.Request(context.Request.Method, path, context.Response.StatusCode,
+                httpLog.Request(context.Request.Method, path, context.Response.StatusCode,
                     Stopwatch.GetElapsedTime(start).TotalMilliseconds);
             }
         });
 
-        // fix-3: the C++ LaunchTask always parses log4j XML events out of the game output
-        // (LaunchTask::parseXmlLogs); the port keeps it behind an opt-in gate for pure-core
-        // consumers and the host turns it on.
-        Core.Launch.LaunchTask.XmlParsingEnabled = true;
         // fix-3: proxy / NumberOfManualRetries / RequestTimeout / UserAgentOverride reach the
         // shared Http stack (also re-applied after every settings write)
         Services.RuntimeNetConfig.Apply(runtime);

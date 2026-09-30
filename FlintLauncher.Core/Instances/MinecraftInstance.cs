@@ -6,8 +6,11 @@
 //    <see cref="BaseInstance.PlaytimeSettings"/>; m_detectedOpenALPath/m_detectedGLFWPath/
 //    m_detectedSDLPath -> the Detected*Path properties; APPLICATION->metacache() ->
 //    <see cref="MetaCache"/> (library_directory defaults to "" while unset); APPLICATION->
-//    icons()->saveIcon -> <see cref="SaveIconHook"/>; the QGuiApplication screen geometry of
-//    the launch script -> <see cref="PrimaryScreenSize"/>. The global settings object
+//    icons()->saveIcon -> <see cref="LaunchServices.Ui"/>.SaveIcon; the QGuiApplication
+//    screen geometry of the launch script -> <see cref="LaunchServices.Ui"/>.PrimaryScreenSize.
+//    The launch pipeline's full dependency set (logger factory, global settings, install
+//    root, UI hooks) travels through the instance-stamped <see cref="LaunchServices"/> /
+//    the per-launch services CreateLaunchTask builds. The global settings object
 //    (APPLICATION->settings()) is the injected BaseInstance global settings.
 //  - The Q_OS_* ifdef'ed bits port to OperatingSystem checks. switcherooSetupGPU() (DBus)
 //    and LibraryUtils::findMangoHud() are system-probing process-launch helpers and are
@@ -76,6 +79,12 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// Null keeps the legacy CWD-anchored behavior for bare fixtures; hosts always set it
     /// (InstanceList stamps it at discovery).</summary>
     public FlintPaths? Paths { get; set; }
+
+    /// <summary>Injected launch-pipeline dependencies (paths, logger factory, global settings,
+    /// install root, UI hooks — the former static hooks). Stamped by the composition root
+    /// (InstanceList) or set directly by tests; CreateLaunchTask uses it as the base for the
+    /// per-launch services and falls back to headless defaults while null.</summary>
+    public Launch.LaunchServices? LaunchServices { get; set; }
 
     public override void SaveNow()
     {
@@ -297,19 +306,6 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     //////  Launch stuff //////
 
-    /// <summary>
-    /// C++ APPLICATION->icons()->saveIcon(...): the host application copies the instance icon
-    /// to gameRoot/icon.png at launch. Unset skips the copy (headless setups without icons).
-    /// </summary>
-    public static Action<string, string>? SaveIconHook;
-
-    /// <summary>
-    /// C++ QGuiApplication::primaryScreen()->availableSize() (minus main-window frame margins)
-    /// used for the maximized windowParams of the launch script. Unset falls back to the
-    /// configured window size — there is no GUI in the headless core.
-    /// </summary>
-    public static Func<(int Width, int Height)>? PrimaryScreenSize;
-
     // TODO(P5): the C++ assembles FoldersTask, LibrariesTask, LegacyFMLLibrariesTask and
     // AssetUpdateTask here (the update pipeline). Ported in Launch/LaunchController and the
     // Launch/Steps/* tasks below.
@@ -325,12 +321,24 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         new Launch.Steps.AssetUpdateTask(this),
     ];
 
-    public override Launch.LaunchTask? CreateLaunchTask(AuthSession? session, MinecraftTarget? targetToJoin)
-    {
-        UpdateRuntimeContext();
-        var process = Launch.LaunchTask.Create(this);
+    /// <summary>Port of createLaunchTask() (2-arg form): builds the per-launch services from
+    /// the instance-stamped LaunchServices (or headless defaults).</summary>
+    public override Launch.LaunchTask? CreateLaunchTask(AuthSession? session, MinecraftTarget? targetToJoin) =>
+        CreateLaunchTask(session, targetToJoin, services: null);
 
-        SaveIconHook?.Invoke(IconKey(), FileSystem.PathCombine(GameRoot(), "icon.png"));
+    /// <summary>Port of createLaunchTask(): builds the <see cref="Launch.LaunchServices"/> for
+    /// this launch (the explicit <paramref name="services"/> wins, then the instance-stamped
+    /// ones, then headless defaults), hands it to the LaunchTask (every step reads its
+    /// environment from Parent.Services) and invokes the UI's saveIcon (C++
+    /// APPLICATION->icons()->saveIcon) — the former SaveIconHook static.</summary>
+    public Launch.LaunchTask? CreateLaunchTask(AuthSession? session, MinecraftTarget? targetToJoin,
+        Launch.LaunchServices? services)
+    {
+        var launchServices = services ?? LaunchServices ?? BuildLaunchServices();
+        UpdateRuntimeContext();
+        var process = Launch.LaunchTask.Create(this, launchServices);
+
+        launchServices.Ui.SaveIcon?.Invoke(IconKey(), FileSystem.PathCombine(GameRoot(), "icon.png"));
 
         // print a header
         process.AppendStep(new Launch.Steps.TextPrint(process, "Minecraft folder is:\n  " + GameRoot() + "\n",
@@ -455,7 +463,23 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         return process;
     }
 
-    public string CreateLaunchScript(AuthSession? session, MinecraftTarget? targetToJoin)
+    /// <summary>Headless LaunchServices for bare fixtures (no stamped services, no explicit
+    /// per-launch override): CWD-anchored paths, a null logger and the injected instance
+    /// cache/settings — the same behavior the former unset static hooks produced.</summary>
+    private Launch.LaunchServices BuildLaunchServices() => new()
+    {
+        Paths = Paths ?? FlintPaths.FromDataDir(Directory.GetCurrentDirectory()),
+        LoggerFactory = Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
+        MetaCache = MetaCache,
+        GlobalSettings = GlobalSettings() as IniSettingsObject,
+        InstallRoot = Paths?.InstallRoot ?? AppContext.BaseDirectory,
+    };
+
+    public string CreateLaunchScript(AuthSession? session, MinecraftTarget? targetToJoin) =>
+        CreateLaunchScript(session, targetToJoin, services: null);
+
+    public string CreateLaunchScript(AuthSession? session, MinecraftTarget? targetToJoin,
+        Launch.LaunchServices? services)
     {
         var launchScript = "";
 
@@ -508,9 +532,9 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                 if (!IsLegacy())
                 {
                     // C++ computes the primary screen's available size shrunk by the main
-                    // window frame margins; the headless core has no screen, so the hook (or
-                    // the configured window size) fills in
-                    var (width, height) = PrimaryScreenSize?.Invoke() ??
+                    // window frame margins; the headless core has no screen, so the injected
+                    // UI hook (or the configured window size) fills in
+                    var (width, height) = (services ?? LaunchServices)?.Ui.PrimaryScreenSize?.Invoke() ??
                         (Variant.AsInt(Settings().Get("MinecraftWinWidth")),
                          Variant.AsInt(Settings().Get("MinecraftWinHeight")));
                     windowParams = FormattableString.Invariant($"{width}x{height}");

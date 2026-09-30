@@ -10,6 +10,10 @@
 // The members are intentionally mutable on a per-instance basis only: a host or test may
 // adjust UiHooks/XmlLogParsing on ITS OWN LaunchServices before handing it to a launch, and
 // no other pipeline in the process can observe that.
+using System.Net;
+using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Java;
+using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 
@@ -38,8 +42,26 @@ public sealed class LaunchServices
     /// replaces the JavaUtils.LauncherRootPath static.</summary>
     public string InstallRoot { get; init; } = AppContext.BaseDirectory;
 
-    // NOTE: SrvResolver joins here when the lookup step is migrated (it is still a static
-    // class with a test-override hook; instance-ification happens with the pipeline phase).
+    /// <summary>Test/override DNS endpoint for the SRV lookup (SrvResolver via
+    /// LookupServerAddress; the C++ had QDnsLookup on the system resolver). Null queries the
+    /// system nameserver.</summary>
+    public IPEndPoint? SrvServerEndpoint { get; init; }
+
+    /// <summary>C++ settings "ResourceURLOverride" (AssetUpdateTask asset-object base URL).
+    /// Null keeps the build default base.</summary>
+    public string? ResourceUrlOverride { get; init; }
+
+    /// <summary>C++ settings "LegacyFMLLibsURLOverride" (LegacyFMLLibrariesTask download
+    /// base). Null keeps the build default base.</summary>
+    public string? LegacyFmllibsUrlOverride { get; init; }
+
+    /// <summary>C++ APPLICATION->javalist() (AutoInstallJava's "no download" branch); null
+    /// degrades to the upstream "no compatible Java version was found" warning.</summary>
+    public Func<JavaInstallList?>? JavaInstallListProvider { get; init; }
+
+    /// <summary>C++ APPLICATION->metadataIndex() (AutoInstallJava's java-meta list); null
+    /// keeps the instance PackProfile's index.</summary>
+    public Func<MinecraftInstance, Meta.Index>? MetadataIndexProvider { get; init; }
 
     /// <summary>GUI-only interaction points (dialogs, window management). Unset members keep
     /// the headless defaults — the C++ GUI host would set them.</summary>

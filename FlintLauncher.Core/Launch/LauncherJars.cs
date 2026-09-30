@@ -19,16 +19,20 @@ public static class LauncherJars
     /// <summary>NewLaunchLegacy.jar: the legacy/applet launcher variant.</summary>
     public const string NewLaunchLegacyJarName = "NewLaunchLegacy.jar";
 
-    /// <summary>Port of Application::getJarPath(jarFile): find an installed launcher jar.</summary>
-    public static string GetJarPath(string jarFile)
+    /// <summary>Port of Application::getJarPath(jarFile): find an installed launcher jar.
+    /// <paramref name="installRoot"/> is the launcher installation root
+    /// (FlintPaths.InstallRoot / LaunchServices.InstallRoot); the default keeps the .NET app
+    /// base directory for bare fixtures.</summary>
+    public static string GetJarPath(string jarFile, string? installRoot = null)
     {
+        var root = installRoot ?? AppContext.BaseDirectory;
         var potentialPaths = new List<string>();
         if (OperatingSystem.IsLinux() || OperatingSystem.IsFreeBSD())
         {
-            potentialPaths.Add(FileSystem.PathCombine(JavaUtils.LauncherRootPath, "share",
+            potentialPaths.Add(FileSystem.PathCombine(root, "share",
                 FlintConfig.Default.LauncherName));
         }
-        potentialPaths.Add(FileSystem.PathCombine(JavaUtils.LauncherRootPath, "jars"));
+        potentialPaths.Add(FileSystem.PathCombine(root, "jars"));
         potentialPaths.Add(FileSystem.PathCombine(AppContext.BaseDirectory, "jars"));
         potentialPaths.Add(FileSystem.PathCombine(AppContext.BaseDirectory, "..", "jars")); // from inside build dir, for debugging
 
@@ -44,7 +48,7 @@ public static class LauncherJars
         // nothing installed: extract the embedded copy to the per-user cache
         if (jarFile is NewLaunchJarName or NewLaunchLegacyJarName or Java.JavaCheckJar.JarFileName)
         {
-            var extracted = Java.EmbeddedJars.EnsureExtracted(jarFile);
+            var extracted = Java.EmbeddedJars.EnsureExtracted(jarFile, installRoot);
             return File.Exists(extracted) ? extracted : "";
         }
         return "";

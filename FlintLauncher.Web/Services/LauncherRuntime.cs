@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.ModPlatform.Flame;
@@ -47,6 +48,13 @@ public sealed class LauncherRuntime
     public AccountList Accounts { get; }
     public HttpMetaCache MetaCache { get; }
     public NewsChecker News { get; }
+
+    /// <summary>The launch-pipeline dependencies (paths, logger factory, global settings,
+    /// meta cache, install root). Built by the composition root (WebHostBuilder) once the
+    /// app's LoggerFactory exists — the constructor runs before the host is built, so this is
+    /// assigned right after builder.Build(); launch endpoints hand it to the controller and
+    /// the instance list stamps it onto (re)discovered instances.</summary>
+    public LaunchServices? LaunchServices { get; set; }
 
     public LauncherRuntime(FlintPaths paths, NetStack? net = null, ModrinthApi? modrinth = null,
         FlameApi? flame = null, TechnicApi? technic = null, AtLauncherApi? atlauncher = null,

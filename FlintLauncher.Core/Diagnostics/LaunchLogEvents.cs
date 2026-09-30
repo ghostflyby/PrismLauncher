@@ -6,8 +6,54 @@
 // qDebug in LauncherPartLaunch.cpp:131), what was written to the child's stdin and when,
 // gate arm/consume edges and per-step outcomes.
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FlintLauncher.Core.Diagnostics;
+
+/// <summary>Diagnostic categories, mirroring the upstream Qt categories style
+/// (launcher.task, launcher.task.net, ...). Resolved from the injected ILoggerFactory
+/// through <see cref="Log.For"/> — the former static facade carried these same strings.</summary>
+public static class LogCategories
+{
+    /// <summary>LoggedProcess: spawn command line, stdin writes, state, exit.</summary>
+    public const string Process = "flint.process";
+    /// <summary>LaunchTask step engine + LauncherPartLaunch gate events.</summary>
+    public const string Launch = "flint.launch";
+    /// <summary>LaunchController: account selection, launch outcome.</summary>
+    public const string Controller = "flint.controller";
+    /// <summary>FlintTaskRegistry: task lifecycle.</summary>
+    public const string Tasks = "flint.tasks";
+    /// <summary>Web request log.</summary>
+    public const string Http = "flint.http";
+}
+
+/// <summary>Per-instance resolution of a diagnostics logger from the injected
+/// ILoggerFactory. Replaces the deleted FlintLog static facade: the factory travels through
+/// constructor injection (LaunchServices/LaunchController/LoggedProcess/DI), so nothing here
+/// is process-global — only the dispose semantics are kept 1:1: an unknown factory degrades
+/// to silence and a disposed host's factory must degrade to silence, not throw.</summary>
+public static class Log
+{
+    /// <summary>Logger for a category (see <see cref="LogCategories"/>). NullLogger for a
+    /// null factory so silent-by-default Core stays usable as a plain library. Resolve per
+    /// call site and never cache the result: a disposed host's factory must degrade to
+    /// silence, not throw.</summary>
+    public static ILogger For(ILoggerFactory? factory, string category)
+    {
+        if (factory is null)
+        {
+            return NullLogger.Instance;
+        }
+        try
+        {
+            return factory.CreateLogger(category);
+        }
+        catch (ObjectDisposedException)
+        {
+            return NullLogger.Instance;
+        }
+    }
+}
 
 /// <summary>flint.process — LoggedProcess.</summary>
 public static partial class ProcessLog

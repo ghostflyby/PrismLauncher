@@ -185,7 +185,7 @@ public class LaunchScriptTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
         var session = fixture.OfflineSession("Steve");
 
         // MinecraftInstance::createCensorFilterFromSession shape
@@ -206,7 +206,7 @@ public class LaunchScriptTests
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
         instance.SetName("My Instance");
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
 
         var args = task.SubstituteVariables("-cp ${INST_DIR} $INST_NAME %INST_NAME%");
 

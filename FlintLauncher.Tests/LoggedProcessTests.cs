@@ -183,13 +183,14 @@ public class LoggedProcessTests
         var sink = FlintLogTest.Attach();
         try
         {
-            using var process = new LoggedProcess();
+            // the diagnostics factory is injected (the pipeline passes LaunchServices.LoggerFactory)
+            using var process = new LoggedProcess(loggerFactory: FlintLogTest.Factory);
             var completion = RunAsync(process, "/bin/sh", "-c", "read line; echo \"$line\"");
             await Task.Delay(200);
             process.Write("hello diag\n");
             await completion;
 
-            var processCategory = Core.Diagnostics.FlintLog.Categories.Process;
+            var processCategory = Core.Diagnostics.LogCategories.Process;
             Assert.True(sink.Has(LogLevel.Debug, processCategory, "Starting process /bin/sh"),
                 "spawn command line should be logged");
             Assert.True(sink.Has(LogLevel.Debug, processCategory, "State -> Running"),
@@ -213,12 +214,12 @@ public class LoggedProcessTests
         var sink = FlintLogTest.Attach();
         try
         {
-            using var process = new LoggedProcess();
+            using var process = new LoggedProcess(loggerFactory: FlintLogTest.Factory);
             // deterministic failure: StandardInput is not available before Start(); the real
             // world case (child died, broken pipe) throws IOException the same way
             process.Write("never started\n");
 
-            Assert.True(sink.Has(LogLevel.Warning, Core.Diagnostics.FlintLog.Categories.Process,
+            Assert.True(sink.Has(LogLevel.Warning, Core.Diagnostics.LogCategories.Process,
                 "Stdin write failed"), "a dropped stdin write must be logged as Warning");
         }
         finally

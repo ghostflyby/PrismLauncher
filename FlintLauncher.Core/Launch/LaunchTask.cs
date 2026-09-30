@@ -22,12 +22,12 @@
 //    records the Aborted state and emits it when StartAsync() runs (deferred by one call —
 //    the observable outcome is the same terminal AbortedByUser state).
 //  - parseXmlLogs(): the log4j XML event parser IS ported (LogParser) and wired like the C++
-//    LaunchTask::onLogLine — but behind the <see cref="XmlParsingEnabled"/> opt-in gate, since
-//    the C++ had no off switch and pure-core consumers should keep the simple path. When
-//    enabled, StdOut/StdErr lines feed the per-level LogParser instances first: complete
-//    log4j events become structured "[HH:mm:ss] [thread/LEVEL] [logger]: message" entries,
-//    everything else falls through the same level-detection heuristics as before. The Web
-//    host enables it at startup (WebHostBuilder).
+//    LaunchTask::onLogLine — but behind the <see cref="LaunchServices.XmlLogParsing"/> opt-in
+//    gate, since the C++ had no off switch and pure-core consumers should keep the simple
+//    path. When enabled, StdOut/StdErr lines feed the per-level LogParser instances first:
+//    complete log4j events become structured "[HH:mm:ss] [thread/LEVEL] [logger]: message"
+//    entries, everything else falls through the same level-detection heuristics as before.
+//    The Web host enables it in the LaunchServices it builds (WebHostBuilder).
 //  - censorPrivateInfo() applies the session censor filter; the QMap iteration order (sorted
 //    by key) is preserved via the SortedDictionary the instance filter is built into.
 using System.Text.RegularExpressions;
@@ -35,6 +35,7 @@ using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Text;
+using Microsoft.Extensions.Logging;
 using static FlintLauncher.Core.Launch.MessageLevelExtensions;
 
 using System.IO;
@@ -57,14 +58,8 @@ public class LaunchTask : FlintTask
     private static readonly Regex SettingUserRegex = new(".*Setting user.+",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-    /// <summary>
-    /// Opt-in gate for the port of LaunchTask::parseXmlLogs (the C++ runs it unconditionally):
-    /// when true, StdOut/StdErr lines feed the per-level <see cref="LogParser"/> instances
-    /// before the level-detection heuristics. The Web host enables it at startup.
-    /// </summary>
-    public static bool XmlParsingEnabled { get; set; }
-
     private readonly MinecraftInstance _instance;
+    private readonly LaunchServices _services;
     private readonly List<LaunchStep> _steps = [];
     private readonly LogParser _stdoutParser = new();
     private readonly LogParser _stderrParser = new();
@@ -75,9 +70,10 @@ public class LaunchTask : FlintTask
     private LogModel? _logModel;
     private TaskCompletionSource? _terminalSignal;
 
-    internal LaunchTask(MinecraftInstance instance)
+    internal LaunchTask(MinecraftInstance instance, LaunchServices services)
     {
         _instance = instance;
+        _services = services;
         Init();
     }
 
@@ -101,6 +97,14 @@ public class LaunchTask : FlintTask
     public bool IsWaitingForProceed => _state == LaunchState.Waiting;
 
     public MinecraftInstance Instance => _instance;
+
+    /// <summary>The injected launch dependencies (paths, logger factory, settings, UI hooks).
+    /// Every LaunchStep reads its environment from here instead of the former static hooks.</summary>
+    public LaunchServices Services => _services;
+
+    /// <summary>Diagnostics logger (flint.launch category). Resolved per call from the
+    /// injected factory — a disposed host's factory degrades to silence, never throws.</summary>
+    private ILogger Log => Diagnostics.Log.For(_services.LoggerFactory, LogCategories.Launch);
 
     public long Pid
     {
@@ -134,7 +138,7 @@ public class LaunchTask : FlintTask
     public void SetCensorFilter(SortedDictionary<string, string> filter) => _censorFilter = filter;
 
     /// <summary>Port of LaunchTask::create().</summary>
-    public static LaunchTask Create(MinecraftInstance instance) => new(instance);
+    public static LaunchTask Create(MinecraftInstance instance, LaunchServices services) => new(instance, services);
 
     // ------------------------------------------------------------------- step engine
 
@@ -168,8 +172,7 @@ public class LaunchTask : FlintTask
     internal void OnReadyForLaunch()
     {
         _state = LaunchState.Waiting;
-        FlintLog.For(FlintLog.Categories.Launch)
-            .ReadyForLaunch(StepName(_currentStep));
+        Log.ReadyForLaunch(StepName(_currentStep));
         ReadyForLaunch?.Invoke();
     }
 
@@ -177,8 +180,7 @@ public class LaunchTask : FlintTask
     internal void OnProgressReportingRequested()
     {
         _state = LaunchState.Waiting;
-        FlintLog.For(FlintLog.Categories.Launch)
-            .ProgressGate(StepName(_currentStep));
+        Log.ProgressGate(StepName(_currentStep));
         RequestProgress?.Invoke(_steps[_currentStep]);
     }
 
@@ -207,8 +209,7 @@ public class LaunchTask : FlintTask
         }
 
         var step = _steps[_currentStep];
-        FlintLog.For(FlintLog.Categories.Launch)
-            .StepFinished(StepName(_currentStep), step.WasSuccessful, step.FailReason);
+        Log.StepFinished(StepName(_currentStep), step.WasSuccessful, step.FailReason);
         if (step.WasSuccessful)
         {
             // end?
@@ -230,8 +231,7 @@ public class LaunchTask : FlintTask
 
     private void StartStep(LaunchStep step)
     {
-        FlintLog.For(FlintLog.Categories.Launch)
-            .StepStarted(_currentStep + 1, _steps.Count, StepName(_currentStep));
+        Log.StepStarted(_currentStep + 1, _steps.Count, StepName(_currentStep));
         _ = step.StartAsync(); // the step reports its terminal state through the events
     }
 
@@ -268,12 +268,10 @@ public class LaunchTask : FlintTask
     {
         if (_state != LaunchState.Waiting)
         {
-            FlintLog.For(FlintLog.Categories.Launch)
-                .ProceedIgnored(_state.ToString());
+            Log.ProceedIgnored(_state.ToString());
             return;
         }
-        FlintLog.For(FlintLog.Categories.Launch)
-            .ProceedRouted(StepName(_currentStep));
+        Log.ProceedRouted(StepName(_currentStep));
         _steps[_currentStep].Proceed();
         _state = LaunchState.Running;
     }
@@ -387,7 +385,7 @@ public class LaunchTask : FlintTask
     /// </summary>
     private bool ParseXmlLogs(string line, MessageLevel level)
     {
-        if (!XmlParsingEnabled)
+        if (!_services.XmlLogParsing)
         {
             return false;
         }

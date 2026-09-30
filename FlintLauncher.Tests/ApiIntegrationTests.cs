@@ -5,8 +5,8 @@
 //
 // Collections (process-global statics make these tests unparallelizable with the suites
 // that own the hooks):
-//  - the main class joins "LauncherJars" — the e2e launch test mutates
-//    JavaUtils.LauncherRootPath exactly like RealLaunchSmokeTests/LauncherPartLaunchTests;
+//  - the main class joins "LauncherJars" — the e2e launch test points the host's install
+//    root at the jars layout exactly like RealLaunchSmokeTests/LauncherPartLaunchTests;
 //  - the Modrinth search class joins "ModrinthApi" (ModrinthApi.BaseUrl is a static hook).
 // The device-code class needs no collection anymore: it redirects the endpoints through a
 // stub-pointed AuthEndpointsOptions handed to its own host.
@@ -16,6 +16,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Launch.Steps;
@@ -514,8 +515,6 @@ public class FlintApiIntegrationTests
         var dataDir = Path.Combine(Path.GetTempPath(), $"flint-api-e2e-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dataDir);
         var previousCwd = Environment.CurrentDirectory;
-        var previousLauncherRoot = JavaUtils.LauncherRootPath;
-        JavaUtils.LauncherRootPath = launcherRoot;
 
         // seed an instance on disk the same way the LaunchFixture does (patched net.minecraft
         // profile loads fully offline) — the API discovers it at startup
@@ -539,7 +538,10 @@ public class FlintApiIntegrationTests
             [
                 "--data-dir", dataDir,
                 "--urls", "http://127.0.0.1:0",
-            ]);
+            ],
+            // the launch pipeline's jar lookups resolve against this install root (the former
+            // JavaUtils.LauncherRootPath static test hook, now LaunchServices.Paths.InstallRoot)
+            paths: FlintPaths.FromDataDir(dataDir) with { InstallRoot = launcherRoot });
             await app.StartAsync();
             using var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
             client.DefaultRequestHeaders.Add("X-Api-Token",
@@ -637,7 +639,6 @@ public class FlintApiIntegrationTests
         }
         finally
         {
-            JavaUtils.LauncherRootPath = previousLauncherRoot;
             Environment.CurrentDirectory = previousCwd;
             try
             {

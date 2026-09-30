@@ -18,21 +18,19 @@ namespace FlintLauncher.Tests;
 public class LauncherPartLaunchTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-launchpart-{Guid.NewGuid():N}");
-    private readonly string? _savedLauncherRoot;
 
     public LauncherPartLaunchTests()
     {
         Directory.CreateDirectory(_root);
-        // the jar lookup (Application::getJarPath) searches <launcher root>/jars/NewLaunch.jar
-        _savedLauncherRoot = JavaUtils.LauncherRootPath;
+        // the jar lookup (Application::getJarPath) searches <install root>/jars/NewLaunch.jar;
+        // the launch tasks below point LaunchServices.Paths.InstallRoot at this fixture root
+        // (the former JavaUtils.LauncherRootPath static test hook)
         Directory.CreateDirectory(Path.Combine(_root, "jars"));
         File.WriteAllText(Path.Combine(_root, "jars", LauncherJars.NewLaunchJarName), "dummy jar bytes");
-        JavaUtils.LauncherRootPath = _root;
     }
 
     public void Dispose()
     {
-        JavaUtils.LauncherRootPath = _savedLauncherRoot ?? AppContext.BaseDirectory;
         try
         {
             Directory.Delete(_root, recursive: true);
@@ -73,12 +71,12 @@ public class LauncherPartLaunchTests : IDisposable
     private bool IsUnix => OperatingSystem.IsMacOS() || OperatingSystem.IsLinux();
 
     private LaunchTask BuildLaunchTask(LaunchFixture fixture, MinecraftInstance instance, string javaPath,
-                                       out LauncherPartLaunch step)
+                                       out LauncherPartLaunch step, string? installRoot = null)
     {
         // JavaPath is the (gate-controlled) global override; the stub applies in both cases
         fixture.Global.StubSet("JavaPath", javaPath);
         Directory.CreateDirectory(instance.GameRoot()); // the step's working directory
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices(installRoot: installRoot ?? _root));
         step = new LauncherPartLaunch(task);
         step.SetWorkingDirectory(instance.GameRoot());
         task.AppendStep(step);
@@ -169,23 +167,18 @@ public class LauncherPartLaunchTests : IDisposable
         }
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        JavaUtils.LauncherRootPath = Path.Combine(_root, "does-not-exist");
-        try
-        {
-            var javaPath = WriteFakeJava();
-            var task = BuildLaunchTask(fixture, instance, javaPath, out var step);
-            step.SetAuthSession(fixture.OfflineSession("Steve"));
-            task.ReadyForLaunch += () => task.Proceed();
+        var javaPath = WriteFakeJava();
+        // an install root without the jar layout: the lookup falls through to the embedded
+        // copies (extracted by EmbeddedJars)
+        var task = BuildLaunchTask(fixture, instance, javaPath, out var step,
+            installRoot: Path.Combine(_root, "does-not-exist"));
+        step.SetAuthSession(fixture.OfflineSession("Steve"));
+        task.ReadyForLaunch += () => task.Proceed();
 
-            await task.StartAsync();
+        await task.StartAsync();
 
-            Assert.Equal(TaskState.Succeeded, task.State);
-            var lines = task.GetLogModel().Entries;
-            Assert.Contains(lines, e => e.Line == "launcher standard");
-        }
-        finally
-        {
-            JavaUtils.LauncherRootPath = _root;
-        }
+        Assert.Equal(TaskState.Succeeded, task.State);
+        var lines = task.GetLogModel().Entries;
+        Assert.Contains(lines, e => e.Line == "launcher standard");
     }
 }

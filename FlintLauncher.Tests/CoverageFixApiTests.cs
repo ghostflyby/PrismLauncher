@@ -471,8 +471,6 @@ public class CoverageFixLaunchJoinApiTests
         var dataDir = Path.Combine(Path.GetTempPath(), $"flint-api-join-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dataDir);
         var previousCwd = Environment.CurrentDirectory;
-        var previousLauncherRoot = JavaUtils.LauncherRootPath;
-        JavaUtils.LauncherRootPath = launcherRoot;
 
         var instanceRoot = Path.Combine(dataDir, "instances", "join-inst");
         Directory.CreateDirectory(instanceRoot);
@@ -494,7 +492,10 @@ public class CoverageFixLaunchJoinApiTests
             [
                 "--data-dir", dataDir,
                 "--urls", "http://127.0.0.1:0",
-            ]);
+            ],
+            // the launch pipeline's jar lookups resolve against this install root (the former
+            // JavaUtils.LauncherRootPath static test hook, now LaunchServices.Paths.InstallRoot)
+            paths: FlintPaths.FromDataDir(dataDir) with { InstallRoot = launcherRoot });
             await app.StartAsync();
             using var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
             client.DefaultRequestHeaders.Add("X-Api-Token",
@@ -605,7 +606,6 @@ public class CoverageFixLaunchJoinApiTests
         }
         finally
         {
-            JavaUtils.LauncherRootPath = previousLauncherRoot;
             Environment.CurrentDirectory = previousCwd;
             try
             {

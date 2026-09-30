@@ -3,9 +3,13 @@
 // launch layer reads (mirroring InstanceTests' GlobalSettingsStub) and a MinecraftInstance
 // factory that seeds a complete net.minecraft patch so PackProfile::getProfile() builds a
 // LaunchProfile offline (no network, no real Mojang metadata).
+using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Settings;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -108,6 +112,24 @@ public sealed class LaunchFixture : IDisposable
         }
         """;
 
+    /// <summary>
+    /// LaunchServices for this fixture's data dir (headless: null logger unless the test
+    /// attaches one, no global settings double — the IniSettingsObject cast in the core
+    /// degrades to null, matching the former unset static providers). The optional
+    /// installRoot stands in for the former JavaUtils.LauncherRootPath test hook (the
+    /// jars/NewLaunch.jar lookup), xmlLogParsing for the former XmlParsingEnabled gate.
+    /// </summary>
+    public LaunchServices CreateServices(ILoggerFactory? loggerFactory = null, string? installRoot = null,
+        bool xmlLogParsing = false)
+    {
+        return new LaunchServices
+        {
+            Paths = new FlintPaths { DataDir = Root, InstallRoot = installRoot ?? AppContext.BaseDirectory },
+            LoggerFactory = loggerFactory ?? NullLoggerFactory.Instance,
+            XmlLogParsing = xmlLogParsing,
+        };
+    }
+
     public async Task<MinecraftInstance> CreateInstance(string? patchJson = DefaultPatchJson)
     {
         var instanceRoot = Path.Combine(Root, "inst");
@@ -126,7 +148,12 @@ public sealed class LaunchFixture : IDisposable
                 """);
         }
         var instance = new MinecraftInstance(Global, new IniSettingsObject(Path.Combine(instanceRoot, "instance.cfg")),
-            instanceRoot);
+            instanceRoot)
+        {
+            // the composition-root stamp (InstanceList does the same in the host): the
+            // CreateLaunchTask path builds its per-launch services from these
+            LaunchServices = CreateServices(),
+        };
         instance.GetPackProfile().Load();
         // the patch files are read by the component update task (PackProfile::reload)
         var result = await instance.GetPackProfile().ReloadAsync(FlintLauncher.Core.Net.NetMode.Offline);

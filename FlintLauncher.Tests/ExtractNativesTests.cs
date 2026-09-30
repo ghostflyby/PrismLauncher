@@ -94,7 +94,7 @@ public class ExtractNativesTests
         var instance = await fixture.CreateInstance(NativeLibrariesPatch);
         WriteNativeJars(instance.GetLocalLibraryPath(), "dylib-bytes", "jnilib-bytes");
 
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
         var gate = new GateStep(task);
         task.AppendStep(new ExtractNatives(task));
         task.AppendStep(gate);
@@ -127,7 +127,7 @@ public class ExtractNativesTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance(); // default patch has no libraries
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
         task.AppendStep(new ExtractNatives(task));
 
         await task.StartAsync();
@@ -183,7 +183,7 @@ public class ExtractNativesTests
         WriteJarModInputs(instance);
         Assert.NotEmpty(instance.GetJarMods()); // the patch yields one jar mod
 
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
         var gate = new GateStep(task);
         task.AppendStep(new ModMinecraftJar(task));
         task.AppendStep(gate);
@@ -220,7 +220,7 @@ public class ExtractNativesTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance(); // no jar mods in the default patch
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
         task.AppendStep(new ModMinecraftJar(task));
 
         await task.StartAsync();
@@ -260,7 +260,7 @@ public class ExtractNativesTests
         var patch = LaunchFixture.DefaultPatchJson.Replace("\"assets\": \"5\"", $"\"assets\": \"{assetsId}\"");
         var instance = await fixture.CreateInstance(patch);
 
-        var task = LaunchTask.Create(instance);
+        var task = LaunchTask.Create(instance, fixture.CreateServices());
         task.AppendStep(new ReconstructAssets(task));
 
         await task.StartAsync();
@@ -326,10 +326,17 @@ public class ExtractNativesTests
         instanceCache.AddBase("asset_indexes", Path.Combine(assetsRoot.Root, "indexes"));
         instance.MetaCache = instanceCache;
         instance.Paths = FlintPaths.FromDataDir(AppContext.BaseDirectory);
-        AssetUpdateTask.ResourceUrlOverride = () => server.Url + "/objects/";
+        // the resource URL override rides the instance-stamped LaunchServices (the former
+        // AssetUpdateTask.ResourceUrlOverride static hook)
+        instance.LaunchServices = new LaunchServices
+        {
+            Paths = instance.Paths,
+            LoggerFactory = Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
+            ResourceUrlOverride = server.Url + "/objects/",
+        };
         try
         {
-            var task = LaunchTask.Create(instance);
+            var task = LaunchTask.Create(instance, instance.LaunchServices);
             // the update tasks run as plain FlintTasks inside the TaskStepWrapper (which
             // gates on the progressReportingRequest/proceed handshake)
             task.RequestProgress += _ => task.Proceed();
@@ -344,7 +351,6 @@ public class ExtractNativesTests
         finally
         {
             Environment.CurrentDirectory = previousCwd;
-            AssetUpdateTask.ResourceUrlOverride = null;
         }
 
         // the index landed in assets/indexes, the object in assets/objects/<2-char>/<hash>
