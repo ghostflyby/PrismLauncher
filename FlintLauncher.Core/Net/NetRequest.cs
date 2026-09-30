@@ -350,97 +350,26 @@ public sealed class NetRequest : FlintTask
     };
 }
 
-/// <summary>Shared HttpClient for all Flint network activity (replaces QNetworkAccessManager).
-/// The proxy/timeout/retry settings the C++ application reads from the global settings
-/// (Application::updateProxySettings, NumberOfManualRetries, RequestTimeout) reach this class
-/// through <see cref="Configure"/> — the host calls it at startup and after every settings
-/// write (Services.RuntimeNetConfig).</summary>
+/// <summary>Shared HttpClient for all Flint network activity. TEMPORARY compatibility shim:
+/// delegates to one process-wide default <see cref="NetStack"/> so existing callers and tests
+/// keep their exact semantics while the injection migration (phases B-E) re-points every
+/// consumer at an instance-owned stack; this class is then deleted.</summary>
 public static class Http
 {
-    public static string UserAgent { get; set; } = "Flint/0.1.0";
+    public static NetStack Default { get; } = NetStack.CreateDefault();
 
-    /// <summary>Port of the NumberOfManualRetries setting: how often a request that failed on
-    /// the network level is retried (NetJob::executeNextStylesheet gate). Consumed by
-    /// <see cref="NetRequest"/>.</summary>
-    public static int ManualRetries { get; set; } = 1;
+    public static string UserAgent { get => Default.UserAgent; set => Default.UserAgent = value; }
 
-    /// <summary>Port of the RequestTimeout setting (QNetworkReply::setTransferTimeout): the
-    /// transfer is aborted when no data flows for this long (an inactivity timeout, not a
-    /// total-duration cap, so large steady downloads keep working).</summary>
-    public static TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(60);
+    public static int ManualRetries { get => Default.ManualRetries; set => Default.ManualRetries = value; }
 
-    private static (string Type, string Host, int Port, string User, string Pass) _proxy =
-        ("None", "", 0, "", "");
+    public static TimeSpan RequestTimeout { get => Default.RequestTimeout; set => Default.RequestTimeout = value; }
 
-    private static (string Ua, string Type, string Host, int Port, string User, string Pass)? _applied;
+    /// <summary>The proxy configuration currently baked into <see cref="Client"/>.</summary>
+    public static (string Type, string Host, int Port, string User, string Pass) ProxyConfig => Default.ProxyConfig;
 
-    /// <summary>The proxy configuration currently baked into <see cref="Client"/>
-    /// (Application::updateProxySettings state; diagnostics/tests).</summary>
-    public static (string Type, string Host, int Port, string User, string Pass) ProxyConfig => _proxy;
+    public static HttpClient Client => Default.Client;
 
-    private static volatile HttpClient _client = CreateClient();
-
-    public static HttpClient Client => _client;
-
-    /// <summary>Port of Application::updateProxySettings (+ the UserAgent the client is built
-    /// with): rebuild the shared client so the proxy/user-agent take effect. Proxy semantics
-    /// match the C++ ProxyPage combo: "SOCKS5" and "HTTP" build an explicit proxy, "None"
-    /// disables proxying and anything else uses the system configuration. Idempotent: an
-    /// unchanged configuration does not rebuild the client.</summary>
+    /// <summary>See <see cref="NetStack.Configure"/>.</summary>
     public static void Configure(string userAgent, string proxyType, string addr, int port,
-        string user, string pass)
-    {
-        var ua = userAgent ?? UserAgent;
-        var type = string.IsNullOrWhiteSpace(proxyType) ? "None" : proxyType.Trim();
-        var host = addr ?? "";
-        // an HTTP/SOCKS proxy without a host cannot be used — fall back to "no proxy"
-        if (type is "HTTP" or "SOCKS5" && host.Length == 0)
-        {
-            type = "None";
-        }
-        var next = (ua, type, host, port, user ?? "", pass ?? "");
-        if (_applied is { } applied && applied.Equals(next))
-        {
-            return;
-        }
-        _applied = next;
-        UserAgent = ua;
-        _proxy = (type, host, port, user ?? "", pass ?? "");
-        _client = CreateClient();
-    }
-
-    private static HttpClient CreateClient()
-    {
-        var handler = new SocketsHttpHandler
-        {
-            AutomaticDecompression = System.Net.DecompressionMethods.All,
-            PooledConnectionLifetime = TimeSpan.FromMinutes(10),
-            Proxy = BuildProxy(),
-        };
-        var client = new HttpClient(handler, disposeHandler: true);
-        // user-supplied user-agent overrides may not be valid product tokens; ignore those
-        _ = client.DefaultRequestHeaders.UserAgent.TryParseAdd(UserAgent);
-        client.Timeout = TimeSpan.FromMinutes(10);
-        return client;
-    }
-
-    private static IWebProxy? BuildProxy() => _proxy.Type switch
-    {
-        "HTTP" => NamedProxy(new Uri($"http://{_proxy.Host}:{_proxy.Port}")),
-        "SOCKS5" => NamedProxy(new Uri($"socks5://{_proxy.Host}:{_proxy.Port}")),
-        // explicit "no proxy"
-        "None" => null,
-        // C++ "DefaultProxy": the system proxy configuration
-        _ => HttpClient.DefaultProxy,
-    };
-
-    private static WebProxy NamedProxy(Uri uri)
-    {
-        var proxy = new WebProxy(uri);
-        if (_proxy.User.Length != 0)
-        {
-            proxy.Credentials = new System.Net.NetworkCredential(_proxy.User, _proxy.Pass);
-        }
-        return proxy;
-    }
+        string user, string pass) => Default.Configure(userAgent, proxyType, addr, port, user, pass);
 }
