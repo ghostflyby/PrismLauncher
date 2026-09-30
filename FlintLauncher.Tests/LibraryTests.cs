@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of tests/Library_test.cpp (testdata in TestData/Libraries).
+using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
@@ -22,11 +23,10 @@ public class LibraryTests
 
     private Library ReadMojangJson(string path)
     {
-        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
         var problems = new ProblemContainer();
         return MojangVersionFormat.LibraryFromJson(
             problems,
-            doc.RootElement.ToJsonObject(),
+            JsonNode.Parse(File.ReadAllText(path))!,
             path);
     }
 
@@ -325,5 +325,26 @@ public class LibraryTests
         Assert.Equal(
             "https://libraries.minecraft.net/tv/twitch/twitch-platform/5.16/twitch-platform-5.16-natives-windows-64.jar",
             dls[1].Url.ToString());
+    }
+
+    /// <summary>Rule parsing read on the JsonNode model: os-qualified allow/disallow rules
+    /// gate IsActive per runtime context.</summary>
+    [Fact]
+    public void Test_Rules_Parse_And_Activate()
+    {
+        var problems = new ProblemContainer();
+        var test = MojangVersionFormat.LibraryFromJson(problems, JsonNode.Parse("""
+        {
+            "name": "test.package:testname:testversion",
+            "rules": [
+                {"action": "allow", "os": {"name": "linux"}}
+            ]
+        }
+        """)!, "rules.json");
+
+        Assert.True(test.ApplyRules);
+        Assert.Single(test.Rules);
+        Assert.True(test.IsActive(DummyContext("linux")));
+        Assert.False(test.IsActive(DummyContext("osx")));
     }
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/meta/JsonFormat.{h,cpp}: the shared metadata format version handling and
-// the Require/RequireSet types, plus the index/version/version-list parsers.
-using System.Text.Json;
+// the Require/RequireSet types, plus the index/version/version-list parsers. Reads go through
+// the JsonNode model (single-DOM); the Parse(JsonObject) entity entry points keep JsonObject.
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
@@ -82,15 +82,39 @@ public static class MetaJsonFormat
     /// <summary>Port of Meta::currentFormatVersion().</summary>
     public static MetadataVersion CurrentFormatVersion() => MetadataVersion.InitialRelease;
 
+    // ------------------------------------------------- node-side member readers
+    //
+    // FlameJson convention: the helper parameters are JsonNode? so JsonObject arguments upcast
+    // at the call site instead of re-binding the (JsonObject, key, what) element-bridge
+    // overloads — see the JsonUtils node-family migration rule.
+
+    /// <summary>obj["key"] equivalent: null node when missing or not an object.</summary>
+    private static JsonNode? Ptr(JsonNode? node, string key) => node is JsonObject obj ? obj[key] : null;
+
+    /// <summary>QJsonObject::contains(key) equivalent: true even when the member holds JSON null.</summary>
+    private static bool Has(JsonNode? node, string key) => node is JsonObject obj && obj.Contains(key);
+
+    /// <summary>Port of require&lt;String&gt;(parent, key).</summary>
+    private static string RequireStringOf(JsonNode? parent, string key) =>
+        JsonUtils.RequireString(parent, key, "'" + key + "'");
+
+    /// <summary>parent.value(key).toString(default) equivalent.</summary>
+    private static string Str(JsonNode? node, string key, string def = "") =>
+        JsonObjectExtensions.StringOr(Ptr(node, key), def);
+
+    /// <summary>parent.value(key).toBool(default) equivalent.</summary>
+    private static bool Bool(JsonNode? node, string key, bool def = false) =>
+        JsonObjectExtensions.BoolOr(Ptr(node, key), def);
+
     // ------------------------------------------------------------------ Index
 
-    private static Index ParseIndexInternal(JsonObject obj)
+    private static Index ParseIndexInternal(JsonNode obj)
     {
         var objects = RequireArrayOfObjects(obj, "packages");
         var lists = new List<VersionList>(objects.Count);
         foreach (var element in objects)
         {
-            var list = new VersionList(JsonUtils.RequireString(element, "uid"))
+            var list = new VersionList(RequireStringOf(element, "uid"))
             {
                 Name = element.StringOr("name"),
             };
@@ -102,22 +126,22 @@ public static class MetaJsonFormat
 
     // ------------------------------------------------------------------ Version
 
-    private static MetaVersion ParseCommonVersion(string uid, JsonObject obj)
+    private static MetaVersion ParseCommonVersion(string uid, JsonNode obj)
     {
-        var version = new MetaVersion(uid, JsonUtils.RequireString(obj, "version"));
+        var version = new MetaVersion(uid, RequireStringOf(obj, "version"));
         // QDateTime::fromString(..., Qt::ISODate).toMSecsSinceEpoch() / 1000; an invalid
         // QDateTime contributes 0
-        var releaseTime = ParseUtils.TimeFromS3Time(JsonUtils.RequireString(obj, "releaseTime"));
+        var releaseTime = ParseUtils.TimeFromS3Time(RequireStringOf(obj, "releaseTime"));
         version.SetTime(releaseTime?.ToUnixTimeMilliseconds() / 1000 ?? 0);
-        version.SetType(obj.StringOr("type"));
-        version.SetRecommended(obj.BoolOr("recommended"));
-        version.SetVolatile(obj.BoolOr("volatile"));
+        version.SetType(Str(obj, "type"));
+        version.SetRecommended(Bool(obj, "recommended"));
+        version.SetVolatile(Bool(obj, "volatile"));
         var reqs = new RequireSet();
         var conflicts = new RequireSet();
         ParseRequires(obj, reqs, "requires");
         ParseRequires(obj, conflicts, "conflicts");
         version.SetRequires(reqs, conflicts);
-        var sha256 = obj.StringOr("sha256");
+        var sha256 = Str(obj, "sha256");
         if (sha256.Length != 0)
         {
             version.SetSha256(sha256);
@@ -125,22 +149,24 @@ public static class MetaJsonFormat
         return version;
     }
 
-    private static MetaVersion ParseVersionInternal(JsonObject obj)
+    private static MetaVersion ParseVersionInternal(JsonNode obj)
     {
-        var version = ParseCommonVersion(JsonUtils.RequireString(obj, "uid"), obj);
+        var version = ParseCommonVersion(RequireStringOf(obj, "uid"), obj);
 
+        // OneSixVersionFormat (own migration batch) still exposes the JsonObject entry; the
+        // meta version document is an object by construction (ParseVersion takes JsonObject).
         version.SetData(OneSixVersionFormat.VersionFileFromJson(
-            obj,
+            (JsonObject)obj,
             $"{version.Uid}/{version.Version}.json",
-            obj.Contains("order")));
+            Has(obj, "order")));
         return version;
     }
 
     // ------------------------------------------------------- Version list / package
 
-    private static VersionList ParseVersionListInternal(JsonObject obj)
+    private static VersionList ParseVersionListInternal(JsonNode obj)
     {
-        var uid = JsonUtils.RequireString(obj, "uid");
+        var uid = RequireStringOf(obj, "uid");
 
         var versionsRaw = RequireArrayOfObjects(obj, "versions");
         var versions = new List<MetaVersion>(versionsRaw.Count);
@@ -153,7 +179,7 @@ public static class MetaJsonFormat
 
         var list = new VersionList(uid)
         {
-            Name = obj.StringOr("name"),
+            Name = Str(obj, "name"),
         };
         list.SetVersions(versions);
         return list;
@@ -161,9 +187,9 @@ public static class MetaJsonFormat
 
     // ------------------------------------------------------------ format version
 
-    public static MetadataVersion ParseFormatVersion(JsonObject obj, bool required = true)
+    public static MetadataVersion ParseFormatVersion(JsonNode obj, bool required = true)
     {
-        if (!obj.Contains("formatVersion"))
+        if (obj is not JsonObject map || !map.Contains("formatVersion"))
         {
             if (required)
             {
@@ -171,12 +197,9 @@ public static class MetaJsonFormat
             }
             return MetadataVersion.InitialRelease;
         }
-        // isDouble(): any JSON number
-        var node = obj["formatVersion"];
-        if (node is not JsonValue || !((JsonValue)node).TryGetValue<double>(out var raw))
-        {
-            return MetadataVersion.Invalid;
-        }
+        // isDouble(): any JSON number. Node-side read (raw token text) — not TryGetValue<T>,
+        // whose result depends on whether the JsonValue is parsed-backed or created in code.
+        var raw = JsonUtils.EnsureDouble(map["formatVersion"], double.NaN);
         return raw switch
         {
             0 or 1 => MetadataVersion.InitialRelease,
@@ -239,21 +262,17 @@ public static class MetaJsonFormat
     {"uid":"foo", "equals":"version"}
     ]
     */
-    public static void ParseRequires(JsonObject obj, RequireSet ptr, string keyName = "requires")
+    public static void ParseRequires(JsonNode obj, RequireSet ptr, string keyName = "requires")
     {
-        if (obj.Contains(keyName))
+        if (Has(obj, keyName))
         {
-            var reqArray = JsonUtils.RequireArray(obj, keyName);
-            foreach (var iter in reqArray.EnumerateArray())
+            var reqArray = JsonUtils.RequireArray(obj, keyName, "'" + keyName + "'");
+            foreach (var iter in reqArray)
             {
-                // NOTE(p2 fix): the request object must be a JsonObject so requireString binds
-                // the (parent, key) overload like the C++ requireString(reqObject, "uid");
-                // the previous JsonElement form passed "uid" as the error label and rejected
-                // every entry with "uid is not a string"
-                var reqObject = JsonUtils.RequireObject(iter).ToJsonObject();
-                var uid = JsonUtils.RequireString(reqObject, "uid");
-                var equals = reqObject.StringOr("equals");
-                var suggests = reqObject.StringOr("suggests");
+                var reqObject = JsonUtils.RequireObject(iter);
+                var uid = RequireStringOf(reqObject, "uid");
+                var equals = Str(reqObject, "equals");
+                var suggests = Str(reqObject, "suggests");
                 ptr.Add(new Require { Uid = uid, EqualsVersion = equals, Suggests = suggests });
             }
         }
@@ -290,14 +309,14 @@ public static class MetaJsonFormat
     /// non-array value yields an empty list (parent[key].toArray() cast upstream), and
     /// non-object elements throw with the "Document" label.
     /// </summary>
-    private static List<JsonObject> RequireArrayOfObjects(JsonObject parent, string key)
+    private static List<JsonObject> RequireArrayOfObjects(JsonNode? parent, string key)
     {
-        if (!parent.Contains(key))
+        if (parent is not JsonObject map || !map.Contains(key))
         {
             throw new JsonParseException("'" + key + "'s parent does not contain '" + key + "'");
         }
         var result = new List<JsonObject>();
-        var node = parent[key];
+        var node = map[key];
         if (node is not JsonArray array)
         {
             return result;
