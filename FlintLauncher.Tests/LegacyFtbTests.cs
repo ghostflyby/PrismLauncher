@@ -2,7 +2,9 @@
 // Tests for the legacy FTB platform: the modpacks.xml/thirdparty.xml parsing (attributes,
 // oldVersions repair, bugged/broken flags), private pack fetching, the private pack code
 // file round-trip and the end-to-end install of a CDN archive (unzip -> minecraft folder,
-// forge from pack.json, jar mods from instMods, the no-method failure).
+// forge from pack.json, jar mods from instMods, the no-method failure). Each task is
+// constructed with its CdnBaseUrl pointed at the stub (per-instance, nothing
+// process-global to restore).
 using System.IO.Compression;
 using System.Text;
 using FlintLauncher.Core.Instances;
@@ -11,7 +13,6 @@ using Xunit;
 
 namespace Flint.Tests;
 
-[Collection("LegacyFtb")]
 public class LegacyFtbTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-legacy-ftb-{Guid.NewGuid():N}");
@@ -21,12 +22,10 @@ public class LegacyFtbTests : IDisposable
     public LegacyFtbTests()
     {
         Directory.CreateDirectory(_root);
-        LegacyFtbPackFetchTask.CdnBaseUrl = _server.Url + "/";
     }
 
     public void Dispose()
     {
-        LegacyFtbPackFetchTask.CdnBaseUrl = FlintLauncher.Core.FlintConfig.Default.LegacyFtbCdnBaseUrl;
         _server.Dispose();
         try
         {
@@ -36,6 +35,10 @@ public class LegacyFtbTests : IDisposable
         {
         }
     }
+
+    /// <summary>A fetch task whose CDN points at the stub server.</summary>
+    private LegacyFtbPackFetchTask CreateFetchTask() =>
+        new() { CdnBaseUrl = _server.Url + "/" };
 
     private InstanceList CreateList()
     {
@@ -75,7 +78,7 @@ public class LegacyFtbTests : IDisposable
             </modpacks>
             """;
 
-        var task = new LegacyFtbPackFetchTask();
+        var task = CreateFetchTask();
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -115,7 +118,7 @@ public class LegacyFtbTests : IDisposable
             """;
         _server.ThirdPartyXml = """<modpacks></modpacks>""";
 
-        var task = new LegacyFtbPackFetchTask();
+        var task = CreateFetchTask();
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -131,7 +134,7 @@ public class LegacyFtbTests : IDisposable
         _server.ModpacksXml = "this is not xml";
         _server.ThirdPartyXml = """<modpacks></modpacks>""";
 
-        var task = new LegacyFtbPackFetchTask();
+        var task = CreateFetchTask();
         await task.StartAsync();
 
         Assert.False(task.WasSuccessful);
@@ -151,7 +154,7 @@ public class LegacyFtbTests : IDisposable
             </modpacks>
             """;
 
-        var task = new LegacyFtbPackFetchTask();
+        var task = CreateFetchTask();
         var fetched = new List<LegacyFtbModpack>();
         task.PrivatePackFetched = fetched.Add;
         await task.FetchPrivateAsync(["secret"]);
@@ -243,7 +246,7 @@ public class LegacyFtbTests : IDisposable
         });
 
         var list = CreateList();
-        var task = new LegacyFtbPackInstallTask(pack, "1.2.3");
+        var task = new LegacyFtbPackInstallTask(pack, "1.2.3") { CdnBaseUrl = _server.Url + "/" };
         task.SetName("Legacy FTB Forge");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
@@ -281,7 +284,7 @@ public class LegacyFtbTests : IDisposable
         });
 
         var list = CreateList();
-        var task = new LegacyFtbPackInstallTask(pack, "2.0.0");
+        var task = new LegacyFtbPackInstallTask(pack, "2.0.0") { CdnBaseUrl = _server.Url + "/" };
         task.SetName("Legacy FTB JarMods");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
@@ -309,7 +312,7 @@ public class LegacyFtbTests : IDisposable
         });
 
         var list = CreateList();
-        var task = new LegacyFtbPackInstallTask(pack, "1.0");
+        var task = new LegacyFtbPackInstallTask(pack, "1.0") { CdnBaseUrl = _server.Url + "/" };
         task.SetName("Legacy FTB Private");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
@@ -330,7 +333,7 @@ public class LegacyFtbTests : IDisposable
         });
 
         var list = CreateList();
-        var task = new LegacyFtbPackInstallTask(pack, "0.1");
+        var task = new LegacyFtbPackInstallTask(pack, "0.1") { CdnBaseUrl = _server.Url + "/" };
         task.SetName("Legacy FTB Bare");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();

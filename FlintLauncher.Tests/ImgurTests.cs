@@ -2,6 +2,8 @@
 // Tests for the imgur screenshot layer (launcher/screenshots/ImgurAPI.{h,cpp}, the unified
 // shape that replaced ImgurUpload/ImgurAlbumCreation): the exact multipart/form shape and
 // headers, the JSON response parsing into the ScreenShot metadata, and every failure path.
+// The factories are instance methods (the client rides an injected NetStack); each suite
+// builds its own ImgurApi.
 using System.Text;
 using System.Text.Json;
 using FlintLauncher.Core.Screenshots;
@@ -12,6 +14,7 @@ namespace Flint.Tests;
 
 public class ImgurTests : IDisposable
 {
+    private readonly ImgurApi _imgur = new();
     private readonly PeripheralStubServer _server = new();
     private readonly string _dir = Path.Combine(Path.GetTempPath(), $"flint-imgur-{Guid.NewGuid():N}");
 
@@ -58,7 +61,7 @@ public class ImgurTests : IDisposable
     {
         // BuildConfig.IMGUR_BASE_URL + "image"; the defaults come from FlintConfig
         var shot = new ScreenShot(TempPng([1, 2, 3]));
-        var upload = ImgurApi.MakeUpload(shot);
+        var upload = _imgur.MakeUpload(shot);
         Assert.Equal("https://api.imgur.com/3/image", upload.EndpointUrl);
         Assert.Equal(FlintLauncher.Core.FlintConfig.Default.ImgurBaseUrl + "image", upload.EndpointUrl);
         Assert.Equal(FlintLauncher.Core.FlintConfig.Default.ImgurBaseUrl + "image", ImgurApi.UploadUrl());
@@ -72,7 +75,7 @@ public class ImgurTests : IDisposable
         _server.Responder = _ => (200, """{"success":true,"data":{"id":"abc123","link":"https://i.imgur.com/abc123.png","deletehash":"del789"}}""", "OK");
 
         var shot = new ScreenShot(path);
-        var upload = ImgurApi.MakeUpload(shot, _server.BaseUrl + "/", "client-id-42");
+        var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "client-id-42");
         await upload.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, upload.State);
@@ -117,7 +120,7 @@ public class ImgurTests : IDisposable
             "OK");
 
         var shot = new ScreenShot(path);
-        var upload = ImgurApi.MakeUpload(shot, _server.BaseUrl + "/", "cid");
+        var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
         await upload.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, upload.State);
@@ -133,7 +136,7 @@ public class ImgurTests : IDisposable
         _server.Responder = _ => (200, """{"success":false,"status":403,"data":{"error":"rate limit"}}""", "OK");
 
         var shot = new ScreenShot(path);
-        var upload = ImgurApi.MakeUpload(shot, _server.BaseUrl + "/", "cid");
+        var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
         await upload.StartAsync();
 
         Assert.Equal(TaskState.Failed, upload.State);
@@ -147,7 +150,7 @@ public class ImgurTests : IDisposable
         _server.Responder = _ => (200, "<html>gateway error</html>", "OK");
 
         var shot = new ScreenShot(path);
-        var upload = ImgurApi.MakeUpload(shot, _server.BaseUrl + "/", "cid");
+        var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
         await upload.StartAsync();
 
         Assert.Equal(TaskState.Failed, upload.State);
@@ -161,7 +164,7 @@ public class ImgurTests : IDisposable
         _server.Responder = _ => (429, """{"success":false}""", "Too Many Requests");
 
         var shot = new ScreenShot(path);
-        var upload = ImgurApi.MakeUpload(shot, _server.BaseUrl + "/", "cid");
+        var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
         await upload.StartAsync();
 
         Assert.Equal(TaskState.Failed, upload.State);
@@ -172,7 +175,7 @@ public class ImgurTests : IDisposable
     public async Task Upload_Fails_When_File_Missing()
     {
         var shot = new ScreenShot(Path.Combine(_dir, "does-not-exist.png"));
-        var upload = ImgurApi.MakeUpload(shot, _server.BaseUrl + "/", "cid");
+        var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
         await upload.StartAsync();
 
         Assert.Equal(TaskState.Failed, upload.State);
@@ -193,7 +196,7 @@ public class ImgurTests : IDisposable
     public void Album_Endpoint_Default()
     {
         var result = new ImgurApi.AlbumResult();
-        var album = ImgurApi.MakeAlbum(result, [ShotWithHash("h1")]);
+        var album = _imgur.MakeAlbum(result, [ShotWithHash("h1")]);
         Assert.Equal("https://api.imgur.com/3/album", album.EndpointUrl);
         Assert.Equal(FlintLauncher.Core.FlintConfig.Default.ImgurBaseUrl + "album", ImgurApi.AlbumUrl());
     }
@@ -204,7 +207,7 @@ public class ImgurTests : IDisposable
         _server.Responder = _ => (200, """{"status":200,"success":true,"data":{"id":"aB1cD2e","deletehash":"dhXyZ"}}""", "OK");
 
         var result = new ImgurApi.AlbumResult();
-        var album = ImgurApi.MakeAlbum(result,
+        var album = _imgur.MakeAlbum(result,
         [
             ShotWithHash("hash-one"), ShotWithHash("hash-two"), ShotWithHash("hash-three"),
         ], _server.BaseUrl + "/", "cid");
@@ -232,7 +235,7 @@ public class ImgurTests : IDisposable
         _server.Responder = _ => (200, """{"success":false,"status":403}""", "OK");
 
         var result = new ImgurApi.AlbumResult();
-        var album = ImgurApi.MakeAlbum(result, [ShotWithHash("h")], _server.BaseUrl + "/", "cid");
+        var album = _imgur.MakeAlbum(result, [ShotWithHash("h")], _server.BaseUrl + "/", "cid");
         await album.StartAsync();
 
         Assert.Equal(TaskState.Failed, album.State);
@@ -247,7 +250,7 @@ public class ImgurTests : IDisposable
         _server.Responder = _ => (200, "nope", "OK");
 
         var result = new ImgurApi.AlbumResult();
-        var album = ImgurApi.MakeAlbum(result, [ShotWithHash("h")], _server.BaseUrl + "/", "cid");
+        var album = _imgur.MakeAlbum(result, [ShotWithHash("h")], _server.BaseUrl + "/", "cid");
         await album.StartAsync();
 
         Assert.Equal(TaskState.Failed, album.State);
@@ -260,7 +263,7 @@ public class ImgurTests : IDisposable
         _server.Responder = _ => (500, "boom", "Internal Server Error");
 
         var result = new ImgurApi.AlbumResult();
-        var album = ImgurApi.MakeAlbum(result, [ShotWithHash("h")], _server.BaseUrl + "/", "cid");
+        var album = _imgur.MakeAlbum(result, [ShotWithHash("h")], _server.BaseUrl + "/", "cid");
         await album.StartAsync();
 
         Assert.Equal(TaskState.Failed, album.State);
@@ -276,7 +279,7 @@ public class ImgurTests : IDisposable
         _server.Responder = _ => (200, """{"success":true}""", "OK");
 
         var shot = new ScreenShot(path);
-        var upload = ImgurApi.MakeUpload(shot, _server.BaseUrl + "/", "cid");
+        var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
         await upload.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, upload.State);

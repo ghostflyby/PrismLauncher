@@ -3,7 +3,8 @@
 // instance.json parsing (fields, modLoader string, legacy version.json fallback, icon
 // detection) and the end-to-end import of a synthetic FTB App instance folder (minecraft/
 // copy, InstanceType/totalTimePlayed/JvmArgs settings, net.minecraft + loader components)
-// through the settable FtbAppPaths.RootPath hook.
+// through an FtbAppPaths instance whose RootPath points at the synthetic tree (per-instance,
+// nothing process-global to restore).
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.FtbApp;
@@ -15,18 +16,15 @@ public class FtbAppTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-ftbapp-{Guid.NewGuid():N}");
     private readonly TestGlobalSettings _global = new();
-    private readonly string _originalRoot;
     private string _instancesPath = "";
 
     public FtbAppTests()
     {
         Directory.CreateDirectory(_root);
-        _originalRoot = FtbAppPaths.RootPath;
     }
 
     public void Dispose()
     {
-        FtbAppPaths.RootPath = _originalRoot;
         try
         {
             Directory.Delete(_root, recursive: true);
@@ -53,7 +51,8 @@ public class FtbAppTests : IDisposable
     }
 
     /// <summary>A synthetic FTB App root: storage/settings.json pointing at an instances
-    /// folder that holds one modpack folder (built by <paramref name="populate"/>).</summary>
+    /// folder that holds one modpack folder (built by <paramref name="populate"/>). The
+    /// matching <see cref="FtbAppPaths"/> instance lands in <see cref="_paths"/>.</summary>
     private string BuildFtbAppTree(Action<string> populate)
     {
         var ftbRoot = Path.Combine(_root, ".ftba");
@@ -66,9 +65,11 @@ public class FtbAppTests : IDisposable
         var packPath = Path.Combine(_instancesPath, "my-ftb-pack");
         Directory.CreateDirectory(packPath);
         populate(packPath);
-        FtbAppPaths.RootPath = ftbRoot;
+        _paths = new FtbAppPaths(ftbRoot);
         return packPath;
     }
+
+    private FtbAppPaths _paths = new();
 
     private static void WriteInstanceJson(string packPath, string modLoader)
     {
@@ -95,7 +96,7 @@ public class FtbAppTests : IDisposable
     {
         var packPath = BuildFtbAppTree(_ => { });
 
-        Assert.Equal(Directory.GetParent(packPath)!.FullName, FtbAppPaths.GetDynamicInstancesPath());
+        Assert.Equal(Directory.GetParent(packPath)!.FullName, _paths.GetDynamicInstancesPath());
     }
 
     [Fact]
@@ -106,16 +107,16 @@ public class FtbAppTests : IDisposable
         Directory.CreateDirectory(Path.Combine(ftbRoot, "bin"));
         File.WriteAllText(Path.Combine(ftbRoot, "bin", "settings.json"),
             $$"""{"instanceLocation": "{{instancesPath.Replace("\\", "\\\\")}}"}""");
-        FtbAppPaths.RootPath = ftbRoot;
+        var paths = new FtbAppPaths(ftbRoot);
 
-        Assert.Equal(instancesPath, FtbAppPaths.GetDynamicInstancesPath());
+        Assert.Equal(instancesPath, paths.GetDynamicInstancesPath());
     }
 
     [Fact]
     public void GetDynamicInstancesPath_MissingSettings_ReturnsEmpty()
     {
-        FtbAppPaths.RootPath = Path.Combine(_root, "nonexistent-ftba");
-        Assert.Equal("", FtbAppPaths.GetDynamicInstancesPath());
+        var paths = new FtbAppPaths(Path.Combine(_root, "nonexistent-ftba"));
+        Assert.Equal("", paths.GetDynamicInstancesPath());
     }
 
     // ----------------------------------------------------------------- parseDirectory

@@ -35,6 +35,10 @@ public sealed class LegacyFtbPackInstallTask : InstanceTask
     /// <summary>APPLICATION->metacache() hook ("FTBPacks" base); null = plain downloads.</summary>
     public HttpMetaCache? MetaCache { get; set; }
 
+    /// <summary>BuildConfig.LEGACY_FTB_CDN_BASE_URL (per-instance; tests construct the task
+    /// pointed at their stub).</summary>
+    public string CdnBaseUrl { get; set; } = FlintConfig.Default.LegacyFtbCdnBaseUrl;
+
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         await DownloadPack(cancellationToken);
@@ -51,11 +55,11 @@ public sealed class LegacyFtbPackInstallTask : InstanceTask
         NetRequest request;
         if (_pack.Type == PackType.Private)
         {
-            url = CdnUrl() + "privatepacks/" + path;
+            url = CdnBaseUrl + "privatepacks/" + path;
         }
         else
         {
-            url = CdnUrl() + "modpacks/" + path;
+            url = CdnBaseUrl + "modpacks/" + path;
         }
 
         if (MetaCache is not null)
@@ -83,9 +87,6 @@ public sealed class LegacyFtbPackInstallTask : InstanceTask
 
         await Unzip(cancellationToken);
     }
-
-    /// <summary>BuildConfig.LEGACY_FTB_CDN_BASE_URL (settable; tests restore it).</summary>
-    private static string CdnUrl() => LegacyFtbPackFetchTask.CdnBaseUrl;
 
     private static string TempCachePath(string relativeName)
     {

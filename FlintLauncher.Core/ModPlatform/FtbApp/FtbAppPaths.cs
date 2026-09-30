@@ -4,19 +4,24 @@
 // Application Support) and the instances folder comes from the "instanceLocation" key of
 // storage/settings.json (fallback bin/settings.json).
 //
-// Deviation: RootPath is a settable static hook (the launcher-wide "FTBAppInstancesPath"
-// setting and the QProcessEnvironment lookups of the original are UI concerns); tests
-// restore it.
+// Deviation: the launcher-wide "FTBAppInstancesPath" setting and the QProcessEnvironment
+// lookups of the original are UI concerns, so RootPath is injected per instance (tests
+// construct an FtbAppPaths pointed at their tree); DefaultRoot stays a pure static helper.
 using System.Text.Json;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.ModPlatform.FtbApp;
 
-public static class FtbAppPaths
+public sealed class FtbAppPaths
 {
-    /// <summary>The FTB App root (getFTBRoot()); settable for tests.</summary>
-    public static string RootPath { get; set; } = DefaultRoot();
+    public FtbAppPaths(string? rootPath = null)
+    {
+        RootPath = rootPath ?? DefaultRoot();
+    }
+
+    /// <summary>The FTB App root (getFTBRoot()); injected.</summary>
+    public string RootPath { get; set; }
 
     /// <summary>Port of getFTBRoot: ~/.ftba, under Library/Application Support on macOS.</summary>
     public static string DefaultRoot()
@@ -32,7 +37,7 @@ public static class FtbAppPaths
     /// <summary>Port of getDynamicPath: the "instanceLocation" value of the FTB App
     /// settings.json (storage/, then bin/); "" when neither file exists or cannot be
     /// parsed.</summary>
-    public static string GetDynamicInstancesPath()
+    public string GetDynamicInstancesPath()
     {
         var settingsPath = FileSystem.PathCombine(RootPath, "storage", "settings.json");
         if (!File.Exists(settingsPath))

@@ -639,11 +639,11 @@ public static class InstanceContentEndpoints
                 var task = new SequentialTask("Uploading screenshots");
                 foreach (var shot in shots)
                 {
-                    task.AddTask(ImgurApi.MakeUpload(shot, baseUrl, clientId));
+                    task.AddTask(runtime.Imgur.MakeUpload(shot, baseUrl, clientId));
                 }
                 if (shots.Count > 1)
                 {
-                    task.AddTask(ImgurApi.MakeAlbum(new ImgurApi.AlbumResult(), shots, baseUrl, clientId));
+                    task.AddTask(runtime.Imgur.MakeAlbum(new ImgurApi.AlbumResult(), shots, baseUrl, clientId));
                 }
 
                 var entry = registry.Register("screenshots-upload", task, instanceId: instance.Id());

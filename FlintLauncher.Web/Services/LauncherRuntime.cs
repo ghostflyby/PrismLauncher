@@ -11,7 +11,9 @@ using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.ModPlatform.Technic;
+using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Core.News;
+using FlintLauncher.Core.Screenshots;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Web.Models;
 
@@ -33,6 +35,10 @@ public sealed class LauncherRuntime
     public TechnicApi Technic { get; }
     /// <summary>The ATLauncher client — same injection story as Modrinth/Flame/Technic.</summary>
     public AtLauncherApi AtLauncher { get; }
+    /// <summary>The FTB App API client — same injection story as Modrinth/Flame/Technic.</summary>
+    public FtbApi Ftb { get; }
+    /// <summary>The imgur screenshot-upload client — same injection story.</summary>
+    public ImgurApi Imgur { get; }
     public IniSettingsObject GlobalSettings { get; }
     public InstanceList Instances { get; }
     public AccountList Accounts { get; }
@@ -40,7 +46,8 @@ public sealed class LauncherRuntime
     public NewsChecker News { get; }
 
     public LauncherRuntime(FlintPaths paths, NetStack? net = null, ModrinthApi? modrinth = null,
-        FlameApi? flame = null, TechnicApi? technic = null, AtLauncherApi? atlauncher = null)
+        FlameApi? flame = null, TechnicApi? technic = null, AtLauncherApi? atlauncher = null,
+        FtbApi? ftb = null, ImgurApi? imgur = null)
     {
         Paths = paths;
         Net = net ?? NetStack.Default;
@@ -48,6 +55,8 @@ public sealed class LauncherRuntime
         Flame = flame ?? new FlameApi(Net);
         Technic = technic ?? new TechnicApi(Net);
         AtLauncher = atlauncher ?? new AtLauncherApi(Net);
+        Ftb = ftb ?? new FtbApi(Net);
+        Imgur = imgur ?? new ImgurApi(Net);
         var dataDir = paths.DataDir;
 
         // global config: flint.cfg first, importing an existing Prism/PolyMC config like the

@@ -9,6 +9,12 @@ namespace FlintLauncher.Core.ModPlatform.Ftb;
 
 public sealed class FtbPackModel
 {
+    public FtbPackModel(FtbApi? ftb = null)
+    {
+        _ftb = ftb ?? new FtbApi();
+    }
+
+    private readonly FtbApi _ftb;
     private readonly List<FtbModpack> _modpacks = [];
 
     public IReadOnlyList<FtbModpack> Packs => _modpacks;
@@ -36,7 +42,7 @@ public sealed class FtbPackModel
     {
         _modpacks.Clear();
 
-        var (indexJob, indexRequest) = FtbApi.FetchModpacks();
+        var (indexJob, indexRequest) = _ftb.FetchModpacks();
         await indexJob.StartAsync(cancellationToken);
         if (!indexJob.WasSuccessful)
         {
@@ -58,7 +64,7 @@ public sealed class FtbPackModel
         while (remainingPacks.Count != 0)
         {
             var currentPack = remainingPacks[0];
-            var (job, request) = FtbApi.FetchModpack(currentPack);
+            var (job, request) = _ftb.FetchModpack(currentPack);
             await job.StartAsync(cancellationToken);
             remainingPacks.Remove(currentPack);
             if (!job.WasSuccessful)

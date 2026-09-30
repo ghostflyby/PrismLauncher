@@ -17,8 +17,9 @@ namespace FlintLauncher.Core.ModPlatform.LegacyFtb;
 
 public sealed class LegacyFtbPackFetchTask : FlintTask
 {
-    /// <summary>BuildConfig.LEGACY_FTB_CDN_BASE_URL (settable; tests restore it).</summary>
-    public static string CdnBaseUrl { get; set; } = FlintConfig.Default.LegacyFtbCdnBaseUrl;
+    /// <summary>BuildConfig.LEGACY_FTB_CDN_BASE_URL (per-instance; tests construct the task
+    /// pointed at their stub).</summary>
+    public string CdnBaseUrl { get; set; } = FlintConfig.Default.LegacyFtbCdnBaseUrl;
 
     public List<LegacyFtbModpack> PublicPacks { get; } = [];
     public List<LegacyFtbModpack> ThirdPartyPacks { get; } = [];

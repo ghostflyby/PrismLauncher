@@ -20,6 +20,7 @@ using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.ModPlatform.Flame;
+using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Web;
@@ -50,7 +51,7 @@ internal sealed class FlintApiHost : IAsyncDisposable
     public string DataDir { get; }
 
     public static async Task<FlintApiHost> StartAsync(ModrinthApi? modrinth = null, FlameApi? flame = null,
-        TechnicApi? technic = null, AtLauncherApi? atlauncher = null)
+        TechnicApi? technic = null, AtLauncherApi? atlauncher = null, FtbApi? ftb = null)
     {
         var dataDir = Path.Combine(Path.GetTempPath(), $"flint-api-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dataDir);
@@ -59,7 +60,7 @@ internal sealed class FlintApiHost : IAsyncDisposable
         [
             "--data-dir", dataDir,
             "--urls", "http://127.0.0.1:0",
-        ], modrinth, flame, technic, atlauncher);
+        ], modrinth, flame, technic, atlauncher, ftb);
         await app.StartAsync();
         var token = File.ReadAllText(Path.Combine(dataDir, ApiAuthService.TokenFileName)).Trim();
         var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };

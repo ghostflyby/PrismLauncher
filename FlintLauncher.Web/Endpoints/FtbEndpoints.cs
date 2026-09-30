@@ -6,12 +6,10 @@
 // metadata and the version files are small, so the flow is synchronous: 201 with the
 // committed instance, 500 creation_failed with the failure message otherwise).
 //
-// FtbApi.BaseUrl is a process-global static — the headless equivalent of the C++
-// BuildConfig.FTB_API_BASE_URL constant. The install's `serverUrl` body field swaps it for
-// the duration of the call; it is saved before and restored in `finally` so a per-request
-// override never leaks into other requests (the tests serialize on the "FlameApi" collection
-// for the same reason — the FTB install also resolves CurseForge-only files through the
-// Flame layer's static base URL).
+// The FTB base URL is per-host state (runtime.Ftb — the headless equivalent of the C++
+// BuildConfig.FTB_API_BASE_URL constant). The install's `serverUrl` body field selects a
+// per-request derived client instead of mutating the shared one, so an override can never
+// leak into other requests (and needs no restore).
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.ModPlatform.Ftb;
@@ -27,9 +25,9 @@ public static class FtbEndpoints
         // ---------------------------------------------------- modplatform/ftb/packs
         // the /modpack/all index pass-through (FtbListModel::requestFinished's parse): the
         // index payload only carries pack ids, so the response is {"packs":[{"id"},...]}
-        api.MapGet("/modplatform/ftb/packs", async () =>
+        api.MapGet("/modplatform/ftb/packs", async (LauncherRuntime runtime) =>
         {
-            var (job, request) = FtbApi.FetchModpacks();
+            var (job, request) = runtime.Ftb.FetchModpacks();
             await job.StartAsync();
             if (!job.WasSuccessful)
             {
@@ -53,13 +51,15 @@ public static class FtbEndpoints
 
         // ---------------------------------------------- modplatform/ftb/packs/{id}
         // the /modpack/{id} description (FtbListModel::packRequestFinished's mapping)
-        api.MapGet("/modplatform/ftb/packs/{id}", async Task<IResult> (int id) =>
-            await WithPackAsync(id, pack => Results.Ok(PackView(pack))));
+        api.MapGet("/modplatform/ftb/packs/{id}", async Task<IResult> (int id,
+            LauncherRuntime runtime) =>
+            await WithPackAsync(runtime, id, pack => Results.Ok(PackView(pack))));
 
         // -------------------------------------- modplatform/ftb/packs/{id}/versions
         // the description's version list (the FTB App API has no separate version index)
-        api.MapGet("/modplatform/ftb/packs/{id}/versions", async Task<IResult> (int id) =>
-            await WithPackAsync(id, pack => Results.Ok(pack.Versions
+        api.MapGet("/modplatform/ftb/packs/{id}/versions", async Task<IResult> (int id,
+            LauncherRuntime runtime) =>
+            await WithPackAsync(runtime, id, pack => Results.Ok(pack.Versions
                 .Select(version => new FtbPackVersionView(version.Id, version.Name,
                     version.Type, version.Updated))
                 .ToArray())));
@@ -73,35 +73,21 @@ public static class FtbEndpoints
                 return ApiJson.Error("invalid_body", "'packId' is required", 400);
             }
 
-            string? serverUrl = null;
-            if (!string.IsNullOrWhiteSpace(request.ServerUrl))
+            // the request's client is resolved up front: a serverUrl override derives its
+            // own client (same net stack), the runtime's shared one is never mutated
+            // (nothing to restore)
+            var ftb = ResolveApi(runtime, request.ServerUrl, out var serverError);
+            if (serverError is not null)
             {
-                var trimmed = request.ServerUrl.Trim();
-                if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var server) ||
-                    server.Scheme is not ("http" or "https"))
-                {
-                    return ApiJson.Error("invalid_server_url",
-                        "'serverUrl' must be an absolute http(s) URL", 400);
-                }
-                // the FTB URL builders concatenate "/modpack/..." onto the hook, so
-                // unlike the ATLauncher one this hook must NOT carry a trailing slash
-                serverUrl = trimmed.TrimEnd('/');
+                return serverError;
             }
-
-            // save the static hook before anything can touch it; restored in finally
-            var previousBaseUrl = FtbApi.BaseUrl;
 
             await runtime.InstanceLock.WaitAsync();
             try
             {
-                if (serverUrl is not null)
-                {
-                    FtbApi.BaseUrl = serverUrl;
-                }
-
                 // the ctor needs the parsed pack description (its version list is what the
                 // task's own lookup matches the version name against)
-                var (job, fetchRequest) = FtbApi.FetchModpack(request.PackId);
+                var (job, fetchRequest) = ftb.FetchModpack(request.PackId);
                 await job.StartAsync();
                 if (!job.WasSuccessful)
                 {
@@ -130,7 +116,7 @@ public static class FtbEndpoints
                         ?? wanted.ToString()
                     : pack.Versions.Count != 0 ? pack.Versions[0].Name : "";
 
-                var task = new FtbPackInstallTask(pack, versionName, runtime.Flame)
+                var task = new FtbPackInstallTask(pack, versionName, runtime.Flame, ftb)
                 {
                     Group = request.Group ?? "",
                 };
@@ -169,7 +155,6 @@ public static class FtbEndpoints
             }
             finally
             {
-                FtbApi.BaseUrl = previousBaseUrl;
                 runtime.InstanceLock.Release();
             }
         });
@@ -177,12 +162,36 @@ public static class FtbEndpoints
 
     // ----------------------------------------------------------------- helpers
 
+    /// <summary>The request's FTB client: the runtime's own, or — with a `serverUrl`
+    /// override — a derived client (same net stack), leaving the shared instance untouched.
+    /// Returns the error result for a malformed override.</summary>
+    private static FtbApi ResolveApi(LauncherRuntime runtime, string? serverUrl, out IResult? error)
+    {
+        error = null;
+        if (string.IsNullOrWhiteSpace(serverUrl))
+        {
+            return runtime.Ftb;
+        }
+        var trimmed = serverUrl.Trim();
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var server) ||
+            server.Scheme is not ("http" or "https"))
+        {
+            error = ApiJson.Error("invalid_server_url",
+                "'serverUrl' must be an absolute http(s) URL", 400);
+            return runtime.Ftb;
+        }
+        // the FTB URL builders concatenate "/modpack/..." onto the base, so unlike the
+        // ATLauncher one this derived base must NOT carry a trailing slash
+        return new FtbApi(runtime.Ftb.Net) { BaseUrl = trimmed.TrimEnd('/') };
+    }
+
     /// <summary>Fetch + parse /modpack/{id} (the shared logic of the two GET endpoints) and
     /// hand the pack to <paramref name="map"/>; fetch/parse failures map to the uniform 502
     /// error envelope instead.</summary>
-    private static async Task<IResult> WithPackAsync(int packId, Func<FtbModpack, IResult> map)
+    private static async Task<IResult> WithPackAsync(LauncherRuntime runtime, int packId,
+        Func<FtbModpack, IResult> map)
     {
-        var (job, request) = FtbApi.FetchModpack(packId);
+        var (job, request) = runtime.Ftb.FetchModpack(packId);
         await job.StartAsync();
         if (!job.WasSuccessful)
         {

@@ -6,13 +6,11 @@
 // CurseForge-only file) and the failure surface (unknown pack -> 500 creation_failed with
 // the fetch reason, unknown version -> the task's FailReason, validation -> 400).
 //
-// [Collection("FlameApi")] matches FtbTests: FtbApi.BaseUrl and FlameConfig.BaseUrl are
-// process-global statics, so every suite that touches them must not run in parallel (the
-// install endpoint also saves/restores BaseUrl around the serverUrl override).
+// Each suite builds its own FtbApi/FlameApi clients pointed at the stubs and hands them to
+// the host (per-instance BaseUrl, nothing process-global to restore).
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Tests;
@@ -20,24 +18,23 @@ using Xunit;
 
 namespace Flint.Tests;
 
-[Collection("FlameApi")]
 public class FtbApiEndpointsTests : IDisposable
 {
     private readonly FlameApi _flameApi = new();
+    private readonly FtbApi _ftbApi;
     private readonly StubFtbServer _server = new();
     private readonly StubFlameServer _flameServer = new();
     private readonly byte[] _cfBytes = "ftb curseforge-resolved mod payload"u8.ToArray();
 
     public FtbApiEndpointsTests()
     {
-        FtbApi.BaseUrl = _server.Url;
+        _ftbApi = new FtbApi { BaseUrl = _server.Url };
         // the FTB install resolves CurseForge-only files through the Flame layer
         _flameApi.BaseUrl = _flameServer.Url;
     }
 
     public void Dispose()
     {
-        FtbApi.BaseUrl = FlintConfig.Default.FtbApiBaseUrl;
         _server.Dispose();
         _flameServer.Dispose();
     }
@@ -64,7 +61,7 @@ public class FtbApiEndpointsTests : IDisposable
     public async Task Packs_Index_PassThrough()
     {
         _server.ModpacksIndexJson = """{"packs":[42, 43]}""";
-        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi, ftb: _ftbApi);
 
         var response = await host.GetAsync("/api/v1/modplatform/ftb/packs");
         response.EnsureSuccessStatusCode();
@@ -81,7 +78,7 @@ public class FtbApiEndpointsTests : IDisposable
     {
         var fixture = FtbPackFixture.Create();
         fixture.Register(_server);
-        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi, ftb: _ftbApi);
 
         var response = await host.GetAsync($"/api/v1/modplatform/ftb/packs/{FtbPackFixture.PackId}");
         response.EnsureSuccessStatusCode();
@@ -116,7 +113,7 @@ public class FtbApiEndpointsTests : IDisposable
     {
         var fixture = FtbPackFixture.Create();
         fixture.Register(_server);
-        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi, ftb: _ftbApi);
 
         var response = await host.GetAsync(
             $"/api/v1/modplatform/ftb/packs/{FtbPackFixture.PackId}/versions");
@@ -138,7 +135,7 @@ public class FtbApiEndpointsTests : IDisposable
         var fixture = FtbPackFixture.Create();
         fixture.Register(_server);
         SetupFlameResolution();
-        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi, ftb: _ftbApi);
 
         var post = await host.PostAsync("/api/v1/modplatform/ftb/install", new
         {
@@ -197,7 +194,7 @@ public class FtbApiEndpointsTests : IDisposable
         var fixture = FtbPackFixture.Create();
         fixture.Register(_server);
         SetupFlameResolution();
-        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi, ftb: _ftbApi);
 
         var post = await host.PostAsync("/api/v1/modplatform/ftb/install", new
         {
@@ -222,7 +219,7 @@ public class FtbApiEndpointsTests : IDisposable
     [Fact]
     public async Task Install_UnknownPack_ReturnsCreationFailed()
     {
-        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi, ftb: _ftbApi);
 
         var post = await host.PostAsync("/api/v1/modplatform/ftb/install", new
         {
@@ -244,7 +241,7 @@ public class FtbApiEndpointsTests : IDisposable
     {
         var fixture = FtbPackFixture.Create();
         fixture.Register(_server);
-        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi, ftb: _ftbApi);
 
         var post = await host.PostAsync("/api/v1/modplatform/ftb/install", new
         {
@@ -263,16 +260,15 @@ public class FtbApiEndpointsTests : IDisposable
     }
 
     [Fact]
-    public async Task Install_ServerUrlOverride_IsHonored_AndHookIsRestored()
+    public async Task Install_ServerUrlOverride_IsHonored_AndSharedClientUntouched()
     {
         var fixture = FtbPackFixture.Create();
         fixture.Register(_server);
         SetupFlameResolution();
-        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
-
-        // a dead static forces the request's serverUrl override to be the only working route
-        FtbApi.BaseUrl = "http://127.0.0.1:9";
-        var previous = FtbApi.BaseUrl;
+        // a dead runtime client forces the request's serverUrl override to be the only
+        // working route
+        var deadClient = new FtbApi { BaseUrl = "http://127.0.0.1:9" };
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi, ftb: deadClient);
 
         var post = await host.PostAsync("/api/v1/modplatform/ftb/install", new
         {
@@ -282,8 +278,8 @@ public class FtbApiEndpointsTests : IDisposable
         });
         Assert.Equal(HttpStatusCode.Created, post.StatusCode);
 
-        // the static hook was restored after the call (the bogus value is still in place)
-        Assert.Equal(previous, FtbApi.BaseUrl);
+        // the override built a derived client; the shared one keeps its (bogus) base URL
+        Assert.Equal("http://127.0.0.1:9", deadClient.BaseUrl);
         Assert.True(File.Exists(Path.Combine(host.DataDir, "instances", "Test FTB Pack",
             ".minecraft", "mods", "testmod.jar")));
     }
@@ -291,7 +287,7 @@ public class FtbApiEndpointsTests : IDisposable
     [Fact]
     public async Task Install_Validation_Errors()
     {
-        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi, ftb: _ftbApi);
 
         var missingPack = await host.PostAsync("/api/v1/modplatform/ftb/install",
             new { versionId = 1 });

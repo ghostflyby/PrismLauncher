@@ -22,15 +22,18 @@ namespace FlintLauncher.Core.ModPlatform.Ftb;
 
 public sealed class FtbPackInstallTask : InstanceTask
 {
-    public FtbPackInstallTask(FtbModpack pack, string versionName, FlameApi? flame = null)
+    public FtbPackInstallTask(FtbModpack pack, string versionName, FlameApi? flame = null,
+        FtbApi? ftb = null)
     {
         _pack = pack;
         _versionName = versionName;
         _flame = flame ?? new FlameApi();
+        _ftb = ftb ?? new FtbApi();
     }
 
     private readonly FtbModpack _pack;
     private readonly FlameApi _flame;
+    private readonly FtbApi _ftb;
     private readonly string _versionName;
 
     private readonly FtbVersion _version = new();
@@ -65,7 +68,7 @@ public sealed class FtbPackInstallTask : InstanceTask
             return;
         }
 
-        var (job, request) = FtbApi.FetchVersion(_pack.Id, versionInfo.Id);
+        var (job, request) = _ftb.FetchVersion(_pack.Id, versionInfo.Id);
         await job.StartAsync(cancellationToken);
         if (!job.WasSuccessful)
         {
