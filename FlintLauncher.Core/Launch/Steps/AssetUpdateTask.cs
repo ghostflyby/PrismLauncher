@@ -2,8 +2,8 @@
 // Port of launcher/minecraft/update/AssetUpdateTask.{h,cpp}: download the assets index for
 // the profile's asset version, then fetch the asset objects into assets/objects/<first2>/<hash>.
 //
-// Application-singleton reach-ins become hooks: the metacache (APPLICATION->metacache()) and
-// the ResourceURLOverride setting (APPLICATION->settings()) — see LegacyFMLLibrariesTask.
+// APPLICATION->metacache() reaches the task through the instance (MinecraftInstance.MetaCache,
+// stamped by the composition root); the ResourceURLOverride setting stays a test hook.
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Net;
 
@@ -14,10 +14,6 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class AssetUpdateTask : FlintTask
 {
-    /// <summary>C++ APPLICATION->metacache(); a missing hook creates a throwaway cache rooted
-    /// at the cwd (the "asset_indexes" base then resolves next to the working directory).</summary>
-    public static Func<HttpMetaCache?>? MetaCacheHook { get; set; }
-
     /// <summary>C++ APPLICATION->settings()->get("ResourceURLOverride").</summary>
     public static Func<string>? ResourceUrlOverride { get; set; }
 
@@ -77,7 +73,9 @@ public sealed class AssetUpdateTask : FlintTask
         }
         var assets = profile.GetMinecraftAssets();
 
-        var assetFname = FileSystem.PathCombine("assets", "indexes", assets.Id + ".json");
+        var assetFname = FileSystem.PathCombine(
+            _inst.Paths?.AssetIndexesDir ?? FileSystem.PathCombine("assets", "indexes"),
+            assets.Id + ".json");
         var index = new AssetsIndex();
         // FIXME: this looks like a job for a generic validator based on json schema?
         if (!AssetsUtils.LoadAssetsIndexJson(assets.Id, assetFname, index))
@@ -89,7 +87,8 @@ public sealed class AssetUpdateTask : FlintTask
             return;
         }
 
-        var job = index.GetDownloadJob(ResourceUrl());
+        var job = index.GetDownloadJob(ResourceUrl(), _inst.Paths?.AssetsRoot
+            ?? FileSystem.PathCombine("assets", ""));
         if (job is not null)
         {
             var resourceUrl = ResourceUrl();
@@ -138,12 +137,15 @@ public sealed class AssetUpdateTask : FlintTask
 
     private HttpMetaCache RequireCache()
     {
-        if (MetaCacheHook?.Invoke() is { } shared)
+        // the composition root stamps the instance with the runtime cache; the throwaway
+        // fallback (no shared ledger, index re-downloaded every run) is for bare fixtures
+        if (_inst.MetaCache is { } shared)
         {
             return shared;
         }
         var cache = new HttpMetaCache();
-        cache.AddBase("asset_indexes", FileSystem.PathCombine(Directory.GetCurrentDirectory(), "assets", "indexes"));
+        cache.AddBase("asset_indexes", _inst.Paths?.AssetIndexesDir
+            ?? FileSystem.PathCombine(Directory.GetCurrentDirectory(), "assets", "indexes"));
         return cache;
     }
 }

@@ -15,6 +15,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Net;
@@ -318,13 +319,13 @@ public class ExtractNativesTests
                 .Replace("ID", assetsId).Replace("URL", server.Url).Replace("SHA", indexSha));
         var instance = await fixture.CreateInstance(patch);
 
-        AssetUpdateTask.MetaCacheHook = () =>
-        {
-            var cache = new HttpMetaCache();
-            // the index is downloaded into the same place the task reads it from
-            cache.AddBase("asset_indexes", Path.Combine(assetsRoot.Root, "indexes"));
-            return cache;
-        };
+        // the index is downloaded into the same place the task reads it from — the injected
+        // instance cache ("asset_indexes" base) instead of the former static hook; Paths
+        // anchor through the "assets" symlink so AssetsRoot = <BaseDirectory>/assets → Root
+        var instanceCache = new HttpMetaCache();
+        instanceCache.AddBase("asset_indexes", Path.Combine(assetsRoot.Root, "indexes"));
+        instance.MetaCache = instanceCache;
+        instance.Paths = FlintPaths.FromDataDir(AppContext.BaseDirectory);
         AssetUpdateTask.ResourceUrlOverride = () => server.Url + "/objects/";
         try
         {
@@ -336,12 +337,13 @@ public class ExtractNativesTests
 
             await task.StartAsync();
 
-            Assert.Equal(TaskState.Succeeded, task.State);
+            Assert.True(task.WasSuccessful, task.FailReason + " | indexFile=" +
+                File.Exists(Path.Combine(assetsRoot.Root, "indexes", assetsId + ".json")) +
+                " objectFile=" + File.Exists(Path.Combine(assetsRoot.Root, "objects", objectHash[..2], objectHash)));
         }
         finally
         {
             Environment.CurrentDirectory = previousCwd;
-            AssetUpdateTask.MetaCacheHook = null;
             AssetUpdateTask.ResourceUrlOverride = null;
         }
 

@@ -22,13 +22,15 @@ public sealed class AssetObject
     /// <summary>Port of AssetObject::getRelPath.</summary>
     public string GetRelPath() => (Hash.Length >= 2 ? Hash[..2] : Hash) + "/" + Hash;
 
-    /// <summary>Port of AssetObject::getLocalPath (relative to the current directory).</summary>
-    public string GetLocalPath() => "assets/objects/" + GetRelPath();
+    /// <summary>Port of AssetObject::getLocalPath (upstream was CWD-relative "assets/objects";
+    /// the assets root is injected here).</summary>
+    public string GetLocalPath(string assetsRoot) =>
+        FileSystem.PathCombine(assetsRoot, "objects", GetRelPath());
 
     /// <summary>Port of AssetObject::getDownloadAction; null when the local file is present.</summary>
-    public NetRequest? GetDownloadAction(string resourceUrl)
+    public NetRequest? GetDownloadAction(string assetsRoot, string resourceUrl)
     {
-        var objectFile = new FileInfo(GetLocalPath());
+        var objectFile = new FileInfo(GetLocalPath(assetsRoot));
         if (!objectFile.Exists || objectFile.Length != Size)
         {
             var objectDl = NetRequest.MakeFile(new Uri(resourceUrl + GetRelPath()), objectFile.FullName);
@@ -53,13 +55,14 @@ public sealed class AssetsIndex
 
     public bool MapToResources { get; set; }
 
-    /// <summary>Port of AssetsIndex::getDownloadJob; null when everything is already present.</summary>
-    public NetJob? GetDownloadJob(string resourceUrl)
+    /// <summary>Port of AssetsIndex::getDownloadJob; null when everything is already present.
+    /// <paramref name="assetsRoot"/> anchors the local object store (injected).</summary>
+    public NetJob? GetDownloadJob(string resourceUrl, string assetsRoot)
     {
         var job = new NetJob($"Assets for {Id}");
         foreach (var @object in Objects.Values)
         {
-            var dl = @object.GetDownloadAction(resourceUrl);
+            var dl = @object.GetDownloadAction(assetsRoot, resourceUrl);
             if (dl is not null)
             {
                 job.AddNetRequest(dl);
@@ -132,13 +135,13 @@ public static class AssetsUtils
     }
 
     /// <summary>Port of AssetsUtils::reconstructAssets: rebuild a virtual assets folder (or the
-    /// resources folder) for the given assets ID.</summary>
-    public static bool ReconstructAssets(string assetsId, string resourcesFolder)
+    /// resources folder) for the given assets ID. <paramref name="assetsRoot"/> anchors the
+    /// asset store (injected; upstream anchored at the launcher working directory).</summary>
+    public static bool ReconstructAssets(string assetsId, string resourcesFolder, string assetsRoot)
     {
-        var assetsDir = "assets/";
-        var indexDir = FileSystem.PathCombine(assetsDir, "indexes");
-        var objectDir = FileSystem.PathCombine(assetsDir, "objects");
-        var virtualDir = FileSystem.PathCombine(assetsDir, "virtual");
+        var indexDir = FileSystem.PathCombine(assetsRoot, "indexes");
+        var objectDir = FileSystem.PathCombine(assetsRoot, "objects");
+        var virtualDir = FileSystem.PathCombine(assetsRoot, "virtual");
 
         var indexPath = FileSystem.PathCombine(indexDir, assetsId + ".json");
         var virtualRoot = FileSystem.PathCombine(virtualDir, assetsId);

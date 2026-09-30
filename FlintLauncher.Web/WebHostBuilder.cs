@@ -21,13 +21,12 @@ public static class WebHostBuilder
 {
     public static WebApplication BuildWebApplication(string[] args)
     {
-        var dataDir = ResolveDataDir(args);
-        Directory.CreateDirectory(dataDir);
-        // Several core paths are CWD-relative (instgroups.json, the meta cache, relative
-        // library/asset anchors) — the C++ application chdir'd into its data dir at startup.
-        Environment.CurrentDirectory = dataDir;
+        var paths = FlintPaths.FromDataDir(ResolveDataDir(args));
+        Directory.CreateDirectory(paths.DataDir);
+        // NOTE: the process working directory is NOT touched — every core path is explicit
+        // (FlintPaths), so multiple hosts can coexist in one process (integration tests).
 
-        var apiAuth = Services.ApiAuthService.Resolve(dataDir, args);
+        var apiAuth = Services.ApiAuthService.Resolve(paths.DataDir, args);
 
         var builder = WebApplication.CreateSlimBuilder(args);
 
@@ -35,14 +34,14 @@ public static class WebHostBuilder
         // FLINT_LOG_LEVEL (default Information), default console provider plus the rolling
         // data-dir file; the Core static facade (FlintLog) shares this exact factory
         builder.Logging.SetMinimumLevel(ResolveLogLevel(args));
-        builder.Logging.AddProvider(new RollingFileLoggerProvider(Path.Combine(dataDir, "logs")));
+        builder.Logging.AddProvider(new RollingFileLoggerProvider(paths.LogsDir));
 
         builder.Services.ConfigureHttpJsonOptions(options =>
         {
             options.SerializerOptions.TypeInfoResolverChain.Insert(0, FlintJsonContext.Default);
         });
 
-        var runtime = new LauncherRuntime(dataDir);
+        var runtime = new LauncherRuntime(paths);
         builder.Services.AddSingleton(FlintConfig.Default);
         builder.Services.AddSingleton(runtime);
         builder.Services.AddSingleton<FlintTaskRegistry>();

@@ -43,6 +43,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tasks;
 
@@ -96,6 +97,14 @@ public class InstanceList
             }
         }
     }
+
+    /// <summary>Injected data-directory layout — stamped onto discovered instances (their
+    /// asset/library/java anchors) and used for instgroups.json. Set by the composition root.</summary>
+    public FlintPaths? Paths { get; set; }
+
+    /// <summary>Injected metadata cache — stamped onto discovered instances (library and
+    /// asset-index download caches, metadata entities).</summary>
+    public HttpMetaCache? MetaCache { get; set; }
 
     // ---------------------------------------------------------------- events (Qt signals)
 
@@ -647,7 +656,11 @@ public class InstanceList
             return new NullInstance(_globalSettings, instanceSettings, instanceRoot);
         }
 
-        var inst = new MinecraftInstance(_globalSettings, instanceSettings, instanceRoot);
+        var inst = new MinecraftInstance(_globalSettings, instanceSettings, instanceRoot)
+        {
+            Paths = Paths,
+            MetaCache = MetaCache,
+        };
         return inst;
     }
 
@@ -669,7 +682,11 @@ public class InstanceList
         {
             return GroupFilePath;
         }
-        // QDir::current().filePath("instgroups.json")
+        if (Paths is { } paths)
+        {
+            return paths.InstgroupsFile;
+        }
+        // QDir::current().filePath("instgroups.json") — legacy CWD anchor, bare fixtures only
         return Path.Combine(Directory.GetCurrentDirectory(), "instgroups.json");
     }
 

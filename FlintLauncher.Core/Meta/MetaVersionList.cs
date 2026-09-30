@@ -41,6 +41,7 @@ public sealed class VersionList : MetaEntity
         if (!_lookup.TryGetValue(version, out var outVersion) || outVersion is null)
         {
             outVersion = new MetaVersion(_uid, version);
+            outVersion.SetMetaCache(Cache);
             _lookup[version] = outVersion;
             _versions.Add(outVersion);
         }
@@ -73,6 +74,10 @@ public sealed class VersionList : MetaEntity
     public void SetVersions(IReadOnlyList<MetaVersion> versions)
     {
         _versions.Clear();
+        foreach (var version in versions)
+        {
+            version.SetMetaCache(Cache);
+        }
         _versions.AddRange(versions);
         // newest first by raw time (std::sort upstream, so ties may reorder either way)
         _versions.Sort((a, b) => b.RawTime().CompareTo(a.RawTime()));
@@ -124,6 +129,7 @@ public sealed class VersionList : MetaEntity
             }
             else
             {
+                otherVersion.SetMetaCache(Cache);
                 _lookup[otherVersion.Version()] = otherVersion;
                 _versions.Add(otherVersion);
                 version = otherVersion;

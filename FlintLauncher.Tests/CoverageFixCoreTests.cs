@@ -214,7 +214,7 @@ public class CoverageFixCoreTests
         var previousTimeout = Http.RequestTimeout;
         try
         {
-            var runtime = new LauncherRuntime(dataDir);
+            var runtime = new LauncherRuntime(FlintPaths.FromDataDir(dataDir));
             runtime.GlobalSettings.Set("ProxyType", "HTTP");
             runtime.GlobalSettings.Set("ProxyAddr", "10.1.2.3");
             runtime.GlobalSettings.Set("ProxyPort", 8118);

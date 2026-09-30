@@ -68,8 +68,14 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// <summary>C++ APPLICATION->m_detectedSDLPath; used by extraArguments().</summary>
     public string DetectedSDLPath { get; set; } = "";
 
-    /// <summary>C++ APPLICATION->metacache(); used for the library_directory profile variable.</summary>
+    /// <summary>C++ APPLICATION->metacache(); used for the library_directory profile variable,
+    /// the library/asset-index download caches and the metadata entities.</summary>
     public HttpMetaCache? MetaCache { get; set; }
+
+    /// <summary>Injected data-directory layout (assets/libraries/java roots, instgroups.json).
+    /// Null keeps the legacy CWD-anchored behavior for bare fixtures; hosts always set it
+    /// (InstanceList stamps it at discovery).</summary>
+    public FlintPaths? Paths { get; set; }
 
     public override void SaveNow()
     {
@@ -247,12 +253,12 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     public string ResourcesDir() => FileSystem.PathCombine(GameRoot(), "resources");
 
     /// <summary>QDir::current().absoluteFilePath("libraries").</summary>
-    public string LibrariesPath() => QDirAbsolutePath("libraries");
+    public string LibrariesPath() => Paths?.LibrariesRoot ?? QDirAbsolutePath("libraries");
 
     public string JarmodsPath() => JarModsDir();
 
     /// <summary>QDir::current().absoluteFilePath("versions").</summary>
-    public string VersionsPath() => QDirAbsolutePath("versions");
+    public string VersionsPath() => Paths?.VersionsRoot ?? QDirAbsolutePath("versions");
 
     public override string InstanceConfigFolder() => FileSystem.PathCombine(GameRoot(), "config");
 
@@ -1096,7 +1102,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
         var absRootDir = QDirAbsolutePath(GameRoot());
         result["game_directory"] = absRootDir;
-        var absAssetsDir = QDirAbsolutePath("assets/");
+        var absAssetsDir = Paths?.AssetsRoot ?? QDirAbsolutePath("assets/");
         var assets = profile.GetMinecraftAssets();
         result["game_assets"] = GetAssetsDir(assets.Id, ResourcesDir());
 
@@ -1296,9 +1302,9 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// Port of AssetsUtils::getAssetsDir reduced to the branch the profile variable mapping
     /// needs (only the index's "virtual" and "mapToResources" booleans are consulted).
     /// </summary>
-    private static string GetAssetsDir(string assetsId, string resourcesFolder)
+    private string GetAssetsDir(string assetsId, string resourcesFolder)
     {
-        var assetsDir = QDirAbsolutePath("assets/");
+        var assetsDir = Paths?.AssetsRoot ?? QDirAbsolutePath("assets/");
         var indexPath = FileSystem.PathCombine(assetsDir, "indexes", assetsId + ".json");
         var virtualRoot = FileSystem.PathCombine(assetsDir, "virtual", assetsId);
 

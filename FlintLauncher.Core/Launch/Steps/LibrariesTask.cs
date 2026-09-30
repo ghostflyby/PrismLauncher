@@ -118,8 +118,8 @@ public sealed class LibrariesTask : FlintTask
     }
 
     /// <summary>The C++ reaches APPLICATION->metacache(); the instance exposes the same cache
-    /// through its MetaCache hook ("libraries" base). A missing hook creates a throwaway cache
-    /// rooted at the cwd so local-only instance setups (no downloads) still work.</summary>
+    /// ("libraries" base, stamped by the composition root). A missing cache creates a
+    /// throwaway cache so local-only instance setups (no downloads) still work.</summary>
     private HttpMetaCache RequireLibraryCache()
     {
         if (_inst.MetaCache is not null)
@@ -127,7 +127,8 @@ public sealed class LibrariesTask : FlintTask
             return _inst.MetaCache;
         }
         var cache = new HttpMetaCache();
-        cache.AddBase("libraries", FileSystem.PathCombine(Directory.GetCurrentDirectory(), "libraries"));
+        cache.AddBase("libraries", _inst.Paths?.LibrariesRoot
+            ?? FileSystem.PathCombine(Directory.GetCurrentDirectory(), "libraries"));
         return cache;
     }
 }

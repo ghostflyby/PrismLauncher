@@ -35,8 +35,26 @@ public abstract class MetaEntity
 
     private FlintTask? _task;
 
-    /// <summary>The shared "meta" cache base (C++: APPLICATION->metacache(), base "meta").</summary>
+    /// <summary>The shared "meta" cache base (C++: APPLICATION->metacache(), base "meta").
+    /// Injection migration: the per-runtime cache is assigned via <see cref="SetMetaCache"/>
+    /// (propagated down the Index/VersionList/MetaVersion chain at entity adoption); the
+    /// static default remains only for bare test fixtures until the test phase removes it.</summary>
     public static readonly HttpMetaCache SharedCache = CreateSharedCache();
+
+    /// <summary>The cache this entity downloads through and resolves its local file under
+    /// (base "meta").</summary>
+    public HttpMetaCache Cache { get; private set; } = SharedCache;
+
+    /// <summary>Wire this entity (and its future children, via the adoption points) to a
+    /// runtime-owned cache.</summary>
+    public void SetMetaCache(HttpMetaCache cache) => Cache = cache;
+
+    /// <summary>Absolute path of a local metadata file under the "meta" base.</summary>
+    protected string MetaPath(string localFile)
+    {
+        var baseDir = Cache.GetBasePath("meta");
+        return baseDir.Length != 0 ? FileSystem.PathCombine(baseDir, localFile) : FileSystem.PathCombine("meta", localFile);
+    }
 
     private static HttpMetaCache CreateSharedCache()
     {
@@ -154,7 +172,7 @@ public abstract class MetaEntity
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            var fname = FileSystem.PathCombine("meta", _entity.LocalFilename());
+            var fname = _entity.MetaPath(_entity.LocalFilename());
             var hashMatches = false;
             // the file exists on disk try to load it
             if (File.Exists(fname))
@@ -213,7 +231,7 @@ public abstract class MetaEntity
                 return;
             }
 
-            var entry = SharedCache.ResolveEntry("meta", _entity.LocalFilename());
+            var entry = _entity.Cache.ResolveEntry("meta", _entity.LocalFilename());
             if (_forceReload)
             {
                 // clear validators so manual refreshes fetch a fresh body
@@ -222,7 +240,7 @@ public abstract class MetaEntity
             }
             entry.SetStale(true);
             // Net::ApiRequest::makeCached == makeCached + AddAPIHeaders
-            var dl = NetRequest.MakeCached(SharedCache, _entity.Url(), entry, RequestOptions.AddAPIHeaders);
+            var dl = NetRequest.MakeCached(_entity.Cache, _entity.Url(), entry, RequestOptions.AddAPIHeaders);
             /*
              * The validator parses the file and loads it into the object.
              * If that fails, the file is not written to storage.

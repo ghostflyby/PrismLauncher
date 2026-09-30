@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // The host's core-object wiring: the singletons a C++ Application object would own, built
-// once by WebHostBuilder against the resolved data dir (which is also the process working
-// directory — several core paths are CWD-relative).
+// once by WebHostBuilder against the resolved data dir. All paths come from the injected
+// FlintPaths — the process working directory is not load-bearing.
 using System.Text.Json.Nodes;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
@@ -15,16 +15,18 @@ namespace FlintLauncher.Web.Services;
 
 public sealed class LauncherRuntime
 {
-    public string DataDir { get; }
+    public FlintPaths Paths { get; }
+    public string DataDir => Paths.DataDir;
     public IniSettingsObject GlobalSettings { get; }
     public InstanceList Instances { get; }
     public AccountList Accounts { get; }
     public HttpMetaCache MetaCache { get; }
     public NewsChecker News { get; }
 
-    public LauncherRuntime(string dataDir)
+    public LauncherRuntime(FlintPaths paths)
     {
-        DataDir = dataDir;
+        Paths = paths;
+        var dataDir = paths.DataDir;
 
         // global config: flint.cfg first, importing an existing Prism/PolyMC config like the
         // C++ multi-path INISettingsObject ctor (fallbacks are copied to the preferred path)
@@ -36,26 +38,29 @@ public sealed class LauncherRuntime
         ]);
         GlobalSettingsRegistration.RegisterGlobalDefaults(GlobalSettings);
 
-        // meta cache (root of the CWD-relative library/asset paths)
-        MetaCache = new HttpMetaCache(Path.Combine(dataDir, "metacache.json"));
+        // meta cache (the shared download ledger for metadata, libraries, asset indexes)
+        MetaCache = new HttpMetaCache(paths.MetacacheFile);
         MetaCache.AddBase("root", dataDir);
-        MetaCache.AddBase("libraries", Path.Combine(dataDir, "libraries"));
-        MetaCache.AddBase("assets", Path.Combine(dataDir, "assets"));
-        MetaCache.AddBase("general", Path.Combine(dataDir, "cache"));
-        MetaCache.AddBase("icons", Path.Combine(dataDir, "cache", "icons"));
+        MetaCache.AddBase("meta", paths.MetaDir);
+        MetaCache.AddBase("libraries", paths.LibrariesRoot);
+        MetaCache.AddBase("assets", paths.AssetsRoot);
+        MetaCache.AddBase("general", paths.CacheDir);
+        MetaCache.AddBase("icons", Path.Combine(paths.CacheDir, "icons"));
         MetaCache.AddBase("screenshots", Path.Combine(dataDir, "screenshots"));
 
-        // instance list: <dataDir>/instances
-        var instancesDir = Path.Combine(dataDir, "instances");
-        Instances = new InstanceList(GlobalSettings, [instancesDir])
+        // instance list: <dataDir>/instances; discovered instances are stamped with the
+        // injected layout and cache (asset/library anchors, metadata entities)
+        Instances = new InstanceList(GlobalSettings, [paths.InstancesDir])
         {
             PlaytimeSettings = GlobalSettings,
+            Paths = paths,
+            MetaCache = MetaCache,
         };
         Instances.LoadList();
 
         // accounts: <dataDir>/accounts.json (autosaved on every change)
         Accounts = new AccountList();
-        Accounts.SetListFilePath(Path.Combine(dataDir, "accounts.json"), autosave: true);
+        Accounts.SetListFilePath(paths.AccountsFile, autosave: true);
         Accounts.LoadList();
 
         // news (feed URL overridable for hermetic API tests)

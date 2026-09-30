@@ -17,9 +17,6 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class LegacyFMLLibrariesTask : FlintTask
 {
-    /// <summary>C++ APPLICATION->metacache(); null creates a throwaway cache (see header).</summary>
-    public static Func<HttpMetaCache?>? MetaCacheHook { get; set; }
-
     /// <summary>C++ APPLICATION->settings()->get("LegacyFMLLibsURLOverride").</summary>
     public static Func<string>? LegacyFmllibsUrlOverride { get; set; }
 
@@ -169,12 +166,15 @@ public sealed class LegacyFMLLibrariesTask : FlintTask
 
     private HttpMetaCache RequireCache()
     {
-        if (MetaCacheHook?.Invoke() is { } shared)
+        // the composition root stamps the instance with the runtime cache; the throwaway
+        // fallback (no shared ledger) is for bare fixtures
+        if (_inst.MetaCache is { } shared)
         {
             return shared;
         }
         var cache = new HttpMetaCache();
-        cache.AddBase("fmllibs", FileSystem.PathCombine(Directory.GetCurrentDirectory(), "cache", "fmllibs"));
+        cache.AddBase("fmllibs", _inst.Paths?.FmllibsCacheDir
+            ?? FileSystem.PathCombine(Directory.GetCurrentDirectory(), "cache", "fmllibs"));
         return cache;
     }
 }

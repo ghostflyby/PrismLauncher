@@ -451,14 +451,6 @@ public static class JsonUtils
         return url;
     }
 
-    /// <summary>Port of requireIsType&lt;QDir&gt;: absolute path relative to the current directory.</summary>
-    public static string RequireDir(JsonElement value, string what = "Value")
-    {
-        var str = RequireString(value, what);
-        // FIXME upstream: does not handle invalid characters!
-        return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), str));
-    }
-
     /// <summary>
     /// Port of requireIsType&lt;QUuid&gt;: valid only when the string is exactly the
     /// canonical lowercase hyphenated form (QUuid round-trip check).
