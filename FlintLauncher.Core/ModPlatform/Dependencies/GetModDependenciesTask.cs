@@ -54,9 +54,10 @@ public class GetModDependenciesTask : SequentialTask
     public sealed record PackDependencyExtraInfo(bool MaybeInstalled, List<string> RequiredByNames, List<string> RequiredByIds);
 
     public GetModDependenciesTask(MinecraftInstance instance, ModFolderModel folder, List<PackDependency> selected,
-                                  ModrinthApi? modrinth = null)
+                                  ModrinthApi? modrinth = null, FlameApi? flame = null)
     {
         _selected = selected;
+        _flame = flame ?? new FlameApi();
         _version = new McVersion(instance.GetPackProfile().GetComponentVersion("net.minecraft"));
         _loaderType = instance.GetPackProfile().GetSupportedModLoaders() ?? ModLoaderType.None;
         _modrinth = modrinth ?? new ModrinthApi();
@@ -88,12 +89,13 @@ public class GetModDependenciesTask : SequentialTask
     private readonly McVersion _version;
     private readonly ModLoaderType _loaderType;
     private readonly ModrinthApi _modrinth;
+    private readonly FlameApi _flame;
 
     private ResourceApi GetApi(ResourceProvider provider)
     {
         if (provider == ResourceProvider.FLAME)
         {
-            return FlameApi.Instance;
+            return _flame;
         }
         return _modrinth;
     }
@@ -179,7 +181,7 @@ public class GetModDependenciesTask : SequentialTask
     {
         if (provider == ResourceProvider.FLAME)
         {
-            var (job, request) = FlameApi.Instance.GetProject(addonId);
+            var (job, request) = _flame.GetProject(addonId);
             return (job, request);
         }
         return _modrinth.GetProject(addonId);

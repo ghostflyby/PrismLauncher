@@ -27,6 +27,7 @@ namespace Flint.Tests;
 [Collection("FlameApi")]
 public class FlameApiTests : IDisposable
 {
+    private readonly FlameApi _flameApi = new();
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-flame-{Guid.NewGuid():N}");
     private readonly StubFlameServer _server = new();
     private readonly string _baseUrl;
@@ -35,13 +36,11 @@ public class FlameApiTests : IDisposable
     {
         Directory.CreateDirectory(_root);
         _baseUrl = _server.Url;
-        FlameConfig.BaseUrl = _baseUrl;
+        _flameApi.BaseUrl = _baseUrl;
     }
 
     public void Dispose()
     {
-        FlameConfig.BaseUrl = FlintConfig.Default.FlameBaseUrl;
-        FlameConfig.ApiKeyProvider = static () => FlintConfig.Default.FlameApiKey;
         _server.Dispose();
         try
         {
@@ -68,7 +67,7 @@ public class FlameApiTests : IDisposable
             CategoryIds = ["adventure"],
         };
 
-        var url = FlameApi.Instance.GetSearchURL(args);
+        var url = _flameApi.GetSearchURL(args);
 
         Assert.NotNull(url);
         Assert.StartsWith(_baseUrl + "/mods/search?gameId=432&", url);
@@ -87,9 +86,9 @@ public class FlameApiTests : IDisposable
     [Fact]
     public async Task Requests_SendApiKeyHeader()
     {
-        FlameConfig.ApiKeyProvider = static () => "user-supplied-key";
+        _flameApi.ApiKeyProvider = static () => "user-supplied-key";
 
-        var (job, _) = FlameApi.MatchFingerprints([123456]);
+        var (job, _) = _flameApi.MatchFingerprints([123456]);
         await job.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, job.State);
@@ -99,7 +98,7 @@ public class FlameApiTests : IDisposable
     [Fact]
     public async Task MatchFingerprints_PostsMurmur2List()
     {
-        var (job, request) = FlameApi.MatchFingerprints([123456789, 42]);
+        var (job, request) = _flameApi.MatchFingerprints([123456789, 42]);
         await job.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, job.State);
@@ -115,7 +114,7 @@ public class FlameApiTests : IDisposable
     [Fact]
     public async Task GetFiles_PostsFileIdList()
     {
-        var (job, _) = FlameApi.GetFiles(["456", "789"]);
+        var (job, _) = _flameApi.GetFiles(["456", "789"]);
         await job.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, job.State);
@@ -129,7 +128,7 @@ public class FlameApiTests : IDisposable
     [Fact]
     public async Task GetProjects_PostsModIdList()
     {
-        var (job, _) = FlameApi.Instance.GetProjects(["123", "222"]);
+        var (job, _) = _flameApi.GetProjects(["123", "222"]);
         await job.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, job.State);
@@ -144,7 +143,7 @@ public class FlameApiTests : IDisposable
     public async Task GetFile_FetchesSingleEndpoint()
     {
         _server.FileJson = FlamePayloads.FileJson(_server.Url, fileId: 456);
-        var (job, _) = FlameApi.GetFile("123", "456");
+        var (job, _) = _flameApi.GetFile("123", "456");
         await job.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, job.State);
@@ -154,10 +153,10 @@ public class FlameApiTests : IDisposable
     [Fact]
     public async Task ChangelogAndDescription_ReadDataField()
     {
-        Assert.Equal("changelog text", await FlameApi.GetModFileChangelog(123, 456));
+        Assert.Equal("changelog text", await _flameApi.GetModFileChangelog(123, 456));
         Assert.Equal(_baseUrl + "/mods/123/files/456/changelog", _server.LastPath);
 
-        Assert.Equal("description text", await FlameApi.GetModDescription(123));
+        Assert.Equal("description text", await _flameApi.GetModDescription(123));
         Assert.Equal(_baseUrl + "/mods/123/description", _server.LastPath);
     }
 
@@ -165,13 +164,13 @@ public class FlameApiTests : IDisposable
     public async Task Categories_UrlAndParsing()
     {
         _server.CategoriesJson = """{"data":[{"id":6,"name":"Mods"},{"id":4471,"name":"Modpacks"}]}""";
-        var (_, request) = FlameApi.GetCategories(ResourceType.Mod);
+        var (_, request) = _flameApi.GetCategories(ResourceType.Mod);
         await request.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, request.State);
         Assert.Equal(_baseUrl + "/categories?gameId=432&classId=6", _server.LastPath);
 
-        var categories = FlameApi.Instance.LoadModCategories(request.BodyAsString);
+        var categories = _flameApi.LoadModCategories(request.BodyAsString);
         Assert.Equal(2, categories.Count);
         Assert.Equal("Mods", categories[0].Name);
         Assert.Equal("6", categories[0].Id);
@@ -195,7 +194,7 @@ public class FlameApiTests : IDisposable
     [Fact]
     public void SortingMethods_ExposeCurseForgeOrder()
     {
-        var methods = FlameApi.Instance.GetSortingMethods();
+        var methods = _flameApi.GetSortingMethods();
         Assert.Equal(8, methods.Count);
         Assert.Equal("Featured", methods[0].Name);
         Assert.Equal("GameVersion", methods[7].Name);
@@ -206,17 +205,17 @@ public class FlameApiTests : IDisposable
     {
         var pack = new IndexedPack { AddonId = "123" };
 
-        var url = FlameApi.Instance.GetVersionsURL(new VersionSearchArgs { Pack = pack });
+        var url = _flameApi.GetVersionsURL(new VersionSearchArgs { Pack = pack });
         Assert.Equal(_baseUrl + "/mods/123/files?pageSize=10000", url);
 
-        url = FlameApi.Instance.GetVersionsURL(new VersionSearchArgs
+        url = _flameApi.GetVersionsURL(new VersionSearchArgs
         {
             Pack = pack,
             McVersions = [new McVersion("1.18.2")],
         });
         Assert.Equal(_baseUrl + "/mods/123/files?pageSize=10000&gameVersion=1.18.2", url);
 
-        url = FlameApi.Instance.GetVersionsURL(new VersionSearchArgs
+        url = _flameApi.GetVersionsURL(new VersionSearchArgs
         {
             Pack = pack,
             McVersions = [new McVersion("1.18.2")],
@@ -225,7 +224,7 @@ public class FlameApiTests : IDisposable
         Assert.Equal(_baseUrl + "/mods/123/files?pageSize=10000&gameVersion=1.18.2&modLoaderType=1", url);
 
         // multiple loaders -> no modLoaderType filter
-        url = FlameApi.Instance.GetVersionsURL(new VersionSearchArgs
+        url = _flameApi.GetVersionsURL(new VersionSearchArgs
         {
             Pack = pack,
             Loaders = ModLoaderType.Forge | ModLoaderType.Fabric,
@@ -446,7 +445,7 @@ public class FlameApiTests : IDisposable
         var manifest = new FlameManifest();
         manifest.Files[456] = new FlameFile { ProjectId = 123, FileId = 456 };
 
-        var task = new FileResolvingTask(manifest);
+        var task = new FileResolvingTask(manifest, flame: _flameApi);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -474,7 +473,7 @@ public class FlameApiTests : IDisposable
         var manifest = new FlameManifest();
         manifest.Files[456] = new FlameFile { ProjectId = 123, FileId = 456 };
 
-        var task = new FileResolvingTask(manifest) { FallbackMRBlockedMods = false };
+        var task = new FileResolvingTask(manifest, flame: _flameApi) { FallbackMRBlockedMods = false };
         await task.StartAsync();
 
         // the resolve succeeds; the blocked state is the *missing download URL*
@@ -497,7 +496,7 @@ public class FlameApiTests : IDisposable
         var manifest = new FlameManifest();
         manifest.Files[456] = new FlameFile { ProjectId = 123, FileId = 456 };
 
-        var task = new FileResolvingTask(manifest);
+        var task = new FileResolvingTask(manifest, flame: _flameApi);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);

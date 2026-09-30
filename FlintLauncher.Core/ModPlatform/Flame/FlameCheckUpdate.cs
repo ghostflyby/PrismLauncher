@@ -48,6 +48,7 @@ public sealed class FlameCheckUpdate : FlintTask
     private readonly List<ModLoaderType> _loadersList;
     private readonly Func<Resource, MetadataHandler.ModStruct?> _metadataLookup;
     private readonly IReadOnlyList<IndexedVersionType> _releaseTypes;
+    private readonly FlameApi _flame;
 
     private readonly Dictionary<Resource, string> _blocked = new();
 
@@ -57,8 +58,10 @@ public sealed class FlameCheckUpdate : FlintTask
                             IReadOnlyList<McVersion> mcVersions,
                             IReadOnlyList<ModLoaderType> loadersList,
                             Func<Resource, MetadataHandler.ModStruct?> metadataLookup,
-                            IReadOnlyList<IndexedVersionType>? releaseTypes = null)
+                            IReadOnlyList<IndexedVersionType>? releaseTypes = null,
+                            FlameApi? flame = null)
     {
+        _flame = flame ?? new FlameApi();
         _resources = resources;
         _gameVersions = mcVersions;
         _loadersList = [.. loadersList];
@@ -111,7 +114,7 @@ public sealed class FlameCheckUpdate : FlintTask
 
     private string? GetVersionsUrl(IndexedPack project)
     {
-        return FlameApi.Instance.GetVersionsURL(new VersionSearchArgs
+        return _flame.GetVersionsURL(new VersionSearchArgs
         {
             Pack = project,
             McVersions = _gameVersions.ToList(),
@@ -186,7 +189,7 @@ public sealed class FlameCheckUpdate : FlintTask
                 oldVersion = resource.Status == ResourceStatus.NotInstalled ? "Not installed" : "Unknown";
             }
 
-            var changelog = await FlameApi.GetModFileChangelog(
+            var changelog = await _flame.GetModFileChangelog(
                 int.Parse(latestVer.AddonId, CultureInfo.InvariantCulture),
                 int.Parse(latestVer.FileId, CultureInfo.InvariantCulture), cancellationToken);
 
@@ -234,11 +237,11 @@ public sealed class FlameCheckUpdate : FlintTask
         var single = addonIds.Count == 1;
         if (single)
         {
-            (projJob, projRequest) = FlameApi.Instance.GetProject(addonIds[0]);
+            (projJob, projRequest) = _flame.GetProject(addonIds[0]);
         }
         else
         {
-            (projJob, projRequest) = FlameApi.Instance.GetProjects(addonIds);
+            (projJob, projRequest) = _flame.GetProjects(addonIds);
         }
 
         await projJob.StartAsync(cancellationToken);

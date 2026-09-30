@@ -54,9 +54,11 @@ public sealed partial class FlameCreationTask : InstanceTask
                              string id = "",
                              string versionId = "",
                              ModrinthApi? modrinth = null,
-                             string originalInstanceId = "")
+                             string originalInstanceId = "",
+                             FlameApi? flame = null)
     {
         _modrinth = modrinth ?? new ModrinthApi();
+        _flame = flame ?? new FlameApi();
         StagingPath = stagingPath;
         TrustedSource = trustedSource;
         SetParentSettings(globalSettings ?? throw new ArgumentNullException(nameof(globalSettings)));
@@ -69,6 +71,7 @@ public sealed partial class FlameCreationTask : InstanceTask
 
     private readonly FlameManifest _pack = new();
     private readonly ModrinthApi _modrinth;
+    private readonly FlameApi _flame;
     private readonly string _managedId;
     private readonly string _managedVersionId;
 
@@ -312,7 +315,7 @@ public sealed partial class FlameCreationTask : InstanceTask
         _newInstance.SaveNow();
 
         // ---------------------------------------------------------- resolve + download
-        var modIdResolver = new FileResolvingTask(_pack, _modrinth);
+        var modIdResolver = new FileResolvingTask(_pack, _modrinth, _flame);
         EmitStatus("Resolving mod IDs...");
         await modIdResolver.StartAsync(cancellationToken);
         if (!modIdResolver.WasSuccessful)

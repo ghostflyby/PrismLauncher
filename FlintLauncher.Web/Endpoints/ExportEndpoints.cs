@@ -96,6 +96,7 @@ public static class ExportEndpoints
                             OptionalFiles = true,
                             Instance = instance,
                             Output = output,
+                            Flame = runtime.Flame,
                         });
                         break;
                     default:

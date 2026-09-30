@@ -24,17 +24,16 @@ namespace FlintLauncher.Tests;
 [Collection("FlameApi")]
 public class FlintApiFlameResourceTests : IDisposable
 {
+    private readonly FlameApi _flameApi = new();
     private readonly StubFlameServer _server = new();
 
     public FlintApiFlameResourceTests()
     {
-        FlameConfig.BaseUrl = _server.Url;
+        _flameApi.BaseUrl = _server.Url;
     }
 
     public void Dispose()
     {
-        FlameConfig.BaseUrl = FlintConfig.Default.FlameBaseUrl;
-        FlameConfig.ApiKeyProvider = static () => FlintConfig.Default.FlameApiKey;
         _server.Dispose();
     }
 
@@ -43,7 +42,7 @@ public class FlintApiFlameResourceTests : IDisposable
     {
         _server.SearchJson = """{"data":[]}""";
 
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
         var response = await host.GetAsync("/api/v1/modplatform/flame/search?type=shaderpacks&query=shaders");
         response.EnsureSuccessStatusCode();
 
@@ -56,7 +55,7 @@ public class FlintApiFlameResourceTests : IDisposable
     {
         _server.SearchJson = """{"data":[]}""";
 
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
         var response = await host.GetAsync("/api/v1/modplatform/flame/search?query=fabric");
         response.EnsureSuccessStatusCode();
 
@@ -70,7 +69,7 @@ public class FlintApiFlameResourceTests : IDisposable
     {
         _server.SearchJson = """{"data":[]}""";
 
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
         var response = await host.GetAsync("/api/v1/modplatform/flame/search?type=texturepacks");
         response.EnsureSuccessStatusCode();
 
@@ -80,7 +79,7 @@ public class FlintApiFlameResourceTests : IDisposable
     [Fact]
     public async Task Flame_Search_UnknownType_Is400()
     {
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
         var response = await host.GetAsync("/api/v1/modplatform/flame/search?type=floppies");
         Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
         var error = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
@@ -102,7 +101,7 @@ public class FlintApiFlameResourceTests : IDisposable
                 (JsonNode?)new JsonObject { ["id"] = 406, ["name"] = "Technology" }),
         }.ToJsonString();
 
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
         var response = await host.GetAsync("/api/v1/modplatform/flame/categories?type=mods");
         response.EnsureSuccessStatusCode();
         var categories = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
@@ -124,7 +123,7 @@ public class FlintApiFlameResourceTests : IDisposable
     {
         _server.CategoriesJson = """{"data":[]}""";
 
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
         var response = await host.GetAsync("/api/v1/modplatform/flame/categories?classId=1234");
         response.EnsureSuccessStatusCode();
         Assert.Equal(JsonValueKind.Array,
@@ -136,7 +135,7 @@ public class FlintApiFlameResourceTests : IDisposable
     [Fact]
     public async Task Flame_Description_WrapsBody()
     {
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
         var response = await host.GetAsync("/api/v1/modplatform/flame/mods/306612/description");
         response.EnsureSuccessStatusCode();
         var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
@@ -148,7 +147,7 @@ public class FlintApiFlameResourceTests : IDisposable
     [Fact]
     public async Task Flame_Changelog_RequiresFileId()
     {
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
         var missing = await host.GetAsync("/api/v1/modplatform/flame/mods/306612/changelog");
         Assert.Equal(System.Net.HttpStatusCode.BadRequest, missing.StatusCode);
 

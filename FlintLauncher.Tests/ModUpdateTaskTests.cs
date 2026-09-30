@@ -22,6 +22,7 @@ namespace Flint.Tests;
 [Collection("FlameApi")]
 public class ModUpdateTaskTests : IDisposable
 {
+    private readonly FlameApi _flameApi = new();
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-mod-update-{Guid.NewGuid():N}");
     private readonly StubFlameServer _server = new();
     private readonly ModInstallTestEnv _env;
@@ -29,13 +30,12 @@ public class ModUpdateTaskTests : IDisposable
     public ModUpdateTaskTests()
     {
         Directory.CreateDirectory(_root);
-        FlameConfig.BaseUrl = _server.Url;
+        _flameApi.BaseUrl = _server.Url;
         _env = new ModInstallTestEnv(_root);
     }
 
     public void Dispose()
     {
-        FlameConfig.BaseUrl = FlintConfig.Default.FlameBaseUrl;
         _server.Dispose();
         _env.Dispose();
     }
@@ -93,7 +93,7 @@ public class ModUpdateTaskTests : IDisposable
 
         // 1. check: the Flame update pass finds the newer file 789
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
-            resource => MetadataHandler.Get(IndexDir, "test-mod"));
+            resource => MetadataHandler.Get(IndexDir, "test-mod"), flame: _flameApi);
         await check.StartAsync();
         Assert.True(check.WasSuccessful, check.FailReason);
         var update = Assert.Single(check.GetUpdates());

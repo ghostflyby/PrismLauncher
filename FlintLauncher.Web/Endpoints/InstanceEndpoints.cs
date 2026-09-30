@@ -148,7 +148,7 @@ public static class InstanceEndpoints
             await runtime.InstanceLock.WaitAsync();
             try
             {
-                var importTask = new InstanceImportTask(uri, trustedSource: true, modrinth: runtime.Modrinth)
+                var importTask = new InstanceImportTask(uri, trustedSource: true, modrinth: runtime.Modrinth, flame: runtime.Flame)
                 {
                     MetaCache = runtime.MetaCache,
                     // the OptionalModDialog answers for mrpack/CurseForge packs (fix-2d):

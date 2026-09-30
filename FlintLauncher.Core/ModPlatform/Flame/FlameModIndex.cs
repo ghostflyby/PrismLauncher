@@ -136,9 +136,9 @@ public static class FlameMod
     }
 
     /// <summary>Port of FlameMod::loadBody (the description fetch; see the header note).</summary>
-    public static async Task LoadBodyAsync(IndexedPack pack, CancellationToken cancellationToken = default)
+    public static async Task LoadBodyAsync(IndexedPack pack, FlameApi flame, CancellationToken cancellationToken = default)
     {
-        pack.ExtraData.Body = await FlameApi.GetModDescription(
+        pack.ExtraData.Body = await flame.GetModDescription(
             int.Parse(pack.AddonId, CultureInfo.InvariantCulture), cancellationToken);
 
         if (pack.ExtraData.IssuesUrl.Length != 0 || pack.ExtraData.SourceUrl.Length != 0

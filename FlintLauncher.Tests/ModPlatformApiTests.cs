@@ -26,17 +26,16 @@ namespace FlintLauncher.Tests;
 [Collection("FlameApi")]
 public class FlintApiFlameSearchTests : IDisposable
 {
+    private readonly FlameApi _flameApi = new();
     private readonly StubFlameServer _server = new();
 
     public FlintApiFlameSearchTests()
     {
-        FlameConfig.BaseUrl = _server.Url;
+        _flameApi.BaseUrl = _server.Url;
     }
 
     public void Dispose()
     {
-        FlameConfig.BaseUrl = FlintConfig.Default.FlameBaseUrl;
-        FlameConfig.ApiKeyProvider = static () => FlintConfig.Default.FlameApiKey;
         _server.Dispose();
     }
 
@@ -61,10 +60,10 @@ public class FlintApiFlameSearchTests : IDisposable
     [Fact]
     public async Task Flame_Search_MapsHits_And_SendsApiKey()
     {
-        FlameConfig.ApiKeyProvider = static () => "user-supplied-key";
+        _flameApi.ApiKeyProvider = static () => "user-supplied-key";
         _server.SearchJson = new JsonObject { ["data"] = new JsonArray(JsonNode.Parse(SearchHitJson)!) }.ToJsonString();
 
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
         var response = await host.GetAsync(
             "/api/v1/modplatform/flame/search?query=fabric&version=1.18.2&loader=fabric&index=Popularity");
         response.EnsureSuccessStatusCode();
@@ -94,7 +93,7 @@ public class FlintApiFlameSearchTests : IDisposable
     {
         _server.SearchJson = """{"data":[]}""";
 
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
         var response = await host.GetAsync("/api/v1/modplatform/flame/search?query=anything");
         response.EnsureSuccessStatusCode();
         Assert.Equal(JsonValueKind.Array,
@@ -105,7 +104,7 @@ public class FlintApiFlameSearchTests : IDisposable
     [Fact]
     public async Task Flame_Search_UnsupportedLoader_Is400()
     {
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
         var response = await host.GetAsync("/api/v1/modplatform/flame/search?loader=babric");
         Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
         var error = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
@@ -118,6 +117,7 @@ public class FlintApiFlameSearchTests : IDisposable
 [Collection("ModrinthApi")]
 public class FlintApiVersionsTests : IDisposable
 {
+    private readonly FlameApi _flameApi = new();
     private readonly StubModrinthServer _modrinth = new();
     private readonly StubFlameServer _flame = new();
 
@@ -126,12 +126,11 @@ public class FlintApiVersionsTests : IDisposable
     public FlintApiVersionsTests()
     {
         _modrinthApi.BaseUrl = _modrinth.Url;
-        FlameConfig.BaseUrl = _flame.Url;
+        _flameApi.BaseUrl = _flame.Url;
     }
 
     public void Dispose()
     {
-        FlameConfig.BaseUrl = FlintConfig.Default.FlameBaseUrl;
         _modrinth.Dispose();
         _flame.Dispose();
     }
@@ -184,7 +183,7 @@ public class FlintApiVersionsTests : IDisposable
                 gameVersions: """["1.18.2", "forge"]"""))!),
         }.ToJsonString();
 
-        await using var host = await FlintApiHost.StartAsync(_modrinthApi);
+        await using var host = await FlintApiHost.StartAsync(_modrinthApi, _flameApi);
         var response = await host.GetAsync("/api/v1/modplatform/flame/versions?projectId=123");
         response.EnsureSuccessStatusCode();
         var versions = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;

@@ -258,6 +258,7 @@ public class GetModDependenciesTaskTests : IDisposable
 [Collection("FlameApi")]
 public class GetModDependenciesFlameTests : IDisposable
 {
+    private readonly FlameApi _flameApi = new();
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-deps-flame-{Guid.NewGuid():N}");
     private readonly StubFlameServer _server = new();
     private readonly ModInstallTestEnv _env;
@@ -265,13 +266,12 @@ public class GetModDependenciesFlameTests : IDisposable
     public GetModDependenciesFlameTests()
     {
         Directory.CreateDirectory(_root);
-        FlameConfig.BaseUrl = _server.Url;
+        _flameApi.BaseUrl = _server.Url;
         _env = new ModInstallTestEnv(_root);
     }
 
     public void Dispose()
     {
-        FlameConfig.BaseUrl = FlintConfig.Default.FlameBaseUrl;
         _server.Dispose();
         _env.Dispose();
     }
@@ -309,7 +309,7 @@ public class GetModDependenciesFlameTests : IDisposable
         };
 
         var task = new GetModDependenciesTask(instance, model,
-            [new GetModDependenciesTask.PackDependency(packA, verA)]);
+            [new GetModDependenciesTask.PackDependency(packA, verA)], flame: _flameApi);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);

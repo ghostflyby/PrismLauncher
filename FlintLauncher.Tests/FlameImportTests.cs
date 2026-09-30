@@ -19,6 +19,7 @@ namespace Flint.Tests;
 [Collection("FlameApi")]
 public class FlameImportTests : IDisposable
 {
+    private readonly FlameApi _flameApi = new();
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-flame-import-{Guid.NewGuid():N}");
     private readonly TestGlobalSettings _global = new();
     private readonly StubFlameServer _server = new();
@@ -29,14 +30,13 @@ public class FlameImportTests : IDisposable
     public FlameImportTests()
     {
         Directory.CreateDirectory(_root);
-        FlameConfig.BaseUrl = _server.Url;
+        _flameApi.BaseUrl = _server.Url;
         _downloadSha1 = Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(_downloadBytes))
             .ToLowerInvariant();
     }
 
     public void Dispose()
     {
-        FlameConfig.BaseUrl = FlintConfig.Default.FlameBaseUrl;
         _server.Dispose();
         try
         {
@@ -85,7 +85,7 @@ public class FlameImportTests : IDisposable
         Assert.True(pack.WriteZip(zipPath));
 
         var list = CreateList();
-        var task = new InstanceImportTask(new Uri(zipPath), trustedSource: true);
+        var task = new InstanceImportTask(new Uri(zipPath), trustedSource: true, flame: _flameApi);
         task.SetName("Flame Imported");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
@@ -140,7 +140,7 @@ public class FlameImportTests : IDisposable
         Assert.True(pack.WriteZip(zipPath));
         Assert.NotNull(FlintLauncher.Core.IO.MMCZip.ExtractDir(zipPath, "", staging));
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global);
+        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName("Fabric Flame");
         await task.StartAsync();
 
@@ -166,7 +166,7 @@ public class FlameImportTests : IDisposable
         Assert.True(pack.WriteZip(zipPath));
         Assert.NotNull(FlintLauncher.Core.IO.MMCZip.ExtractDir(zipPath, "", staging));
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global);
+        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName("Blocked Pack");
         await task.StartAsync();
 
@@ -195,7 +195,7 @@ public class FlameImportTests : IDisposable
         var localCopy = TempPath("local-test.jar");
         await File.WriteAllBytesAsync(localCopy, _downloadBytes);
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global)
+        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi)
         {
             // stand-in for the BlockedModsDialog matching step
             BlockedModLocalFileResolver = _ => localCopy,
@@ -224,7 +224,7 @@ public class FlameImportTests : IDisposable
         Assert.True(pack.WriteZip(zipPath));
         Assert.NotNull(FlintLauncher.Core.IO.MMCZip.ExtractDir(zipPath, "", staging));
 
-        var task = new FlameCreationTask(staging, trustedSource: false, _global);
+        var task = new FlameCreationTask(staging, trustedSource: false, _global, flame: _flameApi);
         task.SetName("Untrusted Pack");
         await task.StartAsync();
 
@@ -244,7 +244,7 @@ public class FlameImportTests : IDisposable
         Assert.True(pack.WriteZip(zipPath));
         Assert.NotNull(FlintLauncher.Core.IO.MMCZip.ExtractDir(zipPath, "", staging));
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global);
+        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName("Trusted Pack");
         await task.StartAsync();
 
@@ -263,7 +263,7 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(staging);
         File.WriteAllText(Path.Combine(staging, "manifest.json"), pack.ManifestJson);
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global);
+        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName("Unknown Loader");
         await task.StartAsync();
 
@@ -292,7 +292,7 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(outsideMarker);
         File.WriteAllText(Path.Combine(outsideMarker, "sentinel.txt"), "must stay");
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global);
+        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName("Traversal");
         await task.StartAsync();
 
@@ -316,7 +316,7 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(staging);
         File.WriteAllText(Path.Combine(staging, "manifest.json"), manifestObj.ToJsonString());
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global);
+        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName("Recommended");
         await task.StartAsync();
 
@@ -327,7 +327,7 @@ public class FlameImportTests : IDisposable
         var staging2 = TempPath("staging-recommended2");
         Directory.CreateDirectory(staging2);
         File.WriteAllText(Path.Combine(staging2, "manifest.json"), manifestObj.ToJsonString());
-        var task2 = new FlameCreationTask(staging2, trustedSource: true, _global);
+        var task2 = new FlameCreationTask(staging2, trustedSource: true, _global, flame: _flameApi);
         FlameCreationTask.RecommendedVersionLookup = (uid, loaderType, mcVersion) =>
         {
             Assert.Equal("net.minecraftforge", uid);
@@ -360,7 +360,7 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(staging);
         File.WriteAllText(Path.Combine(staging, "manifest.json"), pack.ManifestJson);
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global);
+        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName("Missing Overrides");
         await task.StartAsync();
 
@@ -376,7 +376,7 @@ public class FlameImportTests : IDisposable
         File.WriteAllText(Path.Combine(staging, "manifest.json"),
             """{"manifestType":"minecraftModpack","manifestVersion":9}""");
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global);
+        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName("Bad Manifest");
         await task.StartAsync();
 
@@ -399,7 +399,7 @@ public class FlameImportTests : IDisposable
         File.WriteAllText(Path.Combine(staging, "manifest.json"), manifestObj.ToJsonString());
 
         RegisterResolvedMod();
-        var task = new FlameCreationTask(staging, trustedSource: true, _global);
+        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName("Optional Pack");
         await task.StartAsync();
 

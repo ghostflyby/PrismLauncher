@@ -23,17 +23,31 @@ using FlintLauncher.Core.Minecraft;
 
 public sealed class FlameApi : ResourceApi
 {
-    private FlameApi()
-    {
-    }
+    /// <summary>BuildConfig.FLAME_BASE_URL (per-instance; tests construct a client pointed
+    /// at their stub).</summary>
+    public string BaseUrl { get; set; } = FlintConfig.Default.FlameBaseUrl;
 
-    private static FlameApi? _instance;
-    public static FlameApi Instance => _instance ??= new FlameApi();
+    /// <summary>BuildConfig.FLAME_DOWNLOAD_HOST (the mod file CDN).</summary>
+    public string DownloadHost { get; set; } = FlintConfig.Default.FlameDownloadHost;
+
+    /// <summary>
+    /// APPLICATION->getFlameAPIKey(). Flint ships no CurseForge key: the default reads
+    /// FlintConfig.FlameApiKey, which is empty unless the user overrides it.
+    /// </summary>
+    public Func<string> ApiKeyProvider { get; set; } = static () => FlintConfig.Default.FlameApiKey;
+
+    /// <summary>The network stack this client's requests go through.</summary>
+    public NetStack Net { get; }
+
+    public FlameApi(NetStack? net = null)
+    {
+        Net = net ?? NetStack.Default;
+    }
 
     // ------------------------------------------------------------------ requests
 
     /// <summary>Port of FlameAPI::matchFingerprints (POST /fingerprints, batch murmur2).</summary>
-    public static (NetJob Job, NetRequest Request) MatchFingerprints(IReadOnlyList<uint> fingerprints)
+    public (NetJob Job, NetRequest Request) MatchFingerprints(IReadOnlyList<uint> fingerprints)
     {
         var netJob = new NetJob("Flame::MatchFingerprints");
 
@@ -46,17 +60,17 @@ public sealed class FlameApi : ResourceApi
         bodyObj["fingerprints"] = fingerprintsArr;
 
         var bodyRaw = System.Text.Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
-        var request = MakeByteArrayRequest($"{FlameConfig.BaseUrl}/fingerprints", bodyRaw);
+        var request = MakeByteArrayRequest($"{BaseUrl}/fingerprints", bodyRaw);
         netJob.AddNetRequest(request);
         return (netJob, request);
     }
 
     /// <summary>Port of FlameAPI::getModFileChangelog (GET /mods/{id}/files/{fid}/changelog);
     /// returns "" when the request or the parse fails, like the C++ event-loop version.</summary>
-    public static async Task<string> GetModFileChangelog(int modId, int fileId,
+    public async Task<string> GetModFileChangelog(int modId, int fileId,
         CancellationToken cancellationToken = default)
     {
-        var request = MakeByteArrayRequest($"{FlameConfig.BaseUrl}/mods/{modId}/files/{fileId}/changelog");
+        var request = MakeByteArrayRequest($"{BaseUrl}/mods/{modId}/files/{fileId}/changelog");
         await request.StartAsync(cancellationToken);
         if (!request.WasSuccessful)
         {
@@ -73,9 +87,9 @@ public sealed class FlameApi : ResourceApi
     }
 
     /// <summary>Port of FlameAPI::getModDescription (GET /mods/{id}/description).</summary>
-    public static async Task<string> GetModDescription(int modId, CancellationToken cancellationToken = default)
+    public async Task<string> GetModDescription(int modId, CancellationToken cancellationToken = default)
     {
-        var request = MakeByteArrayRequest($"{FlameConfig.BaseUrl}/mods/{modId}/description");
+        var request = MakeByteArrayRequest($"{BaseUrl}/mods/{modId}/description");
         await request.StartAsync(cancellationToken);
         if (!request.WasSuccessful)
         {
@@ -105,7 +119,7 @@ public sealed class FlameApi : ResourceApi
         bodyObj["modIds"] = addonsArr;
 
         var bodyRaw = System.Text.Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
-        var request = MakeByteArrayRequest($"{FlameConfig.BaseUrl}/mods", bodyRaw);
+        var request = MakeByteArrayRequest($"{BaseUrl}/mods", bodyRaw);
         netJob.AddNetRequest(request);
         return (netJob, request);
     }
@@ -121,7 +135,7 @@ public sealed class FlameApi : ResourceApi
     }
 
     /// <summary>Port of FlameAPI::getFiles (POST /mods/files, multiple file ids).</summary>
-    public static (NetJob Job, NetRequest Request) GetFiles(IReadOnlyList<string> fileIds)
+    public (NetJob Job, NetRequest Request) GetFiles(IReadOnlyList<string> fileIds)
     {
         var netJob = new NetJob("Flame::GetFiles");
 
@@ -134,32 +148,32 @@ public sealed class FlameApi : ResourceApi
         bodyObj["fileIds"] = filesArr;
 
         var bodyRaw = System.Text.Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
-        var request = MakeByteArrayRequest($"{FlameConfig.BaseUrl}/mods/files", bodyRaw);
+        var request = MakeByteArrayRequest($"{BaseUrl}/mods/files", bodyRaw);
         netJob.AddNetRequest(request);
         return (netJob, request);
     }
 
     /// <summary>Port of FlameAPI::getFile (GET /mods/{addonId}/files/{fileId}).</summary>
-    public static (NetJob Job, NetRequest Request) GetFile(string addonId, string fileId)
+    public (NetJob Job, NetRequest Request) GetFile(string addonId, string fileId)
     {
         var netJob = new NetJob("Flame::GetFile");
-        var request = MakeByteArrayRequest($"{FlameConfig.BaseUrl}/mods/{addonId}/files/{fileId}");
+        var request = MakeByteArrayRequest($"{BaseUrl}/mods/{addonId}/files/{fileId}");
         netJob.AddNetRequest(request);
         return (netJob, request);
     }
 
     /// <summary>Port of FlameAPI::getCategories (GET /categories?gameId=432&classId=...).</summary>
-    public static (NetJob Job, NetRequest Request) GetCategories(ResourceType type)
+    public (NetJob Job, NetRequest Request) GetCategories(ResourceType type)
     {
         return GetCategoriesForClassId(GetClassId(type));
     }
 
     /// <summary>The raw-classId variant the categories endpoint uses (search hits carry a
     /// CurseForge classId that may not have a ResourceType in the map above).</summary>
-    public static (NetJob Job, NetRequest Request) GetCategoriesForClassId(int classId)
+    public (NetJob Job, NetRequest Request) GetCategoriesForClassId(int classId)
     {
         var netJob = new NetJob("Flame::GetCategories");
-        var request = MakeByteArrayRequest($"{FlameConfig.BaseUrl}/categories?gameId=432&classId={classId}");
+        var request = MakeByteArrayRequest($"{BaseUrl}/categories?gameId=432&classId={classId}");
         netJob.AddNetRequest(request);
         return (netJob, request);
     }
@@ -397,13 +411,13 @@ public sealed class FlameApi : ResourceApi
             getArguments.Add($"gameVersion={versions[0]}");
         }
 
-        return FlameConfig.BaseUrl + "/mods/search?gameId=432&" + string.Join("&", getArguments);
+        return BaseUrl + "/mods/search?gameId=432&" + string.Join("&", getArguments);
     }
 
     public override string? GetVersionsURL(VersionSearchArgs args)
     {
         var addonId = args.Pack.AddonId;
-        var url = $"{FlameConfig.BaseUrl}/mods/{addonId}/files?pageSize=10000";
+        var url = $"{BaseUrl}/mods/{addonId}/files?pageSize=10000";
 
         if (args.McVersions is { } mcVersions)
         {
@@ -419,12 +433,12 @@ public sealed class FlameApi : ResourceApi
         return url;
     }
 
-    public override string? GetInfoURL(string id) => $"{FlameConfig.BaseUrl}/mods/{id}";
+    public override string? GetInfoURL(string id) => $"{BaseUrl}/mods/{id}";
 
     public override string? GetDependencyURL(DependencySearchArgs args)
     {
         var addonId = args.Dependency.AddonId;
-        var url = $"{FlameConfig.BaseUrl}/mods/{addonId}/files?pageSize=10000&gameVersion={args.McVersion}";
+        var url = $"{BaseUrl}/mods/{addonId}/files?pageSize=10000&gameVersion={args.McVersion}";
         if (args.Loader != 0 && ModIndex.HasSingleModLoaderSelected(args.Loader))
         {
             var mappedModLoader = GetMappedModLoader(args.Loader);
@@ -479,31 +493,31 @@ public sealed class FlameApi : ResourceApi
 
     /// <summary>Port of the FlameAPI::loadExtraPackInfo override (see FlameMod.LoadBodyAsync).</summary>
     public Task LoadExtraPackInfoAsync(IndexedPack pack, CancellationToken cancellationToken = default)
-        => FlameMod.LoadBodyAsync(pack, cancellationToken);
+        => FlameMod.LoadBodyAsync(pack, this, cancellationToken);
 
     // ---------------------------------------------------------------- plumbing
 
     /// <summary>The x-api-key header the C++ ApiHeaderProxy attaches to Flame API requests
     /// (only sent when a key is configured; see FlameConfig for the shipping story).</summary>
-    public static void AddApiKeyHeader(NetRequest request)
+    public void AddApiKeyHeader(NetRequest request)
     {
-        var key = FlameConfig.ApiKeyProvider();
+        var key = ApiKeyProvider();
         if (key.Length != 0)
         {
             request.AddHeader("x-api-key", key);
         }
     }
 
-    private static NetRequest MakeByteArrayRequest(string url)
+    private NetRequest MakeByteArrayRequest(string url)
     {
-        var request = NetRequest.MakeByteArray(new Uri(url));
+        var request = NetRequest.MakeByteArray(new Uri(url), stack: Net);
         AddApiKeyHeader(request);
         return request;
     }
 
-    private static NetRequest MakeByteArrayRequest(string url, byte[] postData)
+    private NetRequest MakeByteArrayRequest(string url, byte[] postData)
     {
-        var request = NetRequest.MakeByteArray(new Uri(url), postData);
+        var request = NetRequest.MakeByteArray(new Uri(url), postData, stack: Net);
         AddApiKeyHeader(request);
         return request;
     }

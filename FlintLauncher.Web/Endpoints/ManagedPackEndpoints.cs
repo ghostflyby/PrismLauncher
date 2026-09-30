@@ -81,7 +81,7 @@ public static class ManagedPackEndpoints
                     : ResourceProvider.MODRINTH;
                 var loadersList = profile.GetModLoadersList();
                 var resolver = new ModSelectionResolver(new McVersion(mcVersion),
-                    profile.GetModLoaders() ?? ModLoaderType.None, loadersList, runtime.Modrinth);
+                    profile.GetModLoaders() ?? ModLoaderType.None, loadersList, runtime.Modrinth, runtime.Flame);
                 IndexedVersion latest;
                 try
                 {

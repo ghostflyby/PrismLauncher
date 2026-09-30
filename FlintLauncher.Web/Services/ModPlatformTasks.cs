@@ -84,9 +84,10 @@ public static class ModPlatformTasks
 /// (IndexedPack, IndexedVersion) pairs: project info through the provider getProject, the
 /// version either pinned by id or the latest one matching the instance's mc version/loader.
 /// </summary>
-public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType loaders, IReadOnlyList<ModLoaderType> loaderList, ModrinthApi? modrinth = null)
+public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType loaders, IReadOnlyList<ModLoaderType> loaderList, ModrinthApi? modrinth = null, FlameApi? flame = null)
 {
     private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
+    private readonly FlameApi _flame = flame ?? new FlameApi();
 
     public async Task<(IndexedPack Pack, IndexedVersion Version)> ResolveAsync(
         ResourceProvider provider, string projectId, string versionId, CancellationToken cancellationToken)
@@ -95,7 +96,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
 
         if (provider == ResourceProvider.FLAME)
         {
-            var (job, request) = FlameApi.Instance.GetProject(projectId);
+            var (job, request) = _flame.GetProject(projectId);
             await job.StartAsync(cancellationToken);
             if (!job.WasSuccessful)
             {
@@ -166,7 +167,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         {
             if (provider == ResourceProvider.FLAME)
             {
-                var (job, request) = FlameApi.GetFile(projectId, versionId);
+                var (job, request) = _flame.GetFile(projectId, versionId);
                 await job.StartAsync(cancellationToken);
                 if (!job.WasSuccessful)
                 {
@@ -208,7 +209,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
     {
         var args = new VersionSearchArgs { Pack = pack, McVersions = [mcVersion] };
         var url = provider == ResourceProvider.FLAME
-            ? FlameApi.Instance.GetVersionsURL(args)
+            ? _flame.GetVersionsURL(args)
             : _modrinth.GetVersionsURL(new VersionSearchArgs
             {
                 Pack = pack,
@@ -308,15 +309,17 @@ public sealed class ModInstallTask : FlintTask
     private readonly List<ModLoaderType> _loaderList;
     private readonly List<ModInstallEntryView> _installed = [];
     private readonly ModrinthApi _modrinth;
+    private readonly FlameApi _flame;
 
     /// <summary>The entries for the task view's optional result payload.</summary>
     public TaskResultView BuildResult() => new(null, _installed);
 
     public ModInstallTask(MinecraftInstance instance, ModFolderModel folder,
         IReadOnlyList<ModInstallRequest> selections, string mcVersion, ModLoaderType loaders,
-        ModrinthApi? modrinth = null)
+        ModrinthApi? modrinth = null, FlameApi? flame = null)
     {
         _modrinth = modrinth ?? new ModrinthApi();
+        _flame = flame ?? new FlameApi();
         _instance = instance;
         _folder = folder;
         _selections = selections;
@@ -333,7 +336,7 @@ public sealed class ModInstallTask : FlintTask
         var selected = new List<GetModDependenciesTask.PackDependency>();
         try
         {
-            var resolver = new ModSelectionResolver(_mcVersion, _loaders, _loaderList, _modrinth);
+            var resolver = new ModSelectionResolver(_mcVersion, _loaders, _loaderList, _modrinth, _flame);
             var current = 0;
             foreach (var selection in _selections)
             {
@@ -436,12 +439,14 @@ public sealed class ModsUpdateTask : FlintTask
     private readonly IReadOnlyList<IndexedVersionType>? _releaseTypes;
     private readonly List<PendingUpdate> _updates = [];
     private readonly ModrinthApi _modrinth;
+    private readonly FlameApi _flame;
 
     public ModsUpdateTask(MinecraftInstance instance, ModFolderModel folder, IReadOnlyList<string>? filter,
         IReadOnlyList<IndexedVersionType>? releaseTypes = null,
-        ModrinthApi? modrinth = null)
+        ModrinthApi? modrinth = null, FlameApi? flame = null)
     {
         _modrinth = modrinth ?? new ModrinthApi();
+        _flame = flame ?? new FlameApi();
         _instance = instance;
         _folder = folder;
         _filter = filter;

@@ -52,6 +52,7 @@ public sealed class FlamePackExportTask : FlintTask
         public required string Output { get; init; }
         public MMCZip.FilterFunction? Filter { get; init; }
         public int RecommendedRam { get; init; }
+        public FlameApi? Flame { get; init; }
     }
 
     private sealed class ResolvedFile
@@ -75,6 +76,7 @@ public sealed class FlamePackExportTask : FlintTask
 
     private readonly Options _options;
     private readonly string _gameRoot;
+    private readonly FlameApi _flame;
 
     private readonly List<string> _files = [];
     private readonly Dictionary<string, HashInfo> _pendingHashes = new(StringComparer.Ordinal);
@@ -84,6 +86,7 @@ public sealed class FlamePackExportTask : FlintTask
     {
         _options = options;
         _gameRoot = options.Instance.GameRoot();
+        _flame = options.Flame ?? new FlameApi();
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -208,7 +211,7 @@ public sealed class FlamePackExportTask : FlintTask
             }
         }
 
-        var (matchJob, response) = FlameApi.MatchFingerprints(fingerprints);
+        var (matchJob, response) = _flame.MatchFingerprints(fingerprints);
         await matchJob.StartAsync(cancellationToken);
         if (matchJob.WasSuccessful)
         {
@@ -307,11 +310,11 @@ public sealed class FlamePackExportTask : FlintTask
         var single = addonIds.Count == 1;
         if (single)
         {
-            (projJob, projRequest) = FlameApi.Instance.GetProject(addonIds[0]);
+            (projJob, projRequest) = _flame.GetProject(addonIds[0]);
         }
         else
         {
-            (projJob, projRequest) = FlameApi.Instance.GetProjects(addonIds);
+            (projJob, projRequest) = _flame.GetProjects(addonIds);
         }
 
         await projJob.StartAsync(cancellationToken);

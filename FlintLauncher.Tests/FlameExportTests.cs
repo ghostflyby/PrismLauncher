@@ -18,6 +18,7 @@ namespace Flint.Tests;
 [Collection("FlameApi")]
 public class FlameExportTests : IDisposable
 {
+    private readonly FlameApi _flameApi = new();
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-flame-export-{Guid.NewGuid():N}");
     private readonly TestGlobalSettings _global = new();
     private readonly StubFlameServer _server = new();
@@ -26,12 +27,11 @@ public class FlameExportTests : IDisposable
     public FlameExportTests()
     {
         Directory.CreateDirectory(_root);
-        FlameConfig.BaseUrl = _server.Url;
+        _flameApi.BaseUrl = _server.Url;
     }
 
     public void Dispose()
     {
-        FlameConfig.BaseUrl = FlintConfig.Default.FlameBaseUrl;
         _server.Dispose();
         try
         {
@@ -65,7 +65,7 @@ public class FlameExportTests : IDisposable
         Directory.CreateDirectory(staging);
         Assert.NotNull(FlintLauncher.Core.IO.MMCZip.ExtractDir(zipPath, "", staging));
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global);
+        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName(name);
         await task.StartAsync();
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -103,6 +103,7 @@ public class FlameExportTests : IDisposable
         var output = TempPath("exported.zip");
         var export = new FlamePackExportTask(new FlamePackExportTask.Options
         {
+            Flame = _flameApi,
             Name = "Exported Pack",
             Version = "2.0.0",
             Author = "exporter",
@@ -186,6 +187,7 @@ public class FlameExportTests : IDisposable
         var output = TempPath("exported-unresolved.zip");
         var export = new FlamePackExportTask(new FlamePackExportTask.Options
         {
+            Flame = _flameApi,
             Name = "Exported Pack",
             Version = "2.0.0",
             Author = "exporter",

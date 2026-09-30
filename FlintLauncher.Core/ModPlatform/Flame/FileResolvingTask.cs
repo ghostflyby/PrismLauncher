@@ -37,11 +37,13 @@ public sealed class FileResolvingTask : FlintTask
 {
     private readonly FlameManifest _manifest;
     private readonly ModrinthApi _modrinth;
+    private readonly FlameApi _flame;
 
-    public FileResolvingTask(FlameManifest toProcess, ModrinthApi? modrinth = null)
+    public FileResolvingTask(FlameManifest toProcess, ModrinthApi? modrinth = null, FlameApi? flame = null)
     {
         _manifest = toProcess;
         _modrinth = modrinth ?? new ModrinthApi();
+        _flame = flame ?? new FlameApi();
     }
 
     public FlameManifest GetResults() => _manifest;
@@ -65,7 +67,7 @@ public sealed class FileResolvingTask : FlintTask
 
         var fileIds = _manifest.Files.Values
             .Select(f => f.FileId.ToString(CultureInfo.InvariantCulture)).ToList();
-        var (job, response) = FlameApi.GetFiles(fileIds);
+        var (job, response) = _flame.GetFiles(fileIds);
         await job.StartAsync(cancellationToken);
         if (!job.WasSuccessful)
         {
@@ -197,7 +199,7 @@ public sealed class FileResolvingTask : FlintTask
         var addonIds = _manifest.Files.Values
             .Select(f => f.ProjectId.ToString(CultureInfo.InvariantCulture)).ToList();
 
-        var (job, response) = FlameApi.Instance.GetProjects(addonIds);
+        var (job, response) = _flame.GetProjects(addonIds);
         await job.StartAsync(cancellationToken);
         if (!job.WasSuccessful)
         {

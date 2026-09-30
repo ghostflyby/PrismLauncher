@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using Xunit;
 
@@ -16,6 +17,7 @@ namespace Flint.Tests;
 [Collection("FlameApi")]
 public class FtbTests : IDisposable
 {
+    private readonly FlameApi _flameApi = new();
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-ftb-{Guid.NewGuid():N}");
     private readonly TestGlobalSettings _global = new();
     private readonly StubFtbServer _server = new();
@@ -27,13 +29,12 @@ public class FtbTests : IDisposable
         Directory.CreateDirectory(_root);
         FtbApi.BaseUrl = _server.Url;
         // the FTB install resolves CurseForge-only files through the Flame layer
-        FlintLauncher.Core.ModPlatform.Flame.FlameConfig.BaseUrl = _flameServer.Url;
+        _flameApi.BaseUrl = _flameServer.Url;
     }
 
     public void Dispose()
     {
         FtbApi.BaseUrl = FlintLauncher.Core.FlintConfig.Default.FtbApiBaseUrl;
-        FlintLauncher.Core.ModPlatform.Flame.FlameConfig.BaseUrl = FlintLauncher.Core.FlintConfig.Default.FlameBaseUrl;
         _server.Dispose();
         _flameServer.Dispose();
         try
@@ -200,7 +201,7 @@ public class FtbTests : IDisposable
         SetupFlameResolution();
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0");
+        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _flameApi);
         task.SetName("FTB Imported");
         task.SetIcon("ftb_logo");
         var wrapped = list.WrapInstanceTask(task);
@@ -240,7 +241,7 @@ public class FtbTests : IDisposable
         _server.Downloads["testmod.jar"] = "corrupted payload!!"u8.ToArray();
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0");
+        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _flameApi);
         task.SetName("FTB Sha1");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
@@ -259,7 +260,7 @@ public class FtbTests : IDisposable
         SetupFlameResolution(downloadUrlPath: null);
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0");
+        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _flameApi);
         task.SetName("FTB Blocked");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
@@ -283,7 +284,7 @@ public class FtbTests : IDisposable
         await File.WriteAllBytesAsync(localPath, _cfBytes);
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0")
+        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _flameApi)
         {
             BlockedModLocalFileResolver = _ => localPath,
         };

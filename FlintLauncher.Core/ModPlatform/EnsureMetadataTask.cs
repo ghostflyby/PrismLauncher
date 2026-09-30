@@ -28,16 +28,18 @@ public sealed class EnsureMetadataTask : FlintTask
     private readonly string _indexDir;
     private readonly ResourceProvider _provider;
     private readonly ModrinthApi _modrinth;
+    private readonly FlameApi _flame;
     private readonly Dictionary<string, IndexedVersion> _tempVersions = new(StringComparer.Ordinal);
     private bool _lockUpdate;
 
     public EnsureMetadataTask(Dictionary<string, Resource> resources, string indexDir, ResourceProvider provider,
-                              ModrinthApi? modrinth = null)
+                              ModrinthApi? modrinth = null, FlameApi? flame = null)
     {
         _resources = resources;
         _indexDir = indexDir;
         _provider = provider;
         _modrinth = modrinth ?? new ModrinthApi();
+        _flame = flame ?? new FlameApi();
     }
 
     /// <summary>Port of EnsureMetadataTask::setUpdateLock: whether the metadata written by
@@ -241,7 +243,7 @@ public sealed class EnsureMetadataTask : FlintTask
             }
         }
 
-        var (job, request) = FlameApi.MatchFingerprints(fingerprints);
+        var (job, request) = _flame.MatchFingerprints(fingerprints);
         await job.StartAsync(cancellationToken);
         if (!job.WasSuccessful)
         {
@@ -329,12 +331,12 @@ public sealed class EnsureMetadataTask : FlintTask
         bool multiple;
         if (addonIds.Count == 1)
         {
-            (projectJob, projectRequest) = FlameApi.Instance.GetProject(addonIds.Keys.First());
+            (projectJob, projectRequest) = _flame.GetProject(addonIds.Keys.First());
             multiple = false;
         }
         else
         {
-            (projectJob, projectRequest) = FlameApi.Instance.GetProjects(addonIds.Keys.ToList());
+            (projectJob, projectRequest) = _flame.GetProjects(addonIds.Keys.ToList());
             multiple = true;
         }
 

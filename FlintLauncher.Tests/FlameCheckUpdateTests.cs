@@ -20,18 +20,18 @@ namespace Flint.Tests;
 [Collection("FlameApi")]
 public class FlameCheckUpdateTests : IDisposable
 {
+    private readonly FlameApi _flameApi = new();
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-flame-update-{Guid.NewGuid():N}");
     private readonly StubFlameServer _server = new();
 
     public FlameCheckUpdateTests()
     {
         Directory.CreateDirectory(_root);
-        FlameConfig.BaseUrl = _server.Url;
+        _flameApi.BaseUrl = _server.Url;
     }
 
     public void Dispose()
     {
-        FlameConfig.BaseUrl = FlintConfig.Default.FlameBaseUrl;
         _server.Dispose();
         try
         {
@@ -89,7 +89,7 @@ public class FlameCheckUpdateTests : IDisposable
         }.ToJsonString();
 
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
-            resource => MetadataHandler.Get(Path.Combine(TempPath("mods"), ".index"), "test-mod"));
+            resource => MetadataHandler.Get(Path.Combine(TempPath("mods"), ".index"), "test-mod"), flame: _flameApi);
 
         var failures = new List<(Resource Resource, string Reason, string RecoverUrl)>();
         check.CheckFailed += (resource, reason, recoverUrl) => failures.Add((resource, reason, recoverUrl));
@@ -124,7 +124,7 @@ public class FlameCheckUpdateTests : IDisposable
         }.ToJsonString();
 
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
-            resource => MetadataHandler.Get(Path.Combine(TempPath("mods"), ".index"), "test-mod"));
+            resource => MetadataHandler.Get(Path.Combine(TempPath("mods"), ".index"), "test-mod"), flame: _flameApi);
         await check.StartAsync();
 
         Assert.True(check.WasSuccessful, check.FailReason);
@@ -150,7 +150,7 @@ public class FlameCheckUpdateTests : IDisposable
         }.ToJsonString();
 
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
-            resource => MetadataHandler.Get(Path.Combine(TempPath("mods"), ".index"), "test-mod"));
+            resource => MetadataHandler.Get(Path.Combine(TempPath("mods"), ".index"), "test-mod"), flame: _flameApi);
 
         var failures = new List<(Resource Resource, string Reason, string RecoverUrl)>();
         check.CheckFailed += (resource, reason, recoverUrl) => failures.Add((resource, reason, recoverUrl));
@@ -180,7 +180,7 @@ public class FlameCheckUpdateTests : IDisposable
         }.ToJsonString();
 
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
-            resource => MetadataHandler.Get(Path.Combine(TempPath("mods"), ".index"), "test-mod"));
+            resource => MetadataHandler.Get(Path.Combine(TempPath("mods"), ".index"), "test-mod"), flame: _flameApi);
 
         var failures = new List<(Resource Resource, string Reason, string RecoverUrl)>();
         check.CheckFailed += (resource, reason, recoverUrl) => failures.Add((resource, reason, recoverUrl));

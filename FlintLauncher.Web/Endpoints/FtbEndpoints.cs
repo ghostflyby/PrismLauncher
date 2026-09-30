@@ -130,7 +130,7 @@ public static class FtbEndpoints
                         ?? wanted.ToString()
                     : pack.Versions.Count != 0 ? pack.Versions[0].Name : "";
 
-                var task = new FtbPackInstallTask(pack, versionName)
+                var task = new FtbPackInstallTask(pack, versionName, runtime.Flame)
                 {
                     Group = request.Group ?? "",
                 };

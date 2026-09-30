@@ -13,6 +13,7 @@
 //  - downloadFiles() (the P5 update pipeline) is not ported; creation succeeds without
 //    fetching game files, like the other creation tasks.
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
@@ -21,13 +22,15 @@ namespace FlintLauncher.Core.ModPlatform.Ftb;
 
 public sealed class FtbPackInstallTask : InstanceTask
 {
-    public FtbPackInstallTask(FtbModpack pack, string versionName)
+    public FtbPackInstallTask(FtbModpack pack, string versionName, FlameApi? flame = null)
     {
         _pack = pack;
         _versionName = versionName;
+        _flame = flame ?? new FlameApi();
     }
 
     private readonly FtbModpack _pack;
+    private readonly FlameApi _flame;
     private readonly string _versionName;
 
     private readonly FtbVersion _version = new();
@@ -138,7 +141,7 @@ public sealed class FtbPackInstallTask : InstanceTask
             }
         }
 
-        var modIdResolverTask = new Flame.FileResolvingTask(manifest);
+        var modIdResolverTask = new Flame.FileResolvingTask(manifest, flame: _flame);
 
         EmitStatus("Resolving mods...");
         await modIdResolverTask.StartAsync(cancellationToken);

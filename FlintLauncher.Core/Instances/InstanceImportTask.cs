@@ -39,6 +39,7 @@ public sealed partial class InstanceImportTask : InstanceTask
 
     private readonly Uri _sourceUrl;
     private readonly ModrinthApi _modrinth;
+    private readonly FlameApi _flame;
     private readonly bool _trustedSource;
     private readonly IReadOnlyDictionary<string, string> _extraInfo;
     private string _archivePath = "";
@@ -57,9 +58,10 @@ public sealed partial class InstanceImportTask : InstanceTask
 
     public InstanceImportTask(Uri sourceUrl, bool trustedSource,
                               IReadOnlyDictionary<string, string>? extraInfo = null,
-                              ModrinthApi? modrinth = null)
+                              ModrinthApi? modrinth = null, FlameApi? flame = null)
     {
         _modrinth = modrinth ?? new ModrinthApi();
+        _flame = flame ?? new FlameApi();
         _sourceUrl = sourceUrl;
         _trustedSource = trustedSource;
         _extraInfo = extraInfo ?? new Dictionary<string, string>();
@@ -218,7 +220,7 @@ public sealed partial class InstanceImportTask : InstanceTask
         }
 
         var instCreationTask = new FlameCreationTask(StagingPath, _trustedSource, GlobalSettings, packId,
-            packVersionId, _modrinth)
+            packVersionId, _modrinth, flame: _flame)
         {
             OptionalModsSelection = OptionalModsSelection,
         };

@@ -65,7 +65,7 @@ public static class ModPlatformEndpoints
                 return ApiJson.Error("invalid_type", unsupportedReason, 400);
             }
             return parsedProvider == ResourceProvider.FLAME
-                ? await FlameSearchAsync(resourceType, query, version, loader, index, offset)
+                ? await FlameSearchAsync(resourceType, query, version, loader, index, offset, runtime)
                 : await ModrinthSearchAsync(resourceType, query, version, loader, index, offset, runtime);
         });
 
@@ -105,8 +105,8 @@ public static class ModPlatformEndpoints
                     effectiveClassId = FlameApi.GetClassId(resourceType);
                 }
 
-                var (_, flameRequest) = FlameApi.GetCategoriesForClassId(effectiveClassId);
-                FlameApi.AddApiKeyHeader(flameRequest);
+                var (_, flameRequest) = runtime.Flame.GetCategoriesForClassId(effectiveClassId);
+                runtime.Flame.AddApiKeyHeader(flameRequest);
                 await flameRequest.StartAsync();
                 if (flameRequest.State != Core.Tasks.TaskState.Succeeded)
                 {
@@ -154,7 +154,7 @@ public static class ModPlatformEndpoints
                 {
                     return ApiJson.Error("invalid_request", "'projectId' must be a CurseForge project id", 400);
                 }
-                body = await FlameApi.GetModDescription(modId);
+                body = await runtime.Flame.GetModDescription(modId);
             }
             else
             {
@@ -166,7 +166,8 @@ public static class ModPlatformEndpoints
 
         // ------------------------------------------------ modplatform/{provider}/mods/{projectId}/changelog
         api.MapGet("/modplatform/{provider}/mods/{projectId}/changelog",
-            async Task<IResult> (string provider, string projectId, string? fileId) =>
+            async Task<IResult> (string provider, string projectId, string? fileId,
+            LauncherRuntime runtime) =>
         {
             if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
             {
@@ -187,7 +188,7 @@ public static class ModPlatformEndpoints
                 return ApiJson.Error("invalid_request", "'projectId' must be a CurseForge project id", 400);
             }
 
-            var body = await FlameApi.GetModFileChangelog(modId, fileIdNum);
+            var body = await runtime.Flame.GetModFileChangelog(modId, fileIdNum);
             return Results.Ok(new ProviderBodyView(body));
         });
 
@@ -206,7 +207,7 @@ public static class ModPlatformEndpoints
             }
 
             var url = parsedProvider == ResourceProvider.FLAME
-                ? FlameApi.Instance.GetVersionsURL(new VersionSearchArgs
+                ? runtime.Flame.GetVersionsURL(new VersionSearchArgs
                 {
                     Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.FLAME },
                 })
@@ -224,7 +225,7 @@ public static class ModPlatformEndpoints
             // builders the core API methods use
             if (parsedProvider == ResourceProvider.FLAME)
             {
-                FlameApi.AddApiKeyHeader(request);
+                runtime.Flame.AddApiKeyHeader(request);
             }
             else
             {
@@ -375,7 +376,7 @@ public static class ModPlatformEndpoints
                 }
 
                 var task = new ModInstallTask(instance, instance.LoaderModList(), requests,
-                    mcVersion, profile.GetSupportedModLoaders() ?? ModLoaderType.None, runtime.Modrinth);
+                    mcVersion, profile.GetSupportedModLoaders() ?? ModLoaderType.None, runtime.Modrinth, runtime.Flame);
                 var entry = registry.Register("mods-install", task, instanceId: instance.Id());
                 // the result payload lists the installed entries (selected + dependencies);
                 // published on terminal events so a download failure still shows what landed
@@ -411,7 +412,7 @@ public static class ModPlatformEndpoints
                         : IndexedVersionType.FromStringList(JsonUtils.ToStringList(
                             runtime.GlobalSettings.Get("ModUpdateReleaseTypes")?.ToString() ?? "[]"));
 
-                var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, releaseTypes, runtime.Modrinth);
+                var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, releaseTypes, runtime.Modrinth, runtime.Flame);
                 var entry = registry.Register("mods-update", task, instanceId: instance.Id());
                 // the result payload carries the found/applied updates; it is published once
                 // the task reaches a terminal state (the check pass fills it before applying)
@@ -579,7 +580,7 @@ public static class ModPlatformEndpoints
     /// <summary>The CurseForge search pass-through (the x-api-key header is attached through
     /// the FlameConfig provider hook; hits map through FlameMod.LoadIndexedPack).</summary>
     private static async Task<IResult> FlameSearchAsync(ResourceType resourceType, string? query, string? version,
-        string? loader, string? index, int offset)
+        string? loader, string? index, int offset, LauncherRuntime runtime)
     {
         var loaders = string.IsNullOrWhiteSpace(loader)
             ? (ModLoaderType?)null
@@ -598,17 +599,17 @@ public static class ModPlatformEndpoints
             Search = string.IsNullOrWhiteSpace(query) ? null : query,
             Versions = string.IsNullOrWhiteSpace(version) ? null : [new McVersion(version)],
             Loaders = loaders,
-            Sorting = FlameSorting(index),
+            Sorting = FlameSorting(index, runtime),
         };
 
-        var url = FlameApi.Instance.GetSearchURL(args);
+        var url = runtime.Flame.GetSearchURL(args);
         if (url is null)
         {
             return ApiJson.Error("invalid_loader", $"loader '{loader}' is not supported by CurseForge", 400);
         }
 
         var request = NetRequest.MakeByteArray(new Uri(url));
-        FlameApi.AddApiKeyHeader(request);
+        runtime.Flame.AddApiKeyHeader(request);
         await request.StartAsync();
         if (request.State != Core.Tasks.TaskState.Succeeded)
         {
@@ -748,9 +749,9 @@ public static class ModPlatformEndpoints
 
     /// <summary>The Flame sorting method by (case-insensitive) name, defaulting to Popularity
     /// (the CurseForge API's default sortField).</summary>
-    private static SortingMethod FlameSorting(string? index)
+    private static SortingMethod FlameSorting(string? index, LauncherRuntime runtime)
     {
-        var methods = FlameApi.Instance.GetSortingMethods();
+        var methods = runtime.Flame.GetSortingMethods();
         if (!string.IsNullOrWhiteSpace(index))
         {
             foreach (var method in methods)
