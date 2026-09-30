@@ -8,11 +8,10 @@
 // small, so the flow is synchronous: 201 with the committed instance, 500 creation_failed
 // with the task's FailReason otherwise).
 //
-// TechnicApi.BaseUrl is a process-global static — the headless equivalent of the C++
-// BuildConfig.TECHNIC_API_BASE_URL constant. The optional `serverUrl` (query param on the
-// GETs, body field on the install) swaps it for the duration of the call; it is saved before
-// and restored in `finally` so a per-request override never leaks into other requests (the
-// tests serialize on the "TechnicApi" collection for the same reason).
+// The Technic client is per-host state (runtime.Technic — the headless equivalent of the C++
+// BuildConfig.TECHNIC_API_BASE_URL constant). The optional `serverUrl` (query param on the
+// GETs, body field on the install) selects a per-request derived client instead of mutating
+// the shared one, so an override can never leak into other requests (and needs no restore).
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
@@ -31,94 +30,91 @@ public static class TechnicEndpoints
         // ListModel::performSearch: a query selects the search URL, an empty one trending
         // (GET /modplatform/technic/trending below). Results map through
         // TechnicApi.LoadSearchResults (the "vanilla" slug exclusion included).
-        api.MapGet("/modplatform/technic/search", async Task<IResult> (string? query, string? serverUrl) =>
-            await SearchAsync(string.IsNullOrWhiteSpace(query) ? "" : query.Trim(), serverUrl));
+        api.MapGet("/modplatform/technic/search", async Task<IResult> (string? query, string? serverUrl,
+            LauncherRuntime runtime) =>
+            await SearchAsync(string.IsNullOrWhiteSpace(query) ? "" : query.Trim(), serverUrl, runtime));
 
         // ----------------------------------------------- modplatform/technic/trending
-        api.MapGet("/modplatform/technic/trending", async Task<IResult> (string? serverUrl) =>
-            await SearchAsync("", serverUrl));
+        api.MapGet("/modplatform/technic/trending", async Task<IResult> (string? serverUrl,
+            LauncherRuntime runtime) =>
+            await SearchAsync("", serverUrl, runtime));
 
         // --------------------------------------------- modplatform/technic/modpack/{slug}
         // TechnicPage::suggestCurrent's metadata step (+ metadataLoaded's Solder build
         // listing for Solder packs, with the "fall back to the current version" rule).
-        api.MapGet("/modplatform/technic/modpack/{slug}", async Task<IResult> (string slug, string? serverUrl) =>
+        api.MapGet("/modplatform/technic/modpack/{slug}", async Task<IResult> (string slug, string? serverUrl,
+            LauncherRuntime runtime) =>
         {
             if (string.IsNullOrWhiteSpace(slug))
             {
                 return ApiJson.Error("invalid_request", "'slug' is required", 400);
             }
 
-            var (hookError, restore) = ApplyServerUrl(serverUrl);
+            var api = ResolveApi(runtime, serverUrl, out var hookError);
             if (hookError is not null)
             {
                 return hookError;
             }
-            try
+
+            var (metaError, metaFailReason, metaBody) = await FetchAsync(api.PackMetadataUrl(slug), api.Net);
+            if (metaError is not null)
             {
-                var (metaError, metaFailReason, metaBody) = await FetchAsync(TechnicApi.PackMetadataUrl(slug));
-                if (metaError is not null)
-                {
-                    // an upstream 404 is an unknown slug (the REST mapping of the C++ page's
-                    // failed metadata step); everything else stays a gateway failure
-                    return metaFailReason.Contains("HTTP status 404", StringComparison.Ordinal)
-                        ? ApiJson.NotFound("pack_not_found", $"no Technic pack '{slug}'")
-                        : metaError;
-                }
+                // an upstream 404 is an unknown slug (the REST mapping of the C++ page's
+                // failed metadata step); everything else stays a gateway failure
+                return metaFailReason.Contains("HTTP status 404", StringComparison.Ordinal)
+                    ? ApiJson.NotFound("pack_not_found", $"no Technic pack '{slug}'")
+                    : metaError;
+            }
 
-                var pack = new TechnicModpack { Slug = slug };
-                if (!TechnicApi.LoadPackMetadata(metaBody, pack))
-                {
-                    // LoadPackMetadata returns false when the payload has neither a url nor a
-                    // solder key — an unknown slug in practice (the C++ warns and bails)
-                    return ApiJson.NotFound("pack_not_found", $"no Technic pack '{slug}'");
-                }
+            var pack = new TechnicModpack { Slug = slug };
+            if (!TechnicApi.LoadPackMetadata(metaBody, pack))
+            {
+                // LoadPackMetadata returns false when the payload has neither a url nor a
+                // solder key — an unknown slug in practice (the C++ warns and bails)
+                return ApiJson.NotFound("pack_not_found", $"no Technic pack '{slug}'");
+            }
 
-                // metadataLoaded(): strip the Solder URL's trailing slashes, then pull the
-                // version list from the Solder instance (zip packs only have one version)
-                var solderUrl = pack.IsSolder ? pack.Url.TrimEnd('/') : null;
-                var versions = new List<string>();
-                string? recommended = null;
-                string? latest = null;
-                if (solderUrl is not null)
+            // metadataLoaded(): strip the Solder URL's trailing slashes, then pull the
+            // version list from the Solder instance (zip packs only have one version)
+            var solderUrl = pack.IsSolder ? pack.Url.TrimEnd('/') : null;
+            var versions = new List<string>();
+            string? recommended = null;
+            string? latest = null;
+            if (solderUrl is not null)
+            {
+                var (solderError, _, solderBody) = await FetchAsync(
+                    TechnicApi.SolderPackUrl(solderUrl, slug), api.Net);
+                var listing = solderError is null ? TechnicApi.LoadSolderPack(solderBody) : null;
+                if (listing is not null)
                 {
-                    var (solderError, _, solderBody) = await FetchAsync(
-                        TechnicApi.SolderPackUrl(solderUrl, slug));
-                    var listing = solderError is null ? TechnicApi.LoadSolderPack(solderBody) : null;
-                    if (listing is not null)
-                    {
-                        versions.AddRange(listing.Builds);
-                        recommended = NullIfEmpty(listing.Recommended);
-                        latest = NullIfEmpty(listing.Latest);
-                    }
-                    if (versions.Count == 0 && pack.CurrentVersion.Length != 0)
-                    {
-                        // onSolderLoaded's fallback: the platform's "version" field
-                        versions.Add(pack.CurrentVersion);
-                    }
+                    versions.AddRange(listing.Builds);
+                    recommended = NullIfEmpty(listing.Recommended);
+                    latest = NullIfEmpty(listing.Latest);
                 }
-                else if (pack.CurrentVersion.Length != 0)
+                if (versions.Count == 0 && pack.CurrentVersion.Length != 0)
                 {
+                    // onSolderLoaded's fallback: the platform's "version" field
                     versions.Add(pack.CurrentVersion);
                 }
-
-                return Results.Ok(new TechnicPackView(
-                    pack.Slug,
-                    DisplayName(metaBody) ?? slug,
-                    pack.IsSolder,
-                    solderUrl ?? pack.Url,
-                    pack.MinecraftVersion,
-                    pack.WebsiteUrl,
-                    pack.Author,
-                    pack.Description,
-                    pack.CurrentVersion,
-                    versions,
-                    recommended,
-                    latest));
             }
-            finally
+            else if (pack.CurrentVersion.Length != 0)
             {
-                restore();
+                versions.Add(pack.CurrentVersion);
             }
+
+            return Results.Ok(new TechnicPackView(
+                pack.Slug,
+                DisplayName(metaBody) ?? slug,
+                pack.IsSolder,
+                solderUrl ?? pack.Url,
+                pack.MinecraftVersion,
+                pack.WebsiteUrl,
+                pack.Author,
+                pack.Description,
+                pack.CurrentVersion,
+                versions,
+                recommended,
+                latest));
         });
 
         // ------------------------------------------------- modplatform/technic/install
@@ -152,31 +148,17 @@ public static class TechnicEndpoints
                 return ApiJson.Error("invalid_body", "'slug' is required with 'solder'", 400);
             }
 
-            string? serverUrl = null;
-            if (!string.IsNullOrWhiteSpace(request.ServerUrl))
+            // the request's client is resolved up front: a serverUrl override derives its own
+            // client, the runtime's shared one is never mutated (nothing to restore)
+            var api = ResolveApi(runtime, request.ServerUrl, out var serverError);
+            if (serverError is not null)
             {
-                var trimmed = request.ServerUrl.Trim();
-                if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var server) ||
-                    server.Scheme is not ("http" or "https"))
-                {
-                    return ApiJson.Error("invalid_server_url",
-                        "'serverUrl' must be an absolute http(s) URL", 400);
-                }
-                // the Technic URL builders concatenate directly onto the hook, so keep the slash
-                serverUrl = trimmed.EndsWith('/') ? trimmed : trimmed + "/";
+                return serverError;
             }
-
-            // save the static hook before anything can touch it; restored in finally
-            var previousBaseUrl = TechnicApi.BaseUrl;
 
             await runtime.InstanceLock.WaitAsync();
             try
             {
-                if (serverUrl is not null)
-                {
-                    TechnicApi.BaseUrl = serverUrl;
-                }
-
                 InstanceTask task;
                 var taskName = request.Name?.Trim();
                 if (zipUrl is { Length: > 0 })
@@ -198,7 +180,7 @@ public static class TechnicEndpoints
                     {
                         // no build given: resolve the Solder listing's default (the version
                         // box preselects the recommended build, like TechnicPage)
-                        var (resolveError, resolved) = await ResolveDefaultBuildAsync(solder, slug!);
+                        var (resolveError, resolved) = await ResolveDefaultBuildAsync(api, solder, slug!);
                         if (resolveError is not null)
                         {
                             return resolveError;
@@ -241,7 +223,6 @@ public static class TechnicEndpoints
             }
             finally
             {
-                TechnicApi.BaseUrl = previousBaseUrl;
                 runtime.InstanceLock.Release();
             }
         });
@@ -249,69 +230,68 @@ public static class TechnicEndpoints
 
     // ------------------------------------------------------------------ helpers
 
-    /// <summary>The search/trending pass-through shared by the two GET endpoints: the
-    /// TechnicApi URL builder (empty term = trending), then LoadSearchResults mapped to
-    /// [{id, name, displayName?, iconUrl}].</summary>
-    private static async Task<IResult> SearchAsync(string term, string? serverUrl)
+    /// <summary>The request's Technic client: the runtime's own, or — with a `serverUrl`
+    /// override — a derived client (same net stack and API build), leaving the shared
+    /// instance untouched. Returns the error result for a malformed override.</summary>
+    private static TechnicApi ResolveApi(LauncherRuntime runtime, string? serverUrl, out IResult? error)
     {
-        var (hookError, restore) = ApplyServerUrl(serverUrl);
-        if (hookError is not null)
-        {
-            return hookError;
-        }
-        try
-        {
-            var (url, mode) = TechnicApi.SearchUrl(term);
-            var request = NetRequest.MakeByteArray(new Uri(url));
-            await request.StartAsync();
-            if (request.State != Core.Tasks.TaskState.Succeeded)
-            {
-                return ApiJson.Error("technic_unavailable",
-                    $"technic search failed: {request.FailReason}", 502);
-            }
-
-            var packs = TechnicApi.LoadSearchResults(request.BodyAsString, mode);
-            // LoadSearchResults maps the single-pack mode's displayName into Name (the
-            // displayed name); the list mode only knows "name"
-            return Results.Ok(packs.Select(pack => new TechnicSearchResultView(
-                pack.Slug,
-                pack.Name,
-                mode == TechnicSearchMode.Single ? pack.Name : null,
-                pack.LogoUrl == "null" ? null : pack.LogoUrl)).ToArray());
-        }
-        finally
-        {
-            restore();
-        }
-    }
-
-    /// <summary>Validates the optional `serverUrl` override and installs it into the
-    /// TechnicApi.BaseUrl static. Returns the error result (null = ok) and the restore
-    /// action (always safe to call, restores the previous value).</summary>
-    private static (IResult? Error, Action Restore) ApplyServerUrl(string? serverUrl)
-    {
+        error = null;
         if (string.IsNullOrWhiteSpace(serverUrl))
         {
-            return (null, static () => { });
+            return runtime.Technic;
         }
         var trimmed = serverUrl.Trim();
         if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var server) ||
             server.Scheme is not ("http" or "https"))
         {
-            return (ApiJson.Error("invalid_server_url",
-                "'serverUrl' must be an absolute http(s) URL", 400), static () => { });
+            error = ApiJson.Error("invalid_server_url",
+                "'serverUrl' must be an absolute http(s) URL", 400);
+            return runtime.Technic;
         }
-        var previous = TechnicApi.BaseUrl;
-        // the URL builders concatenate directly onto the hook, so keep the slash
-        TechnicApi.BaseUrl = trimmed.EndsWith('/') ? trimmed : trimmed + "/";
-        return (null, () => TechnicApi.BaseUrl = previous);
+        // the URL builders concatenate directly onto the base, so keep the slash
+        return new TechnicApi(runtime.Technic.Net)
+        {
+            BaseUrl = trimmed.EndsWith('/') ? trimmed : trimmed + "/",
+            ApiBuild = runtime.Technic.ApiBuild,
+        };
+    }
+
+    /// <summary>The search/trending pass-through shared by the two GET endpoints: the
+    /// TechnicApi URL builder (empty term = trending), then LoadSearchResults mapped to
+    /// [{id, name, displayName?, iconUrl}].</summary>
+    private static async Task<IResult> SearchAsync(string term, string? serverUrl, LauncherRuntime runtime)
+    {
+        var api = ResolveApi(runtime, serverUrl, out var hookError);
+        if (hookError is not null)
+        {
+            return hookError;
+        }
+
+        var (url, mode) = api.SearchUrl(term);
+        var request = NetRequest.MakeByteArray(new Uri(url), stack: api.Net);
+        await request.StartAsync();
+        if (request.State != Core.Tasks.TaskState.Succeeded)
+        {
+            return ApiJson.Error("technic_unavailable",
+                $"technic search failed: {request.FailReason}", 502);
+        }
+
+        var packs = TechnicApi.LoadSearchResults(request.BodyAsString, mode);
+        // LoadSearchResults maps the single-pack mode's displayName into Name (the
+        // displayed name); the list mode only knows "name"
+        return Results.Ok(packs.Select(pack => new TechnicSearchResultView(
+            pack.Slug,
+            pack.Name,
+            mode == TechnicSearchMode.Single ? pack.Name : null,
+            pack.LogoUrl == "null" ? null : pack.LogoUrl)).ToArray());
     }
 
     /// <summary>Fetches a Technic/Solder URL; fetch failures map to the uniform 502 error
     /// envelope, success yields the raw body for the caller's parser.</summary>
-    private static async Task<(IResult? Error, string FailReason, string Body)> FetchAsync(string url)
+    private static async Task<(IResult? Error, string FailReason, string Body)> FetchAsync(
+        string url, NetStack? net = null)
     {
-        var request = NetRequest.MakeByteArray(new Uri(url));
+        var request = NetRequest.MakeByteArray(new Uri(url), stack: net);
         await request.StartAsync();
         return request.State != Core.Tasks.TaskState.Succeeded
             ? (ApiJson.Error("technic_unavailable",
@@ -323,9 +303,9 @@ public static class TechnicEndpoints
     /// listed) — an error result when the listing is unusable (500 creation_failed, like the
     /// install's own failure surface).</summary>
     private static async Task<(IResult? Error, string Build)> ResolveDefaultBuildAsync(
-        string solderUrl, string slug)
+        TechnicApi api, string solderUrl, string slug)
     {
-        var (_, failReason, body) = await FetchAsync(TechnicApi.SolderPackUrl(solderUrl, slug));
+        var (_, failReason, body) = await FetchAsync(TechnicApi.SolderPackUrl(solderUrl, slug), api.Net);
         if (failReason.Length != 0)
         {
             return (ApiJson.Error("creation_failed",

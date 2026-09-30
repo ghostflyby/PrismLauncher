@@ -9,6 +9,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
+using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.News;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Web.Models;
@@ -27,6 +28,8 @@ public sealed class LauncherRuntime
     public ModrinthApi Modrinth { get; }
     /// <summary>The Flame (CurseForge) client — same injection story as Modrinth.</summary>
     public FlameApi Flame { get; }
+    /// <summary>The Technic client — same injection story as Modrinth/Flame.</summary>
+    public TechnicApi Technic { get; }
     public IniSettingsObject GlobalSettings { get; }
     public InstanceList Instances { get; }
     public AccountList Accounts { get; }
@@ -34,12 +37,13 @@ public sealed class LauncherRuntime
     public NewsChecker News { get; }
 
     public LauncherRuntime(FlintPaths paths, NetStack? net = null, ModrinthApi? modrinth = null,
-        FlameApi? flame = null)
+        FlameApi? flame = null, TechnicApi? technic = null)
     {
         Paths = paths;
         Net = net ?? NetStack.Default;
         Modrinth = modrinth ?? new ModrinthApi(Net);
         Flame = flame ?? new FlameApi(Net);
+        Technic = technic ?? new TechnicApi(Net);
         var dataDir = paths.DataDir;
 
         // global config: flint.cfg first, importing an existing Prism/PolyMC config like the

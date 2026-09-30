@@ -6,9 +6,8 @@
 // reusing the TechnicTestSupport fixture builders, since the endpoint runs the very same
 // SingleZipPackInstallTask / SolderPackInstallTask the core tests drive directly.
 //
-// [Collection("TechnicApi")] matches TechnicTests: TechnicApi.BaseUrl is a process-global
-// static, so every suite that touches it must not run in parallel (the endpoints also
-// save/restore it around the serverUrl overrides).
+// Every host gets its own TechnicApi client pointed at the stub (BaseUrl/ApiBuild are
+// per-instance state now, so no [Collection] serialization is needed anymore).
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -18,21 +17,18 @@ using Xunit;
 
 namespace Flint.Tests;
 
-[Collection("TechnicApi")]
 public class TechnicApiEndpointsTests : IDisposable
 {
     private readonly StubTechnicServer _server = new();
+    private readonly TechnicApi _api;
 
     public TechnicApiEndpointsTests()
     {
-        TechnicApi.BaseUrl = _server.Url + "/";
-        TechnicApi.ApiBuild = "testbuild";
+        _api = new TechnicApi { BaseUrl = _server.Url + "/", ApiBuild = "testbuild" };
     }
 
     public void Dispose()
     {
-        TechnicApi.BaseUrl = FlintLauncher.Core.FlintConfig.Default.TechnicApiBaseUrl;
-        TechnicApi.ApiBuild = FlintLauncher.Core.FlintConfig.Default.TechnicApiBuild;
         _server.Dispose();
     }
 
@@ -51,7 +47,7 @@ public class TechnicApiEndpointsTests : IDisposable
     public async Task Search_PassThrough_MapsHitsAndSkipsVanilla()
     {
         SeedSearchList();
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(technic: _api);
 
         var response = await host.GetAsync("/api/v1/modplatform/technic/search?query=bevo");
         response.EnsureSuccessStatusCode();
@@ -75,7 +71,7 @@ public class TechnicApiEndpointsTests : IDisposable
     public async Task Trending_PassThrough_HitsTheTrendingPath()
     {
         SeedSearchList();
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(technic: _api);
 
         var response = await host.GetAsync("/api/v1/modplatform/technic/trending");
         response.EnsureSuccessStatusCode();
@@ -87,34 +83,27 @@ public class TechnicApiEndpointsTests : IDisposable
     }
 
     [Fact]
-    public async Task Search_ServerUrl_Override_IsHonored_AndRestored()
+    public async Task Search_ServerUrl_Override_IsHonored_WithoutTouchingTheClient()
     {
         SeedSearchList();
-        await using var host = await FlintApiHost.StartAsync();
+        // a dead base on the injected client forces the query's serverUrl override to be
+        // the only working route
+        var api = new TechnicApi { BaseUrl = "http://127.0.0.1:9/", ApiBuild = "testbuild" };
+        await using var host = await FlintApiHost.StartAsync(technic: api);
 
-        // a dead static forces the query's serverUrl override to be the only working route
-        var previous = TechnicApi.BaseUrl;
-        TechnicApi.BaseUrl = "http://127.0.0.1:9/";
-        try
-        {
-            var response = await host.GetAsync(
-                $"/api/v1/modplatform/technic/search?query=bevo&serverUrl={Uri.EscapeDataString(_server.Url + "/")}");
-            response.EnsureSuccessStatusCode();
-            Assert.Equal("/search", _server.LastPath);
-        }
-        finally
-        {
-            // the endpoint restored the hook even though the call succeeded
-            Assert.Equal("http://127.0.0.1:9/", TechnicApi.BaseUrl);
-            TechnicApi.BaseUrl = previous;
-        }
+        var response = await host.GetAsync(
+            $"/api/v1/modplatform/technic/search?query=bevo&serverUrl={Uri.EscapeDataString(_server.Url + "/")}");
+        response.EnsureSuccessStatusCode();
+        Assert.Equal("/search", _server.LastPath);
+        // the override is a per-request derived client: the injected client's base is untouched
+        Assert.Equal("http://127.0.0.1:9/", api.BaseUrl);
     }
 
     [Fact]
     public async Task Search_BadServerUrl_IsRejected()
     {
         SeedSearchList();
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(technic: _api);
 
         var response = await host.GetAsync("/api/v1/modplatform/technic/search?query=bevo&serverUrl=nope");
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -138,7 +127,7 @@ public class TechnicApiEndpointsTests : IDisposable
             ["description"] = "A zip pack",
             ["version"] = "1.2.3",
         }.ToJsonString();
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(technic: _api);
 
         var response = await host.GetAsync("/api/v1/modplatform/technic/modpack/zippack");
         response.EnsureSuccessStatusCode();
@@ -172,7 +161,7 @@ public class TechnicApiEndpointsTests : IDisposable
             ["latest"] = "1.2.0",
             ["builds"] = new JsonArray("1.0.0", "1.1.0", "1.2.0"),
         }.ToJsonString();
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(technic: _api);
 
         var response = await host.GetAsync("/api/v1/modplatform/technic/modpack/solderpack");
         response.EnsureSuccessStatusCode();
@@ -190,7 +179,7 @@ public class TechnicApiEndpointsTests : IDisposable
     [Fact]
     public async Task PackMetadata_UnknownSlug_IsNotFound()
     {
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(technic: _api);
 
         var response = await host.GetAsync("/api/v1/modplatform/technic/modpack/ghost");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -211,7 +200,7 @@ public class TechnicApiEndpointsTests : IDisposable
         _server.Downloads[zipName] = await File.ReadAllBytesAsync(zipPath);
         try
         {
-            await using var host = await FlintApiHost.StartAsync();
+            await using var host = await FlintApiHost.StartAsync(technic: _api);
 
             var post = await host.PostAsync("/api/v1/modplatform/technic/install", new
             {
@@ -269,7 +258,7 @@ public class TechnicApiEndpointsTests : IDisposable
                 }),
         }.ToJsonString();
         _server.Downloads["soldermod.zip"] = modBytes;
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(technic: _api);
 
         var post = await host.PostAsync("/api/v1/modplatform/technic/install", new
         {
@@ -307,7 +296,7 @@ public class TechnicApiEndpointsTests : IDisposable
             ["minecraft"] = "1.16.5",
             ["mods"] = new JsonArray(),
         }.ToJsonString();
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(technic: _api);
 
         var post = await host.PostAsync("/api/v1/modplatform/technic/install", new
         {
@@ -330,7 +319,7 @@ public class TechnicApiEndpointsTests : IDisposable
     [Fact]
     public async Task Install_Solder_UnknownBuild_ReturnsCreationFailed()
     {
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(technic: _api);
 
         var post = await host.PostAsync("/api/v1/modplatform/technic/install", new
         {
@@ -349,10 +338,10 @@ public class TechnicApiEndpointsTests : IDisposable
     }
 
     [Fact]
-    public async Task Install_ServerUrl_Override_IsHonored_AndRestored()
+    public async Task Install_ServerUrl_Override_IsHonored_WithoutTouchingTheClient()
     {
         // search-driven installs need the Platform base; a zip install via serverUrl proves
-        // the hook swap without touching the default
+        // the per-request client derivation without touching the injected one
         var pack = new TechnicZipPackBuilder();
         var zipName = "override-pack.zip";
         var zipPath = Path.Combine(Path.GetTempPath(), $"flint-technic-api-{Guid.NewGuid():N}.zip");
@@ -360,29 +349,21 @@ public class TechnicApiEndpointsTests : IDisposable
         _server.Downloads[zipName] = await File.ReadAllBytesAsync(zipPath);
         try
         {
-            await using var host = await FlintApiHost.StartAsync();
+            var api = new TechnicApi { BaseUrl = "http://127.0.0.1:9/", ApiBuild = "testbuild" };
+            await using var host = await FlintApiHost.StartAsync(technic: api);
 
-            var previous = TechnicApi.BaseUrl;
-            TechnicApi.BaseUrl = "http://127.0.0.1:9/";
-            try
+            var post = await host.PostAsync("/api/v1/modplatform/technic/install", new
             {
-                var post = await host.PostAsync("/api/v1/modplatform/technic/install", new
-                {
-                    url = $"{_server.Url}/{zipName}",
-                    minecraftVersion = "1.19.2",
-                    name = "Override Installed",
-                    serverUrl = _server.Url + "/",
-                });
-                Assert.Equal(HttpStatusCode.Created, post.StatusCode);
-                Assert.True(File.Exists(Path.Combine(host.DataDir, "instances", "Override Installed",
-                    "minecraft", "modpack", "options.txt")));
-            }
-            finally
-            {
-                // the hook was restored after the call (the bogus value is still in place)
-                Assert.Equal("http://127.0.0.1:9/", TechnicApi.BaseUrl);
-                TechnicApi.BaseUrl = previous;
-            }
+                url = $"{_server.Url}/{zipName}",
+                minecraftVersion = "1.19.2",
+                name = "Override Installed",
+                serverUrl = _server.Url + "/",
+            });
+            Assert.Equal(HttpStatusCode.Created, post.StatusCode);
+            Assert.True(File.Exists(Path.Combine(host.DataDir, "instances", "Override Installed",
+                "minecraft", "modpack", "options.txt")));
+            // the override never leaked into the injected client (the bogus base is still in place)
+            Assert.Equal("http://127.0.0.1:9/", api.BaseUrl);
         }
         finally
         {
@@ -393,7 +374,7 @@ public class TechnicApiEndpointsTests : IDisposable
     [Fact]
     public async Task Install_Validation_Errors()
     {
-        await using var host = await FlintApiHost.StartAsync();
+        await using var host = await FlintApiHost.StartAsync(technic: _api);
 
         // neither shape
         var empty = await host.PostAsync("/api/v1/modplatform/technic/install", new { });

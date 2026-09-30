@@ -21,7 +21,8 @@ public static class WebHostBuilder
 {
     public static WebApplication BuildWebApplication(string[] args,
         Core.ModPlatform.Modrinth.ModrinthApi? modrinth = null,
-        Core.ModPlatform.Flame.FlameApi? flame = null)
+        Core.ModPlatform.Flame.FlameApi? flame = null,
+        Core.ModPlatform.Technic.TechnicApi? technic = null)
     {
         var paths = FlintPaths.FromDataDir(ResolveDataDir(args));
         Directory.CreateDirectory(paths.DataDir);
@@ -43,7 +44,7 @@ public static class WebHostBuilder
             options.SerializerOptions.TypeInfoResolverChain.Insert(0, FlintJsonContext.Default);
         });
 
-        var runtime = new LauncherRuntime(paths, modrinth: modrinth, flame: flame);
+        var runtime = new LauncherRuntime(paths, modrinth: modrinth, flame: flame, technic: technic);
         builder.Services.AddSingleton(FlintConfig.Default);
         builder.Services.AddSingleton(runtime);
         builder.Services.AddSingleton<FlintTaskRegistry>();

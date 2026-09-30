@@ -54,9 +54,9 @@ public sealed class SolderPackInstallTask : InstanceTask
         SolderPackBuild build;
         try
         {
-            using var doc = JsonUtils.RequireDocument(response, "JSON response from Solder");
+            var root = TechnicJson.RequireDocument(response, "JSON response from Solder");
             build = new SolderPackBuild();
-            TechnicSolder.LoadPackBuild(build, TechnicJson.RequireObject(doc));
+            TechnicSolder.LoadPackBuild(build, JsonUtils.RequireObject(root, "Document"));
         }
         catch (JsonParseException e)
         {

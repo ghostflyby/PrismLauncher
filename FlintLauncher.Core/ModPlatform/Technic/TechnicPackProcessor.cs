@@ -153,8 +153,8 @@ public static class TechnicPackProcessor
 
         try
         {
-            using var doc = JsonUtils.RequireDocument(data, "version.json");
-            var root = TechnicJson.RequireObject(JsonUtils.RequireObject(doc, "version.json"), "version.json");
+            var root = TechnicJson.RequireDocument(data, "version.json");
+            JsonUtils.RequireObject(root, "version.json");
             var packMinecraftVersion = StringOrEmpty(root, "inheritsFrom");
             if (packMinecraftVersion.Length == 0)
             {
@@ -166,7 +166,7 @@ public static class TechnicPackProcessor
             }
             _ = components.SetComponentVersion("net.minecraft", packMinecraftVersion, important: true)
                 .GetAwaiter().GetResult();
-            if (root.TryGetPropertyValue("libraries", out var librariesNode) && librariesNode is JsonArray libraries)
+            if (root["libraries"] is JsonArray libraries)
             {
                 foreach (var library in libraries)
                 {
@@ -182,10 +182,8 @@ public static class TechnicPackProcessor
                         // it is neoforge
                         // no easy way to get the version from the libs so use the arguments
                         var neoforgeVersion = "";
-                        if (root.TryGetPropertyValue("arguments", out var argumentsNode)
-                            && argumentsNode is JsonObject arguments
-                            && arguments.TryGetPropertyValue("game", out var gameNode)
-                            && gameNode is JsonArray game)
+                        if (root["arguments"] is JsonObject arguments
+                            && arguments["game"] is JsonArray game)
                         {
                             var isVersionArg = false;
                             foreach (var arg in game)
@@ -255,9 +253,9 @@ public static class TechnicPackProcessor
         ("org.quiltmc:quilt-loader:", "org.quiltmc.quilt-loader"),
     ];
 
-    private static string StringOrEmpty(JsonObject obj, string key)
+    private static string StringOrEmpty(JsonNode? obj, string key)
     {
-        return obj.TryGetPropertyValue(key, out var node) && node is JsonValue value ? StringValue(value) : "";
+        return obj is JsonObject map && map[key] is JsonValue value ? StringValue(value) : "";
     }
 
     private static string StringValue(JsonValue value)

@@ -3,7 +3,9 @@
 // parsing (including the url-vs-solder detection), the SingleZipPackInstallTask over the
 // three pack flavors (bin/version.json, bin/modpack.jar, vanilla), the Solder pack install
 // (build JSON -> md5-verified mod downloads -> extraction -> postProcess) and the pack
-// processor's component writing — all against the stub Technic/Solder server.
+// processor's component writing — all against the stub Technic/Solder server. Each test
+// drives its own TechnicApi client pointed at the stub (the former process-global
+// BaseUrl/ApiBuild hooks are per-instance state now).
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -14,24 +16,21 @@ using Xunit;
 
 namespace Flint.Tests;
 
-[Collection("TechnicApi")]
 public class TechnicTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-technic-{Guid.NewGuid():N}");
     private readonly TestGlobalSettings _global = new();
     private readonly StubTechnicServer _server = new();
+    private readonly TechnicApi _api;
 
     public TechnicTests()
     {
         Directory.CreateDirectory(_root);
-        TechnicApi.BaseUrl = _server.Url + "/";
-        TechnicApi.ApiBuild = "testbuild";
+        _api = new TechnicApi { BaseUrl = _server.Url + "/", ApiBuild = "testbuild" };
     }
 
     public void Dispose()
     {
-        TechnicApi.BaseUrl = FlintLauncher.Core.FlintConfig.Default.TechnicApiBaseUrl;
-        TechnicApi.ApiBuild = FlintLauncher.Core.FlintConfig.Default.TechnicApiBuild;
         _server.Dispose();
         try
         {
@@ -72,23 +71,23 @@ public class TechnicTests : IDisposable
     public void SearchUrl_BuildsPlatformUrls()
     {
         // empty term -> trending, plain term -> search, #slug / modpack urls -> single
-        var (trending, trendingMode) = TechnicApi.SearchUrl("");
-        Assert.Equal($"{TechnicApi.BaseUrl}trending?build=testbuild", trending);
+        var (trending, trendingMode) = _api.SearchUrl("");
+        Assert.Equal($"{_api.BaseUrl}trending?build=testbuild", trending);
         Assert.Equal(TechnicSearchMode.List, trendingMode);
 
-        var (search, searchMode) = TechnicApi.SearchUrl("bevo");
-        Assert.Equal($"{TechnicApi.BaseUrl}search?build=testbuild&q=bevo", search);
+        var (search, searchMode) = _api.SearchUrl("bevo");
+        Assert.Equal($"{_api.BaseUrl}search?build=testbuild&q=bevo", search);
         Assert.Equal(TechnicSearchMode.List, searchMode);
 
-        var (hashed, hashedMode) = TechnicApi.SearchUrl("#bevo");
+        var (hashed, hashedMode) = _api.SearchUrl("#bevo");
         Assert.Equal("https://api.technicpack.net/modpack/bevo?build=testbuild", hashed);
         Assert.Equal(TechnicSearchMode.Single, hashedMode);
 
-        var (httpsUrl, httpsMode) = TechnicApi.SearchUrl("https://api.technicpack.net/modpack/bevo");
+        var (httpsUrl, httpsMode) = _api.SearchUrl("https://api.technicpack.net/modpack/bevo");
         Assert.Equal("https://api.technicpack.net/modpack/bevo?build=testbuild", httpsUrl);
         Assert.Equal(TechnicSearchMode.Single, httpsMode);
 
-        var (httpUrl, _) = TechnicApi.SearchUrl("http://api.technicpack.net/modpack/bevo");
+        var (httpUrl, _) = _api.SearchUrl("http://api.technicpack.net/modpack/bevo");
         Assert.Equal("https://api.technicpack.net/modpack/bevo?build=testbuild", httpUrl);
     }
 
@@ -102,7 +101,7 @@ public class TechnicTests : IDisposable
                 {"name":"No Icon","slug":"noicon"}
             ]}
             """;
-        var (url, mode) = TechnicApi.SearchUrl("");
+        var (url, mode) = _api.SearchUrl("");
         var request = FlintLauncher.Core.Net.NetRequest.MakeByteArray(new Uri(url));
         var job = new FlintLauncher.Core.Net.NetJob("search");
         job.AddNetRequest(request);
@@ -137,6 +136,40 @@ public class TechnicTests : IDisposable
         Assert.Empty(TechnicApi.LoadSearchResults("""{"error":"invalid id"}""", TechnicSearchMode.Single));
         // a malformed payload parses to nothing (the C++ logs and returns)
         Assert.Empty(TechnicApi.LoadSearchResults("""{"modpacks":}""", TechnicSearchMode.List));
+    }
+
+    [Fact]
+    public void Search_NonObjectPayloads_ParseToNothing()
+    {
+        // the requireObject(doc) path: a non-object root is a parse failure, never a crash
+        Assert.Empty(TechnicApi.LoadSearchResults("[]", TechnicSearchMode.List));
+        Assert.Empty(TechnicApi.LoadSearchResults("\"text\"", TechnicSearchMode.Single));
+        Assert.False(TechnicApi.LoadPackMetadata("[]", new TechnicModpack()));
+        Assert.Null(TechnicApi.LoadSolderPack("[]"));
+    }
+
+    [Fact]
+    public void Search_NullAndNonStringMembers_ReadAsTheMissingDefaults()
+    {
+        // {"error":null} still marks the invalid-API-url payload (contains(), not the value)
+        Assert.Empty(TechnicApi.LoadSearchResults("""{"error":null}""", TechnicSearchMode.Single));
+
+        // JSON null / non-string members read like QJsonValue's toString(default) fallbacks
+        var packs = TechnicApi.LoadSearchResults("""
+            {"modpacks":[
+                {"name":"Null Icon","slug":"nullicon","iconUrl":null},
+                {"name":"Number Icon","slug":"numicon","iconUrl":5}
+            ]}
+            """, TechnicSearchMode.List);
+        Assert.Equal(2, packs.Count);
+        Assert.Equal("null", packs[0].LogoUrl);
+        Assert.Equal("null", packs[0].LogoName);
+        Assert.Equal("null", packs[1].LogoUrl);
+
+        var zipPack = new TechnicModpack { Slug = "zip" };
+        Assert.True(TechnicApi.LoadPackMetadata("""{"url":"http://x","minecraft":null,"user":7}""", zipPack));
+        Assert.Equal("", zipPack.MinecraftVersion);
+        Assert.Equal("", zipPack.Author);
     }
 
     [Fact]
@@ -355,6 +388,17 @@ public class TechnicTests : IDisposable
         Assert.Equal("1.19.2", components[0].GetProperty("version").GetString());
     }
 
+    [Fact]
+    public async Task SingleZip_MalformedVersionJson_FailsWithParseMessage()
+    {
+        // the surfaced parse error keeps the requireDocument wrapping around the node parse
+        var task = await RunZipInstall(new TechnicZipPackBuilder { VersionJson = """{"inheritsFrom":}""" },
+            name: "Technic BadVersionJson");
+        Assert.Equal(TaskState.Failed, task.State);
+        Assert.Contains("Could not understand \"version.json\":", task.FailReason);
+        Assert.Contains("Error parsing JSON", task.FailReason);
+    }
+
     // --------------------------------------------------------------- Solder install
 
     [Fact]
@@ -419,6 +463,22 @@ public class TechnicTests : IDisposable
         await wrapped.StartAsync();
 
         Assert.Equal(TaskState.Failed, task.State);
+    }
+
+    [Fact]
+    public async Task SolderInstall_MalformedManifest_FailsWithParseMessage()
+    {
+        // the surfaced parse error keeps the requireDocument wrapping around the node parse
+        _server.SolderBuildJson["testpack/1.0.0"] = """{"minecraft":}""";
+        var list = CreateList();
+        var task = new SolderPackInstallTask(new Uri(_server.Url), "testpack", "1.0.0", minecraftVersion: "");
+        task.SetName("Solder BadManifest");
+        var wrapped = list.WrapInstanceTask(task);
+        await wrapped.StartAsync();
+
+        Assert.Equal(TaskState.Failed, task.State);
+        Assert.Contains("Could not understand pack manifest:", task.FailReason);
+        Assert.Contains("Error parsing JSON", task.FailReason);
     }
 
     [Fact]
