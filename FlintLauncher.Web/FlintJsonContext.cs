@@ -127,4 +127,11 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(FtbPackAuthorView[]))]
 // collection roots for the Technic list endpoints (standalone arrays are NOT auto-generated)
 [JsonSerializable(typeof(TechnicSearchResultView[]))]
+// migration layer (Prism→Flint import): request body + plan items
+[JsonSerializable(typeof(FlintLauncher.Web.Endpoints.PrismImportRequest))]
+[JsonSerializable(typeof(FlintLauncher.Web.Endpoints.PrismDeclineRequest))]
+[JsonSerializable(typeof(FlintLauncher.Core.Migration.PrismSourceDetector.PrismSourceCandidate[]))]
+[JsonSerializable(typeof(FlintLauncher.Web.Endpoints.PrismImportPlanResponse))]
+[JsonSerializable(typeof(FlintLauncher.Web.Endpoints.PrismImportDryRunResponse))]
+[JsonSerializable(typeof(FlintLauncher.Core.Migration.PrismImportPlanItem))]
 internal sealed partial class FlintJsonContext : JsonSerializerContext;

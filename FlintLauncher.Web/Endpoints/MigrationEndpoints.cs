@@ -13,6 +13,18 @@ namespace FlintLauncher.Web.Endpoints;
 /// <summary>POST /migration/prism body.</summary>
 public sealed record PrismImportRequest(string Source, string? Mode, bool DryRun);
 
+/// <summary>POST /migration/prism/decline body。</summary>
+public sealed record PrismDeclineRequest(string Source);
+
+/// <summary>POST /migration/prism?dryRun=true response。</summary>
+public sealed record PrismImportDryRunResponse(
+    bool DryRun, long TotalFiles, long TotalBytes, PrismImportPlanItem[] Items);
+
+/// <summary>GET /migration/prism/plan response (named record: AOT 源生成需要具体类型)。</summary>
+public sealed record PrismImportPlanResponse(
+    string Source, string Mode, long TotalFiles, long TotalBytes,
+    PrismImportPlanItem[] Items);
+
 public static class MigrationEndpoints
 {
     public static void MapMigration(this IEndpointRouteBuilder api)
@@ -20,7 +32,7 @@ public static class MigrationEndpoints
         var group = api.MapGroup("/migration/prism");
 
         group.MapGet("/candidates", (LauncherRuntime runtime) =>
-            Results.Ok(PrismSourceDetector.Detect(runtime.Paths.DataDir)));
+            Results.Ok(PrismSourceDetector.Detect(runtime.Paths.DataDir).ToArray()));
 
         group.MapGet("/plan", (LauncherRuntime runtime, string source, string? mode) =>
         {
@@ -35,7 +47,8 @@ public static class MigrationEndpoints
             var plan = PrismImportPlanner.Plan(source, runtime.Paths.DataDir, importMode);
             var totalFiles = plan.Sum(item => item.Files);
             var totalBytes = plan.Sum(item => item.Bytes);
-            return Results.Ok(new { source, mode = importMode.ToString(), totalFiles, totalBytes, items = plan });
+            return Results.Ok(new PrismImportPlanResponse(source, importMode.ToString(), totalFiles, totalBytes,
+                plan.ToArray()));
         });
 
         group.MapPost("/", async (LauncherRuntime runtime, FlintTaskRegistry registry, PrismImportRequest request) =>
@@ -52,13 +65,11 @@ public static class MigrationEndpoints
             if (request.DryRun)
             {
                 var plan = PrismImportPlanner.Plan(request.Source, runtime.Paths.DataDir, importMode);
-                return Results.Ok(new
-                {
-                    dryRun = true,
-                    totalFiles = plan.Sum(item => item.Files),
-                    totalBytes = plan.Sum(item => item.Bytes),
-                    items = plan,
-                });
+                return Results.Ok(new PrismImportDryRunResponse(
+                    DryRun: true,
+                    TotalFiles: plan.Sum(item => item.Files),
+                    TotalBytes: plan.Sum(item => item.Bytes),
+                    Items: plan.ToArray()));
             }
 
             var task = new PrismImportTask(request.Source, runtime.Paths.DataDir, importMode);
@@ -69,9 +80,9 @@ public static class MigrationEndpoints
             return Results.Accepted($"/api/v1/tasks/{entry.Id}", new TaskAcceptedResponse(entry.Id));
         });
 
-        group.MapPost("/decline", (LauncherRuntime runtime, string source) =>
+        group.MapPost("/decline", (LauncherRuntime runtime, PrismDeclineRequest request) =>
         {
-            var name = LegacyNameFor(source);
+            var name = LegacyNameFor(request.Source);
             DataMigration.SetDoNotMigrate(runtime.Paths.DataDir, name);
             return Results.NoContent();
         });
