@@ -149,6 +149,7 @@ public static class WebHostBuilder
         api.MapExport();
         api.MapManagedPack();
         api.MapSettingsAndIcons();
+        api.MapMigration();
 
         return app;
     }
