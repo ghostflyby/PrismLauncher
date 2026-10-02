@@ -2,6 +2,7 @@
 
 状态：事实清单与建议，尚无设计决议。
 日期：2026-10-01。
+修订：2026-10-02 移入 `docs/reform/`；accounts.json 归属由 config 更正为 **data**（§2/§3 对应行失效，决议见 [CONFIG.md](CONFIG.md) C3）；instgroups.json 拆分决议见 CONFIG.md C8；§4 低效结构 #1（稳定短 ID 目录）**被 [DATA.md](DATA.md) D2/D3 取代**——实例寻址链（inode→uuid→dirname）下目录名保持人类可读，不做短 ID 目录；§2/§3 生命周期分类**被 [CACHE.md](CACHE.md) E1/E2 修订为五类**——assets/libraries/java 归新类 **store**（共享安装内容，禁自动清），§3 XDG 表相应失效；§4 #4 修正为"账本入 cache 根"（CACHE.md E3，账本跨 store+cache 描述）；§1.1 中 api-token/prism_nomigrate/logs 的落位由 [STATE.md](STATE.md) S1–S4 接管（api-token 零落盘、标记→state/migration、logs→StateRoot/logs）；§7.1 的"四分"句随五类分类失效。本文其余事实清单仍为有效设计输入。阶段索引见 [README.md](README.md)。
 范围：Flint 数据目录的现状盘点（以本机 `~/Library/Application Support/FlintLauncher` 与 `PrismLauncher` 实测为准）、逐项用途与参与度、生命周期归类、XDG 映射、结构性问题与 Model 化审计。
 
 前置背景：
