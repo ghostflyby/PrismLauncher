@@ -24,8 +24,16 @@ public sealed record ApiErrorEnvelope(ErrorResponse Error);
 
 // ------------------------------------------------------------------ instances
 
+/// <summary>One entry of GET /instances (DATA D2 wire shape): every handle of the
+/// addressing chain is exposed — uuid (the only persistent reference form), inode (0 on
+/// platforms without stat inode support, e.g. Windows) and dirName (compat/display; the
+/// "id" field keeps serving the same dirname so existing clients do not break the
+/// chain).</summary>
 public sealed record InstanceSummary(
     string Id,
+    string Uuid,
+    long Inode,
+    string DirName,
     string Name,
     string IconKey,
     string Group,
@@ -36,6 +44,9 @@ public sealed record InstanceSummary(
 
 public sealed record InstanceDetail(
     string Id,
+    string Uuid,
+    long Inode,
+    string DirName,
     string Name,
     string IconKey,
     string Group,
@@ -130,11 +141,9 @@ public sealed record DeviceCodeStartResponse(
 
 public sealed record DeviceCodePollResponse(string State, AccountView? Account);
 
-// ------------------------------------------------------------------ java / news / modplatform
+// ------------------------------------------------------------------ java / modplatform
 
 public sealed record JavaView(string Path, string Version, string Architecture);
-
-public sealed record NewsView(string Title, string Content, string Link);
 
 public sealed record ModrinthSearchResult(
     string Id,
@@ -497,3 +506,17 @@ public sealed record TechnicInstallRequest(
 /// <summary>GET /accounts/{profileId}/skin: the profile skin data the login flow stored on
 /// the account (variant is the API's CLASSIC/SLIM spelling; empty when unknown).</summary>
 public sealed record AccountSkinView(string Url, string Variant);
+
+// ------------------------------------------------- skins (DATA D6: local skin library)
+
+/// <summary>One entry of the local skin library (GET /skins). model is CLASSIC/SLIM;
+/// capeId/url are the stored metadata (empty when unknown); fileExists reports whether the
+/// texture png is present in the skins dir.</summary>
+public sealed record SkinView(string Name, string Model, string CapeId, string Url, bool FileExists);
+
+/// <summary>POST /skins/{name}/apply body: which account wears the stored skin. model
+/// overrides the stored variant ("classic"/"slim"); omitted = the stored one.</summary>
+public sealed record SkinApplyRequest(string ProfileId, string? Model = null);
+
+/// <summary>POST /skins response.</summary>
+public sealed record SkinStoredResponse(string Name);

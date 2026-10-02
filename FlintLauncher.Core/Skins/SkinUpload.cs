@@ -4,9 +4,10 @@
 //
 // Deviations:
 //  - Upstream builds the request through QHttpMultiPart on QNetworkAccessManager; the port
-//    pre-builds an identical multipart body (same part headers, CRLF framing) and sends it with
-//    the shared Http.Client. This stays a FlintTask like the C++ Net::Request subclass. The
-//    multipart Content-Type must be set on the content headers, which NetRequest cannot do.
+//    pre-builds an identical multipart body (same part headers, CRLF framing) and sends it
+//    with an injected NetStack (defaulting to the canonical process-wide stack). This stays a
+//    FlintTask like the C++ Net::Request subclass. The multipart Content-Type must be set on
+//    the content headers, which NetRequest cannot do.
 //  - QHttpMultiPart generates a random boundary of a different shape — any legal boundary is
 //    equivalent, so the port uses a "flint-<32 hex>" one.
 //  - The endpoint base goes through the injected AuthEndpointsOptions.MinecraftServices
@@ -24,25 +25,29 @@ public sealed class SkinUpload : FlintTask
     private readonly byte[] _skinData;
     private readonly string _variant;
     private readonly AuthEndpointsOptions _auth;
+    private readonly NetStack _net;
 
-    private SkinUpload(string token, byte[] skinData, string variant, AuthEndpointsOptions? auth)
+    private SkinUpload(string token, byte[] skinData, string variant, AuthEndpointsOptions? auth, NetStack? net)
     {
         _token = token;
         _skinData = skinData;
         _variant = variant;
         _auth = auth ?? new AuthEndpointsOptions();
+        _net = net ?? NetStack.Default;
     }
 
     /// <summary>Port of SkinUpload::make(token, path, variant) — the file is read eagerly.</summary>
-    public static SkinUpload Make(string token, string path, string variant, AuthEndpointsOptions? auth = null)
+    public static SkinUpload Make(string token, string path, string variant,
+        AuthEndpointsOptions? auth = null, NetStack? net = null)
     {
-        return Make(token, File.ReadAllBytes(path), variant, auth);
+        return Make(token, File.ReadAllBytes(path), variant, auth, net);
     }
 
     /// <summary>Body-bytes variant (FS::read(m_path) upstream).</summary>
-    public static SkinUpload Make(string token, byte[] skinData, string variant, AuthEndpointsOptions? auth = null)
+    public static SkinUpload Make(string token, byte[] skinData, string variant,
+        AuthEndpointsOptions? auth = null, NetStack? net = null)
     {
-        return new SkinUpload(token, skinData, variant, auth);
+        return new SkinUpload(token, skinData, variant, auth, net);
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -57,7 +62,7 @@ public sealed class SkinUpload : FlintTask
         message.Content = new ByteArrayContent(body);
         message.Content.Headers.TryAddWithoutValidation("Content-Type", "multipart/form-data; boundary=" + boundary);
 
-        using var response = await NetStack.Default.Client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
+        using var response = await _net.Client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
             cancellationToken).ConfigureAwait(false);
         var statusCode = (int)response.StatusCode;
         if (statusCode is not 200 and not 201 and not 202 and not 203 and not 204 and not 206)

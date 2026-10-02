@@ -1,27 +1,32 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Local-token authentication for the /api/v1 surface: the host generates a random token on
-// first run and stores it next to the data dir (0600 on unix); clients send it as
-// `Authorization: Bearer <token>` or `X-Api-Token: <token>`. Override with --api-token <t> /
-// FLINT_API_TOKEN; disable entirely with --no-auth / FLINT_NO_AUTH=1 (e.g. for a loopback-only
-// deployment where another layer owns auth).
+// Local-token authentication for the /api/v1 surface: the token lives for the PROCESS
+// lifetime and never touches the disk (STATE S2 — the pre-reform <dataDir>/api-token file is
+// dead; the host owns credential provisioning). Resolution order: an explicit token from
+// --api-token <t> / FLINT_API_TOKEN (host injection — the host is responsible for getting
+// the token to its clients) → a freshly generated temporary token held in-process (the
+// startup logs it once at Information). Disable entirely with --no-auth / FLINT_NO_AUTH=1
+// (e.g. for a loopback-only deployment where another layer owns auth).
 using System.Security.Cryptography;
 
 namespace FlintLauncher.Web.Services;
 
 public sealed class ApiAuthService
 {
-    public const string TokenFileName = "api-token";
-
     public bool Enabled { get; }
     public string Token { get; }
 
-    private ApiAuthService(bool enabled, string token)
+    /// <summary>True when the effective token was generated for this process (S2's default):
+    /// the host must surface it from the startup log line — it exists nowhere else.</summary>
+    public bool TokenGenerated { get; }
+
+    private ApiAuthService(bool enabled, string token, bool tokenGenerated)
     {
         Enabled = enabled;
         Token = token;
+        TokenGenerated = tokenGenerated;
     }
 
-    public static ApiAuthService Resolve(string dataDir, string[] args)
+    public static ApiAuthService Resolve(string[] args)
     {
         string? explicitToken = null;
         var disabled = false;
@@ -50,29 +55,18 @@ public sealed class ApiAuthService
         }
         if (disabled)
         {
-            return new ApiAuthService(false, "");
+            return new ApiAuthService(false, "", tokenGenerated: false);
         }
 
-        var tokenFile = Path.Combine(dataDir, TokenFileName);
         if (explicitToken is not null)
         {
-            // keep the file in sync so clients can always read the effective token
-            WriteTokenFile(tokenFile, explicitToken);
-            return new ApiAuthService(true, explicitToken);
+            return new ApiAuthService(true, explicitToken, tokenGenerated: false);
         }
 
-        if (File.Exists(tokenFile))
-        {
-            var stored = File.ReadAllText(tokenFile).Trim();
-            if (stored.Length > 0)
-            {
-                return new ApiAuthService(true, stored);
-            }
-        }
-
+        // S2: no file fallback, no write-back — a process-lifetime token, logged once at
+        // startup (the host prints it; see WebHostBuilder), never persisted anywhere
         var generated = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
-        WriteTokenFile(tokenFile, generated);
-        return new ApiAuthService(true, generated);
+        return new ApiAuthService(true, generated, tokenGenerated: true);
     }
 
     public bool Validate(string? candidate) =>
@@ -80,19 +74,21 @@ public sealed class ApiAuthService
         (candidate is not null &&
          string.Equals(candidate, Token, StringComparison.Ordinal));
 
-    private static void WriteTokenFile(string path, string token)
+    /// <summary>S2 cleanup: the pre-reform token file (&lt;dataDir&gt;/api-token) is dead —
+    /// no compatibility read, and a leftover is deleted on startup (best effort; an unreadable
+    /// leftover is inert since nothing reads it anymore).</summary>
+    public const string LegacyTokenFileName = "api-token";
+
+    public static void RemoveLegacyTokenFile(string dataDir)
     {
-        File.WriteAllText(path, token + Environment.NewLine);
-        if (!OperatingSystem.IsWindows())
+        try
         {
-            try
-            {
-                File.SetUnixFileMode(path, System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite);
-            }
-            catch (IOException)
-            {
-                // best effort: the file lives inside the (0700-recommended) data dir anyway
-            }
+            File.Delete(Path.Combine(dataDir, LegacyTokenFileName));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException
+                                 or System.Security.SecurityException)
+        {
+            // the leftover stays; it is inert (nothing reads it anymore)
         }
     }
 }
@@ -126,7 +122,7 @@ public static class ApiAuthMiddleware
                         System.Text.Json.JsonSerializer.Serialize(
                             new Models.ApiErrorEnvelope(
                                 new Models.ErrorResponse("unauthorized",
-                                    "provide the data-dir token as 'Authorization: Bearer <token>' or 'X-Api-Token'")),
+                                    "provide the API token as 'Authorization: Bearer <token>' or 'X-Api-Token'")),
                             FlintJsonContext.Default.ApiErrorEnvelope));
                     return Results.Empty;
                 }

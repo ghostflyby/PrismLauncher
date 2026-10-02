@@ -151,4 +151,48 @@ public class IconFilesTests : IDisposable
         // deleting a missing key fails
         Assert.False(IconFiles.DeleteIcon(_iconsDir, "deleteme"));
     }
+
+    // DATA D5: the IconPool model over the static helpers (key→path index, scan,
+    // install/delete — the IconList half; the endpoints consume this, not the statics)
+    [Fact]
+    public void IconPool_IndexesScansInstallsAndDeletes()
+    {
+        WriteFile(Path.Combine(_iconsDir, "grass.png"));
+        WriteFile(Path.Combine(_iconsDir, "sub", "inner.svg"));
+
+        var pool = new IconPool(() => _iconsDir);
+        Assert.Equal(_iconsDir, pool.IconsDir);
+
+        // the scan indexes subdirectory icons by their base-name key; entries carry the
+        // display name ("dir » name" for nested icons)
+        var entries = pool.Entries();
+        Assert.Equal(2, entries.Count);
+        Assert.Equal(Path.Combine(_iconsDir, "grass.png"),
+            entries.Single(e => e.Key == "grass").Path);
+        Assert.Equal("sub » inner", entries.Single(e => e.Key == "inner").DisplayName);
+
+        // lookups go through the index (and the default→grass alias survives)
+        Assert.Equal(Path.Combine(_iconsDir, "grass.png"), pool.GetIconFile("grass"));
+        Assert.Equal(Path.Combine(_iconsDir, "grass.png"), pool.GetIconFile("default"));
+        Assert.True(pool.IconFileExists("inner"));
+        Assert.False(pool.IconFileExists("missing"));
+
+        // install refreshes the index; the QFile::copy no-overwrite rule holds
+        var source = Path.Combine(_root, "fake.png");
+        WriteFile(source);
+        Assert.True(pool.Install(source, "installed.png"));
+        Assert.True(pool.IconFileExists("installed"));
+        Assert.False(pool.Install(source, "installed.png")); // target exists
+        Assert.False(pool.Install(Path.Combine(_root, "nope.png")));
+
+        // delete drops both the file and the index entry
+        Assert.True(pool.Delete("installed"));
+        Assert.False(pool.IconFileExists("installed"));
+        Assert.False(File.Exists(Path.Combine(_iconsDir, "installed.png")));
+        Assert.False(pool.Delete("installed"));
+
+        // external changes are picked up by the next read (the watcher's replacement)
+        WriteFile(Path.Combine(_iconsDir, "late.png"));
+        Assert.True(pool.IconFileExists("late"));
+    }
 }

@@ -8,8 +8,8 @@ namespace FlintLauncher.Core.Instances;
 
 public class NullInstance : BaseInstance
 {
-    public NullInstance(SettingsObject globalSettings, SettingsObject settings, string rootDir)
-        : base(globalSettings, settings, rootDir)
+    public NullInstance(SettingsObject settings, string rootDir)
+        : base(settings, rootDir)
     {
         SetVersionBroken(true);
     }

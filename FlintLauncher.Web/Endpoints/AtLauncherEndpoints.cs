@@ -98,10 +98,11 @@ public static class AtLauncherEndpoints
                 }
 
                 runtime.Instances.LoadList();
-                var inst = runtime.Instances.GetInstanceById(expectedId);
+                // the staged commit's expected dirname, resolved through the D2 chain
+                var inst = runtime.Instances.ResolveInstance(expectedId);
                 return inst is null
                     ? ApiJson.Error("creation_failed", "instance was committed but not discovered", 500)
-                    : Results.Created($"/api/v1/instances/{inst.Id()}",
+                    : Results.Created($"/api/v1/instances/{inst.Uuid}",
                         new InstanceCreatedResponse(inst.Id(), inst.Name()));
             }
             finally

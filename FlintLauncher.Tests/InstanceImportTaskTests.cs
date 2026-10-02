@@ -45,7 +45,7 @@ public class InstanceImportTaskTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList(_global, [instancesDir]);
+        return new InstanceList([instancesDir]) { Environment = _global };
     }
 
     private async Task<FlintTask> RunImport(Uri source, IReadOnlyDictionary<string, string>? extraInfo = null,
@@ -110,11 +110,12 @@ public class InstanceImportTaskTests : IDisposable
         var task = await RunImport(new Uri(zipPath));
 
         Assert.True(task.WasSuccessful, task.FailReason);
-        // the extracted pack folder landed in the staging instance dir and was renamed
+        // the extracted pack folder landed in the staging instance dir and was renamed; the
+        // import fixups run through the typed adapter — instance.json (D4)
         var instanceDir = Path.Combine(_root, "instances", "Imported");
         Assert.True(Directory.Exists(instanceDir));
-        var cfg = File.ReadAllText(Path.Combine(instanceDir, "instance.cfg"));
-        Assert.Contains("name=Imported", cfg);
+        var cfg = File.ReadAllText(Path.Combine(instanceDir, "instance.json"));
+        Assert.Contains("Imported", cfg);
         Assert.True(File.Exists(Path.Combine(instanceDir, ".minecraft", "options.txt")));
     }
 
@@ -162,9 +163,10 @@ public class InstanceImportTaskTests : IDisposable
         Assert.True(task.WasSuccessful, task.FailReason);
         var instanceDir = Path.Combine(_root, "instances", "Imported");
         Assert.True(Directory.Exists(instanceDir));
-        // the pack contents landed in minecraft/ and the version.json flavor set the component
+        // the pack contents landed in minecraft/, the version.json flavor set the component,
+        // and the identity landed in instance.json (D4)
         Assert.True(File.Exists(Path.Combine(instanceDir, "minecraft", "modpack", "options.txt")));
-        Assert.Contains("name=Imported", File.ReadAllText(Path.Combine(instanceDir, "instance.cfg")));
+        Assert.Contains("Imported", File.ReadAllText(Path.Combine(instanceDir, "instance.json")));
         using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(instanceDir, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
             c => c.GetProperty("uid").GetString() == "net.minecraft"

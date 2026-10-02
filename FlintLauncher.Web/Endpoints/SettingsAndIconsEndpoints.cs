@@ -1,8 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Settings groups (the global settings pages of the C++ UI collapse into named key groups
-// over the same flint.cfg-backed IniSettingsObject) and the global icon library endpoints
-// (IconPickerDialog). UI-API mapping Wave B.
+// over the typed flint.json stack — CONFIG C5/C6; the group KEYS are the wire contract and
+// stay, while the values come from the single key registry FlintConfigKeys — the old
+// Groups value-table + GlobalSettingsRegistration double bookkeeping retired) and the
+// global icon library endpoints (IconPickerDialog). UI-API mapping Wave B; the icon half
+// runs on the injected IconPool model since DATA D5 (IconsDir setting honored).
+//
+// G4 secret rerouting: PUT of ProxyPass/ModrinthToken/FlameKeyOverride writes the
+// ISecretStore (C4 — flint.json carries no secret fields); GET serves the stored values so
+// the wire contract is unchanged for the host.
 using FlintLauncher.Core;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Icons;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Net;
@@ -15,135 +23,136 @@ namespace FlintLauncher.Web.Endpoints;
 
 public static class SettingsAndIconsEndpoints
 {
-    /// <summary>group -> (key -> typed default) — the keys each C++ settings page owns.
-    /// Defaults mirror Application::registerSettings (fix-3: the table and
-    /// GlobalSettingsRegistration carry the same values; GET prefers the registered value,
-    /// the table supplies the type and the pre-registration fallback).</summary>
-    public static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, object?>> Groups =
-        new Dictionary<string, IReadOnlyDictionary<string, object?>>(StringComparer.Ordinal)
+    /// <summary>group -> ordered wire keys — the keys each C++ settings page owns. The
+    /// VALUES live once, in the record defaults (FlintConfigKeys / the record property
+    /// initializers); this table only fixes membership and order.</summary>
+    public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> Groups =
+        new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
         {
-            ["launcher"] = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["MenuBarInsteadOfToolBar"] = false,
-                ["NumberOfConcurrentTasks"] = 10,
-                ["NumberOfConcurrentDownloads"] = 6,
-                ["NumberOfManualRetries"] = 1,
-                ["RequestTimeout"] = 60,
-                ["CloseAfterLaunch"] = false,
-                ["QuitAfterGameStop"] = false,
-                ["AutoCloseConsole"] = false,
+            ["launcher"] =
+            [
+                "MenuBarInsteadOfToolBar",
+                "NumberOfConcurrentTasks",
+                "NumberOfConcurrentDownloads",
+                "NumberOfManualRetries",
+                "RequestTimeout",
+                "CloseAfterLaunch",
+                "QuitAfterGameStop",
+                "AutoCloseConsole",
                 // LauncherPage (instance list + console behavior)
-                ["InstSortMode"] = "Name",
-                ["InstRenamingMode"] = "AskEverytime",
-                ["ShowConsole"] = false,
-                ["ShowConsoleOnError"] = true,
-                ["LogPrePostOutput"] = true,
-                ["ConsoleMaxLines"] = 100000,
-                ["ConsoleOverflowStop"] = true,
+                "InstSortMode",
+                "InstRenamingMode",
+                "ShowConsole",
+                "ShowConsoleOnError",
+                "LogPrePostOutput",
+                "ConsoleMaxLines",
+                "ConsoleOverflowStop",
                 // java wizard / modpack flow switches owned by the launcher pages
-                ["IgnoreJavaWizard"] = false,
-                ["ModDependenciesDisabled"] = false,
-                ["SkipModpackUpdatePrompt"] = false,
-                ["DownloadGameFilesDuringInstanceCreation"] = true,
-                ["ShowModIncompat"] = false,
-            },
-            ["minecraft"] = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["MinMemAlloc"] = 512,
-                ["MaxMemAlloc"] = GlobalSettingsRegistration.DefaultMaxMemAlloc,
-                ["PermGen"] = 128,
-                ["MinecraftWinWidth"] = 854,
-                ["MinecraftWinHeight"] = 480,
-                ["LaunchMaximized"] = false,
-                ["PreLaunchCommand"] = "",
-                ["PostExitCommand"] = "",
-                ["WrapperCommand"] = "",
-                ["Env"] = "{}",
+                "IgnoreJavaWizard",
+                "ModDependenciesDisabled",
+                "SkipModpackUpdatePrompt",
+                "DownloadGameFilesDuringInstanceCreation",
+                "ShowModIncompat",
+            ],
+            ["minecraft"] =
+            [
+                "MinMemAlloc",
+                "MaxMemAlloc",
+                "PermGen",
+                "MinecraftWinWidth",
+                "MinecraftWinHeight",
+                "LaunchMaximized",
+                "PreLaunchCommand",
+                "PostExitCommand",
+                "WrapperCommand",
+                "Env",
                 // game time (MinecraftPage "game time" section)
-                ["ShowGameTime"] = true,
-                ["ShowGlobalGameTime"] = true,
-                ["RecordGameTime"] = true,
-                ["ShowGameTimeWithoutDays"] = false,
+                "ShowGameTime",
+                "ShowGlobalGameTime",
+                "RecordGameTime",
+                "ShowGameTimeWithoutDays",
                 // native library workarounds + performance (MinecraftPage "workarounds")
-                ["UseNativeOpenAL"] = false,
-                ["CustomOpenALPath"] = "",
-                ["UseNativeGLFW"] = false,
-                ["CustomGLFWPath"] = "",
-                ["UseNativeSDL"] = false,
-                ["CustomSDLPath"] = "",
-                ["EnableFeralGamemode"] = false,
-                ["EnableMangoHud"] = false,
-                ["UseDiscreteGpu"] = false,
-                ["UseZink"] = false,
-                ["LowMemWarning"] = true,
-                ["OnlineFixes"] = false,
-            },
-            ["java"] = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
+                "UseNativeOpenAL",
+                "CustomOpenALPath",
+                "UseNativeGLFW",
+                "CustomGLFWPath",
+                "UseNativeSDL",
+                "CustomSDLPath",
+                "EnableFeralGamemode",
+                "EnableMangoHud",
+                "UseDiscreteGpu",
+                "UseZink",
+                "LowMemWarning",
+                "OnlineFixes",
+            ],
+            ["java"] =
+            [
                 // C++ default is the empty path: the automatic-java machinery fills it
-                ["JavaPath"] = "",
-                ["JvmArgs"] = "",
-                ["IgnoreJavaCompatibility"] = false,
-                // legacy table key kept writable (AutoInstallJava writes it on the instance
-                // settings; the C++ derive their defaults from JavaPath being empty)
-                ["AutomaticJava"] = true,
-                ["AutomaticJavaDownload"] = true,
-                ["AutomaticJavaSwitch"] = true,
-            },
-            ["dirs"] = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                // LauncherPage folders (relative to the data dir like the C++ defaults;
-                // InstanceDir itself is structural in the host and stays unwritable)
-                ["CentralModsDir"] = "mods",
-                ["IconsDir"] = "icons",
-                ["DownloadsDir"] = GlobalSettingsRegistration.DefaultDownloadsDir,
-                ["DownloadsDirWatchRecursive"] = false,
-                ["MoveModsFromDownloadsDir"] = false,
-                ["SkinsDir"] = "skins",
-                ["JavaDir"] = "java",
-            },
-            ["language"] = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
+                "JavaPath",
+                "JvmArgs",
+                "IgnoreJavaCompatibility",
+                // legacy wire keys (AutoInstallJava consults the instance-level flag; the
+                // C++ derive their defaults from JavaPath being empty)
+                "AutomaticJava",
+                "AutomaticJavaDownload",
+                "AutomaticJavaSwitch",
+            ],
+            ["dirs"] =
+            [
+                // LauncherPage folders (IconsDir/SkinsDir relative to the data dir, JavaDir
+                // under STORE root semantics since the E2 remount; InstanceDir itself is
+                // structural in the host and stays unwritable). CentralModsDir left with
+                // DATA D8 (true dead setting, unregistered).
+                "IconsDir",
+                "DownloadsDir",
+                "DownloadsDirWatchRecursive",
+                "MoveModsFromDownloadsDir",
+                "SkinsDir",
+                "JavaDir",
+            ],
+            ["language"] =
+            [
                 // LanguagePage
-                ["Language"] = "",
-                ["UseSystemLocale"] = false,
-            },
-            ["meta"] = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
+                "Language",
+                "UseSystemLocale",
+            ],
+            ["meta"] =
+            [
                 // custom mirrors: MetaURLOverride feeds the metadata index, ResourceURLOverride
                 // the AssetUpdateTask and LegacyFMLLibsURLOverride the LegacyFMLLibrariesTask
                 // (read hooks already live in the core launch steps)
-                ["MetaURLOverride"] = "",
-                ["ResourceURLOverride"] = "",
-                ["LegacyFMLLibsURLOverride"] = "",
-            },
-            ["proxy"] = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                // ProxyPage: written values reach Http.Configure through RuntimeNetConfig
-                ["ProxyType"] = "None",
-                ["ProxyAddr"] = "127.0.0.1",
-                ["ProxyPort"] = 8080,
-                ["ProxyUser"] = "",
-                ["ProxyPass"] = "",
-            },
-            ["api"] = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["FlameKeyOverride"] = "",
-                ["ModrinthToken"] = "",
-                ["MetaURLOverride"] = "",
-                ["MSAClientIDOverride"] = "",
-                ["UserAgentOverride"] = "",
+                "MetaURLOverride",
+                "ResourceURLOverride",
+                "LegacyFMLLibsURLOverride",
+            ],
+            ["proxy"] =
+            [
+                // ProxyPage: written values reach the NetStack through RuntimeNetConfig;
+                // ProxyPass is a C4 secret — same wire key, ISecretStore storage
+                "ProxyType",
+                "ProxyAddr",
+                "ProxyPort",
+                "ProxyUser",
+                "ProxyPass",
+            ],
+            ["api"] =
+            [
+                "FlameKeyOverride",
+                "ModrinthToken",
+                "MetaURLOverride",
+                "MSAClientIDOverride",
+                "UserAgentOverride",
                 // paste providers (the registerSettings "HACK" block; the paste endpoint reads them)
-                ["PastebinType"] = (int)PasteUpload.PasteType.Mclogs,
-                ["PastebinCustomAPIBase"] = "",
-            },
-            ["tools"] = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["JsonEditor"] = "",
-                ["JProfilerPath"] = "",
-                ["JVisualVMPath"] = "",
-                ["MCEditPath"] = "",
-            },
+                "PastebinType",
+                "PastebinCustomAPIBase",
+            ],
+            ["tools"] =
+            [
+                "JsonEditor",
+                "JProfilerPath",
+                "JVisualVMPath",
+                "MCEditPath",
+            ],
         };
 
     public static void MapSettingsAndIcons(this IEndpointRouteBuilder api)
@@ -154,11 +163,13 @@ public static class SettingsAndIconsEndpoints
             foreach (var (group, keys) in Groups)
             {
                 var values = new Dictionary<string, object?>(StringComparer.Ordinal);
-                foreach (var (key, def) in keys)
+                foreach (var key in keys)
                 {
-                    values[key] = runtime.GlobalSettings.GetSetting(key) is { } setting
-                        ? TypedValue(setting.Get(), def)
-                        : def;
+                    // G4: the secret trio serves from the store; everything else from the
+                    // typed stack's resolved fold (defaults = the record property defaults)
+                    values[key] = FlintConfigKeys.IsSecret(key)
+                        ? runtime.Secrets.Get(key) ?? ""
+                        : TypedValue(runtime.Config.Get(key), FlintConfigKeys.Default(key));
                 }
                 groups[group] = values;
             }
@@ -175,43 +186,59 @@ public static class SettingsAndIconsEndpoints
             var keys = Groups[body.Group];
             foreach (var prop in body.Values.EnumerateObject())
             {
-                if (!keys.TryGetValue(prop.Name, out var def))
+                if (!keys.Contains(prop.Name))
                 {
                     return ApiJson.Error("unknown_setting",
                         $"key '{prop.Name}' is not part of group '{body.Group}'", 400);
                 }
-                runtime.GlobalSettings.Set(prop.Name, TypedValue(
-                    prop.Value.ValueKind == JsonValueKind.Null ? "" : (object?)prop.Value.Clone(), def));
+                var value = TypedValue(
+                    prop.Value.ValueKind == JsonValueKind.Null ? "" : (object?)prop.Value.Clone(),
+                    FlintConfigKeys.Default(prop.Name));
+                if (FlintConfigKeys.IsSecret(prop.Name))
+                {
+                    // G4: the secret trio never touches flint.json — the write goes to the
+                    // ISecretStore (empty clears the stored secret)
+                    if (Variant.AsString(value) is { Length: > 0 } secret)
+                    {
+                        runtime.Secrets.Set(prop.Name, secret);
+                    }
+                    else
+                    {
+                        runtime.Secrets.Delete(prop.Name);
+                    }
+                }
+                else
+                {
+                    runtime.Config.Set(prop.Name, value);
+                }
             }
             // proxy / retries / timeout / user-agent take effect immediately (Application
-            // re-runs updateProxySettings from the ProxyPage the same way)
+            // re-runs updateProxySettings from the ProxyPage the same way); the apply also
+            // re-reads the store-backed secrets and the mod-platform API credentials
             RuntimeNetConfig.Apply(runtime);
             return Results.NoContent();
         });
 
         // ---- global icon library (IconPickerDialog) ------------------------------------
+        // D5: the surface talks to the injected IconPool model (key→path index, scan,
+        // install/delete) and the IconsDir SETTING decides where the library lives — the
+        // three former hardcoded Path.Combine(DataDir, "icons") sites ignored the setting.
 
-        api.MapGet("/icons", (LauncherRuntime runtime) =>
+        api.MapGet("/icons", (IconPool icons) =>
         {
-            var iconsDir = Path.Combine(runtime.DataDir, "icons");
-            Directory.CreateDirectory(iconsDir);
-            var icons = IconFiles.GetIconFilePaths(iconsDir)
-                .Select(file => new IconView(
-                    IconFiles.IconKeyForFile(iconsDir, file),
-                    IconFiles.IconDisplayName(iconsDir, file)))
-                .OrderBy(i => i.Key, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            return Results.Ok(icons);
+            Directory.CreateDirectory(icons.IconsDir);
+            return Results.Ok(icons.Entries()
+                .Select(entry => new IconView(entry.Key, entry.DisplayName))
+                .ToArray());
         });
 
-        api.MapPost("/icons", async (HttpRequest request, LauncherRuntime runtime) =>
+        api.MapPost("/icons", async (HttpRequest request, IconPool icons) =>
         {
             if (!request.HasFormContentType || request.Form.Files.Count == 0)
             {
                 return ApiJson.Error("invalid_request", "multipart file field is required", 400);
             }
-            var iconsDir = Path.Combine(runtime.DataDir, "icons");
-            Directory.CreateDirectory(iconsDir);
+            Directory.CreateDirectory(icons.IconsDir);
             var installed = new List<string>();
             foreach (var file in request.Form.Files)
             {
@@ -226,7 +253,7 @@ public static class SettingsAndIconsEndpoints
                     await file.CopyToAsync(stream);
                 }
                 var name = Path.GetFileNameWithoutExtension(file.FileName);
-                if (!IconFiles.InstallIcon(iconsDir, temp, name))
+                if (!icons.Install(temp, name))
                 {
                     return ApiJson.Error("invalid_icon", $"could not install {file.FileName}", 400);
                 }
@@ -235,24 +262,29 @@ public static class SettingsAndIconsEndpoints
             return Results.Ok(new IconInstalledResponse(installed[0]));
         });
 
-        api.MapPut("/instances/{id}/icon", async (string id, HttpRequest request, LauncherRuntime runtime) =>
+        api.MapDelete("/icons/{key}", (string key, IconPool icons) =>
+            icons.Delete(key)
+                ? Results.NoContent()
+                : ApiJson.NotFound("icon_not_found", $"no icon '{key}'"));
+
+        api.MapPut("/instances/{ref}/icon", async (string @ref, HttpRequest request,
+            LauncherRuntime runtime) =>
         {
-            if (runtime.Instances.GetInstanceById(id) is not MinecraftInstance instance)
+            if (runtime.Instances.ResolveInstance(@ref) is not MinecraftInstance instance)
             {
-                return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
+                return ApiJson.NotFound("instance_not_found", $"no launchable instance '{@ref}'");
             }
             string key;
             if (request.HasFormContentType && request.Form.Files.Count > 0)
             {
-                var iconsDir = Path.Combine(runtime.DataDir, "icons");
-                Directory.CreateDirectory(iconsDir);
+                Directory.CreateDirectory(runtime.Icons.IconsDir);
                 var file = request.Form.Files[0];
                 var temp = Path.Combine(Path.GetTempPath(), $"flint-icon-{Guid.NewGuid():N}{Path.GetExtension(file.FileName)}");
                 await using (var stream = File.Create(temp))
                 {
                     await file.CopyToAsync(stream);
                 }
-                if (!IconFiles.InstallIcon(iconsDir, temp, instance.Id()))
+                if (!runtime.Icons.Install(temp, instance.Id()))
                 {
                     return ApiJson.Error("invalid_icon", $"could not install {file.FileName}", 400);
                 }

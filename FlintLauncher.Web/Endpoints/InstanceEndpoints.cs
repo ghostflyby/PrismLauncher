@@ -23,7 +23,7 @@ public static class InstanceEndpoints
                 // MainWindow's instance-view filter: name contains + group equals (both
                 // case-insensitive; the group match is exact except for casing)
                 IEnumerable<InstanceSummary> summaries = runtime.Instances.Instances
-                    .Select(inst => Summary(inst, runtime.Instances));
+                    .Select(inst => Summary(inst, runtime));
                 if (!string.IsNullOrEmpty(search))
                 {
                     summaries = summaries.Where(summary =>
@@ -56,12 +56,12 @@ public static class InstanceEndpoints
                     {
                         continue; // ungrouped instances are not a group
                     }
-                    if (!byGroup.TryGetValue(group, out var ids))
+                    if (!byGroup.TryGetValue(group, out var uuids))
                     {
-                        ids = new List<string>();
-                        byGroup[group] = ids;
+                        uuids = new List<string>();
+                        byGroup[group] = uuids;
                     }
-                    ids.Add(inst.Id());
+                    uuids.Add(inst.Uuid);
                 }
                 return Results.Ok(byGroup.Select(pair =>
                     new InstanceGroupView(pair.Key, pair.Value.OrderBy(id => id, StringComparer.Ordinal)
@@ -73,15 +73,17 @@ public static class InstanceEndpoints
             }
         });
 
-        api.MapGet("/instances/{id}", async (string id, LauncherRuntime runtime) =>
+        // {ref} resolves through the D2 chain (inode → uuid → dirname); direct
+        // GetInstanceById is banned at the API boundary (GLOBAL §1 review rule)
+        api.MapGet("/instances/{ref}", async (string @ref, LauncherRuntime runtime) =>
         {
             await runtime.InstanceLock.WaitAsync();
             try
             {
-                var inst = runtime.Instances.GetInstanceById(id);
+                var inst = runtime.Instances.ResolveInstance(@ref);
                 return inst is null
-                    ? ApiJson.NotFound("instance_not_found", $"no instance '{id}'")
-                    : Results.Ok(Detail(inst, runtime.Instances));
+                    ? ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'")
+                    : Results.Ok(Detail(inst, runtime));
             }
             finally
             {
@@ -123,10 +125,10 @@ public static class InstanceEndpoints
                 }
 
                 runtime.Instances.LoadList();
-                var inst = runtime.Instances.GetInstanceById(expectedId);
+                var inst = runtime.Instances.ResolveInstance(expectedId);
                 return inst is null
                     ? ApiJson.Error("creation_failed", "instance was committed but not discovered", 500)
-                    : Results.Created($"/api/v1/instances/{inst.Id()}",
+                    : Results.Created($"/api/v1/instances/{inst.Uuid}",
                         new InstanceCreatedResponse(inst.Id(), inst.Name()));
             }
             finally
@@ -188,7 +190,7 @@ public static class InstanceEndpoints
 
         // CopyInstanceDialog: a selective copy runs as a staged instance task (the copy is
         // committed into instances/ on success) and is tracked like import
-        api.MapPost("/instances/{id}/copy", async (string id, CopyInstanceRequest request,
+        api.MapPost("/instances/{ref}/copy", async (string @ref, CopyInstanceRequest request,
             LauncherRuntime runtime, FlintTaskRegistry registry) =>
         {
             if (string.IsNullOrWhiteSpace(request.Name))
@@ -199,10 +201,10 @@ public static class InstanceEndpoints
             await runtime.InstanceLock.WaitAsync();
             try
             {
-                var original = runtime.Instances.GetInstanceById(id);
+                var original = runtime.Instances.ResolveInstance(@ref);
                 if (original is null)
                 {
-                    return ApiJson.NotFound("instance_not_found", $"no instance '{id}'");
+                    return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
                 }
 
                 // the dialog checkboxes; unspecified flags keep the InstanceCopyPrefs defaults
@@ -234,7 +236,7 @@ public static class InstanceEndpoints
                 task.Icon = request.IconKey ?? original.IconKey();
 
                 var wrapped = runtime.Instances.WrapInstanceTask(task);
-                var entry = registry.Register("copy", wrapped, instanceId: id,
+                var entry = registry.Register("copy", wrapped, instanceId: @ref,
                     onFinished: () => _ = Task.Run(() =>
                     {
                         runtime.InstanceLock.Wait();
@@ -256,17 +258,17 @@ public static class InstanceEndpoints
             }
         });
 
-        api.MapDelete("/instances/{id}", async (string id, LauncherRuntime runtime) =>
+        api.MapDelete("/instances/{ref}", async (string @ref, LauncherRuntime runtime) =>
         {
             await runtime.InstanceLock.WaitAsync();
             try
             {
-                var inst = runtime.Instances.GetInstanceById(id);
+                var inst = runtime.Instances.ResolveInstance(@ref);
                 if (inst is null)
                 {
-                    return ApiJson.NotFound("instance_not_found", $"no instance '{id}'");
+                    return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
                 }
-                runtime.Instances.DeleteInstance(id);
+                runtime.Instances.DeleteInstance(inst.Id());
                 return Results.NoContent();
             }
             finally
@@ -275,24 +277,25 @@ public static class InstanceEndpoints
             }
         });
 
-        api.MapPatch("/instances/{id}", async (string id, PatchInstanceRequest request, LauncherRuntime runtime) =>
+        // D3: a rename is a pure METADATA write — the directory name stays (it is the
+        // display form, not the identity); references hold through the D2 chain (uuid),
+        // so there is no directory move, no LoadList reload and no group re-attachment
+        // (the old syncInstanceDirName flow is gone).
+        api.MapPatch("/instances/{ref}", async (string @ref, PatchInstanceRequest request,
+            LauncherRuntime runtime) =>
         {
             await runtime.InstanceLock.WaitAsync();
             try
             {
-                var inst = runtime.Instances.GetInstanceById(id);
+                var inst = runtime.Instances.ResolveInstance(@ref);
                 if (inst is null)
                 {
-                    return ApiJson.NotFound("instance_not_found", $"no instance '{id}'");
+                    return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
                 }
 
-                // metadata edits first (persisted at the current directory), like upstream's
-                // rename flow where the name edit commits before the directory moves
-                var renameRequested = false;
                 if (request.Name is { } name && name.Length != 0 && name != inst.Name())
                 {
                     inst.SetName(name);
-                    renameRequested = true;
                 }
                 if (request.IconKey is { } icon)
                 {
@@ -307,26 +310,6 @@ public static class InstanceEndpoints
                     runtime.Instances.SetInstanceGroup(inst.Id(), group);
                 }
                 runtime.Instances.SaveNow();
-
-                if (renameRequested)
-                {
-                    // syncInstanceDirName semantics: also rename the instance directory (the
-                    // id follows the directory name); failure keeps a metadata-only rename
-                    var groupBefore = runtime.Instances.GetInstanceGroup(inst.Id());
-                    var newRoot = Path.Combine(runtime.Instances.PrimaryDir(),
-                        FileSystem.DirNameFromString(request.Name!, runtime.Instances.PrimaryDir()));
-                    if (inst.SyncInstanceDirName(newRoot))
-                    {
-                        runtime.Instances.LoadList();
-                        // carry the group over to the new id (upstream re-applies the group
-                        // after refreshing the instance list)
-                        var finalGroup = request.Group ?? groupBefore;
-                        if (finalGroup.Length != 0)
-                        {
-                            runtime.Instances.SetInstanceGroup(Path.GetFileName(newRoot), finalGroup);
-                        }
-                    }
-                }
                 return Results.NoContent();
             }
             finally
@@ -336,33 +319,39 @@ public static class InstanceEndpoints
         });
 
         // ------------------------------------------------------------ instance settings
-        api.MapGet("/instances/{id}/settings", async (string id, LauncherRuntime runtime) =>
+        api.MapGet("/instances/{ref}/settings", async (string @ref, LauncherRuntime runtime) =>
         {
             await runtime.InstanceLock.WaitAsync();
             try
             {
-                var inst = runtime.Instances.GetInstanceById(id);
+                var inst = runtime.Instances.ResolveInstance(@ref);
                 if (inst is null)
                 {
-                    return ApiJson.NotFound("instance_not_found", $"no instance '{id}'");
+                    return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
                 }
                 var settings = inst.Settings();
                 var node = new JsonObject();
-                if (settings is IniSettingsObject ini && File.Exists(ini.FilePath))
+                if (settings is Core.Config.InstanceJsonSettingsObject typed)
                 {
-                    var file = new IniFile();
-                    file.LoadFile(ini.FilePath);
-                    foreach (var key in file.Keys)
+                    // the instance's own layer (D4): the derived gate states, every
+                    // instance-layer member that is set (with its EFFECTIVE value — the C7
+                    // fold over flint.json) and the runtime time trio (instance-state.json).
+                    // Keys the instance layer never set are absent — they inherit.
+                    foreach (var entry in Core.Config.InstanceConfigKeys.All
+                                 .OrderBy(e => e.Key, StringComparer.Ordinal))
                     {
-                        // registered keys are reported with their typed effective value
-                        // (typed by the setting's declared default kind — the INI stores
-                        // everything as strings); unregistered INI keys stay raw strings
-                        // (SettingsObject does not expose setting enumeration, so the INI
-                        // keys define the map — documented)
-                        node[key] = settings.GetSetting(key) is { } setting
-                            ? ToNode(TypedByDefaultKind(setting))
-                            : file.Get(key) is { } raw ? ToNode(Variant.FromIniValue(raw)) : null;
+                        var derivedGate = entry.Key.StartsWith("Override", StringComparison.Ordinal);
+                        // NullInstance only registers the BaseInstance key set — type-specific
+                        // keys that never registered are absent, like un-set ones
+                        if ((derivedGate || entry.IsSet(typed.ConfigStore.Current)) &&
+                            settings.GetSetting(entry.Key) is { } setting)
+                        {
+                            node[entry.Key] = ToNode(TypedByDefaultKind(setting));
+                        }
                     }
+                    node["lastLaunchTime"] = typed.StateStore.Current.LastLaunchTime;
+                    node["lastTimePlayed"] = typed.StateStore.Current.LastTimePlayed;
+                    node["totalTimePlayed"] = typed.StateStore.Current.TotalTimePlayed;
                 }
                 return ApiJson.Node(node);
             }
@@ -372,7 +361,7 @@ public static class InstanceEndpoints
             }
         });
 
-        api.MapPut("/instances/{id}/settings", async (string id, SettingsPutRequest request,
+        api.MapPut("/instances/{ref}/settings", async (string @ref, SettingsPutRequest request,
                                                       LauncherRuntime runtime) =>
         {
             if (request.Overrides.ValueKind != JsonValueKind.Object)
@@ -383,10 +372,10 @@ public static class InstanceEndpoints
             await runtime.InstanceLock.WaitAsync();
             try
             {
-                var inst = runtime.Instances.GetInstanceById(id);
+                var inst = runtime.Instances.ResolveInstance(@ref);
                 if (inst is null)
                 {
-                    return ApiJson.NotFound("instance_not_found", $"no instance '{id}'");
+                    return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
                 }
                 var settings = inst.Settings();
 
@@ -411,10 +400,14 @@ public static class InstanceEndpoints
 
     // ----------------------------------------------------------------- DTO mapping
 
-    public static InstanceSummary Summary(BaseInstance inst, InstanceList list)
+    public static InstanceSummary Summary(BaseInstance inst, LauncherRuntime runtime)
     {
         _ = inst.Settings(); // ensure the type-specific settings (and InstanceType) are loaded
+        var list = runtime.Instances;
         return new InstanceSummary(
+            inst.Id(),
+            inst.Uuid,
+            runtime.Instances.InodeOf(inst),
             inst.Id(),
             inst.Name(),
             inst.IconKey(),
@@ -425,10 +418,14 @@ public static class InstanceEndpoints
             InstanceType(inst));
     }
 
-    public static InstanceDetail Detail(BaseInstance inst, InstanceList list)
+    public static InstanceDetail Detail(BaseInstance inst, LauncherRuntime runtime)
     {
         _ = inst.Settings();
+        var list = runtime.Instances;
         return new InstanceDetail(
+            inst.Id(),
+            inst.Uuid,
+            runtime.Instances.InodeOf(inst),
             inst.Id(),
             inst.Name(),
             inst.IconKey(),
@@ -483,6 +480,13 @@ public static class InstanceEndpoints
             : long.TryParse(value.ToString(), out var l) ? l : 0L,
         double => value.ValueKind == JsonValueKind.Number ? value.GetDouble()
             : double.TryParse(value.ToString(), out var d) ? d : 0d,
+        // typed string lists (linkedInstances — D4): a JSON array of strings
+        IReadOnlyList<string> => value.ValueKind == JsonValueKind.Array
+            ? value.EnumerateArray()
+                .Where(e => e.ValueKind == JsonValueKind.String)
+                .Select(e => e.GetString()!)
+                .ToList()
+            : [],
         _ => value.ToString(),
     };
 }

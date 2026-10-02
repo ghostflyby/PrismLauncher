@@ -28,14 +28,20 @@ public sealed class JavaInstallList
 
     private readonly bool _onlyManagedVersions;
     private readonly int _maxConcurrent;
+    private readonly string? _javaRoot;
     private Status _status = Status.NotDone;
     private JavaListLoadTask? _loadTask;
     private List<JavaInstall> _vlist = [];
 
-    public JavaInstallList(bool onlyManagedVersions = false, int maxConcurrent = ConcurrentTask.DefaultMaxConcurrent)
+    /// <summary><paramref name="javaRoot"/> is the launcher-managed java dir (the JavaDir
+    /// setting under E2 store semantics — the host passes the resolved root; the default
+    /// keeps the C++ cwd-relative behavior for bare fixtures).</summary>
+    public JavaInstallList(bool onlyManagedVersions = false, int maxConcurrent = ConcurrentTask.DefaultMaxConcurrent,
+        string? javaRoot = null)
     {
         _onlyManagedVersions = onlyManagedVersions;
         _maxConcurrent = maxConcurrent;
+        _javaRoot = javaRoot;
     }
 
     /// <summary>Port of JavaInstallList::getLoadTask().</summary>
@@ -55,7 +61,7 @@ public sealed class JavaInstallList
         if (_status != Status.InProgress)
         {
             _status = Status.InProgress;
-            _loadTask = new JavaListLoadTask(this, _onlyManagedVersions, _maxConcurrent);
+            _loadTask = new JavaListLoadTask(this, _onlyManagedVersions, _maxConcurrent, _javaRoot);
             // C++ starts the task immediately; the returned Task tracks the in-flight run.
             _ = _loadTask.StartAsync();
         }
@@ -95,20 +101,25 @@ public sealed class JavaListLoadTask : FlintTask
     private readonly JavaInstallList _list;
     private readonly bool _onlyManagedVersions;
     private readonly int _maxConcurrent;
+    private readonly string? _javaRoot;
     private readonly List<JavaChecker.Result> _results = [];
 
-    public JavaListLoadTask(JavaInstallList vlist, bool onlyManagedVersions = false, int maxConcurrent = ConcurrentTask.DefaultMaxConcurrent)
+    public JavaListLoadTask(JavaInstallList vlist, bool onlyManagedVersions = false,
+        int maxConcurrent = ConcurrentTask.DefaultMaxConcurrent, string? javaRoot = null)
     {
         _list = vlist;
         _onlyManagedVersions = onlyManagedVersions;
         _maxConcurrent = maxConcurrent;
+        _javaRoot = javaRoot;
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Detecting Java installations...");
 
-        var candidatePaths = _onlyManagedVersions ? JavaUtils.GetPrismJavaBundle() : JavaUtils.FindJavaPaths();
+        var candidatePaths = _onlyManagedVersions
+            ? JavaUtils.GetPrismJavaBundle(_javaRoot)
+            : JavaUtils.FindJavaPaths(_javaRoot);
 
         var job = new ConcurrentTask("Java detection", _maxConcurrent);
         job.Progress += (_, progress) => EmitProgress(progress);

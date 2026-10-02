@@ -60,10 +60,19 @@ public class FlintApiFlameSearchTests : IDisposable
     [Fact]
     public async Task Flame_Search_MapsHits_And_SendsApiKey()
     {
-        _flameApi.ApiKeyProvider = static () => "user-supplied-key";
+        // G4: the Flame key is a store secret — the host startup apply derives the provider
+        // from the ISecretStore, so the key goes in through PUT /settings (the former direct
+        // ApiKeyProvider override no longer survives host startup)
         _server.SearchJson = new JsonObject { ["data"] = new JsonArray(JsonNode.Parse(SearchHitJson)!) }.ToJsonString();
 
         await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
+        var keyPut = await host.PutAsync("/api/v1/settings", new
+        {
+            group = "api",
+            values = new Dictionary<string, object> { ["FlameKeyOverride"] = "user-supplied-key" },
+        });
+        Assert.Equal(System.Net.HttpStatusCode.NoContent, keyPut.StatusCode);
+
         var response = await host.GetAsync(
             "/api/v1/modplatform/flame/search?query=fabric&version=1.18.2&loader=fabric&index=Popularity");
         response.EnsureSuccessStatusCode();

@@ -126,11 +126,11 @@ public sealed class LegacyFtbPackInstallTask : InstanceTask
             }
         }
 
-        var instanceConfigPath = FileSystem.PathCombine(StagingPath, "instance.cfg");
+        // D4: the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
-            GlobalSettings ?? throw new InvalidOperationException(
-                "InstanceTask requires SetParentSettings before execution."),
-            new Settings.IniSettingsObject(instanceConfigPath), StagingPath);
+            new Core.Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
+                "InstanceTask requires SetParentEnvironment before execution.")),
+            StagingPath);
         {
             var components = instance.GetPackProfile();
             components.BuildingFromScratch();

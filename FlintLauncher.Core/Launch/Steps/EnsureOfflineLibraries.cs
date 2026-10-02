@@ -24,7 +24,7 @@ public sealed class EnsureOfflineLibraries : LaunchStep
         }
         var allJars = new List<string>();
         profile.GetLibraryFiles(_instance.RuntimeContext, allJars, allJars, _instance.GetLocalLibraryPath(),
-            _instance.BinRoot(), false);
+            _instance.BinRoot(), false, storageBase: _instance.LibraryStorageBase());
 
         var missing = new List<string>();
         foreach (var jar in allJars)

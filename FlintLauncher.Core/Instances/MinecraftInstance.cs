@@ -3,7 +3,8 @@
 //
 // Deviations from the C++ original:
 //  - Application-singleton reach-ins become injectable hooks: playtimeSettings() ->
-//    <see cref="BaseInstance.PlaytimeSettings"/>; m_detectedOpenALPath/m_detectedGLFWPath/
+//    <see cref="BaseInstance.LauncherState"/> (launcher-state.json since S5/C9);
+//    m_detectedOpenALPath/m_detectedGLFWPath/
 //    m_detectedSDLPath -> the Detected*Path properties; APPLICATION->metacache() ->
 //    <see cref="MetaCache"/> (library_directory defaults to "" while unset); APPLICATION->
 //    icons()->saveIcon -> <see cref="LaunchServices.Ui"/>.SaveIcon; the QGuiApplication
@@ -42,6 +43,7 @@ using System.Text.RegularExpressions;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Json;
+using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Net;
@@ -55,8 +57,8 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 {
     private static readonly Regex TokenRegex = new(@"\$\{(.+?)\}", RegexOptions.CultureInvariant); // InvertedGreediness
 
-    public MinecraftInstance(SettingsObject globalSettings, SettingsObject settings, string rootDir)
-        : base(globalSettings, settings, rootDir)
+    public MinecraftInstance(SettingsObject settings, string rootDir)
+        : base(settings, rootDir)
     {
         _components = new PackProfile(this);
     }
@@ -72,8 +74,23 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     public string DetectedSDLPath { get; set; } = "";
 
     /// <summary>C++ APPLICATION->metacache(); used for the library_directory profile variable,
-    /// the library/asset-index download caches and the metadata entities.</summary>
-    public HttpMetaCache? MetaCache { get; set; }
+    /// the library/asset-index download caches and the metadata entities. E6 wiring: setting
+    /// it ALSO stamps the pack profile's metadata index (the "meta" base chain — the
+    /// SetMetadataCache call the former static SharedCache default papered over).</summary>
+    public HttpMetaCache? MetaCache
+    {
+        get => _metaCache;
+        set
+        {
+            _metaCache = value;
+            if (value is not null)
+            {
+                _components?.SetMetadataCache(value);
+            }
+        }
+    }
+
+    private HttpMetaCache? _metaCache;
 
     /// <summary>Injected data-directory layout (assets/libraries/java roots, instgroups.json).
     /// Null keeps the legacy CWD-anchored behavior for bare fixtures; hosts always set it
@@ -98,72 +115,54 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             return;
         }
 
-        // Java Settings
-        var locationOverride = _settings.RegisterSetting("OverrideJavaLocation", false);
-        var argsOverride = _settings.RegisterSetting("OverrideJavaArgs", false);
+        // Java Settings (C7: the gate keys register as derived keys — inheritance is the
+        // fold, the override chains are gone; the java probe quintet is NOT here, it lives
+        // in launcher-state.json's path-keyed map, S5/C9)
+        _settings.RegisterSetting("OverrideJavaLocation", false);
+        _settings.RegisterSetting("OverrideJavaArgs", false);
         _settings.RegisterSetting("AutomaticJava", false);
         _settings.RegisterSetting("UseLatestMinecraftVersion", false);
         _settings.RegisterSetting("UseLatestMinecraftVersionType", "release");
 
-        if (GlobalSettings() is { } globalSettings)
-        {
-            _settings.RegisterOverride(globalSettings.GetSetting("JavaPath")!, locationOverride!);
-            _settings.RegisterOverride(globalSettings.GetSetting("JvmArgs")!, argsOverride!);
-            _settings.RegisterOverride(globalSettings.GetSetting("IgnoreJavaCompatibility")!, locationOverride!);
+        _settings.RegisterSetting("OverrideWindow", false);
+        _settings.RegisterSetting("LaunchMaximized", false);
+        _settings.RegisterSetting("MinecraftWinWidth", 854);
+        _settings.RegisterSetting("MinecraftWinHeight", 480);
+        _settings.RegisterSetting("OverrideMemory", false);
+        _settings.RegisterSetting("MinMemAlloc", 512);
+        _settings.RegisterSetting("MaxMemAlloc", 4096);
+        _settings.RegisterSetting("PermGen", 128);
+        _settings.RegisterSetting("LowMemWarning", true);
+        _settings.RegisterSetting("OverrideNativeWorkarounds", false);
+        _settings.RegisterSetting("UseNativeOpenAL", false);
+        _settings.RegisterSetting("CustomOpenALPath", "");
+        _settings.RegisterSetting("UseNativeGLFW", false);
+        _settings.RegisterSetting("CustomGLFWPath", "");
+        _settings.RegisterSetting("UseNativeSDL", false);
+        _settings.RegisterSetting("CustomSDLPath", "");
+        _settings.RegisterSetting("OverridePerformance", false);
+        _settings.RegisterSetting("EnableFeralGamemode", false);
+        _settings.RegisterSetting("EnableMangoHud", false);
+        _settings.RegisterSetting("UseDiscreteGpu", false);
+        _settings.RegisterSetting("UseZink", false);
+        _settings.RegisterSetting("OverrideMiscellaneous", false);
+        _settings.RegisterSetting("CloseAfterLaunch", false);
+        _settings.RegisterSetting("QuitAfterGameStop", false);
+        _settings.RegisterSetting("OverrideLegacySettings", false);
+        _settings.RegisterSetting("OnlineFixes", false);
+        _settings.RegisterSetting("OverrideEnv", false);
+        _settings.RegisterSetting("Env", "{}");
+        // the layered member keys resolve instance ?? user through the adapter — the
+        // registered values are type anchors only (C6 defaults live in the flint.json
+        // record property initializers, the single source)
+        _settings.RegisterSetting("JavaPath", "");
+        _settings.RegisterSetting("JvmArgs", "");
+        _settings.RegisterSetting("IgnoreJavaCompatibility", false);
 
-            // special!
-            _settings.RegisterPassthrough(globalSettings.GetSetting("JavaSignature")!, locationOverride!);
-            _settings.RegisterPassthrough(globalSettings.GetSetting("JavaArchitecture")!, locationOverride!);
-            _settings.RegisterPassthrough(globalSettings.GetSetting("JavaRealArchitecture")!, locationOverride!);
-            _settings.RegisterPassthrough(globalSettings.GetSetting("JavaVersion")!, locationOverride!);
-            _settings.RegisterPassthrough(globalSettings.GetSetting("JavaVendor")!, locationOverride!);
-
-            // Window Size
-            var windowSetting = _settings.RegisterSetting("OverrideWindow", false)!;
-            _settings.RegisterOverride(globalSettings.GetSetting("LaunchMaximized")!, windowSetting);
-            _settings.RegisterOverride(globalSettings.GetSetting("MinecraftWinWidth")!, windowSetting);
-            _settings.RegisterOverride(globalSettings.GetSetting("MinecraftWinHeight")!, windowSetting);
-
-            // Memory
-            var memorySetting = _settings.RegisterSetting("OverrideMemory", false)!;
-            _settings.RegisterOverride(globalSettings.GetSetting("MinMemAlloc")!, memorySetting);
-            _settings.RegisterOverride(globalSettings.GetSetting("MaxMemAlloc")!, memorySetting);
-            _settings.RegisterOverride(globalSettings.GetSetting("PermGen")!, memorySetting);
-            _settings.RegisterOverride(globalSettings.GetSetting("LowMemWarning")!, memorySetting);
-
-            // Native library workarounds
-            var nativeLibraryWorkaroundsOverride = _settings.RegisterSetting("OverrideNativeWorkarounds", false)!;
-            _settings.RegisterOverride(globalSettings.GetSetting("UseNativeOpenAL")!, nativeLibraryWorkaroundsOverride);
-            _settings.RegisterOverride(globalSettings.GetSetting("CustomOpenALPath")!, nativeLibraryWorkaroundsOverride);
-            _settings.RegisterOverride(globalSettings.GetSetting("UseNativeGLFW")!, nativeLibraryWorkaroundsOverride);
-            _settings.RegisterOverride(globalSettings.GetSetting("CustomGLFWPath")!, nativeLibraryWorkaroundsOverride);
-            _settings.RegisterOverride(globalSettings.GetSetting("UseNativeSDL")!, nativeLibraryWorkaroundsOverride);
-            _settings.RegisterOverride(globalSettings.GetSetting("CustomSDLPath")!, nativeLibraryWorkaroundsOverride);
-
-            // Performance related options
-            var performanceOverride = _settings.RegisterSetting("OverridePerformance", false)!;
-            _settings.RegisterOverride(globalSettings.GetSetting("EnableFeralGamemode")!, performanceOverride);
-            _settings.RegisterOverride(globalSettings.GetSetting("EnableMangoHud")!, performanceOverride);
-            _settings.RegisterOverride(globalSettings.GetSetting("UseDiscreteGpu")!, performanceOverride);
-            _settings.RegisterOverride(globalSettings.GetSetting("UseZink")!, performanceOverride);
-
-            // Miscellaneous
-            var miscellaneousOverride = _settings.RegisterSetting("OverrideMiscellaneous", false)!;
-            _settings.RegisterOverride(globalSettings.GetSetting("CloseAfterLaunch")!, miscellaneousOverride);
-            _settings.RegisterOverride(globalSettings.GetSetting("QuitAfterGameStop")!, miscellaneousOverride);
-
-            // Legacy-related options
-            var legacySettings = _settings.RegisterSetting("OverrideLegacySettings", false)!;
-            _settings.RegisterOverride(globalSettings.GetSetting("OnlineFixes")!, legacySettings);
-
-            var envSetting = _settings.RegisterSetting("OverrideEnv", false)!;
-            _settings.RegisterOverride(globalSettings.GetSetting("Env")!, envSetting);
-
-            if (Variant.AsString(_settings.Get("InstanceType")) != "OneSix")
-            {
-                _settings.Set("InstanceType", "OneSix");
-            }
-        }
+        // the C++ force-wrote InstanceType=OneSix here; with the typed layer the record
+        // default IS OneSix (BaseInstance registration) and a non-OneSix type never
+        // constructs a MinecraftInstance (InstanceList yields NullInstance instead), so
+        // a fresh load performs no write — the dual-track read-only guarantee (D4)
 
         // Join server on launch, this does not have a global override
         _settings.RegisterSetting("JoinServerOnLaunch", false);
@@ -186,7 +185,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // (upstream connects both settings to reset the data pack folder model; that model is
         //  not ported yet, so there is nothing to reset here)
 
-        // Join server on launch, this does not have a global override
+        // Mod download loaders (the C7 OverrideModDownloadLoaders family; instance-only)
         _settings.RegisterSetting("OverrideModDownloadLoaders", false);
         _settings.RegisterSetting("ModDownloadLoaders", "[]");
 
@@ -198,9 +197,12 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     public override void UpdateRuntimeContext()
     {
         // RuntimeContext::updateFromInstanceSettings (the member itself lives on the C++
-        // RuntimeContext struct; the C# struct has no SettingsObject dependency)
-        _runtimeContext.JavaArchitecture = Variant.AsString(_settings.Get("JavaArchitecture"));
-        _runtimeContext.JavaRealArchitecture = Variant.AsString(_settings.Get("JavaRealArchitecture"));
+        // RuntimeContext struct; the C# struct has no SettingsObject dependency). The
+        // probed architectures come from the state-side probe cache (S5 path-keyed map;
+        // the former JavaArchitecture/JavaRealArchitecture settings keys are gone, C9).
+        var detection = JavaDetection();
+        _runtimeContext.JavaArchitecture = detection?.Architecture ?? "";
+        _runtimeContext.JavaRealArchitecture = detection?.RealArchitecture ?? "";
         _components!.InvalidateLaunchProfile();
     }
 
@@ -265,9 +267,6 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     public string LibrariesPath() => Paths?.LibrariesRoot ?? QDirAbsolutePath("libraries");
 
     public string JarmodsPath() => JarModsDir();
-
-    /// <summary>QDir::current().absoluteFilePath("versions").</summary>
-    public string VersionsPath() => Paths?.VersionsRoot ?? QDirAbsolutePath("versions");
 
     public override string InstanceConfigFolder() => FileSystem.PathCombine(GameRoot(), "config");
 
@@ -468,10 +467,10 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// cache/settings — the same behavior the former unset static hooks produced.</summary>
     private Launch.LaunchServices BuildLaunchServices() => new()
     {
-        Paths = Paths ?? FlintPaths.FromDataDir(Directory.GetCurrentDirectory()),
+        Paths = Paths ?? FlintPaths.FromHomeDir(Directory.GetCurrentDirectory()),
         LoggerFactory = Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
         MetaCache = MetaCache,
-        GlobalSettings = GlobalSettings() as IniSettingsObject,
+        Config = UserConfigStore,
         InstallRoot = Paths?.InstallRoot ?? AppContext.BaseDirectory,
     };
 
@@ -1168,8 +1167,8 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         var description = $"Minecraft {mcVersion}";
         if (Variant.AsBool(_settings.Get("ShowGameTime")))
         {
-            var withoutDays = GlobalSettings() is { } appSettings &&
-                              Variant.AsBool(appSettings.Get("ShowGameTimeWithoutDays"));
+            // the without-days display flag is global-only (no instance override in C++)
+            var withoutDays = UserLayer.GameTime.ShowGameTimeWithoutDays ?? false;
             if (LastTimePlayed() > 0 && LastLaunch() > 0)
             {
                 var lastLaunchTime = DateTimeOffset.FromUnixTimeMilliseconds(LastLaunch()).LocalDateTime;
@@ -1195,7 +1194,8 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         var jars = new List<string>();
         var nativeJars = new List<string>();
         var profile = _components!.GetProfile()!;
-        profile.GetLibraryFiles(RuntimeContext, jars, nativeJars, GetLocalLibraryPath(), BinRoot());
+        profile.GetLibraryFiles(RuntimeContext, jars, nativeJars, GetLocalLibraryPath(), BinRoot(),
+            storageBase: LibraryStorageBase());
         return jars;
     }
 
@@ -1204,9 +1204,16 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         var jars = new List<string>();
         var nativeJars = new List<string>();
         var profile = _components!.GetProfile()!;
-        profile.GetLibraryFiles(RuntimeContext, jars, nativeJars, GetLocalLibraryPath(), BinRoot());
+        profile.GetLibraryFiles(RuntimeContext, jars, nativeJars, GetLocalLibraryPath(), BinRoot(),
+            storageBase: LibraryStorageBase());
         return nativeJars;
     }
+
+    /// <summary>The storage base unstamped (meta-loaded) library paths resolve against —
+    /// the C++ anchored the relative "libraries/" prefix on its chdir'd data dir; the port
+    /// has no chdir (DI-B), so it anchors on the store root (E2). Bare fixtures without a
+    /// stamped layout keep the historical CWD-relative behavior.</summary>
+    public string LibraryStorageBase() => Paths?.StoreRoot ?? "";
 
     public string GetMainClass()
     {
@@ -1216,7 +1223,34 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public JavaVersion GetJavaVersion()
     {
-        return new JavaVersion(Variant.AsString(Settings().Get("JavaVersion")));
+        // the probe cache is launcher-state.json's path-keyed java map now (S5/C9) —
+        // settings never carried the probed version back
+        return new JavaVersion(JavaDetection()?.Version ?? "");
+    }
+
+    /// <summary>The probe-cache key for a configured java path (S5): the resolved executable,
+    /// or the configured string as-is when it cannot be resolved (deterministic — CheckJava
+    /// stores and every reader resolves through this same function).</summary>
+    public static string JavaDetectKey(string javaPathSetting)
+    {
+        var resolved = LauncherJars.ResolveExecutable(javaPathSetting);
+        return resolved.Length != 0 ? resolved : javaPathSetting;
+    }
+
+    /// <summary>The probe-cache entry for this instance's configured java (S5
+    /// JavaDetectState.Detections), or null when that binary has not been probed (or no state
+    /// store is wired). Goes through Settings() so the specific settings (and the JavaPath
+    /// override) are loaded like every other reader, and reads the INSTANCE-stamped state
+    /// store — instances discovered at startup carry it from InstanceList, while their
+    /// LaunchServices may still be null (it is stamped later by the composition root).</summary>
+    public State.JavaDetectEntry? JavaDetection()
+    {
+        var key = JavaDetectKey(Variant.AsString(Settings().Get("JavaPath")));
+        if (key.Length == 0)
+        {
+            return null;
+        }
+        return LauncherState?.Current.Java.Detections.GetValueOrDefault(key);
     }
 
     //////  Mod Lists //////
@@ -1225,8 +1259,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         if (_loaderModList is null)
         {
-            var isIndexed = GlobalSettings() is not { } appSettings ||
-                            !Variant.AsBool(appSettings.Get("ModMetadataDisabled"));
+            var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
             _loaderModList = new ModFolderModel(ModsRoot(), isIndexed, createDir: true);
         }
         return _loaderModList;
@@ -1236,8 +1269,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         if (_coreModList is null)
         {
-            var isIndexed = GlobalSettings() is not { } appSettings ||
-                            !Variant.AsBool(appSettings.Get("ModMetadataDisabled"));
+            var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
             _coreModList = new ModFolderModel(CoreModsDir(), isIndexed, createDir: true);
         }
         return _coreModList;
@@ -1247,8 +1279,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         if (_nilModList is null)
         {
-            var isIndexed = GlobalSettings() is not { } appSettings ||
-                            !Variant.AsBool(appSettings.Get("ModMetadataDisabled"));
+            var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
             // NOTE: upstream does not create the folder for the nil mod list (4th arg false)
             _nilModList = new ModFolderModel(NilModsDir(), isIndexed, createDir: false);
         }

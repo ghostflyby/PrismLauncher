@@ -11,4 +11,11 @@
     <ProjectReference Include="..\FlintLauncher.Core\FlintLauncher.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The tests exercise FlintJsonContext's source-generated roots directly (the AOT
+         smoke: a root type missing from the context is a RUNTIME failure, not a compile
+         error) — same pattern as Core's InternalsVisibleTo. -->
+    <InternalsVisibleTo Include="FlintLauncher.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -51,7 +51,7 @@ public class FtbTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList(_global, [instancesDir]);
+        return new InstanceList([instancesDir]) { Environment = _global };
     }
 
     private static List<(string? Uid, string? Version)> Components(string staging)
@@ -288,8 +288,10 @@ public class FtbTests : IDisposable
         Assert.Contains(components, c => c.Uid == "net.minecraftforge" && c.Version == "40.1.0");
         Assert.DoesNotContain(components, c => c.Uid == "net.fabricmc.fabric-loader");
 
-        // managed-pack bookkeeping
-        Assert.Contains("ManagedPackType=ftb", File.ReadAllText(Path.Combine(staging, "instance.cfg")));
+        // managed-pack bookkeeping (D4: instance.json, the "managed" domain)
+        var instJson = File.ReadAllText(Path.Combine(staging, "instance.json"));
+        Assert.Contains("managed", instJson);
+        Assert.Contains("\"ftb\"", instJson);
     }
 
     [Fact]

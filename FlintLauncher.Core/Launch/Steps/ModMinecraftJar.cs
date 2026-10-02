@@ -59,7 +59,8 @@ public sealed class ModMinecraftJar : LaunchStep
             var temp1 = new List<string>();
             var temp2 = new List<string>();
             var temp3 = new List<string>();
-            mainJar.GetApplicableFiles(inst.RuntimeContext, jars, temp1, temp2, temp3, inst.GetLocalLibraryPath());
+            mainJar.GetApplicableFiles(inst.RuntimeContext, jars, temp1, temp2, temp3, inst.GetLocalLibraryPath(),
+                inst.LibraryStorageBase());
             var sourceJarPath = jars[0];
             if (!CreateModdedJar(sourceJarPath, finalJarPath, jarMods))
             {

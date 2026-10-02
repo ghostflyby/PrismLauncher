@@ -29,16 +29,23 @@ public class SequentialTask : ConcurrentTask
 
     protected override void UpdateState()
     {
-        // Port of SequentialTask::updateState().
+        // Port of SequentialTask::updateState() — stamped like ConcurrentTask's: a snapshot
+        // captured under the gate is emitted only while it is still the freshest, so
+        // interleaved completion bookkeeping can never leave a stale status behind.
+        long stamp;
         int doing, done, totalSize;
         lock (_gate)
         {
+            stamp = BeginStateUpdateLocked();
             doing = _doing.Count;
             done = _done.Count;
             totalSize = TotalSizeLocked();
         }
 
-        SetProgress(done, totalSize);
-        EmitStatus($"Executing task {doing + done} out of {totalSize}");
+        EmitStateUpdate(stamp, () =>
+        {
+            SetProgress(done, totalSize);
+            EmitStatus($"Executing task {doing + done} out of {totalSize}");
+        });
     }
 }

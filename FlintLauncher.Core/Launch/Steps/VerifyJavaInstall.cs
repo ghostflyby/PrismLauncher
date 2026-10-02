@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/launch/VerifyJavaInstall.{h,cpp}: verify that the selected Java
-// major version is compatible with the instance profile.
+// major version is compatible with the instance profile. The probed version/architecture
+// come from the state-side probe cache (S5) via the instance, not from settings (C9).
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Settings;
 
@@ -17,9 +18,9 @@ public sealed class VerifyJavaInstall : LaunchStep
         var instance = Parent.Instance;
         var packProfile = instance.GetPackProfile();
         var settings = instance.Settings();
-        var storedVersion = Variant.AsString(settings.Get("JavaVersion"));
+        var storedVersion = instance.GetJavaVersion().ToString();
         var ignoreCompatibility = Variant.AsBool(settings.Get("IgnoreJavaCompatibility"));
-        var javaArchitecture = Variant.AsString(settings.Get("JavaArchitecture"));
+        var javaArchitecture = instance.JavaDetection()?.Architecture ?? "";
         var maxMemAlloc = Variant.AsInt(settings.Get("MaxMemAlloc"));
 
         if (javaArchitecture == "32" && maxMemAlloc > 2048)

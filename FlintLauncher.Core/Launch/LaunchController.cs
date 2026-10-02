@@ -16,7 +16,9 @@
 //  - askOfflineName(): the name dialog becomes <see cref="AskOfflineNameHandler"/>; the
 //    headless default uses <see cref="OfflineName"/> and falls back to the suggested name.
 //    The C++ stores the choice in APPLICATION->settings() "LastOfflinePlayerName"; the port
-//    mirrors that through <see cref="Services.GlobalSettings"/> when one is installed.
+//    mirrors that through the launcher runtime state (launcher-state.json, S5 — CONFIG C9
+//    moved the key out of settings) when one is installed, and the dialog suggestion
+//    prefers the stored name like the C++.
 //  - reauthenticateAccount(): the re-login dialog becomes <see cref="ReauthenticateHandler"/>;
 //    unset means the launch aborts (the C++ "No" button).
 //  - the ProfileSetupDialog branch (Normal launch without a profile) aborts the launch —
@@ -54,12 +56,11 @@ public class LaunchController : FlintTask
     private Launch.LaunchTask? _launcher;
     private LaunchMode _actualLaunchMode = LaunchMode.Normal;
 
-    /// <summary>The injected launch dependencies: the controller reads the global settings
-    /// (LastOfflinePlayerName storage, C++ APPLICATION->settings()) from
-    /// <see cref="LaunchServices.GlobalSettings"/>, its diagnostics logger from
-    /// <see cref="LaunchServices.LoggerFactory"/> and hands the services down to the
-    /// LaunchTask it builds. Null keeps the headless defaults (null decides like the former
-    /// unset hooks).</summary>
+    /// <summary>The injected launch dependencies: the controller reads/writes the offline
+    /// name through <see cref="LaunchServices.LauncherState"/> (launcher-state.json, S5),
+    /// its diagnostics logger from <see cref="LaunchServices.LoggerFactory"/> and hands the
+    /// services down to the LaunchTask it builds. Null keeps the headless defaults (null
+    /// decides like the former unset hooks).</summary>
     public LaunchServices? Services { get; set; }
 
     /// <summary>Diagnostics logger (flint.controller category). Resolved per call from the
@@ -317,10 +318,15 @@ public class LaunchController : FlintTask
                 return null;
         }
 
+        // the dialog suggestion prefers the stored last offline name, like the C++
+        // (LastOfflinePlayerName — now in launcher-state.json, S5/C9)
+        var lastName = Services?.LauncherState?.Current.LastOfflinePlayerName ?? "";
+        var suggestion = lastName.Length != 0 ? lastName : playerName;
+
         string usedName;
         if (AskOfflineNameHandler is not null)
         {
-            usedName = AskOfflineNameHandler(title, message, playerName) ?? "";
+            usedName = AskOfflineNameHandler(title, message, suggestion) ?? "";
             if (usedName.Length == 0)
             {
                 return null;
@@ -329,15 +335,14 @@ public class LaunchController : FlintTask
         else
         {
             // headless default: the configured offline name, then the suggestion
-            usedName = OfflineName.Length != 0 ? OfflineName : playerName;
+            usedName = OfflineName.Length != 0 ? OfflineName : suggestion;
             if (usedName.Length == 0)
             {
                 return null;
             }
         }
 
-        var globalSettings = Services?.GlobalSettings;
-        globalSettings?.Set("LastOfflinePlayerName", usedName);
+        Services?.LauncherState?.Update(state => state with { LastOfflinePlayerName = usedName });
         return usedName;
     }
 

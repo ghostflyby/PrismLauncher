@@ -45,8 +45,9 @@ public enum TransferMethod
 public static class FileTransfer
 {
     /// <summary>Transfers one file per mode. The destination is never overwritten; an
-    /// existing destination returns SkippedDestinationExists (idempotent). Returns false
-    /// when the transfer failed (the source is left intact).</summary>
+    /// existing destination returns SkippedDestinationExists (idempotent). Move degrades
+    /// rename → reflink → plain copy (+ source delete on success) and returns false only
+    /// when every mechanism failed (the source is left intact).</summary>
     public static bool TransferFile(string src, string dst, ImportMode mode, out TransferMethod method)
     {
         method = TransferMethod.SkippedDestinationExists;
@@ -64,11 +65,22 @@ public static class FileTransfer
                         method = TransferMethod.SameVolumeRename;
                         return true;
                     }
-                    if (!TryClone(src, dst))
+                    if (TryClone(src, dst))
                     {
+                        method = TransferMethod.Reflink;
+                    }
+                    else if (!CopyInto(src, dst))
+                    {
+                        // cross-volume with neither rename nor reflink: the plain-copy
+                        // degradation the type documents ("clone/copy + source delete")
+                        // — without it a cross-volume Move is an unconditional false and
+                        // every per-file walk fails forever
                         return false;
                     }
-                    method = TransferMethod.Reflink;
+                    else
+                    {
+                        method = TransferMethod.Copy;
+                    }
                     // the content is in place; failing to delete the source is not a failure
                     TryDeleteFile(src);
                     return true;
@@ -97,11 +109,15 @@ public static class FileTransfer
 
     /// <summary>Moves a whole directory when src and dst sit on the same volume (one rename,
     /// sub-second for any size); returns false when the volume differs and the caller must
-    /// walk files item by item.</summary>
+    /// walk files item by item. The destination's parent is created first — a rename(2)
+    /// cannot create it, and letting the missing parent surface as DirectoryNotFoundException
+    /// would silently degrade the wholesale move into a per-file walk that leaves the source
+    /// behind.</summary>
     public static bool TryMoveDirectory(string src, string dst)
     {
         try
         {
+            EnsureDirectoryFor(dst);
             Directory.Move(src, dst);
             return true;
         }
@@ -137,6 +153,45 @@ public static class FileTransfer
         }
         return false;
     }
+
+    // ------------------------------------------------------------------ unix stat (D2)
+    //
+    // The instance addressing chain (DATA D2) needs the instance directory's inode: stable
+    // across renames, zero-write, resolvable even when the instance cfg is broken. Same
+    // blittable convention as clonefile below (NUL-terminated UTF-8 byte[] args, plain
+    // DllImport, no marshaler, no unsafe). Windows has no libc binding and returns 0 — the
+    // addressing chain skips the inode link there (NTFS FileId can come later, D2).
+    //
+    // The native side writes the WHOLE struct stat, so the managed buffer must be at least
+    // as large as the largest ABI in play (144 bytes on x86-64 Linux, 136 on macOS, 128 on
+    // arm64 Linux); 256 covers them all. Only st_ino is read, at offset 8 — the offset it
+    // holds on every LP64 ABI this port ships for (macOS, glibc/musl x86-64 + arm64).
+
+    /// <summary>Native size the stat buffer must cover (see the block comment above).</summary>
+    private const int StatBufferSize = 256;
+
+    /// <summary>The unix inode of <paramref name="path"/>; 0 when unavailable (Windows, a
+    /// missing path, or a libc without a plain "stat" export — older glibc routed stat(2)
+    /// through __xstat). A 0 result simply skips the inode link of the D2 chain.</summary>
+    public static long StatInode(string path)
+    {
+        if (OperatingSystem.IsWindows() || (!OperatingSystem.IsMacOS() && !OperatingSystem.IsLinux()))
+        {
+            return 0;
+        }
+        try
+        {
+            var buf = new byte[StatBufferSize];
+            return stat(NullTerminatedUtf8(path), buf) == 0 ? BitConverter.ToInt64(buf, 8) : 0;
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return 0; // no usable stat export — the chain runs on uuid/dirname only
+        }
+    }
+
+    [DllImport("libc", SetLastError = true)]
+    private static extern int stat(byte[] path, byte[] buf);
 
     // ------------------------------------------------------------------ macOS clonefile
     //

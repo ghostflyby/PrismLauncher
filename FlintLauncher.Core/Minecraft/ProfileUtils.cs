@@ -43,8 +43,7 @@ public static class ProfileUtils
         // and it's valid JSON
         try
         {
-            using var doc = JsonUtils.RequireDocument(data, path);
-            var obj = JsonUtils.RequireObject(doc).ToJsonObject();
+            var obj = JsonUtils.RequireObject(JsonUtils.RequireNode(data, path));
             // check order file version.
             var version = JsonUtils.RequireInteger(obj, "version");
             if (version != CurrentOrderFileVersion)
@@ -52,7 +51,7 @@ public static class ProfileUtils
                 throw new JsonParseException($"Invalid order file version, expected {CurrentOrderFileVersion}");
             }
             var orderArray = JsonUtils.RequireArray(obj, "order");
-            foreach (var item in orderArray.EnumerateArray())
+            foreach (var item in orderArray)
             {
                 order.Add(JsonUtils.RequireString(item));
             }
@@ -81,11 +80,13 @@ public static class ProfileUtils
         return outError;
     }
 
-    private static VersionFile GuardedParseJson(JsonDocument doc, string fileId, string filepath, bool requireOrder)
+    private static VersionFile GuardedParseJson(JsonNode? root, string fileId, string filepath, bool requireOrder)
     {
         try
         {
-            return OneSixVersionFormat.VersionFileFromJson(doc.RootElement.ToJsonObject(), filepath, requireOrder);
+            return OneSixVersionFormat.VersionFileFromJson(
+                root as JsonObject ?? throw new JsonParseException("Value is not an object"),
+                filepath, requireOrder);
         }
         catch (Exception e) when (e is JsonParseException or JsonException)
         {
@@ -107,10 +108,10 @@ public static class ProfileUtils
             var errorStr = $"Unable to open the version file {Path.GetFileName(filePath)}: {e.Message}.";
             return CreateErrorVersionFile(CompleteBaseName(filePath), filePath, errorStr);
         }
-        JsonDocument doc;
+        JsonNode? root;
         try
         {
-            doc = JsonDocument.Parse(data);
+            root = JsonNode.Parse(data);
         }
         catch (JsonException e)
         {
@@ -121,10 +122,7 @@ public static class ProfileUtils
             var errorStr = $"Unable to process the version file {Path.GetFileName(filePath)}: {e.Message} at line {line} column {column}.";
             return CreateErrorVersionFile(CompleteBaseName(filePath), filePath, errorStr);
         }
-        using (doc)
-        {
-            return GuardedParseJson(doc, CompleteBaseName(filePath), filePath, requireOrder);
-        }
+        return GuardedParseJson(root, CompleteBaseName(filePath), filePath, requireOrder);
     }
 
     /// <summary>Port of ProfileUtils::saveJsonFile (indented, Qt-style JSON like QJsonDocument::toJson).</summary>

@@ -3,7 +3,6 @@
 // DataPackUtils::processComponent (the JSON chat component renderer) on fixtures under
 // tests/testdata/MetaComponentParse — the ported renderer lives in
 // FlintLauncher.Core/Minecraft/Resources (moved there from Minecraft/ in P3-b).
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
@@ -21,8 +20,7 @@ public class MetaComponentParseTests
 
         var data = File.ReadAllText(compRp);
 
-        using var doc = JsonDocument.Parse(data);
-        var obj = doc.RootElement.ToJsonObject();
+        var obj = JsonNode.Parse(data)!.AsObject();
 
         Assert.True(obj.Contains("description"));
         Assert.True(obj.Contains("expected_output"));

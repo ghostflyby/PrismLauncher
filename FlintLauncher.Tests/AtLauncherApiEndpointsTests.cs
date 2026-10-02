@@ -149,10 +149,10 @@ public class AtLauncherApiEndpointsTests : IDisposable
             await File.ReadAllBytesAsync(Path.Combine(staging, "minecraft", "mods", "optsel.jar")));
         Assert.False(File.Exists(Path.Combine(staging, "minecraft", "mods", "optunsel.jar")));
 
-        // instance.cfg metadata (name + icon key) and the discovered instance surface
-        var cfg = await File.ReadAllTextAsync(Path.Combine(staging, "instance.cfg"));
-        Assert.Contains("name=Test Pack", cfg);
-        Assert.Contains("iconKey=flint", cfg);
+        // instance.json metadata (name + icon key, D4) and the discovered instance surface
+        var cfg = await File.ReadAllTextAsync(Path.Combine(staging, "instance.json"));
+        Assert.Contains("Test Pack", cfg);
+        Assert.Contains("flint", cfg);
         var list = JsonDocument.Parse(
             await (await host.GetAsync("/api/v1/instances")).Content.ReadAsStringAsync()).RootElement;
         var entry = list.EnumerateArray().Single(e => e.GetProperty("id").GetString() == id);

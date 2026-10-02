@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/update/LibrariesTask.{h,cpp}: download the profile's libraries
 // (and jar mods) through a NetJob built from Library.getDownloads.
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
@@ -37,7 +36,10 @@ public sealed class LibrariesTask : FlintTask
         var job = new NetJob($"Libraries for instance {inst.Name()}");
         _downloadJob = job;
 
-        var metacache = RequireLibraryCache();
+        // E6: the stamped runtime cache is the only source — the bare-fixture throwaway is
+        // gone; an unstamped instance fails the step naming the missing wire
+        var metacache = inst.MetaCache ?? throw new InvalidOperationException(
+            $"no meta cache stamped on instance '{inst.Name()}' — the composition root must inject it");
 
         var failedLocalLibraries = new List<string>();
         var libArtifactPool = new List<Library?>();
@@ -115,20 +117,5 @@ public sealed class LibrariesTask : FlintTask
             }
         }
         return true;
-    }
-
-    /// <summary>The C++ reaches APPLICATION->metacache(); the instance exposes the same cache
-    /// ("libraries" base, stamped by the composition root). A missing cache creates a
-    /// throwaway cache so local-only instance setups (no downloads) still work.</summary>
-    private HttpMetaCache RequireLibraryCache()
-    {
-        if (_inst.MetaCache is not null)
-        {
-            return _inst.MetaCache;
-        }
-        var cache = new HttpMetaCache();
-        cache.AddBase("libraries", _inst.Paths?.LibrariesRoot
-            ?? FileSystem.PathCombine(Directory.GetCurrentDirectory(), "libraries"));
-        return cache;
     }
 }

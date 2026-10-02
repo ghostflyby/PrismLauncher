@@ -91,7 +91,7 @@ public class LauncherPartLaunchTests : IDisposable
             return;
         }
         using var fixture = new LaunchFixture();
-        fixture.Global.StubSet("JavaVersion", "17.0.2");
+        fixture.SeedJavaDetection("java", 0, version: "17.0.2"); // C9: probe cache, not settings
         var instance = await fixture.CreateInstance();
         var session = fixture.OfflineSession("Steve");
         var javaPath = WriteFakeJava();
@@ -135,7 +135,7 @@ public class LauncherPartLaunchTests : IDisposable
             return;
         }
         using var fixture = new LaunchFixture();
-        fixture.Global.StubSet("JavaVersion", "17.0.2");
+        fixture.SeedJavaDetection("java", 0, version: "17.0.2"); // C9: probe cache, not settings
         var instance = await fixture.CreateInstance();
         var javaPath = WriteFakeJava();
 

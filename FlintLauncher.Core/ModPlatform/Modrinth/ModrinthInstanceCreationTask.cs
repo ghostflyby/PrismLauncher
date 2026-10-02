@@ -50,7 +50,7 @@ public sealed class ModrinthCreationTask : InstanceTask
 
     public ModrinthCreationTask(string stagingPath,
                                 bool trustedSource,
-                                SettingsObject? globalSettings,
+                                Core.Config.InstanceEnvironment environment,
                                 string id = "",
                                 string versionId = "",
                                 string originalInstanceId = "",
@@ -59,7 +59,7 @@ public sealed class ModrinthCreationTask : InstanceTask
         _modrinth = modrinth ?? new ModrinthApi();
         StagingPath = stagingPath;
         TrustedSource = trustedSource;
-        SetParentSettings(globalSettings ?? throw new ArgumentNullException(nameof(globalSettings)));
+        SetParentEnvironment(environment);
         _managedId = id;
         _managedVersionId = versionId;
         SetOverride(false, originalInstanceId);
@@ -154,9 +154,12 @@ public sealed class ModrinthCreationTask : InstanceTask
             return;
         }
 
-        var configPath = FileSystem.PathCombine(StagingPath, "instance.cfg");
-        var instanceSettings = new IniSettingsObject(configPath);
-        var newInstance = new MinecraftInstance(GlobalSettings!, instanceSettings, StagingPath);
+        // D4: the staged instance is Flint format from birth (typed instance.json adapter)
+        var newInstance = new MinecraftInstance(
+            new Core.Config.InstanceJsonSettingsObject(StagingPath, Environment ??
+                throw new InvalidOperationException(
+                    "InstanceTask requires SetParentEnvironment before execution.")),
+            StagingPath);
 
         var components = newInstance.GetPackProfile();
         components.BuildingFromScratch();

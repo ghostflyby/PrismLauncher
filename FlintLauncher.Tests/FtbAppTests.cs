@@ -8,6 +8,7 @@
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.FtbApp;
+using FlintLauncher.Core.Settings;
 using Xunit;
 
 namespace Flint.Tests;
@@ -38,7 +39,7 @@ public class FtbAppTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList(_global, [instancesDir]);
+        return new InstanceList([instancesDir]) { Environment = _global };
     }
 
     private static List<(string? Uid, string? Version)> Components(string staging)
@@ -256,13 +257,16 @@ public class FtbAppTests : IDisposable
         Assert.Equal("extra=1\n",
             await File.ReadAllTextAsync(Path.Combine(staging, "minecraft", "config", "extra.cfg")));
 
-        // the settings of the C++ copySettings
-        var instanceCfg = File.ReadAllText(Path.Combine(staging, "instance.cfg"));
-        Assert.Contains("InstanceType=OneSix", instanceCfg);
-        Assert.Contains("totalTimePlayed=95514", instanceCfg); // ms -> s
-        Assert.Contains("OverrideJavaArgs=true", instanceCfg);
-        // values containing '=' are quoted by the INI codec (Qt behavior)
-        Assert.Contains(@"JvmArgs=""-Xmx2G -Dtest=1""", instanceCfg);
+        // the settings of the C++ copySettings, through the typed layer (D4): the time trio
+        // lands in instance-state.json and the jvm args in instance.json (the derived
+        // OverrideJavaArgs gate reads true because JvmArgs is set)
+        Assert.Equal(95514, // ms -> s
+            Variant.AsLong(new MinecraftInstance(
+                new FlintLauncher.Core.Config.InstanceJsonSettingsObject(staging, _global.Environment),
+                staging).Settings().Get("totalTimePlayed")));
+        var instanceJson = File.ReadAllText(Path.Combine(staging, "instance.json"));
+        Assert.Contains("jvmArgs", instanceJson); // camelCase wire shape
+        Assert.Contains("-Xmx2G -Dtest=1", instanceJson);
 
         var components = Components(staging);
         Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.18.2");

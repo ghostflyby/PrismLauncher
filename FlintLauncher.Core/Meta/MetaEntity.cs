@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/meta/BaseEntity.{h,cpp} (BaseEntity, ParsingValidator and
 // BaseEntityLoadTask). Deviations from the C++ original:
-//  - The shared meta cache is a static HttpMetaCache here; the C++ code reaches it through
-//    APPLICATION->metacache() (base "meta" pointing at the CWD-relative "meta" folder, which
-//    is preserved). The "MetaURLOverride" setting is not part of the settings layer yet, so
-//    Url() always resolves against BuildConfig.META_URL (FlintConfig.MetaUrl).
+//  - The C++ code reaches the shared cache through APPLICATION->metacache() (base "meta");
+//    the port stamps that cache onto the entity chain at adoption (SetMetaCache — the
+//    composition root's HttpMetaCache, base "meta" under the cache root, E3/E6). There is
+//    NO static fallback: a load without a stamp fails fast. The "MetaURLOverride" setting
+//    is not part of the settings layer yet, so Url() always resolves against
+//    BuildConfig.META_URL (FlintConfig.MetaUrl).
 //  - The NetJob wrapper of BaseEntityLoadTask is reduced to awaiting the single NetRequest
 //    directly (NetJob + setAskRetry(false) + one request has no extra semantics); progress,
 //    status and details signal propagation from the inner request is not ported.
@@ -35,35 +37,25 @@ public abstract class MetaEntity
 
     private FlintTask? _task;
 
-    /// <summary>The shared "meta" cache base (C++: APPLICATION->metacache(), base "meta").
-    /// Injection migration: the per-runtime cache is assigned via <see cref="SetMetaCache"/>
-    /// (propagated down the Index/VersionList/MetaVersion chain at entity adoption); the
-    /// static default remains only for bare test fixtures until the test phase removes it.</summary>
-    public static readonly HttpMetaCache SharedCache = CreateSharedCache();
-
     /// <summary>The cache this entity downloads through and resolves its local file under
-    /// (base "meta").</summary>
-    public HttpMetaCache Cache { get; private set; } = SharedCache;
+    /// (base "meta"; C++: APPLICATION->metacache()). E6: the static CWD-anchored fallback is
+    /// GONE — the composition root's cache is stamped down the Index/VersionList/entity
+    /// chain at adoption (SetMetaCache), so a load without a stamp fails fast naming the
+    /// missing wire instead of silently re-downloading into the process working directory.</summary>
+    public HttpMetaCache? Cache { get; private set; }
 
     /// <summary>Wire this entity (and its future children, via the adoption points) to a
     /// runtime-owned cache.</summary>
     public void SetMetaCache(HttpMetaCache cache) => Cache = cache;
 
-    /// <summary>Absolute path of a local metadata file under the "meta" base.</summary>
-    protected string MetaPath(string localFile)
-    {
-        var baseDir = Cache.GetBasePath("meta");
-        return baseDir.Length != 0 ? FileSystem.PathCombine(baseDir, localFile) : FileSystem.PathCombine("meta", localFile);
-    }
+    /// <summary>The stamped runtime cache (naming the missing wire when unset — the E6
+    /// bare-fixture fallback must not come back).</summary>
+    protected HttpMetaCache RequireCache() => Cache ?? throw new InvalidOperationException(
+        "no meta cache stamped on this entity — wire the runtime cache (SetMetaCache)");
 
-    private static HttpMetaCache CreateSharedCache()
-    {
-        var cache = new HttpMetaCache();
-        // the C++ Application registers the "meta" base pointing at <cwd>/meta, matching the
-        // QDir("meta").absoluteFilePath(...) used for the direct local-file reads below
-        cache.AddBase("meta", Path.GetFullPath("meta"));
-        return cache;
-    }
+    /// <summary>Absolute path of a local metadata file under the "meta" base.</summary>
+    protected string MetaPath(string localFile) =>
+        FileSystem.PathCombine(RequireCache().GetBasePath("meta"), localFile);
 
     /// <summary>the expected sha256</summary>
     protected string Sha256 = "";
@@ -142,9 +134,8 @@ public abstract class MetaEntity
             var fname = _entity.LocalFilename();
             try
             {
-                using var doc = JsonUtils.RequireDocument(
-                    System.Text.Encoding.UTF8.GetString([.. _data]), fname);
-                var obj = JsonUtils.RequireObject(doc, fname).ToJsonObject();
+                var obj = JsonUtils.RequireObject(
+                    JsonUtils.RequireNode(System.Text.Encoding.UTF8.GetString([.. _data]), fname), fname);
                 _entity.Parse(obj);
                 return true;
             }
@@ -201,9 +192,8 @@ public abstract class MetaEntity
                     // load local file
                     if (_entity._loadStatus == LoadStatus.NotLoaded)
                     {
-                        using var doc = JsonUtils.RequireDocument(
-                            System.Text.Encoding.UTF8.GetString(fileData), fname);
-                        var obj = JsonUtils.RequireObject(doc, fname).ToJsonObject();
+                        var obj = JsonUtils.RequireObject(
+                            JsonUtils.RequireNode(System.Text.Encoding.UTF8.GetString(fileData), fname), fname);
                         _entity.Parse(obj);
                         _entity._loadStatus = LoadStatus.Local;
                     }
@@ -231,7 +221,8 @@ public abstract class MetaEntity
                 return;
             }
 
-            var entry = _entity.Cache.ResolveEntry("meta", _entity.LocalFilename());
+            var cache = _entity.RequireCache();
+            var entry = cache.ResolveEntry("meta", _entity.LocalFilename());
             if (_forceReload)
             {
                 // clear validators so manual refreshes fetch a fresh body
@@ -240,7 +231,7 @@ public abstract class MetaEntity
             }
             entry.SetStale(true);
             // Net::ApiRequest::makeCached == makeCached + AddAPIHeaders
-            var dl = NetRequest.MakeCached(_entity.Cache, _entity.Url(), entry, RequestOptions.AddAPIHeaders);
+            var dl = NetRequest.MakeCached(cache, _entity.Url(), entry, RequestOptions.AddAPIHeaders);
             /*
              * The validator parses the file and loads it into the object.
              * If that fails, the file is not written to storage.

@@ -42,7 +42,9 @@ tags
 .DS_Store
 
 branding/
-secrets/
+# repo-root anchored: an unanchored "secrets/" also swallowed FlintLauncher.Core/Secrets/
+# (the C4 secret-store sources) and left new clones unable to compile
+/secrets/
 run/
 
 .cache/

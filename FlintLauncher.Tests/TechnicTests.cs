@@ -45,7 +45,7 @@ public class TechnicTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList(_global, [instancesDir]);
+        return new InstanceList([instancesDir]) { Environment = _global };
     }
 
     private async Task<SingleZipPackInstallTask> RunZipInstall(TechnicZipPackBuilder pack, string minecraftVersion = "",
@@ -224,9 +224,9 @@ public class TechnicTests : IDisposable
         // the extracted pack landed in minecraft/
         Assert.Equal("technic=1\n", await File.ReadAllTextAsync(Path.Combine(staging, "minecraft", "modpack", "options.txt")));
         Assert.True(File.Exists(Path.Combine(staging, "minecraft", "bin", "version.json")));
-        // instance.cfg keys
-        var cfg = File.ReadAllText(Path.Combine(staging, "instance.cfg"));
-        Assert.Contains("name=Technic Imported", cfg);
+        // instance.json identity (D4)
+        var cfg = File.ReadAllText(Path.Combine(staging, "instance.json"));
+        Assert.Contains("Technic Imported", cfg);
         // the forge library name was translated into the component version
         using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
         var components = doc.RootElement.GetProperty("components").EnumerateArray()

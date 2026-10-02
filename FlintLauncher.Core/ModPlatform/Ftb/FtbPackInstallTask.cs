@@ -222,12 +222,11 @@ public sealed class FtbPackInstallTask : InstanceTask
     private async Task CreateInstance(CancellationToken cancellationToken)
     {
         EmitStatus("Creating the instance...");
-        var instanceConfigPath = FileSystem.PathCombine(StagingPath, "instance.cfg");
-        var instanceSettings = new Settings.IniSettingsObject(instanceConfigPath);
+        // D4: the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
-            GlobalSettings ?? throw new InvalidOperationException(
-                "InstanceTask requires SetParentSettings before execution."),
-            instanceSettings, StagingPath);
+            new Core.Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
+                "InstanceTask requires SetParentEnvironment before execution.")),
+            StagingPath);
         var components = instance.GetPackProfile();
         components.BuildingFromScratch();
 

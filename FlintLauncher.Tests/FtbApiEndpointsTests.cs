@@ -174,13 +174,13 @@ public class FtbApiEndpointsTests : IDisposable
             c => c.GetProperty("uid").GetString() == "net.minecraftforge"
                  && c.GetProperty("version").GetString() == "40.1.0");
 
-        // instance.cfg metadata (name + icon key + managed-pack bookkeeping) and the
-        // discovered instance surface
-        var cfg = await File.ReadAllTextAsync(Path.Combine(staging, "instance.cfg"));
-        Assert.Contains("name=FTB API Import", cfg);
-        Assert.Contains("iconKey=flint", cfg);
-        Assert.Contains("ManagedPackType=ftb", cfg);
-        Assert.Contains($"ManagedPackID={FtbPackFixture.PackId}", cfg);
+        // instance.json metadata (name + icon key + managed-pack bookkeeping, D4 camelCase)
+        // and the discovered instance surface
+        var cfg = await File.ReadAllTextAsync(Path.Combine(staging, "instance.json"));
+        Assert.Contains("FTB API Import", cfg);
+        Assert.Contains("flint", cfg);
+        Assert.Contains("managed", cfg);
+        Assert.Contains($"{FtbPackFixture.PackId}", cfg);
         var list = JsonDocument.Parse(
             await (await host.GetAsync("/api/v1/instances")).Content.ReadAsStringAsync()).RootElement;
         var entry = list.EnumerateArray().Single(e => e.GetProperty("id").GetString() == id);
@@ -206,14 +206,14 @@ public class FtbApiEndpointsTests : IDisposable
             .RootElement.GetProperty("id").GetString()!;
 
         // the pack's first-listed version (the fixture's 1.0.0/4242) was installed and the
-        // instance name/icon fell back to the pack name / "default"
+        // instance name/icon fell back to the pack name / "default" (D4: instance.json)
         var cfg = await File.ReadAllTextAsync(
-            Path.Combine(host.DataDir, "instances", id, "instance.cfg"));
-        Assert.Contains($"ManagedPackVersionID={FtbPackFixture.VersionId}", cfg);
-        Assert.Contains("ManagedPackVersionName=1.0.0", cfg);
-        Assert.Contains("name=Test FTB Pack", cfg);
-        // "iconKey" is registered with the default "default", so the INI writer omits it
-        Assert.DoesNotContain("iconKey=", cfg);
+            Path.Combine(host.DataDir, "instances", id, "instance.json"));
+        Assert.Contains($"{FtbPackFixture.VersionId}", cfg);
+        Assert.Contains("1.0.0", cfg);
+        Assert.Contains("Test FTB Pack", cfg);
+        // "iconKey" stays unset (the registered default applies) — the JSON carries it as null
+        Assert.DoesNotContain("\"iconKey\":\"", cfg);
     }
 
     [Fact]

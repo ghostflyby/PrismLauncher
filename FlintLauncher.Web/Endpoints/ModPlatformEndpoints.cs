@@ -239,10 +239,10 @@ public static class ModPlatformEndpoints
                     $"{provider} version list failed: {request.FailReason}", 502);
             }
 
-            JsonDocument doc;
+            JsonNode? bodyRoot;
             try
             {
-                doc = JsonDocument.Parse(request.BodyAsString);
+                bodyRoot = JsonNode.Parse(request.BodyAsString);
             }
             catch (JsonException)
             {
@@ -250,33 +250,30 @@ public static class ModPlatformEndpoints
                     $"{provider} returned invalid JSON", 502);
             }
 
-            using (doc)
             {
                 var pack = new IndexedPack { AddonId = projectId, Provider = parsedProvider };
                 try
                 {
                     if (parsedProvider == ResourceProvider.FLAME)
                     {
-                        if (doc.RootElement.ValueKind == JsonValueKind.Object &&
-                            doc.RootElement.TryGetProperty("data", out var data) &&
-                            data.ValueKind == JsonValueKind.Array)
+                        if (bodyRoot is JsonObject flameRoot &&
+                            flameRoot["data"] is JsonArray data)
                         {
                             // loads + validates every file, sorted newest first
-                            FlameMod.LoadIndexedPackVersions(pack, (JsonArray)(JsonUtils.ToNode(data) ?? new JsonArray()));
+                            FlameMod.LoadIndexedPackVersions(pack, data);
                         }
                     }
-                    else if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                    else if (bodyRoot is JsonArray array)
                     {
-                        foreach (var entry in doc.RootElement.EnumerateArray())
+                        foreach (var entry in array)
                         {
-                            if (entry.ValueKind != JsonValueKind.Object)
+                            if (entry is not JsonObject entryObj)
                             {
                                 continue;
                             }
                             try
                             {
-                                // entry is kind-checked as an object above: ToNode cannot yield null
-                                var version = ModrinthPackIndex.LoadIndexedPackVersion(JsonUtils.ToNode(entry)!);
+                                var version = ModrinthPackIndex.LoadIndexedPackVersion(entryObj);
                                 if (version.FileId.Length != 0)
                                 {
                                     pack.Versions.Add(version);
@@ -407,12 +404,13 @@ public static class ModPlatformEndpoints
                 ModPlatformTasks.EnsureProfileLoaded(instance);
 
                 // release channels (#3404): the request's explicit list wins; otherwise the
-                // global ModUpdateReleaseTypes setting (the ResourceUpdateDialog fallback)
+                // global ModUpdateReleaseTypes setting (the ResourceUpdateDialog fallback) —
+                // read from the typed user layer (C5/D4)
                 IReadOnlyList<IndexedVersionType> releaseTypes =
                     filter?.ReleaseTypes is { Count: > 0 } requested
                         ? IndexedVersionType.FromStringList(requested)
                         : IndexedVersionType.FromStringList(JsonUtils.ToStringList(
-                            runtime.GlobalSettings.Get("ModUpdateReleaseTypes")?.ToString() ?? "[]"));
+                            runtime.Config.Current.ModDownload.ModUpdateReleaseTypes ?? "[]"));
 
                 var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, releaseTypes, runtime.Modrinth, runtime.Flame);
                 var entry = registry.Register("mods-update", task, instanceId: instance.Id());
@@ -514,33 +512,31 @@ public static class ModPlatformEndpoints
     private static List<ProviderCategoryView> ParseFlameCategories(string response)
     {
         var result = new List<ProviderCategoryView>();
-        JsonDocument doc;
+        JsonNode? root;
         try
         {
-            doc = JsonDocument.Parse(response);
+            root = JsonNode.Parse(response);
         }
         catch (JsonException)
         {
             return result;
         }
 
-        using (doc)
+        if (root is JsonObject obj && obj["data"] is JsonArray data)
         {
-            if (doc.RootElement.ValueKind == JsonValueKind.Object &&
-                doc.RootElement.TryGetProperty("data", out var data) &&
-                data.ValueKind == JsonValueKind.Array)
+            foreach (var entry in data)
             {
-                foreach (var entry in data.EnumerateArray())
+                if (entry is not JsonObject entryObj)
                 {
-                    if (entry.ValueKind != JsonValueKind.Object)
-                    {
-                        continue;
-                    }
-                    var id = entry.TryGetProperty("id", out var idNode) && idNode.ValueKind == JsonValueKind.Number
-                        ? idNode.GetInt64().ToString(System.Globalization.CultureInfo.InvariantCulture)
-                        : "";
-                    result.Add(new ProviderCategoryView(id, Str(entry, "name"), Str(entry, "icon")));
+                    continue;
                 }
+                var id = entryObj["id"] is JsonValue idValue &&
+                         idValue.ToJsonString() is var idRaw &&
+                         idRaw.Length != 0 && idRaw[0] != '"' && // numbers only (GetInt64 upstream)
+                         long.TryParse(idRaw, System.Globalization.CultureInfo.InvariantCulture, out var idNumber)
+                    ? idNumber.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    : "";
+                result.Add(new ProviderCategoryView(id, Str(entryObj, "name"), Str(entryObj, "icon")));
             }
         }
         return result;
@@ -551,29 +547,26 @@ public static class ModPlatformEndpoints
     private static List<ProviderCategoryView> ParseModrinthCategories(string response, string projectType)
     {
         var result = new List<ProviderCategoryView>();
-        JsonDocument doc;
+        JsonNode? root;
         try
         {
-            doc = JsonDocument.Parse(response);
+            root = JsonNode.Parse(response);
         }
         catch (JsonException)
         {
             return result;
         }
 
-        using (doc)
+        if (root is JsonArray array)
         {
-            if (doc.RootElement.ValueKind == JsonValueKind.Array)
+            foreach (var entry in array)
             {
-                foreach (var entry in doc.RootElement.EnumerateArray())
+                if (entry is not JsonObject entryObj || Str(entryObj, "project_type") != projectType)
                 {
-                    if (entry.ValueKind != JsonValueKind.Object || Str(entry, "project_type") != projectType)
-                    {
-                        continue;
-                    }
-                    var name = Str(entry, "name");
-                    result.Add(new ProviderCategoryView(name, name, Str(entry, "icon")));
+                    continue;
                 }
+                var name = Str(entryObj, "name");
+                result.Add(new ProviderCategoryView(name, name, Str(entryObj, "icon")));
             }
         }
         return result;
@@ -619,26 +612,23 @@ public static class ModPlatformEndpoints
                 $"curseforge search failed: {request.FailReason}", 502);
         }
 
-        JsonDocument doc;
+        JsonNode? bodyRoot;
         try
         {
-            doc = JsonDocument.Parse(request.BodyAsString);
+            bodyRoot = JsonNode.Parse(request.BodyAsString);
         }
         catch (JsonException)
         {
             return ApiJson.Error("flame_invalid_response", "curseforge returned invalid JSON", 502);
         }
 
-        using (doc)
         {
             var results = new List<FlameSearchResult>();
-            if (doc.RootElement.ValueKind == JsonValueKind.Object &&
-                doc.RootElement.TryGetProperty("data", out var hits) &&
-                hits.ValueKind == JsonValueKind.Array)
+            if (bodyRoot is JsonObject obj && obj["data"] is JsonArray hits)
             {
-                foreach (var hit in hits.EnumerateArray())
+                foreach (var hit in hits)
                 {
-                    if (hit.ValueKind != JsonValueKind.Object)
+                    if (hit is not JsonObject hitObj)
                     {
                         continue;
                     }
@@ -646,7 +636,7 @@ public static class ModPlatformEndpoints
                     var pack = new IndexedPack();
                     try
                     {
-                        FlameMod.LoadIndexedPack(pack, JsonUtils.ToNode(hit)!);
+                        FlameMod.LoadIndexedPack(pack, hitObj);
                     }
                     catch (FlintLauncher.Core.Json.JsonParseException)
                     {
@@ -658,7 +648,7 @@ public static class ModPlatformEndpoints
                         pack.Name,
                         pack.LogoUrl,
                         pack.Authors.Count != 0 ? pack.Authors[0].Name : "",
-                        Downloads(hit)));
+                        Downloads(hitObj)));
                 }
             }
             return Results.Ok(results.ToArray());
@@ -701,34 +691,37 @@ public static class ModPlatformEndpoints
                 $"modrinth search failed: {request.FailReason}", 502);
         }
 
-        JsonDocument doc;
+        JsonNode? bodyRoot;
         try
         {
-            doc = JsonDocument.Parse(request.BodyAsString);
+            bodyRoot = JsonNode.Parse(request.BodyAsString);
         }
         catch (JsonException)
         {
             return ApiJson.Error("modrinth_invalid_response", "modrinth returned invalid JSON", 502);
         }
 
-        using (doc)
         {
             var results = new List<ModrinthSearchResult>();
-            if (doc.RootElement.ValueKind == JsonValueKind.Object &&
-                doc.RootElement.TryGetProperty("hits", out var hits) &&
-                hits.ValueKind == JsonValueKind.Array)
+            if (bodyRoot is JsonObject obj && obj["hits"] is JsonArray hits)
             {
-                foreach (var hit in hits.EnumerateArray())
+                foreach (var hit in hits)
                 {
+                    if (hit is not JsonObject hitObj)
+                    {
+                        continue;
+                    }
                     results.Add(new ModrinthSearchResult(
-                        Str(hit, "project_id"),
-                        Str(hit, "slug"),
-                        Str(hit, "title"),
-                        Str(hit, "icon_url"),
-                        Str(hit, "author"),
-                        hit.TryGetProperty("downloads", out var downloads) &&
-                        downloads.ValueKind == JsonValueKind.Number
-                            ? downloads.GetInt64()
+                        Str(hitObj, "project_id"),
+                        Str(hitObj, "slug"),
+                        Str(hitObj, "title"),
+                        Str(hitObj, "icon_url"),
+                        Str(hitObj, "author"),
+                        hitObj["downloads"] is JsonValue downloads &&
+                        downloads.ToJsonString() is var dlRaw &&
+                        dlRaw.Length != 0 && dlRaw[0] != '"' && // numbers only (GetInt64 upstream)
+                        long.TryParse(dlRaw, System.Globalization.CultureInfo.InvariantCulture, out var downloadCount)
+                            ? downloadCount
                             : 0));
                 }
             }
@@ -737,17 +730,14 @@ public static class ModPlatformEndpoints
     }
 
     /// <summary>A string property of a JSON hit object ("" when absent or of another kind).</summary>
-    private static string Str(JsonElement element, string name) =>
-        element.ValueKind == JsonValueKind.Object &&
-        element.TryGetProperty(name, out var value) &&
-        value.ValueKind == JsonValueKind.String
-            ? value.GetString() ?? ""
-            : "";
+    private static string Str(JsonObject obj, string name) =>
+        obj[name] is JsonValue value && value.TryGetValue<string>(out var str) ? str : "";
 
-    /// <summary>The MinecraftInstance for an id (null when missing or not a Minecraft
-    /// instance — the mods surface only exists for real instances, like launch).</summary>
-    private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string id) =>
-        runtime.Instances.GetInstanceById(id) is MinecraftInstance instance ? instance : null;
+    /// <summary>The MinecraftInstance for a {ref} (null when missing or not a Minecraft
+    /// instance — the mods surface only exists for real instances, like launch).
+    /// D2: every endpoint resolves through the addressing chain (GLOBAL §1).</summary>
+    private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string reference) =>
+        runtime.Instances.ResolveInstance(reference) is MinecraftInstance instance ? instance : null;
 
     /// <summary>The Flame sorting method by (case-insensitive) name, defaulting to Popularity
     /// (the CurseForge API's default sortField).</summary>
@@ -768,16 +758,18 @@ public static class ModPlatformEndpoints
             new SortingMethod { Index = 2, Name = "Popularity", ReadableName = "Sort by Popularity" });
     }
 
-    /// <summary>The optional hit download count (FlameMod does not load it; read it raw).</summary>
-    private static long? Downloads(JsonElement hit)
+    /// <summary>The optional hit download count (FlameMod does not load it; read it raw).
+    /// Only JSON number tokens count — a quoted "123" string is not a number.</summary>
+    private static long? Downloads(JsonObject hit)
     {
         foreach (var key in new[] { "downloadCount", "downloads" })
         {
-            if (hit.ValueKind == JsonValueKind.Object &&
-                hit.TryGetProperty(key, out var value) &&
-                value.ValueKind == JsonValueKind.Number)
+            if (hit[key] is JsonValue value &&
+                value.ToJsonString() is var raw &&
+                raw.Length != 0 && raw[0] != '"' &&
+                long.TryParse(raw, System.Globalization.CultureInfo.InvariantCulture, out var number))
             {
-                return value.GetInt64();
+                return number;
             }
         }
         return null;

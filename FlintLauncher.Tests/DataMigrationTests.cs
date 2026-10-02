@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Tests for the data-migration port (launcher/DataMigrationTask.{h,cpp} plus the data-level
 // half of Application::handleDataMigration): the whitelist inventory, the dry-run/copy task
-// flow, the "_nomigrate.txt" marker and the idempotency decision tree.
+// flow, the S3 migration decision records (with the legacy "_nomigrate.txt" marker upgrade)
+// and the idempotency decision tree.
 using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.Tasks;
+using FlintLauncher.Web;
 using Xunit;
 
 namespace Flint.Tests;
@@ -11,6 +13,11 @@ namespace Flint.Tests;
 public class DataMigrationTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), $"flint-migrate-{Guid.NewGuid():N}");
+
+    /// <summary>The S3 decision store over a throwaway migration directory.</summary>
+    private MigrationDecisionStore Decisions() =>
+        new(Path.Combine(_dir, Guid.NewGuid().ToString("N"), "migration"),
+            FlintJsonContext.Default.MigrationDecisionRecord);
 
     public void Dispose()
     {
@@ -94,13 +101,22 @@ public class DataMigrationTests : IDisposable
     }
 
     [Fact]
-    public void SetDoNotMigrate_Creates_An_Empty_Marker()
+    public void Decline_Writes_A_Decision_Record()
     {
-        var current = MakeDir(LauncherConfigFile);
-        DataMigration.SetDoNotMigrate(current, "PolyMC");
-        var marker = DataMigration.NoMigrateMarkerPath(current, "PolyMC");
-        Assert.True(File.Exists(marker));
-        Assert.Equal(0, new FileInfo(marker).Length);
+        var decisions = Decisions();
+        decisions.Write(new MigrationDecisionRecord
+        {
+            Source = "PolyMC",
+            Decision = MigrationDecisionRecord.Declined,
+            At = DateTimeOffset.Now.ToString("o"),
+        });
+
+        var record = decisions.Read("PolyMC");
+        Assert.NotNull(record);
+        Assert.Equal(MigrationDecisionRecord.Declined, record!.Decision);
+        Assert.Equal("PolyMC", record.Source);
+        // undecided sources read back as null
+        Assert.Null(decisions.Read("prism"));
     }
 
     [Fact]
@@ -128,24 +144,69 @@ public class DataMigrationTests : IDisposable
     }
 
     [Fact]
-    public void Decide_Marker_Present_Wins_Over_Everything()
+    public void Decide_Decision_Record_Wins_Over_Everything()
+    {
+        var decisions = Decisions();
+        decisions.Write(new MigrationDecisionRecord
+        {
+            Source = "PolyMC", Decision = MigrationDecisionRecord.Imported,
+            At = "2026-10-02T00:00:00.0000000+08:00", Mode = "cow", Instances = 3, Bytes = 1024,
+        });
+        var current = MakeDir();
+        var old = MakeDir(PolyMcConfigFile, "instances/a.zip");
+
+        Assert.Equal(DataMigration.MigrationDecision.MarkerPresent,
+            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
+    }
+
+    [Fact]
+    public void Decide_Legacy_Marker_Still_Counts_Without_A_Store()
     {
         var current = MakeDir("PolyMC_nomigrate.txt");
         var old = MakeDir(PolyMcConfigFile, "instances/a.zip");
 
         Assert.Equal(DataMigration.MigrationDecision.MarkerPresent,
             DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile));
+        // without a store the marker is left alone (nothing upgrades it away)
+        Assert.True(File.Exists(DataMigration.NoMigrateMarkerPath(current, "PolyMC")));
     }
 
-    // idempotency: after a successful migration the marker exists, so re-running is a no-op
+    // S3: a legacy empty marker upgrades in place on first sight — declined@unknown record,
+    // marker file deleted
     [Fact]
-    public async Task Migration_Is_Idempotent_Through_The_Marker()
+    public void Decide_Upgrades_The_Legacy_Marker_Into_A_Decision_Record()
     {
+        var decisions = Decisions();
+        var current = MakeDir("PolyMC_nomigrate.txt");
+        var old = MakeDir(PolyMcConfigFile, "instances/a.zip");
+
+        Assert.Equal(DataMigration.MigrationDecision.MarkerPresent,
+            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
+
+        Assert.False(File.Exists(DataMigration.NoMigrateMarkerPath(current, "PolyMC")));
+        var record = decisions.Read("PolyMC");
+        Assert.NotNull(record);
+        Assert.Equal(MigrationDecisionRecord.Declined, record!.Decision);
+        Assert.Equal(MigrationDecisionRecord.UnknownAt, record.At);
+        Assert.Equal("", record.Mode);
+
+        // the upgraded record carries the decision from here on
+        var current2 = MakeDir();
+        Assert.Equal(DataMigration.MigrationDecision.MarkerPresent,
+            DataMigration.Decide(current2, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
+    }
+
+    // idempotency: after a successful migration the decision record exists, so re-running is
+    // a no-op
+    [Fact]
+    public async Task Migration_Is_Idempotent_Through_The_Decision_Record()
+    {
+        var decisions = Decisions();
         var current = MakeDir();
         var old = MakeDir(PolyMcConfigFile, "accounts.json", "instances/1.21/world/level.dat");
 
         Assert.Equal(DataMigration.MigrationDecision.ReadyToMigrate,
-            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile));
+            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
 
         var task = new DataMigrationTask(old, current, DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
         await task.StartAsync();
@@ -153,11 +214,17 @@ public class DataMigrationTests : IDisposable
         Assert.True(File.Exists(Path.Combine(current, "polymc.cfg")));
         Assert.True(File.Exists(Path.Combine(current, "instances", "1.21", "world", "level.dat")));
 
-        // the host marks the migration done, like setDoNotMigrate() after a successful run
-        DataMigration.SetDoNotMigrate(current, "PolyMC");
+        // the host records the completed migration (the S3 record replaces setDoNotMigrate)
+        decisions.Write(new MigrationDecisionRecord
+        {
+            Source = "PolyMC",
+            Decision = MigrationDecisionRecord.Imported,
+            At = DateTimeOffset.Now.ToString("o"),
+            Mode = "copy",
+        });
 
         Assert.Equal(DataMigration.MigrationDecision.MarkerPresent,
-            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile));
+            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
     }
 
     // an existing flint.cfg in the current directory skips the copy entirely

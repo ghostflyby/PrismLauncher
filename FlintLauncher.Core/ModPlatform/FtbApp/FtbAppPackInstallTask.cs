@@ -42,18 +42,18 @@ public sealed class FtbAppPackInstallTask : InstanceTask
         EmitStatus("Copying settings...");
         SetProgress(2, 2);
 
-        var instanceConfigPath = FileSystem.PathCombine(StagingPath, "instance.cfg");
+        // D4: the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
-            GlobalSettings ?? throw new InvalidOperationException(
-                "InstanceTask requires SetParentSettings before execution."),
-            new Settings.IniSettingsObject(instanceConfigPath), StagingPath);
+            new Core.Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
+                "InstanceTask requires SetParentEnvironment before execution.")),
+            StagingPath);
 
-        instance.Settings().Set("InstanceType", "OneSix");
         instance.Settings().Set("totalTimePlayed", _pack.TotalPlayTime / 1000);
 
         if (_pack.JvmArgs.Length != 0)
         {
-            instance.Settings().Set("OverrideJavaArgs", true);
+            // C7: writing JvmArgs sets the instance-layer member, which IS the override (the
+            // derived OverrideJavaArgs gate reads true; no separate gate write exists)
             instance.Settings().Set("JvmArgs", _pack.JvmArgs);
         }
 

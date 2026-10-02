@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Port of launcher/settings/INIFile.{h,cpp}: sectionless INI storage for instance configs and
-// the global launcher config. Reads legacy formats (no ConfigVersion, 1.1, 1.2) and always
-// writes the current 1.3 QSettings IniFormat layout, staying byte-compatible with PrismLauncher.
+// Port of launcher/settings/INIFile.{h,cpp}: sectionless INI storage. Since CONFIG C5/D4
+// this is the READ side only — the one-shot INI imports (FlintConfigImporter for the global
+// chain, InstanceIniImporter for instance.cfg). Flint never writes an INI; the write sides
+// are flint.json and instance.json (TypedJsonFile). Reads legacy formats (no ConfigVersion,
+// 1.1, 1.2), staying byte-compatible with PrismLauncher.
 using System.Text;
 
 namespace FlintLauncher.Core.Settings;
@@ -111,32 +113,6 @@ public sealed class IniFile
             }
         }
         return true;
-    }
-
-    public bool SaveFile(string fileName)
-    {
-        if (!_map.ContainsKey(QSettingsIniCodec.ConfigVersionKey))
-        {
-            _map[QSettingsIniCodec.ConfigVersionKey] = IniValue.From(QSettingsIniCodec.CurrentConfigVersion);
-        }
-        try
-        {
-            File.WriteAllText(fileName, WriteToString(), new UTF8Encoding(false));
-            return true;
-        }
-        catch (IOException)
-        {
-            return false;
-        }
-    }
-
-    public string WriteToString()
-    {
-        if (!_map.ContainsKey(QSettingsIniCodec.ConfigVersionKey))
-        {
-            _map[QSettingsIniCodec.ConfigVersionKey] = IniValue.From(QSettingsIniCodec.CurrentConfigVersion);
-        }
-        return QSettingsIniCodec.Encode(_map);
     }
 
     // ------------------------------------------------------------- legacy formats

@@ -14,7 +14,7 @@ public static class LaunchEndpoints
 {
     public static void MapLaunch(this IEndpointRouteBuilder api)
     {
-        api.MapPost("/instances/{id}/launch", async (string id, LaunchRequest request,
+        api.MapPost("/instances/{ref}/launch", async (string @ref, LaunchRequest request,
                                                      LauncherRuntime runtime,
                                                      FlintTaskRegistry registry) =>
         {
@@ -62,15 +62,15 @@ public static class LaunchEndpoints
             await runtime.InstanceLock.WaitAsync();
             try
             {
-                var inst = runtime.Instances.GetInstanceById(id);
+                var inst = runtime.Instances.ResolveInstance(@ref); // D2 chain
                 if (inst is null)
                 {
-                    return ApiJson.NotFound("instance_not_found", $"no instance '{id}'");
+                    return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
                 }
                 if (inst is not MinecraftInstance instance)
                 {
                     return ApiJson.Conflict("not_launchable",
-                        $"instance '{id}' is of type '{inst.InstanceType()}' and cannot be launched");
+                        $"instance '{@ref}' is of type '{inst.InstanceType()}' and cannot be launched");
                 }
                 // core CanLaunch: refuses broken versions and already-running instances —
                 // this also guards against two concurrent API launches of the same instance
@@ -79,8 +79,8 @@ public static class LaunchEndpoints
                 {
                     return ApiJson.Conflict("instance_unavailable",
                         instance.HasVersionBroken
-                            ? $"instance '{id}' has a broken version and cannot be launched"
-                            : $"instance '{id}' is already running or launching");
+                            ? $"instance '{@ref}' has a broken version and cannot be launched"
+                            : $"instance '{@ref}' is already running or launching");
                 }
 
                 MinecraftAccount? account = null;

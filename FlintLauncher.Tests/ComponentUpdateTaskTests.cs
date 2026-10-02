@@ -23,15 +23,23 @@ namespace FlintLauncher.Tests;
 public class ComponentUpdateTaskTests : IDisposable
 {
     private readonly string _root;
+    private readonly FlintLauncher.Core.Net.HttpMetaCache _metaCache;
 
     public ComponentUpdateTaskTests()
     {
         _root = Path.Combine(Path.GetTempPath(), "flint-resolve-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_root);
+        // the stamped fixture cache (E6 fixture injection): "meta" base inside the test root,
+        // replacing the former CWD-anchored static fallback; every profile gets it via
+        // SetMetadataCache so metadata entities resolve files under <_root>/meta
+        _metaCache = new FlintLauncher.Core.Net.HttpMetaCache(
+            Path.Combine(_root, "metacache.json"));
+        _metaCache.AddBase("meta", Path.Combine(_root, "meta"));
     }
 
     public void Dispose()
     {
+        _metaCache.Dispose();
         try
         {
             Directory.Delete(_root, true);
@@ -39,6 +47,15 @@ public class ComponentUpdateTaskTests : IDisposable
         catch (IOException)
         {
         }
+    }
+
+    /// <summary>A PackProfile over the fixture root, wired to the fixture's stamped cache
+    /// (the SetMetadataCache call the composition root performs through the instance).</summary>
+    private PackProfile NewProfile()
+    {
+        var profile = new PackProfile(_root);
+        profile.SetMetadataCache(_metaCache);
+        return profile;
     }
 
     private string WriteInstanceFile(string relativePath, string content)
@@ -101,15 +118,15 @@ public class ComponentUpdateTaskTests : IDisposable
     private void WritePatch(string uid, string json) => WriteInstanceFile($"patches/{uid}.json", json);
 
     /// <summary>
-    /// Seeds a metadata version into the shared local meta cache (the CWD-relative "meta"
-    /// folder) exactly like a previous online download would have, and marks the entity
-    /// loaded in <paramref name="index"/> the way the online sha256 verification would. The
-    /// caller owns the created folder and must delete it once the resolution finished.
+    /// Seeds a metadata version into the fixture's local meta cache (the stamped "meta" base
+    /// under the test root) exactly like a previous online download would have, and marks the
+    /// entity loaded in <paramref name="index"/> the way the online sha256 verification would.
+    /// The test's Dispose owns the created folder.
     /// </summary>
-    private static async Task SeedLoadedMetaVersion(FlintLauncher.Core.Meta.Index index, string uid, string version,
-                                                    string json)
+    private async Task SeedLoadedMetaVersion(FlintLauncher.Core.Meta.Index index, string uid, string version,
+                                             string json)
     {
-        var metaDir = Path.Combine(Directory.GetCurrentDirectory(), "meta", uid);
+        var metaDir = MetaDirFor(uid);
         var metaFile = Path.Combine(metaDir, version + ".json");
         Directory.CreateDirectory(metaDir);
         await File.WriteAllTextAsync(metaFile, json);
@@ -119,8 +136,8 @@ public class ComponentUpdateTaskTests : IDisposable
         Assert.True(metaVersion.IsLoaded(), "seeded meta version should be loaded");
     }
 
-    /// <summary>The CWD-relative meta cache folder for one uid (shared static base of the Meta layer).</summary>
-    private static string MetaDirFor(string uid) => Path.Combine(Directory.GetCurrentDirectory(), "meta", uid);
+    /// <summary>The fixture meta cache folder for one uid (the stamped "meta" base, E6).</summary>
+    private string MetaDirFor(string uid) => Path.Combine(_root, "meta", uid);
 
     /// <summary>Meta-format version record (uid/version/releaseTime required by the meta parser).</summary>
     private static string MetaVersionJson(string uid, string version, string name, string? mainClass = null)
@@ -151,7 +168,7 @@ public class ComponentUpdateTaskTests : IDisposable
             mainClass: "net.minecraft.client.main.Main"));
         WritePatch("org.lwjgl3", VersionFileJson("org.lwjgl3", "3.1.2", "LWJGL 3"));
 
-        using var profile = new PackProfile(_root);
+        using var profile = NewProfile();
         var result = await profile.ReloadAsync(NetMode.Offline);
         Assert.True(result.Ok, result.ErrorMessage);
         Assert.Null(profile.GetCurrentTask()); // updateSucceeded() released it
@@ -181,7 +198,7 @@ public class ComponentUpdateTaskTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(MetaDirFor("net.minecraft"), "1.12.2.json"),
             MetaVersionJson("net.minecraft", "1.12.2", "Minecraft"));
 
-        using var profile = new PackProfile(_root);
+        using var profile = NewProfile();
         Assert.True(profile.Load().Ok);
 
         var task = new ComponentUpdateTask(ComponentUpdateTask.Mode.Resolution, NetMode.Offline, profile);
@@ -202,7 +219,7 @@ public class ComponentUpdateTaskTests : IDisposable
         WritePatch("test.modloader", VersionFileJson("test.modloader", "1.0.0", "Test Mod Loader",
             requires: ("net.minecraft", "1.12.2")));
 
-        using var profile = new PackProfile(_root);
+        using var profile = NewProfile();
         var result = await profile.ReloadAsync(NetMode.Offline);
         // the reload itself succeeded (the component file was read); the checkOnly dependency
         // pass failed afterwards (like upstream, reload() does not report the task failure)
@@ -226,7 +243,7 @@ public class ComponentUpdateTaskTests : IDisposable
         WritePatch("test.modloader", VersionFileJson("test.modloader", "1.0.0", "Test Mod Loader",
             requires: ("test.deplib", "1.0")));
 
-        using var profile = new PackProfile(_root);
+        using var profile = NewProfile();
         try
         {
             // metadata cache as a previous online download would have left it, marked loaded
@@ -278,7 +295,7 @@ public class ComponentUpdateTaskTests : IDisposable
         var depPatchPath = Path.Combine(_root, "patches", "test.dep.json");
         Assert.True(File.Exists(depPatchPath));
 
-        using var profile = new PackProfile(_root);
+        using var profile = NewProfile();
         var result = await profile.ReloadAsync(NetMode.Offline);
         Assert.True(result.Ok, result.ErrorMessage);
 
@@ -299,7 +316,7 @@ public class ComponentUpdateTaskTests : IDisposable
     [Fact]
     public async Task UpdateActionRemoveIsApplied()
     {
-        using var profile = new PackProfile(_root);
+        using var profile = NewProfile();
         profile.BuildingFromScratch();
         var file = new VersionFile { Name = "Test A", Uid = "test.a", Version = "1" };
         var component = new Component(profile, "test.a", file);
@@ -320,7 +337,7 @@ public class ComponentUpdateTaskTests : IDisposable
         WriteInstanceFile("patches/test.a.json", VersionFileJson("test.a", "1.0", "Test A"));
         WritePack(("test.a", "1.0", false));
 
-        using var profile = new PackProfile(_root);
+        using var profile = NewProfile();
         var result = await profile.ReloadAsync(NetMode.Offline);
         Assert.True(result.Ok, result.ErrorMessage);
         var component = profile.GetComponent("test.a")!;

@@ -23,7 +23,7 @@
 //  - validateOtherResources uses the API-declared resource type instead of the
 //    ResourceUtils::identify content sniffing (which is not ported); .zip files inside
 //    mods/ therefore receive no mod metadata (upstream only did for identified jars).
-//  - getVersionForLoader's "recommended" branch resolves through the static
+//  - getVersionForLoader's "recommended" branch resolves through the injected
 //    RecommendedVersionLookup hook (the meta version list layer is not wired in this
 //    phase); without a hook the install fails like the C++ does when the version list
 //    cannot be loaded.
@@ -50,7 +50,7 @@ public sealed partial class FlameCreationTask : InstanceTask
 {
     public FlameCreationTask(string stagingPath,
                              bool trustedSource,
-                             SettingsObject? globalSettings,
+                             Core.Config.InstanceEnvironment environment,
                              string id = "",
                              string versionId = "",
                              ModrinthApi? modrinth = null,
@@ -61,7 +61,7 @@ public sealed partial class FlameCreationTask : InstanceTask
         _flame = flame ?? new FlameApi();
         StagingPath = stagingPath;
         TrustedSource = trustedSource;
-        SetParentSettings(globalSettings ?? throw new ArgumentNullException(nameof(globalSettings)));
+        SetParentEnvironment(environment);
         _managedId = id;
         _managedVersionId = versionId;
         SetOverride(false, originalInstanceId);
@@ -116,8 +116,10 @@ public sealed partial class FlameCreationTask : InstanceTask
     }
 
     /// <summary>Stand-in for the "recommended" loader-version lookup over the meta index:
-    /// (loader uid, loader type, mc version) -> version descriptor.</summary>
-    public static Func<string, string, string, string?>? RecommendedVersionLookup { get; set; }
+    /// (loader uid, loader type, mc version) -> version descriptor. Per-task hook (DI):
+    /// the caller sets it before StartAsync, so parallel creations cannot see each other's
+    /// stub.</summary>
+    public Func<string, string, string, string?>? RecommendedVersionLookup { get; set; }
 
     private void LogWarning(string message)
     {
@@ -233,9 +235,12 @@ public sealed partial class FlameCreationTask : InstanceTask
             loaderVersion = id;
         }
 
-        var configPath = FileSystem.PathCombine(StagingPath, "instance.cfg");
-        var instanceSettings = new IniSettingsObject(configPath);
-        _newInstance = new MinecraftInstance(GlobalSettings!, instanceSettings, StagingPath);
+        // D4: the staged instance is Flint format from birth (typed instance.json adapter)
+        _newInstance = new MinecraftInstance(
+            new Core.Config.InstanceJsonSettingsObject(StagingPath, Environment ??
+                throw new InvalidOperationException(
+                    "InstanceTask requires SetParentEnvironment before execution.")),
+            StagingPath);
         var mcVersion = _pack.Minecraft.Version;
 
         // Hack to correct some 'special sauce'...
@@ -295,7 +300,8 @@ public sealed partial class FlameCreationTask : InstanceTask
                 recommendedRam = (int)max;
             }
 
-            _newInstance.Settings().Set("OverrideMemory", true);
+            // C7: writing MaxMemAlloc sets the instance-layer member, which IS the override
+            // (the derived OverrideMemory gate reads true; no separate gate write exists)
             _newInstance.Settings().Set("MaxMemAlloc", recommendedRam);
         }
 

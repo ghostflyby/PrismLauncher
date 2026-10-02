@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// fix-3 core-level tests: the C++-aligned GlobalSettingsRegistration defaults, the
+// fix-3 core-level tests: the C++-aligned config defaults (CONFIG C5/C6 — the record
+// property defaults are the single source, read through the typed flint.json store; the D4
+// batch retired the SettingsObject adapter view), the
 // LaunchTask.parseXmlLogs wiring (LogParser behind the LaunchServices.XmlLogParsing gate),
 // the Http proxy/timeout hook application (RuntimeNetConfig) and the meta-cache eviction the
 // DELETE /api/v1/meta-cache endpoint delegates to.
 //
-// Joins "LauncherJars": Http.Configure/ManualRetries/RequestTimeout are process-global
+// Joins "LauncherJars": NetStack.Default.Configure/ManualRetries/RequestTimeout are process-global
 // statics — the tests mutate and restore them, so they must not race the API-host suites.
 using FlintLauncher.Core;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
+using FlintLauncher.Web;
 using FlintLauncher.Web.Services;
 using Xunit;
 
@@ -19,25 +23,15 @@ namespace FlintLauncher.Tests;
 [Collection("LauncherJars")]
 public class CoverageFixCoreTests
 {
-    /// <summary>A completely blank settings double: nothing pre-registered, so
-    /// RegisterGlobalDefaults' values are observable (same pattern as TestGlobalSettings).</summary>
-    private sealed class BlankSettingsStub : SettingsObject
+    /// <summary>A fresh typed store over a temp flint.json: the resolved fold IS the record
+    /// defaults, so the store's Get() observations are exactly the single-source defaults
+    /// (the same key names the C++ registered).</summary>
+    private static FlintConfigStore NewStore()
     {
-        private readonly Dictionary<string, object?> _values = new();
-
-        protected override void ChangeSetting(Setting setting, object? value) => _values[setting.Id] = value;
-
-        protected override void ResetSetting(Setting setting) => _values.Remove(setting.Id);
-
-        internal override object? RetrieveValue(Setting setting) => _values.GetValueOrDefault(setting.Id);
-
-        public override void SuspendSave()
-        {
-        }
-
-        public override void ResumeSave()
-        {
-        }
+        var dir = Path.Combine(Path.GetTempPath(), $"flint-config-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        return new FlintConfigStore(Path.Combine(dir, "flint.json"),
+            FlintJsonContext.Default.FlintConfigFile);
     }
 
     // ---------------------------------------------------------------- defaults (fix-3)
@@ -45,62 +39,74 @@ public class CoverageFixCoreTests
     [Fact]
     public void Global_Defaults_Match_Cpp_RegisterSettings()
     {
-        var settings = new BlankSettingsStub();
-        GlobalSettingsRegistration.RegisterGlobalDefaults(settings);
+        var store = NewStore();
 
         // console (C++: ShowConsoleOnError/ConsoleOverflowStop true)
-        Assert.True(Variant.AsBool(settings.Get("ShowConsoleOnError")));
-        Assert.True(Variant.AsBool(settings.Get("ConsoleOverflowStop")));
-        Assert.Equal(100000, Variant.AsInt(settings.Get("ConsoleMaxLines")));
+        Assert.True(Variant.AsBool(store.Get("ShowConsoleOnError")));
+        Assert.True(Variant.AsBool(store.Get("ConsoleOverflowStop")));
+        Assert.Equal(100000, Variant.AsInt(store.Get("ConsoleMaxLines")));
         // java (C++ default is the empty path; the automatic-java switches derive from it)
-        Assert.Equal("", Variant.AsString(settings.Get("JavaPath")));
-        Assert.True(Variant.AsBool(settings.Get("AutomaticJavaSwitch")));
-        Assert.True(Variant.AsBool(settings.Get("AutomaticJavaDownload")));
-        Assert.False(Variant.AsBool(settings.Get("UserAskedAboutAutomaticJavaDownload")));
-        Assert.False(Variant.AsBool(settings.Get("IgnoreJavaWizard")));
-        Assert.Equal("", Variant.AsString(settings.Get("LastHostname")));
+        Assert.Equal("", Variant.AsString(store.Get("JavaPath")));
+        Assert.True(Variant.AsBool(store.Get("AutomaticJavaSwitch")));
+        Assert.True(Variant.AsBool(store.Get("AutomaticJavaDownload")));
+        Assert.False(Variant.AsBool(store.Get("IgnoreJavaWizard")));
+        // CONFIG C9: the runtime-state keys (UserAskedAboutAutomaticJavaDownload,
+        // LastHostname, the java probe quintet, LastOfflinePlayerName, TotalPlayTime*) are
+        // NOT settings anymore — launcher-state.json owns them (see LauncherStateStoreTests)
+        Assert.Null(FlintConfigKeys.Resolve("UserAskedAboutAutomaticJavaDownload"));
+        Assert.Null(FlintConfigKeys.Resolve("LastHostname"));
+        Assert.Null(FlintConfigKeys.Resolve("JavaSignature"));
+        Assert.Null(FlintConfigKeys.Resolve("TotalPlayTime"));
+        Assert.Null(FlintConfigKeys.Resolve("LastOfflinePlayerName"));
+        // C4: the secret trio is not a config member — the wire serves it from the store
+        Assert.True(FlintConfigKeys.IsSecret("ProxyPass"));
+        Assert.True(FlintConfigKeys.IsSecret("ModrinthToken"));
+        Assert.True(FlintConfigKeys.IsSecret("FlameKeyOverride"));
         // memory (C++: PermGen 128, LowMemWarning true, MaxMemAlloc = defaultMaxJvmMem)
-        Assert.Equal(512, Variant.AsInt(settings.Get("MinMemAlloc")));
-        Assert.Equal(GlobalSettingsRegistration.DefaultMaxMemAlloc, Variant.AsInt(settings.Get("MaxMemAlloc")));
-        Assert.Equal(128, Variant.AsInt(settings.Get("PermGen")));
-        Assert.True(Variant.AsBool(settings.Get("LowMemWarning")));
+        Assert.Equal(512, Variant.AsInt(store.Get("MinMemAlloc")));
+        Assert.Equal(MemoryConfig.DefaultMaxMemAlloc, Variant.AsInt(store.Get("MaxMemAlloc")));
+        Assert.Equal(128, Variant.AsInt(store.Get("PermGen")));
+        Assert.True(Variant.AsBool(store.Get("LowMemWarning")));
         // network (NumberOfManualRetries/RequestTimeout/Proxy*)
-        Assert.Equal(10, Variant.AsInt(settings.Get("NumberOfConcurrentTasks")));
-        Assert.Equal(6, Variant.AsInt(settings.Get("NumberOfConcurrentDownloads")));
-        Assert.Equal(1, Variant.AsInt(settings.Get("NumberOfManualRetries")));
-        Assert.Equal(60, Variant.AsInt(settings.Get("RequestTimeout")));
-        Assert.Equal("None", Variant.AsString(settings.Get("ProxyType")));
-        Assert.Equal("127.0.0.1", Variant.AsString(settings.Get("ProxyAddr")));
-        Assert.Equal(8080, Variant.AsInt(settings.Get("ProxyPort")));
-        Assert.Equal("", Variant.AsString(settings.Get("ProxyUser")));
-        Assert.Equal("", Variant.AsString(settings.Get("ProxyPass")));
+        Assert.Equal(10, Variant.AsInt(store.Get("NumberOfConcurrentTasks")));
+        Assert.Equal(6, Variant.AsInt(store.Get("NumberOfConcurrentDownloads")));
+        Assert.Equal(1, Variant.AsInt(store.Get("NumberOfManualRetries")));
+        Assert.Equal(60, Variant.AsInt(store.Get("RequestTimeout")));
+        Assert.Equal("None", Variant.AsString(store.Get("ProxyType")));
+        Assert.Equal("127.0.0.1", Variant.AsString(store.Get("ProxyAddr")));
+        Assert.Equal(8080, Variant.AsInt(store.Get("ProxyPort")));
+        Assert.Equal("", Variant.AsString(store.Get("ProxyUser")));
         // mirrors / overrides
-        Assert.Equal("", Variant.AsString(settings.Get("MetaURLOverride")));
-        Assert.Equal("", Variant.AsString(settings.Get("ResourceURLOverride")));
-        Assert.Equal("", Variant.AsString(settings.Get("LegacyFMLLibsURLOverride")));
-        Assert.Equal("", Variant.AsString(settings.Get("MSAClientIDOverride")));
-        Assert.Equal("", Variant.AsString(settings.Get("UserAgentOverride")));
-        // folders
-        Assert.Equal("mods", Variant.AsString(settings.Get("CentralModsDir")));
-        Assert.Equal("icons", Variant.AsString(settings.Get("IconsDir")));
-        Assert.Equal("skins", Variant.AsString(settings.Get("SkinsDir")));
-        Assert.Equal("java", Variant.AsString(settings.Get("JavaDir")));
-        Assert.False(string.IsNullOrEmpty(Variant.AsString(settings.Get("DownloadsDir"))));
+        Assert.Equal("", Variant.AsString(store.Get("MetaURLOverride")));
+        Assert.Equal("", Variant.AsString(store.Get("ResourceURLOverride")));
+        Assert.Equal("", Variant.AsString(store.Get("LegacyFMLLibsURLOverride")));
+        Assert.Equal("", Variant.AsString(store.Get("MSAClientIDOverride")));
+        Assert.Equal("", Variant.AsString(store.Get("UserAgentOverride")));
+        // folders (DATA D8: CentralModsDir is unregistered — the lookup resolves to null)
+        Assert.Null(FlintConfigKeys.Resolve("CentralModsDir"));
+        Assert.Equal("icons", Variant.AsString(store.Get("IconsDir")));
+        Assert.Equal("skins", Variant.AsString(store.Get("SkinsDir")));
+        Assert.Equal("java", Variant.AsString(store.Get("JavaDir")));
+        Assert.False(string.IsNullOrEmpty(Variant.AsString(store.Get("DownloadsDir"))));
         // game time / modpack flow switches
-        Assert.True(Variant.AsBool(settings.Get("ShowGameTime")));
-        Assert.True(Variant.AsBool(settings.Get("ShowGlobalGameTime")));
-        Assert.True(Variant.AsBool(settings.Get("RecordGameTime")));
-        Assert.True(Variant.AsBool(settings.Get("DownloadGameFilesDuringInstanceCreation")));
-        Assert.False(Variant.AsBool(settings.Get("ModDependenciesDisabled")));
-        Assert.False(Variant.AsBool(settings.Get("SkipModpackUpdatePrompt")));
-        Assert.False(Variant.AsBool(settings.Get("ShowModIncompat")));
+        Assert.True(Variant.AsBool(store.Get("ShowGameTime")));
+        Assert.True(Variant.AsBool(store.Get("ShowGlobalGameTime")));
+        Assert.True(Variant.AsBool(store.Get("RecordGameTime")));
+        Assert.True(Variant.AsBool(store.Get("DownloadGameFilesDuringInstanceCreation")));
+        Assert.False(Variant.AsBool(store.Get("ModDependenciesDisabled")));
+        Assert.False(Variant.AsBool(store.Get("SkipModpackUpdatePrompt")));
+        Assert.False(Variant.AsBool(store.Get("ShowModIncompat")));
         // paste defaults (registerSettings "HACK" block: mclo.gs)
-        Assert.Equal((int)PasteUpload.PasteType.Mclogs, Variant.AsInt(settings.Get("PastebinType")));
-        Assert.Equal("", Variant.AsString(settings.Get("PastebinCustomAPIBase")));
+        Assert.Equal((int)PasteUpload.PasteType.Mclogs, Variant.AsInt(store.Get("PastebinType")));
+        Assert.Equal("", Variant.AsString(store.Get("PastebinCustomAPIBase")));
 
-        // idempotent like RegisterSetting's duplicate check
-        GlobalSettingsRegistration.RegisterGlobalDefaults(settings);
-        Assert.Equal(128, Variant.AsInt(settings.Get("PermGen")));
+        // every registry key resolves (FlintConfigKeys) and the store round-trips a write
+        // into flint.json (the authoritative global source, C5)
+        store.Set("PermGen", 192);
+        Assert.Equal(192, Variant.AsInt(store.Get("PermGen")));
+        Assert.True(File.Exists(store.FilePath));
+        var reloaded = new FlintConfigStore(store.FilePath, FlintJsonContext.Default.FlintConfigFile);
+        Assert.Equal(192, reloaded.Current.Memory.PermGen);
     }
 
     [Fact]
@@ -110,8 +116,8 @@ public class CoverageFixCoreTests
         // back to 4096 when the RAM size is unknown
         var totalRam = HardwareInfo.TotalRamMiB();
         var expected = totalRam == 0 ? 4096 : totalRam < 6144UL ? (int)(totalRam / 1.5) : 4096;
-        Assert.Equal(expected, GlobalSettingsRegistration.DefaultMaxMemAlloc);
-        Assert.InRange(GlobalSettingsRegistration.DefaultMaxMemAlloc, 1, 4096);
+        Assert.Equal(expected, MemoryConfig.DefaultMaxMemAlloc);
+        Assert.InRange(MemoryConfig.DefaultMaxMemAlloc, 1, 4096);
     }
 
     // ------------------------------------------------------------ parseXmlLogs (fix-3)
@@ -181,34 +187,34 @@ public class CoverageFixCoreTests
     {
         var dataDir = Path.Combine(Path.GetTempPath(), $"flint-netcfg-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dataDir);
-        var previousUa = Http.UserAgent;
-        var previousRetries = Http.ManualRetries;
-        var previousTimeout = Http.RequestTimeout;
+        var previousUa = NetStack.Default.UserAgent;
+        var previousRetries = NetStack.Default.ManualRetries;
+        var previousTimeout = NetStack.Default.RequestTimeout;
         try
         {
-            var runtime = new LauncherRuntime(FlintPaths.FromDataDir(dataDir));
-            runtime.GlobalSettings.Set("ProxyType", "HTTP");
-            runtime.GlobalSettings.Set("ProxyAddr", "10.1.2.3");
-            runtime.GlobalSettings.Set("ProxyPort", 8118);
-            runtime.GlobalSettings.Set("NumberOfManualRetries", 4);
-            runtime.GlobalSettings.Set("RequestTimeout", 120);
-            runtime.GlobalSettings.Set("UserAgentOverride", "Flint-NetCfg-Agent/9.9");
+            var runtime = new LauncherRuntime(FlintPaths.FromHomeDir(dataDir));
+            runtime.Config.Set("ProxyType", "HTTP");
+            runtime.Config.Set("ProxyAddr", "10.1.2.3");
+            runtime.Config.Set("ProxyPort", 8118);
+            runtime.Config.Set("NumberOfManualRetries", 4);
+            runtime.Config.Set("RequestTimeout", 120);
+            runtime.Config.Set("UserAgentOverride", "Flint-NetCfg-Agent/9.9");
 
             RuntimeNetConfig.Apply(runtime);
 
-            Assert.Equal(("HTTP", "10.1.2.3", 8118, "", ""), Http.ProxyConfig);
-            Assert.Equal(4, Http.ManualRetries);
-            Assert.Equal(TimeSpan.FromSeconds(120), Http.RequestTimeout);
-            Assert.Equal("Flint-NetCfg-Agent/9.9", Http.UserAgent);
+            Assert.Equal(("HTTP", "10.1.2.3", 8118, "", ""), NetStack.Default.ProxyConfig);
+            Assert.Equal(4, NetStack.Default.ManualRetries);
+            Assert.Equal(TimeSpan.FromSeconds(120), NetStack.Default.RequestTimeout);
+            Assert.Equal("Flint-NetCfg-Agent/9.9", NetStack.Default.UserAgent);
         }
         finally
         {
             // restore the steady state a host startup produces (the registered defaults)
-            Http.Configure(FlintConfig.Default.UserAgent, "None", "127.0.0.1", 8080, "", "");
-            Http.ManualRetries = previousRetries;
-            Http.RequestTimeout = previousTimeout;
-            Assert.Equal(("None", "127.0.0.1", 8080, "", ""), Http.ProxyConfig);
-            Assert.Equal(FlintConfig.Default.UserAgent, Http.UserAgent);
+            NetStack.Default.Configure(FlintConfig.Default.UserAgent, "None", "127.0.0.1", 8080, "", "");
+            NetStack.Default.ManualRetries = previousRetries;
+            NetStack.Default.RequestTimeout = previousTimeout;
+            Assert.Equal(("None", "127.0.0.1", 8080, "", ""), NetStack.Default.ProxyConfig);
+            Assert.Equal(FlintConfig.Default.UserAgent, NetStack.Default.UserAgent);
             try
             {
                 Directory.Delete(dataDir, recursive: true);
@@ -222,22 +228,22 @@ public class CoverageFixCoreTests
     [Fact]
     public void Http_Configure_Is_Idempotent_For_An_Unchanged_Config()
     {
-        var previousUa = Http.UserAgent;
+        var previousUa = NetStack.Default.UserAgent;
         try
         {
-            Http.Configure("Flint-Idempotent/1.0", "None", "", 0, "", "");
-            var client = Http.Client;
+            NetStack.Default.Configure("Flint-Idempotent/1.0", "None", "", 0, "", "");
+            var client = NetStack.Default.Client;
             // same configuration -> no client rebuild (connection pool survives)
-            Http.Configure("Flint-Idempotent/1.0", "None", "", 0, "", "");
-            Assert.Same(client, Http.Client);
+            NetStack.Default.Configure("Flint-Idempotent/1.0", "None", "", 0, "", "");
+            Assert.Same(client, NetStack.Default.Client);
             // a UA change rebuilds the client so the new header lands
-            Http.Configure("Flint-Idempotent/2.0", "None", "", 0, "", "");
-            Assert.NotSame(client, Http.Client);
-            Assert.Equal("Flint-Idempotent/2.0", Http.UserAgent);
+            NetStack.Default.Configure("Flint-Idempotent/2.0", "None", "", 0, "", "");
+            Assert.NotSame(client, NetStack.Default.Client);
+            Assert.Equal("Flint-Idempotent/2.0", NetStack.Default.UserAgent);
         }
         finally
         {
-            Http.Configure(FlintConfig.Default.UserAgent, "None", "", 0, "", "");
+            NetStack.Default.Configure(FlintConfig.Default.UserAgent, "None", "", 0, "", "");
         }
     }
 

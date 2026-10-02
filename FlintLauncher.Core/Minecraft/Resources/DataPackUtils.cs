@@ -225,8 +225,8 @@ public static partial class DataPackUtils
     // https://minecraft.wiki/w/Tutorials/Creating_a_resource_pack#Formatting_pack.mcmeta
     public static bool ProcessMCMeta(DataPack pack, string rawData)
     {
-        var jsonDoc = JsonUtils.ParseUntilGarbage(rawData, out _);
-        if (jsonDoc is null)
+        var jsonRoot = JsonUtils.ParseNodeUntilGarbage(rawData, out _);
+        if (jsonRoot is null)
         {
             // qWarning() << "Failed to parse JSON:" << parse_error.errorString();
             return false;
@@ -234,35 +234,30 @@ public static partial class DataPackUtils
 
         try
         {
-            using (jsonDoc)
-            {
-                // The C++ calls Json::requireObject(json_doc.object(), "pack", {}): the
-                // parent+key overload. QJsonDocument::object() yields an empty object for
-                // non-object roots, and the "pack" member is then required to be an
-                // object — otherwise a JsonException (→ false below).
-                var root = jsonDoc.RootElement.ValueKind == JsonValueKind.Object
-                    ? jsonDoc.RootElement.ToJsonObject()
-                    : new JsonObject();
-                var packObj = JsonUtils.RequireObject(root, "pack", "").ToJsonObject();
+            // The C++ calls Json::requireObject(json_doc.object(), "pack", {}): the
+            // parent+key overload. QJsonDocument::object() yields an empty object for
+            // non-object roots, and the "pack" member is then required to be an
+            // object — otherwise a JsonException (→ false below).
+            var root = jsonRoot as JsonObject ?? new JsonObject();
+            var packObj = JsonUtils.RequireObject(root, "pack", "");
 
-                var packFormat = 0;
-                (int Major, int Minor) minFormat = default;
-                (int Major, int Minor) maxFormat = default;
-                if (packObj.Contains("pack_format"))
-                {
-                    packFormat = QJsonValueToInt(packObj["pack_format"]);
-                }
-                if (packObj.Contains("min_format"))
-                {
-                    minFormat = ParseVersion(packObj["min_format"]);
-                }
-                if (packObj.Contains("max_format"))
-                {
-                    maxFormat = ParseVersion(packObj["max_format"]);
-                }
-                pack.SetPackFormat(packFormat, minFormat, maxFormat);
-                pack.SetDescription(ProcessComponent(packObj["description"]));
+            var packFormat = 0;
+            (int Major, int Minor) minFormat = default;
+            (int Major, int Minor) maxFormat = default;
+            if (packObj.Contains("pack_format"))
+            {
+                packFormat = QJsonValueToInt(packObj["pack_format"]);
             }
+            if (packObj.Contains("min_format"))
+            {
+                minFormat = ParseVersion(packObj["min_format"]);
+            }
+            if (packObj.Contains("max_format"))
+            {
+                maxFormat = ParseVersion(packObj["max_format"]);
+            }
+            pack.SetPackFormat(packFormat, minFormat, maxFormat);
+            pack.SetDescription(ProcessComponent(packObj["description"]));
         }
         catch (JsonParseException)
         {

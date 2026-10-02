@@ -14,12 +14,12 @@
 //    FlameCreationTask; the C++ reject path fails "Unknown download type: browser")
 //
 // Deviations (headless port):
-//  - getComponentVersion consults the static MetaVersionDataLookup hook (the meta index
+//  - getComponentVersion consults the injected MetaVersionDataLookup hook (the meta index
 //    layer is not wired in this phase). Unlike the C++ — which fails the install when
 //    net.minecraft is not in the local index — the lookup is best-effort: its only use is
 //    a null-checked library exemption, so a miss only skips that optimization. The
 //    Forge/LiteLoader lookups keep the C++ null paths (fall back to a jar mod).
-//  - getVersionForLoader's recommended/latest branch resolves through the static
+//  - getVersionForLoader's recommended/latest branch resolves through the injected
 //    RecommendedLoaderVersionLookup hook (the version-list traversal is not ported);
 //    without a hook the install fails like the C++ does when the version list cannot
 //    be loaded.
@@ -94,12 +94,14 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
     // ------------------------------------------------------------- meta layer hooks
 
     /// <summary>(uid, version) -> loaded VersionFile from the local metadata index
-    /// (APPLICATION->metadataIndex()->getLoadedVersion). Best-effort — see the header note.</summary>
-    public static Func<string, string, VersionFile?>? MetaVersionDataLookup { get; set; }
+    /// (APPLICATION->metadataIndex()->getLoadedVersion). Best-effort — see the header note.
+    /// Per-task hook (DI): the caller sets it before StartAsync, so parallel installs and
+    /// parallel tests cannot see each other's stub.</summary>
+    public Func<string, string, VersionFile?>? MetaVersionDataLookup { get; set; }
 
     /// <summary>(loader uid, loader type, minecraft version) -> version descriptor for the
-    /// recommended/latest loader resolution.</summary>
-    public static Func<string, string, string, string?>? RecommendedLoaderVersionLookup { get; set; }
+    /// recommended/latest loader resolution. Per-task hook (DI).</summary>
+    public Func<string, string, string, string?>? RecommendedLoaderVersionLookup { get; set; }
 
     // -------------------------------------------------------------------- state
 
@@ -1037,11 +1039,11 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
     {
         EmitStatus("Installing modpack");
 
-        var instanceConfigPath = FileSystem.PathCombine(StagingPath, "instance.cfg");
+        // D4: the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
-            GlobalSettings ?? throw new InvalidOperationException(
-                "InstanceTask requires SetParentSettings before execution."),
-            new Settings.IniSettingsObject(instanceConfigPath), StagingPath);
+            new Core.Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
+                "InstanceTask requires SetParentEnvironment before execution.")),
+            StagingPath);
         {
             var components = instance.GetPackProfile();
             components.BuildingFromScratch();

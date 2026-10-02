@@ -70,7 +70,7 @@ public static class SkinEndpoints
 
             using var body = new MemoryStream();
             await file.CopyToAsync(body);
-            var upload = SkinUpload.Make(account.AccessToken(), body.ToArray(), model, runtime.Auth);
+            var upload = SkinUpload.Make(account.AccessToken(), body.ToArray(), model, runtime.Auth, runtime.Net);
             await upload.StartAsync();
             return upload.WasSuccessful
                 ? Results.NoContent()

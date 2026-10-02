@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Tests for the VanillaCreationTask port: folder layout, instance.cfg keys and the initial
-// mmc-pack.json, verified through the real PackProfile loader.
+// Tests for the VanillaCreationTask port: folder layout, the instance.json identity keys and
+// the initial mmc-pack.json, verified through the real PackProfile loader. D4: a fresh
+// instance is Flint format from birth — no instance.cfg is written.
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Instances.Creation;
@@ -35,7 +36,8 @@ public class VanillaCreationTests : IDisposable
         }
     }
 
-    private InstanceList CreateList() => new(_global, [_instancesDir]) { GroupFilePath = _groupFile };
+    private InstanceList CreateList() =>
+        new([_instancesDir]) { Environment = _global, GroupFilePath = _groupFile };
 
     private VanillaCreationTask CreateTask(string version, string name)
     {
@@ -44,12 +46,12 @@ public class VanillaCreationTests : IDisposable
         task.SetName(name);
         task.SetIcon("flint-icon");
         task.SetGroup("Vanilla");
-        task.SetParentSettings(_global);
+        task.SetParentEnvironment(_global.Environment);
         return task;
     }
 
     [Fact]
-    public async Task Create_WritesFolderInstanceCfgAndMmcPack()
+    public async Task Create_WritesFolderInstanceJsonAndMmcPack()
     {
         var list = CreateList();
         // probe the (empty) list first — like the launcher's startup scan — so the commit
@@ -64,13 +66,14 @@ public class VanillaCreationTests : IDisposable
         var dir = Path.Combine(_instancesDir, "Test Instance");
         Assert.True(Directory.Exists(dir));
 
-        // instance.cfg: name/iconKey/uuid written by the instance shell
-        var cfgPath = Path.Combine(dir, "instance.cfg");
-        Assert.True(File.Exists(cfgPath));
-        var cfg = File.ReadAllText(cfgPath);
-        Assert.Contains("name=Test Instance", cfg);
-        Assert.Contains("iconKey=flint-icon", cfg);
-        Assert.Contains("uuid=", cfg);
+        // instance.json: name/iconKey/uuid written by the typed instance shell (no INI)
+        var jsonPath = Path.Combine(dir, "instance.json");
+        Assert.True(File.Exists(jsonPath));
+        var json = File.ReadAllText(jsonPath);
+        Assert.Contains("Test Instance", json);
+        Assert.Contains("flint-icon", json);
+        Assert.Contains("uuid", json);
+        Assert.False(File.Exists(Path.Combine(dir, "instance.cfg")));
 
         // mmc-pack.json: the initial net.minecraft component
         using (var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "mmc-pack.json"))))
@@ -107,7 +110,7 @@ public class VanillaCreationTests : IDisposable
         var task = new VanillaCreationTask("1.20.1", "net.fabricmc.fabric-loader", "0.15.0");
         task.SetName("Fab");
         task.SetIcon("default");
-        task.SetParentSettings(_global);
+        task.SetParentEnvironment(_global.Environment);
 
         await list.WrapInstanceTask(task).StartAsync();
         Assert.True(task.WasSuccessful);
@@ -145,7 +148,7 @@ public class VanillaCreationTests : IDisposable
     }
 
     [Fact]
-    public async Task Create_WithoutParentSettings_FailsTheTask()
+    public async Task Create_WithoutParentEnvironment_FailsTheTask()
     {
         var task = new VanillaCreationTask("1.20.1");
         task.SetName("Orphan");
@@ -169,7 +172,7 @@ public class VanillaCreationTests : IDisposable
         Assert.True(Directory.Exists(tempRoot));
         Assert.Empty(Directory.EnumerateFileSystemEntries(tempRoot));
 
-        // the staging folder itself became the instance folder
-        Assert.True(File.Exists(Path.Combine(_instancesDir, "Consumed", "instance.cfg")));
+        // the staging folder itself became the instance folder (Flint format)
+        Assert.True(File.Exists(Path.Combine(_instancesDir, "Consumed", "instance.json")));
     }
 }

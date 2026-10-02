@@ -103,23 +103,19 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             {
                 throw new ModResolveException($"fetching the CurseForge project {projectId} failed: {job.FailReason}");
             }
-            using (var doc = ParseBody(request.BodyAsString, $"the CurseForge project {projectId}"))
+            // Flame nests the project under "data" (the C++ Json::requireObject(doc, "data"))
+            if (ParseBodyNode(request.BodyAsString, $"the CurseForge project {projectId}") is not JsonObject root ||
+                root["data"] is not JsonObject data)
             {
-                // Flame nests the project under "data" (the C++ Json::requireObject(doc, "data"))
-                if (doc.RootElement.ValueKind != JsonValueKind.Object ||
-                    !doc.RootElement.TryGetProperty("data", out var data) ||
-                    data.ValueKind != JsonValueKind.Object)
-                {
-                    throw new ModResolveException($"the CurseForge project response for {projectId} has no data object");
-                }
-                try
-                {
-                    FlameMod.LoadIndexedPack(pack, JsonUtils.ToNode(data)!);
-                }
-                catch (JsonParseException e)
-                {
-                    throw new ModResolveException($"the CurseForge project response for {projectId} is invalid: {e.Message}");
-                }
+                throw new ModResolveException($"the CurseForge project response for {projectId} has no data object");
+            }
+            try
+            {
+                FlameMod.LoadIndexedPack(pack, data);
+            }
+            catch (JsonParseException e)
+            {
+                throw new ModResolveException($"the CurseForge project response for {projectId} is invalid: {e.Message}");
             }
         }
         else
@@ -134,18 +130,15 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             {
                 throw new ModResolveException($"fetching the Modrinth project {projectId} failed: {job.FailReason}");
             }
-            using (var doc = ParseBody(request.BodyAsString, $"the Modrinth project {projectId}"))
+            try
             {
-                try
-                {
-                    ModrinthPackIndex.LoadIndexedPack(pack,
-                        JsonUtils.ToNode(doc.RootElement)
-                        ?? throw new ModResolveException($"the Modrinth project {projectId} is not a JSON object"));
-                }
-                catch (JsonParseException e)
-                {
-                    throw new ModResolveException($"the Modrinth project response for {projectId} is invalid: {e.Message}");
-                }
+                ModrinthPackIndex.LoadIndexedPack(pack,
+                    ParseBodyNode(request.BodyAsString, $"the Modrinth project {projectId}")
+                    ?? throw new ModResolveException($"the Modrinth project {projectId} is not a JSON object"));
+            }
+            catch (JsonParseException e)
+            {
+                throw new ModResolveException($"the Modrinth project response for {projectId} is invalid: {e.Message}");
             }
         }
 
@@ -176,14 +169,12 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
                 {
                     throw new ModResolveException($"fetching the CurseForge file {versionId} failed: {job.FailReason}");
                 }
-                using var doc = ParseBody(request.BodyAsString, $"the CurseForge file {versionId}");
-                if (doc.RootElement.ValueKind != JsonValueKind.Object ||
-                    !doc.RootElement.TryGetProperty("data", out var data) ||
-                    data.ValueKind != JsonValueKind.Object)
+                if (ParseBodyNode(request.BodyAsString, $"the CurseForge file {versionId}") is not JsonObject root ||
+                    root["data"] is not JsonObject data)
                 {
                     throw new ModResolveException($"the CurseForge file response for {versionId} has no data object");
                 }
-                return FlameMod.LoadIndexedPackVersion(JsonUtils.ToNode(data)!);
+                return FlameMod.LoadIndexedPackVersion(data);
             }
 
             var pinnedUrl = $"{_modrinth.BaseUrl}/version/{versionId}";
@@ -193,9 +184,8 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             {
                 throw new ModResolveException($"fetching the Modrinth version {versionId} failed: {pinnedRequest.FailReason}");
             }
-            using var pinnedDoc = ParseBody(pinnedRequest.BodyAsString, $"the Modrinth version {versionId}");
             return ModrinthPackIndex.LoadIndexedPackVersion(
-                JsonUtils.ToNode(pinnedDoc.RootElement)
+                ParseBodyNode(pinnedRequest.BodyAsString, $"the Modrinth version {versionId}")
                 ?? throw new ModResolveException($"the Modrinth version {versionId} is not a JSON object"));
         }
         catch (JsonParseException e)
@@ -233,18 +223,16 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             throw new ModResolveException($"fetching the version list of {pack.AddonId} failed: {request.FailReason}");
         }
 
-        using var doc = ParseBody(request.BodyAsString, $"the version list of {pack.AddonId}");
+        var bodyRoot = ParseBodyNode(request.BodyAsString, $"the version list of {pack.AddonId}");
         if (provider == ResourceProvider.FLAME)
         {
-            if (doc.RootElement.ValueKind != JsonValueKind.Object ||
-                !doc.RootElement.TryGetProperty("data", out var data) ||
-                data.ValueKind != JsonValueKind.Array)
+            if (bodyRoot is not JsonObject flameRoot || flameRoot["data"] is not JsonArray data)
             {
                 throw new ModResolveException($"the CurseForge version list of {pack.AddonId} has no data array");
             }
             try
             {
-                FlameMod.LoadIndexedPackVersions(pack, (JsonArray)(JsonUtils.ToNode(data) ?? new JsonArray()));
+                FlameMod.LoadIndexedPackVersions(pack, data);
             }
             catch (JsonParseException e)
             {
@@ -257,19 +245,18 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         // Modrinth: an array of versions; keep the valid ones for the instance's loader
         // (the getDependencyVersion heuristic) and take the newest by published date
         var versions = new List<IndexedVersion>();
-        if (doc.RootElement.ValueKind == JsonValueKind.Array)
+        if (bodyRoot is JsonArray array)
         {
-            foreach (var entry in doc.RootElement.EnumerateArray())
+            foreach (var entry in array)
             {
-                if (entry.ValueKind != JsonValueKind.Object)
+                if (entry is not JsonObject entryObj)
                 {
                     continue;
                 }
                 IndexedVersion file;
                 try
                 {
-                    // entry is kind-checked as an object above: ToNode cannot yield null
-                    file = ModrinthPackIndex.LoadIndexedPackVersion(JsonUtils.ToNode(entry)!);
+                    file = ModrinthPackIndex.LoadIndexedPackVersion(entryObj);
                 }
                 catch (JsonParseException)
                 {
@@ -286,8 +273,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         return versions.Count != 0 ? versions[0] : null;
     }
 
-    /// <summary>Node-side parse for the Modrinth flows (single-DOM read model); the Flame
-    /// flows keep the element variant until their phase.</summary>
+    /// <summary>Node-side parse for the modplatform flows (single-DOM read model).</summary>
     private static JsonNode? ParseBodyNode(string body, string what)
     {
         try
@@ -297,18 +283,6 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         catch (JsonException e)
         {
             throw new ModResolveException($"{what} is invalid: {e.Message}");
-        }
-    }
-
-    private static JsonDocument ParseBody(string body, string what)
-    {
-        try
-        {
-            return JsonDocument.Parse(body);
-        }
-        catch (JsonException e)
-        {
-            throw new ModResolveException($"the response for {what} is not valid JSON: {e.Message}");
         }
     }
 }

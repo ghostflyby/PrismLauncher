@@ -13,6 +13,7 @@
 // GETs, body field on the install) selects a per-request derived client instead of mutating
 // the shared one, so an override can never leak into other requests (and needs no restore).
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Technic;
@@ -215,10 +216,11 @@ public static class TechnicEndpoints
                 }
 
                 runtime.Instances.LoadList();
-                var inst = runtime.Instances.GetInstanceById(expectedId);
+                // the staged commit's expected dirname, resolved through the D2 chain
+                var inst = runtime.Instances.ResolveInstance(expectedId);
                 return inst is null
                     ? ApiJson.Error("creation_failed", "instance was committed but not discovered", 500)
-                    : Results.Created($"/api/v1/instances/{inst.Id()}",
+                    : Results.Created($"/api/v1/instances/{inst.Uuid}",
                         new InstanceCreatedResponse(inst.Id(), inst.Name()));
             }
             finally
@@ -325,14 +327,15 @@ public static class TechnicEndpoints
     {
         try
         {
-            using var doc = JsonDocument.Parse(body);
+            if (JsonNode.Parse(body) is not JsonObject obj)
+            {
+                return null;
+            }
             foreach (var key in new[] { "displayName", "name" })
             {
-                if (doc.RootElement.ValueKind == JsonValueKind.Object &&
-                    doc.RootElement.TryGetProperty(key, out var value) &&
-                    value.ValueKind == JsonValueKind.String)
+                if (obj[key] is JsonValue value && value.TryGetValue<string>(out var str))
                 {
-                    return value.GetString();
+                    return str;
                 }
             }
         }

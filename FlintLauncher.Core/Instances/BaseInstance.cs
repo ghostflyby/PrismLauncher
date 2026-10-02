@@ -6,19 +6,30 @@
 //  - QObject signals become C# events: propertiesChanged -> PropertiesChanged,
 //    runningStatusChanged -> RunningStatusChanged, statusChanged -> StatusChanged. The
 //    launchTaskChanged/profilerChanged signals belong to the launch pipeline (P5).
-//  - setMinecraftRunning() adds the played seconds to APPLICATION->playtimeSettings()'s
-//    "TotalPlayTime" key; the application singleton is not ported, so the global playtime
-//    settings object is injected through <see cref="PlaytimeSettings"/>. When it is null
-//    the global accumulation is skipped (all instance-local keys behave as upstream).
+//  - setMinecraftRunning() adds the played seconds to the launcher runtime state's
+//    Playtime.Total (launcher-state.json, S5; the C++ used the "TotalPlayTime" settings
+//    key — moved out of the config world by CONFIG C9). The state store is injected
+//    through <see cref="LauncherState"/>; when it is null the global accumulation is
+//    skipped (all instance-local keys behave as upstream).
 //  - iconUpdated() received the icon list singleton's signal; it becomes a plain method
 //    taking the updated key.
 //  - populateLaunchMenu() (QMenu construction) is pure UI and is not ported.
 //  - The qWarning for shortcuts with non-existent paths is dropped (no logging layer at
 //    this level); the shortcuts are skipped like upstream.
 //  - QUuid::Id128 form maps to Guid.ToString("N") (32 hex digits, no separators).
+//  - D4 (instance.json): the settings object IS the typed layer stack —
+//    flint.json (user) -> instance.json (instance) — see
+//    Core.Config.InstanceJsonSettingsObject. The C++ override-gate machinery
+//    (RegisterOverride/RegisterPassthrough, OverrideSetting/PassthroughSetting) is retired:
+//    C7 degenerates the gates to "instance-layer member is non-null", so inheritance comes
+//    from the fold and the per-domain gate keys are derived (reading) / family clears
+//    (writing false). The RegisterSetting calls STAY — they are where the instance-only
+//    keys' defaults live (C6) and the key existence contract for the settings surfaces.
+//    The runtime time trio (lastLaunchTime/lastTimePlayed/totalTimePlayed) is routed to
+//    instance-state.json by the adapter (D4) — the reads/writes below are unchanged.
 //  - The C++ registerPassthrough(setting, nullptr) calls (ConsoleMaxLines/
-//    ConsoleOverflowStop) are emulated with a detached, permanently-false gate — exactly
-//    the null-gate semantics of PassthroughSetting::isOverriding().
+//    ConsoleOverflowStop) become plain registrations whose values the adapter resolves from
+//    the user layer — the C7 passthrough pair is global-only, instance writes are dropped.
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -54,23 +65,17 @@ public abstract class BaseInstance
     /// <summary>Port of ShortcutData.</summary>
     public readonly record struct ShortcutData(string Name, string FilePath, ShortcutTarget Target = ShortcutTarget.Other);
 
-    /// <summary>
-    /// Emulates the C++ `registerPassthrough(setting, nullptr)` calls: a detached gate with
-    /// no storage that always reads its default (false), keeping the passthrough permanently
-    /// "not overriding" — reads and writes always hit the global setting, like upstream.
-    /// </summary>
-    private static readonly Setting NeverOverridingGate = new(["__never_overriding_gate__"], false);
-
-    protected BaseInstance(SettingsObject globalSettings, SettingsObject settings, string rootDir)
+    protected BaseInstance(SettingsObject settings, string rootDir)
     {
         _rootDir = rootDir;
         _settings = settings;
-        _globalSettings = globalSettings;
 
         _settings.RegisterSetting("name", "Unnamed Instance");
         _settings.RegisterSetting("iconKey", "default");
         _settings.RegisterSetting("notes", "");
 
+        // the runtime time trio lives in instance-state.json since D4 — the adapter routes
+        // these keys there; the registrations carry their zero defaults
         _settings.RegisterSetting("lastLaunchTime", 0L);
         _settings.RegisterSetting("totalTimePlayed", 0L);
         if (Variant.AsLong(_settings.Get("totalTimePlayed")) < 0)
@@ -79,7 +84,8 @@ public abstract class BaseInstance
         }
         _settings.RegisterSetting("lastTimePlayed", 0L);
 
-        _settings.RegisterSetting("linkedInstances", "[]");
+        // D4: a real string list (the old JSON text form parses through GetLinkedInstances)
+        _settings.RegisterSetting("linkedInstances", Array.Empty<string>());
         _settings.RegisterSetting("shortcuts", "");
         _settings.RegisterSetting("uuid", "");
 
@@ -93,35 +99,41 @@ public abstract class BaseInstance
             _uuid = savedUuid;
         }
 
-        // Game time override
-        var gameTimeOverride = _settings.RegisterSetting("OverrideGameTime", false)!;
-        _settings.RegisterOverride(globalSettings.GetSetting("ShowGameTime")!, gameTimeOverride);
-        _settings.RegisterOverride(globalSettings.GetSetting("RecordGameTime")!, gameTimeOverride);
+        // Game time override family (C7: the gate key stays readable; its value is derived
+        // from Misc.GameTime's members by the adapter — no OverrideSetting chain anymore).
+        // The member keys register plain: the adapter resolves them instance ?? user layer.
+        _settings.RegisterSetting("OverrideGameTime", false);
+        _settings.RegisterSetting("ShowGameTime", true);
+        _settings.RegisterSetting("RecordGameTime", true);
         _settings.RegisterSetting("CountGameTime", true);
 
         // NOTE: Sometimes InstanceType is already registered, as it was used to identify the
-        // type of a locally stored instance
+        // type of a locally stored instance. "OneSix" is the only instantiable type and the
+        // record default (an unknown type never constructs a MinecraftInstance — InstanceList
+        // pre-reads the type from instance.json/instance.cfg and yields NullInstance).
         if (_settings.GetSetting("InstanceType") is null)
         {
-            _settings.RegisterSetting("InstanceType", "");
+            _settings.RegisterSetting("InstanceType", "OneSix");
         }
 
-        // Custom Commands
-        var commandSetting = _settings.RegisterSetting(["OverrideCommands", "OverrideLaunchCmd"], false)!;
-        _settings.RegisterOverride(globalSettings.GetSetting("PreLoadCommand")!, commandSetting);
-        _settings.RegisterOverride(globalSettings.GetSetting("PreLaunchCommand")!, commandSetting);
-        _settings.RegisterOverride(globalSettings.GetSetting("WrapperCommand")!, commandSetting);
-        _settings.RegisterOverride(globalSettings.GetSetting("PostExitCommand")!, commandSetting);
+        // Custom Commands (OverrideCommands family; the synonym covers the legacy spelling)
+        _settings.RegisterSetting(["OverrideCommands", "OverrideLaunchCmd"], false);
+        _settings.RegisterSetting("PreLoadCommand", "");
+        _settings.RegisterSetting("PreLaunchCommand", "");
+        _settings.RegisterSetting("WrapperCommand", "");
+        _settings.RegisterSetting("PostExitCommand", "");
 
-        // Console
-        var consoleSetting = _settings.RegisterSetting("OverrideConsole", false)!;
-        _settings.RegisterOverride(globalSettings.GetSetting("ShowConsole")!, consoleSetting);
-        _settings.RegisterOverride(globalSettings.GetSetting("AutoCloseConsole")!, consoleSetting);
-        _settings.RegisterOverride(globalSettings.GetSetting("ShowConsoleOnError")!, consoleSetting);
-        _settings.RegisterOverride(globalSettings.GetSetting("LogPrePostOutput")!, consoleSetting);
-
-        _settings.RegisterPassthrough(globalSettings.GetSetting("ConsoleMaxLines")!, NeverOverridingGate);
-        _settings.RegisterPassthrough(globalSettings.GetSetting("ConsoleOverflowStop")!, NeverOverridingGate);
+        // Console (OverrideConsole family)
+        _settings.RegisterSetting("OverrideConsole", false);
+        _settings.RegisterSetting("ShowConsole", false);
+        _settings.RegisterSetting("AutoCloseConsole", false);
+        _settings.RegisterSetting("ShowConsoleOnError", true);
+        _settings.RegisterSetting("LogPrePostOutput", true);
+        // C7 passthrough pair: global-only values (the adapter resolves them from the user
+        // layer); registered so the GetConsoleMaxLines/ShouldStopOnConsoleOverflow readers
+        // keep finding the keys
+        _settings.RegisterSetting("ConsoleMaxLines", 100000);
+        _settings.RegisterSetting("ConsoleOverflowStop", true);
 
         // Managed Packs
         _settings.RegisterSetting("ManagedPack", false);
@@ -237,10 +249,13 @@ public abstract class BaseInstance
             Settings().Set("totalTimePlayed", current + secondsPlayed);
             Settings().Set("lastTimePlayed", secondsPlayed);
 
-            if (CountTimePlayed() && PlaytimeSettings is not null)
+            if (CountTimePlayed() && LauncherState is not null)
             {
-                var globalTotal = Variant.AsLong(PlaytimeSettings.Get("TotalPlayTime"));
-                PlaytimeSettings.Set("TotalPlayTime", globalTotal + secondsPlayed);
+                // the add happens inside the update so concurrent writers cannot lose time
+                LauncherState.Update(s => s with
+                {
+                    Playtime = s.Playtime with { Total = s.Playtime.Total + secondsPlayed },
+                });
             }
 
             PropertiesChanged?.Invoke();
@@ -311,24 +326,12 @@ public abstract class BaseInstance
         PropertiesChanged?.Invoke();
     }
 
-    /// <summary>Sync name and rename instance dir accordingly; returns true if successful.</summary>
-    public bool SyncInstanceDirName(string newRoot)
-    {
-        var oldRoot = InstanceRoot();
-        if (oldRoot == newRoot)
-        {
-            return true;
-        }
-        try
-        {
-            Directory.Move(oldRoot, newRoot);
-            return true;
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            return false;
-        }
-    }
+    // NOTE (DATA D3): the C++ setInstanceSyncLine moved the instance directory on rename
+    // (syncInstanceDirName) so the dirname stayed a stable handle. The D2 addressing chain
+    // (inode → uuid → dirname) makes that move unnecessary — directory names stay
+    // human-readable, a rename is a pure metadata write, and references hold via uuid.
+
+
 
     /// <summary>Register a created shortcut.</summary>
     public void RegisterShortcut(ShortcutData data)
@@ -468,12 +471,15 @@ public abstract class BaseInstance
         _settings.Set("ManagedPackVersionID", versionId);
         _settings.Set("ManagedPackVersionName", version);
 
-        if (Variant.AsBool(_globalSettings.Get("AutomaticJavaSwitch")) &&
+        if ((UserLayer.Java.AutomaticJavaSwitch ?? true) &&
             Variant.AsBool(_settings.Get("AutomaticJava")) &&
             Variant.AsBool(_settings.Get("OverrideJavaLocation")))
         {
+            // C7 translation of the C++ pair (gate=false + JavaPath=""): clear the instance
+            // java-location family — every member falls back to the user layer. There is no
+            // separate JavaPath="" write anymore: with the gate gone, an explicit empty
+            // string would be a real (empty) override, the opposite of the intent.
             _settings.Set("OverrideJavaLocation", false);
-            _settings.Set("JavaPath", "");
         }
     }
 
@@ -598,11 +604,18 @@ public abstract class BaseInstance
 
     public Status CurrentStatus() => _status;
 
-    public List<string> GetLinkedInstances() => JsonUtils.ToStringList(Variant.AsString(_settings.Get("linkedInstances")));
+    public List<string> GetLinkedInstances()
+    {
+        // D4: the typed layer carries a real string array; a legacy JSON text (old cfg value
+        // round-tripping through a plain SettingsObject double) still parses
+        return _settings.Get("linkedInstances") is IReadOnlyList<string> list
+            ? list.ToList()
+            : JsonUtils.ToStringList(Variant.AsString(_settings.Get("linkedInstances")));
+    }
 
     public void SetLinkedInstances(IReadOnlyList<string> list)
     {
-        _settings.Set("linkedInstances", JsonUtils.FromStringList(list));
+        _settings.Set("linkedInstances", list);
     }
 
     public void AddLinkedInstanceId(string id)
@@ -638,7 +651,16 @@ public abstract class BaseInstance
         }
     }
 
-    protected SettingsObject GlobalSettings() => _globalSettings;
+    /// <summary>The resolved user layer (flint.json) behind the typed settings stack — the
+    /// C++ reads of APPLICATION->settings() on the instance side. Defaults when the settings
+    /// object is not the typed adapter (bare test doubles).</summary>
+    protected Core.Config.FlintConfigFile UserLayer =>
+        (_settings as Core.Config.InstanceJsonSettingsObject)?.UserLayer ?? Core.Config.FlintConfigFile.Default();
+
+    /// <summary>The live user-layer store (flint.json) when the settings object is the typed
+    /// adapter — handed to LaunchServices so the launch pipeline reads the same stack.</summary>
+    protected Core.Config.FlintConfigStore? UserConfigStore =>
+        (_settings as Core.Config.InstanceJsonSettingsObject)?.UserConfig;
 
     protected bool IsSpecificSettingsLoaded() => _specificSettingsLoaded;
 
@@ -655,8 +677,11 @@ public abstract class BaseInstance
     // NOTE: struct fields need an explicit construction here or System would stay null
     protected RuntimeContext _runtimeContext = new();
 
-    /// <summary>C++ APPLICATION->playtimeSettings() — null skips the global playtime accumulation.</summary>
-    public SettingsObject? PlaytimeSettings { get; set; }
+    /// <summary>The launcher runtime state (launcher-state.json, S5) — the playtime
+    /// accumulation lands in <c>Playtime.Total</c> (the former TotalPlayTime settings key,
+    /// CONFIG C9). Null skips the global accumulation; the instance list stamps it at
+    /// discovery.</summary>
+    public State.LauncherStateStore? LauncherState { get; set; }
 
     private string _uuid = "";
     private Status _status = Status.Present;
@@ -664,6 +689,5 @@ public abstract class BaseInstance
     private bool _hasUpdate;
     private bool _hasBrokenVersion;
 
-    private readonly SettingsObject _globalSettings;
     private bool _specificSettingsLoaded;
 }

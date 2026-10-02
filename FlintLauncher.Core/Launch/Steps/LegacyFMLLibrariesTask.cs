@@ -5,8 +5,8 @@
 // Application-singleton reach-ins resolve through the instance (see Launch/LaunchController.cs
 // for the same pattern): the global settings override (LegacyFMLLibsURLOverride) comes from
 // the instance-stamped LaunchServices (Services.LegacyFmllibsUrlOverride) and the metacache
-// from the instance; when the cache is unset a throwaway cache is used so instances with the
-// libraries already in place behave identically.
+// from the instance ("fmllibs" base — registered once at the composition root, E6; an
+// unstamped instance fails the step instead of silently re-downloading).
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Net;
 
@@ -81,7 +81,10 @@ public sealed class LegacyFMLLibrariesTask : FlintTask
 
         // download missing libs to our place
         EmitStatus("Downloading FML libraries...");
-        var metacache = RequireCache();
+        // E6: the stamped runtime cache is the only source — the bare-fixture throwaway is
+        // gone; an unstamped instance fails the step naming the missing wire
+        var metacache = _inst.MetaCache ?? throw new InvalidOperationException(
+            $"no meta cache stamped on instance '{_inst.Name()}' — the composition root must inject it");
         var dlJob = new NetJob("FML libraries");
         _downloadJob = dlJob;
         foreach (var lib in _fmlLibsToProcess)
@@ -116,7 +119,8 @@ public sealed class LegacyFMLLibrariesTask : FlintTask
         {
             EmitStatus("Copying FML libraries into the instance...");
             var inst = _inst;
-            var metacache = RequireCache();
+            var metacache = _inst.MetaCache ?? throw new InvalidOperationException(
+                $"no meta cache stamped on instance '{_inst.Name()}' — the composition root must inject it");
             var index = 0;
             foreach (var lib in _fmlLibsToProcess)
             {
@@ -161,19 +165,5 @@ public sealed class LegacyFMLLibrariesTask : FlintTask
             // Prematurely aborted LegacyFMLLibrariesTask
         }
         base.Abort();
-    }
-
-    private HttpMetaCache RequireCache()
-    {
-        // the composition root stamps the instance with the runtime cache; the throwaway
-        // fallback (no shared ledger) is for bare fixtures
-        if (_inst.MetaCache is { } shared)
-        {
-            return shared;
-        }
-        var cache = new HttpMetaCache();
-        cache.AddBase("fmllibs", _inst.Paths?.FmllibsCacheDir
-            ?? FileSystem.PathCombine(Directory.GetCurrentDirectory(), "cache", "fmllibs"));
-        return cache;
     }
 }

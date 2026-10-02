@@ -748,9 +748,11 @@ public static class InstanceContentEndpoints
 
     // ----------------------------------------------------------------------- helpers
 
-    /// <summary>The MinecraftInstance for an id (the content surfaces need the game root).</summary>
-    private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string id) =>
-        runtime.Instances.GetInstanceById(id) is MinecraftInstance instance ? instance : null;
+    /// <summary>The MinecraftInstance for a {ref} (the content surfaces need the game
+    /// root). D2: every endpoint resolves through the addressing chain — direct
+    /// GetInstanceById is banned at the API boundary (GLOBAL §1).</summary>
+    private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string reference) =>
+        runtime.Instances.ResolveInstance(reference) is MinecraftInstance instance ? instance : null;
 
     private static string ServersPath(MinecraftInstance instance) =>
         Path.Combine(instance.GameRoot(), "servers.dat");

@@ -37,7 +37,10 @@ public sealed class AssetUpdateTask : FlintTask
         var indexUrl = assets.Url;
         var localPath = assets.Id + ".json";
 
-        var metacache = RequireCache();
+        // E6: the stamped runtime cache is the only source — the bare-fixture throwaway is
+        // gone; an unstamped instance fails the step naming the missing wire
+        var metacache = _inst.MetaCache ?? throw new InvalidOperationException(
+            $"no meta cache stamped on instance '{_inst.Name()}' — the composition root must inject it");
         var entry = metacache.ResolveEntry("asset_indexes", localPath);
         entry.SetStale(true);
         var job = new NetJob($"Asset index for {_inst.Name()}");
@@ -78,7 +81,8 @@ public sealed class AssetUpdateTask : FlintTask
         // FIXME: this looks like a job for a generic validator based on json schema?
         if (!AssetsUtils.LoadAssetsIndexJson(assets.Id, assetFname, index))
         {
-            var metacache = RequireCache();
+            var metacache = _inst.MetaCache ?? throw new InvalidOperationException(
+                $"no meta cache stamped on instance '{_inst.Name()}' — the composition root must inject it");
             var entry = metacache.ResolveEntry("asset_indexes", assets.Id + ".json");
             metacache.EvictEntry(entry);
             EmitFailed("Failed to read the assets index!");
@@ -131,19 +135,5 @@ public sealed class AssetUpdateTask : FlintTask
             // Prematurely aborted AssetUpdateTask
         }
         base.Abort();
-    }
-
-    private HttpMetaCache RequireCache()
-    {
-        // the composition root stamps the instance with the runtime cache; the throwaway
-        // fallback (no shared ledger, index re-downloaded every run) is for bare fixtures
-        if (_inst.MetaCache is { } shared)
-        {
-            return shared;
-        }
-        var cache = new HttpMetaCache();
-        cache.AddBase("asset_indexes", _inst.Paths?.AssetIndexesDir
-            ?? FileSystem.PathCombine(Directory.GetCurrentDirectory(), "assets", "indexes"));
-        return cache;
     }
 }

@@ -4,7 +4,6 @@
 // The QJsonDocument wrapper of versionFileFromJson is replaced by a JsonObject parameter (the
 // "document is empty or null" branch cannot trigger for an object); the upstream bug where
 // versionFileToJson serializes jarMods into the "mods" array is preserved and marked.
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Java;
@@ -20,10 +19,10 @@ public static partial class OneSixVersionFormat
         return root.Contains(key) ? JsonUtils.RequireString(root, key, "Value") : current;
     }
 
-    /// <summary>root.value(key) as a JsonElement (for the require*(QJsonValue) overload shape).</summary>
-    private static JsonElement ValueOf(JsonObject root, string key)
+    /// <summary>root.value(key) as a node (for the require*(JsonNode) overload shape).</summary>
+    private static JsonNode? ValueOf(JsonObject root, string key)
     {
-        return root[key].ToElement();
+        return root[key];
     }
 
     public static Library LibraryFromJson(ProblemContainer problems, JsonObject libObj, string filename)
@@ -115,7 +114,7 @@ public static partial class OneSixVersionFormat
 
         if (root.Contains("+tweakers"))
         {
-            foreach (var tweakerVal in JsonUtils.RequireArray(ValueOf(root, "+tweakers")).EnumerateArray())
+            foreach (var tweakerVal in JsonUtils.RequireArray(ValueOf(root, "+tweakers")))
             {
                 outInfo.AddTweakers.Add(JsonUtils.RequireString(tweakerVal));
             }
@@ -123,7 +122,7 @@ public static partial class OneSixVersionFormat
 
         if (root.Contains("+traits"))
         {
-            foreach (var traitVal in JsonUtils.RequireArray(ValueOf(root, "+traits")).EnumerateArray())
+            foreach (var traitVal in JsonUtils.RequireArray(ValueOf(root, "+traits")))
             {
                 outInfo.Traits.Add(JsonUtils.RequireString(traitVal));
             }
@@ -131,7 +130,7 @@ public static partial class OneSixVersionFormat
 
         if (root.Contains("+jvmArgs"))
         {
-            foreach (var arg in JsonUtils.RequireArray(ValueOf(root, "+jvmArgs")).EnumerateArray())
+            foreach (var arg in JsonUtils.RequireArray(ValueOf(root, "+jvmArgs")))
             {
                 outInfo.AddnJvmArguments.Add(JsonUtils.RequireString(arg));
             }
@@ -139,9 +138,9 @@ public static partial class OneSixVersionFormat
 
         if (root.Contains("jarMods"))
         {
-            foreach (var libVal in JsonUtils.RequireArray(ValueOf(root, "jarMods")).EnumerateArray())
+            foreach (var libVal in JsonUtils.RequireArray(ValueOf(root, "jarMods")))
             {
-                var libObj = JsonUtils.RequireObject(libVal).ToJsonObject();
+                var libObj = JsonUtils.RequireObject(libVal);
                 // parse the jarmod
                 var lib = JarModFromJson(outInfo, libObj, filename);
                 // and add to jar mods
@@ -150,9 +149,9 @@ public static partial class OneSixVersionFormat
         }
         else if (root.Contains("+jarMods")) // DEPRECATED: old style '+jarMods' are only here for backwards compatibility
         {
-            foreach (var libVal in JsonUtils.RequireArray(ValueOf(root, "+jarMods")).EnumerateArray())
+            foreach (var libVal in JsonUtils.RequireArray(ValueOf(root, "+jarMods")))
             {
-                var libObj = JsonUtils.RequireObject(libVal).ToJsonObject();
+                var libObj = JsonUtils.RequireObject(libVal);
                 // parse the jarmod
                 var lib = PlusJarModFromJson(outInfo, libObj, filename, outInfo.Name);
                 // and add to jar mods
@@ -162,9 +161,9 @@ public static partial class OneSixVersionFormat
 
         if (root.Contains("mods"))
         {
-            foreach (var libVal in JsonUtils.RequireArray(ValueOf(root, "mods")).EnumerateArray())
+            foreach (var libVal in JsonUtils.RequireArray(ValueOf(root, "mods")))
             {
-                var libObj = JsonUtils.RequireObject(libVal).ToJsonObject();
+                var libObj = JsonUtils.RequireObject(libVal);
                 // parse the mod
                 var lib = ModFromJson(outInfo, libObj, filename);
                 // and add to mods
@@ -174,9 +173,9 @@ public static partial class OneSixVersionFormat
 
         void ReadLibs(string which, List<Library> outList)
         {
-            foreach (var libVal in JsonUtils.RequireArray(ValueOf(root, which)).EnumerateArray())
+            foreach (var libVal in JsonUtils.RequireArray(ValueOf(root, which)))
             {
-                var libObj = JsonUtils.RequireObject(libVal).ToJsonObject();
+                var libObj = JsonUtils.RequireObject(libVal);
                 // parse the library
                 var lib = LibraryFromJson(outInfo, libObj, filename);
                 outList.Add(lib);
@@ -208,9 +207,9 @@ public static partial class OneSixVersionFormat
 
         if (root.Contains("+agents"))
         {
-            foreach (var agentVal in JsonUtils.RequireArray(ValueOf(root, "+agents")).EnumerateArray())
+            foreach (var agentVal in JsonUtils.RequireArray(ValueOf(root, "+agents")))
             {
-                var agentObj = JsonUtils.RequireObject(agentVal).ToJsonObject();
+                var agentObj = JsonUtils.RequireObject(agentVal);
                 var lib = LibraryFromJson(outInfo, agentObj, filename);
 
                 var arg = "";
@@ -224,7 +223,7 @@ public static partial class OneSixVersionFormat
         if (root.Contains("mainJar"))
         {
             var libObj = JsonUtils.RequireObject(root, "mainJar");
-            outInfo.MainJar = LibraryFromJson(outInfo, libObj.ToJsonObject(), filename);
+            outInfo.MainJar = LibraryFromJson(outInfo, libObj, filename);
         }
         // else reconstruct it from downloads and id ... if that's available
         else if (outInfo.MinecraftVersion.Length != 0)
@@ -278,9 +277,9 @@ public static partial class OneSixVersionFormat
         if (root.Contains("runtimes"))
         {
             outInfo.Runtimes = [];
-            foreach (var runtime in JsonUtils.RequireArray(ValueOf(root, "runtimes")).EnumerateArray())
+            foreach (var runtime in JsonUtils.RequireArray(ValueOf(root, "runtimes")))
             {
-                outInfo.Runtimes.Add(JavaMetadata.ParseJavaMeta(JsonUtils.RequireObject(runtime).ToJsonObject()));
+                outInfo.Runtimes.Add(JavaMetadata.ParseJavaMeta(JsonUtils.RequireObject(runtime)));
             }
         }
 

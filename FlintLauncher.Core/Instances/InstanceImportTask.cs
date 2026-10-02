@@ -219,8 +219,10 @@ public sealed partial class InstanceImportTask : InstanceTask
             packVersionId = _extraInfo.TryGetValue("pack_version_id", out var versionId) ? versionId : "";
         }
 
-        var instCreationTask = new FlameCreationTask(StagingPath, _trustedSource, GlobalSettings, packId,
-            packVersionId, _modrinth, flame: _flame)
+        var instCreationTask = new FlameCreationTask(StagingPath, _trustedSource,
+            Environment ?? throw new InvalidOperationException(
+                "InstanceTask requires SetParentEnvironment before execution."),
+            packId, packVersionId, _modrinth, flame: _flame)
         {
             OptionalModsSelection = OptionalModsSelection,
         };
@@ -251,10 +253,10 @@ public sealed partial class InstanceImportTask : InstanceTask
         // separate minecraft version (that only the Solder/zip install tasks know), so the
         // pack processor runs with an empty version — a modpack.jar without version.json
         // therefore fails like upstream.
-        var failure = TechnicPackProcessor.Run(
-            GlobalSettings ?? throw new InvalidOperationException(
-                "InstanceTask requires SetParentSettings before execution."),
-            Name(), Icon, StagingPath);
+        var failure = await TechnicPackProcessor.RunAsync(
+            Environment ?? throw new InvalidOperationException(
+                "InstanceTask requires SetParentEnvironment before execution."),
+            Name(), Icon, StagingPath, cancellationToken: cancellationToken);
         if (failure is not null)
         {
             EmitFailed(failure);
@@ -266,13 +268,13 @@ public sealed partial class InstanceImportTask : InstanceTask
 
     private void ProcessMultiMC()
     {
-        var configPath = FileSystem.PathCombine(StagingPath, "instance.cfg");
-        var instanceSettings = new Settings.IniSettingsObject(configPath);
-
+        // D4: the staged MultiMC import writes its fixups (fresh uuid, name, playtime reset)
+        // through the typed adapter — the committed folder is Flint format (instance.json);
+        // the cfg inside the zip, if any, stays untouched
         var instance = new NullInstance(
-            GlobalSettings ?? throw new InvalidOperationException(
-                "InstanceTask requires SetParentSettings before execution."),
-            instanceSettings, StagingPath);
+            new Core.Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
+                "InstanceTask requires SetParentEnvironment before execution.")),
+            StagingPath);
 
         // reset time played on import... because packs.
         instance.ResetTimePlayed();
@@ -312,8 +314,10 @@ public sealed partial class InstanceImportTask : InstanceTask
             }
         }
 
-        var instCreationTask = new ModrinthCreationTask(StagingPath, _trustedSource, GlobalSettings, packId,
-            packVersionId, modrinth: _modrinth)
+        var instCreationTask = new ModrinthCreationTask(StagingPath, _trustedSource,
+            Environment ?? throw new InvalidOperationException(
+                "InstanceTask requires SetParentEnvironment before execution."),
+            packId, packVersionId, modrinth: _modrinth)
         {
             OptionalModsSelection = OptionalModsSelection,
         };

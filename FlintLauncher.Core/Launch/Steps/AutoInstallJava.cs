@@ -5,10 +5,12 @@
 //
 // Application-singleton reach-ins resolve through the parent LaunchTask's LaunchServices
 // (see the other Launch steps):
-//  - APPLICATION->settings() (global)               -> Services.GlobalSettings
+//  - APPLICATION->settings() (global, the java/download switches) -> Services.Config
+//    (the typed flint.json store, D4)
 //  - APPLICATION->javalist() (the "no download" branch) -> Services.JavaInstallListProvider
 //    (null degrades to the upstream "no compatible Java version was found" warning)
-//  - APPLICATION->javaPath() (settings "JavaDir")   -> Services.Paths.JavaRoot
+//  - APPLICATION->javaPath() (settings "JavaDir")   -> Services.JavaRoot (the JavaDir
+//    setting under E2 store semantics; falls back to the store/java anchor)
 //  - APPLICATION->metadataIndex()                   -> Services.MetadataIndexProvider
 //    (defaults to the instance PackProfile's index)
 //
@@ -43,7 +45,11 @@ public sealed class AutoInstallJava : LaunchStep
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         var settings = _instance.Settings();
-        if (!Variant.AsBool(Services.GlobalSettings?.Get("AutomaticJavaSwitch")) ||
+        // the typed user layer (D4): the store's resolved fold materializes the defaults,
+        // so a present store means the C++ defaults (true) — a null store keeps the bare-
+        // fixture "feature off" behavior the former unset global double produced
+        if (Services.Config is not { } config ||
+            !(config.Current.Java.AutomaticJavaSwitch ?? false) ||
             (Variant.AsBool(settings.Get("OverrideJavaLocation")) &&
              (File.Exists(Variant.AsString(settings.Get("JavaPath"))) || Directory.Exists(Variant.AsString(settings.Get("JavaPath"))))))
         {
@@ -51,7 +57,7 @@ public sealed class AutoInstallJava : LaunchStep
             return;
         }
         var packProfile = _instance.GetPackProfile();
-        if (!Variant.AsBool(Services.GlobalSettings?.Get("AutomaticJavaDownload")))
+        if (!(config.Current.Java.AutomaticJavaDownload ?? false))
         {
             var javas = Services.JavaInstallListProvider?.Invoke();
             if (javas is not null)
@@ -94,7 +100,7 @@ public sealed class AutoInstallJava : LaunchStep
             EmitSucceeded();
             return;
         }
-        var javaDir = Services.Paths.JavaRoot;
+        var javaDir = Services.JavaRoot;
         var relativeBinary = FileSystem.PathCombine(wantedJavaName, "bin", JavaUtils.JavaExecutable);
         var wantedJavaPath = FileSystem.PathCombine(javaDir, relativeBinary);
         if (File.Exists(wantedJavaPath) || Directory.Exists(wantedJavaPath))
@@ -124,7 +130,8 @@ public sealed class AutoInstallJava : LaunchStep
     private void SetJavaPath(string path)
     {
         var settings = _instance.Settings();
-        settings.Set("OverrideJavaLocation", true);
+        // C7: there is no gate boolean anymore — writing JavaPath sets the instance-layer
+        // member, which IS the override (the derived OverrideJavaLocation reads true)
         settings.Set("JavaPath", path);
         settings.Set("AutomaticJava", true);
         EmitLogLine($"Compatible Java found at: {path}.", MessageLevel.Launcher);
@@ -135,7 +142,7 @@ public sealed class AutoInstallJava : LaunchStep
     {
         var packProfile = _instance.GetPackProfile();
         var javaName = packProfile.GetProfile()?.GetCompatibleJavaName() ?? "";
-        var javaDir = Services.Paths.JavaRoot;
+        var javaDir = Services.JavaRoot;
         // just checking if the executable is there should suffice
         // but if needed this can be achieved through refreshing the javalist
         // and retrieving the path that contains the java name
@@ -160,7 +167,7 @@ public sealed class AutoInstallJava : LaunchStep
         {
             if (java.RuntimeOs == _supportedArch && java.Name() == javaName)
             {
-                var javaDir = Services.Paths.JavaRoot;
+                var javaDir = Services.JavaRoot;
                 var finalPath = FileSystem.PathCombine(javaDir, java.Name());
                 switch (java.DownloadType)
                 {

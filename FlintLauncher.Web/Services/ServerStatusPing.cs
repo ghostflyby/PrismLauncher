@@ -17,6 +17,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 
@@ -153,45 +154,41 @@ public static class ServerStatusPing
     /// extracts players.online/max, version.name and the motd text when present.</summary>
     private static ServerPingResult ParseStatus(string ip, int port, string json, long latencyMs)
     {
-        JsonDocument doc;
+        JsonNode? root;
         try
         {
-            doc = JsonDocument.Parse(json);
+            root = JsonNode.Parse(json);
         }
         catch (JsonException e)
         {
             throw new InvalidOperationException("server sent an invalid status reply", e);
         }
-        using (doc)
+        int online = 0, max = 0;
+        if (root?["players"] is JsonObject players)
         {
-            var root = doc.RootElement;
-            int online = 0, max = 0;
-            if (root.TryGetProperty("players", out var players) &&
-                players.ValueKind == JsonValueKind.Object)
-            {
-                online = players.TryGetProperty("online", out var o) &&
-                         o.ValueKind == JsonValueKind.Number ? o.GetInt32() : 0;
-                max = players.TryGetProperty("max", out var m) &&
-                      m.ValueKind == JsonValueKind.Number ? m.GetInt32() : 0;
-            }
-            string? version = null;
-            if (root.TryGetProperty("version", out var v) && v.ValueKind == JsonValueKind.Object &&
-                v.TryGetProperty("name", out var vn) && vn.ValueKind == JsonValueKind.String)
-            {
-                version = vn.GetString();
-            }
-            string? motd = null;
-            if (root.TryGetProperty("description", out var d))
-            {
-                motd = d.ValueKind == JsonValueKind.String
-                    ? d.GetString()
-                    : d.ValueKind == JsonValueKind.Object &&
-                      d.TryGetProperty("text", out var dt) && dt.ValueKind == JsonValueKind.String
-                        ? dt.GetString()
-                        : d.GetRawText();
-            }
-            return new ServerPingResult(ip, port, online, max, version, motd, latencyMs);
+            online = players["online"] is JsonValue o &&
+                     int.TryParse(o.ToJsonString(), System.Globalization.CultureInfo.InvariantCulture, out var onlineNumber)
+                ? onlineNumber : 0;
+            max = players["max"] is JsonValue m &&
+                  int.TryParse(m.ToJsonString(), System.Globalization.CultureInfo.InvariantCulture, out var maxNumber)
+                ? maxNumber : 0;
         }
+        string? version = null;
+        if (root?["version"] is JsonObject v && v["name"] is JsonValue vn &&
+            vn.TryGetValue<string>(out var versionName))
+        {
+            version = versionName;
+        }
+        string? motd = null;
+        if (root?["description"] is { } d)
+        {
+            motd = d is JsonValue dv && dv.TryGetValue<string>(out var motdText)
+                ? motdText
+                : d is JsonObject do_ && do_["text"] is JsonValue dt && dt.TryGetValue<string>(out var text)
+                    ? text
+                    : d.ToJsonString();
+        }
+        return new ServerPingResult(ip, port, online, max, version, motd, latencyMs);
     }
 
     // ------------------------------------------------------------------- varInt framing

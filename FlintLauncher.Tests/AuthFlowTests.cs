@@ -292,7 +292,7 @@ public class AuthFlowTests : IDisposable
         var redirectUri = Uri.UnescapeDataString(
             url.Split("redirect_uri=")[1].Split('&')[0]);
         var port = new Uri(redirectUri).Port;
-        using var callback = await Http.Client
+        using var callback = await NetStack.Default.Client
             .GetAsync($"http://127.0.0.1:{port}/?code=INTERACTIVE_CODE")
             .WaitAsync(TimeSpan.FromSeconds(10));
         Assert.True(callback.IsSuccessStatusCode);
@@ -327,7 +327,7 @@ public class AuthFlowTests : IDisposable
 
         var redirectUri = Uri.UnescapeDataString(url.Split("redirect_uri=")[1].Split('&')[0]);
         var port = new Uri(redirectUri).Port;
-        using var _ = await Http.Client
+        using var _ = await NetStack.Default.Client
             .GetAsync($"http://127.0.0.1:{port}/?error=access_denied&error_description=User+cancelled")
             .WaitAsync(TimeSpan.FromSeconds(10));
 

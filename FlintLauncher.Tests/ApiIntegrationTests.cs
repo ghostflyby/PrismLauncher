@@ -29,6 +29,7 @@ using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Web;
 using FlintLauncher.Web.Services;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -40,10 +41,12 @@ internal sealed class FlintApiHost : IAsyncDisposable
     private readonly WebApplication _app;
     private readonly string _previousCwd;
 
-    private FlintApiHost(WebApplication app, HttpClient client, string dataDir, string previousCwd, string token)
+    private FlintApiHost(WebApplication app, HttpClient client, string homeDir, string dataDir,
+        string previousCwd, string token)
     {
         _app = app;
         Client = client;
+        HomeDir = homeDir;
         DataDir = dataDir;
         Token = token;
         _previousCwd = previousCwd;
@@ -51,26 +54,35 @@ internal sealed class FlintApiHost : IAsyncDisposable
 
     public HttpClient Client { get; }
 
+    /// <summary>The temp home root (passed as --home-dir; cleaned up on dispose).</summary>
+    public string HomeDir { get; }
+
+    /// <summary>The data root (home layout: &lt;home&gt;/data) — where instances, accounts
+    /// and the API token live.</summary>
     public string DataDir { get; }
 
     public static async Task<FlintApiHost> StartAsync(ModrinthApi? modrinth = null, FlameApi? flame = null,
         TechnicApi? technic = null, AtLauncherApi? atlauncher = null, FtbApi? ftb = null,
         AuthEndpointsOptions? auth = null)
     {
-        var dataDir = Path.Combine(Path.GetTempPath(), $"flint-api-{Guid.NewGuid():N}");
+        var homeDir = Path.Combine(Path.GetTempPath(), $"flint-api-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(homeDir);
+        var dataDir = Path.Combine(homeDir, "data");
         Directory.CreateDirectory(dataDir);
         var previousCwd = Environment.CurrentDirectory;
+        // S2: the token is host-injected (--api-token) — there is no token file to read
+        var token = Guid.NewGuid().ToString("N");
         var app = WebHostBuilder.BuildWebApplication(
         [
-            "--data-dir", dataDir,
+            "--home-dir", homeDir,
+            "--api-token", token,
             "--urls", "http://127.0.0.1:0",
         ], modrinth, flame, technic, atlauncher, ftb, auth);
         await app.StartAsync();
-        var token = File.ReadAllText(Path.Combine(dataDir, ApiAuthService.TokenFileName)).Trim();
         var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
-        // every API route (except /healthz and /api/v1/info) requires the data-dir token
+        // every API route (except /healthz and /api/v1/info) requires the injected token
         client.DefaultRequestHeaders.Add("X-Api-Token", token);
-        return new FlintApiHost(app, client, dataDir, previousCwd, token);
+        return new FlintApiHost(app, client, homeDir, dataDir, previousCwd, token);
     }
 
     /// <summary>A client WITHOUT credentials, for auth-rejection assertions.</summary>
@@ -136,7 +148,7 @@ internal sealed class FlintApiHost : IAsyncDisposable
             Environment.CurrentDirectory = restoreTo;
             try
             {
-                Directory.Delete(DataDir, recursive: true);
+                Directory.Delete(HomeDir, recursive: true);
             }
             catch (DirectoryNotFoundException)
             {
@@ -145,7 +157,7 @@ internal sealed class FlintApiHost : IAsyncDisposable
     }
 }
 
-/// <summary>Minimal stub JSON server (device-code endpoints, news feed, modrinth search).</summary>
+/// <summary>Minimal stub JSON server (device-code endpoints, modrinth search).</summary>
 internal sealed class ApiStubServer : IDisposable
 {
     private readonly HttpListener _listener = new();
@@ -155,14 +167,10 @@ internal sealed class ApiStubServer : IDisposable
     public ApiStubServer(Func<HttpListenerContext, Task> handler)
     {
         Handler = handler;
-        // hold a reserved port until the instant this listener takes it over (a blind random
-        // pick could collide with a peer test class or a foreign process)
-        using var lease = PortAllocator.Reserve();
-        var port = lease.Port;
-        _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
-        lease.Dispose();
-        _listener.Start();
-        Url = $"http://127.0.0.1:{port}";
+        // TestPorts owns the port lease AND the rebind-retry (a blind random pick could
+        // collide with a peer test class or a foreign process; HttpListener cannot adopt the
+        // lease socket, so losing the takeover window retries on a fresh port)
+        (_listener, Url) = PortAllocator.StartHttpListener();
         _loop = Task.Run(ListenLoop);
     }
 
@@ -262,6 +270,11 @@ public class FlintApiIntegrationTests
         Assert.Equal("Packs", entry.GetProperty("group").GetString());
         Assert.Equal(0L, entry.GetProperty("lastLaunchTime").GetInt64());
         Assert.False(entry.GetProperty("running").GetBoolean());
+        // DATA D2 wire shape: every handle of the addressing chain is exposed
+        Assert.Equal(id, entry.GetProperty("dirName").GetString());
+        var uuid = entry.GetProperty("uuid").GetString()!;
+        Assert.False(string.IsNullOrEmpty(uuid));
+        Assert.NotEqual(0L, entry.GetProperty("inode").GetInt64()); // unix stat; Windows would be 0
 
         // detail -----------------------------------------------------------------------
         var detail = JsonDocument.Parse(
@@ -281,15 +294,29 @@ public class FlintApiIntegrationTests
         Assert.Equal("hello api", detail.GetProperty("notes").GetString());
         Assert.Equal("infinity", detail.GetProperty("iconKey").GetString());
 
-        // rename: the core renames the directory -> the instance id follows ------------
+        // rename: a pure METADATA write since DATA D3 — the directory (and with it the id)
+        // stays, the name changes, and the uuid holds as the stable reference -----------
         var rename = await host.PatchAsync($"/api/v1/instances/{Uri.EscapeDataString(id)}",
             new { name = "Renamed Trip" });
         Assert.Equal(HttpStatusCode.NoContent, rename.StatusCode);
         list = JsonDocument.Parse(
             await (await host.GetAsync("/api/v1/instances")).Content.ReadAsStringAsync()).RootElement;
         entry = list.EnumerateArray().Single(e => e.GetProperty("name").GetString() == "Renamed Trip");
-        Assert.Equal("Renamed Trip", entry.GetProperty("id").GetString());
-        id = entry.GetProperty("id").GetString()!;
+        Assert.Equal("Renamed Trip", entry.GetProperty("name").GetString());
+        // the dirname handle did not move (D3) and the uuid survived
+        Assert.Equal(id, entry.GetProperty("id").GetString());
+        Assert.Equal(uuid, entry.GetProperty("uuid").GetString());
+        Assert.Equal(id, entry.GetProperty("dirName").GetString());
+
+        // the D2 chain resolves the same instance through uuid AND dirname --------------
+        var byUuid = JsonDocument.Parse(
+            await (await host.GetAsync($"/api/v1/instances/{Uri.EscapeDataString(uuid)}")).Content
+                .ReadAsStringAsync()).RootElement;
+        Assert.Equal("Renamed Trip", byUuid.GetProperty("name").GetString());
+        var byDirname = JsonDocument.Parse(
+            await (await host.GetAsync($"/api/v1/instances/{Uri.EscapeDataString(id)}")).Content
+                .ReadAsStringAsync()).RootElement;
+        Assert.Equal(uuid, byDirname.GetProperty("uuid").GetString());
 
         // patch the group on the renamed instance --------------------------------------
         Assert.Equal(HttpStatusCode.NoContent, (
@@ -327,6 +354,8 @@ public class FlintApiIntegrationTests
             .RootElement.GetProperty("id").GetString()!;
 
         // PUT with kind-carrying values -------------------------------------------------
+        // C7: the gate has no boolean anymore — JavaPath at the instance layer IS the
+        // override, and the derived OverrideJavaLocation gate reads true
         Assert.Equal(HttpStatusCode.NoContent, (
             await host.PutAsync(
                 $"/api/v1/instances/{Uri.EscapeDataString(id)}/settings",
@@ -335,6 +364,7 @@ public class FlintApiIntegrationTests
                     overrides = new Dictionary<string, object>
                     {
                         ["OverrideJavaLocation"] = true,
+                        ["JavaPath"] = "/tmp/flint-e2e-java",
                         ["JoinServerOnLaunch"] = true,
                         ["notes"] = "typed",
                         ["iconKey"] = "grass",
@@ -344,8 +374,10 @@ public class FlintApiIntegrationTests
         var settings = JsonDocument.Parse(await (await host.GetAsync(
             $"/api/v1/instances/{Uri.EscapeDataString(id)}/settings")).Content.ReadAsStringAsync())
             .RootElement;
-        // the settings map exposes the raw instance.cfg (INI) keys
+        // the settings map exposes the derived gates, the instance-layer members (D4) and
+        // the runtime time trio
         Assert.Equal(JsonValueKind.True, settings.GetProperty("OverrideJavaLocation").ValueKind);
+        Assert.Equal("/tmp/flint-e2e-java", settings.GetProperty("JavaPath").GetString());
         Assert.Equal(JsonValueKind.True, settings.GetProperty("JoinServerOnLaunch").ValueKind);
         Assert.Equal("typed", settings.GetProperty("notes").GetString());
         Assert.Equal("grass", settings.GetProperty("iconKey").GetString());
@@ -457,42 +489,12 @@ public class FlintApiIntegrationTests
     }
 
     [Fact]
-    public async Task News_Feed_Through_Stub_Rss_Server()
+    public async Task News_Endpoint_Is_Retired()
     {
-        var rss = """
-            <?xml version="1.0" encoding="utf-8"?>
-            <feed xmlns="http://www.w3.org/2005/Atom">
-              <entry>
-                <title>Flint API news</title>
-                <content>Hello from the stub feed</content>
-                <id>https://flint.test/news/1</id>
-              </entry>
-            </feed>
-            """;
-        using var server = new ApiStubServer(async ctx =>
-        {
-            var bytes = Encoding.UTF8.GetBytes(rss);
-            ctx.Response.ContentType = "application/xml";
-            await ctx.Response.OutputStream.WriteAsync(bytes);
-            ctx.Response.Close();
-        });
-        var previousFeed = Environment.GetEnvironmentVariable("FLINT_NEWS_RSS_URL");
-        Environment.SetEnvironmentVariable("FLINT_NEWS_RSS_URL", server.Url + "/feed.xml");
-        try
-        {
-            await using var host = await FlintApiHost.StartAsync();
-            var response = await host.GetAsync("/api/v1/news");
-            response.EnsureSuccessStatusCode();
-            var entries = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
-            Assert.Equal(1, entries.GetArrayLength());
-            Assert.Equal("Flint API news", entries[0].GetProperty("title").GetString());
-            Assert.Equal("Hello from the stub feed", entries[0].GetProperty("content").GetString());
-            Assert.Equal("https://flint.test/news/1", entries[0].GetProperty("link").GetString());
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("FLINT_NEWS_RSS_URL", previousFeed);
-        }
+        // CACHE E7: the news surface is deleted whole — checker, endpoint, feed base, env
+        await using var host = await FlintApiHost.StartAsync();
+        var response = await host.GetAsync("/api/v1/news");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     // ------------------------------------------------------------- full launch e2e
@@ -519,11 +521,12 @@ public class FlintApiIntegrationTests
 
         var dataDir = Path.Combine(Path.GetTempPath(), $"flint-api-e2e-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dataDir);
+        var dataRoot = Path.Combine(dataDir, "data"); // the G1 home layout's data root
         var previousCwd = Environment.CurrentDirectory;
 
         // seed an instance on disk the same way the LaunchFixture does (patched net.minecraft
         // profile loads fully offline) — the API discovers it at startup
-        var instanceRoot = Path.Combine(dataDir, "instances", "e2e-inst");
+        var instanceRoot = Path.Combine(dataRoot, "instances", "e2e-inst");
         Directory.CreateDirectory(instanceRoot);
         await File.WriteAllTextAsync(Path.Combine(instanceRoot, "instance.cfg"), "name=E2E Instance\n");
         Directory.CreateDirectory(Path.Combine(instanceRoot, "patches"));
@@ -539,19 +542,37 @@ public class FlintApiIntegrationTests
 
         try
         {
+            // S2: the token is host-injected (--api-token) — no token file exists to read
+            var apiToken = Guid.NewGuid().ToString("N");
             var app = WebHostBuilder.BuildWebApplication(
             [
-                "--data-dir", dataDir,
+                "--home-dir", dataDir,
+                "--api-token", apiToken,
                 "--urls", "http://127.0.0.1:0",
             ],
             // the launch pipeline's jar lookups resolve against this install root (the former
             // JavaUtils.LauncherRootPath static test hook, now LaunchServices.Paths.InstallRoot)
-            paths: FlintPaths.FromDataDir(dataDir) with { InstallRoot = launcherRoot });
+            paths: FlintPaths.FromHomeDir(dataDir) with { InstallRoot = launcherRoot });
             await app.StartAsync();
             using var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
-            client.DefaultRequestHeaders.Add("X-Api-Token",
-                File.ReadAllText(Path.Combine(dataDir, ApiAuthService.TokenFileName)).Trim());
+            client.DefaultRequestHeaders.Add("X-Api-Token", apiToken);
             Environment.CurrentDirectory = dataDir;
+
+            // S5: seed the java probe cache in the launcher state (the former settings-key
+            // seeding — CONFIG C9 moved the probe quintet out of the settings world) so
+            // CheckJava trusts the fake java without running the checker
+            app.Services.GetRequiredService<LauncherRuntime>().State.Update(state => state with
+            {
+                Java = state.Java with
+                {
+                    Detections = new Dictionary<string, FlintLauncher.Core.State.JavaDetectEntry>(
+                        state.Java.Detections, StringComparer.Ordinal)
+                    {
+                        [javaPath] = new(CheckJava.ComputeJavaSignature(javaUnixTime, javaPath),
+                            "64", "arm64", "17.0.2", "api-e2e"),
+                    },
+                },
+            });
 
             // instance visible with its display name -----------------------------------
             var list = JsonDocument.Parse(
@@ -565,11 +586,6 @@ public class FlintApiIntegrationTests
                 {
                     ["OverrideJavaLocation"] = true,
                     ["JavaPath"] = javaPath,
-                    ["JavaSignature"] = CheckJava.ComputeJavaSignature(javaUnixTime, javaPath),
-                    ["JavaVersion"] = "17.0.2",
-                    ["JavaArchitecture"] = "64",
-                    ["JavaRealArchitecture"] = "arm64",
-                    ["JavaVendor"] = "api-e2e",
                 },
             });
             Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
@@ -885,7 +901,7 @@ public class ApiAuthTests
         {
             var app = WebHostBuilder.BuildWebApplication(
             [
-                "--data-dir", dataDir,
+                "--home-dir", dataDir,
                 "--urls", "http://127.0.0.1:0",
                 "--no-auth",
             ]);

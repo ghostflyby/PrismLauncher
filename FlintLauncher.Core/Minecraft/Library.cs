@@ -205,7 +205,8 @@ public class Library
         List<string> native,
         List<string> native32,
         List<string> native64,
-        string overridePath)
+        string overridePath,
+        string storageBase = "")
     {
         var local = IsLocal();
 
@@ -217,6 +218,14 @@ public class Library
             {
                 var fileName = Path.GetFileName(outPath);
                 return Path.GetFullPath(IO.FileSystem.PathCombine(overridePath, fileName));
+            }
+            // the default prefix is the C++-era relative "libraries/", which anchored on
+            // the C++ process CWD (the application chdir'd into its data dir at startup);
+            // the port has no chdir (DI-B), so an unstamped prefix must anchor on the
+            // storage base (the store root, E2) — never on the process CWD
+            if (!Path.IsPathRooted(outPath) && storageBase.Length != 0)
+            {
+                outPath = IO.FileSystem.PathCombine(storageBase, outPath);
             }
             return Path.GetFullPath(outPath);
         }
@@ -408,6 +417,12 @@ public class Library
         }
         return Filename(runtimeContext);
     }
+
+    /// <summary>The Maven-relative storage path under the libraries root — the same string
+    /// the download path keys the ledger entry with (base "libraries"; see GetDownloads) and
+    /// the store-completeness derivation checks (CACHE E5). Native ${arch} placeholders are
+    /// NOT expanded here (GetApplicableFiles expands them into the 32/64 pair).</summary>
+    public string StorageRelativePath(RuntimeContext runtimeContext) => StorageSuffix(runtimeContext);
 
     /// <summary>the default storage prefix used by Prism Launcher</summary>
     private static string DefaultStoragePrefix() => "libraries/";

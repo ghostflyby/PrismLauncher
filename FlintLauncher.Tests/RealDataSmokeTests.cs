@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Manual verification against a real PrismLauncher data directory (P3 exit criterion).
 // Read-only: skips silently when the directory is absent, never writes to the data dir.
+// D4: instances load through the typed layer stack — a Prism-format instance.cfg imports in
+// memory (read-only, nothing materializes) and InstanceType/uuid still resolve.
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Settings;
+using FlintLauncher.Web;
 using Xunit;
 
 namespace Flint.Tests;
@@ -21,11 +24,12 @@ public class RealDataSmokeTests
             return; // no real data dir on this machine (CI) — nothing to verify
         }
 
-        // read-only view of the real global config (never saved back)
-        var global = new IniSettingsObject(Path.Combine(DataDir, "prismlauncher.cfg"));
-        // the C++ application registers the global Setting objects in Application::registerSettings();
-        // replicate that minimal registration set so instance ctors can resolve overrides.
-        RegisterGlobalDefaults(global);
+        // the user layer: a typed store over a THROWAWAY flint.json (never writes into the
+        // real data dir); the real global INI is not imported here — the defaults suffice
+        // for the shape assertions below
+        var user = Flint.Tests.TestGlobalSettings.CreateStore();
+        var environment = new InstanceEnvironment(user,
+            FlintJsonContext.Default.InstanceConfigFile, FlintJsonContext.Default.InstanceStateFile);
 
         var instancesDir = Path.Combine(DataDir, "instances");
         var found = 0;
@@ -38,11 +42,13 @@ public class RealDataSmokeTests
                 continue; // instgroups.json and co.
             }
             found++;
-            var settings = new IniSettingsObject(cfg);
-            var instance = new MinecraftInstance(global, settings, dir);
+            var instance = new MinecraftInstance(
+                new InstanceJsonSettingsObject(dir, environment), dir);
             Assert.Equal("OneSix", instance.InstanceType());
             Assert.False(string.IsNullOrEmpty(instance.Uuid));
             Assert.NotNull(instance.GameRoot());
+            // read-only: the dual-track load must not materialize anything in the real dir
+            Assert.False(File.Exists(Path.Combine(dir, "instance.json")));
 
             var mmcPack = Path.Combine(dir, "mmc-pack.json");
             if (File.Exists(mmcPack))
@@ -57,29 +63,5 @@ public class RealDataSmokeTests
         }
         Assert.True(found >= 3, $"expected several instances, found {found}");
         Assert.True(withProfile >= 3, $"expected several with components, got {withProfile}");
-    }
-
-    /// <summary>The global settings Application::registerSettings() would have registered.</summary>
-    private static void RegisterGlobalDefaults(SettingsObject global)
-    {
-        string[] plain =
-        [
-            "ShowGameTime", "RecordGameTime", "PreLoadCommand", "PreLaunchCommand", "WrapperCommand",
-            "PostExitCommand", "ShowConsole", "AutoCloseConsole", "ShowConsoleOnError", "LogPrePostOutput",
-            "ConsoleMaxLines", "ConsoleOverflowStop", "JavaPath", "JvmArgs", "IgnoreJavaCompatibility",
-            "JavaSignature", "JavaArchitecture", "JavaRealArchitecture", "JavaVersion", "JavaVendor",
-            "LaunchMaximized", "MinecraftWinWidth", "MinecraftWinHeight", "MinMemAlloc", "MaxMemAlloc",
-            "PermGen", "LowMemWarning", "UseNativeOpenAL", "CustomOpenALPath", "UseNativeGLFW",
-            "CustomGLFWPath", "UseNativeSDL", "CustomSDLPath", "EnableFeralGamemode", "EnableMangoHud",
-            "UseDiscreteGpu", "UseZink", "CloseAfterLaunch", "QuitAfterGameStop", "OnlineFixes", "Env",
-            "AutomaticJavaSwitch",
-        ];
-        foreach (var key in plain)
-        {
-            if (global.GetSetting(key) is null)
-            {
-                global.RegisterSetting(key);
-            }
-        }
     }
 }

@@ -8,78 +8,84 @@ using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Settings;
+using FlintLauncher.Web;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace FlintLauncher.Tests;
 
-/// <summary>Global settings with every key the instance/launch layer expects.</summary>
-public class GlobalLaunchSettingsStub : SettingsObject
+/// <summary>The user layer for the launch tests: a REAL FlintConfigStore over the fixture's
+/// config root, seeded with the same values the former in-memory stub registered (the tests'
+/// expectations were written against these — deliberately NOT the production defaults).
+/// StubSet is a typed store Set; the D4 instance stack reads this store as its user layer.</summary>
+public class GlobalLaunchSettingsStub
 {
-    private readonly Dictionary<string, object?> _values = new();
+    /// <summary>The fixture's typed user-layer store (flint.json under the fixture config root).</summary>
+    public FlintLauncher.Core.Config.FlintConfigStore Store { get; }
+
+    private readonly string _configDir;
 
     public GlobalLaunchSettingsStub()
     {
-        RegisterSetting("ShowGameTime", true);
-        RegisterSetting("ShowGameTimeWithoutDays", false);
-        RegisterSetting("RecordGameTime", true);
-        RegisterSetting("PreLoadCommand", "");
-        RegisterSetting("PreLaunchCommand", "");
-        RegisterSetting("WrapperCommand", "");
-        RegisterSetting("PostExitCommand", "");
-        RegisterSetting("ShowConsole", false);
-        RegisterSetting("AutoCloseConsole", false);
-        RegisterSetting("ShowConsoleOnError", false);
-        RegisterSetting("LogPrePostOutput", true);
-        RegisterSetting("ConsoleMaxLines", 100000);
-        RegisterSetting("ConsoleOverflowStop", false);
-        RegisterSetting("JavaPath", "java");
-        RegisterSetting("JvmArgs", "");
-        RegisterSetting("IgnoreJavaCompatibility", false);
-        RegisterSetting("JavaSignature", "");
-        RegisterSetting("JavaArchitecture", "");
-        RegisterSetting("JavaRealArchitecture", "");
-        RegisterSetting("JavaVersion", "");
-        RegisterSetting("JavaVendor", "");
-        RegisterSetting("LaunchMaximized", false);
-        RegisterSetting("MinecraftWinWidth", 854);
-        RegisterSetting("MinecraftWinHeight", 480);
-        RegisterSetting("MinMemAlloc", 512);
-        RegisterSetting("MaxMemAlloc", 4096);
-        RegisterSetting("PermGen", 64);
-        RegisterSetting("LowMemWarning", false);
-        RegisterSetting("UseNativeOpenAL", false);
-        RegisterSetting("CustomOpenALPath", "");
-        RegisterSetting("UseNativeGLFW", false);
-        RegisterSetting("CustomGLFWPath", "");
-        RegisterSetting("UseNativeSDL", false);
-        RegisterSetting("CustomSDLPath", "");
-        RegisterSetting("EnableFeralGamemode", false);
-        RegisterSetting("EnableMangoHud", false);
-        RegisterSetting("UseDiscreteGpu", false);
-        RegisterSetting("UseZink", false);
-        RegisterSetting("CloseAfterLaunch", false);
-        RegisterSetting("QuitAfterGameStop", false);
-        RegisterSetting("OnlineFixes", false);
-        RegisterSetting("Env", "{}");
-        RegisterSetting("AutomaticJavaSwitch", false);
-        RegisterSetting("AutomaticJavaDownload", false);
-        RegisterSetting("ModMetadataDisabled", false);
-        RegisterSetting("LastOfflinePlayerName", "");
+        _configDir = Path.Combine(Path.GetTempPath(), $"flint-user-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_configDir);
+        Store = new FlintLauncher.Core.Config.FlintConfigStore(
+            Path.Combine(_configDir, "flint.json"), FlintJsonContext.Default.FlintConfigFile);
+
+        StubSet("ShowGameTime", true);
+        StubSet("ShowGameTimeWithoutDays", false);
+        StubSet("RecordGameTime", true);
+        StubSet("PreLoadCommand", "");
+        StubSet("PreLaunchCommand", "");
+        StubSet("WrapperCommand", "");
+        StubSet("PostExitCommand", "");
+        StubSet("ShowConsole", false);
+        StubSet("AutoCloseConsole", false);
+        StubSet("ShowConsoleOnError", false);
+        StubSet("LogPrePostOutput", true);
+        StubSet("ConsoleMaxLines", 100000);
+        StubSet("ConsoleOverflowStop", false);
+        StubSet("JavaPath", "java");
+        StubSet("JvmArgs", "");
+        StubSet("IgnoreJavaCompatibility", false);
+        // NOTE: the java probe quintet / LastOfflinePlayerName are NOT here — they live in
+        // launcher-state.json since CONFIG C9 (seed through LaunchFixture.SeedJavaDetection)
+
+        StubSet("LaunchMaximized", false);
+        StubSet("MinecraftWinWidth", 854);
+        StubSet("MinecraftWinHeight", 480);
+        StubSet("MinMemAlloc", 512);
+        StubSet("MaxMemAlloc", 4096);
+        StubSet("PermGen", 64);
+        StubSet("LowMemWarning", false);
+        StubSet("UseNativeOpenAL", false);
+        StubSet("CustomOpenALPath", "");
+        StubSet("UseNativeGLFW", false);
+        StubSet("CustomGLFWPath", "");
+        StubSet("UseNativeSDL", false);
+        StubSet("CustomSDLPath", "");
+        StubSet("EnableFeralGamemode", false);
+        StubSet("EnableMangoHud", false);
+        StubSet("UseDiscreteGpu", false);
+        StubSet("UseZink", false);
+        StubSet("CloseAfterLaunch", false);
+        StubSet("QuitAfterGameStop", false);
+        StubSet("OnlineFixes", false);
+        StubSet("Env", "{}");
+        StubSet("AutomaticJavaSwitch", false);
+        StubSet("AutomaticJavaDownload", false);
+        StubSet("ModMetadataDisabled", false);
     }
 
-    public void StubSet(string id, object? value) => _values[id] = value;
+    public void StubSet(string id, object? value) => Store.Set(id, value);
 
-    protected override void ChangeSetting(Setting setting, object? value) => _values[setting.Id] = value;
+    /// <summary>The typed instance environment over this store (the D4 instance.json stack).</summary>
+    public FlintLauncher.Core.Config.InstanceEnvironment Environment =>
+        new(Store, FlintJsonContext.Default.InstanceConfigFile, FlintJsonContext.Default.InstanceStateFile);
 
-    protected override void ResetSetting(Setting setting) => _values.Remove(setting.Id);
-
-    internal override object? RetrieveValue(Setting setting) => _values.GetValueOrDefault(setting.Id);
-
-    public override void SuspendSave() { }
-
-    public override void ResumeSave() { }
+    public static implicit operator FlintLauncher.Core.Config.InstanceEnvironment(
+        GlobalLaunchSettingsStub stub) => stub.Environment;
 }
 
 /// <summary>
@@ -92,9 +98,53 @@ public sealed class LaunchFixture : IDisposable
 
     public GlobalLaunchSettingsStub Global { get; } = new();
 
+    /// <summary>The fixture's five-root stamp (G1 home layout); disposed with the fixture.</summary>
+    private readonly TestFlintPaths _paths = TestFlintPaths.UnderHome();
+
+    /// <summary>The fixture's stamped meta cache (E6 fixture injection: the runtime cache the
+    /// composition root owns, "meta" base under the fixture's cache root — the CWD-anchored
+    /// static fallback is gone). Instances created here carry it, which also stamps their
+    /// pack profiles' metadata index.</summary>
+    public FlintLauncher.Core.Net.HttpMetaCache MetaCache { get; }
+
+    /// <summary>The launcher runtime state store (S5) over the fixture's state root — launch
+    /// fixtures seed the java probe cache / offline name through <see cref="SeedJavaDetection"/>
+    /// or <see cref="State"/> directly.</summary>
+    public FlintLauncher.Core.State.LauncherStateStore State { get; }
+
     public LaunchFixture()
     {
         Directory.CreateDirectory(Root);
+        State = new FlintLauncher.Core.State.LauncherStateStore(
+            Path.Combine(_paths.Paths.StateRoot, "launcher-state.json"),
+            FlintJsonContext.Default.LauncherState);
+        MetaCache = new FlintLauncher.Core.Net.HttpMetaCache(
+            Path.Combine(_paths.Paths.CacheRoot, "metacache.json"));
+        MetaCache.AddBase("meta", _paths.Paths.MetaDir);
+        MetaCache.AddBase("libraries", _paths.Paths.LibrariesRoot);
+        MetaCache.AddBase("asset_indexes", _paths.Paths.AssetIndexesDir);
+    }
+
+    /// <summary>Seed the S5 java probe cache for a configured java path so CheckJava trusts
+    /// the binary without running the checker (the former settings-key seeding, C9): the
+    /// stored signature matches ComputeJavaSignature(mtime, resolved-path).</summary>
+    public void SeedJavaDetection(string javaPathSetting, long javaUnixTime, string version = "17.0.2",
+        string architecture = "64", string realArchitecture = "arm64", string vendor = "fixture")
+    {
+        var key = FlintLauncher.Core.Instances.MinecraftInstance.JavaDetectKey(javaPathSetting);
+        State.Update(state => state with
+        {
+            Java = state.Java with
+            {
+                Detections = new Dictionary<string, FlintLauncher.Core.State.JavaDetectEntry>(
+                    state.Java.Detections, StringComparer.Ordinal)
+                {
+                    [key] = new(
+                        FlintLauncher.Core.Launch.Steps.CheckJava.ComputeJavaSignature(javaUnixTime, key),
+                        architecture, realArchitecture, version, vendor),
+                },
+            },
+        });
     }
 
     /// <summary>The default profile fixture: main class, minecraft arguments, a trait and assets.</summary>
@@ -124,8 +174,9 @@ public sealed class LaunchFixture : IDisposable
     {
         return new LaunchServices
         {
-            Paths = new FlintPaths { DataDir = Root, InstallRoot = installRoot ?? AppContext.BaseDirectory },
+            Paths = _paths.Paths with { InstallRoot = installRoot ?? AppContext.BaseDirectory },
             LoggerFactory = loggerFactory ?? NullLoggerFactory.Instance,
+            LauncherState = State,
             XmlLogParsing = xmlLogParsing,
         };
     }
@@ -147,12 +198,22 @@ public sealed class LaunchFixture : IDisposable
                 }
                 """);
         }
-        var instance = new MinecraftInstance(Global, new IniSettingsObject(Path.Combine(instanceRoot, "instance.cfg")),
+        // the typed instance layer (D4): the adapter over the fixture root folds the
+        // fixture's user-layer store (Global) with the instance's own instance.json
+        var instance = new MinecraftInstance(
+            new FlintLauncher.Core.Config.InstanceJsonSettingsObject(
+                instanceRoot, new FlintLauncher.Core.Config.InstanceEnvironment(
+                    Global.Store, FlintJsonContext.Default.InstanceConfigFile,
+                    FlintJsonContext.Default.InstanceStateFile)),
             instanceRoot)
         {
             // the composition-root stamp (InstanceList does the same in the host): the
-            // CreateLaunchTask path builds its per-launch services from these
+            // CreateLaunchTask path builds its per-launch services from these, the launcher
+            // runtime state carries the java probe cache (S5), and the fixture meta cache
+            // (E6 fixture injection) feeds the metadata/library/asset-index downloads
             LaunchServices = CreateServices(),
+            LauncherState = State,
+            MetaCache = MetaCache,
         };
         instance.GetPackProfile().Load();
         // the patch files are read by the component update task (PackProfile::reload)
@@ -178,6 +239,8 @@ public sealed class LaunchFixture : IDisposable
 
     public void Dispose()
     {
+        MetaCache.Dispose();
+        _paths.Dispose();
         try
         {
             Directory.Delete(Root, recursive: true);

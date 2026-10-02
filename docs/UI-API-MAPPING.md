@@ -22,18 +22,22 @@
 | ExternalToolsPage | JsonEditor/JProfilerPath/JVisualVMPath/MCEditPath | `PUT /settings tools` 组 | done |
 | ProxyPage | ProxyType/Addr/Port/User/Pass | `PUT /settings proxy` 组 | done |
 | LanguagePage / AppearancePage | 语言键可留（翻译加载不做）；外观 GUI-bound | `PUT /settings {Language}` | partial |
-| NewsDialog | 新闻 | `GET /news` | done |
+| NewsDialog | 新闻 | — | deleted（CACHE E7：GUI-bound，整体删除——checker、`GET /news`、feed base、FLINT_NEWS_RSS_URL） |
+| 存储内容校验（CACHE E5 新增，无 Qt 对应页） | store 完备性派生视图（`dpkg --verify` 模型） | `GET /store/status/libraries/{versionRef}`（versionRef = net.minecraft 的 meta 版本描述符，如 `1.21.4`；走版本清单 libraries[] 逐个查账本+文件存在性 → `{complete, missing[], bytes}`）、`GET /store/status/assets/{assetsId}`（资产索引 objects 同型；对象文件按存在+尺寸核对，资产对象不走账本） | done（纯派生不落盘：清单在 `cache/meta/net.minecraft/` 与 `store/assets/indexes/` 读盘，缺清单/索引 → 404） |
 
-设计：`GET /api/v1/settings?group=launcher|minecraft|java|proxy|api|tools` 返回该组键值；`PUT /api/v1/settings` 写回。分组表 = C++ Application::registerSettings 键的子集。
+设计：`GET /api/v1/settings?group=launcher|minecraft|java|proxy|api|tools` 返回该组键值；`PUT /api/v1/settings` 写回。落停后（C5/C6）：设置存储 = 强类型 `flint.json`（FlintConfigStore，record 域 + 源生成注册，原子写），端点分组只是其上的**派生视图**——分组键名保持 C++ registerSetting 线格式兼容，读写折进类型化域；秘密三元组（ProxyPass/ModrinthToken/FlameKeyOverride）走 C4 secrets.json（0600），状态键（C9）走 launcher-state.json。INI（flint.cfg/prismlauncher.cfg）只读导入、不再写回。
 
 ## 2. 实例域（instance/）
+
+> 实例寻址（DATA D2）：所有 `/instances/{id}`、`/instances/{ref}` 路径参数统一经 **D2 链（uuid→inode→dirname）** 解析（`InstanceList.ResolveInstance` 唯一入口）——uuid 为规范引用，目录名仅展示；端点禁直接 `GetInstanceById`。
 
 | Qt 源 | 功能 | API | 状态 |
 |---|---|---|---|
 | NewInstanceDialog | 原版创建/URL 导入 | `POST /instances/vanilla`、`POST /instances/import` | done |
 | CopyInstanceDialog | 选择性复制 | `POST /instances/{id}/copy {name, prefs}` | done |
-| MainWindow 重命名/图标/分组/删除 | CRUD | `PATCH/DELETE /instances` | done |
-| IconPickerDialog | 图标库 | `GET /icons`、`POST /icons`、`PUT /instances/{id}/icon` | done |
+| MainWindow 重命名/图标/分组/删除 | CRUD | `PATCH/DELETE /instances` | done（D3：改名=纯元数据，目录名不动；引用走 D2 链 uuid） |
+| IconPickerDialog | 图标库 | `GET /icons`、`POST /icons`、`DELETE /icons/{key}`、`PUT /instances/{id}/icon` | done（D5：IconPool 模型 + IconsDir 设置生效） |
+| SkinManageDialog（本地库半） | 本地皮肤库 | `GET/POST /skins`、`GET/DELETE /skins/{name}`、`POST /skins/{name}/apply` | done（D6 方案 B：apply 组合账号上传 SkinUpload；SkinsDir 设置生效） |
 | NotesPage | 实例备注 | `PATCH /instances/{id} {notes}` | done |
 | InstanceSettingsPage | 覆盖设置 | `GET/PUT /instances/{id}/settings` | done |
 | **VersionPage** | 组件栈管理（见下） | `/instances/{id}/components` | done |

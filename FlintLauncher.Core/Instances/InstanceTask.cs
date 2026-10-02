@@ -18,7 +18,6 @@
 //    "saves/" paths, Yes schedules them like the dialog's answer).
 //  - the copy executes synchronously inside StartAsync (no QtConcurrent thread hop).
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Instances;
@@ -58,9 +57,11 @@ public abstract class InstanceTask : FlintTask
     private bool _confirmUpdate = true;
     private string _originalInstanceId = "";
 
-    /// <summary>C++ m_globalSettings; set through <see cref="SetParentSettings"/> (the
-    /// InstanceStaging wrapper does it before the task runs).</summary>
-    protected SettingsObject? GlobalSettings { get; private set; }
+    /// <summary>The typed instance-layer environment (D4): user flint.json store + the
+    /// instance.json/instance-state.json type infos. Set through
+    /// <see cref="SetParentEnvironment"/> (the InstanceStaging wrapper does it before the
+    /// task runs); the creation tasks build their staged instances with it.</summary>
+    protected Core.Config.InstanceEnvironment? Environment { get; private set; }
 
     /// <summary>C++ m_instIcon + setIcon().</summary>
     public string Icon { get; set; } = "";
@@ -81,7 +82,7 @@ public abstract class InstanceTask : FlintTask
     /// <summary>C++ m_filesToRemove (consumed by the import/update flows).</summary>
     protected IReadOnlyList<string> FilesToRemove => _filesToRemove;
 
-    public void SetParentSettings(SettingsObject settings) => GlobalSettings = settings;
+    public void SetParentEnvironment(Core.Config.InstanceEnvironment environment) => Environment = environment;
 
     /// <summary>C++ setIcon().</summary>
     public void SetIcon(string icon) => Icon = icon;

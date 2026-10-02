@@ -75,7 +75,7 @@ public class JavaArgumentsTests
     public async Task PermGen_Added_ForJava7_WhenNotDefault()
     {
         using var fixture = new LaunchFixture();
-        fixture.Global.StubSet("JavaVersion", "1.7.0_80");
+        fixture.SeedJavaDetection("java", 0, version: "1.7.0_80"); // C9: probe cache, not settings
         fixture.Global.StubSet("PermGen", 128);
         var instance = await fixture.CreateInstance();
         Assert.True(instance.GetJavaVersion().RequiresPermGen());
@@ -89,11 +89,11 @@ public class JavaArgumentsTests
     public async Task PermGen_Skipped_AtDefault64_AndOnModernJava()
     {
         using var fixture = new LaunchFixture();
-        fixture.Global.StubSet("JavaVersion", "1.7.0_80"); // PermGen stays 64
+        fixture.SeedJavaDetection("java", 0, version: "1.7.0_80"); // PermGen stays 64
         var instance = await fixture.CreateInstance();
         Assert.DoesNotContain(instance.JavaArguments(), a => a.StartsWith("-XX:PermSize"));
 
-        fixture.Global.StubSet("JavaVersion", "17.0.2"); // no PermGen in modern java
+        fixture.SeedJavaDetection("java", 0, version: "17.0.2"); // no PermGen in modern java
         fixture.Global.StubSet("PermGen", 128);
         var modern = await fixture.CreateInstance();
         Assert.False(modern.GetJavaVersion().RequiresPermGen());
@@ -107,7 +107,7 @@ public class JavaArgumentsTests
         var patch = LaunchFixture.DefaultPatchJson.Replace("\"+traits\": [\"FirstThreadOnMacOS\"]",
             "\"+traits\": [\"FirstThreadOnMacOS\", \"legacyServices\"]");
         fixture.Global.StubSet("OnlineFixes", true);
-        fixture.Global.StubSet("JavaVersion", "17.0.2");
+        fixture.SeedJavaDetection("java", 0, version: "17.0.2");
         var instance = await fixture.CreateInstance(patch);
         Assert.True(instance.ShouldApplyOnlineFixes());
 

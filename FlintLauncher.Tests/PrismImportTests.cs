@@ -195,7 +195,7 @@ public class PrismImportTaskTests : IDisposable
         TryDelete(_root);
 
     [Fact]
-    public async Task ImportTask_MergesWhitelistedContent_AndWritesMarker()
+    public async Task ImportTask_MergesWhitelistedContent_AndWritesImportedRecord()
     {
         // synthetic Prism source
         Directory.CreateDirectory(Path.Combine(_root, "src", "instances", "demo"));
@@ -209,7 +209,12 @@ public class PrismImportTaskTests : IDisposable
         Directory.CreateDirectory(Path.Combine(_root, "dst", "meta"));
         File.WriteAllText(Path.Combine(_root, "dst", "meta", "index.json"), "existing");
 
-        var task = new PrismImportTask(Path.Combine(_root, "src"), Path.Combine(_root, "dst"), ImportMode.CopyOnWrite);
+        var decisions = new MigrationDecisionStore(Path.Combine(_root, "state", "migration"),
+            FlintLauncher.Web.FlintJsonContext.Default.MigrationDecisionRecord);
+        // S7: the task files under the ACTUAL source name — a polymc source must not be
+        // recorded as "prism" (the old hardcode)
+        var task = new PrismImportTask(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
+            ImportMode.CopyOnWrite, "polymc", decisions);
         await task.StartAsync();
 
         if (!task.WasSuccessful)
@@ -226,8 +231,17 @@ public class PrismImportTaskTests : IDisposable
         Assert.Equal("existing", File.ReadAllText(Path.Combine(_root, "dst", "meta", "index.json"))); // idempotent skip
         Assert.True(File.Exists(Path.Combine(_root, "dst", "instances", "demo", "instance.cfg")));
         Assert.True(File.Exists(Path.Combine(_root, "dst", "accounts.json")));
-        // declined marker written after full success
-        Assert.True(File.Exists(Path.Combine(_root, "dst", "prism_nomigrate.txt")));
+
+        // S3: an `imported` decision record after full success — no marker file anywhere
+        Assert.False(File.Exists(Path.Combine(_root, "dst", "prism_nomigrate.txt")));
+        Assert.False(File.Exists(Path.Combine(_root, "dst", "polymc_nomigrate.txt")));
+        var record = decisions.Read("polymc");
+        Assert.NotNull(record);
+        Assert.Equal(MigrationDecisionRecord.Imported, record!.Decision);
+        Assert.Equal("cow", record.Mode);
+        Assert.NotEqual(MigrationDecisionRecord.UnknownAt, record.At);
+        Assert.Equal(1, record.Instances); // the demo instance dir at the source
+        Assert.True(record.Bytes > 0);
     }
 
     [Fact]
@@ -240,6 +254,30 @@ public class PrismImportTaskTests : IDisposable
 
         Assert.Equal(TaskState.Failed, task.State);
         Assert.Contains("Nothing to import", task.FailReason);
+    }
+
+    [Fact]
+    public async Task ImportTask_MoveMode_RecordsInstanceCount_FromBeforeTheTransfer()
+    {
+        // a same-volume move renames <src>/instances away wholesale — the record's instance
+        // count must come from the pre-transfer inventory, not from the emptied source
+        Directory.CreateDirectory(Path.Combine(_root, "src", "instances", "demo"));
+        Directory.CreateDirectory(Path.Combine(_root, "src", "instances", "second"));
+        File.WriteAllText(Path.Combine(_root, "src", "instances", "demo", "instance.cfg"), "x");
+        File.WriteAllText(Path.Combine(_root, "src", "prismlauncher.cfg"), "k=v");
+
+        var decisions = new MigrationDecisionStore(Path.Combine(_root, "state-move", "migration"),
+            FlintLauncher.Web.FlintJsonContext.Default.MigrationDecisionRecord);
+        var task = new PrismImportTask(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
+            ImportMode.Move, "prism", decisions);
+        await task.StartAsync();
+
+        Assert.True(task.WasSuccessful, task.FailReason);
+        Assert.False(Directory.Exists(Path.Combine(_root, "src", "instances"))); // the wholesale move happened
+        var record = decisions.Read("prism");
+        Assert.NotNull(record);
+        Assert.Equal("move", record!.Mode);
+        Assert.Equal(2, record.Instances);
     }
 
 

@@ -22,7 +22,6 @@
 //  - Not ported: setOldConfigVersion() and writeOverrideOrders() (declared-but-undefined
 //    upstream), updateLatestMinecraft() (instance update flow, P3) and the model roles.
 using System.Text;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
@@ -421,10 +420,10 @@ public sealed class PackProfile : IDisposable
         }
 
         // and it's valid JSON
-        JsonDocument doc;
+        JsonNode root;
         try
         {
-            doc = JsonUtils.RequireDocument(data, filename);
+            root = JsonUtils.RequireNode(data, filename);
         }
         catch (JsonParseException e)
         {
@@ -434,23 +433,18 @@ public sealed class PackProfile : IDisposable
         // and then read it and process it if all above is true.
         try
         {
-            using (doc)
+            var obj = JsonUtils.RequireObject(root);
+            // check order file version.
+            var version = JsonUtils.RequireInteger(obj, "formatVersion");
+            if (version != CurrentComponentsFileVersion)
             {
-                // the C# requireObject(doc) yields the raw element; convert to the JsonObject
-                // shape the (parent, key) require* overloads operate on
-                var obj = JsonUtils.RequireObject(doc).ToJsonObject();
-                // check order file version.
-                var version = JsonUtils.RequireInteger(obj, "formatVersion");
-                if (version != CurrentComponentsFileVersion)
-                {
-                    throw new JsonParseException($"Invalid component file version, expected {CurrentComponentsFileVersion}");
-                }
-                var orderArray = JsonUtils.RequireArray(obj, "components");
-                foreach (var item in orderArray.EnumerateArray())
-                {
-                    var compObj = JsonUtils.RequireObject(item, "Component must be an object.").ToJsonObject();
-                    container.Add(ComponentFromJsonV1(parent, componentJsonPattern, compObj));
-                }
+                throw new JsonParseException($"Invalid component file version, expected {CurrentComponentsFileVersion}");
+            }
+            var orderArray = JsonUtils.RequireArray(obj, "components");
+            foreach (var item in orderArray)
+            {
+                var compObj = JsonUtils.RequireObject(item, "Component must be an object.");
+                container.Add(ComponentFromJsonV1(parent, componentJsonPattern, compObj));
             }
         }
         catch (JsonParseException)

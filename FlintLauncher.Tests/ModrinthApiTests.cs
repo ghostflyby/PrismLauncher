@@ -305,7 +305,8 @@ public class ModrinthApiTests : IDisposable
                 .Select(c => c.GetProperty("uid").GetString()!).ToList();
             Assert.Equal(["net.minecraft", "net.fabricmc.fabric-loader"], uids);
         }
-        Assert.Contains("name=Imported Pack", File.ReadAllText(Path.Combine(staging, "instance.cfg")));
+        // D4: the staged instance's identity lives in instance.json (Flint format)
+        Assert.Contains("Imported Pack", File.ReadAllText(Path.Combine(staging, "instance.json")));
 
         // packwiz-style metadata written per mod
         var indexPath = Path.Combine(staging, "minecraft", "mods", ".index", "test-mod.pw.toml");
@@ -468,9 +469,9 @@ public class ModrinthApiTests : IDisposable
         await import.StartAsync();
         Assert.True(import.WasSuccessful, import.FailReason);
 
-        // ... then export the instance again
-        var instanceSettings = new FlintLauncher.Core.Settings.IniSettingsObject(Path.Combine(staging, "instance.cfg"));
-        var instance = new MinecraftInstance(_global, instanceSettings, staging);
+        // ... then export the instance again (the staged instance is Flint format, D4)
+        var instance = new MinecraftInstance(
+            new FlintLauncher.Core.Config.InstanceJsonSettingsObject(staging, _global.Environment), staging);
         var output = TempPath("exported.mrpack");
         var export = new ModrinthPackExportTask("Round Trip Pack", "1.0.0", "round trip", optionalFiles: true,
             instance, output, modrinth: _api);

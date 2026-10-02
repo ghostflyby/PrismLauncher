@@ -2,6 +2,9 @@
 // Tests for the InstanceCopyPrefs/InstanceCopyTask port. Everything synthetic (temp dirs);
 // the copy flows go through the real staging machinery of the InstanceList port, like the
 // upstream MainWindow::on_actionCopyInstance_triggered flow (dialog -> task -> staging).
+// D4: the source here is Prism format (instance.cfg, read-only); the copy's metadata fixups
+// run through the typed adapter, so the staged folder commits as Flint format (instance.json
+// + instance-state.json) while the copied cfg stays untouched on disk.
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Settings;
 using Xunit;
@@ -52,9 +55,11 @@ public class InstanceCopyTests : IDisposable
     }
 
     private FlintLauncher.Core.Instances.MinecraftInstance CreateSource() =>
-        new(_global, new IniSettingsObject(Path.Combine(_sourceDir, "instance.cfg")), _sourceDir);
+        new(new FlintLauncher.Core.Config.InstanceJsonSettingsObject(_sourceDir, _global.Environment),
+            _sourceDir);
 
-    private InstanceList CreateList() => new(_global, [_instancesDir]) { GroupFilePath = _groupFile };
+    private InstanceList CreateList() =>
+        new([_instancesDir]) { Environment = _global, GroupFilePath = _groupFile };
 
     // ------------------------------------------------------------------ prefs/filters
 
@@ -123,7 +128,7 @@ public class InstanceCopyTests : IDisposable
         task.SetName("Source Copy");
         task.SetGroup("Copied");
         task.SetIcon("flint-icon");
-        task.SetParentSettings(_global);
+        task.SetParentEnvironment(_global.Environment);
 
         await list.WrapInstanceTask(task).StartAsync();
         Assert.True(task.WasSuccessful);
@@ -133,7 +138,9 @@ public class InstanceCopyTests : IDisposable
         Assert.True(File.Exists(Path.Combine(copiedDir, "minecraft", "saves", "World One", "level.dat")));
         Assert.True(File.Exists(Path.Combine(copiedDir, "minecraft", "mods", "somemod.jar")));
         Assert.True(File.Exists(Path.Combine(copiedDir, "minecraft", "options.txt")));
+        // the copied source cfg rides along untouched; the copy's OWN layer is instance.json
         Assert.True(File.Exists(Path.Combine(copiedDir, "instance.cfg")));
+        Assert.True(File.Exists(Path.Combine(copiedDir, "instance.json")));
 
         // reload from disk through the list: id = folder name, new uuid, new name/icon
         list.LoadList();
@@ -145,9 +152,10 @@ public class InstanceCopyTests : IDisposable
         Assert.Equal(32, copy.Uuid.Length);
         Assert.Equal("Copied", list.GetInstanceGroup("Source Copy"));
 
-        // keepPlaytime=true: the copied playtime survives
-        var copyCfg = File.ReadAllText(Path.Combine(copiedDir, "instance.cfg"));
-        Assert.Contains("totalTimePlayed=1234", copyCfg);
+        // keepPlaytime=true: the copied playtime survives (the source's read-only cfg seed
+        // was carried into the copy's instance-state.json)
+        var copyState = File.ReadAllText(Path.Combine(copiedDir, "instance-state.json"));
+        Assert.Contains("1234", copyState);
     }
 
     [Fact]
@@ -156,15 +164,21 @@ public class InstanceCopyTests : IDisposable
         var source = CreateSource();
         var task = new InstanceCopyTask(source, new InstanceCopyPrefs { KeepPlaytime = false });
         task.SetName("Fresh Copy");
-        task.SetParentSettings(_global);
+        task.SetParentEnvironment(_global.Environment);
 
         var list = CreateList();
         await list.WrapInstanceTask(task).StartAsync();
         Assert.True(task.WasSuccessful);
 
-        var copyCfg = File.ReadAllText(Path.Combine(_instancesDir, "Fresh Copy", "instance.cfg"));
-        Assert.DoesNotContain("totalTimePlayed", copyCfg);
-        Assert.DoesNotContain("lastTimePlayed", copyCfg);
+        var copyDir = Path.Combine(_instancesDir, "Fresh Copy");
+        // the copied cfg still carries the source's number (read-compat, never rewritten)…
+        Assert.Contains("totalTimePlayed=1234",
+            File.ReadAllText(Path.Combine(copyDir, "instance.cfg")));
+        // …but the authoritative state file is zeroed
+        var copy = new FlintLauncher.Core.Instances.MinecraftInstance(
+            new FlintLauncher.Core.Config.InstanceJsonSettingsObject(copyDir, _global.Environment), copyDir);
+        Assert.Equal(0, copy.TotalTimePlayed());
+        Assert.Equal(0, copy.LastTimePlayed());
     }
 
     [Fact]
@@ -173,7 +187,7 @@ public class InstanceCopyTests : IDisposable
         var source = CreateSource();
         var task = new InstanceCopyTask(source, new InstanceCopyPrefs { CopySaves = false });
         task.SetName("No Saves");
-        task.SetParentSettings(_global);
+        task.SetParentEnvironment(_global.Environment);
 
         var list = CreateList();
         await list.WrapInstanceTask(task).StartAsync();
@@ -191,17 +205,17 @@ public class InstanceCopyTests : IDisposable
         var source = CreateSource();
         var list = CreateList();
 
-        // copying without changing the name: the instance.cfg name stays "Source", the first
-        // folder is taken, so FS::DirNameFromString appends "(1)"
+        // copying without changing the name: the instance layer's name stays "Source", the
+        // first folder is taken, so FS::DirNameFromString appends "(1)"
         var first = new InstanceCopyTask(source, new InstanceCopyPrefs());
         first.SetName("Source");
-        first.SetParentSettings(_global);
+        first.SetParentEnvironment(_global.Environment);
         await list.WrapInstanceTask(first).StartAsync();
         Assert.True(first.WasSuccessful);
 
         var second = new InstanceCopyTask(source, new InstanceCopyPrefs());
         second.SetName("Source");
-        second.SetParentSettings(_global);
+        second.SetParentEnvironment(_global.Environment);
         await list.WrapInstanceTask(second).StartAsync();
         Assert.True(second.WasSuccessful);
 
@@ -220,12 +234,12 @@ public class InstanceCopyTests : IDisposable
         var source = CreateSource();
 
         var symlinks = new InstanceCopyTask(source, new InstanceCopyPrefs { UseSymLinks = true });
-        symlinks.SetParentSettings(_global);
+        symlinks.SetParentEnvironment(_global.Environment);
         await symlinks.StartAsync();
         Assert.Equal(FlintLauncher.Core.Tasks.TaskState.Failed, symlinks.State);
 
         var clone = new InstanceCopyTask(source, new InstanceCopyPrefs { UseClone = true });
-        clone.SetParentSettings(_global);
+        clone.SetParentEnvironment(_global.Environment);
         await clone.StartAsync();
         Assert.Equal(FlintLauncher.Core.Tasks.TaskState.Failed, clone.State);
 

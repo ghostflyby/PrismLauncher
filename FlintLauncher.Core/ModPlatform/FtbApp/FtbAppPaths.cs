@@ -8,6 +8,7 @@
 // lookups of the original are UI concerns, so RootPath is injected per instance (tests
 // construct an FtbAppPaths pointed at their tree); DefaultRoot stays a pure static helper.
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 
@@ -50,11 +51,9 @@ public sealed class FtbAppPaths
         }
         try
         {
-            using var doc = JsonUtils.RequireDocumentFromFile(settingsPath, "FTB App settings file");
-            var root = doc.RootElement;
-            return root.TryGetProperty("instanceLocation", out var location)
-                && location.ValueKind == JsonValueKind.String
-                ? location.GetString() ?? "" : "";
+            var root = JsonUtils.RequireNodeFromFile(settingsPath, "FTB App settings file");
+            return root["instanceLocation"] is JsonValue value && value.TryGetValue<string>(out var location)
+                ? location : "";
         }
         catch (Exception e) when (e is JsonParseException or JsonException)
         {

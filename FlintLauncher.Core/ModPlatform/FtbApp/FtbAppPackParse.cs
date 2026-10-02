@@ -89,8 +89,7 @@ public static class FtbAppPackParse
         }
         try
         {
-            using var doc = JsonUtils.RequireDocumentFromFile(instanceFile, "FTB_APP instance JSON file");
-            var root = RequireObject(doc.RootElement);
+            var root = RequireObject(JsonUtils.RequireNodeFromFile(instanceFile, "FTB_APP instance JSON file"));
             modpack.Uuid = JsonUtils.RequireString(root, "uuid", "uuid");
             modpack.Id = JsonUtils.RequireInteger(root, "id", "id");
             modpack.VersionId = JsonUtils.RequireInteger(root, "versionId", "versionId");
@@ -158,11 +157,10 @@ public static class FtbAppPackParse
         }
         try
         {
-            using var doc = JsonUtils.RequireDocumentFromFile(versionsFile, "FTB_APP version JSON file");
-            var root = RequireObject(doc.RootElement);
+            var root = RequireObject(JsonUtils.RequireNodeFromFile(versionsFile, "FTB_APP version JSON file"));
             var targets = JsonUtils.RequireArray(root, "targets", "targets");
 
-            foreach (var target in targets.EnumerateArray())
+            foreach (var target in targets)
             {
                 var obj = RequireObject(JsonUtils.RequireObject(target, "target"));
                 var name = JsonUtils.RequireString(obj, "name", "name");
@@ -250,9 +248,9 @@ public static class FtbAppPackParse
         return modpacks;
     }
 
-    private static JsonObject RequireObject(JsonElement element)
+    private static JsonObject RequireObject(JsonNode? node)
     {
-        return JsonNode.Parse(element.GetRawText()) as JsonObject
+        return node as JsonObject
             ?? throw new JsonParseException("Value is not an object");
     }
 }

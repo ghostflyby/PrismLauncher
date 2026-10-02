@@ -2,7 +2,8 @@
 // Byte-level compatibility tests for the INI layer against golden files produced by real
 // QSettings (Qt 6.11) — see FlintLauncher/tools/qt-ini-golden. The *_dump.tsv fixtures record
 // what QSettings itself reads back from the same files, so the parser is compared against Qt's
-// own interpretation, not just against our writer.
+// own interpretation. READ side only (CONFIG C5/D4: Flint never writes an INI — the writer
+// half and its byte-level round-trip tests retired with the instance.cfg write path).
 using FlintLauncher.Core.Settings;
 using Xunit;
 
@@ -47,8 +48,8 @@ public class IniFileGoldenTests
             var (key, typeName, repr) = (parts[0], parts[1], parts[2]);
             if (typeName == "QVariantList")
             {
-                // QDataStream-backed @Variant blobs: we keep the raw text verbatim instead of
-                // decoding; the byte-level writer test below covers those keys instead.
+                // QDataStream-backed @Variant blobs: kept verbatim instead of decoded (the
+                // launch path never consumes them, so there is no decode to verify)
                 continue;
             }
             checkedKeys.Add(key);
@@ -66,44 +67,8 @@ public class IniFileGoldenTests
         Assert.Equal(checkedKeys.Count, expected.Length - expected.Count(l => l.Split('\t')[1] == "QVariantList"));
     }
 
-    /// <summary>Loading the QSettings-written golden file and re-saving it must reproduce the bytes exactly.</summary>
-    [Fact]
-    public void Writer_Reproduces_QSettings_Bytes()
-    {
-        var fixture = Fixture("golden_qsettings.ini");
-        var map = QSettingsIniCodec.Parse(File.ReadAllText(fixture));
-        var rewritten = QSettingsIniCodec.Encode(map);
-        Assert.Equal(File.ReadAllText(fixture), rewritten, ignoreLineEndingDifferences: false);
-    }
-
-    [Fact]
-    public void SaveLoad_RoundTrip_TempFile()
-    {
-        var path = Path.Combine(Path.GetTempPath(), $"flint-ini-{Guid.NewGuid():N}.ini");
-        try
-        {
-            var f = new IniFile();
-            f.Set("a", "a");
-            f.Set("b", "a\nb\t\n\\\\\\C:\\Program files\\terrible\\name\\of something\\#thisIsNotAComment");
-            f.Set("list", IniValue.From(["a", "b", "c"]));
-            f.Set("numbers", IniValue.From(["1", "2", "3", "10"]));
-            Assert.True(f.SaveFile(path));
-
-            var f2 = new IniFile();
-            Assert.True(f2.LoadFile(path));
-            Assert.Equal("a", f2.GetString("a", "NOT SET"));
-            Assert.Equal("a\nb\t\n\\\\\\C:\\Program files\\terrible\\name\\of something\\#thisIsNotAComment", f2.GetString("b", "NOT SET"));
-            Assert.Equal(["a", "b", "c"], Assert.IsType<IniValue>(f2.Get("list")).List);
-            Assert.Equal(["1", "2", "3", "10"], Assert.IsType<IniValue>(f2.Get("numbers")).List);
-            Assert.Equal("1.3", f2.GetString("ConfigVersion", "NOT SET"));
-        }
-        finally
-        {
-            File.Delete(path);
-        }
-    }
-
-    /// <summary>Port of IniFileTest::test_SaveAlreadyExistingFile (pre-1.1 legacy format).</summary>
+    /// <summary>Port of IniFileTest::test_SaveAlreadyExistingFile (pre-1.1 legacy format) —
+    /// the parse/migrate half only (Flint never re-saves an INI, C5/D4).</summary>
     [Fact]
     public void Legacy_NoConfigVersion_File_Parses()
     {
@@ -123,13 +88,7 @@ public class IniFileGoldenTests
             Assert.True(f1.LoadFile(path));
             Assert.Equal("\"$INST_JAVA\" -jar packwiz-installer-bootstrap.jar link", f1.GetString("PreLaunchCommand", "NOT SET"));
             Assert.Equal("\"$INST_JAVA\" -jar packwiz-installer-bootstrap.jar link =", f1.GetString("Wrapperommand", "NOT SET"));
-            Assert.True(f1.SaveFile(path));
-
-            var f2 = new IniFile();
-            Assert.True(f2.LoadFile(path));
-            Assert.Equal("\"$INST_JAVA\" -jar packwiz-installer-bootstrap.jar link", f2.GetString("PreLaunchCommand", "NOT SET"));
-            Assert.Equal("\"$INST_JAVA\" -jar packwiz-installer-bootstrap.jar link =", f2.GetString("Wrapperommand", "NOT SET"));
-            Assert.Equal("1.3", f2.GetString("ConfigVersion", "NOT SET"));
+            Assert.Equal("1.3", f1.GetString("ConfigVersion", "NOT SET"));
         }
         finally
         {

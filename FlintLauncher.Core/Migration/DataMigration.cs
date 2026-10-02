@@ -169,8 +169,10 @@ public sealed class DataMigrationTask : FlintTask
 
 /// <summary>
 /// Data-level port of Application::handleDataMigration: which legacy launcher directories can
-/// be migrated, the exact inventory copied, and the "already migrated"/"declined" marker that
-/// makes the migration a one-shot decision per legacy launcher.
+/// be migrated, the exact inventory copied, and the one-shot per-source decision that keeps
+/// the migration from proposing twice — since STATE S3 that decision lives in the
+/// <see cref="MigrationDecisionRecord"/> files (the C++/pre-reform "_nomigrate.txt" empty
+/// markers are read only as a legacy input and upgraded away).
 /// </summary>
 public static class DataMigration
 {
@@ -228,20 +230,22 @@ public static class DataMigration
     }
 
     /// <summary>Port of the handleDataMigration decision tree (without the dialog): a migration
-    /// runs only when an old config exists, the marker does not, and the current directory has
-    /// no launcher config yet.</summary>
+    /// runs only when an old config exists, the decision was not made yet, and the current
+    /// directory has no launcher config yet. The "decision made" check is the S3 record
+    /// (<see cref="MigrationDecisionStore"/>/<paramref name="decisions"/>) when one is
+    /// available, falling back to the legacy empty marker — which the record store upgrades
+    /// on sight (declined@unknown record + marker deleted, see
+    /// <see cref="DecisionAlreadyMade"/>).</summary>
     public static MigrationDecision Decide(string currentData, string oldData, string name, string configFile,
-        string launcherConfigFile)
+        string launcherConfigFile, MigrationDecisionStore? decisions = null)
     {
-        var nomigratePath = NoMigrateMarkerPath(currentData, name);
-
         var configExists = false;
         foreach (var configPath in OldConfigCandidates(oldData, configFile, launcherConfigFile))
         {
             configExists |= File.Exists(configPath);
         }
 
-        if (!configExists || File.Exists(nomigratePath))
+        if (!configExists || DecisionAlreadyMade(currentData, name, decisions))
         {
             return configExists ? MigrationDecision.MarkerPresent : MigrationDecision.NoOldConfig;
         }
@@ -250,18 +254,43 @@ public static class DataMigration
         return currentExists ? MigrationDecision.CurrentDataExists : MigrationDecision.ReadyToMigrate;
     }
 
-    /// <summary>Port of setDoNotMigrate(): create the (empty) marker file.</summary>
-    public static void SetDoNotMigrate(string currentData, string name)
+    /// <summary>S3: has the one-shot decision for this source been made? A decision record
+    /// counts; a legacy <c>&lt;source&gt;_nomigrate.txt</c> empty marker counts too and is
+    /// upgraded on sight — it becomes a declined@unknown record and the marker file is
+    /// deleted (the markers stop existing; the record carries the decision). Without a
+    /// <paramref name="decisions"/> store only the legacy marker is consulted (bare
+    /// fixtures); it is then left in place.</summary>
+    internal static bool DecisionAlreadyMade(string currentData, string name, MigrationDecisionStore? decisions)
     {
-        var nomigratePath = NoMigrateMarkerPath(currentData, name);
-        try
+        if (decisions is not null && decisions.Read(name) is not null)
         {
-            File.WriteAllBytes(nomigratePath, []);
+            return true;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                 or NotSupportedException or System.Security.SecurityException)
+
+        var legacyMarker = NoMigrateMarkerPath(currentData, name);
+        if (!File.Exists(legacyMarker))
         {
-            // qWarning in the C++: failure to write the marker is not fatal.
+            return false;
         }
+        if (decisions is not null)
+        {
+            decisions.Write(new MigrationDecisionRecord
+            {
+                Source = name,
+                Decision = MigrationDecisionRecord.Declined,
+                At = MigrationDecisionRecord.UnknownAt,
+            });
+            try
+            {
+                File.Delete(legacyMarker);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException
+                                     or ArgumentException or NotSupportedException
+                                     or System.Security.SecurityException)
+            {
+                // best effort — the record exists; the leftover marker is inert
+            }
+        }
+        return true;
     }
 }

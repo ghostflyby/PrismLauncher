@@ -71,7 +71,7 @@ public class FlameImportTests : IDisposable
     {
         var instancesDir = TempPath("instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList(_global, [instancesDir]);
+        return new InstanceList([instancesDir]) { Environment = _global };
     }
 
     // ------------------------------------------------------------- dispatch (e2e)
@@ -113,7 +113,7 @@ public class FlameImportTests : IDisposable
             Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.18.2");
             Assert.Contains(components, c => c.Uid == "net.minecraftforge" && c.Version == "40.1.0");
         }
-        Assert.Contains("name=Flame Imported", File.ReadAllText(Path.Combine(staging, "instance.cfg")));
+        Assert.Contains("Flame Imported", File.ReadAllText(Path.Combine(staging, "instance.json")));
 
         // per-mod .pw.toml with the Flame ([update.curseforge]) table
         var metadataToml = await File.ReadAllTextAsync(Path.Combine(staging, "minecraft", "mods", ".index", "test-mod.pw.toml"));
@@ -323,31 +323,26 @@ public class FlameImportTests : IDisposable
         Assert.Equal(TaskState.Failed, task.State);
         Assert.Contains("Failed to get local metadata index", task.FailReason);
 
-        // with a lookup hook the recommended version resolves
+        // with a lookup hook the recommended version resolves (per-task hook, no global reset)
         var staging2 = TempPath("staging-recommended2");
         Directory.CreateDirectory(staging2);
         File.WriteAllText(Path.Combine(staging2, "manifest.json"), manifestObj.ToJsonString());
-        var task2 = new FlameCreationTask(staging2, trustedSource: true, _global, flame: _flameApi);
-        FlameCreationTask.RecommendedVersionLookup = (uid, loaderType, mcVersion) =>
+        var task2 = new FlameCreationTask(staging2, trustedSource: true, _global, flame: _flameApi)
         {
-            Assert.Equal("net.minecraftforge", uid);
-            Assert.Equal("forge", loaderType);
-            Assert.Equal("1.18.2", mcVersion);
-            return "40.2.0";
+            RecommendedVersionLookup = (uid, loaderType, mcVersion) =>
+            {
+                Assert.Equal("net.minecraftforge", uid);
+                Assert.Equal("forge", loaderType);
+                Assert.Equal("1.18.2", mcVersion);
+                return "40.2.0";
+            },
         };
-        try
-        {
-            await task2.StartAsync();
-            Assert.True(task2.WasSuccessful, task2.FailReason);
-            using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging2, "mmc-pack.json")));
-            Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
-                c => c.GetProperty("uid").GetString() == "net.minecraftforge"
-                     && c.GetProperty("version").GetString() == "40.2.0");
-        }
-        finally
-        {
-            FlameCreationTask.RecommendedVersionLookup = null;
-        }
+        await task2.StartAsync();
+        Assert.True(task2.WasSuccessful, task2.FailReason);
+        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging2, "mmc-pack.json")));
+        Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
+            c => c.GetProperty("uid").GetString() == "net.minecraftforge"
+                 && c.GetProperty("version").GetString() == "40.2.0");
     }
 
     [Fact]

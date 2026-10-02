@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Port of launcher/settings/SettingsObject.{h,cpp}.
+// Port of launcher/settings/SettingsObject.{h,cpp} (the registration/Get/Set surface).
+//
+// Since CONFIG C5/D4 the only production backing store is the typed layer stack
+// (Core.Config.InstanceJsonSettingsObject: flint.json -> instance.json). The C++
+// RegisterOverride/RegisterPassthrough machinery (OverrideSetting/PassthroughSetting) is
+// retired with it — C7 degenerates the gates to "instance-layer member is non-null".
 using System.Collections.ObjectModel;
 
 namespace FlintLauncher.Core.Settings;
@@ -15,30 +20,6 @@ public abstract class SettingsObject
     protected bool SuspendSaveFlag { get; set; }
 
     protected bool DoSaveFlag { get; set; }
-
-    public Setting? RegisterOverride(Setting original, Setting gate)
-    {
-        if (Contains(original.Id))
-        {
-            return null;
-        }
-        var setting = new OverrideSetting(original, gate) { Storage = this };
-        _settings[setting.Id] = setting;
-        OnSettingRegistered(setting);
-        return setting;
-    }
-
-    public Setting? RegisterPassthrough(Setting original, Setting gate)
-    {
-        if (Contains(original.Id))
-        {
-            return null;
-        }
-        var setting = new PassthroughSetting(original, gate) { Storage = this };
-        _settings[setting.Id] = setting;
-        OnSettingRegistered(setting);
-        return setting;
-    }
 
     public Setting? RegisterSetting(IReadOnlyList<string> synonyms, object? defVal = null)
     {

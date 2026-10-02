@@ -281,9 +281,10 @@ public static class ComponentEndpoints
 
     // ----------------------------------------------------------------------- helpers
 
-    /// <summary>The MinecraftInstance for an id (the component stack needs the PackProfile).</summary>
-    private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string id) =>
-        runtime.Instances.GetInstanceById(id) is MinecraftInstance instance ? instance : null;
+    /// <summary>The MinecraftInstance for a {ref} (the component stack needs the PackProfile).
+    /// D2: every endpoint resolves through the addressing chain (GLOBAL §1).</summary>
+    private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string reference) =>
+        runtime.Instances.ResolveInstance(reference) is MinecraftInstance instance ? instance : null;
 
     private static int IndexOfUid(PackProfile profile, string uid)
     {

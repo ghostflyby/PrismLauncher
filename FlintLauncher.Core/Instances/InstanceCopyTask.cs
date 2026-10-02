@@ -81,13 +81,13 @@ public class InstanceCopyTask : InstanceTask
             return Task.CompletedTask;
         }
 
-        // copyFinished(): the copy's instance.cfg is rewritten through a generic (null type)
-        // instance shell; the staged folder is loaded as a real instance after the commit.
-        var instanceSettings = new IniSettingsObject(FileSystem.PathCombine(StagingPath, "instance.cfg"));
-        BaseInstance inst = new NullInstance(
-            GlobalSettings ?? throw new InvalidOperationException(
-                "InstanceTask requires SetParentSettings before execution."),
-            instanceSettings, StagingPath);
+        // copyFinished(): the copy's instance layer is rewritten through a generic (null
+        // type) instance shell over the typed adapter — the staged folder commits as Flint
+        // format (instance.json), whatever format the source was
+        var instanceSettings = new Core.Config.InstanceJsonSettingsObject(
+            StagingPath, Environment ?? throw new InvalidOperationException(
+                "InstanceTask requires SetParentEnvironment before execution."));
+        BaseInstance inst = new NullInstance(instanceSettings, StagingPath);
         inst.SetName(Name());
         inst.SetIconKey(Icon);
         inst.RegenerateUuid();

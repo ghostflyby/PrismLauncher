@@ -326,7 +326,8 @@ public class LaunchProfile : ProblemProvider
         List<string> nativeJars,
         string overridePath,
         string tempPath,
-        bool addJarMods = true)
+        bool addJarMods = true,
+        string storageBase = "")
     {
         var native32 = new List<string>();
         var native64 = new List<string>();
@@ -334,7 +335,7 @@ public class LaunchProfile : ProblemProvider
         nativeJars.Clear();
         foreach (var lib in GetLibraries())
         {
-            lib.GetApplicableFiles(runtimeContext, jars, nativeJars, native32, native64, overridePath);
+            lib.GetApplicableFiles(runtimeContext, jars, nativeJars, native32, native64, overridePath, storageBase);
         }
         // NOTE: order is important here, add main jar last to the lists
         if (_mainJar is not null)
@@ -346,12 +347,12 @@ public class LaunchProfile : ProblemProvider
             }
             else
             {
-                _mainJar.GetApplicableFiles(runtimeContext, jars, nativeJars, native32, native64, overridePath);
+                _mainJar.GetApplicableFiles(runtimeContext, jars, nativeJars, native32, native64, overridePath, storageBase);
             }
         }
         foreach (var lib in GetNativeLibraries())
         {
-            lib.GetApplicableFiles(runtimeContext, jars, nativeJars, native32, native64, overridePath);
+            lib.GetApplicableFiles(runtimeContext, jars, nativeJars, native32, native64, overridePath, storageBase);
         }
         if (runtimeContext.JavaArchitecture == "32")
         {

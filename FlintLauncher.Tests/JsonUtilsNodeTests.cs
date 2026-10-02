@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Number/kind semantics of the JsonNode-side Require*/Ensure* family: the node mirrors must
-// agree with the JsonElement family for parsed documents — especially around numbers (int
-// truncation, double rejection in RequireInteger, string numbers NOT coerced) because the
-// node read model is what parsers migrate onto.
-using System.Text.Json;
+// Number/kind semantics of the JsonNode Require*/Ensure* family (the single read model since
+// the element dual track retired) — especially around numbers (int truncation, double
+// rejection in RequireInteger, string numbers NOT coerced).
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 using Xunit;
@@ -44,10 +42,10 @@ public class JsonUtilsNodeTests
     }
 
     [Fact]
-    public void EnsureInteger_TruncatesLikeTheElementFamily()
+    public void EnsureInteger_TruncatesLikeQt()
     {
         JsonNode obj = Object("""{"a":1.9, "b":"7", "c":null}""");
-        Assert.Equal(1, JsonUtils.EnsureInteger(obj["a"]));   // truncation, like (int)GetDouble
+        Assert.Equal(1, JsonUtils.EnsureInteger(obj["a"]));   // truncation, like QJsonValue::toInt
         Assert.Equal(0, JsonUtils.EnsureInteger(obj["b"]));   // string numbers are NOT coerced
         Assert.Equal(0, JsonUtils.EnsureInteger(obj["c"]));   // JSON null -> default
         Assert.Equal(0, JsonUtils.EnsureInteger(null));       // missing -> default
@@ -82,21 +80,6 @@ public class JsonUtilsNodeTests
         Assert.Throws<JsonParseException>(() => JsonUtils.RequireObject(obj["a"], "a"));
         Assert.Throws<JsonParseException>(() => JsonUtils.RequireArray(obj["o"], "o"));
         Assert.Throws<JsonParseException>(() => JsonUtils.RequireObject(obj["s"], "s"));
-
-        // element<->node round trips through the AOT-safe helpers
-        var element = JsonUtils.ToOwnedElement(obj);
-        var back = JsonUtils.ToNode(element);
-        Assert.Equal(obj.ToJsonString(), back.ToJsonString());
-    }
-
-    [Fact]
-    public void CachedStandIns_BehaveLikeMissingValues()
-    {
-        Assert.Equal(JsonValueKind.Null, JsonUtils.NullElement.ValueKind);
-        Assert.Equal(JsonValueKind.Object, JsonUtils.EmptyObjectElement.ValueKind);
-        Assert.Equal(JsonValueKind.Array, JsonUtils.EmptyArrayElement.ValueKind);
-        // cloned stand-ins stay usable across many reads (they outlive their documents)
-        Assert.Equal("", JsonUtils.EnsureString(JsonUtils.NullElement));
     }
 
     [Fact]
@@ -114,10 +97,10 @@ public class JsonUtilsNodeTests
     }
 
     [Fact]
-    public void EnsureLong_And_EnsureDouble_MirrorElementSemantics()
+    public void EnsureLong_And_EnsureDouble_NumberSemantics()
     {
         JsonNode obj = Object("""{"big":9007199254740992, "d":2.75, "s":"1", "z":null}""");
-        Assert.Equal(9007199254740992, JsonUtils.EnsureLong(obj["big"])); // 2^53: beyond GetDouble precision, same as element family
+        Assert.Equal(9007199254740992, JsonUtils.EnsureLong(obj["big"])); // 2^53: parsed from the raw token, no double round-trip
         Assert.Equal(2.75, JsonUtils.EnsureDouble(obj["d"]));
         Assert.Equal(0, JsonUtils.EnsureDouble(obj["s"]));
         Assert.Equal(0L, JsonUtils.EnsureLong(obj["z"]));
@@ -139,7 +122,7 @@ public class JsonUtilsNodeTests
     public void MissingKey_KeepsDoesNotContainMessage()
     {
         JsonNode obj = Object("""{"n":null}""");
-        // missing key -> "does not contain" (element-family contract); JSON null -> kind error
+        // missing key -> "does not contain" (the C++ require(parent, key) contract); JSON null -> kind error
         var missing = Assert.Throws<JsonParseException>(() => JsonUtils.RequireInteger(obj, "nope", "index"));
         Assert.Contains("does not contain", missing.Message);
         var nullValue = Assert.Throws<JsonParseException>(() => JsonUtils.RequireInteger(obj, "n", "index"));

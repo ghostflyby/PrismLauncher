@@ -131,16 +131,16 @@ public sealed class SolderPackInstallTask : InstanceTask
 
         // (the "fixing permissions" walk is not ported — see SingleZipPackInstallTask)
 
-        var failure = TechnicPackProcessor.Run(
-            GlobalSettings ?? throw new InvalidOperationException(
-                "InstanceTask requires SetParentSettings before execution."),
-            Name(), Icon, StagingPath, _minecraftVersion, isSolder: true);
+        var failure = await TechnicPackProcessor.RunAsync(
+            Environment ?? throw new InvalidOperationException(
+                "InstanceTask requires SetParentEnvironment before execution."),
+            Name(), Icon, StagingPath, _minecraftVersion, isSolder: true,
+            cancellationToken: cancellationToken);
         if (failure is not null)
         {
             EmitFailed(failure);
             return;
         }
-        await Task.CompletedTask;
         EmitSucceeded();
     }
 }

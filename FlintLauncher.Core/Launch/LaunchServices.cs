@@ -15,7 +15,6 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Launch;
 
@@ -26,13 +25,25 @@ public sealed class LaunchServices
     public required Microsoft.Extensions.Logging.ILoggerFactory LoggerFactory { get; init; }
 
     /// <summary>Shared metadata cache for library/asset-index downloads (the C++
-    /// APPLICATION->metacache() the update tasks receive). Null keeps the legacy one-shot
-    /// fallback caches; hosts always set it.</summary>
+    /// APPLICATION->metacache()). The update steps read the INSTANCE-stamped cache
+    /// (MinecraftInstance.MetaCache — the same object the composition root registered);
+    /// this mirror exists for pure-core consumers of the services. Since E6 there is no
+    /// bare-fixture fallback anywhere: an unstamped instance fails the update steps.</summary>
     public HttpMetaCache? MetaCache { get; init; }
 
-    /// <summary>APLLICATION->settings(): global launcher settings (AutoInstallJava reads
-    /// java/download keys from it; LaunchController's offline-name flow).</summary>
-    public IniSettingsObject? GlobalSettings { get; init; }
+    /// <summary>The typed flint.json store (the user layer of the C7 stack — D4 retired the
+    /// SettingsObject adapter view). AutoInstallJava reads the java/download switches from
+    /// it; null keeps the bare-fixture "feature off" behavior.</summary>
+    public Core.Config.FlintConfigStore? Config { get; init; }
+
+    /// <summary>The launcher runtime state (launcher-state.json, S5): the java probe cache
+    /// (CheckJava/VerifyJavaInstall) and the offline-name write-back (LaunchController) live
+    /// here since CONFIG C9 moved them out of the settings world. EMBEDDING REQUIREMENT:
+    /// hosts must wire it — with a null store CheckJava's probe results are dropped (each
+    /// launch re-probes) and VerifyJavaInstall sees an unprobed java, while the offline-name
+    /// persistence silently degrades to per-launch defaults. All in-repo construction sites
+    /// (WebHostBuilder, launch fixtures) wire it.</summary>
+    public Core.State.LauncherStateStore? LauncherState { get; init; }
 
     /// <summary>Parse log4j XML events out of the game output (LaunchTask::parseXmlLogs; the
     /// C++ had no switch — the host enables it).</summary>
@@ -58,6 +69,16 @@ public sealed class LaunchServices
     /// <summary>C++ APPLICATION->javalist() (AutoInstallJava's "no download" branch); null
     /// degrades to the upstream "no compatible Java version was found" warning.</summary>
     public Func<JavaInstallList?>? JavaInstallListProvider { get; init; }
+
+    /// <summary>Resolved launcher-managed java root (CACHE E2 via GLOBAL §3: the JavaDir
+    /// setting under STORE semantics — relative joins the store root). The host provides it
+    /// so AutoInstallJava installs into the configured store location; null keeps the
+    /// Paths.JavaRoot anchor (the store/java default).</summary>
+    public Func<string>? JavaRootProvider { get; init; }
+
+    /// <summary>The effective java root: the provider's resolution when wired, else the
+    /// store-root java anchor (the same store semantics with the default dir name).</summary>
+    public string JavaRoot => JavaRootProvider?.Invoke() ?? Paths.JavaRoot;
 
     /// <summary>C++ APPLICATION->metadataIndex() (AutoInstallJava's java-meta list); null
     /// keeps the instance PackProfile's index.</summary>

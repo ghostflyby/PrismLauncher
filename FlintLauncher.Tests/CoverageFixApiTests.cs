@@ -18,6 +18,7 @@ using FlintLauncher.Nbt;
 using FlintLauncher.Web;
 using FlintLauncher.Web.Services;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -46,8 +47,9 @@ public class CoverageFixSettingsApiTests
 
         var minecraft = groups.GetProperty("minecraft");
         Assert.Equal(128, minecraft.GetProperty("PermGen").GetInt32());
-        // RAM-derived (SysInfo::defaultMaxJvmMem port); the host registered the machine's value
-        Assert.Equal(GlobalSettingsRegistration.DefaultMaxMemAlloc,
+        // RAM-derived (SysInfo::defaultMaxJvmMem port); the record property default is the
+        // single source (CONFIG C6 — GlobalSettingsRegistration retired)
+        Assert.Equal(FlintLauncher.Core.Config.MemoryConfig.DefaultMaxMemAlloc,
             minecraft.GetProperty("MaxMemAlloc").GetInt32());
         Assert.True(minecraft.GetProperty("LowMemWarning").GetBoolean());
         Assert.True(minecraft.GetProperty("ShowGlobalGameTime").GetBoolean());
@@ -58,7 +60,8 @@ public class CoverageFixSettingsApiTests
         Assert.Equal("127.0.0.1", groups.GetProperty("proxy").GetProperty("ProxyAddr").GetString());
 
         var dirs = groups.GetProperty("dirs");
-        Assert.Equal("mods", dirs.GetProperty("CentralModsDir").GetString());
+        // CentralModsDir left with DATA D8 (true dead setting — not served, not writable)
+        Assert.False(dirs.TryGetProperty("CentralModsDir", out _));
         Assert.Equal("icons", dirs.GetProperty("IconsDir").GetString());
         Assert.Equal("skins", dirs.GetProperty("SkinsDir").GetString());
         Assert.Equal("java", dirs.GetProperty("JavaDir").GetString());
@@ -80,10 +83,16 @@ public class CoverageFixSettingsApiTests
             group = "dirs",
             values = new Dictionary<string, object>
             {
-                ["CentralModsDir"] = "custom-mods",
                 ["DownloadsDirWatchRecursive"] = true,
             },
         })).StatusCode);
+        // DATA D8: the dead CentralModsDir key is not part of the dirs group — rejected
+        var deadKey = await host.PutAsync("/api/v1/settings", new
+        {
+            group = "dirs",
+            values = new Dictionary<string, object> { ["CentralModsDir"] = "custom-mods" },
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, deadKey.StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await host.PutAsync("/api/v1/settings", new
         {
             group = "language",
@@ -109,7 +118,6 @@ public class CoverageFixSettingsApiTests
         })).StatusCode);
 
         var groups = await GetGroups(host);
-        Assert.Equal("custom-mods", groups.GetProperty("dirs").GetProperty("CentralModsDir").GetString());
         Assert.True(groups.GetProperty("dirs").GetProperty("DownloadsDirWatchRecursive").GetBoolean());
         Assert.Equal("qq", groups.GetProperty("language").GetProperty("Language").GetString());
         Assert.Equal("https://mirror.test/resources/",
@@ -140,9 +148,9 @@ public class CoverageFixSettingsApiTests
     [Fact]
     public async Task Proxy_Retry_Timeout_Settings_Reach_The_Http_Stack()
     {
-        var previousUa = Http.UserAgent;
-        var previousRetries = Http.ManualRetries;
-        var previousTimeout = Http.RequestTimeout;
+        var previousUa = NetStack.Default.UserAgent;
+        var previousRetries = NetStack.Default.ManualRetries;
+        var previousTimeout = NetStack.Default.RequestTimeout;
         try
         {
             await using var host = await FlintApiHost.StartAsync();
@@ -157,7 +165,7 @@ public class CoverageFixSettingsApiTests
                     ["ProxyPort"] = 39999,
                 },
             })).StatusCode);
-            Assert.Equal(("HTTP", "127.0.0.1", 39999, "", ""), Http.ProxyConfig);
+            Assert.Equal(("HTTP", "127.0.0.1", 39999, "", ""), NetStack.Default.ProxyConfig);
 
             Assert.Equal(HttpStatusCode.NoContent, (await host.PutAsync("/api/v1/settings", new
             {
@@ -168,15 +176,15 @@ public class CoverageFixSettingsApiTests
                     ["RequestTimeout"] = 90,
                 },
             })).StatusCode);
-            Assert.Equal(3, Http.ManualRetries);
-            Assert.Equal(TimeSpan.FromSeconds(90), Http.RequestTimeout);
+            Assert.Equal(3, NetStack.Default.ManualRetries);
+            Assert.Equal(TimeSpan.FromSeconds(90), NetStack.Default.RequestTimeout);
 
             Assert.Equal(HttpStatusCode.NoContent, (await host.PutAsync("/api/v1/settings", new
             {
                 group = "api",
                 values = new Dictionary<string, object> { ["UserAgentOverride"] = "Flint-Api-Agent/1.0" },
             })).StatusCode);
-            Assert.Equal("Flint-Api-Agent/1.0", Http.UserAgent);
+            Assert.Equal("Flint-Api-Agent/1.0", NetStack.Default.UserAgent);
 
             // "None" disables the proxy again without a restart
             Assert.Equal(HttpStatusCode.NoContent, (await host.PutAsync("/api/v1/settings", new
@@ -184,16 +192,16 @@ public class CoverageFixSettingsApiTests
                 group = "proxy",
                 values = new Dictionary<string, object> { ["ProxyType"] = "None" },
             })).StatusCode);
-            Assert.Equal(("None", "127.0.0.1", 39999, "", ""), Http.ProxyConfig);
+            Assert.Equal(("None", "127.0.0.1", 39999, "", ""), NetStack.Default.ProxyConfig);
         }
         finally
         {
             // restore the steady state a host startup produces (the registered defaults)
-            Http.Configure(FlintConfig.Default.UserAgent, "None", "127.0.0.1", 8080, "", "");
-            Http.ManualRetries = previousRetries;
-            Http.RequestTimeout = previousTimeout;
-            Assert.Equal(("None", "127.0.0.1", 8080, "", ""), Http.ProxyConfig);
-            Assert.Equal(FlintConfig.Default.UserAgent, Http.UserAgent);
+            NetStack.Default.Configure(FlintConfig.Default.UserAgent, "None", "127.0.0.1", 8080, "", "");
+            NetStack.Default.ManualRetries = previousRetries;
+            NetStack.Default.RequestTimeout = previousTimeout;
+            Assert.Equal(("None", "127.0.0.1", 8080, "", ""), NetStack.Default.ProxyConfig);
+            Assert.Equal(FlintConfig.Default.UserAgent, NetStack.Default.UserAgent);
         }
     }
 
@@ -255,7 +263,7 @@ public class CoverageFixWorldsApiTests : IAsyncDisposable
         File.WriteAllBytes(Path.Combine(worldDir, "level.dat"), NbtIo.WriteCompoundGzip(root));
     }
 
-    private string SavesDir => Path.Combine(_dataDir, "instances", "w-four", "minecraft", "saves");
+    private string SavesDir => Path.Combine(WaveSeed.InstancesDir(_dataDir), "w-four", "minecraft", "saves");
 
     public async ValueTask DisposeAsync()
     {
@@ -470,9 +478,10 @@ public class CoverageFixLaunchJoinApiTests
 
         var dataDir = Path.Combine(Path.GetTempPath(), $"flint-api-join-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dataDir);
+        var dataRoot = Path.Combine(dataDir, "data"); // the G1 home layout's data root
         var previousCwd = Environment.CurrentDirectory;
 
-        var instanceRoot = Path.Combine(dataDir, "instances", "join-inst");
+        var instanceRoot = Path.Combine(dataRoot, "instances", "join-inst");
         Directory.CreateDirectory(instanceRoot);
         await File.WriteAllTextAsync(Path.Combine(instanceRoot, "instance.cfg"), "name=Join Instance\n");
         Directory.CreateDirectory(Path.Combine(instanceRoot, "patches"));
@@ -488,19 +497,36 @@ public class CoverageFixLaunchJoinApiTests
 
         try
         {
+            // S2: the token is host-injected (--api-token) — no token file exists to read
+            var apiToken = Guid.NewGuid().ToString("N");
             var app = WebHostBuilder.BuildWebApplication(
             [
-                "--data-dir", dataDir,
+                "--home-dir", dataDir,
+                "--api-token", apiToken,
                 "--urls", "http://127.0.0.1:0",
             ],
             // the launch pipeline's jar lookups resolve against this install root (the former
             // JavaUtils.LauncherRootPath static test hook, now LaunchServices.Paths.InstallRoot)
-            paths: FlintPaths.FromDataDir(dataDir) with { InstallRoot = launcherRoot });
+            paths: FlintPaths.FromHomeDir(dataDir) with { InstallRoot = launcherRoot });
             await app.StartAsync();
             using var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
-            client.DefaultRequestHeaders.Add("X-Api-Token",
-                File.ReadAllText(Path.Combine(dataDir, ApiAuthService.TokenFileName)).Trim());
+            client.DefaultRequestHeaders.Add("X-Api-Token", apiToken);
             Environment.CurrentDirectory = dataDir;
+
+            // S5: seed the java probe cache in the launcher state (the former settings-key
+            // seeding — CONFIG C9 moved the probe quintet out of the settings world)
+            app.Services.GetRequiredService<LauncherRuntime>().State.Update(state => state with
+            {
+                Java = state.Java with
+                {
+                    Detections = new Dictionary<string, FlintLauncher.Core.State.JavaDetectEntry>(
+                        state.Java.Detections, StringComparer.Ordinal)
+                    {
+                        [javaPath] = new(CheckJava.ComputeJavaSignature(javaUnixTime, javaPath),
+                            "64", "arm64", "17.0.2", "join-e2e"),
+                    },
+                },
+            });
 
             var put = await client.PutAsJsonAsync("/api/v1/instances/join-inst/settings", new
             {
@@ -508,11 +534,6 @@ public class CoverageFixLaunchJoinApiTests
                 {
                     ["OverrideJavaLocation"] = true,
                     ["JavaPath"] = javaPath,
-                    ["JavaSignature"] = CheckJava.ComputeJavaSignature(javaUnixTime, javaPath),
-                    ["JavaVersion"] = "17.0.2",
-                    ["JavaArchitecture"] = "64",
-                    ["JavaRealArchitecture"] = "arm64",
-                    ["JavaVendor"] = "join-e2e",
                 },
             });
             Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);

@@ -27,13 +27,9 @@ internal sealed class StubTechnicServer : IDisposable
 
     public StubTechnicServer()
     {
-        // hold a reserved port until the instant this listener takes it over
-        using var lease = PortAllocator.Reserve();
-        var port = lease.Port;
-        _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
-        lease.Dispose();
-        _listener.Start();
-        Url = $"http://127.0.0.1:{port}";
+        // TestPorts owns the port lease AND the rebind-retry (HttpListener cannot adopt the
+        // lease socket, so losing the takeover window retries on a fresh port)
+        (_listener, Url) = PortAllocator.StartHttpListener();
         _ = Task.Run(async () =>
         {
             while (_listener.IsListening)

@@ -90,7 +90,7 @@ public class ExtractNativesTests
     public async Task ExtractsNativeJars_WithJniLibRename()
     {
         using var fixture = new LaunchFixture();
-        fixture.Global.StubSet("JavaVersion", "17.0.2"); // >= 8: the .jnilib hack applies
+        fixture.SeedJavaDetection("java", 0, version: "17.0.2"); // >= 8: the .jnilib hack applies (C9: state cache)
         var instance = await fixture.CreateInstance(NativeLibrariesPatch);
         WriteNativeJars(instance.GetLocalLibraryPath(), "dylib-bytes", "jnilib-bytes");
 
@@ -320,12 +320,15 @@ public class ExtractNativesTests
         var instance = await fixture.CreateInstance(patch);
 
         // the index is downloaded into the same place the task reads it from — the injected
-        // instance cache ("asset_indexes" base) instead of the former static hook; Paths
-        // anchor through the "assets" symlink so AssetsRoot = <BaseDirectory>/assets → Root
+        // instance cache ("asset_indexes" base) instead of the former static hook; the
+        // instance stamp reads its assets anchors through the <BaseDirectory>/assets symlink
+        // (the CWD-lexical fallback of FILE-LAYOUT §1.5), so the STORE root is BaseDirectory
+        // (E2: assets hang off the store root)
         var instanceCache = new HttpMetaCache();
         instanceCache.AddBase("asset_indexes", Path.Combine(assetsRoot.Root, "indexes"));
         instance.MetaCache = instanceCache;
-        instance.Paths = FlintPaths.FromDataDir(AppContext.BaseDirectory);
+        instance.Paths = FlintPaths.FromRoots(AppContext.BaseDirectory, AppContext.BaseDirectory,
+            AppContext.BaseDirectory, AppContext.BaseDirectory, AppContext.BaseDirectory);
         // the resource URL override rides the instance-stamped LaunchServices (the former
         // AssetUpdateTask.ResourceUrlOverride static hook)
         instance.LaunchServices = new LaunchServices
@@ -460,13 +463,9 @@ internal sealed class TestHttpServer : IDisposable
 
     public TestHttpServer(Action<HttpListenerContext> handler)
     {
-        // hold a reserved port until the instant this listener takes it over
-        using var lease = PortAllocator.Reserve();
-        var port = lease.Port;
-        _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
-        lease.Dispose();
-        _listener.Start();
-        Url = $"http://127.0.0.1:{port}";
+        // TestPorts owns the port lease AND the rebind-retry (HttpListener cannot adopt the
+        // lease socket, so losing the takeover window retries on a fresh port)
+        (_listener, Url) = PortAllocator.StartHttpListener();
         _ = Task.Run(async () =>
         {
             while (_listener.IsListening)

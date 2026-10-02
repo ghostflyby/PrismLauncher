@@ -18,7 +18,7 @@
 | `StringUtils.{h,cpp}` | `FlintLauncher.Core/Text/StringUtils.cs` | partial | 仅 NaturalCompare（ordinal 代替 locale）；其余按需补 |
 | `FileSystem.{h,cpp}` | `FlintLauncher.Core/IO/FileSystem.cs` | partial | 平台中立子集（copy/move/delete/combine/原子写等）；reflink/trash/desktop 等记录为 skip |
 | `GZip.{h,cpp}` | `FlintLauncher.Core/IO/GZip.cs` | ported | System.IO.Compression |
-| `Json.{h,cpp}` | `FlintLauncher.Core/Json/JsonUtils.cs` | partial | require/ensure 全家 + to/from list/map；QVariant 部分不适用 |
+| `Json.{h,cpp}` | `FlintLauncher.Core/Json/JsonUtils.cs` | ported | require/ensure 全家（JsonNode 单 DOM 读模型，2026-10-03 起唯一轨道：element 双轨家族已删除）+ to/from list/map；QVariant 部分不适用 |
 | `StringUtils`(其余) `Markdown.{h,cpp}` | `FlintLauncher.Core/Text/Markdown.cs` | ported | 手写 cmark 子集 |
 | `Commandline.{h,cpp}` | `FlintLauncher.Core/Text/Commandline.cs` | ported | |
 | `MMCZip.{h,cpp}` | `FlintLauncher.Core/IO/MMCZip.cs` | partial | extract/compress/merge；createModdedJar 待 Mod 模型；符号链接/权限位未实现 |
@@ -28,10 +28,10 @@
 | `net/Request*` | `FlintLauncher.Core/Net/NetRequest.cs` | partial | HttpClient 底座；429/503 自动重试；HeaderProxy 简化为 AddHeader |
 | `net/Sink*` `FileSink` `ByteArraySink` `MetaCacheSink` | `FlintLauncher.Core/Net/Sink.cs` `FileSink.cs` | ported | PSaveFile→临时文件+原子替换 |
 | `net/Validator*` `ChecksumValidator` | `FlintLauncher.Core/Net/Validator.cs` | ported | IncrementalHash |
-| `net/HttpMetaCache*` | `FlintLauncher.Core/Net/HttpMetaCache.cs` | ported | metacache JSON 格式（version "1"）与原版互通 |
+| `net/HttpMetaCache*` | `FlintLauncher.Core/Net/HttpMetaCache.cs` | ported | metacache JSON 格式（version "1"）与原版互通；挂载表（baseId→根）+ 账本分离（E4），账本落 cache 根（E3），启动 Load()（E6） |
 | `net/NetJob*` | `FlintLauncher.Core/Net/NetJob.cs` | ported | 共享静态 HttpClient |
 | `net/Mode.h` `ApiRequest.h` `HeaderProxy*` | `FlintLauncher.Core/Net/Mode.cs`；头机制简化 | partial | 头注入按需在 P2/P6 恢复 |
-| `net/PasteUpload*` | — | todo | P7 |
+| `net/PasteUpload*` | `FlintLauncher.Core/Net/PasteUpload.cs` | ported | P7 完成（见下）；注入 NetStack 直发 |
 | `RWStorage.h` | — | n/a | 由 C# 并发设施取代 |
 | `ExponentialSeries.h` `AssertHelpers.h` `Exception.h` `EnumWrapper.h` `QVariantUtils.h` `QObjectPtr.h` `Usable.h` `SeparatorPrefixTree.h` `Filter.h` `WatchLock.h` `KonamiCode` | `n/a`（Variant.cs 承接 QVariantUtils 子集） | n/a | Qt 设施，被 C# 语言设施取代 |
 | `PSaveFile.h` | `FlintLauncher.Core/IO/FileSystem.cs`（原子写）+ `Net/FileSink.cs` | ported | |
@@ -42,7 +42,7 @@
 | 原文件 | C# 目标 | 状态 | 备注 |
 |---|---|---|---|
 | `meta/JsonFormat*` | `FlintLauncher.Core/Meta/MetaJsonFormat.cs` | ported | Require/RequireSet（uid 相等语义） |
-| `meta/BaseEntity*` + BaseEntityLoadTask | `FlintLauncher.Core/Meta/MetaEntity.cs` | ported | sha256 校验、本地缓存优先、ParsingValidator 防坏提交；静态共享 HttpMetaCache(base "meta") |
+| `meta/BaseEntity*` + BaseEntityLoadTask | `FlintLauncher.Core/Meta/MetaEntity.cs` | ported | sha256 校验、本地缓存优先、ParsingValidator 防坏提交；注入盖章的 HttpMetaCache(base "meta"，无静态兜底，E6) |
 | `meta/Index*` `VersionList*` `Version*` | `FlintLauncher.Core/Meta/Index.cs` `MetaVersionList.cs` `MetaVersion.cs` | ported | recommended/latest 逻辑 |
 | `minecraft/GradleSpecifier.h` | `FlintLauncher.Core/Minecraft/GradleSpecifier.cs` | ported | readonly struct 保值拷贝语义 |
 | `minecraft/Rule.*` `RuntimeContext.h` `SysInfo`(部分) | `FlintLauncher.Core/Minecraft/Rule.cs` `RuntimeContext.cs` | ported | |
@@ -67,7 +67,7 @@
 | `libraries/libnbtplusplus`（launcher 用子集） | `FlintLauncher.Nbt/` | ported | 全 Tag 集、Java modified-UTF-8、gzip/raw 自检、插入序 Compound |
 | `BaseInstance*` `NullInstance.h` | `FlintLauncher.Core/Instances/BaseInstance.cs` `NullInstance.cs` | ported | 设置注册/游玩时长/快捷方式/链接实例；Qt 信号→事件 |
 | `minecraft/MinecraftInstance*` | `FlintLauncher.Core/Instances/MinecraftInstance.cs` | ported | 全部设置组与路径访问器；launch 管线 TODO(P5) |
-| `InstanceList*` | `FlintLauncher.Core/Instances/InstanceList.cs` | ported | instgroups.json 往返、staged commit；QAbstractListModel/Watcher 不移植 |
+| `InstanceList*` | `FlintLauncher.Core/Instances/InstanceList.cs` + `Instances/InstanceGroupModel.cs` | ported | 组半边归 InstanceGroupModel（G4：config 侧 groups.json 成员 uuid 化 C8/D3 + state 侧 hidden S5）；D2 寻址链（inode→uuid→dirname）ResolveInstance 唯一入口；QAbstractListModel/Watcher 不移植 |
 | `InstanceCopyPrefs*` `InstanceCopyTask*` `InstanceTask*` | `FlintLauncher.Core/Instances/InstanceCopy*.cs` `InstanceTask.cs` | ported | link/clone 传输清晰报错（上游 create_link/clone 未移植） |
 | `InstanceImportTask*` | — | todo | P6（依赖 modplatform 分发） |
 | `InstanceDirUpdate*` | — | n/a | GUI 对话框耦合；纯文件半已在 BaseInstance/InstanceList |
@@ -77,7 +77,8 @@
 | `LocalWorldSaveParseTask` | `Worlds/WorldSaveIdentification.cs` | ported | |
 | `minecraft/mod/*`（资源模型与解析） | `FlintLauncher.Core/Minecraft/Resources/` | ported | pack_format 表全量；QImage→PNG IHDR 读取（已记录偏差） |
 | `minecraft/Op*`（gameoptions） | — | todo | P7 |
-| `icons/IconList` `IconUtils`（文件部分） | `FlintLauncher.Core/Icons/IconFiles.cs` | ported | Qt 模型/主题不移植 |
+| `icons/IconList` `IconUtils`（文件部分） | `FlintLauncher.Core/Icons/IconFiles.cs` + `Icons/IconPool.cs` | ported | D5：IconPool 模型（key→path 索引/扫描/安装/删除，DI 注入，IconsDir 设置生效）；Qt 模型/主题不移植 |
+| `skins/SkinList`（模型半） | `FlintLauncher.Core/Skins/SkinsLibrary.cs` | ported | D6 方案 B：本地皮肤库（SkinListStore 持久化半现成）；套用=组合 SkinUpload |
 | `RecursiveFileSystemWatcher*` `FileIgnoreProxy*` `FastFileIconProvider*` | — | n/a | GUI/Qt watcher |
 
 ## P4 账户（已完成 2026-09-12）
@@ -133,7 +134,7 @@
 | 原文件 | C# 目标 | 状态 | 备注 |
 |---|---|---|---|
 | `screenshots/*` | `FlintLauncher.Core/Screenshots/` | ported | Imgur 上传/相册（Client-ID + multipart） |
-| `news/*` | `FlintLauncher.Core/News/` | ported | RSS 下载缓存 + Atom 解析 |
+| `news/*` | — | deleted（CACHE E7） | 纯 GUI 功能，整体删除（checker + `/news` 端点 + feed base + FLINT_NEWS_RSS_URL） |
 | `net/PasteUpload*` + `logs/AnonymizeLog*` | `Net/PasteUpload.cs` | ported | 四 provider + 日志匿名化 |
 | `logs/LogParser*` | `Launch/LogParser.cs` | ported | Log4j XML/纯文本拆分；前导文本被吞语义保留 |
 | `minecraft/GameOptions*`(Op*) | `Minecraft/GameOptions/GameOptions.cs` | ported | options.txt 读写与转义 |
@@ -141,7 +142,7 @@
 | `tools/*` | `Tools/Profilers.cs` | ported | 注册表 + argv 构建（无进程派生） |
 | `translations/*` 下载逻辑 | — | deferred | 无头核心价值低，需要时再补 |
 | `updater/*` | GUI-bound / 进程外 | n/a | |
-| `Application*` `main.cpp` `ApplicationMessage*` `LocalPeer` | `FlintLauncher.Web/WebHostBuilder.cs` + Services/* | ported | v1 API：instances CRUD/settings/launch/tasks+日志+SSE/accounts(含 MSA 设备码)/java/news/modplatform 搜索+分页+install/update 结果负载+本地 token 鉴权(--api-token/--no-auth)；数据目录注入+CWD 切换；账号后台刷新(FLINT_ACCOUNT_REFRESH_MINUTES, 默认关) |
+| `Application*` `main.cpp` `ApplicationMessage*` `LocalPeer` | `FlintLauncher.Web/WebHostBuilder.cs` + Services/* | ported | v1 API：instances CRUD/settings/launch/tasks+日志+SSE/accounts(含 MSA 设备码)/java/modplatform 搜索+分页+install/update 结果负载+本地 token 鉴权(--api-token/--no-auth)；五根注入（news 已随 CACHE E7 删除）；账号后台刷新(FLINT_ACCOUNT_REFRESH_MINUTES, 默认关) |
 | `HardwareInfo*` `SysInfo*` | `Launch/HardwareInfo.cs` `SysInfo.cs` | ported | P5 已带出 |
 | `DesktopServices*` | n/a（打开文件/URL 语义按需暴露） | n/a | |
 | `ui/**` `icons`(渲染) `ui/themes` `translations`(UI) | — | GUI-bound | |
@@ -164,3 +165,9 @@
 
 - **JSON 读侧单 DOM**：Modrinth/Flame/Technic/AtLauncher/FTB 家族/Meta/Minecraft 的解析器已统一迁到 JsonNode 读模型（JsonUtils node 侧 Require*/Ensure* 家族）；JsonUtils 的 element 家族保留供未迁移的少数读取点，最终删除待定。
 - **DI 注入进度**：Modrinth/Flame/Technic/AtLauncher/FTB/Imgur 静态类已全部实例化（LauncherRuntime 持有、构造注入 NetStack、可选参数贯穿调用链）；Auth 端点已 AuthEndpointsOptions 注入；启动管线已接 LaunchServices（全部启动钩子静态改实例成员）；FlintLog 静态门面已删除（ILoggerFactory 构造注入）；测试端口分配已收敛 PortAllocator。测试并行保持串行（collections 试验 14 例失败，失败清单记录于提交 e8add2daa 后的编排运行报告，为后续静态清理批次的验收输入）。
+
+## 迁移注记（2026-10-03，静态残余收尾批量）
+
+- **JsonUtils element 双轨家族删除**：Core 10 文件（OneSixVersionFormat/FtbAppPackParse/PackProfile/JavaMetadata/ProfileUtils/Flame PackManifest/MetaEntity/HttpMetaCache/DataPackUtils/FtbAppPaths）+ Web 4 文件（ModPlatformEndpoints/ModPlatformTasks/TechnicEndpoints/ServerStatusPing）的残余读取点全部 node 化后，JsonDocument/JsonElement 轨道的 require*/ensure*、(JsonObject,key) 桥接重载、ToNode/ToOwnedElement 转换缝与缓存 element 站桩全部删除；JsonObject 键控重载保留为纯 node 委托（身份转换优先级防止 2 参 (parent,key) 调用误绑 (value,what) 重载）。零生产调用方的 element 专用成员（RequireByteArray/DateTime/Url/Uuid/ArrayOfStrings、Write/ToText、ToJsonByteArray/DateTime/Uuid）随轨删除。仓库另存若干**局部** System.Text.Json element 解析点（ImgurAPI/PasteUpload/InstanceGroupModel/AssetsUtils/BaseInstance/SkinModel/ExportToModList/MojangVersionFormat/LocalModParse/QtJson 缩进 shim 等）——它们不经 JsonUtils，不属双轨家族，转 node 另立批次。
+- **DI 残余清零**：AtLauncherPackInstallTask 的 MetaVersionDataLookup/RecommendedLoaderVersionLookup、FlameCreationTask 的 RecommendedVersionLookup 由静态改 per-task 注入（测试经构造/初始化器设置，无可污染的全局态）；PasteUpload/SkinUpload 直发改注入 NetStack（端点传 runtime.Net，默认回落 NetStack.Default）；`Http` 静态 shim 删除（消费点仅存测试，已重指 NetStack.Default）。collections 并行试验的失败输入清单按此收敛，重验证随全量测试批次。
+- **TechnicPackProcessor 异步化**：同步 `Run`（内部 `SetComponentVersion(...).GetAwaiter().GetResult()` 阻塞元数据网络解析）改 `async Task<string?> RunAsync`，三个调用点（SingleZip/Solder/InstanceImport）await 直连并贯穿 CancellationToken。

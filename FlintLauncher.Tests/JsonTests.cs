@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Focused tests for the port of launcher/Json.{h,cpp} (require/ensure helpers,
-// string-list/map settings helpers, parseUntilGarbage).
-using System.Text.Json;
+// string-list/map settings helpers, parseUntilGarbage). All readers run on the JsonNode
+// single-DOM read model — the former JsonDocument/JsonElement dual track is retired.
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 using Xunit;
@@ -10,9 +10,9 @@ namespace FlintLauncher.Tests;
 
 public class JsonTests
 {
-    private static JsonElement Parse(string json)
+    private static JsonNode? Parse(string json)
     {
-        return JsonDocument.Parse(json).RootElement;
+        return JsonNode.Parse(json);
     }
 
     private static JsonObject ParseObject(string json)
@@ -23,9 +23,9 @@ public class JsonTests
     // -------------------------------------------------------------- require*
 
     [Fact]
-    public void RequireDocument_Throws_On_Invalid_Json()
+    public void RequireNode_Throws_On_Invalid_Json()
     {
-        var e = Assert.Throws<JsonParseException>(() => JsonUtils.RequireDocument("{invalid", "Doc"));
+        var e = Assert.Throws<JsonParseException>(() => JsonUtils.RequireNode("{invalid", "Doc"));
         Assert.StartsWith("Doc: Error parsing JSON:", e.Message);
     }
 
@@ -91,56 +91,12 @@ public class JsonTests
     }
 
     [Fact]
-    public void RequireArrayOfStrings()
+    public void StringListOfMembers_MirrorsRequireIsArrayOf()
     {
-        Assert.Equal(["a", "b"],
-            JsonUtils.RequireArrayOfStrings(ParseObject("""{"list":["a","b"]}"""), "list"));
-        Assert.Throws<JsonParseException>(() =>
-            JsonUtils.RequireArrayOfStrings(ParseObject("""{"list":["a",1]}"""), "list"));
-    }
-
-    [Fact]
-    public void RequireByteArray_HexRoundTrip()
-    {
-        var data = new byte[] { 0x00, 0xDE, 0xAD, 0xBE, 0xEF, 0xFF };
-        var hex = Convert.ToHexString(data).ToLowerInvariant();
-        Assert.Equal(data, JsonUtils.RequireByteArray(Parse($"\"{hex}\"")));
-
-        // Qt's fromHex silently stops at invalid characters (yields an empty buffer here)
-        Assert.Empty(JsonUtils.RequireByteArray(Parse("\"zz\"")));
-        Assert.Throws<JsonParseException>(() => JsonUtils.RequireByteArray(Parse("\"\u0100\""))); // not Latin1
-        Assert.Throws<JsonParseException>(() => JsonUtils.RequireByteArray(Parse("42")));
-    }
-
-    [Fact]
-    public void RequireDateTime_IsoFormat()
-    {
-        Assert.Equal(new DateTime(2023, 1, 2, 3, 4, 5, DateTimeKind.Utc),
-            JsonUtils.RequireDateTime(Parse("\"2023-01-02T03:04:05Z\"")));
-        Assert.Equal(new DateTime(2023, 1, 2), JsonUtils.RequireDateTime(Parse("\"2023-01-02\"")));
-        Assert.Throws<JsonParseException>(() => JsonUtils.RequireDateTime(Parse("\"not a date\"")));
-    }
-
-    [Fact]
-    public void RequireUrl()
-    {
-        Assert.Null(JsonUtils.RequireUrl(Parse("\"\""))); // default-constructed QUrl
-        Assert.Equal(new Uri("https://docs.prismlauncher.org/x"),
-            JsonUtils.RequireUrl(Parse("\"https://docs.prismlauncher.org/x\"")));
-        Assert.Throws<JsonParseException>(() => JsonUtils.RequireUrl(Parse("\"not a url\"")));
-    }
-
-    [Fact]
-    public void RequireUuid_RoundTripCheck()
-    {
-        var canonical = "de1813ee-7f63-4b63-bb8e-9fa0b8b5c1a8";
-        Assert.Equal(Guid.Parse(canonical), JsonUtils.RequireUuid(Parse($"\"{canonical}\"")));
-        // anything that does not round-trip to the exact same text is rejected, like QUuid
-        Assert.Throws<JsonParseException>(() =>
-            JsonUtils.RequireUuid(Parse("\"DE1813EE-7F63-4B63-BB8E-9FA0B8B5C1A8\"")));
-        Assert.Throws<JsonParseException>(() =>
-            JsonUtils.RequireUuid(Parse("\"{de1813ee-7f63-4b63-bb8e-9fa0b8b5c1a8}\"")));
-        Assert.Throws<JsonParseException>(() => JsonUtils.RequireUuid(Parse("\"nope\"")));
+        // the requireIsArrayOf semantics now live in ToStringList (the parent+key overload
+        // went with the element track): a non-string element yields [] instead of throwing
+        Assert.Equal(["a", "b"], JsonUtils.ToStringList("""["a","b"]"""));
+        Assert.Empty(JsonUtils.ToStringList("""["a",1]"""));
     }
 
     // --------------------------------------------------------------- ensure*
@@ -148,16 +104,16 @@ public class JsonTests
     [Fact]
     public void Ensure_Returns_Defaults()
     {
-        var value = Parse("""{"s":"x","b":true,"n":1.9}""");
-        Assert.Equal("x", JsonUtils.EnsureString(value.GetProperty("s")));
-        Assert.Equal("", JsonUtils.EnsureString(value.GetProperty("n")));
-        Assert.Equal("def", JsonUtils.EnsureString(value.GetProperty("n"), "def"));
-        Assert.True(JsonUtils.EnsureBoolean(value.GetProperty("b")));
-        Assert.False(JsonUtils.EnsureBoolean(value.GetProperty("s")));
-        Assert.Equal(1.9, JsonUtils.EnsureDouble(value.GetProperty("n")));
-        Assert.Equal(0.0, JsonUtils.EnsureDouble(value.GetProperty("s")));
-        Assert.Equal(1, JsonUtils.EnsureInteger(value.GetProperty("n"))); // truncates like Qt
-        Assert.Equal(7, JsonUtils.EnsureInteger(value.GetProperty("s"), 7));
+        var value = ParseObject("""{"s":"x","b":true,"n":1.9}""");
+        Assert.Equal("x", JsonUtils.EnsureString(value["s"]));
+        Assert.Equal("", JsonUtils.EnsureString(value["n"]));
+        Assert.Equal("def", JsonUtils.EnsureString(value["n"], "def"));
+        Assert.True(JsonUtils.EnsureBoolean(value["b"]));
+        Assert.False(JsonUtils.EnsureBoolean(value["s"]));
+        Assert.Equal(1.9, JsonUtils.EnsureDouble(value["n"]));
+        Assert.Equal(0.0, JsonUtils.EnsureDouble(value["s"]));
+        Assert.Equal(1, JsonUtils.EnsureInteger(value["n"])); // truncates like Qt
+        Assert.Equal(7, JsonUtils.EnsureInteger(value["s"], 7));
     }
 
     // -------------------------------------------------------- settings helpers
@@ -190,41 +146,18 @@ public class JsonTests
     // ----------------------------------------------------- documents & garbage
 
     [Fact]
-    public void Write_ToText_RoundTrip()
+    public void ParseNodeUntilGarbage()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"flint-json-{Guid.NewGuid():N}.json");
-        try
-        {
-            using (var doc = JsonDocument.Parse("""{"key":"value","n":3}"""))
-            {
-                JsonUtils.Write(doc.RootElement, path);
-                // toText is compact
-                Assert.Equal("""{"key":"value","n":3}""", System.Text.Encoding.UTF8.GetString(JsonUtils.ToText(doc.RootElement)));
-            }
-            using var read = JsonUtils.RequireDocumentFromFile(path);
-            // requireString(document.object(), "key") analog
-            Assert.Equal("value", JsonUtils.RequireString(ParseObject(File.ReadAllText(path)), "key"));
-            Assert.Equal("value", JsonUtils.RequireString(read.RootElement.GetProperty("key")));
-        }
-        finally
-        {
-            File.Delete(path);
-        }
-    }
-
-    [Fact]
-    public void ParseUntilGarbage()
-    {
-        using var doc = JsonUtils.ParseUntilGarbage("""{"a":1} trailing garbage""", out var garbage);
+        var doc = JsonUtils.ParseNodeUntilGarbage("""{"a":1} trailing garbage""", out var garbage);
         Assert.NotNull(doc);
         Assert.Equal(" trailing garbage", garbage);
-        Assert.Equal(1, JsonUtils.RequireInteger(doc!.RootElement.GetProperty("a")));
+        Assert.Equal(1, JsonUtils.RequireInteger(doc!.AsObject()["a"]));
 
-        using var strict = JsonUtils.ParseUntilGarbage("""{"a":1}""", out var noGarbage);
+        var strict = JsonUtils.ParseNodeUntilGarbage("""{"a":1}""", out var noGarbage);
         Assert.NotNull(strict);
         Assert.Null(noGarbage);
 
-        using var broken = JsonUtils.ParseUntilGarbage("{invalid", out _);
+        var broken = JsonUtils.ParseNodeUntilGarbage("{invalid", out _);
         Assert.Null(broken);
     }
 

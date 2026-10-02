@@ -29,44 +29,55 @@ internal sealed class SkinApiHost : IAsyncDisposable
     private readonly WebApplication _app;
     private readonly string _previousCwd;
 
-    private SkinApiHost(WebApplication app, HttpClient client, string dataDir, string previousCwd)
+    private SkinApiHost(WebApplication app, HttpClient client, string homeDir, string dataDir,
+        string previousCwd)
     {
         _app = app;
         Client = client;
+        HomeDir = homeDir;
         DataDir = dataDir;
         _previousCwd = previousCwd;
     }
 
     public HttpClient Client { get; }
 
+    /// <summary>The temp home root (passed as --home-dir; cleaned up on dispose).</summary>
+    public string HomeDir { get; }
+
+    /// <summary>The data root (home layout: &lt;home&gt;/data).</summary>
     public string DataDir { get; }
 
     public Task<HttpResponseMessage> GetAsync(string path) => Client.GetAsync(path);
 
     public Task<HttpResponseMessage> DeleteAsync(string path) => Client.DeleteAsync(path);
 
-    /// <summary>Builds the real app over a data dir pre-seeded with <paramref name="seed"/>
-    /// files (relative path -> content), so startup-time loads (accounts.json) see them.</summary>
+    /// <summary>Builds the real app over a temp home whose data root is pre-seeded with
+    /// <paramref name="seed"/> files (data-root-relative path -> content), so startup-time
+    /// loads (accounts.json) see them.</summary>
     public static async Task<SkinApiHost> StartAsync(IReadOnlyDictionary<string, string>? seed = null,
         AuthEndpointsOptions? auth = null)
     {
-        var dataDir = Path.Combine(Path.GetTempPath(), $"flint-skinapi-{Guid.NewGuid():N}");
+        var homeDir = Path.Combine(Path.GetTempPath(), $"flint-skinapi-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(homeDir);
+        var dataDir = Path.Combine(homeDir, "data");
         Directory.CreateDirectory(dataDir);
         foreach (var (name, content) in seed ?? new Dictionary<string, string>())
         {
             await File.WriteAllTextAsync(Path.Combine(dataDir, name), content);
         }
         var previousCwd = Environment.CurrentDirectory;
+        // S2: the token is host-injected (--api-token) — no token file exists to read
+        var token = Guid.NewGuid().ToString("N");
         var app = WebHostBuilder.BuildWebApplication(
         [
-            "--data-dir", dataDir,
+            "--home-dir", homeDir,
+            "--api-token", token,
             "--urls", "http://127.0.0.1:0",
         ], auth: auth);
         await app.StartAsync();
         var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
-        client.DefaultRequestHeaders.Add("X-Api-Token",
-            File.ReadAllText(Path.Combine(dataDir, ApiAuthService.TokenFileName)).Trim());
-        return new SkinApiHost(app, client, dataDir, previousCwd);
+        client.DefaultRequestHeaders.Add("X-Api-Token", token);
+        return new SkinApiHost(app, client, homeDir, dataDir, previousCwd);
     }
 
     public async ValueTask DisposeAsync()
@@ -83,7 +94,7 @@ internal sealed class SkinApiHost : IAsyncDisposable
             Environment.CurrentDirectory = restoreTo;
             try
             {
-                Directory.Delete(DataDir, recursive: true);
+                Directory.Delete(HomeDir, recursive: true);
             }
             catch (DirectoryNotFoundException)
             {

@@ -44,7 +44,10 @@ public static class PrismImportPlanner
         "logs", "accounts", "assets", "icons", "instances", "libraries", "mods", "themes", "meta",
     ];
 
-    /// <summary>Top-level files of the whitelist, in import order.</summary>
+    /// <summary>Top-level files of the whitelist, in import order. NOTE (CACHE E8): the
+    /// Prism bare <c>metacache</c> ledger is deliberately NOT whitelisted — Flint never
+    /// reads it, so importing it would only move dead stock; existing copies in the target
+    /// directory are deleted once after a successful import (see PrismImportTask).</summary>
     public static readonly string[] ImportFiles =
     [
         "accounts.json", "instgroups.json", "prismlauncher.cfg", "polymc.cfg", "mmc.cfg",
@@ -135,20 +138,29 @@ public static class PrismImportPlanner
 /// into the Flint data directory per the chosen mode. Directories move with one same-volume
 /// rename when possible, otherwise per file through
 /// <see cref="FileTransfer.TransferFile"/>; destination files are never overwritten (the
-/// import is an idempotent merge). On full success the "declined" marker is written so a
-/// detector does not propose the same source twice.
+/// import is an idempotent merge). On full success the import decision is recorded (S3:
+/// {source, decision: imported, at, mode, instances, bytes} under the state root's
+/// migration/ directory) so a detector does not propose the same source twice.
 /// </summary>
 public sealed class PrismImportTask : FlintTask
 {
     private readonly string _sourceDir;
     private readonly string _targetDataDir;
     private readonly ImportMode _mode;
+    private readonly string _sourceName;
+    private readonly MigrationDecisionStore? _decisions;
 
-    public PrismImportTask(string sourceDir, string targetDataDir, ImportMode mode)
+    /// <summary><paramref name="sourceName"/> is the actual legacy-launcher id the record is
+    /// filed under (S7: "prism" was hardcoded before; candidates carry polymc/multimc too).
+    /// <paramref name="decisions"/> null (bare fixtures) skips the record write.</summary>
+    public PrismImportTask(string sourceDir, string targetDataDir, ImportMode mode,
+        string sourceName = "prism", MigrationDecisionStore? decisions = null)
     {
         _sourceDir = sourceDir;
         _targetDataDir = targetDataDir;
         _mode = mode;
+        _sourceName = sourceName;
+        _decisions = decisions;
     }
 
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
@@ -162,6 +174,10 @@ public sealed class PrismImportTask : FlintTask
             EmitFailed("Nothing to import: the source directory has no whitelisted content.");
             return Task.CompletedTask;
         }
+
+        // the source inventory is read BEFORE any transfer: a same-volume move empties the
+        // source mid-task, so counting afterwards would undercount the record's Instances
+        var sourceInstances = CountSourceInstances();
 
         var done = 0L;
         var failed = false;
@@ -210,9 +226,76 @@ public sealed class PrismImportTask : FlintTask
             return Task.CompletedTask;
         }
 
-        DataMigration.SetDoNotMigrate(_targetDataDir, "prism");
+        // CACHE E8: the target may still carry the Prism bare `metacache` ledger from
+        // historical imports (the whitelist never carried it; nothing reads it) — dead
+        // stock, deleted once here. Best effort: the data has fully landed.
+        try
+        {
+            var legacyLedger = System.IO.Path.Combine(_targetDataDir, "metacache");
+            if (File.Exists(legacyLedger))
+            {
+                File.Delete(legacyLedger);
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException
+                                     or System.Security.SecurityException or ArgumentException
+                                     or NotSupportedException)
+        {
+        }
+
+        RecordImportDecision(plan, sourceInstances);
         EmitSucceeded();
         return Task.CompletedTask;
+    }
+
+    /// <summary>S3/S7: the completed import lands as an `imported` decision record under the
+    /// actual source name — instances counts the instance directories observed at the source
+    /// BEFORE the transfer ran (planned basis), bytes the planned transfer size (the
+    /// 计划量 vs 实成量 口径 stays open per STATE §4; the planned figure is the reproducible
+    /// one).</summary>
+    private void RecordImportDecision(IReadOnlyList<PrismImportPlanItem> plan, long sourceInstances)
+    {
+        if (_decisions is null)
+        {
+            return;
+        }
+        try
+        {
+            _decisions.Write(new MigrationDecisionRecord
+            {
+                Source = _sourceName,
+                Decision = MigrationDecisionRecord.Imported,
+                At = DateTimeOffset.Now.ToString("o", CultureInfo.InvariantCulture),
+                Mode = _mode switch
+                {
+                    ImportMode.CopyOnWrite => "cow",
+                    ImportMode.Move => "move",
+                    _ => "copy",
+                },
+                Instances = sourceInstances,
+                Bytes = plan.Sum(item => item.Bytes),
+            });
+        }
+        catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException
+                                  or NotSupportedException or System.Security.SecurityException)
+        {
+            // best-effort (the legacy marker write was the same, DataMigration.Decide's
+            // upgrade path included): the data has fully landed — a failed decision-record
+            // write must not report the import itself as failed. The next detect/decide
+            // pass will re-propose the source, which is the honest outcome of a missing
+            // record.
+        }
+    }
+
+    /// <summary>The instance-directory count of the source (the record's planned Instances
+    /// basis — called before any transfer so a same-volume move of instances/ cannot
+    /// undercount).</summary>
+    private long CountSourceInstances()
+    {
+        var instancesDir = System.IO.Path.Combine(_sourceDir, "instances");
+        return Directory.Exists(instancesDir)
+            ? Directory.EnumerateDirectories(instancesDir).Count()
+            : 0;
     }
 
     private static IEnumerable<string> EnumerateFiles(string dir)
@@ -281,12 +364,16 @@ public static class PrismSourceDetector
         int InstancesFound);
 
     /// <summary>Scan the default parents for launcher data directories carrying one of the
-    /// known config files, with the migration decision for the given Flint data directory.</summary>
-    public static IReadOnlyList<PrismSourceCandidate> Detect(string targetDataDir) =>
-        Detect(targetDataDir, DefaultParents());
+    /// known config files, with the migration decision for the given Flint data directory
+    /// (S3: <paramref name="decisions"/> carries the per-source decision records and upgrades
+    /// any legacy marker encountered).</summary>
+    public static IReadOnlyList<PrismSourceCandidate> Detect(string targetDataDir,
+        MigrationDecisionStore? decisions = null) =>
+        Detect(targetDataDir, DefaultParents(), decisions);
 
     /// <summary>Detect over explicit parent directories (tests inject a sandbox root).</summary>
-    public static IReadOnlyList<PrismSourceCandidate> Detect(string targetDataDir, IEnumerable<string> parents)
+    public static IReadOnlyList<PrismSourceCandidate> Detect(string targetDataDir, IEnumerable<string> parents,
+        MigrationDecisionStore? decisions = null)
     {
         var found = new List<PrismSourceCandidate>();
         foreach (var parent in parents)
@@ -313,7 +400,7 @@ public static class PrismSourceDetector
                     ? Directory.EnumerateDirectories(instances).Count()
                     : 0;
                 var decision = DataMigration.Decide(targetDataDir, dir, name,
-                    configFile, "flint.cfg");
+                    configFile, "flint.cfg", decisions);
                 found.Add(new PrismSourceCandidate(dir, name, configFile,
                     ConfigFound: true, MarkerPresent: decision == DataMigration.MigrationDecision.MarkerPresent,
                     TargetHasOwnConfig: decision == DataMigration.MigrationDecision.CurrentDataExists,

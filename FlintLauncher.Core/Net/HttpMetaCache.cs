@@ -3,6 +3,7 @@
 // format is kept byte-compatible with PrismLauncher's "metacache" JSON (version "1").
 using System.Text.Json;
 using System.Text.Json.Nodes;
+
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 
@@ -12,9 +13,12 @@ public sealed class MetaEntry
 {
     private bool _stale = true;
 
-    public string BaseId { get; set; } = "";
+    /// <summary>The cache whose mount table resolves <see cref="GetFullPath"/> (E4: the
+    /// base path is NOT a field on the entry — the storage layer owns the baseId → root
+    /// table and the key → path resolution; the disk format never carried it anyway).</summary>
+    private HttpMetaCache? _owner;
 
-    public string BasePath { get; set; } = "";
+    public string BaseId { get; set; } = "";
 
     public string RelativePath { get; set; } = "";
 
@@ -37,9 +41,25 @@ public sealed class MetaEntry
 
     public void SetStale(bool stale) => _stale = stale;
 
-    public string GetFullPath() => FileSystem.PathCombine(BasePath, RelativePath);
+    /// <summary>Full path of the cached file: resolved LIVE through the owning cache's
+    /// mount table (E4 — remounting a base re-points every entry with it). Fails fast when
+    /// the entry has no owning cache or its base is not registered — the silent fallback
+    /// to a process-CWD-relative path is exactly the E6 defect shape (② lazy bases → CWD
+    /// landing) and must not come back through a side door.</summary>
+    public string GetFullPath()
+    {
+        var owner = _owner ?? throw new InvalidOperationException(
+            "meta entry has no owning cache — resolve it through HttpMetaCache.ResolveEntry");
+        var basePath = owner.GetBasePath(BaseId);
+        return basePath.Length != 0
+            ? FileSystem.PathCombine(basePath, RelativePath)
+            : throw new InvalidOperationException(
+                $"base '{BaseId}' is not registered on the owning meta cache — the composition root must register it");
+    }
 
     public bool IsExpired(long offset) => !IsEternal && CurrentAge >= MaxAge - offset;
+
+    internal void SetOwner(HttpMetaCache? owner) => _owner = owner;
 }
 
 public sealed class HttpMetaCache : IDisposable
@@ -156,8 +176,9 @@ public sealed class HttpMetaCache : IDisposable
             return StaleEntry(baseId, resourcePath);
         }
 
-        // entry passed all the checks we cared about.
-        entry.BasePath = basePath;
+        // entry passed all the checks we cared about. (the base path is not cached on the
+        // entry — E4: GetFullPath resolves through the mount table, so a remount of the
+        // base re-points the entry without a rewrite)
         return entry;
     }
 
@@ -238,9 +259,9 @@ public sealed class HttpMetaCache : IDisposable
         var entry = new MetaEntry
         {
             BaseId = baseId,
-            BasePath = GetBasePath(baseId),
             RelativePath = resourcePath,
         };
+        entry.SetOwner(this);
         entry.SetStale(true);
         return entry;
     }
@@ -251,74 +272,71 @@ public sealed class HttpMetaCache : IDisposable
         {
             return;
         }
-        JsonDocument doc;
+        JsonNode? root;
         try
         {
-            doc = JsonDocument.Parse(File.ReadAllText(_indexFile));
+            root = JsonNode.Parse(File.ReadAllText(_indexFile));
         }
         catch (JsonException)
         {
             return;
         }
-        using (doc)
+        if (root is not JsonObject rootObj)
         {
-            var root = doc.RootElement;
-            if (root.ValueKind != JsonValueKind.Object)
+            return;
+        }
+        if (GetStr(rootObj, "version") != "1")
+        {
+            return;
+        }
+        if (rootObj["entries"] is not JsonArray array)
+        {
+            return;
+        }
+        lock (_lock)
+        {
+            foreach (var elementObj in array)
             {
-                return;
-            }
-            if (GetStr(root, "version") != "1")
-            {
-                return;
-            }
-            if (!root.TryGetProperty("entries", out var array) || array.ValueKind != JsonValueKind.Array)
-            {
-                return;
-            }
-            lock (_lock)
-            {
-                foreach (var elementObj in array.EnumerateArray())
+                if (elementObj is not JsonObject entryObj)
                 {
-                    if (elementObj.ValueKind != JsonValueKind.Object)
-                    {
-                        continue;
-                    }
-                    var baseId = GetStr(elementObj, "base");
-                    if (!_basePaths.ContainsKey(baseId))
-                    {
-                        continue;
-                    }
-                    var entry = new MetaEntry
-                    {
-                        BaseId = baseId,
-                        RelativePath = GetStr(elementObj, "path"),
-                        Md5Sum = GetStr(elementObj, "md5sum"),
-                        Etag = GetStr(elementObj, "etag"),
-                        LocalChangedTimestamp = (long)GetDouble(elementObj, "last_changed_timestamp"),
-                        RemoteChangedTimestamp = GetStr(elementObj, "remote_changed_timestamp"),
-                        IsEternal = GetBool(elementObj, "eternal"),
-                    };
-                    if (!entry.IsEternal)
-                    {
-                        entry.CurrentAge = (long)GetDouble(elementObj, "current_age");
-                        entry.MaxAge = (long)GetDouble(elementObj, "max_age");
-                    }
-                    // presumed innocent until closer examination
-                    entry.SetStale(false);
-                    _entries[baseId][entry.RelativePath] = entry;
+                    continue;
                 }
+                var baseId = GetStr(entryObj, "base");
+                if (!_basePaths.ContainsKey(baseId))
+                {
+                    continue;
+                }
+                var entry = new MetaEntry
+                {
+                    BaseId = baseId,
+                    RelativePath = GetStr(entryObj, "path"),
+                    Md5Sum = GetStr(entryObj, "md5sum"),
+                    Etag = GetStr(entryObj, "etag"),
+                    LocalChangedTimestamp = (long)GetDouble(entryObj, "last_changed_timestamp"),
+                    RemoteChangedTimestamp = GetStr(entryObj, "remote_changed_timestamp"),
+                    IsEternal = GetBool(entryObj, "eternal"),
+                };
+                if (!entry.IsEternal)
+                {
+                    entry.CurrentAge = (long)GetDouble(entryObj, "current_age");
+                    entry.MaxAge = (long)GetDouble(entryObj, "max_age");
+                }
+                // presumed innocent until closer examination
+                entry.SetOwner(this);
+                entry.SetStale(false);
+                _entries[baseId][entry.RelativePath] = entry;
             }
         }
     }
 
-    private static string GetStr(JsonElement obj, string key, string def = "") =>
-        obj.TryGetProperty(key, out var v) ? JsonUtils.EnsureString(v, def) : def;
+    private static string GetStr(JsonObject obj, string key, string def = "") =>
+        JsonUtils.EnsureString(obj[key], def);
 
-    private static bool GetBool(JsonElement obj, string key, bool def = false) =>
-        obj.TryGetProperty(key, out var v) ? JsonUtils.EnsureBoolean(v, def) : def;
+    private static bool GetBool(JsonObject obj, string key, bool def = false) =>
+        JsonUtils.EnsureBoolean(obj[key], def);
 
-    private static double GetDouble(JsonElement obj, string key, double def = 0) =>
-        obj.TryGetProperty(key, out var v) ? JsonUtils.EnsureDouble(v, def) : def;
+    private static double GetDouble(JsonObject obj, string key, double def = 0) =>
+        JsonUtils.EnsureDouble(obj[key], def);
 
     public void SaveEventually()
     {

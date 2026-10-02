@@ -20,11 +20,13 @@ public sealed class FlintConfig
     public string LauncherAppBinaryName { get; init; } = "flint";
     public string LauncherDisplayName { get; init; } = "Flint Launcher";
     public string LauncherCopyright { get; init; } = "© 2026 Flint Contributors";
-    /// <summary>Domain of the upstream services Flint consumes (meta server, news, translations).</summary>
+    /// <summary>Domain of the upstream services Flint consumes (meta server, translations).</summary>
     public string LauncherDomain { get; init; } = "prismlauncher.org";
     /// <summary>
-    /// Global config file name. Prism uses "prismlauncher.cfg"; Flint writes "flint.cfg" and
-    /// imports the Prism/PolyMC/MultiMC config on first run (port of DataMigrationTask, planned P7).
+    /// Global config file name. Prism uses "prismlauncher.cfg"; Flint's own historical name
+    /// was "flint.cfg" — since CONFIG C5 the global config is flint.json and this name is
+    /// the IMPORT-ONLY chain anchor (FlintConfigImporter probe order) plus the legacy
+    /// migration filter term; Flint never writes it.
     /// </summary>
     public string LauncherConfigFile { get; init; } = "flint.cfg";
     public string LauncherGit { get; init; } = "https://github.com/PrismLauncher/PrismLauncher";
@@ -56,8 +58,7 @@ public sealed class FlintConfig
     // ---- URLs (kept identical to Prism so data and metadata stay compatible) ---
 
     public string UpdaterGithubRepo { get; init; } = "https://github.com/PrismLauncher/PrismLauncher";
-    public string NewsRssUrl { get; init; } = "https://prismlauncher.org/feed/feed.xml";
-    public string NewsOpenUrl { get; init; } = "https://prismlauncher.org/news";
+    // (the news feed URLs left with CACHE E7 — the checker they fed is deleted)
     public string WikiUrl { get; init; } = "https://prismlauncher.org/wiki/";
     public string HelpUrl { get; init; } = "https://prismlauncher.org/wiki/help-pages/%1";
     public string LoginCallbackUrl { get; init; } = "https://prismlauncher.org/successful-login";

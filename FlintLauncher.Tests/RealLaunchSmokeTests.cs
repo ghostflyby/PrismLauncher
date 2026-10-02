@@ -30,18 +30,15 @@ public class RealLaunchSmokeTests
 
         // Pre-seed the java probe results so CheckJava skips the JavaCheck.jar run (exactly the
         // state of an instance whose java was already checked by a previous launch): the stored
-        // signature must equal ComputeJavaSignature(mtime, path).
+        // signature must equal ComputeJavaSignature(mtime, path). Since CONFIG C9/S5 the probe
+        // cache lives in launcher-state.json, seeded through the fixture's state store.
         var javaPath = WriteFakeJava(root);
         var javaUnixTime = new DateTimeOffset(File.GetLastWriteTimeUtc(javaPath)).ToUnixTimeMilliseconds();
-        // JavaPath is a gated override: the gate must be on for the instance-level value to
-        // apply (real Prism instance.cfg files carry OverrideJavaLocation=true the same way).
-        instance.Settings().Set("OverrideJavaLocation", true);
+        // JavaPath is the instance-layer override: writing the member IS the override (the
+        // derived OverrideJavaLocation gate reads true — C7; real Prism instance.cfg files
+        // carry the same override as a gated value).
         instance.Settings().Set("JavaPath", javaPath);
-        instance.Settings().Set("JavaSignature", FlintLauncher.Core.Launch.Steps.CheckJava.ComputeJavaSignature(javaUnixTime, javaPath));
-        instance.Settings().Set("JavaVersion", "17.0.2");
-        instance.Settings().Set("JavaArchitecture", "64");
-        instance.Settings().Set("JavaRealArchitecture", "arm64");
-        instance.Settings().Set("JavaVendor", "smoke");
+        fixture.SeedJavaDetection(javaPath, javaUnixTime, vendor: "smoke");
 
         // Resolve the REAL NewLaunch.jar/JavaCheck.jar built by the BuildJavaJars MSBuild target
         // (the fake java ignores the classpath; CheckJava requires JavaCheck.jar to exist).
@@ -130,7 +127,11 @@ public class RealLaunchSmokeTests
         // assembly needs a resolved component profile, which offline needs the meta cache
         // (in the deployed host the CWD is the data dir, so CWD/meta IS the Prism cache).
         var global = new GlobalLaunchSettingsStub();
-        var instance = new MinecraftInstance(global, new IniSettingsObject(Path.Combine(instanceDir, "instance.cfg")), instanceDir);
+        // D4: the real Prism instance loads read-only through the typed layer stack (the
+        // instance.cfg imports in memory; nothing materializes)
+        var instance = new MinecraftInstance(
+            new FlintLauncher.Core.Config.InstanceJsonSettingsObject(instanceDir, global.Environment),
+            instanceDir);
         _ = instance.Settings();
         var reload = await instance.GetPackProfile().ReloadAsync(FlintLauncher.Core.Net.NetMode.Offline);
         if (!reload.Ok)

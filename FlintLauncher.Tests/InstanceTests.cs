@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Tests for the BaseInstance/MinecraftInstance ports. Everything synthetic (temp dirs);
-// instance.cfg persistence is exercised through the real QSettings-compatible INI layer.
+// Tests for the BaseInstance/MinecraftInstance ports over the typed layer stack (D4):
+// instance.json (settings+identity) and instance-state.json (the runtime time trio) —
+// everything synthetic (temp dirs). The dual-track guarantee is exercised directly: a
+// Prism-format instance.cfg is READ-ONLY on load and only converts on the first write.
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Settings;
+using FlintLauncher.Web;
 using Xunit;
 
 namespace Flint.Tests;
@@ -11,7 +15,7 @@ namespace Flint.Tests;
 public class InstanceTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-inst-{Guid.NewGuid():N}");
-    private readonly GlobalSettingsStub _global = new();
+    private readonly TestGlobalSettings _global = new();
     private readonly string _cfgPath;
 
     public InstanceTests()
@@ -31,11 +35,13 @@ public class InstanceTests : IDisposable
         }
     }
 
-    private MinecraftInstance CreateInstance()
-    {
-        var settings = new IniSettingsObject(_cfgPath);
-        return new MinecraftInstance(_global, settings, _root);
-    }
+    private string JsonPath => Path.Combine(_root, "instance.json");
+    private string StatePath => Path.Combine(_root, "instance-state.json");
+
+    private InstanceJsonSettingsObject Settings() =>
+        new(_root, TestInstanceEnvironment.Default(_global.Store));
+
+    private MinecraftInstance CreateInstance() => new(Settings(), _root);
 
     [Fact]
     public void Defaults_MatchUpstream()
@@ -51,66 +57,82 @@ public class InstanceTests : IDisposable
     }
 
     [Fact]
-    public void NameIconNotes_PersistToInstanceCfg()
+    public void Identity_PersistsToInstanceJson()
     {
         var instance = CreateInstance();
         instance.SetName("My Test");
         instance.SetIconKey("custom-icon");
         instance.SetNotes("some notes\nwith a newline");
-        instance.SaveNow();
 
-        var reloaded = new MinecraftInstance(_global, new IniSettingsObject(_cfgPath), _root);
+        // the write landed in instance.json (the INI write path is gone, C5/D4)
+        Assert.True(File.Exists(JsonPath));
+        Assert.False(File.Exists(_cfgPath)); // nothing ever wrote an instance.cfg
+        Assert.Contains("My Test", File.ReadAllText(JsonPath));
+
+        var reloaded = new MinecraftInstance(Settings(), _root);
         Assert.Equal("My Test", reloaded.Name());
         Assert.Equal("custom-icon", reloaded.IconKey());
         Assert.Equal("some notes\nwith a newline", reloaded.Notes());
-
-        var text = File.ReadAllText(_cfgPath);
-        Assert.Contains("name=My Test", text);
     }
 
     [Fact]
-    public void InstanceType_ForcedToOneSix()
+    public void InstanceType_DefaultsToOneSix()
     {
         var instance = CreateInstance();
-        // loadSpecificSettings runs lazily through Settings()
+        // loadSpecificSettings runs lazily through Settings(); the record default IS OneSix
+        // — nothing force-writes the type anymore (a non-OneSix type never constructs a
+        // MinecraftInstance; InstanceList yields NullInstance instead)
         _ = instance.Settings();
         Assert.Equal("OneSix", instance.InstanceType());
-        Assert.Contains("InstanceType=OneSix", File.ReadAllText(_cfgPath));
+        // the only thing a fresh construction persists is the generated uuid identity —
+        // no InstanceType write, no INI
+        Assert.DoesNotContain("InstanceType", File.ReadAllText(JsonPath));
+        Assert.False(File.Exists(_cfgPath));
     }
 
     [Fact]
-    public void CommandOverrides_ResolveThroughGate()
+    public void CommandOverrides_ResolveThroughTheFold()
     {
         _global.StubSet("PreLaunchCommand", "echo global");
         var instance = CreateInstance();
 
-        // gate off -> global value
+        // instance layer unset -> the user layer's value (the C7 fold)
         Assert.Equal("echo global", instance.GetPreLaunchCommand());
 
-        // gate on -> local value
-        instance.Settings().Set("OverrideCommands", true);
+        // instance-layer write -> the override (the gate DEGENERATED to member-set, C7:
+        // there is no separate OverrideCommands write; the derived gate reads true)
         instance.Settings().Set("PreLaunchCommand", "echo local");
         Assert.Equal("echo local", instance.GetPreLaunchCommand());
+        Assert.True(Variant.AsBool(instance.Settings().Get("OverrideCommands")));
 
-        instance.SaveNow();
-        var text = File.ReadAllText(_cfgPath);
-        Assert.Contains("OverrideCommands=true", text);
-        Assert.Contains("PreLaunchCommand=echo local", text);
+        // persisted to instance.json and reloaded
+        var reloaded = new MinecraftInstance(Settings(), _root);
+        Assert.Equal("echo local", reloaded.GetPreLaunchCommand());
+
+        // reset -> member null -> inherits the user layer again
+        reloaded.Settings().Reset("PreLaunchCommand");
+        Assert.Equal("echo global", reloaded.GetPreLaunchCommand());
+        Assert.False(Variant.AsBool(reloaded.Settings().Get("OverrideCommands")));
     }
 
     [Fact]
-    public void MemoryOverride_GatedWrite()
+    public void MemoryOverride_InstanceLayerWrite()
     {
         var instance = CreateInstance();
-        // gate off -> global default
+        // unset -> the user layer's seeded value
         Assert.Equal(4096, Variant.AsInt(instance.Settings().Get("MaxMemAlloc")));
+        Assert.False(Variant.AsBool(instance.Settings().Get("OverrideMemory")));
 
-        instance.Settings().Set("OverrideMemory", true);
         instance.Settings().Set("MaxMemAlloc", 8192);
-        instance.SaveNow();
-
         Assert.Equal(8192, Variant.AsInt(instance.Settings().Get("MaxMemAlloc")));
-        Assert.Contains("MaxMemAlloc=8192", File.ReadAllText(_cfgPath));
+        // the derived gate: a set family member IS the override (C7)
+        Assert.True(Variant.AsBool(instance.Settings().Get("OverrideMemory")));
+        Assert.Contains("8192", File.ReadAllText(JsonPath));
+
+        // gate-write false clears the family back to inheritance
+        instance.Settings().Set("OverrideMemory", false);
+        Assert.Equal(4096, Variant.AsInt(instance.Settings().Get("MaxMemAlloc")));
+        Assert.False(Variant.AsBool(instance.Settings().Get("OverrideMemory")));
     }
 
     [Fact]
@@ -174,19 +196,27 @@ public class InstanceTests : IDisposable
     }
 
     [Fact]
-    public void Playtime_AccumulatesOnRunningToggle()
+    public void Playtime_AccumulatesIntoInstanceStateFile()
     {
         var instance = CreateInstance();
         Assert.Equal(0, instance.TotalTimePlayed());
+        // construction persisted the fresh identity (uuid) — which converts the whole
+        // instance, state side included (zeros)
 
         instance.SetMinecraftRunning(true);
         Assert.Equal(0, instance.TotalTimePlayed()); // reset base while running
         Assert.True(instance.LastLaunch() > 0);
+        Assert.True(File.Exists(StatePath)); // the launch stamped instance-state.json (D4)
 
         instance.SetMinecraftRunning(false);
-        // ~0 seconds elapsed, but the keys must have been written
+        // ~0 seconds elapsed, but the state file must carry the bookkeeping
         Assert.True(instance.TotalTimePlayed() >= 0);
         Assert.True(Variant.AsLong(instance.Settings().Get("lastTimePlayed")) >= 0);
+
+        // the trio survives a reload (instance-state.json, not instance.json)
+        var reloaded = new MinecraftInstance(Settings(), _root);
+        Assert.Equal(instance.TotalTimePlayed(), reloaded.TotalTimePlayed());
+        Assert.Equal(instance.LastLaunch(), reloaded.LastLaunch());
     }
 
     [Fact]
@@ -196,8 +226,11 @@ public class InstanceTests : IDisposable
         var instance = CreateInstance();
         instance.SetMinecraftRunning(true);
         instance.SetMinecraftRunning(false);
-        // RecordGameTime=false: no bookkeeping at all (upstream returns early)
+        // RecordGameTime=false: no bookkeeping at all (upstream returns early) — the state
+        // file (materialized by the identity write) still carries zeros
         Assert.Equal(0, instance.LastLaunch());
+        Assert.Equal(0, instance.TotalTimePlayed());
+        Assert.Equal(0, Variant.AsLong(instance.Settings().Get("lastTimePlayed")));
     }
 
     [Fact]
@@ -205,7 +238,9 @@ public class InstanceTests : IDisposable
     {
         var instance = CreateInstance();
         instance.Settings().Set("AutomaticJava", true);
-        instance.Settings().Set("OverrideJavaLocation", true);
+        // C7: the gate is the member — an explicit JavaPath at the instance layer
+        instance.Settings().Set("JavaPath", "/opt/pinned-jdk");
+        Assert.True(Variant.AsBool(instance.Settings().Get("OverrideJavaLocation")));
         _global.StubSet("AutomaticJavaSwitch", true);
 
         instance.SetManagedPack("modrinth", "id1", "Pack", "vid", "1.0.0");
@@ -213,87 +248,172 @@ public class InstanceTests : IDisposable
         Assert.True(instance.IsManagedPack());
         Assert.Equal("modrinth", instance.GetManagedPackType());
         Assert.Equal("id1", instance.GetManagedPackID());
-        // upstream: managed-pack adoption clears a local AutomaticJava override; with the gate
-        // off, JavaPath resolves through to the global setting again.
+        // managed-pack adoption cleared the instance java-location family: JavaPath resolves
+        // through the fold to the user layer again
         Assert.False(Variant.AsBool(instance.Settings().Get("OverrideJavaLocation")));
         Assert.Equal("java", Variant.AsString(instance.Settings().Get("JavaPath")));
     }
 
     [Fact]
+    public void PrismFormat_CfgIsReadOnlyUntilFirstWrite()
+    {
+        // a Prism-format instance directory (instance.cfg, no instance.json)
+        File.WriteAllLines(_cfgPath,
+        [
+            "[General]",
+            "ConfigVersion=1.3",
+            "name=Prism Inst",
+            "iconKey=grass",
+            "uuid=0123456789abcdef0123456789abcdef",
+            "InstanceType=OneSix",
+            "OverrideMemory=true",
+            "MaxMemAlloc=2048",
+            "lastLaunchTime=1700000000000",
+            "totalTimePlayed=3600",
+            "lastTimePlayed=120",
+        ]);
+
+        var instance = new MinecraftInstance(Settings(), _root);
+        // reads come from the in-memory cfg import (C7 gate honored: gate=true keeps the value)
+        Assert.Equal("Prism Inst", instance.Name());
+        Assert.Equal("grass", instance.IconKey());
+        Assert.Equal("0123456789abcdef0123456789abcdef", instance.Uuid);
+        Assert.Equal(2048, Variant.AsInt(instance.Settings().Get("MaxMemAlloc")));
+        Assert.True(Variant.AsBool(instance.Settings().Get("OverrideMemory")));
+        Assert.Equal(1700000000000, instance.LastLaunch());
+        Assert.Equal(3600, instance.TotalTimePlayed());
+        // read-only: neither the config nor the state was materialized by the load
+        Assert.False(File.Exists(JsonPath));
+        Assert.False(File.Exists(StatePath));
+
+        // the FIRST WRITE converts: the imported payload (uuid verbatim) becomes instance.json
+        instance.SetNotes("converted");
+        Assert.True(File.Exists(JsonPath));
+        Assert.True(File.Exists(StatePath)); // the trio moved to the state file on first write
+        var converted = File.ReadAllText(JsonPath);
+        Assert.Contains("converted", converted);
+        Assert.Contains("0123456789abcdef0123456789abcdef", converted); // uuid survives (D2/D4)
+        // the cfg is never rewritten or deleted (read-compat), but instance.json now wins
+        Assert.Contains("name=Prism Inst", File.ReadAllText(_cfgPath));
+
+        var reloaded = new MinecraftInstance(Settings(), _root);
+        Assert.Equal("converted", reloaded.Notes());
+        Assert.Equal("0123456789abcdef0123456789abcdef", reloaded.Uuid);
+        Assert.Equal(2048, Variant.AsInt(reloaded.Settings().Get("MaxMemAlloc")));
+        Assert.Equal(3600, reloaded.TotalTimePlayed());
+    }
+
+    [Fact]
+    public void PrismFormat_GateFalse_DropsIntoInheritance()
+    {
+        // gate=false values are treated as unset on import (C7) — the user layer's value wins
+        File.WriteAllLines(_cfgPath,
+        [
+            "[General]",
+            "name=Gate Inst",
+            "OverrideMemory=false",
+            "MaxMemAlloc=2048",
+        ]);
+
+        var instance = new MinecraftInstance(Settings(), _root);
+        Assert.False(Variant.AsBool(instance.Settings().Get("OverrideMemory")));
+        Assert.Equal(4096, Variant.AsInt(instance.Settings().Get("MaxMemAlloc"))); // user layer
+    }
+
+    [Fact]
+    public void PrismFormat_QSettingsKeyOrder_ValuesBeforeGates_StillImport()
+    {
+        // QSettings writes instance.cfg keys in ORDINAL order, so the member keys (JavaPath,
+        // JvmArgs, LowMemWarning, MaxMemAlloc, MinMemAlloc) all precede their Override* gate
+        // keys. The gate must be decided by the Override* keys only — a member value like
+        // "8192" (AsBool=false) must never disable its own family.
+        File.WriteAllLines(_cfgPath,
+        [
+            "[General]",
+            "name=Ordered Inst",
+            "JavaPath=/opt/jdk-21/bin/java",
+            "JvmArgs=-Xss1m",
+            "LowMemWarning=false",
+            "MaxMemAlloc=8192",
+            "MinMemAlloc=1024",
+            "OverrideJavaArgs=true",
+            "OverrideJavaLocation=true",
+            "OverrideMemory=true",
+        ]);
+
+        var instance = new MinecraftInstance(Settings(), _root);
+        Assert.Equal("/opt/jdk-21/bin/java", Variant.AsString(instance.Settings().Get("JavaPath")));
+        Assert.Equal("-Xss1m", Variant.AsString(instance.Settings().Get("JvmArgs")));
+        Assert.Equal(8192, Variant.AsInt(instance.Settings().Get("MaxMemAlloc")));
+        Assert.Equal(1024, Variant.AsInt(instance.Settings().Get("MinMemAlloc")));
+        Assert.False(Variant.AsBool(instance.Settings().Get("LowMemWarning")));
+        Assert.True(Variant.AsBool(instance.Settings().Get("OverrideMemory")));
+        Assert.True(Variant.AsBool(instance.Settings().Get("OverrideJavaLocation")));
+        Assert.True(Variant.AsBool(instance.Settings().Get("OverrideJavaArgs")));
+    }
+
+    [Fact]
+    public void PrismFormat_ValueKeyCannotPolluteAnExplicitFalseGate()
+    {
+        // the reverse direction: a member key must never flip a gate the cfg set to false —
+        // a Prism instance that explicitly does NOT override memory must not load as one
+        File.WriteAllLines(_cfgPath,
+        [
+            "[General]",
+            "name=No Override",
+            "LowMemWarning=true",
+            "OverrideMemory=false",
+        ]);
+
+        var instance = new MinecraftInstance(Settings(), _root);
+        Assert.False(Variant.AsBool(instance.Settings().Get("OverrideMemory")));
+        // the orphaned value was dropped (gate=false), the seeded user-layer default applies
+        Assert.True(Variant.AsBool(instance.Settings().Get("LowMemWarning")));
+    }
+
+    [Fact]
+    public void PrismFormat_AbsentGate_DropsIntoInheritance()
+    {
+        // a layered value whose gate key is absent resolves like the C++ OverrideSetting with
+        // its registered default (false): through to the user layer
+        File.WriteAllLines(_cfgPath,
+        [
+            "[General]",
+            "name=No Gate Key",
+            "MaxMemAlloc=8192",
+        ]);
+
+        var instance = new MinecraftInstance(Settings(), _root);
+        Assert.False(Variant.AsBool(instance.Settings().Get("OverrideMemory")));
+        Assert.Equal(4096, Variant.AsInt(instance.Settings().Get("MaxMemAlloc"))); // user layer
+    }
+
+    [Fact]
+    public void LinkedInstances_RoundTripThroughTheTypedLayer()
+    {
+        var instance = CreateInstance();
+        Assert.Empty(instance.GetLinkedInstances());
+
+        instance.AddLinkedInstanceId("11111111111111111111111111111111");
+        instance.AddLinkedInstanceId("22222222222222222222222222222222");
+        Assert.Equal(2, instance.GetLinkedInstances().Count);
+        Assert.True(instance.IsLinkedToInstanceId("22222222222222222222222222222222"));
+        Assert.Contains("22222222222222222222222222222222", File.ReadAllText(JsonPath));
+
+        var reloaded = new MinecraftInstance(Settings(), _root);
+        Assert.Equal(2, reloaded.GetLinkedInstances().Count);
+        Assert.True(reloaded.RemoveLinkedInstanceId("11111111111111111111111111111111"));
+        Assert.Single(reloaded.GetLinkedInstances());
+    }
+
+    [Fact]
     public void NullInstance_IsBrokenByDefault()
     {
-        var settings = new IniSettingsObject(_cfgPath);
-        var instance = new NullInstance(_global, settings, _root);
+        var instance = new NullInstance(Settings(), _root);
         Assert.True(instance.HasVersionBroken);
         Assert.False(instance.CanLaunch());
     }
 
     private static string FileSystemPathCombine(string a, string b) =>
         FlintLauncher.Core.IO.FileSystem.PathCombine(a, b).TrimEnd('/');
-
-    /// <summary>Global settings with every key the instance ctors expect (Application.cpp's set).</summary>
-    private sealed class GlobalSettingsStub : SettingsObject
-    {
-        private readonly Dictionary<string, object?> _values = new();
-
-        public GlobalSettingsStub()
-        {
-            Register("ShowGameTime", true);
-            Register("RecordGameTime", true);
-            Register("PreLoadCommand", "");
-            Register("PreLaunchCommand", "");
-            Register("WrapperCommand", "");
-            Register("PostExitCommand", "");
-            Register("ShowConsole", false);
-            Register("AutoCloseConsole", false);
-            Register("ShowConsoleOnError", false);
-            Register("LogPrePostOutput", true);
-            Register("ConsoleMaxLines", 100000);
-            Register("ConsoleOverflowStop", false);
-            Register("JavaPath", "java");
-            Register("JvmArgs", "");
-            Register("IgnoreJavaCompatibility", false);
-            Register("JavaSignature", "");
-            Register("JavaArchitecture", "");
-            Register("JavaRealArchitecture", "");
-            Register("JavaVersion", "");
-            Register("JavaVendor", "");
-            Register("LaunchMaximized", false);
-            Register("MinecraftWinWidth", 854);
-            Register("MinecraftWinHeight", 480);
-            Register("MinMemAlloc", 512);
-            Register("MaxMemAlloc", 4096);
-            Register("PermGen", 192);
-            Register("LowMemWarning", true);
-            Register("UseNativeOpenAL", false);
-            Register("CustomOpenALPath", "");
-            Register("UseNativeGLFW", false);
-            Register("CustomGLFWPath", "");
-            Register("UseNativeSDL", false);
-            Register("CustomSDLPath", "");
-            Register("EnableFeralGamemode", false);
-            Register("EnableMangoHud", false);
-            Register("UseDiscreteGpu", false);
-            Register("UseZink", false);
-            Register("CloseAfterLaunch", false);
-            Register("QuitAfterGameStop", false);
-            Register("OnlineFixes", false);
-            Register("Env", "{}");
-            Register("AutomaticJavaSwitch", false);
-        }
-
-        private void Register(string id, object? def) => RegisterSetting(id, def);
-
-        public void StubSet(string id, object? value) => _values[id] = value;
-
-        protected override void ChangeSetting(Setting setting, object? value) => _values[setting.Id] = value;
-
-        protected override void ResetSetting(Setting setting) => _values.Remove(setting.Id);
-
-        internal override object? RetrieveValue(Setting setting) => _values.GetValueOrDefault(setting.Id);
-
-        public override void SuspendSave() { }
-
-        public override void ResumeSave() { }
-    }
 }

@@ -12,7 +12,8 @@
 //    TrashHistoryItem stack): FS::trash needs desktop-shell integration which FileSystem.cs
 //    declares not ported. DeleteInstance (hard delete) is ported;
 //  - on_GroupStateChanged stays as <see cref="SetGroupCollapsed"/> because it persists the
-//    group view state into instgroups.json ("hidden").
+//    group view state — since the C8/S5 split into launcher-state.json ("hidden" is machine-
+//    local state now; the group file carries the group definitions only).
 //
 // Deviations from the C++ original:
 //  - the group of an instance lives in InstanceList's own id->group map upstream (C++
@@ -25,22 +26,25 @@
 //    broken instance.
 //  - the group file location: upstream hard-codes QDir::current().filePath("instgroups.json")
 //    (the launcher data dir, where the application chdir'd at startup) with a legacy
-//    fallback inside the primary instance dir. The port defaults to the same CWD path but
-//    the location can be overridden through <see cref="GroupFilePath"/> (tests/embedding).
+//    fallback inside the primary instance dir. Since CONFIG C8 the canonical file is the
+//    config-side groups.json (FlintPaths.GroupsFile) with both legacy instgroups.json
+//    anchors as read-compat fallbacks, and the whole group half lives in the
+//    InstanceGroupModel (GLOBAL G4) — the location can still be pinned through
+//    <see cref="GroupFilePath"/> (tests/embedding).
 //  - instance-dir canonicalization uses Path.GetFullPath (QDir::canonicalPath resolves
 //    symlinks; there is no cheap portable equivalent and the watcher dedup use is dropped).
 //  - on_InstFolderChanged becomes <see cref="SetInstanceDirs"/> and the signal chain it
 //    triggered (instancesChanged -> providerUpdated -> loadList) is collapsed into a direct
 //    LoadList() call.
-//  - migrateTotalPlayTime()'s APPLICATION->playtimeSettings() is the injectable
-//    <see cref="PlaytimeSettings"/>; when it is null the migration is skipped.
+//  - migrateTotalPlayTime()'s APPLICATION->playtimeSettings() becomes the injectable
+//    <see cref="LauncherState"/> (launcher-state.json since S5 — CONFIG C9 retired the
+//    settings keys); when it is null the migration is skipped.
 //  - instance order inside a group of instgroups.json: QSet iteration is unordered upstream,
 //    the port writes ids sorted (ordinal) for deterministic output.
 //  - CommitStagedInstance's override path re-implements FS::overrideFolder as an
 //    overwrite-copy of the staging folder over the destination.
-using System.Text;
+using System.Globalization;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Minecraft;
@@ -59,33 +63,31 @@ public enum InstListError : byte
 
 public class InstanceList
 {
-    /// <summary>g_GROUP_FILE_FORMAT_VERSION.</summary>
-    public const int GroupFileFormatVersion = 1;
-
     private const int MinBackoff = 1;
     private const int MaxBackoff = 16;
 
-    private readonly SettingsObject _globalSettings;
     private readonly List<string> _instDirs = [];
 
     private readonly List<BaseInstance> _instances = [];
-    // id -> refs (C++ m_groupNameCache)
-    private readonly Dictionary<string, int> _groupNameCache = new(StringComparer.Ordinal);
-    // C++ m_instanceGroupIndex: id -> group
-    private readonly Dictionary<string, string> _instanceGroupIndex = new(StringComparer.Ordinal);
     // C++ m_instanceRootDirMap: id -> instance dir that provided it
     private readonly Dictionary<string, string> _instanceRootDirMap = new(StringComparer.Ordinal);
     private readonly HashSet<string> _instanceSet = new(StringComparer.Ordinal);
-    // "" represents the ungrouped "group" (C++ m_collapsedGroups)
-    private readonly HashSet<string> _collapsedGroups = new(StringComparer.Ordinal);
+
+    // D2 inode index: instance uuid <-> the stat(2) inode of its instance dir. Rebuilt on
+    // every LoadList ("索引随 LoadList 重建"); empty on platforms without inode support
+    // (Windows StatInode = 0 — the addressing chain skips the inode link).
+    private readonly Dictionary<string, long> _inodeByUuid = new(StringComparer.Ordinal);
+    private readonly Dictionary<long, string> _uuidByInode = new();
+
+    // G4: the group model is the sole owner of the config-side group file (uuid members)
+    // and the state-side collapse flags; the list only translates instance handles.
+    private readonly InstanceGroupModel _groups;
 
     private bool _groupsLoaded;
     private bool _instancesProbed;
 
-    public InstanceList(SettingsObject globalSettings, IEnumerable<string> instDirs)
+    public InstanceList(IEnumerable<string> instDirs)
     {
-        _globalSettings = globalSettings;
-
         foreach (var dir in instDirs)
         {
             // Create and normalize path (QDir::current().mkpath(dir))
@@ -97,7 +99,19 @@ public class InstanceList
                 _instDirs.Add(canonical);
             }
         }
+
+        _groups = new InstanceGroupModel(
+            CanonicalGroupFile,
+            LegacyGroupFiles,
+            () => LauncherState,
+            canPersist: () => _instancesProbed);
     }
+
+    /// <summary>The typed instance-layer environment (D4): the user-layer flint.json store
+    /// plus the instance.json / instance-state.json type infos. The C++ passed the global
+    /// SettingsObject here; the typed stack replaced it (CONFIG C6/C7). Must be stamped
+    /// before LoadList — discovery cannot build instances without it.</summary>
+    public Core.Config.InstanceEnvironment? Environment { get; set; }
 
     /// <summary>Injected data-directory layout — stamped onto discovered instances (their
     /// asset/library/java anchors) and used for instgroups.json. Set by the composition root.</summary>
@@ -126,15 +140,18 @@ public class InstanceList
     // --------------------------------------------------------------------- configuration
 
     /// <summary>
-    /// C++ APPLICATION->playtimeSettings(), used by the one-shot TotalPlayTime migration;
-    /// null skips the migration (no application singleton in the port).
+    /// The launcher runtime state (launcher-state.json, S5) — the one-shot TotalPlayTime
+    /// migration and the group collapse ("hidden") persistence land here; null skips both
+    /// (no state root in a bare fixture).
     /// </summary>
-    public SettingsObject? PlaytimeSettings { get; set; }
+    public Core.State.LauncherStateStore? LauncherState { get; set; }
 
     /// <summary>
-    /// Location of instgroups.json. Empty (default) reproduces upstream:
-    /// &lt;current working directory&gt;/instgroups.json with a legacy fallback inside the
-    /// primary instance dir.
+    /// Overrides the C8 groups-file location (tests/embedding). When set, it IS the
+    /// canonical file (only the primary-instance-dir legacy copy still falls back).
+    /// Empty (default) uses the config-side anchors: &lt;config-root&gt;/groups.json
+    /// (FlintPaths.GroupsFile, C8) with the legacy data-root instgroups.json and the
+    /// primary-instance-dir instgroups.json as read-compat fallbacks.
     /// </summary>
     public string GroupFilePath { get; set; } = "";
 
@@ -200,6 +217,7 @@ public class InstanceList
         {
             Add(newList);
         }
+        RebuildInodeIndex(); // D2: the inode index follows every (re)discovery
         MigrateTotalPlayTime();
         return InstListError.NoError;
     }
@@ -209,6 +227,69 @@ public class InstanceList
         foreach (var inst in _instances)
         {
             inst.SaveNow();
+        }
+    }
+
+    /// <summary>
+    /// The D2 instance addressing chain (inode → uuid → dirname) — the SINGLE entry point
+    /// through which every endpoint resolves an <c>{ref}</c> parameter (GLOBAL §1 bans the
+    /// direct GetInstanceById use at the API boundary; this is its only caller shape there).
+    /// Unresolved references yield null (the endpoint answers 404).
+    /// </summary>
+    /// <remarks>
+    /// Layer semantics (DATA D2):
+    ///  - <b>inode</b>: first link. Only a pure-numeric reference can name an inode; the
+    ///    index is rebuilt with every LoadList and is empty on platforms without inode
+    ///    support (Windows StatInode returns 0), so the chain transparently skips the link.
+    ///    DOCUMENTED BOUNDARY (D2): a pure-numeric DIRECTORY name that collides with a live
+    ///    inode resolves to the INODE — the directory loses. Probability tends to zero and
+    ///    the collision is resolved deterministically (inode wins) rather than left ambiguous.
+    ///    The index is local-only, never persisted: a rename does not change the inode, so
+    ///    references survive renames across restarts; only cross-filesystem/machine moves
+    ///    and delete+recreate (inode reuse) invalidate it — persistent references are
+    ///    therefore always UUIDs.
+    ///  - <b>uuid</b>: the instance metadata's "uuid" key — the only form allowed in
+    ///    persisted references (group file members, linkedInstances).
+    ///  - <b>dirname</b>: the compatibility last link (and the display form); old clients
+    ///    keep working through it.
+    /// </remarks>
+    public BaseInstance? ResolveInstance(string reference)
+    {
+        if (reference.Length == 0)
+        {
+            return null;
+        }
+        // inode link: a numeric miss falls through (the reference may be a numeric dirname
+        // whose inode is not tracked, or the platform may not track inodes at all)
+        if (long.TryParse(reference, NumberStyles.Integer, CultureInfo.InvariantCulture, out var inode) &&
+            _uuidByInode.TryGetValue(inode, out var inodeUuid) &&
+            FindByUuidOrDirname(inodeUuid) is { } byInode)
+        {
+            return byInode;
+        }
+        return FindByUuidOrDirname(reference);
+    }
+
+    /// <summary>The instance directory's stat inode (D2), 0 when unavailable (Windows, or
+    /// the directory vanished since LoadList).</summary>
+    public long InodeOf(BaseInstance inst) =>
+        _inodeByUuid.GetValueOrDefault(inst.Uuid, 0);
+
+    /// <summary>D2: re-stat every instance dir; the index is local-only and never
+    /// persisted, so a rebuild is always authoritative.</summary>
+    private void RebuildInodeIndex()
+    {
+        _inodeByUuid.Clear();
+        _uuidByInode.Clear();
+        foreach (var inst in _instances)
+        {
+            var inode = FileTransfer.StatInode(inst.InstanceRoot());
+            if (inode == 0)
+            {
+                continue; // platform without inode support (Windows) or a vanished dir
+            }
+            _inodeByUuid[inst.Uuid] = inode;
+            _uuidByInode[inode] = inst.Uuid;
         }
     }
 
@@ -222,6 +303,20 @@ public class InstanceList
         foreach (var inst in _instances)
         {
             if (inst.Id() == id || inst.Uuid == id)
+            {
+                return inst;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>The uuid/directname half of the D2 chain: uuid first (the persistent
+    /// handle), dirname second (compat).</summary>
+    private BaseInstance? FindByUuidOrDirname(string reference)
+    {
+        foreach (var inst in _instances)
+        {
+            if (inst.Uuid == reference || inst.Id() == reference)
             {
                 return inst;
             }
@@ -260,6 +355,9 @@ public class InstanceList
     }
 
     // ---------------------------------------------------------------------- group logic
+    // G4: InstanceGroupModel is the SOLE owner of both halves (config groups file + state
+    // hidden); the list only translates instance handles (dirname/uuid) and raises the
+    // per-instance change notifications around the model's answers.
 
     /// <summary>The group of the instance with the given id ("" when ungrouped).</summary>
     public string GetInstanceGroup(string id)
@@ -269,115 +367,128 @@ public class InstanceList
         {
             return "";
         }
-        return _instanceGroupIndex.TryGetValue(inst.Id(), out var group) ? group : "";
+        EnsureGroupsLoaded();
+        // the member key is the uuid (D3); the dirname fallback covers a staged commit's
+        // transient not-yet-converted member
+        return _groups.GroupOfInstance(inst.Uuid, inst.Id());
     }
 
     public void SetInstanceGroup(string id, string name)
     {
-        // (upstream normalizes an empty non-null QString to null; the port has one empty value)
-        if (name.Length == 0)
-        {
-            name = "";
-        }
-
         var inst = GetInstanceById(id);
         if (inst is null)
         {
             // qDebug() << "Attempt to set a null instance's group"
             return;
         }
-
-        var changed = false;
-        if (_instanceGroupIndex.TryGetValue(inst.Id(), out var current))
+        EnsureGroupsLoaded();
+        if (_groups.SetMemberGroup(inst.Uuid, name))
         {
-            if (current != name)
-            {
-                DecreaseGroupCount(current);
-                _instanceGroupIndex[inst.Id()] = name;
-                changed = true;
-            }
+            InstanceDataChanged?.Invoke(inst);
         }
-        else
-        {
-            changed = true;
-            _instanceGroupIndex[id] = name;
-        }
-
-        if (changed)
-        {
-            IncreaseGroupCount(name);
-            SaveGroupList();
-        }
+        // dedupe: a staged commit whose uuid was unprovable left a dirname-keyed member —
+        // assigned under the uuid now, so the transient form goes (the uuid member keeps
+        // the count above zero, so this cannot uncollapse the group)
+        _groups.RemoveMember(inst.Id());
     }
 
     /// <summary>The non-empty groups that currently have instances (sorted, like QMap keys).</summary>
     public List<string> GetGroups()
     {
-        return _groupNameCache.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList();
+        EnsureGroupsLoaded();
+        return _groups.GroupNames();
     }
 
     public void DeleteGroup(string name)
     {
-        _groupNameCache.Remove(name);
-        _collapsedGroups.Remove(name);
-
-        var removed = false;
-        foreach (var instance in _instances.ToList())
+        EnsureGroupsLoaded();
+        var affected = _groups.DeleteGroup(name);
+        foreach (var member in affected)
         {
-            var instId = instance.Id();
-            if (GetInstanceGroup(instId) == name)
+            if (FindByUuidOrDirname(member) is { } inst)
             {
-                _instanceGroupIndex.Remove(instId);
-                removed = true;
-                InstanceDataChanged?.Invoke(instance);
+                InstanceDataChanged?.Invoke(inst);
             }
-        }
-        if (removed)
-        {
-            SaveGroupList();
         }
     }
 
     public void RenameGroup(string src, string dst)
     {
-        _groupNameCache.Remove(src);
-        if (_collapsedGroups.Remove(src))
+        EnsureGroupsLoaded();
+        var affected = _groups.RenameGroup(src, dst);
+        foreach (var member in affected)
         {
-            _collapsedGroups.Add(dst);
-        }
-
-        var modified = false;
-        foreach (var instance in _instances)
-        {
-            var instId = instance.Id();
-            if (GetInstanceGroup(instId) == src)
+            if (FindByUuidOrDirname(member) is { } inst)
             {
-                _instanceGroupIndex[instId] = dst;
-                IncreaseGroupCount(dst);
-                modified = true;
-                InstanceDataChanged?.Invoke(instance);
+                InstanceDataChanged?.Invoke(inst);
             }
-        }
-        if (modified)
-        {
-            SaveGroupList();
         }
     }
 
-    public bool IsGroupCollapsed(string group) => _collapsedGroups.Contains(group);
+    public bool IsGroupCollapsed(string group)
+    {
+        EnsureGroupsLoaded();
+        return _groups.IsCollapsed(group);
+    }
 
-    /// <summary>Port of the on_GroupStateChanged slot.</summary>
+    /// <summary>Port of the on_GroupStateChanged slot. Only the state side changes (the
+    /// collapse state is launcher-state.json's since C8/S5 — the group file no longer
+    /// carries "hidden"), so there is no config write to order against.</summary>
     public void SetGroupCollapsed(string group, bool collapsed)
     {
-        if (collapsed)
+        EnsureGroupsLoaded();
+        _groups.SetCollapsed(group, collapsed);
+    }
+
+    /// <summary>The group definitions load lazily on first group access (it used to hang
+    /// off the first instance load, but the D3 uuid conversion needs the COMPLETE
+    /// discovery). Retries until a file was parsed — a missing file may still appear
+    /// (e.g. a Prism import landing instgroups.json mid-session).</summary>
+    private void EnsureGroupsLoaded()
+    {
+        if (!_groupsLoaded)
         {
-            _collapsedGroups.Add(group);
+            _groupsLoaded = _groups.Load(ResolveMemberUuid);
         }
-        else
+    }
+
+    /// <summary>D3 import conversion for group-file members: a dirname (the legacy and
+    /// Prism-import form) becomes the instance's uuid; unknown references return null and
+    /// are kept verbatim. The addressing here is deliberately uuid/dirname only — a
+    /// numeric member must not resolve through the inode link.</summary>
+    private string? ResolveMemberUuid(string member) =>
+        member.Length == 0 ? null : GetInstanceById(member)?.Uuid;
+
+    /// <summary>The canonical C8 groups file (the model's write target): the GroupFilePath
+    /// override when pinned, else the config-side groups.json, else the legacy CWD anchor
+    /// of bare fixtures.</summary>
+    private string CanonicalGroupFile()
+    {
+        if (GroupFilePath.Length != 0)
         {
-            _collapsedGroups.Remove(group);
+            return GroupFilePath;
         }
-        SaveGroupList();
+        if (Paths is { } paths)
+        {
+            return paths.GroupsFile;
+        }
+        // legacy CWD anchor — bare fixtures only (the process working directory is not
+        // load-bearing anywhere else)
+        return Path.Combine(Directory.GetCurrentDirectory(), "groups.json");
+    }
+
+    /// <summary>The read-compat instgroups.json anchors, probed in order when the canonical
+    /// file is missing: the pre-C8 data-root copy (the Prism import target) and the
+    /// primary-instance-dir copy upstream used before there was a launcher data dir.</summary>
+    private IReadOnlyList<string> LegacyGroupFiles()
+    {
+        var legacy = new List<string>();
+        if (Paths is { } paths)
+        {
+            legacy.Add(paths.InstgroupsFile);
+        }
+        legacy.Add(FileSystem.PathCombine(PrimaryDir(), "instgroups.json"));
+        return legacy;
     }
 
     // ---------------------------------------------------------------- instance deletion
@@ -391,13 +502,11 @@ public class InstanceList
             return;
         }
 
-        var cachedGroupId = _instanceGroupIndex.GetValueOrDefault(id, "");
-
-        if (_instanceGroupIndex.Remove(id))
-        {
-            DecreaseGroupCount(cachedGroupId);
-            SaveGroupList();
-        }
+        // drop the group membership under BOTH reference forms (the uuid member plus a
+        // possibly not-yet-converted dirname member from a staged commit)
+        EnsureGroupsLoaded();
+        _groups.RemoveMember(inst.Uuid);
+        _groups.RemoveMember(inst.Id());
 
         if (!FileSystem.DeletePath(inst.InstanceRoot()))
         {
@@ -420,7 +529,7 @@ public class InstanceList
     /// </summary>
     public FlintTask WrapInstanceTask(InstanceTask task)
     {
-        return new InstanceStaging(this, task, _globalSettings);
+        return new InstanceStaging(this, task);
     }
 
     /// <summary>
@@ -521,17 +630,28 @@ public class InstanceList
                 return false;
             }
 
-            _instanceGroupIndex[instId] = groupName;
-            IncreaseGroupCount(groupName);
             _instanceRootDirMap[instId] = targetDir;
         }
 
         _instanceSet.Add(instId);
 
+        if (groupName.Length != 0)
+        {
+            // D3: the group file stores UUID references, but the committed folder is not
+            // discovered yet — probe its metadata for the uuid; when unreadable the member
+            // goes in under the raw dirname and the next group load converts it.
+            EnsureGroupsLoaded();
+            var member = ProbeInstanceUuid(destination);
+            if (member.Length == 0)
+            {
+                member = instId;
+            }
+            _groups.SetMemberGroup(member, groupName);
+        }
+
         InstanceListChanged?.Invoke();
         InstanceSelectRequest?.Invoke(instId);
 
-        SaveGroupList();
         return true;
     }
 
@@ -562,7 +682,7 @@ public class InstanceList
 
         if (_groupsLoaded)
         {
-            SaveGroupList();
+            _groups.Save();
         }
         _instDirs.Clear();
         _instDirs.AddRange(newDirs);
@@ -596,7 +716,11 @@ public class InstanceList
             foreach (var entry in rootInfo.EnumerateDirectories("*", options))
             {
                 var subDir = entry.FullName;
-                if (!File.Exists(FileSystem.PathCombine(subDir, "instance.cfg")))
+                // D4 dual-track discovery: a Flint-format directory carries instance.json,
+                // a Prism-format one instance.cfg — both are instances (the cfg stays
+                // read-only until the instance's first write converts it)
+                if (!File.Exists(FileSystem.PathCombine(subDir, "instance.json")) &&
+                    !File.Exists(FileSystem.PathCombine(subDir, "instance.cfg")))
                 {
                     continue;
                 }
@@ -643,30 +767,35 @@ public class InstanceList
 
     private BaseInstance? LoadInstance(string id)
     {
-        if (!_groupsLoaded)
-        {
-            LoadGroupList();
-        }
+        var environment = Environment ??
+            throw new InvalidOperationException(
+                "InstanceList.Environment (the typed instance.json stack) must be stamped before LoadList.");
 
         var instanceRoot = FileSystem.PathCombine(RootDirOf(id), id);
-        var instanceSettings = new IniSettingsObject(FileSystem.PathCombine(instanceRoot, "instance.cfg"));
+        // the typed layer stack (D4): instance.json when present (Flint format), otherwise
+        // the read-only instance.cfg import in memory — no write happens on discovery
+        var instanceSettings = new Core.Config.InstanceJsonSettingsObject(instanceRoot, environment);
+        // register the discriminator before dispatch (BaseInstance would only register it
+        // inside the ctor, which the dispatch below decides)
+        instanceSettings.RegisterSetting("InstanceType", "OneSix");
 
-        instanceSettings.RegisterSetting("InstanceType", "");
-
+        // the format discriminator: instance.json Misc.InstanceType (default OneSix) or the
+        // imported cfg value
         var instType = Variant.AsString(instanceSettings.Get("InstanceType"));
         if (instType.Length != 0 && instType != "OneSix")
         {
             // Upstream (this revision) bails out with nullptr here: the folder is not listed
             // at all. Older MultiMC had dedicated Legacy/OneSixOld instance classes; the port
             // keeps such folders visible as broken instances instead (see the file header).
-            return new NullInstance(_globalSettings, instanceSettings, instanceRoot);
+            return new NullInstance(instanceSettings, instanceRoot);
         }
 
-        var inst = new MinecraftInstance(_globalSettings, instanceSettings, instanceRoot)
+        var inst = new MinecraftInstance(instanceSettings, instanceRoot)
         {
             Paths = Paths,
             MetaCache = MetaCache,
             LaunchServices = LaunchServices,
+            LauncherState = LauncherState,
         };
         return inst;
     }
@@ -682,267 +811,55 @@ public class InstanceList
     }
 
     // -------------------------------------------------------------------- groups file
+    // (G4: the file mechanics — load/save/strip/counts — live in InstanceGroupModel now;
+    // this type keeps only the location anchors above and the uuid conversion delegate.)
 
-    private string GroupFileLocation()
+    /// <summary>The uuid of a just-committed instance folder, read straight from its
+    /// metadata (instance.json identity.uuid first, else the imported instance.cfg uuid
+    /// key — the same precedence discovery uses). Empty = unresolvable: the group member
+    /// is then written under the raw dirname and converted at the next group load.</summary>
+    private static string ProbeInstanceUuid(string instanceRoot)
     {
-        if (GroupFilePath.Length != 0)
-        {
-            return GroupFilePath;
-        }
-        if (Paths is { } paths)
-        {
-            return paths.InstgroupsFile;
-        }
-        // QDir::current().filePath("instgroups.json") — legacy CWD anchor, bare fixtures only
-        return Path.Combine(Directory.GetCurrentDirectory(), "instgroups.json");
-    }
-
-    private void SaveGroupList()
-    {
-        if (!_instancesProbed)
-        {
-            // qDebug: group saving prevented because we don't know the full list of instances yet
-            return;
-        }
-
-        var groupFileName = GroupFileLocation();
-
-        // C++ QMap<QString, QSet<QString>> reverseGroupMap; the port uses sorted containers
-        // for deterministic output
-        var reverseGroupMap = new SortedDictionary<string, SortedSet<string>>(StringComparer.Ordinal);
-        foreach (var (id, group) in _instanceGroupIndex)
-        {
-            if (group.Length == 0)
-            {
-                continue;
-            }
-            if (!reverseGroupMap.TryGetValue(group, out var set))
-            {
-                set = new SortedSet<string>(StringComparer.Ordinal);
-                reverseGroupMap[group] = set;
-            }
-            set.Add(id);
-        }
-
-        var toplevel = new JsonObject();
-        toplevel["formatVersion"] = JsonValue.Create("1"); // QJsonValue(QString("1")) — a string!
-        var groupsArr = new JsonObject();
-        foreach (var (name, list) in reverseGroupMap)
-        {
-            var groupObj = new JsonObject();
-            var instanceArr = new JsonArray();
-            groupObj["hidden"] = _collapsedGroups.Contains(name);
-            foreach (var item in list)
-            {
-                instanceArr.Add((JsonNode)JsonValue.Create(item)!); // non-generic Add: AOT/trimming clean
-            }
-            groupObj["instances"] = instanceArr;
-            groupsArr[name] = groupObj;
-        }
-        toplevel["groups"] = groupsArr;
-        // empty string represents ungrouped "group"
-        if (_collapsedGroups.Contains(""))
-        {
-            var ungrouped = new JsonObject();
-            ungrouped["hidden"] = true;
-            toplevel["ungrouped"] = ungrouped;
-        }
         try
         {
-            FileSystem.Write(groupFileName, Encoding.UTF8.GetBytes(QtJson.ToIndentedString(toplevel) + "\n"));
-        }
-        catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
-                                  or NotSupportedException)
-        {
-            // qCritical: failed to write instance group file
-        }
-    }
-
-    private void LoadGroupList()
-    {
-        _instanceGroupIndex.Clear();
-        _groupNameCache.Clear();
-        _collapsedGroups.Clear();
-
-        var migratingLegacyGroups = false;
-
-        // If there's no group file, try the legacy location.
-        var groupFileName = GroupFileLocation();
-        if (!File.Exists(groupFileName))
-        {
-            var legacyGroupFileName = FileSystem.PathCombine(PrimaryDir(), "instgroups.json");
-            if (!File.Exists(legacyGroupFileName))
+            var jsonPath = FileSystem.PathCombine(instanceRoot, "instance.json");
+            if (File.Exists(jsonPath))
             {
-                return;
-            }
-            groupFileName = legacyGroupFileName;
-            migratingLegacyGroups = true;
-        }
-
-        byte[] jsonData;
-        try
-        {
-            jsonData = FileSystem.Read(groupFileName);
-        }
-        catch (FileSystemException)
-        {
-            // qCritical: failed to read instance group file
-            return;
-        }
-
-        JsonDocument jsonDoc;
-        try
-        {
-            jsonDoc = JsonDocument.Parse(jsonData);
-        }
-        catch (JsonException)
-        {
-            // qCritical: failed to parse instance group file
-            return;
-        }
-
-        using (jsonDoc)
-        {
-            var rootObj = jsonDoc.RootElement;
-
-            // if the root of the json wasn't an object, fail
-            if (rootObj.ValueKind != JsonValueKind.Object)
-            {
-                // qWarning: invalid group file. Root entry should be an object.
-                return;
-            }
-
-            // Make sure the format version matches, otherwise fail.
-            // (QJsonValue::toVariant().toInt() accepts both numbers and numeric strings)
-            if (!TryGetFormatVersion(rootObj, out var formatVersion) || formatVersion != GroupFileFormatVersion)
-            {
-                return;
-            }
-
-            // Get the groups. if it's not an object, fail
-            if (!rootObj.TryGetProperty("groups", out var groupsValue) || groupsValue.ValueKind != JsonValueKind.Object)
-            {
-                // qWarning: invalid group list JSON: 'groups' should be an object.
-                return;
-            }
-
-            foreach (var groupProp in groupsValue.EnumerateObject())
-            {
-                var groupName = groupProp.Name;
-                if (groupName.Length == 0)
+                using var doc = JsonDocument.Parse(FileSystem.Read(jsonPath));
+                if (doc.RootElement.ValueKind == JsonValueKind.Object &&
+                    doc.RootElement.TryGetProperty("identity", out var identity) &&
+                    identity.ValueKind == JsonValueKind.Object &&
+                    identity.TryGetProperty("uuid", out var uuid) &&
+                    uuid.ValueKind == JsonValueKind.String)
                 {
-                    // qWarning: redundant empty group found
-                    continue;
+                    return uuid.GetString() ?? "";
                 }
-                if (groupProp.Value.ValueKind != JsonValueKind.Object)
-                {
-                    // qWarning: group 'X' in the group list should be an object
-                    continue;
-                }
-
-                var groupObj = groupProp.Value;
-                if (!groupObj.TryGetProperty("instances", out var instancesValue) ||
-                    instancesValue.ValueKind != JsonValueKind.Array)
-                {
-                    // qWarning: group 'X' is invalid, it should contain an array called 'instances'
-                    continue;
-                }
-
-                // QJsonValue::toBool(false): only a real JSON true counts
-                var hidden = groupObj.TryGetProperty("hidden", out var hiddenValue) &&
-                             hiddenValue.ValueKind == JsonValueKind.True;
-                if (hidden)
-                {
-                    _collapsedGroups.Add(groupName);
-                }
-
-                foreach (var value in instancesValue.EnumerateArray())
-                {
-                    // QJsonValue::toString() yields "" for non-strings
-                    var instanceId = value.ValueKind == JsonValueKind.String ? value.GetString()! : "";
-                    _instanceGroupIndex[instanceId] = groupName;
-                    IncreaseGroupCount(groupName);
-                }
+                return "";
             }
-
-            var ungroupedHidden = false;
-            if (rootObj.TryGetProperty("ungrouped", out var ungroupedValue) &&
-                ungroupedValue.ValueKind == JsonValueKind.Object &&
-                ungroupedValue.TryGetProperty("hidden", out var ungroupedHiddenValue))
+            var cfgPath = FileSystem.PathCombine(instanceRoot, Core.Config.InstanceIniImporter.LegacyFileName);
+            if (File.Exists(cfgPath))
             {
-                ungroupedHidden = ungroupedHiddenValue.ValueKind == JsonValueKind.True;
+                var ini = new Settings.IniFile();
+                return ini.LoadFile(cfgPath) ? ini.GetString("uuid", "") : "";
             }
-            if (ungroupedHidden)
-            {
-                // empty string represents ungrouped "group"
-                _collapsedGroups.Add("");
-            }
-            _groupsLoaded = true;
         }
-
-        if (migratingLegacyGroups)
+        catch (Exception e) when (e is JsonException or FileSystemException or IOException
+                                  or UnauthorizedAccessException)
         {
-            SaveGroupList();
+            // a broken commit payload simply loses its group assignment until the next load
         }
-    }
-
-    private static bool TryGetFormatVersion(JsonElement rootObj, out int version)
-    {
-        version = 0;
-        if (!rootObj.TryGetProperty("formatVersion", out var value))
-        {
-            return false;
-        }
-        switch (value.ValueKind)
-        {
-            case JsonValueKind.Number:
-                version = value.GetInt32();
-                return true;
-            case JsonValueKind.String:
-                return int.TryParse(value.GetString(), out version);
-            default:
-                return false;
-        }
-    }
-
-    private void IncreaseGroupCount(string group)
-    {
-        if (group.Length == 0)
-        {
-            return;
-        }
-        _groupNameCache.TryGetValue(group, out var count);
-        _groupNameCache[group] = count + 1;
-    }
-
-    private void DecreaseGroupCount(string group)
-    {
-        if (group.Length == 0)
-        {
-            return;
-        }
-        _groupNameCache.TryGetValue(group, out var count);
-        count--;
-        if (count < 1)
-        {
-            _groupNameCache.Remove(group);
-            _collapsedGroups.Remove(group);
-        }
-        else
-        {
-            _groupNameCache[group] = count;
-        }
+        return "";
     }
 
     // ------------------------------------------------------------------ playtime migration
 
     private void MigrateTotalPlayTime()
     {
-        if (PlaytimeSettings is null)
+        if (LauncherState is null)
         {
-            return; // no APPLICATION->playtimeSettings() to migrate into
+            return; // no state root to migrate into
         }
-        if (Variant.AsBool(PlaytimeSettings.Get("TotalPlayTimeMigrated")))
+        if (LauncherState.Current.Playtime.Migrated)
         {
             return;
         }
@@ -956,9 +873,16 @@ public class InstanceList
             }
         }
 
-        var current = Variant.AsLong(PlaytimeSettings.Get("TotalPlayTime"));
-        PlaytimeSettings.Set("TotalPlayTime", current + existingTotal);
-        PlaytimeSettings.Set("TotalPlayTimeMigrated", true);
+        // the add happens inside the update so a concurrent writer cannot lose the totals
+        // (S5: the former TotalPlayTime/TotalPlayTimeMigrated settings keys, CONFIG C9)
+        LauncherState.Update(state => state with
+        {
+            Playtime = new State.PlaytimeState
+            {
+                Total = state.Playtime.Total + existingTotal,
+                Migrated = true,
+            },
+        });
     }
 
     // ------------------------------------------------------------------------ helpers
@@ -989,7 +913,7 @@ public class InstanceList
     /// commits it with the C++ exponential backoff (1..16, in 500ms steps) around the commit
     /// — the defense against Windows antivirus locking freshly written files.
     /// </summary>
-    private sealed class InstanceStaging(InstanceList parent, InstanceTask child, SettingsObject settings) : FlintTask
+    private sealed class InstanceStaging(InstanceList parent, InstanceTask child) : FlintTask
     {
         private readonly string _stagingPath = parent.GetStagedInstancePath(child.TargetDir) ?? "";
 
@@ -1002,7 +926,11 @@ public class InstanceList
             }
 
             child.StagingPath = _stagingPath;
-            child.SetParentSettings(settings);
+            // D4: the typed instance environment (user flint.json store + instance.json
+            // type infos) replaces the former parent SettingsObject handle
+            child.SetParentEnvironment(parent.Environment ??
+                throw new InvalidOperationException(
+                    "InstanceList.Environment (the typed instance.json stack) must be stamped before staging instances."));
 
             await child.StartAsync(cancellationToken);
 

@@ -1,96 +1,127 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Shared test double for the Application-global settings object (the same registration set
-// as the GlobalSettingsStub nested in InstanceTests, which mirrors Application.cpp's set)
-// plus a playtime-settings double for the TotalPlayTime migration.
-using FlintLauncher.Core.Settings;
+// Shared test double for the user layer (flint.json): a REAL FlintConfigStore over a
+// throwaway file, seeded with the same values the former in-memory SettingsObject stub
+// registered — so the tests' expectations keep holding. StubSet is a typed store Set (it
+// persists like production; the C5 importer's write path is the same).
+//
+// D4: the instance layer reads this store as the user layer of its instance.json stack, so
+// the double converts implicitly to the InstanceEnvironment the instance ctors take (type
+// infos from the host's FlintJsonContext — tests reference Web for it).
+using FlintLauncher.Core;
+using FlintLauncher.Core.Config;
+using FlintLauncher.Web;
 
 namespace Flint.Tests;
 
-internal sealed class TestGlobalSettings : SettingsObject
+internal sealed class TestGlobalSettings
 {
-    private readonly Dictionary<string, object?> _values = new();
+    public FlintConfigStore Store { get; }
 
     public TestGlobalSettings()
     {
-        Register("ShowGameTime", true);
-        Register("RecordGameTime", true);
-        Register("PreLoadCommand", "");
-        Register("PreLaunchCommand", "");
-        Register("WrapperCommand", "");
-        Register("PostExitCommand", "");
-        Register("ShowConsole", false);
-        Register("AutoCloseConsole", false);
-        Register("ShowConsoleOnError", false);
-        Register("LogPrePostOutput", true);
-        Register("ConsoleMaxLines", 100000);
-        Register("ConsoleOverflowStop", false);
-        Register("JavaPath", "java");
-        Register("JvmArgs", "");
-        Register("IgnoreJavaCompatibility", false);
-        Register("JavaSignature", "");
-        Register("JavaArchitecture", "");
-        Register("JavaRealArchitecture", "");
-        Register("JavaVersion", "");
-        Register("JavaVendor", "");
-        Register("LaunchMaximized", false);
-        Register("MinecraftWinWidth", 854);
-        Register("MinecraftWinHeight", 480);
-        Register("MinMemAlloc", 512);
-        Register("MaxMemAlloc", 4096);
-        Register("PermGen", 192);
-        Register("LowMemWarning", true);
-        Register("UseNativeOpenAL", false);
-        Register("CustomOpenALPath", "");
-        Register("UseNativeGLFW", false);
-        Register("CustomGLFWPath", "");
-        Register("UseNativeSDL", false);
-        Register("CustomSDLPath", "");
-        Register("EnableFeralGamemode", false);
-        Register("EnableMangoHud", false);
-        Register("UseDiscreteGpu", false);
-        Register("UseZink", false);
-        Register("CloseAfterLaunch", false);
-        Register("QuitAfterGameStop", false);
-        Register("OnlineFixes", false);
-        Register("Env", "{}");
-        Register("AutomaticJavaSwitch", false);
+        Store = CreateStore();
+        // the same seed set the former in-memory stub registered (the tests' expectations
+        // were written against these — deliberately NOT the production defaults)
+        StubSet("ShowGameTime", true);
+        StubSet("RecordGameTime", true);
+        StubSet("PreLoadCommand", "");
+        StubSet("PreLaunchCommand", "");
+        StubSet("WrapperCommand", "");
+        StubSet("PostExitCommand", "");
+        StubSet("ShowConsole", false);
+        StubSet("AutoCloseConsole", false);
+        StubSet("ShowConsoleOnError", false);
+        StubSet("LogPrePostOutput", true);
+        StubSet("ConsoleMaxLines", 100000);
+        StubSet("ConsoleOverflowStop", false);
+        StubSet("JavaPath", "java");
+        StubSet("JvmArgs", "");
+        StubSet("IgnoreJavaCompatibility", false);
+        // NOTE: the java probe quintet is NOT seeded — launcher-state.json owns it (C9)
+        StubSet("LaunchMaximized", false);
+        StubSet("MinecraftWinWidth", 854);
+        StubSet("MinecraftWinHeight", 480);
+        StubSet("MinMemAlloc", 512);
+        StubSet("MaxMemAlloc", 4096);
+        StubSet("PermGen", 192);
+        StubSet("LowMemWarning", true);
+        StubSet("UseNativeOpenAL", false);
+        StubSet("CustomOpenALPath", "");
+        StubSet("UseNativeGLFW", false);
+        StubSet("CustomGLFWPath", "");
+        StubSet("UseNativeSDL", false);
+        StubSet("CustomSDLPath", "");
+        StubSet("EnableFeralGamemode", false);
+        StubSet("EnableMangoHud", false);
+        StubSet("UseDiscreteGpu", false);
+        StubSet("UseZink", false);
+        StubSet("CloseAfterLaunch", false);
+        StubSet("QuitAfterGameStop", false);
+        StubSet("OnlineFixes", false);
+        StubSet("Env", "{}");
+        StubSet("AutomaticJavaSwitch", false);
     }
 
-    private void Register(string id, object? def) => RegisterSetting(id, def);
+    /// <summary>A typed store.Set (persists to the throwaway flint.json, like production).</summary>
+    public void StubSet(string key, object? value) => Store.Set(key, value);
 
-    protected override void ChangeSetting(Setting setting, object? value) => _values[setting.Id] = value;
+    /// <summary>The instance-layer environment over this store (the D4 typed stack).</summary>
+    public InstanceEnvironment Environment => new(Store,
+        FlintJsonContext.Default.InstanceConfigFile, FlintJsonContext.Default.InstanceStateFile);
 
-    protected override void ResetSetting(Setting setting) => _values.Remove(setting.Id);
+    public static implicit operator InstanceEnvironment(TestGlobalSettings settings) => settings.Environment;
 
-    internal override object? RetrieveValue(Setting setting) => _values.GetValueOrDefault(setting.Id);
-
-    public override void SuspendSave() { }
-
-    public override void ResumeSave() { }
+    /// <summary>A throwaway user-layer store (fresh flint.json at the record defaults).</summary>
+    public static FlintConfigStore CreateStore() =>
+        new(Path.Combine(Path.GetTempPath(), $"flint-user-{Guid.NewGuid():N}", "flint.json"),
+            FlintJsonContext.Default.FlintConfigFile);
 }
 
-/// <summary>Stand-in for APPLICATION->playtimeSettings() (TotalPlayTime keys).</summary>
-internal sealed class TestPlaytimeSettings : SettingsObject
+/// <summary>The typed instance environment over NO user store (record defaults — the bare
+/// fixture form) for tests that construct instances directly.</summary>
+internal static class TestInstanceEnvironment
 {
-    private readonly Dictionary<string, object?> _values = new();
+    public static InstanceEnvironment Default(FlintConfigStore? user = null) => new(user,
+        FlintJsonContext.Default.InstanceConfigFile, FlintJsonContext.Default.InstanceStateFile);
+}
 
-    public TestPlaytimeSettings()
+/// <summary>A throwaway launcher-state store (the real one over a temp file) for tests that
+/// wire <c>InstanceList.LauncherState</c> — the playtime hook since C9 retired the settings
+/// keys. Created dirs are swept at process exit (tests get no per-store Dispose hook — the
+/// store is handed straight to the instance list).</summary>
+internal static class TestLauncherState
+{
+    private static readonly System.Collections.Concurrent.ConcurrentBag<string> Dirs = [];
+    private static bool _sweepRegistered;
+
+    public static FlintLauncher.Core.State.LauncherStateStore Create()
     {
-        RegisterSetting("TotalPlayTime", 0L);
-        RegisterSetting("TotalPlayTimeMigrated", false);
+        var dir = Path.Combine(Path.GetTempPath(), $"flint-state-{Guid.NewGuid():N}");
+        lock (Dirs)
+        {
+            if (!_sweepRegistered)
+            {
+                _sweepRegistered = true;
+                AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+                {
+                    foreach (var d in Dirs)
+                    {
+                        try
+                        {
+                            Directory.Delete(d, recursive: true);
+                        }
+                        catch (IOException)
+                        {
+                        }
+                        catch (UnauthorizedAccessException)
+                        {
+                        }
+                    }
+                };
+            }
+        }
+        Dirs.Add(dir);
+        return new(Path.Combine(dir, "launcher-state.json"),
+            FlintLauncher.Web.FlintJsonContext.Default.LauncherState);
     }
-
-    public long TotalPlayTime => Variant.AsLong(_values.GetValueOrDefault("TotalPlayTime"));
-
-    public bool TotalPlayTimeMigrated => Variant.AsBool(_values.GetValueOrDefault("TotalPlayTimeMigrated"));
-
-    protected override void ChangeSetting(Setting setting, object? value) => _values[setting.Id] = value;
-
-    protected override void ResetSetting(Setting setting) => _values.Remove(setting.Id);
-
-    internal override object? RetrieveValue(Setting setting) => _values.GetValueOrDefault(setting.Id);
-
-    public override void SuspendSave() { }
-
-    public override void ResumeSave() { }
 }

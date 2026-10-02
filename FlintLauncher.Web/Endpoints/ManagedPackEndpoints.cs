@@ -21,15 +21,15 @@ public static class ManagedPackEndpoints
 {
     public static void MapManagedPack(this IEndpointRouteBuilder api)
     {
-        api.MapGet("/instances/{id}/managedpack", async (string id, LauncherRuntime runtime) =>
+        api.MapGet("/instances/{ref}/managedpack", async (string @ref, LauncherRuntime runtime) =>
         {
             await runtime.InstanceLock.WaitAsync();
             try
             {
                 // the managed-pack metadata lives in instance.cfg on every instance type
-                if (runtime.Instances.GetInstanceById(id) is not { } instance)
+                if (runtime.Instances.ResolveInstance(@ref) is not { } instance)
                 {
-                    return ApiJson.NotFound("instance_not_found", $"no instance '{id}'");
+                    return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
                 }
                 return Results.Ok(new ManagedPackView(
                     instance.IsManagedPack(),
@@ -45,15 +45,15 @@ public static class ManagedPackEndpoints
             }
         });
 
-        api.MapPost("/instances/{id}/managedpack/update-check", async (string id,
+        api.MapPost("/instances/{ref}/managedpack/update-check", async (string @ref,
             HttpContext httpContext, LauncherRuntime runtime) =>
         {
             await runtime.InstanceLock.WaitAsync();
             try
             {
-                if (runtime.Instances.GetInstanceById(id) is not MinecraftInstance instance)
+                if (runtime.Instances.ResolveInstance(@ref) is not MinecraftInstance instance)
                 {
-                    return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
+                    return ApiJson.NotFound("instance_not_found", $"no launchable instance '{@ref}'");
                 }
                 var type = instance.GetManagedPackType().Trim().ToLowerInvariant();
                 if (!instance.IsManagedPack() ||
@@ -72,7 +72,7 @@ public static class ManagedPackEndpoints
                 if (mcVersion.Length == 0)
                 {
                     return ApiJson.Error("instance_unresolved",
-                        $"instance '{id}' has no resolved minecraft version; its components must be resolved first",
+                        $"instance '{@ref}' has no resolved minecraft version; its components must be resolved first",
                         409);
                 }
 

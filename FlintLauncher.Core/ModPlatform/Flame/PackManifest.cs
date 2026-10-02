@@ -60,12 +60,10 @@ public sealed class FlameManifest
     /// Throws <see cref="JsonParseException"/> for non-modpack manifests and unknown versions.</summary>
     public static void LoadManifest(FlameManifest m, string filepath)
     {
-        var doc = JsonUtils.RequireDocumentFromFile(filepath, "manifest.json");
-        if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
+        if (JsonUtils.RequireNodeFromFile(filepath, "manifest.json") is not JsonObject obj)
         {
             throw new JsonParseException("manifest.json is not an object");
         }
-        var obj = JsonNode.Parse(doc.RootElement.GetRawText())!.AsObject();
 
         m.ManifestType = RequireString(obj, "manifestType");
         if (m.ManifestType != "minecraftModpack")
@@ -114,7 +112,7 @@ public sealed class FlameManifest
 
     private static void LoadManifestV1(FlameManifest pack, JsonObject manifest)
     {
-        var mc = RequireObject(manifest, "minecraft");
+        var mc = JsonUtils.RequireObject(manifest, "minecraft");
         LoadMinecraftV1(pack.Minecraft, mc);
 
         pack.Name = OptString(manifest, "name", "Unnamed");
@@ -171,13 +169,6 @@ public sealed class FlameManifest
     private static int RequireInteger(JsonObject parent, string key)
     {
         return JsonUtils.RequireInteger(parent, key);
-    }
-
-    private static JsonObject RequireObject(JsonObject parent, string key)
-    {
-        var element = JsonUtils.RequireObject(parent, key);
-        return JsonNode.Parse(element.GetRawText()) as JsonObject
-            ?? throw new JsonParseException("'" + key + "' is not an object");
     }
 
     private static JsonObject RequireObject(JsonNode node)

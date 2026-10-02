@@ -36,7 +36,10 @@ public sealed class Index : MetaEntity
         if (!_uids.TryGetValue(uid, out var outList) || outList is null)
         {
             outList = new VersionList(uid);
-            outList.SetMetaCache(Cache);
+            if (Cache is { } cache)
+            {
+                outList.SetMetaCache(cache);
+            }
             _uids[uid] = outList;
             _lists.Add(outList);
         }
@@ -70,7 +73,10 @@ public sealed class Index : MetaEntity
         {
             foreach (var list in lists)
             {
-                list.SetMetaCache(Cache);
+                if (Cache is { } cache)
+                {
+                    list.SetMetaCache(cache);
+                }
                 if (_uids.TryGetValue(list.Uid(), out var existing) && existing is not null)
                 {
                     existing.MergeFromIndex(list);

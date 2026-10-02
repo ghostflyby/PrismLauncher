@@ -136,7 +136,7 @@ public sealed class NetRequest : FlintTask
     {
         // Port of the NetJob manual-retry gate (NumberOfManualRetries): a request that failed
         // on the network level (connection refused/reset, DNS, the RequestTimeout idle timeout)
-        // is retried up to Http.ManualRetries times before it finally fails. HTTP error
+        // is retried up to the stack's ManualRetries times before it finally fails. HTTP error
         // statuses are not retried here (the AutoRetry option covers 429/503 like the C++).
         for (var attempt = 0; ; attempt++)
         {
@@ -351,28 +351,4 @@ public sealed class NetRequest : FlintTask
         HttpMethodValue.Trace => System.Net.Http.HttpMethod.Trace,
         _ => System.Net.Http.HttpMethod.Get,
     };
-}
-
-/// <summary>Shared HttpClient for all Flint network activity. TEMPORARY compatibility shim:
-/// delegates to one process-wide default <see cref="NetStack"/> so existing callers and tests
-/// keep their exact semantics while the injection migration (phases B-E) re-points every
-/// consumer at an instance-owned stack; this class is then deleted.</summary>
-public static class Http
-{
-    public static NetStack Default => NetStack.Default;
-
-    public static string UserAgent { get => Default.UserAgent; set => Default.UserAgent = value; }
-
-    public static int ManualRetries { get => Default.ManualRetries; set => Default.ManualRetries = value; }
-
-    public static TimeSpan RequestTimeout { get => Default.RequestTimeout; set => Default.RequestTimeout = value; }
-
-    /// <summary>The proxy configuration currently baked into <see cref="Client"/>.</summary>
-    public static (string Type, string Host, int Port, string User, string Pass) ProxyConfig => Default.ProxyConfig;
-
-    public static HttpClient Client => Default.Client;
-
-    /// <summary>See <see cref="NetStack.Configure"/>.</summary>
-    public static void Configure(string userAgent, string proxyType, string addr, int port,
-        string user, string pass) => Default.Configure(userAgent, proxyType, addr, port, user, pass);
 }

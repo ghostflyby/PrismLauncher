@@ -26,42 +26,54 @@ namespace FlintLauncher.Tests;
 
 // --------------------------------------------------------------------------- host fixture
 
-/// <summary>Like FlintApiHost, but the data dir is created (and seeded) by the caller BEFORE
-/// the host starts — the instance list loads once in the runtime constructor.</summary>
+/// <summary>Like FlintApiHost, but the temp home's data root is created (and seeded) by the
+/// caller BEFORE the host starts — the instance list loads once in the runtime constructor.
+/// The caller passes the home root; instances live under &lt;home&gt;/data/instances (the
+/// G1 home layout).</summary>
 internal sealed class WaveApiHost : IAsyncDisposable
 {
     private readonly WebApplication _app;
     private readonly string _previousCwd;
 
-    private WaveApiHost(WebApplication app, HttpClient client, string dataDir, string previousCwd)
+    private WaveApiHost(WebApplication app, HttpClient client, string homeDir, string dataDir,
+        string previousCwd)
     {
         _app = app;
         Client = client;
+        HomeDir = homeDir;
         DataDir = dataDir;
         _previousCwd = previousCwd;
     }
 
     public HttpClient Client { get; }
 
+    /// <summary>The temp home root (passed as --home-dir; cleaned up on dispose).</summary>
+    public string HomeDir { get; }
+
+    /// <summary>The data root (home layout: &lt;home&gt;/data) — where instances live.</summary>
     public string DataDir { get; }
 
     public string GameRootOf(string folder) =>
         Path.Combine(DataDir, "instances", folder, "minecraft");
 
-    public static async Task<WaveApiHost> StartAsync(string dataDir)
+    public static async Task<WaveApiHost> StartAsync(string homeDir)
     {
+        Directory.CreateDirectory(homeDir);
+        var dataDir = Path.Combine(homeDir, "data");
         Directory.CreateDirectory(dataDir);
         var previousCwd = Environment.CurrentDirectory;
+        // S2: the token is host-injected (--api-token) — no token file exists to read
+        var token = Guid.NewGuid().ToString("N");
         var app = WebHostBuilder.BuildWebApplication(
         [
-            "--data-dir", dataDir,
+            "--home-dir", homeDir,
+            "--api-token", token,
             "--urls", "http://127.0.0.1:0",
         ]);
         await app.StartAsync();
-        var token = File.ReadAllText(Path.Combine(dataDir, ApiAuthService.TokenFileName)).Trim();
         var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
         client.DefaultRequestHeaders.Add("X-Api-Token", token);
-        return new WaveApiHost(app, client, dataDir, previousCwd);
+        return new WaveApiHost(app, client, homeDir, dataDir, previousCwd);
     }
 
     public async Task<HttpResponseMessage> PostAsync<T>(string path, T body) =>
@@ -105,7 +117,7 @@ internal sealed class WaveApiHost : IAsyncDisposable
             Environment.CurrentDirectory = restoreTo;
             try
             {
-                Directory.Delete(DataDir, recursive: true);
+                Directory.Delete(HomeDir, recursive: true);
             }
             catch (DirectoryNotFoundException)
             {
@@ -118,11 +130,15 @@ internal sealed class WaveApiHost : IAsyncDisposable
 
 internal static class WaveSeed
 {
+    /// <summary>The data root's instances dir for a home root (the G1 home layout).</summary>
+    public static string InstancesDir(string homeDir) =>
+        Path.Combine(homeDir, "data", "instances");
+
     /// <summary>A minimal OneSix instance on disk (patches + mmc-pack like the launch e2e);
-    /// must run before the host starts.</summary>
-    public static string Instance(string dataDir, string folder, string name)
+    /// must run before the host starts. <paramref name="homeDir"/> is the temp home root.</summary>
+    public static string Instance(string homeDir, string folder, string name)
     {
-        var instanceRoot = Path.Combine(dataDir, "instances", folder);
+        var instanceRoot = Path.Combine(InstancesDir(homeDir), folder);
         Directory.CreateDirectory(instanceRoot);
         File.WriteAllText(Path.Combine(instanceRoot, "instance.cfg"), $"name={name}\n");
         Directory.CreateDirectory(Path.Combine(instanceRoot, "patches"));
@@ -243,7 +259,8 @@ public class InstanceQueryApiTests : IAsyncDisposable
         WaveSeed.Instance(_dataDir, "loose", "Loose");
         _host = await WaveApiHost.StartAsync(_dataDir);
 
-        // assign groups through the PATCH endpoint (the group field lives in instgroups.json)
+        // assign groups through the PATCH endpoint (the group definitions live in the C8
+        // groups file, members as uuid references)
         await PatchGroup("one", "Packs");
         await PatchGroup("two", "Packs");
 
@@ -251,9 +268,16 @@ public class InstanceQueryApiTests : IAsyncDisposable
             "/api/v1/instances/groups")).RootElement;
         Assert.Equal(1, groups.GetArrayLength());
         Assert.Equal("Packs", groups[0].GetProperty("name").GetString());
+        // DATA D3: the members are uuid references (the persistent form)
+        var uuidOf = await _host.Client.GetStringAsync("/api/v1/instances");
+        var uuids = JsonDocument.Parse(uuidOf).RootElement.EnumerateArray()
+            .Where(e => new[] { "one", "two" }.Contains(e.GetProperty("id").GetString()))
+            .Select(e => e.GetProperty("uuid").GetString())
+            .OrderBy(u => u, StringComparer.Ordinal)
+            .ToList();
         var ids = groups[0].GetProperty("instanceIds").EnumerateArray()
-            .Select(i => i.GetString()).ToList();
-        Assert.Equal(new[] { "one", "two" }, ids);
+            .Select(i => i.GetString()).OrderBy(u => u, StringComparer.Ordinal).ToList();
+        Assert.Equal(uuids, ids);
     }
 }
 
@@ -314,7 +338,7 @@ public class InstanceCopyApiTests : IAsyncDisposable
         Assert.Equal("Copies", list[0].GetProperty("group").GetString());
 
         // the prefs filters: options.txt kept, saves/ + mods/ excluded
-        var copyRoot = Path.Combine(_dataDir, "instances", copyId, "minecraft");
+        var copyRoot = Path.Combine(WaveSeed.InstancesDir(_dataDir), copyId, "minecraft");
         Assert.True(File.Exists(Path.Combine(copyRoot, "options.txt")));
         Assert.False(Directory.Exists(Path.Combine(copyRoot, "saves")));
         Assert.False(Directory.Exists(Path.Combine(copyRoot, "mods")));
@@ -353,7 +377,7 @@ public class WorldApiTests : IAsyncDisposable
     private async Task<WaveApiHost> StartHostWithInstance()
     {
         WaveSeed.Instance(_dataDir, "worlds-inst", "Worlds Inst");
-        WaveSeed.World(Path.Combine(_dataDir, "instances", "worlds-inst", "minecraft", "saves",
+        WaveSeed.World(Path.Combine(WaveSeed.InstancesDir(_dataDir), "worlds-inst", "minecraft", "saves",
             "world_one"), "World One");
         return await WaveApiHost.StartAsync(_dataDir);
     }
@@ -829,7 +853,7 @@ public class ScreenshotApiTests : IAsyncDisposable
         var escape = await _host.Client.DeleteAsync(
             "/api/v1/instances/shots-inst/screenshots/..%2Finstance.cfg");
         Assert.Equal(HttpStatusCode.NotFound, escape.StatusCode);
-        Assert.True(File.Exists(Path.Combine(_dataDir, "instances", "shots-inst", "instance.cfg")));
+        Assert.True(File.Exists(Path.Combine(WaveSeed.InstancesDir(_dataDir), "shots-inst", "instance.cfg")));
     }
 
     [Fact]

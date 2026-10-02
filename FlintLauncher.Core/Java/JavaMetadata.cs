@@ -10,7 +10,6 @@
 // shim used across the Minecraft format layer since P2a) keeps its original
 // FlintLauncher.Core.Minecraft namespace so its many consumers keep compiling; that is also
 // why this file uses classic block-scoped namespaces instead of the file-scoped form.
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
@@ -91,17 +90,14 @@ namespace FlintLauncher.Core.Java
             if (obj.Contains("checksum"))
             {
                 var checksumObj = JsonUtils.RequireObject(obj, "checksum");
-                checksumObj.TryGetProperty("hash", out var hash);
-                meta.ChecksumHash = JsonUtils.EnsureString(hash);
-                checksumObj.TryGetProperty("type", out var type);
-                meta.ChecksumType = JsonUtils.EnsureString(type);
+                meta.ChecksumHash = JsonUtils.EnsureString(checksumObj["hash"]);
+                meta.ChecksumType = JsonUtils.EnsureString(checksumObj["type"]);
             }
 
             if (obj.Contains("version"))
             {
                 var versionObj = JsonUtils.RequireObject(obj, "version");
-                versionObj.TryGetProperty("name", out var nameNode);
-                var name = JsonUtils.EnsureString(nameNode);
+                var name = JsonUtils.EnsureString(versionObj["name"]);
                 // QJsonValue::toInteger() yields 0 for missing/non-numeric members
                 var major = IntegerOr(versionObj, "major");
                 var minor = IntegerOr(versionObj, "minor");
@@ -113,9 +109,9 @@ namespace FlintLauncher.Core.Java
         }
 
         /// <summary>QJsonValue::toInteger(default) on an object member (0 for missing/non-numbers).</summary>
-        private static int IntegerOr(JsonElement obj, string key)
+        private static int IntegerOr(JsonObject obj, string key)
         {
-            return obj.TryGetProperty(key, out var value) ? JsonUtils.EnsureInteger(value) : 0;
+            return JsonUtils.EnsureInteger(obj[key]);
         }
 
         // ------------------------------------------------------------- comparators
@@ -243,24 +239,6 @@ namespace FlintLauncher.Core.Minecraft
         public static int IntegerOr(JsonNode? node, int defaultValue = 0)
         {
             return node is JsonValue value && value.TryGetValue<double>(out var d) && d % 1 == 0 ? (int)d : defaultValue;
-        }
-
-        /// <summary>
-        /// Converts a JsonNode into a JsonElement so the JsonUtils require*/ensure* family applies
-        /// to it (the same bridge JsonUtils uses internally for JsonObject members).
-        /// </summary>
-        public static JsonElement ToElement(this JsonNode? node)
-        {
-            using var doc = JsonDocument.Parse(node?.ToJsonString() ?? "null");
-            // clone so the element outlives the document
-            return doc.RootElement.Clone();
-        }
-
-        /// <summary>Bridges a JsonElement back to a JsonObject (throws when it is not an object).</summary>
-        public static JsonObject ToJsonObject(this JsonElement element)
-        {
-            return JsonNode.Parse(element.GetRawText()) as JsonObject
-                ?? throw new JsonParseException("Value is not an object");
         }
     }
 }

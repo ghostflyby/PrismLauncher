@@ -5,7 +5,7 @@
 //
 // Deviations:
 //  - Upstream is a Net::Request subclass posting through QNetworkAccessManager; the port is a
-//    FlintTask sending the identical request through the shared Http.Client (like
+//    FlintTask sending the identical request through an injected NetStack (like
 //    Skins/SkinUpload.cs), because NetRequest cannot express multipart/JSON Content-Type headers.
 //  - The C++ constructor anonymizes the log in place (logs/AnonymizeLog.cpp); the port applies
 //    the same seven rules in AnonymizeLog() before the request is built.
@@ -52,15 +52,19 @@ public sealed class PasteUpload : FlintTask
     private readonly string _log;
     private readonly string _baseUrl;
     private readonly PasteType _pasteType;
+    private readonly NetStack _net;
 
     /// <summary>Port of PasteUpload::PasteUpload(log, url, pasteType): anonymizes the log,
     /// falls back to the provider default base when url is empty and resolves the request URL
-    /// (with the paste.gg api subdomain HACK kept verbatim).</summary>
-    public PasteUpload(string log, string url, PasteType pasteType)
+    /// (with the paste.gg api subdomain HACK kept verbatim). The request rides the injected
+    /// NetStack (the runtime's — tests may isolate their own; the default falls back to the
+    /// canonical process-wide stack).</summary>
+    public PasteUpload(string log, string url, PasteType pasteType, NetStack? net = null)
     {
         _log = AnonymizeLog(log);
         _baseUrl = url;
         _pasteType = pasteType;
+        _net = net ?? NetStack.Default;
 
         var base_ = PasteTypes[(int)pasteType];
         if (string.IsNullOrEmpty(_baseUrl))
@@ -95,7 +99,7 @@ public sealed class PasteUpload : FlintTask
         HttpResponseMessage response;
         try
         {
-            response = await NetStack.Default.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead,
+            response = await _net.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken).ConfigureAwait(false);
         }
         catch (HttpRequestException e)

@@ -47,16 +47,22 @@ public class MultipleOptionsTask : ConcurrentTask
 
     protected override void UpdateState()
     {
-        // Port of MultipleOptionsTask::updateState().
+        // Port of MultipleOptionsTask::updateState() — stamped like ConcurrentTask's: a
+        // snapshot captured under the gate is emitted only while it is still the freshest.
+        long stamp;
         int doing, done, totalSize;
         lock (_gate)
         {
+            stamp = BeginStateUpdateLocked();
             doing = _doing.Count;
             done = _done.Count;
             totalSize = TotalSizeLocked();
         }
 
-        SetProgress(done, totalSize);
-        EmitStatus($"Attempting task {doing + done} out of {totalSize}");
+        EmitStateUpdate(stamp, () =>
+        {
+            SetProgress(done, totalSize);
+            EmitStatus($"Attempting task {doing + done} out of {totalSize}");
+        });
     }
 }

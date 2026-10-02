@@ -35,8 +35,7 @@ public class AtLauncherTests : IDisposable
 
     public void Dispose()
     {
-        AtLauncherPackInstallTask.MetaVersionDataLookup = null;
-        AtLauncherPackInstallTask.RecommendedLoaderVersionLookup = null;
+        // (the meta lookup hooks are per-task state now — nothing process-global to reset)
         _server.Dispose();
         try
         {
@@ -51,7 +50,7 @@ public class AtLauncherTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList(_global, [instancesDir]);
+        return new InstanceList([instancesDir]) { Environment = _global };
     }
 
     /// <summary>The (uid, version) component list of the created instance's mmc-pack.json;
@@ -66,7 +65,8 @@ public class AtLauncherTests : IDisposable
     }
 
     private async Task<AtLauncherPackInstallTask> RunInstall(AtlPackFixture fixture,
-        IReadOnlyDictionary<string, bool>? optionalSelection = null, string name = "ATL Imported")
+        IReadOnlyDictionary<string, bool>? optionalSelection = null, string name = "ATL Imported",
+        Func<string, string, string, string?>? recommendedLookup = null)
     {
         fixture.Register(_server);
         var list = CreateList();
@@ -77,6 +77,7 @@ public class AtLauncherTests : IDisposable
                 ["Optional Selected"] = true,
                 ["Optional Unselected"] = false,
             },
+            RecommendedLoaderVersionLookup = recommendedLookup,
         };
         task.SetName(name);
         var wrapped = list.WrapInstanceTask(task);
@@ -223,9 +224,9 @@ public class AtLauncherTests : IDisposable
         Assert.True(Directory.Exists(patches));
         Assert.Contains(Directory.GetFiles(patches), f => Path.GetFileName(f).StartsWith("custom.jarmod."));
 
-        // instance.cfg keys + the net.minecraft component from the pack
-        var cfg = File.ReadAllText(Path.Combine(staging, "instance.cfg"));
-        Assert.Contains("name=ATL Imported", cfg);
+        // instance.json identity + the net.minecraft component from the pack (D4)
+        var cfg = File.ReadAllText(Path.Combine(staging, "instance.json"));
+        Assert.Contains("ATL Imported", cfg);
         var components = Components(staging);
         Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.20.1");
         // the jar-mod patch component is registered without a version
@@ -237,9 +238,12 @@ public class AtLauncherTests : IDisposable
 
     private static string? GetManagedType(string staging)
     {
-        var cfg = File.ReadAllLines(Path.Combine(staging, "instance.cfg"));
-        return cfg.Where(l => l.StartsWith("ManagedPackType=", StringComparison.Ordinal))
-            .Select(l => l["ManagedPackType=".Length..]).FirstOrDefault();
+        // D4: managed-pack registration lives in instance.json ("managedPackType")
+        var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "instance.json")));
+        return json.RootElement.TryGetProperty("managed", out var managed) &&
+               managed.TryGetProperty("type", out var type)
+            ? type.GetString()
+            : null;
     }
 
     [Fact]
@@ -399,14 +403,14 @@ public class AtLauncherTests : IDisposable
     public async Task Install_RecommendedLoader_WithLookupHook_ResolvesVersion()
     {
         var fixture = AtlPackFixture.Create("""{"type":"forge","metadata":{"version":"","recommended":true,"latest":false}}""");
-        AtLauncherPackInstallTask.RecommendedLoaderVersionLookup = (uid, loaderType, mcVersion) =>
+        // the lookup hook is per-task (DI): set through RunInstall's initializer below
+        var task = await RunInstall(fixture, name: "ATL Recommended2", recommendedLookup: (uid, loaderType, mcVersion) =>
         {
             Assert.Equal("net.minecraftforge", uid);
             Assert.Equal("forge", loaderType);
             Assert.Equal("1.20.1", mcVersion);
             return "40.2.0";
-        };
-        var task = await RunInstall(fixture, name: "ATL Recommended2");
+        });
 
         Assert.True(task.WasSuccessful, task.FailReason);
         var staging = Path.Combine(_root, "instances", "ATL Recommended2");

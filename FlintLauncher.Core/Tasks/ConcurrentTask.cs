@@ -38,6 +38,16 @@ public class ConcurrentTask : FlintTask
     /// the outcome and start a subtask that should never have run (SequentialTask fail-fast).
     /// </summary>
     private int _pendingCompletions;
+    /// <summary>
+    /// Gate-guarded stamp bumped on every composition mutation (subtask finished / next
+    /// dequeued). UpdateState captures the stamp together with its snapshot; the emission is
+    /// serialized through <see cref="_emitLock"/> and DROPPED when superseded — concurrent
+    /// completions finish their bookkeeping in any order, and without this a slower thread's
+    /// STALE snapshot could be the last status emitted (the C++ got ordering for free from
+    /// the single-threaded event loop; ConcurrentTaskAggregatesProgressTotals caught it).
+    /// </summary>
+    private long _stateStamp;
+    private readonly object _emitLock = new();
 
     public ConcurrentTask(string taskName = "", int maxConcurrent = DefaultMaxConcurrent)
     {
@@ -154,17 +164,26 @@ public class ConcurrentTask : FlintTask
         // single arbiter: it starts queued work, no-ops while slots are busy, and finishes the
         // task once queue and doing are both empty. Sampling between a subtask's removal from
         // _doing and the next start must not be mistaken for "done", hence the yield-and-recheck.
+        // A null entry is a committed reservation (a subtask will run, or its completion
+        // bookkeeping is mid-flight on another thread) — waiting is the only correct move while
+        // one is visible; the driver must never run its own ExecuteNextSubTask on top of it.
         var cancelled = new TaskCompletionSource();
         using (cancellationToken.Register(static state => ((TaskCompletionSource)state!).TrySetResult(), cancelled))
         {
             while (State == TaskState.Running)
             {
                 Task? pending = null;
+                var reserved = false;
                 lock (_gate)
                 {
                     foreach (var runTask in _doing.Values)
                     {
-                        if (runTask is not null && !runTask.IsCompleted)
+                        if (runTask is null)
+                        {
+                            reserved = true;
+                            continue;
+                        }
+                        if (!runTask.IsCompleted)
                         {
                             pending = runTask;
                             break;
@@ -174,10 +193,10 @@ public class ConcurrentTask : FlintTask
 
                 if (pending is null)
                 {
-                    // Wait for in-flight completion bookkeeping before (re)starting anything, so
-                    // the completion handler's decision (e.g. SequentialTask failing the parent)
-                    // is observed atomically by this loop.
-                    if (Volatile.Read(ref _pendingCompletions) > 0)
+                    // Wait for in-flight completion bookkeeping (or a reservation being filled)
+                    // before (re)starting anything, so the completion handler's decision (e.g.
+                    // SequentialTask failing the parent) is observed atomically by this loop.
+                    if (reserved || Volatile.Read(ref _pendingCompletions) > 0)
                     {
                         await Task.Yield();
                         continue;
@@ -222,6 +241,7 @@ public class ConcurrentTask : FlintTask
                 // (C++ inserts into m_doing before the queued child start).
                 _doing[next] = null;
                 _taskProgress[next.Uid] = new TaskStepProgress(next.Uid);
+                _stateStamp++;
             }
             else if (_doing.Count == 0)
             {
@@ -272,12 +292,14 @@ public class ConcurrentTask : FlintTask
 
         // Mirror the C++ Qt::QueuedConnection between a subtask finishing and the parent's
         // bookkeeping; also keeps long chains of synchronous subtasks from recursing deeply.
-        // The completion window is announced so the driver loop does not start new work until
-        // the outcome (success/failure/parent-fail) has been fully applied.
-        await Task.Yield();
+        // The completion window is announced BEFORE the yield parks this continuation: from
+        // this moment the subtask is (or is about to be) terminal, so every observer must see
+        // _pendingCompletions > 0 until the outcome (success/failure/parent-fail) has been
+        // fully applied — no window where a terminal subtask is unannounced.
         Interlocked.Increment(ref _pendingCompletions);
         try
         {
+            await Task.Yield();
             OnSubTaskFinished(next);
         }
         finally
@@ -336,6 +358,7 @@ public class ConcurrentTask : FlintTask
                 _failed[task] = task;
             }
             _doing.Remove(task);
+            _stateStamp++;
 
             // C++ copies the progress entry by value, sets the state and removes it from the map.
             if (_taskProgress.Remove(task.Uid, out var progress))
@@ -466,12 +489,16 @@ public class ConcurrentTask : FlintTask
             : $"Multiple subtasks failed\n{string.Join("\n", failReasons)}");
     }
 
-    /// <summary>Port of ConcurrentTask::updateState().</summary>
+    /// <summary>Port of ConcurrentTask::updateState(). Snapshot and stamp are captured
+    /// atomically under the gate; the emission is stamped so a superseded (older-snapshot)
+    /// update can never be the last one emitted.</summary>
     protected virtual void UpdateState()
     {
+        long stamp;
         int doing, done, queued, totalSize;
         lock (_gate)
         {
+            stamp = ++_stateStamp;
             doing = _doing.Count;
             done = _done.Count;
             queued = _queue.Count;
@@ -480,8 +507,11 @@ public class ConcurrentTask : FlintTask
 
         if (totalSize > 1)
         {
-            SetProgress(done, totalSize);
-            EmitStatus($"Executing {doing} task(s) ({done} out of {totalSize} are done)");
+            EmitStateUpdate(stamp, () =>
+            {
+                SetProgress(done, totalSize);
+                EmitStatus($"Executing {doing} task(s) ({done} out of {totalSize} are done)");
+            });
         }
         else
         {
@@ -498,7 +528,27 @@ public class ConcurrentTask : FlintTask
             {
                 status = "Task finished.";
             }
-            EmitStatus(status);
+            EmitStateUpdate(stamp, () => EmitStatus(status));
+        }
+    }
+
+    /// <summary>Capture a state stamp (gate held): the caller's snapshot is the freshest for
+    /// this stamp until a later gate section bumps it again.</summary>
+    private protected long BeginStateUpdateLocked() => ++_stateStamp;
+
+    /// <summary>Emit one stamped state update. A superseded stamp (a later mutation already
+    /// captured a newer snapshot) is dropped: concurrent completions may reach this point in
+    /// any order, but the LAST emitted status always reflects the LATEST snapshot — and at
+    /// quiescence the latest snapshot's emitter is exactly the one whose check still holds.</summary>
+    private protected void EmitStateUpdate(long stamp, Action emit)
+    {
+        lock (_emitLock)
+        {
+            if (Volatile.Read(ref _stateStamp) != stamp)
+            {
+                return; // a newer snapshot exists — its own update supersedes this one
+            }
+            emit();
         }
     }
 

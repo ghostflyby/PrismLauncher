@@ -23,20 +23,23 @@ using FlintLauncher.Core.Minecraft;
 
 public static class TechnicPackProcessor
 {
-    /// <summary>Port of Technic::TechnicPackProcessor::run (see the header note).</summary>
-    public static string? Run(SettingsObject? globalSettings,
-                              string instName,
-                              string instIcon,
-                              string stagingPath,
-                              string minecraftVersion = "",
-                              bool isSolder = false)
+    /// <summary>Port of Technic::TechnicPackProcessor::run (see the header note). Async:
+    /// the important:true SetComponentVersion calls resolve against the meta index (network),
+    /// so the flow awaits instead of blocking a thread (the former .GetAwaiter().GetResult()
+    /// sync-over-async is retired).</summary>
+    public static async Task<string?> RunAsync(Core.Config.InstanceEnvironment environment,
+        string instName,
+        string instIcon,
+        string stagingPath,
+        string minecraftVersion = "",
+        bool isSolder = false,
+        CancellationToken cancellationToken = default)
     {
         _ = isSolder; // (unused upstream too)
         var minecraftPath = FileSystem.PathCombine(stagingPath, "minecraft");
-        var configPath = FileSystem.PathCombine(stagingPath, "instance.cfg");
-        var instanceSettings = new IniSettingsObject(configPath);
+        // D4: the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
-            globalSettings ?? throw new ArgumentNullException(nameof(globalSettings)), instanceSettings, stagingPath);
+            new Core.Config.InstanceJsonSettingsObject(stagingPath, environment), stagingPath);
 
         instance.SetName(instName);
 
@@ -95,8 +98,8 @@ public static class TechnicPackProcessor
                     {
                         return "Could not find \"version.json\" inside \"bin/modpack.jar\", but Minecraft version is unknown";
                     }
-                    _ = components.SetComponentVersion("net.minecraft", minecraftVersion, important: true)
-                        .GetAwaiter().GetResult();
+                    _ = await components.SetComponentVersion("net.minecraft", minecraftVersion, important: true,
+                            cancellationToken: cancellationToken);
                     _ = components.InstallJarMods([modpackJar]);
 
                     // Forge for 1.4.7 and for 1.5.2 require extra libraries.
@@ -122,8 +125,9 @@ public static class TechnicPackProcessor
                             return "Invalid \"forgeversion.properties\"!";
                         }
 
-                        _ = components.SetComponentVersion("net.minecraftforge",
-                            major + '.' + minor + '.' + revision + '.' + build).GetAwaiter().GetResult();
+                        _ = await components.SetComponentVersion("net.minecraftforge",
+                            major + '.' + minor + '.' + revision + '.' + build,
+                            cancellationToken: cancellationToken);
                     }
 
                     components.SaveNow();
@@ -145,8 +149,8 @@ public static class TechnicPackProcessor
         else
         {
             // This is the "Vanilla" modpack, excluded by the search code
-            _ = components.SetComponentVersion("net.minecraft", minecraftVersion, important: true)
-                .GetAwaiter().GetResult();
+            _ = await components.SetComponentVersion("net.minecraft", minecraftVersion, important: true,
+                    cancellationToken: cancellationToken);
             components.SaveNow();
             return null;
         }
@@ -164,8 +168,8 @@ public static class TechnicPackProcessor
                 }
                 packMinecraftVersion = fmlMinecraftVersion;
             }
-            _ = components.SetComponentVersion("net.minecraft", packMinecraftVersion, important: true)
-                .GetAwaiter().GetResult();
+            _ = await components.SetComponentVersion("net.minecraft", packMinecraftVersion, important: true,
+                    cancellationToken: cancellationToken);
             if (root["libraries"] is JsonArray libraries)
             {
                 foreach (var library in libraries)
@@ -199,7 +203,8 @@ public static class TechnicPackProcessor
                         }
                         if (neoforgeVersion.Length != 0)
                         {
-                            _ = components.SetComponentVersion("net.neoforged", neoforgeVersion).GetAwaiter().GetResult();
+                            _ = await components.SetComponentVersion("net.neoforged", neoforgeVersion,
+                                    cancellationToken: cancellationToken);
                         }
                         break;
                     }
@@ -210,14 +215,14 @@ public static class TechnicPackProcessor
                         var libraryVersion = Section(libraryName, ':', 2);
                         if (!libraryVersion.StartsWith("1.7.10-", StringComparison.Ordinal))
                         {
-                            _ = components.SetComponentVersion("net.minecraftforge", Section(libraryName, '-', 1))
-                                .GetAwaiter().GetResult();
+                            _ = await components.SetComponentVersion("net.minecraftforge", Section(libraryName, '-', 1),
+                                    cancellationToken: cancellationToken);
                         }
                         else
                         {
                             // 1.7.10 versions sometimes look like 1.7.10-10.13.4.1614-1.7.10, this filters out the 10.13.4.1614 part
-                            _ = components.SetComponentVersion("net.minecraftforge", Section(libraryName, '-', 1, 1))
-                                .GetAwaiter().GetResult();
+                            _ = await components.SetComponentVersion("net.minecraftforge", Section(libraryName, '-', 1, 1),
+                                    cancellationToken: cancellationToken);
                         }
                         break;
                     }
@@ -228,8 +233,8 @@ public static class TechnicPackProcessor
                         {
                             if (libraryName.StartsWith(loaderPrefix, StringComparison.Ordinal))
                             {
-                                _ = components.SetComponentVersion(componentUid, Section(libraryName, ':', 2))
-                                    .GetAwaiter().GetResult();
+                                _ = await components.SetComponentVersion(componentUid, Section(libraryName, ':', 2),
+                                        cancellationToken: cancellationToken);
                                 break;
                             }
                         }

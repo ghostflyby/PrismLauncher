@@ -32,7 +32,6 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(DeviceCodeStartResponse))]
 [JsonSerializable(typeof(DeviceCodePollResponse))]
 [JsonSerializable(typeof(JavaView))]
-[JsonSerializable(typeof(NewsView))]
 [JsonSerializable(typeof(ModrinthSearchResult))]
 [JsonSerializable(typeof(FlameSearchResult))]
 [JsonSerializable(typeof(ProviderVersionView))]
@@ -64,6 +63,11 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(TechnicInstallRequest))]
 // skins (fix-2c): the account skin surface
 [JsonSerializable(typeof(AccountSkinView))]
+// skins (DATA D6): the local skin library surface
+[JsonSerializable(typeof(SkinView))]
+[JsonSerializable(typeof(SkinApplyRequest))]
+[JsonSerializable(typeof(SkinStoredResponse))]
+[JsonSerializable(typeof(SkinView[]))]
 // Wave A (UI-API mapping): instance content surface
 [JsonSerializable(typeof(InstanceGroupView))]
 [JsonSerializable(typeof(CopyInstanceRequest))]
@@ -108,7 +112,6 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(GameOptionView[]))]
 [JsonSerializable(typeof(TaskView[]))]
 [JsonSerializable(typeof(AccountView[]))]
-[JsonSerializable(typeof(NewsView[]))]
 [JsonSerializable(typeof(ModrinthSearchResult[]))]
 [JsonSerializable(typeof(JavaView[]))]
 [JsonSerializable(typeof(FlameSearchResult[]))]
@@ -134,4 +137,54 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(FlintLauncher.Web.Endpoints.PrismImportPlanResponse))]
 [JsonSerializable(typeof(FlintLauncher.Web.Endpoints.PrismImportDryRunResponse))]
 [JsonSerializable(typeof(FlintLauncher.Core.Migration.PrismImportPlanItem))]
+// migration decision records (STATE S3) — TypedJsonFile root
+[JsonSerializable(typeof(FlintLauncher.Core.Migration.MigrationDecisionRecord))]
+// store completeness (CACHE E5): the derived {complete, missing[], bytes} report
+[JsonSerializable(typeof(FlintLauncher.Core.Store.StoreStatusReport))]
+// launcher-state.json (STATE S5) — TypedJsonFile roots
+[JsonSerializable(typeof(FlintLauncher.Core.State.LauncherState))]
+[JsonSerializable(typeof(FlintLauncher.Core.State.PlaytimeState))]
+[JsonSerializable(typeof(FlintLauncher.Core.State.JavaDetectState))]
+[JsonSerializable(typeof(FlintLauncher.Core.State.JavaDetectEntry))]
+[JsonSerializable(typeof(FlintLauncher.Core.State.UiState))]
+// secrets.json (CONFIG C4) — TypedJsonFile root
+[JsonSerializable(typeof(FlintLauncher.Core.Secrets.SecretsFile))]
+// flint.json (CONFIG C5) — TypedJsonFile root: the record domain full set (§2.2 finalized).
+// A missing root here is a RUNTIME 500, not a compile error (AOT red line)
+[JsonSerializable(typeof(FlintLauncher.Core.Config.FlintConfigFile))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.LauncherConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.ConsoleConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.GameTimeConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.WindowConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.MemoryConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.PerformanceConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.NativeLibConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.CommandsConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.MinecraftMiscConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.ModDownloadConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.JavaConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.DirsConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.LanguageConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.MirrorConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.ProxyConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.ApiConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.ToolsConfig))]
+// instance.json (DATA D4) — TypedJsonFile root: the record domain full set. A missing root
+// here is a RUNTIME 500, not a compile error (AOT red line)
+[JsonSerializable(typeof(FlintLauncher.Core.Config.InstanceConfigFile))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.InstanceIdentityConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.InstanceLaunchConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.InstanceJavaConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.InstanceMemoryConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.InstanceWindowConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.InstanceCommandsConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.InstancePerformanceConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.InstanceNativeLibConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.InstanceManagedConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.InstanceExportConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.InstanceMiscConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.InstanceConsoleConfig))]
+[JsonSerializable(typeof(FlintLauncher.Core.Config.InstanceGameTimeConfig))]
+// instance-state.json (DATA D4) — TypedJsonFile root (the per-instance runtime time trio)
+[JsonSerializable(typeof(FlintLauncher.Core.Config.InstanceStateFile))]
 internal sealed partial class FlintJsonContext : JsonSerializerContext;

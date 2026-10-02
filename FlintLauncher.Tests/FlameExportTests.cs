@@ -97,9 +97,10 @@ public class FlameExportTests : IDisposable
                 websiteUrl: "https://www.curseforge.com/projects/unmeta-mod")),
         }.ToJsonString();
 
-        // the export reads the instance through its settings + pack profile
-        var instanceSettings = new IniSettingsObject(Path.Combine(staging, "instance.cfg"));
-        var instance = new MinecraftInstance(_global, instanceSettings, staging);
+        // the export reads the instance through the typed settings stack (D4) — the staged
+        // instance is Flint format (instance.json), written by the import task itself
+        var instance = new MinecraftInstance(
+            new FlintLauncher.Core.Config.InstanceJsonSettingsObject(staging, _global.Environment), staging);
         var output = TempPath("exported.zip");
         var export = new FlamePackExportTask(new FlamePackExportTask.Options
         {
@@ -182,8 +183,8 @@ public class FlameExportTests : IDisposable
         await File.WriteAllBytesAsync(Path.Combine(staging, "minecraft", "mods", "unmeta.jar"), unmetaBytes);
         _server.FingerprintJson = """{"data":{"exactMatches":[]}}""";
 
-        var instanceSettings = new IniSettingsObject(Path.Combine(staging, "instance.cfg"));
-        var instance = new MinecraftInstance(_global, instanceSettings, staging);
+        var instance = new MinecraftInstance(
+            new FlintLauncher.Core.Config.InstanceJsonSettingsObject(staging, _global.Environment), staging);
         var output = TempPath("exported-unresolved.zip");
         var export = new FlamePackExportTask(new FlamePackExportTask.Options
         {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Java discovery, launcher news, the static /about identity (fix-4), the paste upload
-// (fix-4: GuiUtil's "upload log" flow over the core PasteUpload) and the metadata-cache
-// eviction endpoint.
+// Java discovery, the static /about identity (fix-4), the paste upload (fix-4: GuiUtil's
+// "upload log" flow over the core PasteUpload) and the metadata-cache eviction endpoint.
+// (the launcher news half left with CACHE E7 — GUI-bound, not ported material)
 using FlintLauncher.Core;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Net;
@@ -24,25 +24,8 @@ public static class MiscEndpoints
         api.MapPost("/java/scan", async (JavaScanService scan) =>
             Results.Ok((await scan.ScanAsync()).ToArray()));
 
-        // --------------------------------------------------------------- news
-        api.MapGet("/news", async (LauncherRuntime runtime) =>
-        {
-            var news = runtime.News;
-            if (!news.IsNewsLoaded && !news.IsLoadingNews)
-            {
-                try
-                {
-                    await news.ReloadNewsAsync().WaitAsync(TimeSpan.FromSeconds(15));
-                }
-                catch (TimeoutException)
-                {
-                    // return whatever is known (empty) — the feed is cached for next call
-                }
-            }
-            return Results.Ok(news.NewsEntries
-                .Select(entry => new NewsView(entry.Title, entry.Content, entry.Link))
-                .ToArray());
-        });
+        // (CACHE E7: the /news endpoint is gone — the news checker was GUI-bound and the
+        // user decision retired it whole: checker, feed base, FLINT_NEWS_RSS_URL)
 
         // --------------------------------------------------------------- about
         // the static identity of the launcher (BuildConfig); no dynamic state
@@ -90,13 +73,13 @@ public static class MiscEndpoints
                 content = request.Content!;
             }
 
-            var settings = runtime.GlobalSettings;
-            var typeIndex = Variant.AsInt(settings.Get("PastebinType"));
+            // the typed user layer (C5/D4 — the SettingsObject view retired)
+            var typeIndex = runtime.Config.Current.Api.PastebinType ?? (int)PasteUpload.PasteType.Mclogs;
             var pasteType = typeIndex >= 0 && typeIndex < PasteUpload.PasteTypes.Length
                 ? (PasteUpload.PasteType)typeIndex
                 : PasteUpload.PasteType.Mclogs;
-            var upload = new PasteUpload(content, Variant.AsString(settings.Get("PastebinCustomAPIBase")),
-                pasteType);
+            var upload = new PasteUpload(content, runtime.Config.Current.Api.PastebinCustomAPIBase ?? "",
+                pasteType, runtime.Net);
             await upload.StartAsync();
             return upload.WasSuccessful && upload.PasteLink.Length > 0
                 ? Results.Created("/api/v1/paste", new PasteCreatedResponse(upload.PasteLink))
@@ -117,11 +100,16 @@ public static class MiscEndpoints
     }
 }
 
-/// <summary>Cached java discovery (GET serves the cache, POST re-scans).</summary>
+/// <summary>Cached java discovery (GET serves the cache, POST re-scans). The scan covers
+/// the launcher-managed java root too — the JavaDir setting under E2 store semantics
+/// (relative → store root), not the CWD the parameterless scan used to fall back to.</summary>
 public sealed class JavaScanService
 {
+    private readonly LauncherRuntime _runtime;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private volatile IReadOnlyList<JavaView>? _cache;
+
+    public JavaScanService(LauncherRuntime runtime) => _runtime = runtime;
 
     public async Task<IReadOnlyList<JavaView>> GetAsync() => _cache ??= await ScanAsync();
 
@@ -130,7 +118,7 @@ public sealed class JavaScanService
         await _lock.WaitAsync();
         try
         {
-            var paths = JavaUtils.FindJavaPaths()
+            var paths = JavaUtils.FindJavaPaths(_runtime.JavaRoot)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             if (paths.Count == 0)

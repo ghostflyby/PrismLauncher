@@ -85,16 +85,15 @@ public sealed class SingleZipPackInstallTask : InstanceTask
 
         // (the "fixing permissions" walk is not ported — see the header note)
 
-        var failure = TechnicPackProcessor.Run(
-            GlobalSettings ?? throw new InvalidOperationException(
-                "InstanceTask requires SetParentSettings before execution."),
-            Name(), Icon, StagingPath, _minecraftVersion);
+        var failure = await TechnicPackProcessor.RunAsync(
+            Environment ?? throw new InvalidOperationException(
+                "InstanceTask requires SetParentEnvironment before execution."),
+            Name(), Icon, StagingPath, _minecraftVersion, cancellationToken: cancellationToken);
         if (failure is not null)
         {
             EmitFailed(failure);
             return;
         }
-        await Task.CompletedTask;
         EmitSucceeded();
     }
 }
