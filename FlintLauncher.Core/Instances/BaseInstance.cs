@@ -620,8 +620,14 @@ public abstract class BaseInstance
 
     public void AddLinkedInstanceId(string id)
     {
+        // D3: the persisted reference form is the uuid — a dirname input resolves at WRITE
+        // time when <see cref="UuidResolver"/> is wired (InstanceList stamps it during
+        // discovery). Without a resolver (bare fixtures, not-yet-discovered targets) the raw
+        // value appends verbatim and converts at the next LoadList round, exactly like the
+        // group-file members. The C++ lineage passed id() — the dirname; that form is NOT
+        // carried over (the D2 persistent handle is the uuid).
         var linkedInstances = GetLinkedInstances();
-        linkedInstances.Add(id);
+        linkedInstances.Add(UuidResolver?.Invoke(id) is { Length: > 0 } uuid ? uuid : id);
         SetLinkedInstances(linkedInstances);
     }
 
@@ -682,6 +688,13 @@ public abstract class BaseInstance
     /// CONFIG C9). Null skips the global accumulation; the instance list stamps it at
     /// discovery.</summary>
     public State.LauncherStateStore? LauncherState { get; set; }
+
+    /// <summary>D3: resolves an instance reference (dirname or uuid) to the referenced
+    /// instance's uuid — the persisted linkedInstances form. Port-internal wiring (no C++
+    /// counterpart): the instance list stamps it at discovery so the write path below
+    /// converts dirname inputs instead of persisting them. Null (bare fixtures) means
+    /// references append verbatim; the LoadList conversion pass is the backstop.</summary>
+    internal Func<string, string?>? UuidResolver { get; set; }
 
     private string _uuid = "";
     private Status _status = Status.Present;

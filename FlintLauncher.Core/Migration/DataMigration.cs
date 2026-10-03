@@ -121,7 +121,9 @@ public sealed class DataMigrationTask : FlintTask
 
     /// <summary>The FS::copy dry run: files (including hidden ones) below the source
     /// directory, matched against the whitelist on the '/'-separated relative path. A missing
-    /// source directory fails the walk, like FS::copy returning false.</summary>
+    /// source directory fails the walk, like FS::copy returning false. File symlinks are
+    /// matched (and copied by content below — the C++ ResolveSymlinks walk); directory
+    /// links are not descended into.</summary>
     private bool Walk(out List<string> matched)
     {
         matched = [];
@@ -129,13 +131,7 @@ public sealed class DataMigrationTask : FlintTask
         {
             return false;
         }
-        var options = new EnumerationOptions
-        {
-            RecurseSubdirectories = true,
-            IgnoreInaccessible = true,
-            AttributesToSkip = FileAttributes.ReparsePoint,
-        };
-        foreach (var file in Directory.EnumerateFiles(_sourcePath, "*", options))
+        foreach (var file in FileTransfer.EnumerateFilesDeep(_sourcePath))
         {
             var relative = System.IO.Path.GetRelativePath(_sourcePath, file).Replace('\\', '/');
             if (_pathMatcher(relative))
@@ -235,9 +231,15 @@ public static class DataMigration
     /// (<see cref="MigrationDecisionStore"/>/<paramref name="decisions"/>) when one is
     /// available, falling back to the legacy empty marker — which the record store upgrades
     /// on sight (declined@unknown record + marker deleted, see
-    /// <see cref="DecisionAlreadyMade"/>).</summary>
+    /// <see cref="DecisionAlreadyMade"/>).
+    /// <paramref name="currentConfigFile"/> is the launcher's own config at its CURRENT
+    /// authoritative position — post-reform <c>&lt;config-root&gt;/flint.json</c> (CONFIG
+    /// C5); when omitted the pre-reform flat position
+    /// <c>&lt;currentData&gt;/&lt;launcherConfigFile&gt;</c> is probed (bare fixtures). The
+    /// C++ existing-data protection (Application.cpp:1994-1999, 2029, 2055-2057: "Migration
+    /// was skipped, due to existing data") keys off exactly this probe.</summary>
     public static MigrationDecision Decide(string currentData, string oldData, string name, string configFile,
-        string launcherConfigFile, MigrationDecisionStore? decisions = null)
+        string launcherConfigFile, MigrationDecisionStore? decisions = null, string? currentConfigFile = null)
     {
         var configExists = false;
         foreach (var configPath in OldConfigCandidates(oldData, configFile, launcherConfigFile))
@@ -250,7 +252,8 @@ public static class DataMigration
             return configExists ? MigrationDecision.MarkerPresent : MigrationDecision.NoOldConfig;
         }
 
-        var currentExists = File.Exists(FileSystem.PathCombine(currentData, launcherConfigFile));
+        var currentExists = File.Exists(currentConfigFile ??
+            FileSystem.PathCombine(currentData, launcherConfigFile));
         return currentExists ? MigrationDecision.CurrentDataExists : MigrationDecision.ReadyToMigrate;
     }
 

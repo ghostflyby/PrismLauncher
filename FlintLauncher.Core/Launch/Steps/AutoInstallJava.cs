@@ -45,9 +45,12 @@ public sealed class AutoInstallJava : LaunchStep
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         var settings = _instance.Settings();
-        // the typed user layer (D4): the store's resolved fold materializes the defaults,
-        // so a present store means the C++ defaults (true) — a null store keeps the bare-
-        // fixture "feature off" behavior the former unset global double produced
+        // the typed user layer (D4): the C++ default of this switch derives from the
+        // INI-loaded JavaPath being empty (Application.cpp:768-770) and the one-shot import
+        // materializes exactly that into flint.json (E3) — so a present store carries the
+        // effective switch (true only for an empty/pinned-absent JavaPath), while a null
+        // store keeps the bare-fixture "feature off" behavior the former unset global double
+        // produced
         if (Services.Config is not { } config ||
             !(config.Current.Java.AutomaticJavaSwitch ?? false) ||
             (Variant.AsBool(settings.Get("OverrideJavaLocation")) &&

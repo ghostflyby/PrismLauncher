@@ -140,6 +140,36 @@ public class MigrationEngineTests : IDisposable
         Assert.Contains(plan!, item => item.Name == "instances");
     }
 
+    // A2: the prism-family profile surfaces a MultiMC source under BOTH config names —
+    // detection delegates to the dual-name probe (upstream multimc.cfg, CONFIG.md:23, plus
+    // the historical mmc.cfg) under the same launcher id
+    [Fact]
+    public void PrismFamily_Detects_MultiMC_Under_Both_Config_Names()
+    {
+        var parent1 = Path.Combine(_dir, "p1");
+        var parent2 = Path.Combine(_dir, "p2");
+        Directory.CreateDirectory(parent1);
+        Directory.CreateDirectory(parent2);
+        var dirName = PrismSourceDetector.NameToDirectory("multimc");
+        Directory.CreateDirectory(Path.Combine(parent1, dirName));
+        File.WriteAllText(Path.Combine(parent1, dirName, "multimc.cfg"), "x");
+        Directory.CreateDirectory(Path.Combine(parent2, dirName));
+        File.WriteAllText(Path.Combine(parent2, dirName, "mmc.cfg"), "x");
+        var engine = new MigrationEngine([new PrismFamilyMigrationProfile([parent1, parent2])]);
+        var paths = FlintPaths.FromRoots(_dir, Path.Combine(_dir, "data"), Path.Combine(_dir, "store"),
+            Path.Combine(_dir, "cache"), Path.Combine(_dir, "state"));
+
+        var candidates = engine.Find("prism-family")!.Detect(paths, Decisions());
+
+        Assert.Equal(2, candidates.Count);
+        Assert.All(candidates, candidate =>
+        {
+            Assert.Equal("multimc", candidate.SourceId);
+            Assert.Equal(PrismSourceDetector.NameToDirectory("multimc"),
+                Path.GetFileName(candidate.Path));
+        });
+    }
+
     [Fact]
     public async Task FlintLegacy_Detects_Root_Anchors_And_AutoRuns_Once()
     {
@@ -426,6 +456,51 @@ public class MigrationEngineTests : IDisposable
         Assert.True(result.Ran);
         Assert.NotNull(result.Error);
         Assert.Null(decisions.Read(FlintLegacyMigrationProfile.ProfileName));
+    }
+
+    // B3: an existing destination DIRECTORY must resume the merge file by file — the old
+    // whole-item skip stranded every not-yet-transferred source file forever, so a pass
+    // that failed halfway could never complete on a rerun
+    [Fact]
+    public void FlintLegacy_DirectoryDestinationExists_ResumesTheMergeFileByFile()
+    {
+        var home = Path.Combine(_dir, "resume");
+        var data = Path.Combine(home, "data");
+        var store = Path.Combine(home, "store");
+        var paths = FlintPaths.FromRoots(Path.Combine(home, "config"), data, store,
+            Path.Combine(home, "cache"), Path.Combine(home, "state"));
+        Directory.CreateDirectory(paths.ConfigRoot);
+        Directory.CreateDirectory(paths.DataRoot);
+        Directory.CreateDirectory(paths.CacheRoot);
+        Directory.CreateDirectory(paths.StateRoot);
+
+        // source content: one file lands, one is blocked — the remount fails halfway
+        Directory.CreateDirectory(Path.Combine(data, "assets", "sub"));
+        File.WriteAllText(Path.Combine(data, "assets", "first.txt"), "first");
+        File.WriteAllText(Path.Combine(data, "assets", "sub", "late.txt"), "late");
+        // a FILE occupies the <store>/assets/sub path, so sub/late.txt cannot transfer —
+        // the exact shape of a half-done earlier pass (some files in, some stranded)
+        Directory.CreateDirectory(Path.Combine(store, "assets"));
+        File.WriteAllText(Path.Combine(store, "assets", "sub"), "a file blocks the subtree");
+
+        var first = FlintLegacyMigration.Execute(paths, data);
+
+        // honest half-failure: the pass reports incomplete, first.txt is in, late.txt is not
+        Assert.True(first.Ran);
+        Assert.NotNull(first.Error);
+        Assert.Equal("first", File.ReadAllText(Path.Combine(store, "assets", "first.txt")));
+        Assert.False(File.Exists(Path.Combine(store, "assets", "sub", "late.txt")));
+        Assert.True(File.Exists(Path.Combine(data, "assets", "sub", "late.txt"))); // source intact
+
+        // the blocker clears (operator or a later pass) — the rerun must now complete the
+        // leftovers THROUGH the existing destination directory
+        File.Delete(Path.Combine(store, "assets", "sub"));
+        var second = FlintLegacyMigration.Execute(paths, data);
+
+        Assert.True(second.Ran);
+        Assert.Null(second.Error);
+        Assert.Equal("late", File.ReadAllText(Path.Combine(store, "assets", "sub", "late.txt")));
+        Assert.Equal("first", File.ReadAllText(Path.Combine(store, "assets", "first.txt"))); // kept
     }
 
     [Fact]

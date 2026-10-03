@@ -238,6 +238,31 @@ public class DataMigrationTests : IDisposable
             DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile));
     }
 
+    // A3: post-reform the authoritative own-config position is the CONFIG root's flint.json
+    // (CONFIG C5) — the flat <data>/flint.cfg probe is dead there, so the C++ existing-data
+    // protection (Application.cpp:1994-1999, 2029, 2055-2057) keys off the config-root path
+    // the caller passes
+    [Fact]
+    public void Decide_Probes_The_Config_Root_Flint_Json_For_The_Existing_Data_Protection()
+    {
+        var current = MakeDir(); // the post-reform reality: NO flint.cfg at the data root
+        var old = MakeDir(PolyMcConfigFile, "instances/a.zip");
+        var configRoot = Path.Combine(_dir, "cfgroot-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(configRoot);
+        var flintJson = Path.Combine(configRoot, "flint.json");
+
+        // no own config yet → ready to migrate
+        Assert.Equal(DataMigration.MigrationDecision.ReadyToMigrate,
+            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile,
+                currentConfigFile: flintJson));
+
+        // flint.json appears (Flint configured / INI imported) → the protection fires
+        File.WriteAllText(flintJson, "{}");
+        Assert.Equal(DataMigration.MigrationDecision.CurrentDataExists,
+            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile,
+                currentConfigFile: flintJson));
+    }
+
     // ---------------------------------------------------------------- task flow
 
     [Fact]
@@ -329,6 +354,38 @@ public class DataMigrationTests : IDisposable
 
         Assert.Equal(TaskState.Failed, task.State);
         Assert.Equal("Failed to scan source path.", task.FailReason);
+    }
+
+    // B4: a file symlink inside the migrated tree is copied by its TARGET'S CONTENT (the
+    // C++ FS::copy default follows file symlinks — m_followSymlinks=true, FileSystem.h:159,
+    // ResolveSymlinks enumeration, FileSystem.cpp:461) — the old ReparsePoint skip silently
+    // pruned it from both the dry-run count and the copy
+    [Fact]
+    public async Task Task_Copies_File_Symlinks_By_Content()
+    {
+        if (!FlintLauncher.Tests.SymlinkSupport.CanCreateLinks())
+        {
+            return; // Windows without symlink privilege
+        }
+        var source = Path.Combine(_dir, "src-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(source, "instances", "demo"));
+        // the link's target sits OUTSIDE the whitelisted tree — only link.cfg itself matches
+        File.WriteAllText(Path.Combine(source, "marker.txt"), "marker-content");
+        File.CreateSymbolicLink(Path.Combine(source, "instances", "demo", "link.cfg"),
+            Path.Combine(source, "marker.txt"));
+        var target = Path.Combine(_dir, "target-" + Guid.NewGuid().ToString("N"));
+
+        var progress = new List<(long current, long total)>();
+        var task = new DataMigrationTask(source, target,
+            DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
+        task.Progress += (_, p) => progress.Add((p.Current, p.Total));
+        await task.StartAsync();
+
+        Assert.Equal(TaskState.Succeeded, task.State);
+        var landed = Path.Combine(target, "instances", "demo", "link.cfg");
+        Assert.Equal("marker-content", File.ReadAllText(landed));
+        Assert.Null(File.ResolveLinkTarget(landed, returnFinalTarget: false)); // content, not a re-link
+        Assert.Equal(1, progress.Last().total); // the plan count includes the link too
     }
 
     // the C++ shortens long status names: left(20) + "…" + right(29)

@@ -91,8 +91,11 @@ public static class SettingsAndIconsEndpoints
                 "JavaPath",
                 "JvmArgs",
                 "IgnoreJavaCompatibility",
-                // legacy wire keys (AutoInstallJava consults the instance-level flag; the
-                // C++ derive their defaults from JavaPath being empty)
+                // AutomaticJava is the instance-level flag (MinecraftInstance.cpp:191 registers
+                // it instance-side; AutoInstallJava writes it, BaseInstance.cpp:201 consults
+                // it); AutomaticJavaSwitch/Download are the GLOBAL switches whose C++ defaults
+                // derive from JavaPath being empty (Application.cpp:768-770 — the one-shot
+                // import materializes the derived pair into flint.json, E3)
                 "AutomaticJava",
                 "AutomaticJavaDownload",
                 "AutomaticJavaSwitch",

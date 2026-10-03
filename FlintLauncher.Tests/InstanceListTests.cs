@@ -781,4 +781,110 @@ public class InstanceListTests : IDisposable
         Assert.Equal(["link"], list.GetLinkedInstancesById("base"));
         Assert.Equal([], list.GetLinkedInstancesById("link"));
     }
+
+    // DATA D3: linkedInstances carry uuid references — the Prism/legacy dirname form
+    // converts at the discovery round (the group-member import conversion, applied to the
+    // per-instance list)
+
+    [Fact]
+    public void LinkedInstances_DirnameImports_ConvertToUuids_AtLoadList()
+    {
+        MakeInstanceDir("base", name: "Base");
+        MakeInstanceDir("link", name: "Link");
+        // Prism cfg: linkedImports in the QSettings string-list form ("base" = dirname)
+        File.AppendAllText(Path.Combine(_instancesDir, "link", "instance.cfg"),
+            "linkedInstances=base\n");
+
+        var list = CreateList();
+        list.LoadList();
+
+        var baseInst = list.GetInstanceById("base")!;
+        var link = list.GetInstanceById("link")!;
+        // the imported dirname became the target's uuid (D3 import conversion)
+        Assert.Equal([baseInst.Uuid], link.GetLinkedInstances());
+        // ...and the conversion persisted (the dual-track write landed the uuid form)
+        using (var doc = JsonDocument.Parse(
+                   File.ReadAllText(Path.Combine(_instancesDir, "link", "instance.json"))))
+        {
+            Assert.Equal([baseInst.Uuid], doc.RootElement
+                .GetProperty("misc").GetProperty("linkedInstances")
+                .EnumerateArray().Select(v => v.GetString()).ToList());
+        }
+        // consumers answer by either reference form
+        Assert.Equal(["link"], list.GetLinkedInstancesById("base"));
+        Assert.Equal(["link"], list.GetLinkedInstancesById(baseInst.Uuid));
+    }
+
+    [Fact]
+    public void LinkedInstances_UnresolvableReferences_StayVerbatim_UntilTheTargetAppears()
+    {
+        // the link names an instance that does not exist yet
+        MakeInstanceDir("late-link", name: "LateLink");
+        File.AppendAllText(Path.Combine(_instancesDir, "late-link", "instance.cfg"),
+            "linkedInstances=ghost\n");
+        var list = CreateList();
+        list.LoadList();
+
+        var late = list.GetInstanceById("late-link")!;
+        // unresolvable: kept verbatim — the persisted payload still carries the raw dirname
+        // (only the uuid identity write of the fresh construction touched the file)
+        Assert.Equal(["ghost"], late.GetLinkedInstances());
+        var afterFirstLoad = File.ReadAllText(
+            Path.Combine(_instancesDir, "late-link", "instance.json"));
+        Assert.Contains("ghost", afterFirstLoad);
+
+        // a converged list must not rewrite: another round without the target changes nothing
+        list.LoadList();
+        Assert.Equal(afterFirstLoad, File.ReadAllText(
+            Path.Combine(_instancesDir, "late-link", "instance.json")));
+
+        // the target appears; the next discovery round converts
+        MakeInstanceDir("ghost", name: "Ghost");
+        list.LoadList();
+        Assert.Equal([list.GetInstanceById("ghost")!.Uuid], late.GetLinkedInstances());
+        Assert.Equal(["late-link"], list.GetLinkedInstancesById("ghost"));
+    }
+
+    [Fact]
+    public void LinkedInstances_HalfConvertedLists_CollapseToTheUuidForm()
+    {
+        // fixed uuid so the cfg payload can carry it alongside the dirname; the link cfg is
+        // a modern Prism file (ConfigVersion present — the QSettings codec splits the
+        // comma list into the real 2-item list the linkedInstances feature always
+        // ships with)
+        MakeInstanceDir("base", name: "Base");
+        File.AppendAllText(Path.Combine(_instancesDir, "base", "instance.cfg"),
+            "uuid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n");
+        MakeInstanceDir("link", name: "Link");
+        File.AppendAllText(Path.Combine(_instancesDir, "link", "instance.cfg"),
+            "ConfigVersion=1.3\nlinkedInstances=base, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n");
+
+        var list = CreateList();
+        list.LoadList();
+
+        // both entries named the same target — one uuid entry survives
+        Assert.Equal(["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+            list.GetInstanceById("link")!.GetLinkedInstances());
+    }
+
+    [Fact]
+    public void AddLinkedInstanceId_ResolvesADirnameToTheUuid_AtWriteTime()
+    {
+        MakeInstanceDir("base", name: "Base");
+        MakeInstanceDir("link", name: "Link");
+        var list = CreateList();
+        list.LoadList();
+
+        var link = list.GetInstanceById("link")!;
+        // the native write path (the C++ lineage passed id(), the dirname — BaseInstance.Id)
+        // stores the uuid form: the list stamps the resolver onto discovered instances
+        link.AddLinkedInstanceId("base");
+        Assert.Equal([list.GetInstanceById("base")!.Uuid], link.GetLinkedInstances());
+
+        // an unknown reference appends verbatim (a not-yet-discovered target converts at
+        // the next LoadList round)
+        link.AddLinkedInstanceId("not-there-yet");
+        Assert.Equal([list.GetInstanceById("base")!.Uuid, "not-there-yet"],
+            link.GetLinkedInstances());
+    }
 }

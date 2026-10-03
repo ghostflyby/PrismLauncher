@@ -316,6 +316,252 @@ public class FlintConfigStoreTests : IDisposable
     }
 
     [Fact]
+    public void Import_C9_Bool_Keys_Read_Qt_Truthy_Strings()
+    {
+        // D1: the C9 seals must judge the INI string the way QVariant(QString).toBool() did —
+        // a hand-edited "True" reads true, so the playtime one-shot seal holds (no re-migration)
+        // and the wizard question stays asked. The strict "true"/"1" match read these false.
+        var paths = Paths;
+        Directory.CreateDirectory(paths.DataRoot);
+        File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"), """
+            [General]
+            TotalPlayTime=999
+            TotalPlayTimeMigrated=True
+            UserAskedAboutAutomaticJavaDownload=True
+            """);
+        var store = NewStore();
+        var (secrets, state) = NewSideStores();
+
+        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+        Assert.Equal(999, state.Current.Playtime.Total);
+        Assert.True(state.Current.Playtime.Migrated);
+        Assert.True(state.Current.UserAskedAboutAutomaticJavaDownload);
+    }
+
+    // ------------------------------------------------- C++ setting synonyms (E1)
+
+    [Fact]
+    public void Registry_Folds_The_Cpp_Synonyms_Onto_The_Primary_Keys()
+    {
+        // the C++ registerSetting brace lists (launcher/Application.cpp:708-912): every
+        // legacy INI spelling answers as its primary entry — and is never an entry of its own
+        (string Alias, string Primary)[] pairs =
+        [
+            ("MCWindowMaximize", "LaunchMaximized"),
+            ("MCWindowWidth", "MinecraftWinWidth"),
+            ("MCWindowHeight", "MinecraftWinHeight"),
+            ("ProxyHostName", "ProxyAddr"),
+            ("ProxyUsername", "ProxyUser"),
+            ("ProxyPassword", "ProxyPass"),
+            ("MinMemoryAlloc", "MinMemAlloc"),
+            ("MaxMemoryAlloc", "MaxMemAlloc"),
+            ("PreLoadCmd", "PreLoadCommand"),
+            ("PreLaunchCmd", "PreLaunchCommand"),
+            ("PostExitCmd", "PostExitCommand"),
+            ("ResourceURL", "ResourceURLOverride"),
+            ("CFKeyOverride", "FlameKeyOverride"),
+        ];
+        foreach (var (alias, primary) in pairs)
+        {
+            Assert.Equal(primary, FlintConfigKeys.Canonical(alias));
+            Assert.Equal(primary, FlintConfigKeys.Resolve(alias)!.Key);
+            Assert.Equal(FlintConfigKeys.Default(primary), FlintConfigKeys.Default(alias));
+            Assert.True(FlintConfigKeys.Resolve(alias) == FlintConfigKeys.Resolve(primary));
+        }
+        // the secret aliases read as secrets (the import redirects them with the primary, C4)
+        Assert.True(FlintConfigKeys.IsSecret("ProxyPassword"));
+        Assert.True(FlintConfigKeys.IsSecret("CFKeyOverride"));
+        // CentralModsDir|ModsDir stays dead (DATA D8): the alias of an unregistered key is
+        // unregistered — a leftover alias in an imported INI stays unread in the file
+        Assert.Null(FlintConfigKeys.Resolve("CentralModsDir"));
+        Assert.Null(FlintConfigKeys.Resolve("ModsDir"));
+    }
+
+    [Fact]
+    public void Import_Folds_The_Legacy_Synonym_Spellings_Onto_The_Primary_Keys()
+    {
+        // E1: an old Prism cfg can carry the alias spellings — they must land under the
+        // primary (record domains; secret aliases redirect with the primary, C4), not drop
+        // on the single pass's exact match
+        var paths = Paths;
+        Directory.CreateDirectory(paths.DataRoot);
+        File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"), """
+            [General]
+            ConfigVersion=1.3
+            MCWindowMaximize=true
+            MCWindowWidth=1024
+            MCWindowHeight=768
+            ProxyHostName=old.corp
+            ProxyUsername=olduser
+            ProxyPassword=oldpass
+            MinMemoryAlloc=2048
+            MaxMemoryAlloc=4096
+            PreLoadCmd=echo preload
+            PreLaunchCmd=echo prelaunch
+            PostExitCmd=echo postexit
+            ResourceURL=https://resources.example
+            CFKeyOverride=cf-old
+            """);
+        var store = NewStore();
+        var (secrets, state) = NewSideStores();
+
+        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+
+        Assert.True(store.Current.Window.LaunchMaximized);
+        Assert.Equal(1024, store.Current.Window.MinecraftWinWidth);
+        Assert.Equal(768, store.Current.Window.MinecraftWinHeight);
+        Assert.Equal("old.corp", store.Current.Proxy.ProxyAddr);
+        Assert.Equal("olduser", store.Current.Proxy.ProxyUser);
+        Assert.Equal(2048, store.Current.Memory.MinMemAlloc);
+        Assert.Equal(4096, store.Current.Memory.MaxMemAlloc);
+        Assert.Equal("echo preload", store.Current.Commands.PreLoadCommand);
+        Assert.Equal("echo prelaunch", store.Current.Commands.PreLaunchCommand);
+        Assert.Equal("echo postexit", store.Current.Commands.PostExitCommand);
+        Assert.Equal("https://resources.example", store.Current.Mirror.ResourceURLOverride);
+
+        // the secret aliases land under the PRIMARY names (C4) — nothing under the aliases
+        Assert.Equal("oldpass", secrets.Get("ProxyPass"));
+        Assert.Equal("cf-old", secrets.Get("FlameKeyOverride"));
+        Assert.Null(secrets.Get("ProxyPassword"));
+        Assert.Null(secrets.Get("CFKeyOverride"));
+        // and never reach flint.json
+        var flintJson = File.ReadAllText(ConfigPath);
+        Assert.DoesNotContain("oldpass", flintJson);
+        Assert.DoesNotContain("cf-old", flintJson);
+    }
+
+    [Fact]
+    public void Import_Primary_Spelling_Wins_When_A_File_Carries_Both_Spellings()
+    {
+        var paths = Paths;
+        Directory.CreateDirectory(paths.DataRoot);
+        File.WriteAllText(Path.Combine(paths.DataRoot, "flint.cfg"), """
+            [General]
+            MinMemAlloc=1111
+            MinMemoryAlloc=2222
+            ProxyPass=primary-secret
+            ProxyPassword=alias-secret
+            """);
+        var store = NewStore();
+        var (secrets, state) = NewSideStores();
+
+        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+
+        // INISettingsObject::retrieveValue walks configKeys() primary-first: the alias line
+        // drops when the primary spelling is present, regardless of file order
+        Assert.Equal(1111, store.Current.Memory.MinMemAlloc);
+        Assert.Equal("primary-secret", secrets.Get("ProxyPass"));
+    }
+
+    // ------------------------------------------------------------ playtime.cfg probe (E2)
+
+    [Fact]
+    public void Import_Probes_The_DataRoot_PlaytimeCfg_For_The_TotalPlayTime_Pair()
+    {
+        // E2: the C++ keeps the pair in <data-root>/playtime.cfg (Application.cpp:943-949 —
+        // the relative name resolves against the chdir'd data root), never in the cfg chain;
+        // a real Prism import takes the pair from the separate file
+        var paths = Paths;
+        Directory.CreateDirectory(paths.DataRoot);
+        File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"),
+            "[General]\nLanguage=zh_CN\n");
+        File.WriteAllText(Path.Combine(paths.DataRoot, "playtime.cfg"), """
+            [General]
+            TotalPlayTime=654321
+            TotalPlayTimeMigrated=true
+            """);
+        var store = NewStore();
+        var (secrets, state) = NewSideStores();
+
+        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+        Assert.Equal(654321, state.Current.Playtime.Total);
+        Assert.True(state.Current.Playtime.Migrated);
+        // the ordinary chain keys landed as usual (the probe rides the same one-shot)
+        Assert.Equal("zh_CN", store.Current.Language.Language);
+    }
+
+    [Fact]
+    public void Import_PlaytimeCfg_Ouranks_The_In_Chain_Compat_Pair_Per_Member()
+    {
+        var paths = Paths;
+        Directory.CreateDirectory(paths.DataRoot);
+        File.WriteAllText(Path.Combine(paths.DataRoot, "flint.cfg"), """
+            [General]
+            TotalPlayTime=111
+            TotalPlayTimeMigrated=true
+            """);
+        // a half-populated playtime.cfg: only the total — the migrated flag falls back to
+        // the in-chain branch, member by member
+        File.WriteAllText(Path.Combine(paths.DataRoot, "playtime.cfg"),
+            "[General]\nTotalPlayTime=222\n");
+        var store = NewStore();
+        var (secrets, state) = NewSideStores();
+
+        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+        Assert.Equal(222, state.Current.Playtime.Total); // the file outranks the chain
+        Assert.True(state.Current.Playtime.Migrated);    // the chain fills the absent member
+    }
+
+    // ------------------------------------------- automatic-java default derivation (E3)
+
+    [Fact]
+    public void Import_Derives_The_Automatic_Java_Pair_From_The_Imported_JavaPath()
+    {
+        // E3: Application.cpp:768-770 registers the pair with the default "JavaPath is
+        // empty", evaluated AFTER the INI loads — a cfg that pins JavaPath while silent on
+        // the pair must land false, or the auto-java machinery would override the pinned
+        // JVM on the next launch (AutoInstallJava / BaseInstance consult this value)
+        var paths = Paths;
+        Directory.CreateDirectory(paths.DataRoot);
+        File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"),
+            "[General]\nJavaPath=/opt/pinned-jdk\n");
+        var store = NewStore();
+        var (secrets, state) = NewSideStores();
+
+        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+        Assert.False(store.Current.Java.AutomaticJavaSwitch);
+        Assert.False(store.Current.Java.AutomaticJavaDownload);
+        // the derived pair materialized into flint.json (the one-shot seal), from where the
+        // launch path's UserLayer reads it
+        var written = JsonDocument.Parse(File.ReadAllText(ConfigPath)).RootElement;
+        Assert.False(written.GetProperty("java").GetProperty("automaticJavaSwitch").GetBoolean());
+        Assert.False(written.GetProperty("java").GetProperty("automaticJavaDownload").GetBoolean());
+    }
+
+    [Fact]
+    public void Import_Explicit_Automatic_Java_Keys_Win_Over_The_Derived_Default_Per_Key()
+    {
+        var paths = Paths;
+        Directory.CreateDirectory(paths.DataRoot);
+        File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"), """
+            [General]
+            JavaPath=/opt/pinned-jdk
+            AutomaticJavaSwitch=true
+            """);
+        var store = NewStore();
+        var (secrets, state) = NewSideStores();
+
+        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+        Assert.True(store.Current.Java.AutomaticJavaSwitch);    // explicit — untouched
+        Assert.False(store.Current.Java.AutomaticJavaDownload); // derived from the pin
+    }
+
+    [Fact]
+    public void Import_Empty_JavaPath_Keeps_The_Automatic_Java_Pair_True()
+    {
+        var paths = Paths;
+        Directory.CreateDirectory(paths.DataRoot);
+        File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"),
+            "[General]\nLanguage=en\n");
+        var store = NewStore();
+        var (secrets, state) = NewSideStores();
+
+        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+        Assert.True(store.Current.Java.AutomaticJavaSwitch);
+        Assert.True(store.Current.Java.AutomaticJavaDownload);
+    }
+
+    [Fact]
     public void Import_Reports_The_Guarded_One_Shot_As_Idle_Not_Failed()
     {
         // flint.json exists → the one-shot guard: Idle (neither imported nor unreadable) —

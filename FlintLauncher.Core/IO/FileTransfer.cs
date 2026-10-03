@@ -46,8 +46,9 @@ public static class FileTransfer
 {
     /// <summary>Transfers one file per mode. The destination is never overwritten; an
     /// existing destination returns SkippedDestinationExists (idempotent). Move degrades
-    /// rename → reflink → plain copy (+ source delete on success) and returns false only
-    /// when every mechanism failed (the source is left intact).</summary>
+    /// rename → reflink → plain copy (+ source delete on success), CoW degrades
+    /// reflink → plain copy — both return false only when every mechanism failed (the
+    /// source is left intact).</summary>
     public static bool TransferFile(string src, string dst, ImportMode mode, out TransferMethod method)
     {
         method = TransferMethod.SkippedDestinationExists;
@@ -85,11 +86,20 @@ public static class FileTransfer
                     TryDeleteFile(src);
                     return true;
                 case ImportMode.CopyOnWrite:
-                    if (!TryClone(src, dst))
+                    if (TryClone(src, dst))
+                    {
+                        method = TransferMethod.Reflink;
+                        return true;
+                    }
+                    // reflink unavailable (ext4/Windows/cross-volume): degrade to a plain
+                    // copy like the Move branch above — a hard false makes every per-file
+                    // import fail wholesale on non-CoW volumes, with the whole task
+                    // EmitFailed'ing file by file
+                    if (!CopyInto(src, dst))
                     {
                         return false;
                     }
-                    method = TransferMethod.Reflink;
+                    method = TransferMethod.Copy;
                     return true;
                 default:
                     if (!CopyInto(src, dst))
@@ -137,11 +147,76 @@ public static class FileTransfer
             OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
     }
 
+    /// <summary>Every file below <paramref name="dir"/>, hidden ones included — the one
+    /// enumeration the migration walks plan and transfer through, so the counts and the
+    /// walk always agree. FILE reparse points (symlinks to files) ARE yielded: the C++
+    /// FS::copy default follows file symlinks and copies the target's content
+    /// (FileSystem.h:159 <c>m_followSymlinks = true</c>, ResolveSymlinks enumeration,
+    /// FileSystem.cpp:461). DIRECTORY reparse points are NOT descended into — a plain
+    /// <c>AttributesToSkip = ReparsePoint</c> enumeration would skip the file links too
+    /// (silently pruning them from the import), and <c>AttributesToSkip = 0</c> would
+    /// descend directory links and loop on link cycles, so the recursion is driven by
+    /// hand.</summary>
+    internal static IEnumerable<string> EnumerateFilesDeep(string dir)
+    {
+        var pending = new Stack<string>();
+        pending.Push(dir);
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+            string[] entries;
+            try
+            {
+                entries = Directory.EnumerateFileSystemEntries(current, "*", new EnumerationOptions
+                {
+                    AttributesToSkip = FileAttributes.None,
+                    IgnoreInaccessible = true,
+                }).ToArray();
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                continue; // unreadable directory — the IgnoreInaccessible stance, per directory
+            }
+            foreach (var entry in entries)
+            {
+                FileAttributes attributes;
+                try
+                {
+                    attributes = File.GetAttributes(entry);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    continue; // vanished between enumeration and stat — not transferable
+                }
+                if (attributes.HasFlag(FileAttributes.Directory))
+                {
+                    if (!attributes.HasFlag(FileAttributes.ReparsePoint))
+                    {
+                        pending.Push(entry); // directory reparse point: never descended (cycles)
+                    }
+                }
+                else
+                {
+                    yield return entry; // includes file reparse points (copied by content)
+                }
+            }
+        }
+    }
+
+    /// <summary>Test seam: replaces the platform reflink attempt so the copy fallbacks run
+    /// on every OS (null = the real platform attempt — clonefile / FICLONE).</summary>
+    internal static Func<string, string, bool>? CloneAttemptHook { get; set; }
+
     /// <summary>CoW clone into a not-yet-existing destination; false when the platform or
-    /// volume does not support reflinks (caller falls back to copy). An existing destination
-    /// counts as success (idempotent, like FS::copy).</summary>
+    /// volume does not support reflinks (the transfer modes fall back to a plain copy). An
+    /// existing destination counts as success (idempotent, like FS::copy).</summary>
     public static bool TryClone(string src, string dst)
     {
+        var hook = CloneAttemptHook;
+        if (hook is not null)
+        {
+            return hook(src, dst);
+        }
         EnsureDirectoryFor(dst);
         if (OperatingSystem.IsMacOS())
         {
@@ -225,6 +300,9 @@ public static class FileTransfer
         var dstFd = (int)dstHandle.SafeFileHandle.DangerousGetHandle();
         if (ioctl(dstFd, FicloneIoctl, srcFd) == 0)
         {
+            // FICLONE clones extents only — the CreateNew destination keeps its
+            // 0666&~umask mode, so a 0600 accounts.json would land world-readable (B5)
+            CarryUnixFileMode(src, dst);
             return true;
         }
         dstHandle.Dispose(); // release before removing the half-written clone
@@ -259,7 +337,31 @@ public static class FileTransfer
     {
         EnsureDirectoryFor(dst);
         File.Copy(src, dst, overwrite: false);
+        // File.Copy's mode preservation is not contractual across runtimes/platforms — the
+        // migration copies credential-bearing files (accounts.json is 0600), so the source
+        // bits are carried explicitly
+        CarryUnixFileMode(src, dst);
         return true;
+    }
+
+    /// <summary>Carries the source's Unix permission bits onto a freshly created destination.
+    /// Best effort: a filesystem without permission storage (FAT/exFAT) rejects the chmod —
+    /// the C++ copy proceeds without modes there too, so the transfer still counts as done.
+    /// Windows has no such bits.</summary>
+    internal static void CarryUnixFileMode(string src, string dst)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+        try
+        {
+            File.SetUnixFileMode(dst, File.GetUnixFileMode(src));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException
+                                 or System.Security.SecurityException or NotSupportedException)
+        {
+        }
     }
 
     private static void EnsureDirectoryFor(string dst)

@@ -321,6 +321,26 @@ public class InstanceTests : IDisposable
     }
 
     [Fact]
+    public void PrismFormat_HandEditedGate_QtTruthyForms_KeepTheInstanceValue()
+    {
+        // D1: QVariant(QString).toBool() reads every string but ""/"0"/"false" as true, so a
+        // hand-edited "True" gate must import like Qt's own read did. Under the strict
+        // "true"/"1" match the gate read false and C7 folded the instance value away to the
+        // user layer (4096) — the override silently vanished on every load.
+        File.WriteAllLines(_cfgPath,
+        [
+            "[General]",
+            "name=Case Gate",
+            "OverrideMemory=True",
+            "MaxMemAlloc=2048",
+        ]);
+
+        var instance = new MinecraftInstance(Settings(), _root);
+        Assert.True(Variant.AsBool(instance.Settings().Get("OverrideMemory")));
+        Assert.Equal(2048, Variant.AsInt(instance.Settings().Get("MaxMemAlloc"))); // kept, not the user layer's 4096
+    }
+
+    [Fact]
     public void PrismFormat_QSettingsKeyOrder_ValuesBeforeGates_StillImport()
     {
         // QSettings writes instance.cfg keys in ORDINAL order, so the member keys (JavaPath,

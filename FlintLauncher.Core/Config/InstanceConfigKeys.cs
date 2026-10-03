@@ -882,7 +882,9 @@ public static class InstanceConfigKeys
     }
 
     /// <summary>linkedInstances accepts a real string list (typed writes) or the legacy JSON
-    /// array text (INI import). Null passes through (reset to inherit).</summary>
+    /// array text (INI import). Null passes through (reset to inherit). Entries are stored
+    /// verbatim — the dirname→uuid conversion (D3) is the discovery-side pass in
+    /// InstanceList, not a transform of this layer.</summary>
     private static IReadOnlyList<string>? ToStringList(object? value) => value switch
     {
         null => null,

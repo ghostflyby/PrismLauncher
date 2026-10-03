@@ -104,13 +104,21 @@ internal static class QSettingsIniCodec
             }
             return IniValue.From(bytes);
         }
+        if (s.StartsWith("@String(", StringComparison.Ordinal) && s.EndsWith(')'))
+        {
+            // @String(<escaped content>): Qt's wrapper for QStrings whose plain INI form would
+            // be ambiguous (embedded NUL and friends — e.g. @String(ab\0\x63\x64)). Qt's read
+            // side unwraps it back to the plain string, so the import must too; the escaping
+            // is the same ini escape set UnescapeContent covers (same as @ByteArray).
+            return IniValue.From(UnescapeContent(s["@String(".Length..^1]));
+        }
         if (s.StartsWith("@@", StringComparison.Ordinal))
         {
             return IniValue.From(s[1..]);
         }
         if (s.StartsWith('@'))
         {
-            // @Variant/@Point/@Rect/@Size/@String/@DateTime(...): keep verbatim; QDataStream-backed
+            // @Variant/@Point/@Rect/@Size/@DateTime(...): keep verbatim; QDataStream-backed
             // shapes are not needed by the launcher core and would not round-trip if decoded.
             return IniValue.Raw(s);
         }

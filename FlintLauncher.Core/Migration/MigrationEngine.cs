@@ -73,9 +73,12 @@ public sealed class PrismFamilyMigrationProfile : IMigrationSourceProfile
     public IReadOnlyList<MigrationSourceCandidate> Detect(FlintPaths paths, MigrationDecisionStore? decisions)
     {
         var candidates = new List<MigrationSourceCandidate>();
+        // the existing-data probe runs against the CONFIG root's flint.json (CONFIG C5) —
+        // the pre-reform <data>/flint.cfg position is dead, and without the config-root
+        // path the C++ "already has data → skip migration" protection would never fire
         var detected = _parentsOverride is null
-            ? PrismSourceDetector.Detect(paths.DataRoot, decisions)
-            : PrismSourceDetector.Detect(paths.DataRoot, _parentsOverride, decisions);
+            ? PrismSourceDetector.Detect(paths.DataRoot, decisions, paths.ConfigFile)
+            : PrismSourceDetector.Detect(paths.DataRoot, _parentsOverride, decisions, paths.ConfigFile);
         foreach (var candidate in detected)
         {
             candidates.Add(new MigrationSourceCandidate
@@ -418,8 +421,11 @@ public static class FlintLegacyMigration
     }
 
     /// <summary>Transfer one whitelist item: a whole-subtree rename when the volume matches,
-    /// otherwise a per-file walk with the merge rule (destination exists → skip). Returns
-    /// the bytes that actually landed; <paramref name="moved"/> counts transferred items and
+    /// otherwise a per-file walk with the merge rule (destination exists → skip). An
+    /// existing destination DIRECTORY resumes the merge file by file instead of skipping
+    /// the whole item (B3: a bare skip would strand every not-yet-transferred source file
+    /// forever — the "resumes the idempotent merge" contract never fires). Returns the
+    /// bytes that actually landed; <paramref name="moved"/> counts transferred items and
     /// <paramref name="failedFiles"/> every file that could not be transferred (a failure
     /// never aborts the walk — the remaining items still move — but the caller must not
     /// seal the decision record over it).</summary>
@@ -432,7 +438,29 @@ public static class FlintLegacyMigration
         var alreadyThere = isDirectory ? Directory.Exists(dst) : File.Exists(dst);
         if (alreadyThere)
         {
-            return 0; // idempotent resume: the destination won
+            if (!isDirectory)
+            {
+                return 0; // idempotent resume: the destination file won
+            }
+            // the destination directory exists (an earlier startup created it, or a
+            // previous pass stopped halfway): merge the source into it file by file —
+            // files already at the destination skip, missing ones transfer
+            long resumed = 0;
+            foreach (var file in FileTransfer.EnumerateFilesDeep(src))
+            {
+                var relative = System.IO.Path.GetRelativePath(src, file);
+                var target = System.IO.Path.Combine(dst, relative);
+                if (FileTransfer.TransferFile(file, target, ImportMode.Move, out _))
+                {
+                    resumed += new FileInfo(target).Length;
+                }
+                else
+                {
+                    failedFiles++;
+                }
+            }
+            moved++;
+            return resumed;
         }
 
         if (isDirectory)
@@ -444,13 +472,7 @@ public static class FlintLegacyMigration
             }
             // volume differs — fall through to the per-file walk
             long bytes = 0;
-            var options = new EnumerationOptions
-            {
-                RecurseSubdirectories = true,
-                IgnoreInaccessible = true,
-                AttributesToSkip = FileAttributes.ReparsePoint,
-            };
-            foreach (var file in Directory.EnumerateFiles(src, "*", options))
+            foreach (var file in FileTransfer.EnumerateFilesDeep(src))
             {
                 var relative = System.IO.Path.GetRelativePath(src, file);
                 var target = System.IO.Path.Combine(dst, relative);

@@ -11,7 +11,9 @@
 //    (FS::create_link and FS::clone are declared not ported in FileSystem.cs): the task
 //    fails with a clear message when they are requested. The link-only extras of
 //    copyFinished() (addLinkedInstanceId + allowed_symlinks.txt bookkeeping) are part of
-//    that path and are therefore not ported either.
+//    that path and are therefore not ported either. When it lands, it must pass
+//    m_origInstance.Uuid to AddLinkedInstanceId — DATA D3 makes the uuid the persisted
+//    reference form (the C++ passed id(), the dirname; that form is not carried over).
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Settings;

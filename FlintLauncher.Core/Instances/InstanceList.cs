@@ -218,6 +218,7 @@ public class InstanceList
             Add(newList);
         }
         RebuildInodeIndex(); // D2: the inode index follows every (re)discovery
+        ConvertLinkedInstanceReferences(); // D3: persisted link references are uuids
         MigrateTotalPlayTime();
         return InstListError.NoError;
     }
@@ -343,15 +344,63 @@ public class InstanceList
 
     public List<string> GetLinkedInstancesById(string id)
     {
+        // D3: the persisted reference form is the uuid; an entry written before its target
+        // was discovered (or between LoadList rounds) may still carry the dirname until the
+        // next conversion pass — match both forms, the same tolerance GroupOfInstance gives
+        // the group members.
+        var uuid = FindByUuidOrDirname(id)?.Uuid;
         var linkedInstances = new List<string>();
         foreach (var inst in _instances)
         {
-            if (inst.IsLinkedToInstanceId(id))
+            if (inst.GetLinkedInstances()
+                    .Any(item => item == id || (uuid is { Length: > 0 } && item == uuid)))
             {
                 linkedInstances.Add(inst.Id());
             }
         }
         return linkedInstances;
+    }
+
+    /// <summary>D3 import conversion for linkedInstances (the group-member precedent, D3:
+    /// "导入时转换" — the import lands dirnames, the discovery round converts them): a
+    /// dirname entry becomes the referenced instance's uuid when the now-complete discovery
+    /// can resolve it; unknown entries are kept verbatim and retried on the next LoadList.
+    /// A changed list persists through SetLinkedInstances — on a Prism-format instance that
+    /// write is the sanctioned dual-track conversion (the in-memory cfg import materializes
+    /// as instance.json); a converged list costs no write.</summary>
+    private void ConvertLinkedInstanceReferences()
+    {
+        foreach (var inst in _instances)
+        {
+            var linked = inst.GetLinkedInstances();
+            if (linked.Count == 0)
+            {
+                continue;
+            }
+            var converted = new List<string>(linked.Count);
+            var changed = false;
+            foreach (var entry in linked)
+            {
+                // uuid/dirname addressing only — a numeric entry must not resolve through
+                // the inode link (same boundary as ResolveMemberUuid)
+                var replacement = FindByUuidOrDirname(entry)?.Uuid;
+                if (replacement is not { Length: > 0 })
+                {
+                    converted.Add(entry);
+                    continue;
+                }
+                changed |= replacement != entry;
+                // the uuid form may already sit in a half-converted list — keep one
+                if (!converted.Contains(replacement))
+                {
+                    converted.Add(replacement);
+                }
+            }
+            if (changed || converted.Count != linked.Count)
+            {
+                inst.SetLinkedInstances(converted);
+            }
+        }
     }
 
     // ---------------------------------------------------------------------- group logic
@@ -452,10 +501,13 @@ public class InstanceList
         }
     }
 
-    /// <summary>D3 import conversion for group-file members: a dirname (the legacy and
-    /// Prism-import form) becomes the instance's uuid; unknown references return null and
-    /// are kept verbatim. The addressing here is deliberately uuid/dirname only — a
-    /// numeric member must not resolve through the inode link.</summary>
+    /// <summary>D3 reference conversion, shared by both persisted-reference forms: a dirname
+    /// (the legacy and Prism-import form — group-file members and linkedInstances entries)
+    /// becomes the instance's uuid; unknown references return null and are kept verbatim
+    /// (the group load retries; the linkedInstances pass retries at the next LoadList).
+    /// Also stamped onto every discovered instance as <see cref="BaseInstance.UuidResolver"/>
+    /// so the write path resolves dirname inputs. The addressing here is deliberately
+    /// uuid/dirname only — a numeric member must not resolve through the inode link.</summary>
     private string? ResolveMemberUuid(string member) =>
         member.Length == 0 ? null : GetInstanceById(member)?.Uuid;
 
@@ -782,21 +834,28 @@ public class InstanceList
         // the format discriminator: instance.json Misc.InstanceType (default OneSix) or the
         // imported cfg value
         var instType = Variant.AsString(instanceSettings.Get("InstanceType"));
+        BaseInstance inst;
         if (instType.Length != 0 && instType != "OneSix")
         {
             // Upstream (this revision) bails out with nullptr here: the folder is not listed
             // at all. Older MultiMC had dedicated Legacy/OneSixOld instance classes; the port
             // keeps such folders visible as broken instances instead (see the file header).
-            return new NullInstance(instanceSettings, instanceRoot);
+            inst = new NullInstance(instanceSettings, instanceRoot);
         }
-
-        var inst = new MinecraftInstance(instanceSettings, instanceRoot)
+        else
         {
-            Paths = Paths,
-            MetaCache = MetaCache,
-            LaunchServices = LaunchServices,
-            LauncherState = LauncherState,
-        };
+            inst = new MinecraftInstance(instanceSettings, instanceRoot)
+            {
+                Paths = Paths,
+                MetaCache = MetaCache,
+                LaunchServices = LaunchServices,
+                LauncherState = LauncherState,
+            };
+        }
+        // D3: the write-side uuid convention — a dirname handed to AddLinkedInstanceId
+        // resolves to the uuid at write time; an unresolvable input appends verbatim and
+        // converts at the next LoadList round (same deferral as the group members).
+        inst.UuidResolver = ResolveMemberUuid;
         return inst;
     }
 

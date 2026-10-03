@@ -44,13 +44,17 @@ public static class PrismImportPlanner
         "logs", "accounts", "assets", "icons", "instances", "libraries", "mods", "themes", "meta",
     ];
 
-    /// <summary>Top-level files of the whitelist, in import order. NOTE (CACHE E8): the
+    /// <summary>Top-level files of the whitelist, in import order. The MultiMC config is
+    /// dual-name (CONFIG.md:23: upstream MultiMC writes <c>multimc.cfg</c> — C++
+    /// Application.cpp:604 — while the historical detector carried only <c>mmc.cfg</c>, a
+    /// name the C++ tree never uses): both are imported when present. NOTE (CACHE E8): the
     /// Prism bare <c>metacache</c> ledger is deliberately NOT whitelisted — Flint never
     /// reads it, so importing it would only move dead stock; existing copies in the target
     /// directory are deleted once after a successful import (see PrismImportTask).</summary>
     public static readonly string[] ImportFiles =
     [
-        "accounts.json", "instgroups.json", "prismlauncher.cfg", "polymc.cfg", "mmc.cfg",
+        "accounts.json", "instgroups.json", "prismlauncher.cfg", "polymc.cfg", "multimc.cfg",
+        "mmc.cfg",
     ];
 
     public static IReadOnlyList<PrismImportPlanItem> Plan(string sourceDir, string targetDataDir, ImportMode mode)
@@ -66,7 +70,18 @@ public static class PrismImportPlanner
             var dst = System.IO.Path.Combine(targetDataDir, dir);
             if (Directory.Exists(dst))
             {
-                items.Add(new PrismImportPlanItem(dir, IsDirectory: true, PlannedMethod.DestinationExists,
+                // B2: Flint ALWAYS creates <data>/instances (InstanceList's constructor
+                // ensures the folder), so a flat "destination exists → skip" silently
+                // strands the whole imported tree behind an EmitSucceeded + imported record.
+                // The C++ migration runs before InstanceList and merges FILE BY FILE
+                // (FileSystem.cpp:403-471): drill down and plan the per-file merge whenever
+                // any source file is missing at the destination — files already there keep
+                // skipping (the idempotent merge), the planner's Files/Bytes stay the
+                // source basis so the walk's progress accounting stays exact.
+                var method = HasFilesMissingAtDestination(src, dst)
+                    ? PlannedMethod.PerFile
+                    : PlannedMethod.DestinationExists;
+                items.Add(new PrismImportPlanItem(dir, IsDirectory: true, method,
                     CountFiles(src), SizeOf(src)));
                 continue;
             }
@@ -96,14 +111,8 @@ public static class PrismImportPlanner
 
     public static long CountFiles(string dir)
     {
-        var options = new EnumerationOptions
-        {
-            RecurseSubdirectories = true,
-            IgnoreInaccessible = true,
-            AttributesToSkip = FileAttributes.ReparsePoint,
-        };
         var count = 0L;
-        foreach (var _ in Directory.EnumerateFiles(dir, "*", options))
+        foreach (var _ in FileTransfer.EnumerateFilesDeep(dir))
         {
             count++;
         }
@@ -112,14 +121,8 @@ public static class PrismImportPlanner
 
     public static long SizeOf(string dir)
     {
-        var options = new EnumerationOptions
-        {
-            RecurseSubdirectories = true,
-            IgnoreInaccessible = true,
-            AttributesToSkip = FileAttributes.ReparsePoint,
-        };
         var total = 0L;
-        foreach (var file in Directory.EnumerateFiles(dir, "*", options))
+        foreach (var file in FileTransfer.EnumerateFilesDeep(dir))
         {
             try
             {
@@ -130,6 +133,24 @@ public static class PrismImportPlanner
             }
         }
         return total;
+    }
+
+    /// <summary>B2: whether any file below <paramref name="srcDir"/> is missing at
+    /// <paramref name="dstDir"/> — the drill-down condition that turns a
+    /// "destination exists" directory into a resumable per-file merge. The same
+    /// enumeration and the same destination layout the import walk uses, so plan and
+    /// transfer can never disagree.</summary>
+    private static bool HasFilesMissingAtDestination(string srcDir, string dstDir)
+    {
+        foreach (var file in FileTransfer.EnumerateFilesDeep(srcDir))
+        {
+            var relative = System.IO.Path.GetRelativePath(srcDir, file);
+            if (!File.Exists(System.IO.Path.Combine(dstDir, relative)))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 }
 
@@ -163,8 +184,16 @@ public sealed class PrismImportTask : FlintTask
         _decisions = decisions;
     }
 
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
+        // C++ Task::start() ran the body on its own QThread; without a yield this body (no
+        // awaits below) would complete INLINE on the caller's thread — the migration
+        // endpoint's fire-and-forget StartAsync would block the POST until the whole
+        // transfer finished and an abort() could never arrive mid-import (the client only
+        // learns the task id from the 202, by which time the task is terminal). The yield
+        // makes the 202 truthful and the cooperative cancellation points below reachable.
+        await Task.Yield();
+
         EmitStatus("Scanning the source directory...");
 
         var plan = PrismImportPlanner.Plan(_sourceDir, _targetDataDir, _mode);
@@ -172,7 +201,7 @@ public sealed class PrismImportTask : FlintTask
         if (totalFiles == 0)
         {
             EmitFailed("Nothing to import: the source directory has no whitelisted content.");
-            return Task.CompletedTask;
+            return;
         }
 
         // the source inventory is read BEFORE any transfer: a same-volume move empties the
@@ -223,7 +252,7 @@ public sealed class PrismImportTask : FlintTask
         if (failed)
         {
             EmitFailed("Some paths could not be imported!");
-            return Task.CompletedTask;
+            return;
         }
 
         // CACHE E8: the target may still carry the Prism bare `metacache` ledger from
@@ -245,7 +274,6 @@ public sealed class PrismImportTask : FlintTask
 
         RecordImportDecision(plan, sourceInstances);
         EmitSucceeded();
-        return Task.CompletedTask;
     }
 
     /// <summary>S3/S7: the completed import lands as an `imported` decision record under the
@@ -309,13 +337,9 @@ public sealed class PrismImportTask : FlintTask
         {
             return [];
         }
-        var options = new EnumerationOptions
-        {
-            RecurseSubdirectories = true,
-            IgnoreInaccessible = true,
-            AttributesToSkip = FileAttributes.ReparsePoint,
-        };
-        return Directory.EnumerateFiles(dir, "*", options);
+        // B4: the transfer enumeration — file symlinks are yielded (copied by content,
+        // like the C++ ResolveSymlinks walk), directory links are not descended into
+        return FileTransfer.EnumerateFilesDeep(dir);
     }
 
     private static string Truncate(string relative) =>
@@ -325,11 +349,18 @@ public sealed class PrismImportTask : FlintTask
 /// <summary>Detects candidate Prism-family data directories at the per-OS default locations.</summary>
 public static class PrismSourceDetector
 {
-    /// <summary>Legacy launcher name → its own config file name.</summary>
+    /// <summary>Legacy launcher name → its own config file name. MultiMC appears twice
+    /// (CONFIG.md:23 dual-name probe): upstream MultiMC writes <c>multimc.cfg</c> (C++
+    /// Application.cpp:604; the C++ tree carries no <c>mmc.cfg</c>), while the historical
+    /// detector only probed <c>mmc.cfg</c> — so a genuine MultiMC directory never entered
+    /// the candidates. The Detect loop probes both names for the one directory (the
+    /// path-dedupe collapses the rows once the first name matched); upstream's
+    /// <c>multimc.cfg</c> wins when both exist.</summary>
     public static readonly (string Name, string ConfigFile)[] KnownLaunchers =
     [
         ("prism", "prismlauncher.cfg"),
         ("polymc", "polymc.cfg"),
+        ("multimc", "multimc.cfg"),
         ("multimc", "mmc.cfg"),
     ];
 
@@ -366,14 +397,16 @@ public static class PrismSourceDetector
     /// <summary>Scan the default parents for launcher data directories carrying one of the
     /// known config files, with the migration decision for the given Flint data directory
     /// (S3: <paramref name="decisions"/> carries the per-source decision records and upgrades
-    /// any legacy marker encountered).</summary>
+    /// any legacy marker encountered). <paramref name="currentConfigFile"/> is Flint's own
+    /// config at its authoritative position (post-reform <c>&lt;config-root&gt;/flint.json</c>)
+    /// — the existing-data probe behind <see cref="PrismSourceCandidate.TargetHasOwnConfig"/>.</summary>
     public static IReadOnlyList<PrismSourceCandidate> Detect(string targetDataDir,
-        MigrationDecisionStore? decisions = null) =>
-        Detect(targetDataDir, DefaultParents(), decisions);
+        MigrationDecisionStore? decisions = null, string? currentConfigFile = null) =>
+        Detect(targetDataDir, DefaultParents(), decisions, currentConfigFile);
 
     /// <summary>Detect over explicit parent directories (tests inject a sandbox root).</summary>
     public static IReadOnlyList<PrismSourceCandidate> Detect(string targetDataDir, IEnumerable<string> parents,
-        MigrationDecisionStore? decisions = null)
+        MigrationDecisionStore? decisions = null, string? currentConfigFile = null)
     {
         var found = new List<PrismSourceCandidate>();
         foreach (var parent in parents)
@@ -400,7 +433,7 @@ public static class PrismSourceDetector
                     ? Directory.EnumerateDirectories(instances).Count()
                     : 0;
                 var decision = DataMigration.Decide(targetDataDir, dir, name,
-                    configFile, "flint.cfg", decisions);
+                    configFile, "flint.cfg", decisions, currentConfigFile);
                 found.Add(new PrismSourceCandidate(dir, name, configFile,
                     ConfigFound: true, MarkerPresent: decision == DataMigration.MigrationDecision.MarkerPresent,
                     TargetHasOwnConfig: decision == DataMigration.MigrationDecision.CurrentDataExists,
@@ -410,9 +443,16 @@ public static class PrismSourceDetector
         return found;
     }
 
-    private static string NameToDirectory(string name) => name switch
+    /// <summary>The directory a legacy launcher's data lives under inside the scanned
+    /// parents. Linux aligns with the C++ probe path (Application.cpp:603): the MultiMC
+    /// sibling of the app-data location is the LOWERCASE <c>multimc</c> (the probe is
+    /// <c>AppDataLocation/../../multimc</c>, i.e. <c>~/.local/share/multimc</c> — exactly
+    /// where <see cref="DefaultParents"/> scans); the other platforms keep the installed
+    /// directory's capitalized name. Public because the migration endpoints map a source
+    /// directory back to its launcher id through it.</summary>
+    public static string NameToDirectory(string name) => name switch
     {
-        "multimc" => "MultiMC",
+        "multimc" => OperatingSystem.IsLinux() ? "multimc" : "MultiMC",
         "polymc" => "PolyMC",
         _ => "PrismLauncher",
     };

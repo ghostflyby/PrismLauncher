@@ -34,16 +34,51 @@ public static class FlintConfigKeys
         "FlameKeyOverride",
     ];
 
+    /// <summary>The C++ Setting synonym lists (launcher/Application.cpp registerSetting brace
+    /// lists): the legacy INI spellings → the primary registry key. The C++ settings chain
+    /// answered reads through the whole synonym list (INISettingsObject::retrieveValue walks
+    /// configKeys() and takes the first hit), so an old prismlauncher.cfg carrying e.g.
+    /// ProxyPassword/CFKeyOverride must land under the primary — not be silently dropped.
+    /// flint.json itself stays primary-name-only (the aliases are an INI-read compat layer);
+    /// the CentralModsDir|ModsDir pair is deliberately absent — the primary itself is
+    /// unregistered per DATA D8, and an alias of a dead key stays dead.</summary>
+    private static readonly Dictionary<string, string> AliasToPrimary = new(StringComparer.Ordinal)
+    {
+        // Application.cpp:740-742 (window size)
+        ["MCWindowMaximize"] = "LaunchMaximized",
+        ["MCWindowWidth"] = "MinecraftWinWidth",
+        ["MCWindowHeight"] = "MinecraftWinHeight",
+        // Application.cpp:746-749 (proxy)
+        ["ProxyHostName"] = "ProxyAddr",
+        ["ProxyUsername"] = "ProxyUser",
+        ["ProxyPassword"] = "ProxyPass", // the C4 secret alias — redirects with the primary
+        // Application.cpp:752-753 (memory)
+        ["MinMemoryAlloc"] = "MinMemAlloc",
+        ["MaxMemoryAlloc"] = "MaxMemAlloc",
+        // Application.cpp:811-813 (custom commands)
+        ["PreLoadCmd"] = "PreLoadCommand",
+        ["PreLaunchCmd"] = "PreLaunchCommand",
+        ["PostExitCmd"] = "PostExitCommand",
+        // Application.cpp:894 (resource mirror)
+        ["ResourceURL"] = "ResourceURLOverride",
+        // Application.cpp:912 (flame api key — the C4 secret alias)
+        ["CFKeyOverride"] = "FlameKeyOverride",
+    };
+
     private static readonly Dictionary<string, ConfigKeyEntry> AllMap = Build();
 
     /// <summary>Every registered key, ordered by name (deterministic adapter registration).</summary>
     public static IReadOnlyCollection<ConfigKeyEntry> All => AllMap.Values;
 
-    public static ConfigKeyEntry? Resolve(string key) => AllMap.GetValueOrDefault(key);
+    /// <summary>The primary registry name for an INI spelling: an alias folds to its primary,
+    /// a primary (or unknown key) passes through unchanged.</summary>
+    public static string Canonical(string key) => AliasToPrimary.GetValueOrDefault(key, key);
 
-    public static object? Default(string key) => AllMap.GetValueOrDefault(key)?.Default;
+    public static ConfigKeyEntry? Resolve(string key) => AllMap.GetValueOrDefault(Canonical(key));
 
-    public static bool IsSecret(string key) => SecretKeys.Contains(key);
+    public static object? Default(string key) => AllMap.GetValueOrDefault(Canonical(key))?.Default;
+
+    public static bool IsSecret(string key) => SecretKeys.Contains(Canonical(key));
 
     private static ConfigKeyEntry Entry(string key, Func<FlintConfigFile, object?> get,
         Func<FlintConfigFile, object?, FlintConfigFile> apply) =>

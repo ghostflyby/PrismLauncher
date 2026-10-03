@@ -7,13 +7,25 @@
 // untouched (C5: the write side is JSON-only now; read-compat only).
 //
 // The single pass sorts every INI key (CONFIG C4 + C9 + the key registry):
-//   1. secret trio (ProxyPass/ModrinthToken/FlameKeyOverride)  → ISecretStore
-//   2. C9 pseudo-config keys (playtime, java probe, offline name, the wizard ask)
-//      → launcher-state.json (the java probe QUINTET is dropped: S5's cache is keyed by the
-//      probed binary path, which the INI never recorded — it is a pure optimization that
-//      re-probes on the next launch)
+//   0. the C++ Setting synonyms fold onto the primary key first (E1: ProxyPassword→ProxyPass,
+//      CFKeyOverride→FlameKeyOverride, MCWindowWidth→MinecraftWinWidth, … — the old INI
+//      spellings must land, not drop); when both spellings are present the primary wins,
+//      like INISettingsObject::retrieveValue walking configKeys() primary-first
+//   1. secret trio (ProxyPass/ModrinthToken/FlameKeyOverride — aliases included) → ISecretStore
+//      under the PRIMARY name (C4)
+//   2. C9 pseudo-config keys (java probe, offline name, the wizard ask) → launcher-state.json
+//      (the java probe QUINTET is dropped: S5's cache is keyed by the probed binary path,
+//      which the INI never recorded — it is a pure optimization that re-probes on the next
+//      launch). TotalPlayTime/TotalPlayTimeMigrated keep an in-chain branch only as a
+//      compatibility fallback: their C++ home is <data-root>/playtime.cfg, probed separately
+//      beside the chain (E2 — the chain never carried them in a real Prism install)
 //   3. everything else → the record domains through the shared key registry (unknown keys
 //      — GUI geometry blobs, themes, ConfigVersion — stay in the INI, unread)
+//
+// After the pass, the automatic-java pair is re-derived the way the C++ did (E3): with a
+// non-empty imported JavaPath and no explicit AutomaticJavaSwitch/Download key, the pair
+// lands false in flint.json (Application.cpp computes the default from the INI-loaded
+// JavaPath before registering the keys; the typed records default them true unconditionally).
 using FlintLauncher.Core.Secrets;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.State;
@@ -91,26 +103,47 @@ public static class FlintConfigImporter
 
         // ---- single pass over the INI: sort every key to its destination -------------------
         var resolved = config.Current;
-        long totalPlayTime = 0;
-        var playtimeMigrated = false;
+        long? chainTotalPlayTime = null;
+        bool? chainPlaytimeMigrated = null;
         string lastOfflinePlayerName = "";
         string lastHostname = "";
         var userAskedAboutAutomaticJavaDownload = false;
         var sawStateKeys = false;
+        var sawExplicitAutomaticJavaSwitch = false;
+        var sawExplicitAutomaticJavaDownload = false;
 
-        foreach (var key in ini.Keys)
+        // E2: the playtime pair's real home — TotalPlayTime/TotalPlayTimeMigrated never lived
+        // in the flint.cfg chain: the C++ registers them on a separate INISettingsObject opened
+        // on the RELATIVE name "playtime.cfg" after chdir-ing to the data root
+        // (Application.cpp:445 + :943-949; BaseInstance.cpp:312-315 accumulates there), so a
+        // real prismlauncher.cfg never carries them. Probe <data-root>/playtime.cfg with the
+        // same QSettings codec, inside the one-shot window (the flint.json seal below ends the
+        // probing forever). The in-chain branches below stay as a compatibility fallback for
+        // files that somehow do carry the keys; per member, the playtime file outranks them.
+        var playtime = ReadPlaytimeFile(paths);
+
+        foreach (var iniKey in ini.Keys)
         {
-            if (key == QSettingsIniCodec.ConfigVersionKey)
+            if (iniKey == QSettingsIniCodec.ConfigVersionKey)
             {
                 continue;
             }
-            var value = ini.Get(key);
+            var value = ini.Get(iniKey);
             if (value is null || value.ValueKind == IniValue.Kind.Invalid)
             {
                 continue;
             }
 
-            // (1) the secret trio → the store, verbatim strings (C4)
+            // (0) E1: fold the C++ synonym spellings onto the primary key. When the file
+            // carries BOTH spellings the primary wins regardless of file order — the C++
+            // retrieveValue walks configKeys() primary-first.
+            var key = FlintConfigKeys.Canonical(iniKey);
+            if (key != iniKey && ini.Contains(key))
+            {
+                continue;
+            }
+
+            // (1) the secret trio → the store, verbatim strings, under the PRIMARY name (C4)
             if (FlintConfigKeys.IsSecret(key))
             {
                 var secret = Variant.AsString(Variant.FromIniValue(value));
@@ -121,16 +154,17 @@ public static class FlintConfigImporter
                 continue;
             }
 
-            // (2) the C9 pseudo-config keys → launcher-state.json
+            // (2) the C9 pseudo-config keys → launcher-state.json (the playtime pair is the
+            // in-chain compatibility fallback — see the E2 probe above)
             if (key == KeyTotalPlayTime)
             {
-                totalPlayTime = Variant.AsLong(Variant.FromIniValue(value));
+                chainTotalPlayTime = Variant.AsLong(Variant.FromIniValue(value));
                 sawStateKeys = true;
                 continue;
             }
             if (key == KeyTotalPlayTimeMigrated)
             {
-                playtimeMigrated = Variant.AsBool(Variant.FromIniValue(value));
+                chainPlaytimeMigrated = Variant.AsBool(Variant.FromIniValue(value));
                 sawStateKeys = true;
                 continue;
             }
@@ -158,6 +192,17 @@ public static class FlintConfigImporter
                 continue;
             }
 
+            // (2b) E3 bookkeeping: which half of the automatic-java pair the INI states
+            // explicitly (each key's derived default only applies to the other half)
+            if (key == "AutomaticJavaSwitch")
+            {
+                sawExplicitAutomaticJavaSwitch = true;
+            }
+            if (key == "AutomaticJavaDownload")
+            {
+                sawExplicitAutomaticJavaDownload = true;
+            }
+
             // (3) the rest → the record domains (unknown keys stay unread in the INI)
             if (FlintConfigKeys.Resolve(key) is { Secret: false } entry)
             {
@@ -165,14 +210,35 @@ public static class FlintConfigImporter
             }
         }
 
+        // ---- E3: re-derive the automatic-java defaults the way the C++ did ------------------
+        // Application.cpp:768-770 evaluates `JavaPath is empty` AFTER the INI loads and
+        // registers the pair with that per-key default — a cfg that pinned JavaPath while
+        // staying silent on the pair must NOT leave the typed records' unconditional true
+        // standing, or the auto-java machinery overrides the user's JVM on the next launch
+        // (AutoInstallJava.cs:52 / BaseInstance.cs:474). An explicit INI key wins for itself.
+        if (!string.IsNullOrEmpty(resolved.Java.JavaPath))
+        {
+            if (!sawExplicitAutomaticJavaSwitch && resolved.Java.AutomaticJavaSwitch == true)
+            {
+                resolved = resolved with { Java = resolved.Java with { AutomaticJavaSwitch = false } };
+            }
+            if (!sawExplicitAutomaticJavaDownload && resolved.Java.AutomaticJavaDownload == true)
+            {
+                resolved = resolved with { Java = resolved.Java with { AutomaticJavaDownload = false } };
+            }
+        }
+
         // ---- land the results: one state write, one config write (the one-shot seal) -------
-        if (sawStateKeys)
+        // E2 merge: per member, the playtime.cfg probe outranks the in-chain fallback
+        var playtimeTotal = playtime?.Total ?? chainTotalPlayTime ?? 0;
+        var playtimeMigrated = playtime?.Migrated ?? chainPlaytimeMigrated ?? false;
+        if (sawStateKeys || playtime is not null)
         {
             state.Update(current => current with
             {
                 Playtime = new PlaytimeState
                 {
-                    Total = totalPlayTime != 0 ? totalPlayTime : current.Playtime.Total,
+                    Total = playtimeTotal != 0 ? playtimeTotal : current.Playtime.Total,
                     Migrated = playtimeMigrated || current.Playtime.Migrated,
                 },
                 UserAskedAboutAutomaticJavaDownload = userAskedAboutAutomaticJavaDownload ||
@@ -208,5 +274,39 @@ public static class FlintConfigImporter
             }
         }
         return null;
+    }
+
+    /// <summary>The E2 playtime pair: which of TotalPlayTime/TotalPlayTimeMigrated carried a
+    /// usable value (either member may be absent — a half-populated playtime.cfg merges
+    /// member-by-member with the in-chain fallback).</summary>
+    private sealed record PlaytimePair(long? Total, bool? Migrated);
+
+    /// <summary>The C++ playtime home: <c>&lt;data-root&gt;/playtime.cfg</c> (the relative
+    /// name the C++ INISettingsObject opened against the chdir'd data root), read with the
+    /// same QSettings codec as the chain. Unreadable or key-less file → null (the probe is
+    /// silent, exactly like the C++ defaults of 0/false behind a missing file).</summary>
+    private static PlaytimePair? ReadPlaytimeFile(FlintPaths paths)
+    {
+        var file = Path.Combine(paths.DataRoot, "playtime.cfg");
+        if (!File.Exists(file))
+        {
+            return null;
+        }
+        var ini = new IniFile();
+        if (!ini.LoadFile(file))
+        {
+            return null;
+        }
+        long? total = null;
+        if (ini.Get("TotalPlayTime") is { ValueKind: not IniValue.Kind.Invalid } totalValue)
+        {
+            total = Variant.AsLong(Variant.FromIniValue(totalValue));
+        }
+        bool? migrated = null;
+        if (ini.Get("TotalPlayTimeMigrated") is { ValueKind: not IniValue.Kind.Invalid } migratedValue)
+        {
+            migrated = Variant.AsBool(Variant.FromIniValue(migratedValue));
+        }
+        return total is null && migrated is null ? null : new PlaytimePair(total, migrated);
     }
 }

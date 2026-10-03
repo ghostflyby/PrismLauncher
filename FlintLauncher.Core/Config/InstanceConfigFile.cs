@@ -186,8 +186,12 @@ public sealed record InstanceMiscConfig
     /// <summary>Count this instance's playtime into the launcher-state global total.</summary>
     public bool? CountGameTime { get; init; }
 
-    /// <summary>D3: uuid references to linked instances (dirname references are converted at
-    /// import; the C++ stored the same list as a JSON string — here it is a real array).</summary>
+    /// <summary>D3: the persisted reference form is the instance uuid. This layer stores the
+    /// list VERBATIM — the INI import lands whatever the Prism cfg carried (dirnames), and
+    /// the conversion to uuids is the discovery-side pass (InstanceList
+    /// ConvertLinkedInstanceReferences after each LoadList; unresolvable entries are retried
+    /// the next round, like the group-file members). The C++ stored the same list as a JSON
+    /// string — here it is a real array.</summary>
     public IReadOnlyList<string>? LinkedInstances { get; init; }
 
     public bool? GlobalDataPacksEnabled { get; init; }

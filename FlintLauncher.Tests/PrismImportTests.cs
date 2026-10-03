@@ -9,12 +9,50 @@ using Xunit;
 
 namespace FlintLauncher.Tests;
 
+/// <summary>Whether this environment can create symbolic links at all (Windows without the
+/// privilege cannot — the link-dependent tests bow out there instead of failing).</summary>
+internal static class SymlinkSupport
+{
+    public static bool CanCreateLinks()
+    {
+        var probe = Path.Combine(Path.GetTempPath(), $"flint-link-probe-{Guid.NewGuid():N}");
+        try
+        {
+            File.WriteAllText(probe, "x");
+            File.CreateSymbolicLink(probe + ".lnk", probe);
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(probe + ".lnk"))
+                {
+                    File.Delete(probe + ".lnk");
+                }
+                if (File.Exists(probe))
+                {
+                    File.Delete(probe);
+                }
+            }
+            catch (IOException)
+            {
+            }
+        }
+    }
+}
+
 public class FileTransferTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-xfer-{Guid.NewGuid():N}");
 
     public void Dispose()
     {
+        FileTransfer.CloneAttemptHook = null; // never leak the seam into another test
         try
         {
             Directory.Delete(_root, recursive: true);
@@ -114,6 +152,102 @@ public class FileTransferTests : IDisposable
     {
         Assert.True(FileTransfer.SameVolume(SrcPath("a"), DstPath("b")));
     }
+
+    // B1: on volumes without reflink support (ext4, Windows, cross-volume) TryClone fails
+    // for every file — the CoW branch must degrade to a plain copy like the Move branch
+    // does, or the whole import task EmitFailed's file by file
+    [Fact]
+    public void TransferFile_CopyOnWrite_FallsBackToPlainCopy_WhenReflinkUnavailable()
+    {
+        Directory.CreateDirectory(_root);
+        FileTransfer.CloneAttemptHook = (_, _) => false; // simulate a non-CoW volume
+        var src = WriteSrc("a.txt", "payload");
+
+        Assert.True(FileTransfer.TransferFile(src, DstPath("a.txt"), ImportMode.CopyOnWrite,
+            out var method));
+
+        Assert.Equal("payload", File.ReadAllText(DstPath("a.txt")));
+        Assert.Equal(TransferMethod.Copy, method); // not a false, and not a fake Reflink
+        Assert.True(File.Exists(src)); // CoW keeps the source
+    }
+
+    // B5: the transferred file must carry the source's permission bits — accounts.json is
+    // 0600 in a Prism data directory and must not land world-readable
+    [Fact]
+    public void TransferFile_CarriesTheSourcePermissionBits()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return; // no Unix permission bits on Windows
+        }
+        Directory.CreateDirectory(_root);
+        var src = WriteSrc("accounts.json", "{}");
+        File.SetUnixFileMode(src, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+
+        // every path that lands bytes: reflink (macOS clonefile / Linux FICLONE+carry),
+        // plain copy, and the CoW fallback's copy
+        Assert.True(FileTransfer.TransferFile(src, DstPath("cow.json"), ImportMode.CopyOnWrite, out _));
+        Assert.True(FileTransfer.TransferFile(src, DstPath("copy.json"), ImportMode.Copy, out _));
+        FileTransfer.CloneAttemptHook = (_, _) => false;
+        Assert.True(FileTransfer.TransferFile(src, DstPath("fallback.json"), ImportMode.CopyOnWrite, out _));
+
+        var expected = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        Assert.Equal(expected, File.GetUnixFileMode(DstPath("cow.json")));
+        Assert.Equal(expected, File.GetUnixFileMode(DstPath("copy.json")));
+        Assert.Equal(expected, File.GetUnixFileMode(DstPath("fallback.json")));
+    }
+
+    // B5: the mode-carry helper itself — the exact call the Linux FICLONE branch makes
+    // after a successful ioctl (not otherwise reachable on this OS)
+    [Fact]
+    public void CarryUnixFileMode_SetsTheDestinationModeFromTheSource()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+        Directory.CreateDirectory(_root);
+        Directory.CreateDirectory(DstPath(""));
+        var src = WriteSrc("secret.txt", "s");
+        var dst = DstPath("secret.txt");
+        File.WriteAllText(dst, "stale");
+        File.SetUnixFileMode(src, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        File.SetUnixFileMode(dst, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead
+            | UnixFileMode.OtherRead);
+
+        FileTransfer.CarryUnixFileMode(src, dst);
+
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(dst));
+    }
+
+    // B4: the migration enumeration — file symlinks are yielded (the C++ ResolveSymlinks
+    // walk copies them by content), directory links are never descended into, link cycles
+    // cannot spin the walk
+    [Fact]
+    public void EnumerateFilesDeep_YieldsFileLinksAndHiddenFiles_NeverDescendsDirectoryLinks()
+    {
+        if (!SymlinkSupport.CanCreateLinks())
+        {
+            return; // Windows without symlink privilege
+        }
+        Directory.CreateDirectory(_root);
+        Directory.CreateDirectory(SrcPath("real/loopA"));
+        Directory.CreateDirectory(SrcPath("real/loopB"));
+        WriteSrc("real/loopA/inner.txt", "m");
+        WriteSrc("real/.hidden", "h");
+        File.CreateSymbolicLink(SrcPath("real/link.txt"), SrcPath("real/loopA/inner.txt"));
+        // a directory link, and a directory-link CYCLE the walk must survive
+        Directory.CreateSymbolicLink(SrcPath("real/dirlink"), SrcPath("real/loopA"));
+        Directory.CreateSymbolicLink(SrcPath("real/loopA/intoB"), SrcPath("real/loopB"));
+        Directory.CreateSymbolicLink(SrcPath("real/loopB/intoA"), SrcPath("real/loopA"));
+
+        var files = FileTransfer.EnumerateFilesDeep(SrcPath("real"))
+            .Select(f => Path.GetRelativePath(SrcPath("real"), f).Replace('\\', '/'))
+            .OrderBy(f => f, StringComparer.Ordinal).ToList();
+
+        // no dirlink/*, no loopB/*, no cycle runaway — exactly the real files + the file link
+        Assert.Equal([".hidden", "link.txt", "loopA/inner.txt"], files);
+    }
 }
 
 public class PrismImportPlannerTests : IDisposable
@@ -173,6 +307,90 @@ public class PrismImportPlannerTests : IDisposable
             ImportMode.CopyOnWrite));
     }
 
+    // A1/A2 (CONFIG.md:23): the whitelist carries BOTH MultiMC config names — the upstream
+    // multimc.cfg (C++ Application.cpp:604) plus the historical mmc.cfg
+    [Fact]
+    public void ImportFiles_Carry_The_MultiMC_Dual_Name()
+    {
+        Assert.Contains("multimc.cfg", PrismImportPlanner.ImportFiles);
+        Assert.Contains("mmc.cfg", PrismImportPlanner.ImportFiles);
+    }
+
+    // B2: Flint startup ALWAYS creates <data>/instances — a destination directory must not
+    // swallow the whole item: the plan drills down into the per-file merge
+    [Fact]
+    public void Plan_DestinationDirectoryExists_PlansTheMergeWhenFilesAreMissing()
+    {
+        Directory.CreateDirectory(_root);
+        Directory.CreateDirectory(Path.Combine(_root, "src", "instances", "demo"));
+        File.WriteAllText(Path.Combine(_root, "src", "instances", "demo", "instance.cfg"), "x");
+        Directory.CreateDirectory(Path.Combine(_root, "dst", "instances")); // what Flint startup creates
+
+        var plan = PrismImportPlanner.Plan(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
+            ImportMode.CopyOnWrite);
+
+        var instances = plan.Single(p => p.Name == "instances");
+        Assert.Equal(PlannedMethod.PerFile, instances.Method); // NOT DestinationExists
+        Assert.Equal(1, instances.Files); // the source basis — the walk visits exactly these
+    }
+
+    // B2: a destination that already holds every source file stays an honest skip
+    [Fact]
+    public void Plan_DestinationDirectoryExists_StillReportsSkipWhenFullyMerged()
+    {
+        Directory.CreateDirectory(_root);
+        Directory.CreateDirectory(Path.Combine(_root, "src", "meta", "net.minecraft"));
+        File.WriteAllText(Path.Combine(_root, "src", "meta", "net.minecraft", "index.json"), "{}");
+        Directory.CreateDirectory(Path.Combine(_root, "dst", "meta", "net.minecraft"));
+        File.WriteAllText(Path.Combine(_root, "dst", "meta", "net.minecraft", "index.json"), "{}");
+
+        var plan = PrismImportPlanner.Plan(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
+            ImportMode.CopyOnWrite);
+
+        Assert.Equal(PlannedMethod.DestinationExists, plan.Single(p => p.Name == "meta").Method);
+    }
+
+    // B4: the planned file count covers file symlinks (they transfer by content) while
+    // directory links add nothing — plan and walk can never disagree
+    [Fact]
+    public void Plan_CountsFileSymlinks_WhileNotDescendingDirectoryLinks()
+    {
+        if (!SymlinkSupport.CanCreateLinks())
+        {
+            return; // Windows without symlink privilege
+        }
+        Directory.CreateDirectory(_root);
+        Directory.CreateDirectory(Path.Combine(_root, "src", "instances", "real"));
+        Directory.CreateDirectory(Path.Combine(_root, "src", "instances", "other"));
+        File.WriteAllText(Path.Combine(_root, "src", "instances", "real", "marker.txt"), "m");
+        File.WriteAllText(Path.Combine(_root, "src", "instances", "other", "unrelated.txt"), "u");
+        File.CreateSymbolicLink(Path.Combine(_root, "src", "instances", "real", "link.txt"),
+            Path.Combine(_root, "src", "instances", "real", "marker.txt"));
+        Directory.CreateSymbolicLink(Path.Combine(_root, "src", "instances", "dirlink"),
+            Path.Combine(_root, "src", "instances", "other"));
+
+        var plan = PrismImportPlanner.Plan(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
+            ImportMode.CopyOnWrite);
+
+        Assert.Equal(3, plan.Single(p => p.Name == "instances").Files); // marker + link + unrelated
+    }
+
+    // A1: a source carrying only the upstream multimc.cfg plans its import
+    [Fact]
+    public void Plan_Imports_The_Upstream_MultimcCfg()
+    {
+        Directory.CreateDirectory(_root);
+        Directory.CreateDirectory(Path.Combine(_root, "src"));
+        File.WriteAllText(Path.Combine(_root, "src", "multimc.cfg"), "x");
+
+        var item = Assert.Single(PrismImportPlanner.Plan(Path.Combine(_root, "src"),
+            Path.Combine(_root, "dst"), ImportMode.CopyOnWrite));
+
+        Assert.Equal("multimc.cfg", item.Name);
+        Assert.False(item.IsDirectory);
+        Assert.Equal(1, item.Files);
+    }
+
     private static void TryDelete(string path)
     {
         try
@@ -191,8 +409,11 @@ public class PrismImportTaskTests : IDisposable
 
     public PrismImportTaskTests() => Directory.CreateDirectory(_root);
 
-    public void Dispose() =>
+    public void Dispose()
+    {
+        FileTransfer.CloneAttemptHook = null; // never leak the seam into another test
         TryDelete(_root);
+    }
 
     [Fact]
     public async Task ImportTask_MergesWhitelistedContent_AndWritesImportedRecord()
@@ -244,6 +465,26 @@ public class PrismImportTaskTests : IDisposable
         Assert.True(record.Bytes > 0);
     }
 
+    // B1 at the task level: on a volume without reflink support the CoW import used to
+    // fail EVERY file and EmitFailed the whole task — the copy fallback must carry it
+    [Fact]
+    public async Task ImportTask_OnReflinklessVolume_StillSucceedsThroughTheCopyFallback()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "src", "instances", "demo"));
+        File.WriteAllText(Path.Combine(_root, "src", "instances", "demo", "instance.cfg"), "x");
+        File.WriteAllText(Path.Combine(_root, "src", "accounts.json"), "{}");
+        FileTransfer.CloneAttemptHook = (_, _) => false; // simulate ext4/Windows/cross-volume
+
+        var task = new PrismImportTask(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
+            ImportMode.CopyOnWrite);
+        await task.StartAsync();
+
+        Assert.True(task.WasSuccessful, task.FailReason);
+        Assert.True(File.Exists(Path.Combine(_root, "dst", "instances", "demo", "instance.cfg")));
+        Assert.True(File.Exists(Path.Combine(_root, "dst", "accounts.json")));
+        Assert.True(File.Exists(Path.Combine(_root, "src", "accounts.json"))); // CoW keeps the source
+    }
+
     [Fact]
     public async Task ImportTask_NoWhitelistedContent_Fails()
     {
@@ -254,6 +495,39 @@ public class PrismImportTaskTests : IDisposable
 
         Assert.Equal(TaskState.Failed, task.State);
         Assert.Contains("Nothing to import", task.FailReason);
+    }
+
+    // B2 production scenario: Flint startup ALWAYS creates <data>/instances before any
+    // import can run — the import must merge the instance tree into the existing
+    // directory and succeed, not skip the whole item behind an imported record
+    [Fact]
+    public async Task ImportTask_PreExistingInstancesDirectory_MergesTheTree_AndSucceeds()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "src", "instances", "demo"));
+        File.WriteAllText(Path.Combine(_root, "src", "instances", "demo", "instance.cfg"),
+            "InstanceType=OneSix\nname=demo\n");
+        File.WriteAllText(Path.Combine(_root, "src", "prismlauncher.cfg"), "k=v");
+        Directory.CreateDirectory(Path.Combine(_root, "dst", "instances")); // Flint startup's own creation
+        // pre-existing sibling content must survive the merge untouched
+        Directory.CreateDirectory(Path.Combine(_root, "dst", "instances", "native"));
+        File.WriteAllText(Path.Combine(_root, "dst", "instances", "native", "instance.cfg"), "native");
+
+        var decisions = new MigrationDecisionStore(Path.Combine(_root, "state", "migration"),
+            FlintLauncher.Web.FlintJsonContext.Default.MigrationDecisionRecord);
+        var task = new PrismImportTask(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
+            ImportMode.CopyOnWrite, "prism", decisions);
+        await task.StartAsync();
+
+        Assert.True(task.WasSuccessful, task.FailReason);
+        Assert.True(File.Exists(Path.Combine(_root, "dst", "instances", "demo", "instance.cfg")));
+        Assert.Equal("native", File.ReadAllText(
+            Path.Combine(_root, "dst", "instances", "native", "instance.cfg"))); // not clobbered
+
+        // and the success is honest: the record lands only WITH the tree actually merged
+        var record = decisions.Read("prism");
+        Assert.NotNull(record);
+        Assert.Equal(MigrationDecisionRecord.Imported, record!.Decision);
+        Assert.Equal(1, record.Instances);
     }
 
     [Fact]
@@ -331,6 +605,92 @@ public class PrismSourceDetectorTests : IDisposable
         var hit = Assert.Single(candidates, c => c.Path.EndsWith("PrismLauncher"));
         Assert.True(hit.MarkerPresent);
         Assert.Equal(DataMigration.MigrationDecision.MarkerPresent, hit.Decision);
+    }
+
+    // A1: upstream MultiMC writes multimc.cfg (C++ Application.cpp:604; the C++ tree
+    // carries no mmc.cfg) — the upstream name alone must surface a MultiMC source, which
+    // the historical mmc.cfg-only probe never did
+    [Fact]
+    public void Detect_MultiMC_Is_Found_Via_The_Upstream_MultimcCfg()
+    {
+        var multimc = Path.Combine(_root, PrismSourceDetector.NameToDirectory("multimc"));
+        Directory.CreateDirectory(multimc);
+        File.WriteAllText(Path.Combine(multimc, "multimc.cfg"), "x");
+
+        var candidates = PrismSourceDetector.Detect(_root, [_root]);
+
+        var hit = Assert.Single(candidates);
+        Assert.Equal("multimc", hit.LegacyName);
+        Assert.Equal("multimc.cfg", hit.ConfigFile);
+        Assert.True(hit.ConfigFound);
+        Assert.Equal(DataMigration.MigrationDecision.ReadyToMigrate, hit.Decision);
+    }
+
+    // A1 (CONFIG.md:23 dual-name): the historical mmc.cfg stays probed as the fallback name
+    [Fact]
+    public void Detect_MultiMC_Is_Still_Found_Via_The_Historical_MmcCfg()
+    {
+        var multimc = Path.Combine(_root, PrismSourceDetector.NameToDirectory("multimc"));
+        Directory.CreateDirectory(multimc);
+        File.WriteAllText(Path.Combine(multimc, "mmc.cfg"), "x");
+
+        var candidates = PrismSourceDetector.Detect(_root, [_root]);
+
+        var hit = Assert.Single(candidates);
+        Assert.Equal("multimc", hit.LegacyName);
+        Assert.Equal("mmc.cfg", hit.ConfigFile);
+    }
+
+    // A1: both names in one directory → ONE candidate, and the upstream multimc.cfg wins
+    [Fact]
+    public void Detect_MultiMC_With_Both_Config_Names_Is_One_Candidate_Preferring_Upstream()
+    {
+        var multimc = Path.Combine(_root, PrismSourceDetector.NameToDirectory("multimc"));
+        Directory.CreateDirectory(multimc);
+        File.WriteAllText(Path.Combine(multimc, "multimc.cfg"), "x");
+        File.WriteAllText(Path.Combine(multimc, "mmc.cfg"), "x");
+
+        var hit = Assert.Single(PrismSourceDetector.Detect(_root, [_root]));
+
+        Assert.Equal("multimc", hit.LegacyName);
+        Assert.Equal("multimc.cfg", hit.ConfigFile);
+    }
+
+    // A1: the MultiMC probe path follows the C++ shape (Application.cpp:603
+    // AppDataLocation/../../multimc): LOWERCASE on Linux (where DefaultParents scans
+    // ~/.local/share), the installed directory's capitalized name elsewhere
+    [Fact]
+    public void NameToDirectory_MultiMC_Follows_The_Cpp_Probe_Path()
+    {
+        Assert.Equal(OperatingSystem.IsLinux() ? "multimc" : "MultiMC",
+            PrismSourceDetector.NameToDirectory("multimc"));
+        Assert.Equal("PolyMC", PrismSourceDetector.NameToDirectory("polymc"));
+        Assert.Equal("PrismLauncher", PrismSourceDetector.NameToDirectory("prism"));
+    }
+
+    // A3: the existing-data decision runs against the CONFIG root's flint.json (CONFIG C5)
+    // — the pre-reform <data>/flint.cfg position is dead, so the C++ protection
+    // (Application.cpp:1994-1999) must fire on the authoritative position again
+    [Fact]
+    public void Detect_Existing_Target_Config_Reports_CurrentDataExists_Via_The_Config_Root()
+    {
+        var prism = Path.Combine(_root, "PrismLauncher");
+        Directory.CreateDirectory(prism);
+        File.WriteAllText(Path.Combine(prism, "prismlauncher.cfg"), "x");
+        var configRoot = Path.Combine(_root, "config");
+        Directory.CreateDirectory(configRoot);
+        var flintJson = Path.Combine(configRoot, "flint.json");
+
+        // no flint.json yet → ready to migrate
+        var before = Assert.Single(PrismSourceDetector.Detect(_root, [_root], null, flintJson));
+        Assert.Equal(DataMigration.MigrationDecision.ReadyToMigrate, before.Decision);
+        Assert.False(before.TargetHasOwnConfig);
+
+        // Flint's own config appears → the C++ existing-data protection fires
+        File.WriteAllText(flintJson, "{}");
+        var hit = Assert.Single(PrismSourceDetector.Detect(_root, [_root], null, flintJson));
+        Assert.Equal(DataMigration.MigrationDecision.CurrentDataExists, hit.Decision);
+        Assert.True(hit.TargetHasOwnConfig);
     }
 
     private static void TryDelete(string path)
