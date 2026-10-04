@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/java/JavaUtils.{h,cpp} (JVM discovery + the process-environment cleaner).
 //
-// The C++ class is stateless, so the port flattens it into a static class. Per-platform notes:
-//  - macOS (the primary Flint dev/host platform): upstream does NOT call /usr/libexec/java_home;
-//    it is a pure filesystem scan of the JVM bundle directories (/Library/Java/JavaVirtualMachines,
-//    /System/Library/Java/JavaVirtualMachines, sdkman, asdf, ~/Library/Java/JavaVirtualMachines and
-//    a few fixed legacy paths). The port follows that 1:1.
-//  - Windows: the registry walk (FindJavaFromRegistryKey) needs Win32 P/Invoke surface that is out
-//    of scope for a portable .NET port; it is stubbed to an empty list and the port keeps the
-//    well-known-path and directory-scan candidates, the bundles and the env fallback.
-//  - Linux/BSD: the directory scans (including the Gentoo/AOSC name filters and $SNAP mirroring)
-//    are ported 1:1.
-//  - getJavaCheckPath() ports Application::getJarPath("JavaCheck.jar") and falls back to the
-//    JavaCheckJar cache extraction (a documented stub in P5-a, see JavaCheckJar.cs).
+// The C++ class is stateless, so the port flattens it into a static class. Discovery is now
+// layered, with the JavaChecker run remaining the validity gate (enumeration may over-produce):
+//  - Layer 1 — JdkFind provider suite (NuGet JdkFind, Apache-2.0): validated Java homes
+//    (bin/java + release, plain / macOS-bundle / Homebrew-keg layouts) from JAVA_HOME, PATH,
+//    the macOS JVM directories, /usr/lib/jvm, Homebrew kegs, Windows registry + Program Files
+//    vendor dirs, ~/.jdks, SDKMAN, Gradle toolchains, Jabba and Scoop. This closes the
+//    documented Windows-registry stub below and adds the sources the C++ scan never had.
+//  - Layer 2 — the C++-parity filesystem scan (the per-platform branches): fixed legacy
+//    candidates, release-less JVMs (old Apple/Oracle runtimes), the distro directories and
+//    name filters JdkFind deliberately does not model (Gentoo/AOSC, /usr/java, /usr/lib64/jvm,
+//    /opt/jdk*, /opt/ibm, /app/jdk, $SNAP mirroring, asdf, FreeBSD/OpenBSD /usr/local).
+//  - Layer 3 — launcher-owned sources: the Minecraft launcher runtime bundle, the
+//    launcher-managed java root, the FLINT_JAVA_PATHS environment override.
 using System.Runtime.InteropServices;
+using JdkFind;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 
@@ -151,9 +153,36 @@ public static class JavaUtils
             javas = [GetDefaultJava().Path];
         }
 
+        // Layer 1 on top of the legacy platform scan: the JdkFind provider suite. Overlap
+        // between the layers is harmless — the exact-string dedup below collapses identical
+        // candidates, and the checker run is the validity gate either way.
+        javas.AddRange(FindJavaPathsFromProviders(JdkFinder.Default.Providers));
+
         javas.AddRange(GetMinecraftJavaBundle());
         javas.AddRange(GetPrismJavaBundle(javaRoot));
         javas = AddJavasFromEnv(javas);
+        return DistinctStable(javas);
+    }
+
+    /// <summary>Layer-1 seam over the JdkFind provider suite: every provider's validated Java
+    /// homes (each already passed <c>JavaHomeLayout.Probe</c> — bin/java + release, plain,
+    /// macOS-bundle or Homebrew-keg layout) mapped to the launcher executable path. Providers
+    /// self-noop on the platforms they do not cover, so the suite is passed through untouched;
+    /// duplicate homes across providers (JAVA_HOME pointing into a scanned directory, ...) are
+    /// collapsed with the same exact-string dedup the composition uses. The suite deliberately
+    /// bypasses <c>JdkFinder.Locate</c>: its release-file parsing would drop release-less JVMs
+    /// the checker can still validate, and its runtime probe spawns a process per JVM that the
+    /// checker already runs.</summary>
+    internal static List<string> FindJavaPathsFromProviders(IReadOnlyList<IJvmProvider> providers)
+    {
+        var javas = new List<string>();
+        foreach (var provider in providers)
+        {
+            foreach (var home in provider.GetJavaHomes())
+            {
+                javas.Add(FileSystem.PathCombine(home, "bin", JavaExecutable));
+            }
+        }
         return DistinctStable(javas);
     }
 
@@ -246,12 +275,14 @@ public static class JavaUtils
     }
 
     /// <summary>
-    /// Port of JavaUtils::FindJavaFromRegistryKey (Windows only). NOT IMPLEMENTED in the .NET
-    /// port: reading the registry per view (KEY_WOW64_64KEY/32KEY) across HKCU/HKLM requires
-    /// Win32 P/Invoke that a portable build avoids; the upstream keys are the Oracle
-    /// (SOFTWARE\JavaSoft\*), AdoptOpenJDK, Eclipse Adoptium/Foundation, IBM Semeru, Microsoft
-    /// JDK, Azul Zulu and BellSoft Liberica locations, each carrying a JavaHome/Path value.
-    /// Documented skip — the port keeps the remaining discovery paths for Windows.
+    /// Port of JavaUtils::FindJavaFromRegistryKey (Windows only). The port's original stub
+    /// (Win32 P/Invoke registry walks were out of scope) is superseded by the JdkFind layer:
+    /// <c>WindowsRegistryJvmProvider</c> walks the JavaSoft / Eclipse Adoptium / Microsoft /
+    /// Azul / Amazon Corretto roots via Microsoft.Win32 (HKLM 64-bit view) and
+    /// <c>WindowsProgramFilesJvmProvider</c> covers the vendor directories under
+    /// %ProgramFiles%. This stub is kept only as the marker of the remaining delta vs the
+    /// C++ walk (AdoptOpenJDK/IBM Semeru roots and the WOW64 32-bit view, both of which
+    /// JdkFind scopes out deliberately) and returns nothing.
     /// </summary>
     private static List<JavaInstall> FindJavaFromRegistryKey(uint keyType, string keyName, string keyJavaDir, string subkeySuffix = "")
     {

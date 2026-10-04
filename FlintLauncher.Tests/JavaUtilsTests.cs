@@ -2,7 +2,10 @@
 // Tests for the JVM discovery (macOS-first, matching the host machine), the process environment
 // cleaner and the JavaCheck.jar lookup. The macOS discovery is a filesystem scan (upstream does
 // not call java_home), so the "real JDK" test is guarded like RealDataSmokeTests: it only
-// asserts when this machine actually has a JDK installed.
+// asserts when this machine actually has a JDK installed. Discovery is layered — the JdkFind
+// provider suite on top of the C++-parity filesystem scan — and both layers are tested here.
+using JdkFind;
+using JdkFind.Providers;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Java;
 using Xunit;
@@ -12,6 +15,7 @@ namespace FlintLauncher.Tests;
 public class JavaUtilsTests : IDisposable
 {
     private readonly List<(string name, string? value)> _savedEnv = [];
+    private readonly List<string> _tempRoots = [];
 
     public void Dispose()
     {
@@ -19,6 +23,23 @@ public class JavaUtilsTests : IDisposable
         {
             Environment.SetEnvironmentVariable(name, value);
         }
+        foreach (var root in _tempRoots)
+        {
+            try
+            {
+                Directory.Delete(root, recursive: true);
+            }
+            catch (DirectoryNotFoundException)
+            {
+            }
+        }
+    }
+
+    private string TempRoot()
+    {
+        var root = Directory.CreateTempSubdirectory("flint-jdkfind-test").FullName;
+        _tempRoots.Add(root);
+        return root;
     }
 
     private void SetEnv(string name, string? value)
@@ -104,6 +125,68 @@ public class JavaUtilsTests : IDisposable
         Assert.Equal("unknown", java.Arch);
         Assert.Equal(OperatingSystem.IsWindows() ? "javaw" : "java", java.Path);
         Assert.Equal(java.Path, JavaUtils.MakeJavaPtr(java.Path, "java", "unknown").Path);
+    }
+
+    [Fact]
+    public void FindJavaPaths_IncludesJdkFindProviderHomes()
+    {
+        // a synthetic plain-layout JDK home (bin/java + release): the JdkFind provider
+        // contract (JavaHomeLayout.Probe) validates it, and the executable mapping turns
+        // the home into a candidate path
+        var root = TempRoot();
+        var home = Path.Combine(root, "jdk-21.0.5");
+        Directory.CreateDirectory(Path.Combine(home, "bin"));
+        File.WriteAllText(Path.Combine(home, "bin",
+            OperatingSystem.IsWindows() ? "java.exe" : "java"), "");
+        File.WriteAllText(Path.Combine(home, "release"), "JAVA_VERSION=\"21.0.5\"\n");
+
+        IJvmProvider provider = OperatingSystem.IsWindows()
+            ? new WindowsProgramFilesJvmProvider([root])
+            : OperatingSystem.IsMacOS()
+                ? new MacOsJvmProvider([root])
+                : new LinuxJvmProvider(root);
+
+        var candidates = JavaUtils.FindJavaPathsFromProviders([provider]);
+
+        // home/bin/<executable>, deduplicated across providers like the composition does
+        Assert.Equal([Path.Combine(home, "bin", JavaUtils.JavaExecutable)],
+            candidates);
+    }
+
+    [Fact]
+    public void FindJavaPaths_MapsEveryProviderHomeToTheExecutable()
+    {
+        // two providers reporting the same home must not double-report the candidate
+        var root = TempRoot();
+        var home = Path.Combine(root, "Contents", "Home");
+        Directory.CreateDirectory(Path.Combine(home, "bin"));
+        File.WriteAllText(Path.Combine(home, "bin",
+            OperatingSystem.IsWindows() ? "java.exe" : "java"), "");
+        File.WriteAllText(Path.Combine(home, "release"), "JAVA_VERSION=\"17.0.2\"\n");
+
+        var candidates = JavaUtils.FindJavaPathsFromProviders(
+            [new MacOsJvmProvider([root]), new JavaHomeJvmProvider(root)]);
+
+        Assert.Equal([Path.Combine(home, "bin", JavaUtils.JavaExecutable)], candidates);
+    }
+
+    [Fact]
+    public void FindJavaPaths_OnMacOS_IncludesHomebrewKegHomes()
+    {
+        // the Homebrew keg layout (libexec/openjdk.jdk/Contents/Home) is a JdkFind-only
+        // source: the legacy filesystem scan never looked under the brew prefix
+        var keg = "/opt/homebrew/opt/openjdk";
+        if (!OperatingSystem.IsMacOS() || !Directory.Exists(keg))
+        {
+            return;
+        }
+
+        var candidates = JavaUtils.FindJavaPaths();
+
+        Assert.Contains(candidates, c =>
+            c.StartsWith("/opt/homebrew/opt/openjdk", StringComparison.Ordinal) &&
+            c.EndsWith("/bin/java", StringComparison.Ordinal) &&
+            File.Exists(c));
     }
 
     // ------------------------------------------------------------- environment

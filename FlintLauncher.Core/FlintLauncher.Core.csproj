@@ -40,6 +40,9 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+    <!-- JVM enumeration (Apache-2.0, GPL-3.0-compatible): the provider suite backs the
+         first discovery layer in JavaUtils.FindJavaPaths. -->
+    <PackageReference Include="JdkFind" Version="0.2.0" />
   </ItemGroup>
 
   <Target Name="NewLaunchJar" Inputs="@(NewLaunchSource)" Outputs="$(JarOutputDir)NewLaunch.jar" Condition="'$(FlintSkipJarBuild)' != 'true'">
