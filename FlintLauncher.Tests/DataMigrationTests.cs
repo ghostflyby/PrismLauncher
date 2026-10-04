@@ -196,6 +196,59 @@ public class DataMigrationTests : IDisposable
             DataMigration.Decide(current2, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
     }
 
+    // C++ wrote the marker under the DISPLAY launcher name (PolyMC/MultiMC,
+    // Application.cpp:599/604+1977) while this port's source ids are lowercase — a
+    // C++-era display-case marker must still be honored when the decision is probed under
+    // the lowercase id, on case-sensitive filesystems too
+    [Fact]
+    public void Decide_Honors_The_Cpp_Display_Case_Marker_Under_The_Lowercase_Id()
+    {
+        var decisions = Decisions();
+        var current = MakeDir("PolyMC_nomigrate.txt");
+        var old = MakeDir(PolyMcConfigFile, "instances/a.zip");
+
+        Assert.Equal(DataMigration.MigrationDecision.MarkerPresent,
+            DataMigration.Decide(current, old, "polymc", PolyMcConfigFile, LauncherConfigFile, decisions));
+
+        // the upgrade ran: the display-case marker is deleted and the lowercase-id record
+        // carries the declined@unknown decision
+        Assert.False(File.Exists(Path.Combine(current, "PolyMC_nomigrate.txt")));
+        var record = decisions.Read("polymc");
+        Assert.NotNull(record);
+        Assert.Equal(MigrationDecisionRecord.Declined, record!.Decision);
+        Assert.Equal(MigrationDecisionRecord.UnknownAt, record.At);
+    }
+
+    // the no-store variant of the same display-case scenario: the marker counts
+    // (case-insensitively) and stays in place — without a store nothing upgrades it away
+    [Fact]
+    public void Decide_Legacy_Display_Case_Marker_Counts_Without_A_Store()
+    {
+        var current = MakeDir("PolyMC_nomigrate.txt");
+        var old = MakeDir(PolyMcConfigFile, "instances/a.zip");
+
+        Assert.Equal(DataMigration.MigrationDecision.MarkerPresent,
+            DataMigration.Decide(current, old, "polymc", PolyMcConfigFile, LauncherConfigFile));
+        Assert.True(File.Exists(Path.Combine(current, "PolyMC_nomigrate.txt")));
+    }
+
+    // a decision-store write failure must not escape Decide: the marker on disk already
+    // encodes the decision, so the probe still reports decided and the marker stays in place
+    [Fact]
+    public void Decide_Tolerates_A_Failing_Decision_Store_And_Keeps_The_Marker()
+    {
+        var current = MakeDir("PolyMC_nomigrate.txt");
+        var old = MakeDir(PolyMcConfigFile, "instances/a.zip");
+        // a FILE occupies the migration records path, so every store Write throws
+        var blocker = Path.Combine(_dir, "blocked-store-" + Guid.NewGuid().ToString("N"));
+        File.WriteAllText(blocker, "a file blocks the migration records directory");
+        var decisions = new MigrationDecisionStore(blocker, FlintJsonContext.Default.MigrationDecisionRecord);
+
+        Assert.Equal(DataMigration.MigrationDecision.MarkerPresent,
+            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
+        Assert.True(File.Exists(DataMigration.NoMigrateMarkerPath(current, "PolyMC")));
+    }
+
     // idempotency: after a successful migration the decision record exists, so re-running is
     // a no-op
     [Fact]

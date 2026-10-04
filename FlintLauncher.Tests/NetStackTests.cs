@@ -142,6 +142,131 @@ public class NetStackTests : IDisposable
         Assert.True(matched.IsStale);
     }
 
+    [Fact]
+    public void MetaCache_Load_SkipsUnreadableLedger()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return; // posix chmod-based negative case
+        }
+        var indexPath = TempPath("metacache-unreadable");
+        var basePath = TempPath("cache-root3");
+        Directory.CreateDirectory(basePath);
+        var file = Path.Combine(basePath, "f.json");
+        File.WriteAllText(file, "{}");
+
+        // seed a valid ledger exactly like MetaCache_SaveLoad_RoundTrip
+        using (var cache = new HttpMetaCache(indexPath))
+        {
+            cache.AddBase("general", basePath);
+            var entry = cache.ResolveEntry("general", "f.json");
+            entry.SetStale(false);
+            entry.Etag = "\"seed\"";
+            entry.Md5Sum = Convert.ToHexString(MD5.HashData("{}"u8.ToArray())).ToLowerInvariant();
+            entry.LocalChangedTimestamp = new DateTimeOffset(File.GetLastWriteTimeUtc(file)).ToUnixTimeMilliseconds();
+            entry.IsEternal = true;
+            Assert.True(cache.UpdateEntry(entry));
+            cache.SaveNow();
+        }
+
+        // C++ Load() silently skips a ledger it cannot open and rebuilds from scratch: the
+        // metacache is a true cache whose loss only costs re-downloads, so an unreadable
+        // ledger file (here: chmod 000) must not make the host fail to start.
+        File.SetUnixFileMode(indexPath, UnixFileMode.None);
+
+        var cache2 = new HttpMetaCache(indexPath);
+        cache2.AddBase("general", basePath);
+        var ex = Record.Exception(cache2.Load);
+        Assert.Null(ex);
+
+        // the skipped ledger means a cold cache: the next resolve takes the rebuild path
+        var resolved = cache2.ResolveEntry("general", "f.json");
+        Assert.True(resolved.IsStale);
+
+        // restore before Dispose(): SaveNow() rewrites the ledger, which needs write access
+        File.SetUnixFileMode(indexPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        cache2.Dispose();
+    }
+
+    [Fact]
+    public void MetaCache_Load_SkipsLedgerLockedByExclusiveHandle()
+    {
+        var indexPath = TempPath("metacache-locked");
+        var basePath = TempPath("cache-root4");
+        Directory.CreateDirectory(basePath);
+        var file = Path.Combine(basePath, "f.json");
+        File.WriteAllText(file, "{}");
+
+        // seed a valid ledger (as above) so the test can tell "skipped" from "loaded"
+        using (var cache = new HttpMetaCache(indexPath))
+        {
+            cache.AddBase("general", basePath);
+            var entry = cache.ResolveEntry("general", "f.json");
+            entry.SetStale(false);
+            entry.Etag = "\"seed\"";
+            entry.Md5Sum = Convert.ToHexString(MD5.HashData("{}"u8.ToArray())).ToLowerInvariant();
+            entry.LocalChangedTimestamp = new DateTimeOffset(File.GetLastWriteTimeUtc(file)).ToUnixTimeMilliseconds();
+            entry.IsEternal = true;
+            Assert.True(cache.UpdateEntry(entry));
+            cache.SaveNow();
+        }
+
+        // C++ Load() opens the ledger read-only and silently returns when that fails, so a
+        // ledger held under an exclusive handle (FileShare.None) must not make Load() throw.
+        using (File.Open(indexPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            using var cache2 = new HttpMetaCache(indexPath);
+            cache2.AddBase("general", basePath);
+            var ex = Record.Exception(cache2.Load);
+            Assert.Null(ex);
+
+            // where the share mode is enforced (Windows, macOS) the read fails and Load()
+            // takes the silent-skip path — a cold cache resolve; on platforms without
+            // in-process share enforcement Load() simply succeeds, which is equally valid.
+            var resolved = cache2.ResolveEntry("general", "f.json");
+            if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+            {
+                Assert.True(resolved.IsStale);
+            }
+        }
+    }
+
+    [Fact]
+    public void MetaCache_ResolveEntry_UnreadableCachedFile_BecomesStale()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return; // posix chmod-based negative case
+        }
+        var indexPath = TempPath("metacache-unreadable-cache");
+        var basePath = TempPath("cache-root5");
+        Directory.CreateDirectory(basePath);
+        var file = Path.Combine(basePath, "locked.json");
+        File.WriteAllText(file, "{}");
+
+        // seed a valid entry exactly like MetaCache_SaveLoad_RoundTrip
+        using var cache = new HttpMetaCache(indexPath);
+        cache.AddBase("general", basePath);
+        var entry = cache.ResolveEntry("general", "locked.json");
+        entry.SetStale(false);
+        entry.Etag = "\"seed\"";
+        entry.Md5Sum = Convert.ToHexString(MD5.HashData("{}"u8.ToArray())).ToLowerInvariant();
+        entry.LocalChangedTimestamp = new DateTimeOffset(File.GetLastWriteTimeUtc(file)).ToUnixTimeMilliseconds();
+        entry.IsEternal = true;
+        Assert.True(cache.UpdateEntry(entry));
+        cache.SaveNow();
+
+        // C++ degrades a cached file that exists but cannot be opened to a stale (disowned)
+        // entry so the download task rebuilds it; the resolve must not throw.
+        File.SetUnixFileMode(file, UnixFileMode.None);
+        var resolved = cache.ResolveEntry("general", "locked.json");
+        Assert.True(resolved.IsStale);
+
+        // the bad entry was disowned: a second resolve returns a fresh stale entry too
+        var again = cache.ResolveEntry("general", "locked.json");
+        Assert.True(again.IsStale);
+    }
+
     // ---------------------------------------------------------------- live requests
 
     [Fact]

@@ -252,8 +252,11 @@ public static class FlintLegacyMigration
     /// <summary>The STARTUP entry (assembly step 5): probe and, when an UNDECIDED legacy
     /// layout is detected, remount it (Move semantics: same-volume rename, cross-volume
     /// clone/copy + source delete — the flat layout is gone after the pass) and seal with
-    /// the decision record. The S3 record gates the AUTO-RUN only — it must never gate the
-    /// remount itself (an upgraded user carries the record permanently; a second prism
+    /// the decision record. Every detected legacy root remounts in the ONE pass (the data
+    /// root and a legacy home root — the double-legacy state an import crash leaves behind)
+    /// and one complete aggregate seals the single profile-level record. The S3 record
+    /// gates the AUTO-RUN only — it must never gate the remount itself (an upgraded user
+    /// carries the record permanently; a second prism
     /// import lands fresh shared content at the data root afterwards, and that remount is
     /// the record-less <see cref="Execute"/> entry). A no-op probe (anchors present but
     /// nothing whitelisted to remount) writes NO record: nothing was imported, and the
@@ -270,23 +273,70 @@ public static class FlintLegacyMigration
             return Result.Skipped;
         }
 
-        var result = Execute(paths, candidates[0].Path);
-        if (result.Ran && result.Error is null)
+        // BOTH legacy roots remount in one eager pass (a double-legacy state: a prism import
+        // landed shared content at the data root and the process died before the
+        // OnImportFinished remount, while the home root is itself a pre-reform total
+        // directory — remounting only the first detected root would strand the other behind
+        // the sealed record forever). The probe mirrors LegacySourceRoot's predicates: data
+        // root first, home root second; a single-legacy layout degenerates to one iteration.
+        var roots = new List<string>();
+        if (FlintLegacyMigrationProfile.HasLegacyAnchor(paths.DataRoot))
         {
-            // a COMPLETE remount seals the startup auto-run: the probe never fires again
-            decisions?.Write(new MigrationDecisionRecord
-            {
-                Source = FlintLegacyMigrationProfile.ProfileName,
-                Decision = MigrationDecisionRecord.Imported,
-                At = DateTimeOffset.Now.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
-                Mode = "move",
-                Instances = Directory.Exists(System.IO.Path.Combine(paths.DataRoot, "instances"))
-                    ? Directory.EnumerateDirectories(System.IO.Path.Combine(paths.DataRoot, "instances")).Count()
-                    : 0,
-                Bytes = result.Bytes,
-            });
+            roots.Add(paths.DataRoot);
         }
-        return result;
+        if (paths.HomeRoot is { } home && home != paths.DataRoot &&
+            FlintLegacyMigrationProfile.HasLegacyAnchor(home))
+        {
+            roots.Add(home);
+        }
+
+        var ran = false;
+        var moved = 0;
+        long bytes = 0;
+        var ledgerCleaned = false;
+        string? error = null;
+        foreach (var root in roots)
+        {
+            var pass = Execute(paths, root);
+            ran |= pass.Ran;
+            moved += pass.ItemsMoved;
+            bytes += pass.Bytes;
+            ledgerCleaned |= pass.LegacyLedgerCleaned;
+            if (pass.Error is not null)
+            {
+                // the single-source semantics hold across roots: an incomplete pass stops the
+                // aggregate and seals NO record — the next startup resumes the idempotent merge
+                error = pass.Error;
+                break;
+            }
+        }
+
+        if (ran && error is null)
+        {
+            // a COMPLETE remount seals the startup auto-run: the probe never fires again.
+            // Fault-tolerant like PrismImportTask.RecordImportDecision: the record seals a
+            // COMPLETE remount; a failed seal write resumes as an honest no-op probe next
+            // startup (the remount itself already tolerated IO failures).
+            try
+            {
+                decisions?.Write(new MigrationDecisionRecord
+                {
+                    Source = FlintLegacyMigrationProfile.ProfileName,
+                    Decision = MigrationDecisionRecord.Imported,
+                    At = DateTimeOffset.Now.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+                    Mode = "move",
+                    Instances = Directory.Exists(System.IO.Path.Combine(paths.DataRoot, "instances"))
+                        ? Directory.EnumerateDirectories(System.IO.Path.Combine(paths.DataRoot, "instances")).Count()
+                        : 0,
+                    Bytes = bytes,
+                });
+            }
+            catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException
+                                     or NotSupportedException or System.Security.SecurityException)
+            {
+            }
+        }
+        return new Result(ran, moved, bytes, ledgerCleaned, error);
     }
 
     /// <summary>The RECORD-LESS transfer entry (the prism import-finished hook,

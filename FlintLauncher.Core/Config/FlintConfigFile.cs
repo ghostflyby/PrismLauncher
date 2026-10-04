@@ -189,7 +189,13 @@ public sealed record JavaConfig
 /// semantics since the E2 remount (GLOBAL §3).</summary>
 public sealed record DirsConfig
 {
-    /// <summary>QStandardPaths::writableLocation(DownloadLocation) approximation.</summary>
+    /// <summary>QStandardPaths::writableLocation(DownloadLocation) approximation. The C++
+    /// default (Application.cpp:710) is platform-sharp: Qt reads XDG_DOWNLOAD_DIR from
+    /// user-dirs.dirs on Linux and SHGetKnownFolderPath(FOLDERID_Downloads) on Windows, so
+    /// a localized/redirected downloads folder diverges from this Home+"Downloads" default.
+    /// Zero core consumers until the downloads-dir drop/move feature (C++ BlockedModsDialog)
+    /// is ported; re-align there if that ever matters — imported DownloadsDir values are
+    /// unaffected.</summary>
     public static string DefaultDownloadsDir =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
 

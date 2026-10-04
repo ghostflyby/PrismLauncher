@@ -354,6 +354,10 @@ public sealed class InstanceGroupModel
 
             // Make sure the format version matches, otherwise fail.
             // (QJsonValue::toVariant().toInt() accepts both numbers and numeric strings)
+            // toVariant().toInt() never throws upstream — an unrepresentable number simply
+            // fails the version match (a decimal like 1.5 rounds to 2 and is rejected there
+            // too). TryGetInt32 keeps that silent-reject shape; a raw GetInt32 would unwind
+            // a FormatException through Load into a group-endpoint 500.
             if (!TryGetFormatVersion(rootObj, out var formatVersion) || formatVersion != GroupFormatVersion)
             {
                 return false;
@@ -460,6 +464,30 @@ public sealed class InstanceGroupModel
             Save();
         }
         return true;
+    }
+
+    /// <summary>D3: re-resolve members kept verbatim at load (dirnames of instances not yet
+    /// discovered — the promise the load-time comment makes). Called after every discovery
+    /// round; a conversion keeps the member's group so counts are untouched, and the file is
+    /// rewritten once when something actually resolved.</summary>
+    public bool ConvertUnresolvedMembers(Func<string, string?> uuidResolver)
+    {
+        var changed = false;
+        foreach (var member in _memberGroups.Keys.ToList())
+        {
+            if (uuidResolver(member) is { Length: > 0 } uuid && uuid != member)
+            {
+                var group = _memberGroups[member];
+                _memberGroups.Remove(member);
+                _memberGroups[uuid] = group;
+                changed = true;
+            }
+        }
+        if (changed)
+        {
+            Save();
+        }
+        return changed;
     }
 
     /// <summary>The group file format version (g_GROUP_FILE_FORMAT_VERSION — the STRING
@@ -578,7 +606,10 @@ public sealed class InstanceGroupModel
         switch (value.ValueKind)
         {
             case JsonValueKind.Number:
-                version = value.GetInt32();
+                if (!value.TryGetInt32(out version))
+                {
+                    return false;
+                }
                 return true;
             case JsonValueKind.String:
                 return int.TryParse(value.GetString(), out version);

@@ -151,3 +151,37 @@ public class QSettingsIniAtTypeTests
         }
     }
 }
+
+public class QSettingsIniKeyEscapeTests
+{
+    // iniUnescapedKey is per-code-unit (see QSettingsIniCodec.UnescapeKey): each %XX becomes
+    // exactly one QChar, so a run of %XX escapes means Latin-1-range characters — never a
+    // UTF-8 byte sequence. The golden/torture fixtures (IniFileGoldenTests) pin the rest of
+    // the key grammar ([%General], %2F, %20) against the same change.
+
+    [Fact]
+    public void Percent_Xx_Run_Decodes_Per_Code_Unit_Not_As_Utf8()
+    {
+        // "a%C3%A9b" is a, U+00C3, U+00A9, b — the old byte-run merge folded it to "aéb"
+        var map = QSettingsIniCodec.Parse("a%C3%A9b=v\n");
+        Assert.Equal(new[] { "a\u00C3\u00A9b" }, map.Keys);
+        Assert.Equal("v", map["a\u00C3\u00A9b"].String);
+    }
+
+    [Fact]
+    public void Single_Latin1_Escape_Decodes_To_Its_Code_Point()
+    {
+        // %E9 -> U+00E9 "é"
+        var map = QSettingsIniCodec.Parse("%E9c=v\n");
+        Assert.Equal("\u00E9c", map.Keys.Single());
+    }
+
+    [Fact]
+    public void Percent_U_Escapes_One_Code_Point()
+    {
+        // %U4E2D -> U+4E2D "中"
+        var map = QSettingsIniCodec.Parse("%U4E2D=v\n");
+        Assert.Equal("\u4E2D", map.Keys.Single());
+        Assert.Equal("v", map["\u4E2D"].String);
+    }
+}

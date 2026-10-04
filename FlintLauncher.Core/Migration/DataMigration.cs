@@ -121,9 +121,15 @@ public sealed class DataMigrationTask : FlintTask
 
     /// <summary>The FS::copy dry run: files (including hidden ones) below the source
     /// directory, matched against the whitelist on the '/'-separated relative path. A missing
-    /// source directory fails the walk, like FS::copy returning false. File symlinks are
-    /// matched (and copied by content below — the C++ ResolveSymlinks walk); directory
-    /// links are not descended into.</summary>
+    /// source directory fails the walk — a deliberate divergence: C++ FS::copy actually
+    /// returns true for a missing root (empty QDirListing, FileSystem.cpp:467; the
+    /// non-directory root is then filtered out by the whitelist matcher on the empty relative
+    /// path, FileSystem.cpp:404/474-475; <c>return err.value() == 0</c>, FileSystem.cpp:514),
+    /// so the C++ task "succeeds" with 0 files and its scan-failure message is unreachable.
+    /// This port prefers a loud failure for direct callers (tests/embedded hosts); the real
+    /// pipeline never reaches this — Decide requires an existing old config first. File
+    /// symlinks are matched (and copied by content below — the C++ ResolveSymlinks walk);
+    /// directory links are not descended into.</summary>
     private bool Walk(out List<string> matched)
     {
         matched = [];
@@ -262,7 +268,10 @@ public static class DataMigration
     /// upgraded on sight — it becomes a declined@unknown record and the marker file is
     /// deleted (the markers stop existing; the record carries the decision). Without a
     /// <paramref name="decisions"/> store only the legacy marker is consulted (bare
-    /// fixtures); it is then left in place.</summary>
+    /// fixtures); it is then left in place. The upgrade write is best-effort (the same
+    /// tolerance PrismImportTask's record write has): the marker on disk already encodes the
+    /// decision, so a failed record write keeps it in place and the decision still
+    /// holds.</summary>
     internal static bool DecisionAlreadyMade(string currentData, string name, MigrationDecisionStore? decisions)
     {
         if (decisions is not null && decisions.Read(name) is not null)
@@ -270,30 +279,60 @@ public static class DataMigration
             return true;
         }
 
-        var legacyMarker = NoMigrateMarkerPath(currentData, name);
-        if (!File.Exists(legacyMarker))
+        var legacyMarker = FindLegacyMarker(currentData, name);
+        if (legacyMarker is null)
         {
             return false;
         }
         if (decisions is not null)
         {
-            decisions.Write(new MigrationDecisionRecord
-            {
-                Source = name,
-                Decision = MigrationDecisionRecord.Declined,
-                At = MigrationDecisionRecord.UnknownAt,
-            });
+            // both steps are best-effort (the same filter PrismImportTask.RecordImportDecision
+            // uses): the disk marker itself already encodes the decision — the same stance as
+            // the no-store branch — so a failed record write keeps it in place and a failed
+            // delete only leaves an inert leftover; either way no failure escapes
             try
             {
+                decisions.Write(new MigrationDecisionRecord
+                {
+                    Source = name,
+                    Decision = MigrationDecisionRecord.Declined,
+                    At = MigrationDecisionRecord.UnknownAt,
+                });
                 File.Delete(legacyMarker);
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException
-                                     or ArgumentException or NotSupportedException
-                                     or System.Security.SecurityException)
+            catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException
+                                     or NotSupportedException or System.Security.SecurityException)
             {
-                // best effort — the record exists; the leftover marker is inert
             }
         }
         return true;
+    }
+
+    /// <summary>The legacy "<c>name</c>_nomigrate.txt" marker for <paramref name="name"/> in
+    /// <paramref name="currentData"/>, or null when none is present. The exact-path probe
+    /// comes first (this port's own lowercase ids); when it misses, ANY file whose name
+    /// matches case-insensitively counts — C++ wrote the marker under the DISPLAY launcher
+    /// name ("PolyMC"/"MultiMC", Application.cpp:599/604+1977) while this port's source ids
+    /// are lowercase (PrismImport.KnownLaunchers), and only a case-insensitive match keeps a
+    /// C++-era decision honored on case-sensitive filesystems.</summary>
+    private static string? FindLegacyMarker(string currentData, string name)
+    {
+        var exact = NoMigrateMarkerPath(currentData, name);
+        if (File.Exists(exact))
+        {
+            return exact;
+        }
+        if (Directory.Exists(currentData))
+        {
+            foreach (var file in Directory.EnumerateFiles(currentData, "*_nomigrate.txt"))
+            {
+                if (string.Equals(System.IO.Path.GetFileName(file), NoMigrateMarkerName(name),
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return file;
+                }
+            }
+        }
+        return null;
     }
 }

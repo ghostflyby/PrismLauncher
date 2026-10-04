@@ -47,7 +47,14 @@ public static class InstanceIniImporter
 
         // pass 1: collect the gate values — from the Override* keys ONLY, scanning the whole
         // file (INI keys are unique, so a full scan has no first/last ambiguity; the key
-        // position relative to its family's value keys is irrelevant by construction)
+        // position relative to its family's value keys is irrelevant by construction).
+        // Synonym gate spellings (OverrideCommands/OverrideLaunchCmd both map to the
+        // OverrideCommands family) are settled LAST-WINS by file order here, while the C++
+        // retrieveValue walks configKeys() primary-first (INISettingsObject.cpp:123 —
+        // BaseInstance.cpp:110 declares OverrideCommands first). Only a hand-edited cfg
+        // carrying both spellings with conflicting values can tell the difference: the C++
+        // write path never produces one (changeSetting writes the primary and removes the
+        // synonyms), so Prism-produced data stays unambiguous.
         var gates = new Dictionary<string, bool>(StringComparer.Ordinal);
         foreach (var key in ini.Keys)
         {

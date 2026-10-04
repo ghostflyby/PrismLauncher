@@ -219,6 +219,13 @@ public class InstanceList
         }
         RebuildInodeIndex(); // D2: the inode index follows every (re)discovery
         ConvertLinkedInstanceReferences(); // D3: persisted link references are uuids
+        if (_groupsLoaded)
+        {
+            // D3: discovery is complete — dirname members resolve now (the model was loaded
+            // earlier in this session with some references unresolvable; without this the
+            // conversion waits for the next process). Never forces the lazy group load.
+            _groups.ConvertUnresolvedMembers(ResolveMemberUuid);
+        }
         MigrateTotalPlayTime();
         return InstListError.NoError;
     }

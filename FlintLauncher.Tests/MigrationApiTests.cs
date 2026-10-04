@@ -79,6 +79,28 @@ public class MigrationApiTests
         Assert.Equal("declined", record.RootElement.GetProperty("decision").GetString());
     }
 
+    // the decline record write is best-effort (like the C++ setDoNotMigrate,
+    // Application.cpp:2015-2026): a state root that cannot take the record must still
+    // return 204 — the worst case is the source being re-proposed, the honest undecided
+    // semantic — never a 500
+    [Fact]
+    public async Task Decline_With_Unwritable_State_Root_Still_Returns_NoContent()
+    {
+        await using var host = await FlintApiHost.StartAsync();
+        // a FILE occupies the migration records directory, so the endpoint's store Write throws
+        var migrationDir = Path.Combine(host.HomeDir, "state", "migration");
+        if (Directory.Exists(migrationDir))
+        {
+            Directory.Delete(migrationDir, recursive: true);
+        }
+        File.WriteAllText(migrationDir, "a file blocks the migration records directory");
+        var source = MakePrismSource(TempRoot());
+
+        var response = await host.PostAsync("/api/v1/migration/prism/decline", new { source });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
     [Fact]
     public async Task Import_Unknown_Source_Is_Rejected_Including_Its_DryRun()
     {

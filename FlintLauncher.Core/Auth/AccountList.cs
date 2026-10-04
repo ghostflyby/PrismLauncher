@@ -217,6 +217,12 @@ public sealed class AccountList
         }
 
         const string newName = "accounts-old.json";
+        // Deliberate divergence from C++ (AccountList.cpp:478-481): the C++ passes a bare relative name to QFile::rename,
+        // which resolves against the PROCESS CWD — the rename usually fails (or lands elsewhere) whenever the CWD is not
+        // the data directory, despite the warning text promising a rename to accounts-old.json. Flint keeps the process
+        // CWD non-load-bearing (see WebHostBuilder), so the backup is created next to the original file — the behavior
+        // the warning actually describes. Both sides return false and never load old-format accounts; on any failure
+        // the original file is left untouched.
         // Attempt to rename the old version.
         try
         {

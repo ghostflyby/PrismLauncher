@@ -214,6 +214,12 @@ public sealed class IniFile
     {
         if (value.ValueKind == IniValue.Kind.ByteArray)
         {
+            // WideBarVisibility_* base64s like the C++ migration table did when this port was
+            // made (upstream added it in 7e174f53a, removed with the feature in 3d006bd0b) —
+            // kept so older Prism cfgs still migrate; no importer consumes these keys.
+            // s_otherByteArrays uses the lossless per-byte Latin-1 form where C++'s
+            // QString::fromUtf8 substitutes U+FFFD into binary state; neither side's migrated
+            // value is ever read back.
             if (key.StartsWith("WideBarVisibility_", StringComparison.Ordinal) ||
                 (key.StartsWith("UI/", StringComparison.Ordinal) && key.EndsWith("_Page/Columns", StringComparison.Ordinal)))
             {

@@ -137,6 +137,21 @@ public sealed class HttpMetaCache : IDisposable
             return StaleEntry(baseId, resourcePath);
         }
 
+        // C++ also requires the file to be readable (finfo.isReadable()): a cached file
+        // that exists but cannot be opened (chmod 000, foreign owner) is degraded to a
+        // stale entry AND disowned, so the download task rebuilds it instead of failing.
+        // The probe costs one open/close — the same order as C++'s per-resolve
+        // QFileInfo::isReadable (stat+access).
+        try
+        {
+            using var probe = File.OpenRead(realPath);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            Disown(baseId, resourcePath);
+            return StaleEntry(baseId, resourcePath);
+        }
+
         if (expectedEtag.Length > 0 && expectedEtag != entry.Etag)
         {
             Disown(baseId, resourcePath);
@@ -153,8 +168,10 @@ public sealed class HttpMetaCache : IDisposable
                 using var stream = File.OpenRead(realPath);
                 md5Sum = Convert.ToHexStringLower(System.Security.Cryptography.MD5.HashData(stream));
             }
-            catch (IOException)
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
             {
+                // no disown here (C++ keeps the entry when the md5 open fails after the
+                // stat succeeded — a TOCTOU race), so a later resolve can still recover.
                 return StaleEntry(baseId, resourcePath);
             }
             if (entry.Md5Sum != md5Sum)
@@ -279,6 +296,14 @@ public sealed class HttpMetaCache : IDisposable
         }
         catch (JsonException)
         {
+            return;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            // C++ Load() silently skips a ledger that exists but cannot be opened
+            // (index.open(ReadOnly) fails -> bare return): the metacache is a true cache
+            // whose loss only costs re-downloads, so the host keeps starting and the
+            // ledger is rebuilt from scratch instead of failing startup.
             return;
         }
         if (root is not JsonObject rootObj)

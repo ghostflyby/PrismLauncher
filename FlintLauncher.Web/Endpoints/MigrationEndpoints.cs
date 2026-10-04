@@ -120,13 +120,24 @@ public static class MigrationEndpoints
                 return ApiJson.Error("invalid_source",
                     $"source directory '{request.Source}' is not a known launcher data directory", 400);
             }
-            // S3: the decline is an auditable decision record, not an empty marker file
-            runtime.MigrationDecisions.Write(new Core.Migration.MigrationDecisionRecord
+            // S3: the decline is an auditable decision record, not an empty marker file —
+            // but the write is best-effort like the C++ setDoNotMigrate
+            // (Application.cpp:2015-2026): the worst case is the source being re-proposed,
+            // which is the honest undecided semantic, so an IO failure here must not surface
+            // as a 500.
+            try
             {
-                Source = name,
-                Decision = Core.Migration.MigrationDecisionRecord.Declined,
-                At = DateTimeOffset.Now.ToString("o"),
-            });
+                runtime.MigrationDecisions.Write(new Core.Migration.MigrationDecisionRecord
+                {
+                    Source = name,
+                    Decision = Core.Migration.MigrationDecisionRecord.Declined,
+                    At = DateTimeOffset.Now.ToString("o"),
+                });
+            }
+            catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException
+                                     or NotSupportedException or System.Security.SecurityException)
+            {
+            }
             return Results.NoContent();
         });
     }

@@ -28,6 +28,10 @@ internal static class QSettingsIniCodec
             var trimmed = line.Trim();
             if (trimmed.Length == 0 || trimmed.StartsWith('#') || trimmed.StartsWith(';'))
             {
+                // Qt's IniFormat treats only ';' as a comment start (qsettings.cpp readIniLine):
+                // a '#' line containing '=' yields a junk key Qt reads and we deliberately drop
+                // — no known key starts with '#'. Lone-CR line endings (which Qt accepts) are
+                // likewise never produced by QSettings on any supported OS.
                 continue;
             }
             if (trimmed.StartsWith('[') && trimmed.EndsWith(']'))
@@ -120,6 +124,11 @@ internal static class QSettingsIniCodec
         {
             // @Variant/@Point/@Rect/@Size/@DateTime(...): keep verbatim; QDataStream-backed
             // shapes are not needed by the launcher core and would not round-trip if decoded.
+            // Qt 6 additionally decodes @Point/@Size/@Rect textually, strips one '@' from
+            // @@-prefixed list elements (stringListToVariantList) and tolerates trailing
+            // whitespace after @Invalid() — none of these shapes occur in Prism-written 1.3
+            // data (Env is stored as a quoted JSON string), so every other @-form is kept
+            // verbatim on purpose; decoding @Variant would require a QDataStream reader.
             return IniValue.Raw(s);
         }
         return IniValue.From(s);
@@ -312,29 +321,11 @@ internal static class QSettingsIniCodec
     /// <summary>Port of QSettings' iniUnescapedKey: '\\' becomes '/', %XX/%UXXXX decode characters.</summary>
     private static string UnescapeKey(string key)
     {
+        // Qt's iniUnescapedKey decodes each %XX to one QChar (per-code-unit escaping,
+        // qsettings.cpp iniEscapedKey/iniUnescapedKey) — multi-escape runs mean
+        // Latin-1-range characters, never UTF-8 sequences.
         var sb = new System.Text.StringBuilder();
-        var byteRun = new List<byte>();
         var i = 0;
-        void FlushByteRun()
-        {
-            if (byteRun.Count == 0)
-            {
-                return;
-            }
-            // %XX escapes may form UTF-8 sequences; decode them, falling back to Latin-1
-            try
-            {
-                sb.Append(System.Text.Encoding.UTF8.GetString(byteRun.ToArray()));
-            }
-            catch (Exception)
-            {
-                foreach (var b in byteRun)
-                {
-                    sb.Append((char)b);
-                }
-            }
-            byteRun.Clear();
-        }
         while (i < key.Length)
         {
             var c = key[i];
@@ -350,35 +341,30 @@ internal static class QSettingsIniCodec
                     Uri.IsHexDigit(key[i + 2]) && Uri.IsHexDigit(key[i + 3]) &&
                     Uri.IsHexDigit(key[i + 4]) && Uri.IsHexDigit(key[i + 5]))
                 {
-                    FlushByteRun();
                     sb.Append((char)Convert.ToInt32(key.Substring(i + 2, 4), 16));
                     i += 6;
                     continue;
                 }
                 if (i + 3 < key.Length && Uri.IsHexDigit(key[i + 1]) && Uri.IsHexDigit(key[i + 2]))
                 {
-                    byteRun.Add((byte)Convert.ToInt32(key.Substring(i + 1, 2), 16));
+                    sb.Append((char)Convert.ToInt32(key.Substring(i + 1, 2), 16));
                     i += 3;
                     continue;
                 }
-                FlushByteRun();
                 sb.Append(c);
                 i++;
             }
             else if (c == '\\')
             {
-                FlushByteRun();
                 sb.Append('/');
                 i++;
             }
             else
             {
-                FlushByteRun();
                 sb.Append(c);
                 i++;
             }
         }
-        FlushByteRun();
         return sb.ToString();
     }
 }

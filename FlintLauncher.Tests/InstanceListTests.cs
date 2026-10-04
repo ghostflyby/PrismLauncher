@@ -299,6 +299,82 @@ public class InstanceListTests : IDisposable
         Assert.Equal(before, File.ReadAllText(_groupFile));
     }
 
+    // L18: toVariant().toInt() never throws upstream — a non-int32-representable number
+    // (a decimal, an overflow) must be a silent version-match reject, not a FormatException
+    // unwinding through Load into a group-endpoint 500
+    [Fact]
+    public void Instgroups_DecimalFormatVersion_IsSilentlyRejected()
+    {
+        File.WriteAllText(_groupFile,
+            """
+            {
+                "formatVersion": 1.5,
+                "groups": {
+                    "Group": {
+                        "instances": []
+                    }
+                }
+            }
+            """);
+
+        var list = CreateList();
+        Assert.Null(Record.Exception(() => list.GetGroups()));
+        Assert.Empty(list.GetGroups());
+    }
+
+    [Fact]
+    public void Instgroups_OverflowFormatVersion_IsSilentlyRejected()
+    {
+        File.WriteAllText(_groupFile,
+            """
+            {
+                "formatVersion": 9999999999,
+                "groups": {
+                    "Group": {
+                        "instances": []
+                    }
+                }
+            }
+            """);
+
+        var list = CreateList();
+        Assert.Null(Record.Exception(() => list.GetGroups()));
+        Assert.Empty(list.GetGroups());
+    }
+
+    // L19: the load-time promise ("unknown members convert on the next load") is honored
+    // in-session now — the discovery round re-resolves dirname members even when the group
+    // model was loaded earlier with the instance still undiscovered
+    [Fact]
+    public void Instgroups_DirnameMembers_ConvertOnTheNextLoadList()
+    {
+        // no instance dir yet: the first group access loads with the member stuck as a dirname
+        File.WriteAllText(_groupFile,
+            """
+            {
+                "formatVersion": "1",
+                "groups": {
+                    "Group": {
+                        "instances": ["late"]
+                    }
+                }
+            }
+            """);
+        var list = CreateList();
+        Assert.Equal(["Group"], list.GetGroups());
+        Assert.Equal("", list.GetInstanceGroup("late"));
+
+        // the instance appears; the next LoadList converts and rewrites the file
+        MakeInstanceDir("late", name: "Late");
+        Assert.Equal(InstListError.NoError, list.LoadList());
+
+        Assert.Equal("Group", list.GetInstanceGroup("late"));
+        using var doc = JsonDocument.Parse(File.ReadAllText(_groupFile));
+        Assert.Equal([list.GetInstanceById("late")!.Uuid], doc.RootElement.GetProperty("groups")
+            .GetProperty("Group").GetProperty("instances").EnumerateArray()
+            .Select(v => v.GetString()).ToList());
+    }
+
     [Fact]
     public void CollapseState_LivesInTheLauncherState_AndSurvivesAReload()
     {

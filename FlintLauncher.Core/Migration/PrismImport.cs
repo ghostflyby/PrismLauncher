@@ -8,6 +8,12 @@
 // Inventory deviations from the C++ whitelist (documented):
 //  - "meta/" and "instgroups.json" are imported too: Flint reads the same formats and this
 //    saves the metadata re-download while keeping instance groups.
+//  - "instgroups.json" lands verbatim: the D3 member uuid-ification (and the hidden->state
+//    split) happen on the FIRST GROUP LOAD (InstanceGroupModel.Load, migratingLegacyGroups
+//    promote per the FlintPaths.GroupsFile contract), not inside this pipeline — G2's
+//    "sorts everything in a single pass" wording is met in outcome (converged terminal
+//    state), not in timing. Do not add a converter here; the group model already owns the
+//    conversion.
 //  - java/, cache/, catpacks/, skins/, translations/ are not imported (Flint manages its
 //    own runtimes; the rest is regenerated or Prism-specific display data).
 using System.Globalization;
