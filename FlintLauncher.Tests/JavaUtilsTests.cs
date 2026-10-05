@@ -128,11 +128,11 @@ public class JavaUtilsTests : IDisposable
     }
 
     [Fact]
-    public void FindJavaPaths_IncludesJdkFindProviderHomes()
+    public async Task DetectAsync_MapsAndDeduplicatesTheLayers()
     {
-        // a synthetic plain-layout JDK home (bin/java + release): the JdkFind provider
-        // contract (JavaHomeLayout.Probe) validates it, and the executable mapping turns
-        // the home into a candidate path
+        // a synthetic plain-layout JDK home reported by an injected provider is the primary
+        // candidate; an env-provided copy of the same path collapses into it, and an env
+        // path that leads nowhere survives as an invalid fallback candidate
         var root = TempRoot();
         var home = Path.Combine(root, "jdk-21.0.5");
         Directory.CreateDirectory(Path.Combine(home, "bin"));
@@ -144,49 +144,100 @@ public class JavaUtilsTests : IDisposable
             ? new WindowsProgramFilesJvmProvider([root])
             : OperatingSystem.IsMacOS()
                 ? new MacOsJvmProvider([root])
-                : new LinuxJvmProvider(root);
+                : new UnixJvmProvider(root);
+        var executable = Path.Combine(home, "bin", JavaUtils.JavaExecutable);
+        SetEnv($"{FlintLauncher.Core.FlintConfig.Default.LauncherAppBinaryEnvName}_JAVA_PATHS",
+            string.Join(Path.PathSeparator, executable, Path.Combine(root, "nonexistent", "java")));
 
-        var candidates = JavaUtils.FindJavaPathsFromProviders([provider]);
+        var candidates = await JavaDetection.DetectAsync(providers: [provider]);
 
-        // home/bin/<executable>, deduplicated across providers like the composition does
-        Assert.Equal([Path.Combine(home, "bin", JavaUtils.JavaExecutable)],
-            candidates);
+        var primary = Assert.Single(candidates, c => c.Path == executable);
+        Assert.True(primary.Valid);
+        Assert.Equal("21.0.5", primary.Version);
+        // the probe cannot execute the empty stub java, so metadata degrades to the release
+        // file; OS_ARCH is absent from the fixture
+        Assert.Equal("unknown", primary.Architecture);
+
+        var dead = Assert.Single(candidates, c => c.Path == Path.Combine(root, "nonexistent", "java"));
+        Assert.False(dead.Valid);
+        Assert.Equal("unknown", dead.Version);
     }
 
     [Fact]
-    public void FindJavaPaths_MapsEveryProviderHomeToTheExecutable()
+    public async Task DetectAsync_ExposesReleaseFileArchitecture()
     {
-        // two providers reporting the same home must not double-report the candidate
+        // OS_ARCH in the release file feeds the same architecture slot the checker's
+        // os.arch used to — JavaInstall.Is64Bit derives from it downstream
         var root = TempRoot();
         var home = Path.Combine(root, "Contents", "Home");
         Directory.CreateDirectory(Path.Combine(home, "bin"));
         File.WriteAllText(Path.Combine(home, "bin",
             OperatingSystem.IsWindows() ? "java.exe" : "java"), "");
-        File.WriteAllText(Path.Combine(home, "release"), "JAVA_VERSION=\"17.0.2\"\n");
+        File.WriteAllText(Path.Combine(home, "release"), "JAVA_VERSION=\"17.0.2\"\nOS_ARCH=\"aarch64\"\n");
 
-        var candidates = JavaUtils.FindJavaPathsFromProviders(
-            [new MacOsJvmProvider([root]), new JavaHomeJvmProvider(root)]);
+        var candidates = await JavaDetection.DetectAsync(
+            providers: [new MacOsJvmProvider([root]), new JavaHomeJvmProvider(root)]);
 
-        Assert.Equal([Path.Combine(home, "bin", JavaUtils.JavaExecutable)], candidates);
+        // the legacy/launcher fallback contributes its own (real-machine) candidates, so
+        // scope the assertion to the synthetic home
+        var candidate = Assert.Single(candidates,
+            c => c.Path == Path.Combine(home, "bin", JavaUtils.JavaExecutable));
+        Assert.True(candidate.Valid);
+        Assert.Equal("aarch64", candidate.Architecture);
+        Assert.True(JavaChecker.Is64BitArchitecture(candidate.Architecture));
     }
 
     [Fact]
-    public void FindJavaPaths_OnMacOS_IncludesHomebrewKegHomes()
+    public async Task JavaListLoadTask_FillsTheListFromDetection()
+    {
+        var root = TempRoot();
+        var home = Path.Combine(root, "jdk-21.0.5");
+        Directory.CreateDirectory(Path.Combine(home, "bin"));
+        File.WriteAllText(Path.Combine(home, "bin",
+            OperatingSystem.IsWindows() ? "java.exe" : "java"), "");
+        File.WriteAllText(Path.Combine(home, "release"), "JAVA_VERSION=\"21.0.5\"\nOS_ARCH=\"x86_64\"\n");
+
+        IJvmProvider provider = OperatingSystem.IsWindows()
+            ? new WindowsProgramFilesJvmProvider([root])
+            : OperatingSystem.IsMacOS()
+                ? new MacOsJvmProvider([root])
+                : new UnixJvmProvider(root);
+
+        var list = new JavaInstallList();
+        var task = new JavaListLoadTask(list, providers: [provider], maxConcurrent: 16);
+        await task.StartAsync();
+
+        var install = Assert.Single(list.Versions(), j => j.Path == Path.Combine(home, "bin", JavaUtils.JavaExecutable));
+        Assert.Equal(21, install.Id.Major);
+        Assert.Equal("x86_64", install.Arch);
+        Assert.True(install.Is64Bit);
+    }
+
+    [Fact]
+    public void JavaVersion_ParsesRuntimeVersionStrings()
+    {
+        // the detection layer feeds RuntimeVersion (java.runtime.version, which carries the
+        // "+build" suffix) into JavaVersion — the same string shape the checker used to
+        Assert.Equal(21, new JavaVersion("21.0.5+9-LTS").Major);
+        Assert.Equal(8, new JavaVersion("1.8.0_402").Major);
+    }
+
+    [Fact]
+    public async Task DetectAsync_IncludesHomebrewKegHomes()
     {
         // the Homebrew keg layout (libexec/openjdk.jdk/Contents/Home) is a JdkFind-only
         // source: the legacy filesystem scan never looked under the brew prefix
-        var keg = "/opt/homebrew/opt/openjdk";
-        if (!OperatingSystem.IsMacOS() || !Directory.Exists(keg))
-        {
-            return;
-        }
+        var prefix = TempRoot();
+        var home = Path.Combine(prefix, "opt", "openjdk21", "libexec", "openjdk.jdk", "Contents", "Home");
+        Directory.CreateDirectory(Path.Combine(home, "bin"));
+        File.WriteAllText(Path.Combine(home, "bin",
+            OperatingSystem.IsWindows() ? "java.exe" : "java"), "");
+        File.WriteAllText(Path.Combine(home, "release"), "JAVA_VERSION=\"21.0.5\"\n");
 
-        var candidates = JavaUtils.FindJavaPaths();
+        var candidates = await JavaDetection.DetectAsync(providers: [new HomebrewJvmProvider([prefix])]);
 
         Assert.Contains(candidates, c =>
-            c.StartsWith("/opt/homebrew/opt/openjdk", StringComparison.Ordinal) &&
-            c.EndsWith("/bin/java", StringComparison.Ordinal) &&
-            File.Exists(c));
+            c.Path == Path.Combine(home, "bin", JavaUtils.JavaExecutable) && c.Valid);
     }
 
     // ------------------------------------------------------------- environment

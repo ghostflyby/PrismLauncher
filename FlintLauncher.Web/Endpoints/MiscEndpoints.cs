@@ -100,9 +100,11 @@ public static class MiscEndpoints
     }
 }
 
-/// <summary>Cached java discovery (GET serves the cache, POST re-scans). The scan covers
-/// the launcher-managed java root too — the JavaDir setting under E2 store semantics
-/// (relative → store root), not the CWD the parameterless scan used to fall back to.</summary>
+/// <summary>Cached java discovery (GET serves the cache, POST re-scans). The scan is the
+/// shared detection pipeline (JavaDetection): JdkFind primary + the checker-validated
+/// legacy/launcher fallback, so the launcher-managed java root — the JavaDir setting under
+/// E2 store semantics — is covered like the system-wide sources. Wire shape unchanged:
+/// invalid fallback candidates list as ("unknown", "unknown").</summary>
 public sealed class JavaScanService
 {
     private readonly LauncherRuntime _runtime;
@@ -118,54 +120,15 @@ public sealed class JavaScanService
         await _lock.WaitAsync();
         try
         {
-            var paths = JavaUtils.FindJavaPaths(_runtime.JavaRoot)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            if (paths.Count == 0)
-            {
-                _cache = [];
-                return _cache;
-            }
-
-            var checkJar = JavaUtils.GetJavaCheckPath();
-            var checks = paths.Select(path => CheckOneAsync(path, checkJar)).ToArray();
-            _cache = await Task.WhenAll(checks);
+            var candidates = await JavaDetection.DetectAsync(_runtime.JavaRoot);
+            _cache = candidates
+                .Select(candidate => new JavaView(candidate.Path, candidate.Version, candidate.Architecture))
+                .ToArray();
             return _cache;
         }
         finally
         {
             _lock.Release();
         }
-    }
-
-    private static async Task<JavaView> CheckOneAsync(string path, string checkJar)
-    {
-        if (checkJar.Length == 0 || !File.Exists(path))
-        {
-            return new JavaView(path, "unknown", "unknown");
-        }
-
-        var checker = new JavaChecker(path, "");
-        JavaChecker.Result? result = null;
-        checker.CheckFinished += r => result = r;
-        try
-        {
-            // StartAsync returns when the checker reaches a terminal state; the result event
-            // has fired by then (JavaChecker always emits exactly one terminal result).
-            await checker.StartAsync().WaitAsync(TimeSpan.FromSeconds(20));
-        }
-        catch (TimeoutException)
-        {
-            checker.Abort();
-            return new JavaView(path, "unknown", "unknown");
-        }
-
-        if (result is null || result.Validity == JavaChecker.Validity.Errored ||
-            result.Validity == JavaChecker.Validity.ReturnedInvalidData)
-        {
-            return new JavaView(path, "unknown", "unknown");
-        }
-        return new JavaView(path, result.JavaVersion.ToString(),
-            result.RealPlatform.Length != 0 ? result.RealPlatform : result.MojangPlatform);
     }
 }

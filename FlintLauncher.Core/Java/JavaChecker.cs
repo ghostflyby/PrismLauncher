@@ -58,6 +58,12 @@ public sealed class JavaChecker : FlintTask
     /// <summary>The check timeout (C++: m_killTimer.start(15000) — "NO MERCY. NO ABUSE.").</summary>
     public static readonly TimeSpan KillTimeout = TimeSpan.FromMilliseconds(15000);
 
+    /// <summary>The os.arch spellings the launcher counts as 64-bit (shared with the
+    /// detection pipeline, which derives JavaInstall.Is64Bit from release/probe
+    /// architecture strings of the same shape).</summary>
+    public static bool Is64BitArchitecture(string osArch) =>
+        osArch is "x86_64" or "amd64" or "aarch64" or "arm64" or "riscv64" or "ppc64le" or "ppc64";
+
     private readonly string _path;
     private readonly string _args;
     private readonly int _minMem;
@@ -201,7 +207,7 @@ public sealed class JavaChecker : FlintTask
             return;
         }
 
-        var is64 = osArch is "x86_64" or "amd64" or "aarch64" or "arm64" or "riscv64" or "ppc64le" or "ppc64";
+        var is64 = Is64BitArchitecture(osArch);
 
         result.Validity = Validity.Valid;
         result.Is64Bit = is64;

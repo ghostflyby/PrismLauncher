@@ -1,21 +1,25 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/java/JavaUtils.{h,cpp} (JVM discovery + the process-environment cleaner).
 //
-// The C++ class is stateless, so the port flattens it into a static class. Discovery is now
-// layered, with the JavaChecker run remaining the validity gate (enumeration may over-produce):
-//  - Layer 1 — JdkFind provider suite (NuGet JdkFind, Apache-2.0): validated Java homes
-//    (bin/java + release, plain / macOS-bundle / Homebrew-keg layouts) from JAVA_HOME, PATH,
-//    the macOS JVM directories, /usr/lib/jvm, Homebrew kegs, Windows registry + Program Files
-//    vendor dirs, ~/.jdks, SDKMAN, Gradle toolchains, Jabba and Scoop. This closes the
-//    documented Windows-registry stub below and adds the sources the C++ scan never had.
-//  - Layer 2 — the C++-parity filesystem scan (the per-platform branches): fixed legacy
-//    candidates, release-less JVMs (old Apple/Oracle runtimes), the distro directories and
-//    name filters JdkFind deliberately does not model (Gentoo/AOSC, /usr/java, /usr/lib64/jvm,
-//    /opt/jdk*, /opt/ibm, /app/jdk, $SNAP mirroring, asdf, FreeBSD/OpenBSD /usr/local).
-//  - Layer 3 — launcher-owned sources: the Minecraft launcher runtime bundle, the
+// The C++ class is stateless, so the port flattens it into a static class. Discovery is
+// layered (see JavaDetection for the pipeline):
+//  - Primary — the JdkFind provider suite (NuGet JdkFind): validated installations
+//    (release file + executable, plain / macOS-bundle / Homebrew-keg / JDK8 inner-JRE
+//    layouts) from JAVA_HOME, PATH, the macOS JVM directories, /usr/lib/jvm and the other
+//    unix distro locations, the Windows registry + Program Files vendor dirs, ~/.jdks,
+//    SDKMAN, asdf, Gradle toolchains, Jabba, Scoop and the flatpak runtime extensions.
+//    This closes the documented Windows-registry stub below.
+//  - Fallback (this file) — the C++-parity filesystem scan: fixed legacy candidates,
+//    release-less JVMs (old Apple/Oracle runtimes), the distro directories and name
+//    filters JdkFind deliberately does not model (Gentoo/AOSC, /usr/java, /usr/lib64/jvm,
+//    /opt/jdk*, /opt/ibm, /app/jdk, $SNAP mirroring, FreeBSD/OpenBSD /usr/local). The
+//    tool-manager scans (sdkman, asdf, gradle) stay in the fallback too — harmless overlap
+//    with JdkFind, collapsed by the exact-string dedup in JavaDetection.
+//  - Launcher-owned sources (this file) — the Minecraft launcher runtime bundle, the
 //    launcher-managed java root, the FLINT_JAVA_PATHS environment override.
+// The fallback and launcher-owned candidates flow through JavaDetection.DetectAsync, which
+// checker-validates whatever the primary layer did not already cover.
 using System.Runtime.InteropServices;
-using JdkFind;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 
@@ -130,6 +134,9 @@ public static class JavaUtils
     // --------------------------------------------------------------- discovery
 
     /// <summary>Port of JavaUtils::FindJavaPaths; dispatches to the platform scan.
+    /// The JdkFind provider suite is NOT part of this scan anymore — it is the primary
+    /// detection layer in <see cref="JavaDetection.DetectAsync"/>; this method produces the
+    /// fallback and launcher-owned candidates only.
     /// <paramref name="javaRoot"/> is the launcher-managed java dir (FlintPaths.JavaRoot);
     /// the default keeps the C++ cwd-relative "java" behaviour for bare fixtures.</summary>
     public static List<string> FindJavaPaths(string? javaRoot = null)
@@ -153,36 +160,9 @@ public static class JavaUtils
             javas = [GetDefaultJava().Path];
         }
 
-        // Layer 1 on top of the legacy platform scan: the JdkFind provider suite. Overlap
-        // between the layers is harmless — the exact-string dedup below collapses identical
-        // candidates, and the checker run is the validity gate either way.
-        javas.AddRange(FindJavaPathsFromProviders(JdkFinder.Default.Providers));
-
         javas.AddRange(GetMinecraftJavaBundle());
         javas.AddRange(GetPrismJavaBundle(javaRoot));
         javas = AddJavasFromEnv(javas);
-        return DistinctStable(javas);
-    }
-
-    /// <summary>Layer-1 seam over the JdkFind provider suite: every provider's validated Java
-    /// homes (each already passed <c>JavaHomeLayout.Probe</c> — bin/java + release, plain,
-    /// macOS-bundle or Homebrew-keg layout) mapped to the launcher executable path. Providers
-    /// self-noop on the platforms they do not cover, so the suite is passed through untouched;
-    /// duplicate homes across providers (JAVA_HOME pointing into a scanned directory, ...) are
-    /// collapsed with the same exact-string dedup the composition uses. The suite deliberately
-    /// bypasses <c>JdkFinder.Locate</c>: its release-file parsing would drop release-less JVMs
-    /// the checker can still validate, and its runtime probe spawns a process per JVM that the
-    /// checker already runs.</summary>
-    internal static List<string> FindJavaPathsFromProviders(IReadOnlyList<IJvmProvider> providers)
-    {
-        var javas = new List<string>();
-        foreach (var provider in providers)
-        {
-            foreach (var home in provider.GetJavaHomes())
-            {
-                javas.Add(FileSystem.PathCombine(home, "bin", JavaExecutable));
-            }
-        }
         return DistinctStable(javas);
     }
 

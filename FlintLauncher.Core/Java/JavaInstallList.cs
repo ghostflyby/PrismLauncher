@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/java/JavaInstallList.{h,cpp}: a list of discovered JavaInstall entries plus
-// the JavaListLoadTask that probes every candidate path with a JavaChecker (fanned out through
-// a ConcurrentTask) and feeds the valid ones into the list.
+// the JavaListLoadTask that fills it. Detection moved to JavaDetection (JdkFind primary +
+// checker-validated fallback); this task maps the candidates onto JavaInstall entries.
 //
 // Deviations from the C++ original:
 //  - The BaseVersionList/QAbstractListModel surface (data() roles, VersionPointerRole, ...)
@@ -10,9 +10,9 @@
 //    no recommendation logic to port; consumers that need a default pick the newest entry.
 //  - The APPLICATION->settings()->get("NumberOfConcurrentTasks") lookup becomes the
 //    maxConcurrent constructor parameter (the host wires the settings value).
-//  - The JavaListLoadTask subscribes to the ConcurrentTask Task::finished signal, which fires
-//    on success AND failure; the port runs the same collection step unconditionally after the
-//    job reaches its terminal state.
+//  - Detection no longer runs JavaCheck.jar per candidate (see JavaDetection); the list
+//    metadata comes from the release file + runtime probe instead of the checker output.
+using JdkFind;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Java;
@@ -95,70 +95,44 @@ public sealed class JavaInstallList
     }
 }
 
-/// <summary>Port of JavaListLoadTask.</summary>
+/// <summary>Port of JavaListLoadTask. The detection itself lives in
+/// <see cref="JavaDetection"/> (JdkFind primary + checker-validated fallback); this task is
+/// the list-model shell around it and maps the candidates onto <see cref="JavaInstall"/>.</summary>
 public sealed class JavaListLoadTask : FlintTask
 {
     private readonly JavaInstallList _list;
     private readonly bool _onlyManagedVersions;
     private readonly int _maxConcurrent;
     private readonly string? _javaRoot;
-    private readonly List<JavaChecker.Result> _results = [];
+    private readonly IReadOnlyList<IJvmProvider>? _providers;
 
     public JavaListLoadTask(JavaInstallList vlist, bool onlyManagedVersions = false,
-        int maxConcurrent = ConcurrentTask.DefaultMaxConcurrent, string? javaRoot = null)
+        int maxConcurrent = ConcurrentTask.DefaultMaxConcurrent, string? javaRoot = null,
+        IReadOnlyList<IJvmProvider>? providers = null)
     {
         _list = vlist;
         _onlyManagedVersions = onlyManagedVersions;
         _maxConcurrent = maxConcurrent;
         _javaRoot = javaRoot;
+        _providers = providers;
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Detecting Java installations...");
 
-        var candidatePaths = _onlyManagedVersions
-            ? JavaUtils.GetPrismJavaBundle(_javaRoot)
-            : JavaUtils.FindJavaPaths(_javaRoot);
+        var candidates = await JavaDetection.DetectAsync(_javaRoot, _maxConcurrent, cancellationToken,
+            providers: _providers, progress: EmitProgress, managedOnly: _onlyManagedVersions).ConfigureAwait(false);
 
-        var job = new ConcurrentTask("Java detection", _maxConcurrent);
-        job.Progress += (_, progress) => EmitProgress(progress);
-
-        // qDebug() << "Probing the following Java paths: ";
-        var id = 0;
-        foreach (var candidate in candidatePaths)
-        {
-            var checker = new JavaChecker(candidate, "", 0, 0, 0, id);
-            checker.CheckFinished += result => _results.Add(result);
-            job.AddTask(checker);
-            id++;
-        }
-
-        await job.StartAsync(cancellationToken).ConfigureAwait(false);
-
-        // the C++ connects Task::finished (fires on success and failure alike)
-        JavaCheckerFinished();
-    }
-
-    private void JavaCheckerFinished()
-    {
-        _results.Sort((a, b) => a.Id.CompareTo(b.Id));
-
-        // qDebug() << "Found the following valid Java installations:";
-        var candidates = new List<JavaInstall>();
-        foreach (var result in _results)
-        {
-            if (result.Validity == JavaChecker.Validity.Valid)
+        var installs = candidates
+            .Where(candidate => candidate.Valid)
+            .Select(candidate => new JavaInstall(new JavaVersion(candidate.Version), candidate.Architecture, candidate.Path)
             {
-                var javaVersion = new JavaInstall(result.JavaVersion, result.RealPlatform, result.Path)
-                {
-                    Is64Bit = result.Is64Bit,
-                };
-                candidates.Add(javaVersion);
-            }
-        }
+                Is64Bit = JavaChecker.Is64BitArchitecture(candidate.Architecture),
+            })
+            .ToList();
 
-        _list.UpdateListData(candidates);
+        _list.UpdateListData(installs);
         EmitSucceeded();
     }
 }
