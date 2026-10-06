@@ -112,7 +112,7 @@ public sealed record MemoryConfig
 
     public int? MinMemAlloc { get; init; } = 512;
     public int? MaxMemAlloc { get; init; } = DefaultMaxMemAlloc;
-    public int? PermGen { get; init; } = 128;
+    // PermGen died with the Java <8 support floor (2026-10-05): PermSize is a pre-8 concept.
     public bool? LowMemWarning { get; init; } = true;
 }
 

@@ -68,18 +68,16 @@ public sealed class JavaChecker : FlintTask
     private readonly string _args;
     private readonly int _minMem;
     private readonly int _maxMem;
-    private readonly int _permGen;
     private readonly int _id;
     private readonly string? _installRoot;
 
-    public JavaChecker(string path, string args, int minMem = 0, int maxMem = 0, int permGen = 0, int id = 0,
+    public JavaChecker(string path, string args, int minMem = 0, int maxMem = 0, int id = 0,
         string? installRoot = null)
     {
         _path = path;
         _args = args;
         _minMem = minMem;
         _maxMem = maxMem;
-        _permGen = permGen;
         _id = id;
         _installRoot = installRoot;
     }
@@ -117,10 +115,7 @@ public sealed class JavaChecker : FlintTask
         {
             args.Add($"-Xmx{_maxMem}m");
         }
-        if (_permGen != 64 && _permGen != 0)
-        {
-            args.Add($"-XX:PermSize={_permGen}m");
-        }
+        // The upstream permGen slot (-XX:PermSize) is gone with the Java <8 support floor.
 
         args.Add("-jar");
         args.Add(checkerJar);

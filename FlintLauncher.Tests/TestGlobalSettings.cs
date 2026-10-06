@@ -43,7 +43,6 @@ internal sealed class TestGlobalSettings
         StubSet("MinecraftWinHeight", 480);
         StubSet("MinMemAlloc", 512);
         StubSet("MaxMemAlloc", 4096);
-        StubSet("PermGen", 192);
         StubSet("LowMemWarning", true);
         StubSet("UseNativeOpenAL", false);
         StubSet("CustomOpenALPath", "");

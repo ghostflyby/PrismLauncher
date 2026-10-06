@@ -91,7 +91,7 @@ public class JavaUtilsTests : IDisposable
     }
 
     [Fact]
-    public void FindJavaPaths_OnMacOS_ProbesBundleLocations()
+    public void FindJavaPaths_OnMacOS_DropsAppleJava6Candidates()
     {
         if (!OperatingSystem.IsMacOS())
         {
@@ -100,9 +100,11 @@ public class JavaUtilsTests : IDisposable
 
         var candidates = JavaUtils.FindJavaPaths();
 
-        // fixed candidates from the C++ macOS branch
-        Assert.Contains("/Library/Internet Plug-Ins/JavaAppletPlugin.plugin/Contents/Home/bin/java", candidates);
-        Assert.Contains("/System/Library/Frameworks/JavaVM.framework/Versions/Current/Commands/java", candidates);
+        // the Apple Java 6 era candidates died with the Java <8 support floor
+        Assert.DoesNotContain("/Applications/Xcode.app/Contents/Applications/Application Loader.app/Contents/MacOS/itms/java/bin/java", candidates);
+        Assert.DoesNotContain("/Library/Internet Plug-Ins/JavaAppletPlugin.plugin/Contents/Home/bin/java", candidates);
+        Assert.DoesNotContain("/System/Library/Frameworks/JavaVM.framework/Versions/Current/Commands/java", candidates);
+        Assert.DoesNotContain(candidates, c => c.Contains("Contents/Commands/java", StringComparison.Ordinal));
     }
 
     [Fact]

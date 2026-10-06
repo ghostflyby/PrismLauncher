@@ -58,7 +58,6 @@ public static class SettingsAndIconsEndpoints
             [
                 "MinMemAlloc",
                 "MaxMemAlloc",
-                "PermGen",
                 "MinecraftWinWidth",
                 "MinecraftWinHeight",
                 "LaunchMaximized",

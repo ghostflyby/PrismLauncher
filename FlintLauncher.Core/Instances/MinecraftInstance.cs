@@ -131,7 +131,6 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         _settings.RegisterSetting("OverrideMemory", false);
         _settings.RegisterSetting("MinMemAlloc", 512);
         _settings.RegisterSetting("MaxMemAlloc", 4096);
-        _settings.RegisterSetting("PermGen", 128);
         _settings.RegisterSetting("LowMemWarning", true);
         _settings.RegisterSetting("OverrideNativeWorkarounds", false);
         _settings.RegisterSetting("UseNativeOpenAL", false);
@@ -725,16 +724,9 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             args.Add($"-Xmx{min}m");
         }
 
-        // No PermGen in newer java.
+        // The PermGen argument died with the Java <8 support floor: PermSize is a
+        // pre-8 concept and the launcher no longer accommodates those runtimes.
         var javaVersion = GetJavaVersion();
-        if (javaVersion.RequiresPermGen())
-        {
-            var permgen = Variant.AsInt(Settings().Get("PermGen"));
-            if (permgen != 64)
-            {
-                args.Add($"-XX:PermSize={permgen}m");
-            }
-        }
 
         if (javaVersion.IsModular() && ShouldApplyOnlineFixes())
         {

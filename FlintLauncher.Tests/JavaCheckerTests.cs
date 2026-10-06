@@ -66,7 +66,7 @@ public class JavaCheckerTests
         }
 
         JavaChecker.Result? result = null;
-        var checker = new JavaChecker("/nonexistent/java", "", 0, 0, 0, 7);
+        var checker = new JavaChecker("/nonexistent/java", "", id: 7);
         checker.CheckFinished += r => result = r;
 
         await checker.StartAsync();
@@ -133,7 +133,7 @@ public class JavaCheckerTests
         }
 
         JavaChecker.Result? result = null;
-        var checker = new JavaChecker("/nonexistent/java", "", 0, 0, 0, 0);
+        var checker = new JavaChecker("/nonexistent/java", "");
         checker.CheckFinished += r => result = r;
 
         await checker.StartAsync();
@@ -167,7 +167,7 @@ public class JavaCheckerTests
     public async Task TestCheck_WithoutJar_ReportsCheckerNotFound()
     {
         var testCheck = new JavaCommon.TestCheck();
-        var outcome = await testCheck.RunAsync("/nonexistent/java", "-Dtest=1", 512, 1024, 64);
+        var outcome = await testCheck.RunAsync("/nonexistent/java", "-Dtest=1", 512, 1024);
 
         if (JavaUtils.GetJavaCheckPath().Length == 0)
         {
@@ -184,7 +184,7 @@ public class JavaCheckerTests
     public async Task TestCheck_RejectsBadArgumentsBeforeAnyCheck()
     {
         var testCheck = new JavaCommon.TestCheck();
-        var outcome = await testCheck.RunAsync("/nonexistent/java", "-Xmx99999m", 512, 1024, 64);
+        var outcome = await testCheck.RunAsync("/nonexistent/java", "-Xmx99999m", 512, 1024);
 
         Assert.Equal(JavaCommon.TestOutcome.ArgsRejected, outcome);
     }

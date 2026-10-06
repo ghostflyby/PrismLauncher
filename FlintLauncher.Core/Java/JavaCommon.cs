@@ -66,10 +66,12 @@ public static partial class JavaCommon
         Ok,
     }
 
-    /// <summary>Port of JavaCommon::TestCheck (minus the QWidget parentage and dialogs).</summary>
+    /// <summary>Port of JavaCommon::TestCheck (minus the QWidget parentage and dialogs).
+    /// The upstream permGen slot is gone with the Java <8 support floor: PermSize only
+    /// ever mattered on those runtimes, so the second pass carries memory args only.</summary>
     public sealed class TestCheck
     {
-        public async Task<TestOutcome> RunAsync(string path, string args, int minMem, int maxMem, int permGen,
+        public async Task<TestOutcome> RunAsync(string path, string args, int minMem, int maxMem,
                                                 CancellationToken cancellationToken = default)
         {
             if (!CheckJvmArgs(args))
@@ -81,15 +83,14 @@ public static partial class JavaCommon
                 return TestOutcome.CheckerNotFound;
             }
 
-            var first = await CheckOnce(new JavaChecker(path, "", 0, 0, 0, 0), cancellationToken).ConfigureAwait(false);
+            var first = await CheckOnce(new JavaChecker(path, "", 0, 0), cancellationToken).ConfigureAwait(false);
             if (first is null || first.Validity != JavaChecker.Validity.Valid)
             {
                 return TestOutcome.BinaryBad;
             }
             // NOTE: upstream passes maxMem into both slots here (new JavaChecker(m_path, m_args,
             // m_maxMem, m_maxMem, ...)); the quirk is preserved.
-            var permGenArg = first.JavaVersion.RequiresPermGen() ? permGen : 0;
-            var second = await CheckOnce(new JavaChecker(path, args, maxMem, maxMem, permGenArg, 0), cancellationToken)
+            var second = await CheckOnce(new JavaChecker(path, args, maxMem, maxMem), cancellationToken)
                 .ConfigureAwait(false);
             return second is not null && second.Validity == JavaChecker.Validity.Valid
                 ? TestOutcome.Ok

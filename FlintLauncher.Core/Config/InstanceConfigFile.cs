@@ -83,7 +83,7 @@ public sealed record InstanceMemoryConfig
 {
     public int? MinMemAlloc { get; init; }
     public int? MaxMemAlloc { get; init; }
-    public int? PermGen { get; init; }
+    // PermGen died with the Java <8 support floor (2026-10-05): PermSize is a pre-8 concept.
     public bool? LowMemWarning { get; init; }
 }
 

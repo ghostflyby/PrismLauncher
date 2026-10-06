@@ -62,10 +62,11 @@ public class CoverageFixCoreTests
         Assert.True(FlintConfigKeys.IsSecret("ProxyPass"));
         Assert.True(FlintConfigKeys.IsSecret("ModrinthToken"));
         Assert.True(FlintConfigKeys.IsSecret("FlameKeyOverride"));
-        // memory (C++: PermGen 128, LowMemWarning true, MaxMemAlloc = defaultMaxJvmMem)
+        // memory (LowMemWarning true, MaxMemAlloc = defaultMaxJvmMem; PermGen died with
+        // the Java <8 support floor)
         Assert.Equal(512, Variant.AsInt(store.Get("MinMemAlloc")));
         Assert.Equal(MemoryConfig.DefaultMaxMemAlloc, Variant.AsInt(store.Get("MaxMemAlloc")));
-        Assert.Equal(128, Variant.AsInt(store.Get("PermGen")));
+        Assert.Null(FlintConfigKeys.Resolve("PermGen"));
         Assert.True(Variant.AsBool(store.Get("LowMemWarning")));
         // network (NumberOfManualRetries/RequestTimeout/Proxy*)
         Assert.Equal(10, Variant.AsInt(store.Get("NumberOfConcurrentTasks")));
@@ -102,11 +103,11 @@ public class CoverageFixCoreTests
 
         // every registry key resolves (FlintConfigKeys) and the store round-trips a write
         // into flint.json (the authoritative global source, C5)
-        store.Set("PermGen", 192);
-        Assert.Equal(192, Variant.AsInt(store.Get("PermGen")));
+        store.Set("LowMemWarning", false);
+        Assert.False(Variant.AsBool(store.Get("LowMemWarning")));
         Assert.True(File.Exists(store.FilePath));
         var reloaded = new FlintConfigStore(store.FilePath, FlintJsonContext.Default.FlintConfigFile);
-        Assert.Equal(192, reloaded.Current.Memory.PermGen);
+        Assert.False(reloaded.Current.Memory.LowMemWarning!.Value);
     }
 
     [Fact]

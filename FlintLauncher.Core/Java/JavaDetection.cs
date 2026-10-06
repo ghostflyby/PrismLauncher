@@ -80,7 +80,7 @@ public static class JavaDetection
             var id = 0;
             foreach (var path in fallback)
             {
-                var checker = new JavaChecker(path, "", 0, 0, 0, id);
+                var checker = new JavaChecker(path, "", id: id);
                 checker.CheckFinished += result => checkResults.Add(result);
                 job.AddTask(checker);
                 id++;

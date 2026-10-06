@@ -9,12 +9,16 @@
 //    unix distro locations, the Windows registry + Program Files vendor dirs, ~/.jdks,
 //    SDKMAN, asdf, Gradle toolchains, Jabba, Scoop and the flatpak runtime extensions.
 //    This closes the documented Windows-registry stub below.
-//  - Fallback (this file) — the C++-parity filesystem scan: fixed legacy candidates,
-//    release-less JVMs (old Apple/Oracle runtimes), the distro directories and name
-//    filters JdkFind deliberately does not model (Gentoo/AOSC, /usr/java, /usr/lib64/jvm,
-//    /opt/jdk*, /opt/ibm, /app/jdk, $SNAP mirroring, FreeBSD/OpenBSD /usr/local). The
-//    tool-manager scans (sdkman, asdf, gradle) stay in the fallback too — harmless overlap
-//    with JdkFind, collapsed by the exact-string dedup in JavaDetection.
+//  - Fallback (this file) — the C++-parity filesystem scan, bounded by the Java 8 support
+//    floor (2026-10-05 user decision; a documented deviation from upstream, which still
+//    caters to Apple Java 6): the Apple-6-era candidates are pruned (JavaVM.framework,
+//    the applet plugin, the Xcode itms bundle, /System/Library JVMs, the Contents/Commands
+//    layout, the jre6/jre7 Windows paths), leaving Contents/Home bundles (incl. the JDK 8
+//    inner JRE) and release-less installs in the directories and name filters JdkFind
+//    deliberately does not model (Gentoo/AOSC, /usr/java, /usr/lib64/jvm, /opt/jdk*,
+//    /opt/ibm, /app/jdk, $SNAP mirroring, FreeBSD/OpenBSD /usr/local). The tool-manager
+//    scans (sdkman, asdf, gradle) stay in the fallback too — harmless overlap with
+//    JdkFind, collapsed by the exact-string dedup in JavaDetection.
 //  - Launcher-owned sources (this file) — the Minecraft launcher runtime bundle, the
 //    launcher-managed java root, the FLINT_JAVA_PATHS environment override.
 // The fallback and launcher-owned candidates flow through JavaDetection.DetectAsync, which
@@ -168,29 +172,20 @@ public static class JavaUtils
 
     /// <summary>
     /// Port of the macOS FindJavaPaths branch: a filesystem scan over the JVM bundle
-    /// directories (upstream does not invoke /usr/libexec/java_home).
+    /// directories. The Apple Java 6 candidates (the JavaVM.framework, the applet plugin,
+    /// the Xcode itms bundle, the /System/Library JVMs and the Contents/Commands layout)
+    /// died with the Java &lt;8 support floor — only Contents/Home bundles and the JDK 8
+    /// inner JRE variant remain.
     /// </summary>
     private static List<string> FindJavaPathsMacOS()
     {
-        var javas = new List<string>
-        {
-            GetDefaultJava().Path,
-            "/Applications/Xcode.app/Contents/Applications/Application Loader.app/Contents/MacOS/itms/java/bin/java",
-            "/Library/Internet Plug-Ins/JavaAppletPlugin.plugin/Contents/Home/bin/java",
-            "/System/Library/Frameworks/JavaVM.framework/Versions/Current/Commands/java",
-        };
+        var javas = new List<string> { GetDefaultJava().Path };
 
         var libraryJVMDir = "/Library/Java/JavaVirtualMachines/";
         foreach (var java in DirectoryNames(libraryJVMDir))
         {
             javas.Add(FileSystem.PathCombine(libraryJVMDir, java, "Contents/Home/bin/java"));
             javas.Add(FileSystem.PathCombine(libraryJVMDir, java, "Contents/Home/jre/bin/java"));
-        }
-        var systemLibraryJVMDir = "/System/Library/Java/JavaVirtualMachines/";
-        foreach (var java in DirectoryNames(systemLibraryJVMDir))
-        {
-            javas.Add(FileSystem.PathCombine(systemLibraryJVMDir, java, "Contents/Home/bin/java"));
-            javas.Add(FileSystem.PathCombine(systemLibraryJVMDir, java, "Contents/Commands/java"));
         }
 
         var home = Environment.GetEnvironmentVariable("HOME") ?? "";
@@ -216,32 +211,25 @@ public static class JavaUtils
         foreach (var java in DirectoryNames(userLibraryJVMDir))
         {
             javas.Add(FileSystem.PathCombine(userLibraryJVMDir, java, "Contents/Home/bin/java"));
-            javas.Add(FileSystem.PathCombine(userLibraryJVMDir, java, "Contents/Commands/java"));
         }
 
         return javas;
     }
 
     /// <summary>
-    /// Port of the Windows FindJavaPaths branch. The registry walks are stubbed out (see
-    /// <see cref="FindJavaFromRegistryKey"/>); the well-known-path candidates, the bundles and
-    /// the env fallback cover the common locations.
+    /// Port of the Windows FindJavaPaths branch. The vendor registry walks and Program
+    /// Files directories are JdkFind's WindowsRegistry/WindowsProgramFiles providers; the
+    /// hardcoded candidates keep only Java 8 — the jre6/jre7 entries died with the
+    /// Java &lt;8 support floor.
     /// </summary>
     private static List<string> FindJavaPathsWindows()
     {
-        var javaCandidates = new List<JavaInstall>();
-
-        // Oracle / AdoptOpenJDK / Eclipse Adoptium / IBM Semeru / Microsoft / Azul Zulu /
-        // BellSoft Liberica registry walks — all stubbed (see FindJavaFromRegistryKey).
-        javaCandidates.Add(MakeJavaPtr("C:/Program Files/Java/jre8/bin/javaw.exe"));
-        javaCandidates.Add(MakeJavaPtr("C:/Program Files/Java/jre7/bin/javaw.exe"));
-        javaCandidates.Add(MakeJavaPtr("C:/Program Files/Java/jre6/bin/javaw.exe"));
-
-        javaCandidates.Add(MakeJavaPtr("C:/Program Files (x86)/Java/jre8/bin/javaw.exe"));
-        javaCandidates.Add(MakeJavaPtr("C:/Program Files (x86)/Java/jre7/bin/javaw.exe"));
-        javaCandidates.Add(MakeJavaPtr("C:/Program Files (x86)/Java/jre6/bin/javaw.exe"));
-
-        javaCandidates.Add(MakeJavaPtr(GetDefaultJava().Path));
+        var javaCandidates = new List<JavaInstall>
+        {
+            MakeJavaPtr("C:/Program Files/Java/jre8/bin/javaw.exe"),
+            MakeJavaPtr("C:/Program Files (x86)/Java/jre8/bin/javaw.exe"),
+            MakeJavaPtr(GetDefaultJava().Path),
+        };
 
         var candidates = new List<string>();
         foreach (var javaCandidate in javaCandidates)

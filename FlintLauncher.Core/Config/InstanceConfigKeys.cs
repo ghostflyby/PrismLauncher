@@ -110,7 +110,7 @@ public static class InstanceConfigKeys
 
     private static bool GateMemory(InstanceConfigFile i) => Any(
         i.Launch?.Memory?.MinMemAlloc, i.Launch?.Memory?.MaxMemAlloc,
-        i.Launch?.Memory?.PermGen, i.Launch?.Memory?.LowMemWarning);
+        i.Launch?.Memory?.LowMemWarning);
 
     private static bool GateWindow(InstanceConfigFile i) => Any(
         i.Launch?.Window?.LaunchMaximized, i.Launch?.Window?.MinecraftWinWidth,
@@ -315,16 +315,8 @@ public static class InstanceConfigKeys
                         Memory = (i.Launch?.Memory ?? new()) with { MaxMemAlloc = IntOf(v) },
                     },
                 }),
-            E("PermGen", "OverrideMemory",
-                (u, i) => i.Launch?.Memory?.PermGen ?? u.Memory.PermGen,
-                i => i.Launch?.Memory?.PermGen is not null,
-                (i, v) => i with
-                {
-                    Launch = (i.Launch ?? new()) with
-                    {
-                        Memory = (i.Launch?.Memory ?? new()) with { PermGen = IntOf(v) },
-                    },
-                }),
+            // PermGen died with the Java <8 support floor (2026-10-05): an imported
+            // instance.cfg PermGen key is now an unknown key and drops silently.
             E("LowMemWarning", "OverrideMemory",
                 (u, i) => i.Launch?.Memory?.LowMemWarning ?? u.Memory.LowMemWarning,
                 i => i.Launch?.Memory?.LowMemWarning is not null,

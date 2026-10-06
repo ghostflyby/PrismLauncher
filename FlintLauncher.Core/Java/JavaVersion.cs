@@ -96,8 +96,6 @@ public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<J
 
     public string Prerelease { get; private set; } = "";
 
-    public bool RequiresPermGen() => !_parseable || Major < 8;
-
     /// <summary>Starting from Java 18, UTF-8 is the default charset: https://openjdk.org/jeps/400</summary>
     public bool DefaultsToUtf8() => _parseable && Major >= 18;
 

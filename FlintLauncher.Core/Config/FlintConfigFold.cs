@@ -108,7 +108,6 @@ public static class FlintConfigFold
     {
         MinMemAlloc = upper?.MinMemAlloc ?? lower.MinMemAlloc,
         MaxMemAlloc = upper?.MaxMemAlloc ?? lower.MaxMemAlloc,
-        PermGen = upper?.PermGen ?? lower.PermGen,
         LowMemWarning = upper?.LowMemWarning ?? lower.LowMemWarning,
     };
 

@@ -46,7 +46,6 @@ public class CoverageFixSettingsApiTests
         Assert.True(launcher.GetProperty("DownloadGameFilesDuringInstanceCreation").GetBoolean());
 
         var minecraft = groups.GetProperty("minecraft");
-        Assert.Equal(128, minecraft.GetProperty("PermGen").GetInt32());
         // RAM-derived (SysInfo::defaultMaxJvmMem port); the record property default is the
         // single source (CONFIG C6 — GlobalSettingsRegistration retired)
         Assert.Equal(FlintLauncher.Core.Config.MemoryConfig.DefaultMaxMemAlloc,

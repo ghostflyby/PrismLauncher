@@ -57,7 +57,6 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Equal(100000, resolved.Console.ConsoleMaxLines);
         Assert.Equal(512, resolved.Memory.MinMemAlloc);
         Assert.Equal(MemoryConfig.DefaultMaxMemAlloc, resolved.Memory.MaxMemAlloc);
-        Assert.Equal(128, resolved.Memory.PermGen);
         Assert.Equal(854, resolved.Window.MinecraftWinWidth);
         Assert.Equal("None", resolved.Proxy.ProxyType);
         Assert.Equal("127.0.0.1", resolved.Proxy.ProxyAddr);
@@ -106,7 +105,6 @@ public class FlintConfigStoreTests : IDisposable
         // reload from disk: the resolved shape round-trips (Flint-only write side, C5)
         var reloaded = NewStore();
         Assert.Equal(3072, reloaded.Current.Memory.MinMemAlloc);
-        Assert.Equal(128, reloaded.Current.Memory.PermGen);
     }
 
     [Fact]
@@ -133,7 +131,6 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Equal(3, store.Current.Launcher.NumberOfConcurrentTasks);
         Assert.Equal(768, store.Current.Memory.MinMemAlloc);
         Assert.Equal(6, store.Current.Launcher.NumberOfConcurrentDownloads);
-        Assert.Equal(128, store.Current.Memory.PermGen);
     }
 
     [Fact]

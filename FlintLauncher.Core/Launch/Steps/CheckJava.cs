@@ -77,7 +77,7 @@ public sealed class CheckJava : LaunchStep
         if (stored is null || stored.Signature != _javaSignature || stored.Version.Length == 0 ||
             stored.Architecture.Length == 0 || stored.RealArchitecture.Length == 0 || stored.Vendor.Length == 0)
         {
-            _javaChecker = new JavaChecker(realJavaPath, "", 0, 0, 0, 0, Services.Paths.InstallRoot);
+            _javaChecker = new JavaChecker(realJavaPath, "", installRoot: Services.Paths.InstallRoot);
             EmitLogLine("Checking Java version...", MessageLevel.Launcher);
             _javaChecker.CheckFinished += CheckJavaFinished;
             _ = _javaChecker.StartAsync(cancellationToken);

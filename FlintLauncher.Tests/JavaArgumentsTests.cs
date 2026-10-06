@@ -72,31 +72,20 @@ public class JavaArgumentsTests
     }
 
     [Fact]
-    public async Task PermGen_Added_ForJava7_WhenNotDefault()
+    public async Task PermGen_NeverAdded_AfterTheJava8Floor()
     {
+        // the Java <8 support floor removed the PermGen accommodation: no version string
+        // produces -XX:PermSize anymore, whatever the PermGen setting says
         using var fixture = new LaunchFixture();
-        fixture.SeedJavaDetection("java", 0, version: "1.7.0_80"); // C9: probe cache, not settings
-        fixture.Global.StubSet("PermGen", 128);
+        fixture.SeedJavaDetection("java", 0, version: "1.7.0_80");
         var instance = await fixture.CreateInstance();
-        Assert.True(instance.GetJavaVersion().RequiresPermGen());
 
         var args = instance.JavaArguments();
 
-        Assert.Contains("-XX:PermSize=128m", args);
-    }
-
-    [Fact]
-    public async Task PermGen_Skipped_AtDefault64_AndOnModernJava()
-    {
-        using var fixture = new LaunchFixture();
-        fixture.SeedJavaDetection("java", 0, version: "1.7.0_80"); // PermGen stays 64
-        var instance = await fixture.CreateInstance();
         Assert.DoesNotContain(instance.JavaArguments(), a => a.StartsWith("-XX:PermSize"));
 
-        fixture.SeedJavaDetection("java", 0, version: "17.0.2"); // no PermGen in modern java
-        fixture.Global.StubSet("PermGen", 128);
+        fixture.SeedJavaDetection("java", 0, version: "17.0.2");
         var modern = await fixture.CreateInstance();
-        Assert.False(modern.GetJavaVersion().RequiresPermGen());
         Assert.DoesNotContain(modern.JavaArguments(), a => a.StartsWith("-XX:PermSize"));
     }
 

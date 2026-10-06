@@ -57,7 +57,6 @@ public class GlobalLaunchSettingsStub
         StubSet("MinecraftWinHeight", 480);
         StubSet("MinMemAlloc", 512);
         StubSet("MaxMemAlloc", 4096);
-        StubSet("PermGen", 64);
         StubSet("LowMemWarning", false);
         StubSet("UseNativeOpenAL", false);
         StubSet("CustomOpenALPath", "");

@@ -57,14 +57,16 @@ public class JavaVersionTests
     }
 
     [Theory]
-    [InlineData("1.6.0_33", true)]
-    [InlineData("1.7.0_60", true)]
-    [InlineData("1.8.0_22", false)]
-    [InlineData("9-ea", false)]
-    [InlineData("9.2.4", false)]
-    public void PermGen(string version, bool needsPermgen)
+    [InlineData("1.6.0_33")]
+    [InlineData("1.7.0_60")]
+    [InlineData("1.8.0_22")]
+    [InlineData("9-ea")]
+    [InlineData("9.2.4")]
+    public void LegacyVersionsStillParseAfterTheJava8Floor(string version)
     {
+        // the <8 support floor removed the PermGen accommodations, but version parsing
+        // itself stays version-agnostic (the floor is enforced at launch, not in parsing)
         var v = new JavaVersion(version);
-        Assert.Equal(needsPermgen, v.RequiresPermGen());
+        Assert.True(v.Major >= 1);
     }
 }
