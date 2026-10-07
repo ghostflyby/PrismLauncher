@@ -34,6 +34,12 @@ public static class JavaUtils
     /// <summary>Port of JavaUtils::javaExecutable ("javaw.exe" on Windows, "java" elsewhere).</summary>
     public static string JavaExecutable => OperatingSystem.IsWindows() ? "javaw.exe" : "java";
 
+    /// <summary>The os.arch spellings the launcher counts as 64-bit (shared by the detection
+    /// pipeline, which derives JavaInstall.Is64Bit and the Mojang "32"/"64" platform string
+    /// from release/probe architecture strings of this shape).</summary>
+    public static bool Is64BitArchitecture(string osArch) =>
+        osArch is "x86_64" or "amd64" or "aarch64" or "arm64" or "riscv64" or "ppc64le" or "ppc64";
+
     /// <summary>Port of JavaUtils::MakeJavaPtr.</summary>
     public static JavaInstall MakeJavaPtr(string path, string? id = "unknown", string? arch = "unknown")
     {
@@ -71,8 +77,8 @@ public static class JavaUtils
     /// Port of CleanEnviroment: the system environment with the dangerous Java variables
     /// (JAVA_ARGS/CLASSPATH/... ) removed, LAUNCHER_* mirrors dropped and the stripped list
     /// (LD_LIBRARY_PATH/LD_PRELOAD on Linux/BSD, QT_PLUGIN_PATH/QT_FONTPATH everywhere)
-    /// filtered by the corresponding LAUNCHER_* variable. Consumed by JavaChecker when
-    /// spawning the check process.
+    /// filtered by the corresponding LAUNCHER_* variable. Consumed by the game process
+    /// environment (MinecraftInstance.createEnvironment).
     /// </summary>
     public static ProcessEnvironment CleanEnvironment()
     {
@@ -336,43 +342,6 @@ public static class JavaUtils
         ScanJavaDirs(FileSystem.PathCombine(gradleUserHome, "jdks"));
 
         return javas;
-    }
-
-    /// <summary>Port of JavaUtils::getJavaCheckPath (Application::getJarPath("JavaCheck.jar")).
-    /// <paramref name="installRoot"/> is the launcher installation root (FlintPaths.InstallRoot);
-    /// the default keeps the .NET app base directory for bare fixtures.</summary>
-    public static string GetJavaCheckPath(string? installRoot = null)
-    {
-        var root = installRoot ?? AppContext.BaseDirectory;
-        var potentialPaths = new List<string>();
-        if (OperatingSystem.IsLinux() || OperatingSystem.IsFreeBSD() || IsOpenBsd())
-        {
-            potentialPaths.Add(FileSystem.PathCombine(root, "share", FlintConfig.Default.LauncherName));
-        }
-        potentialPaths.Add(FileSystem.PathCombine(root, "jars"));
-        potentialPaths.Add(FileSystem.PathCombine(AppContext.BaseDirectory, "jars"));
-        potentialPaths.Add(FileSystem.PathCombine(AppContext.BaseDirectory, "..", "jars")); // from inside build dir, for debugging
-
-        foreach (var p in potentialPaths)
-        {
-            var jarPath = FileSystem.PathCombine(p, JavaCheckJar.JarFileName);
-            if (File.Exists(jarPath))
-            {
-                return jarPath;
-            }
-        }
-
-        // nothing packaged: fall back to the cache copy of the embedded checker (a documented
-        // P5-a stub that currently always fails, see JavaCheckJar.TryExtractTo)
-        if (File.Exists(JavaCheckJar.DefaultExtractionPath))
-        {
-            return JavaCheckJar.DefaultExtractionPath;
-        }
-        if (JavaCheckJar.TryExtractTo(JavaCheckJar.DefaultExtractionPath, out _, installRoot))
-        {
-            return JavaCheckJar.DefaultExtractionPath;
-        }
-        return "";
     }
 
     /// <summary>Port of getMinecraftJavaBundle: locate the runtime JVMs the official launcher installed.</summary>

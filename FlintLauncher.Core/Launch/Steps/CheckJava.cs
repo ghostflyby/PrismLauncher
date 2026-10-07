@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Port of launcher/launch/steps/CheckJava.{h,cpp}: verify the configured java binary, run the
-// JavaChecker when its signature changed and store the probed properties in the launcher
-// runtime state's path-keyed probe cache (launcher-state.json, S5 — the C++ stored them as
-// settings keys, moved out of the config world by CONFIG C9).
+// Port of launcher/launch/steps/CheckJava.{h,cpp}: verify the configured java binary and,
+// when its signature changed, probe it through JdkFind.FromExecutable (the JavaCheck.jar
+// checker died in the migration) and store the probed properties in the launcher runtime
+// state's path-keyed probe cache (launcher-state.json, S5 — the C++ stored them as settings
+// keys, moved out of the config world by CONFIG C9).
 using System.Security.Cryptography;
+using JdkFind;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Java;
@@ -15,13 +17,12 @@ public sealed class CheckJava : LaunchStep
     private string _javaPath = "";
     private string _javaSignature = "";
     private string _detectKey = "";
-    private JavaChecker? _javaChecker;
 
     public CheckJava(LaunchTask parent) : base(parent)
     {
     }
 
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         var instance = Parent.Instance;
         var settings = instance.Settings();
@@ -48,17 +49,10 @@ public sealed class CheckJava : LaunchStep
                             "the settings.", MessageLevel.Warning);
             }
             EmitFailed("Java path is not valid.");
-            return Task.CompletedTask;
+            return;
         }
 
         EmitLogLine("Java path is:\n  " + _javaPath, MessageLevel.Launcher);
-
-        if (JavaUtils.GetJavaCheckPath(Services.Paths.InstallRoot).Length == 0)
-        {
-            EmitLogLine("Java checker library could not be found. Please check your installation.", MessageLevel.Fatal);
-            EmitFailed("Java checker library could not be found. Please check your installation.");
-            return Task.CompletedTask;
-        }
 
         var javaInfo = new FileInfo(realJavaPath);
         var javaUnixTime = new DateTimeOffset(javaInfo.LastWriteTimeUtc).ToUnixTimeMilliseconds();
@@ -77,68 +71,74 @@ public sealed class CheckJava : LaunchStep
         if (stored is null || stored.Signature != _javaSignature || stored.Version.Length == 0 ||
             stored.Architecture.Length == 0 || stored.RealArchitecture.Length == 0 || stored.Vendor.Length == 0)
         {
-            _javaChecker = new JavaChecker(realJavaPath, "", installRoot: Services.Paths.InstallRoot);
-            EmitLogLine("Checking Java version...", MessageLevel.Launcher);
-            _javaChecker.CheckFinished += CheckJavaFinished;
-            _ = _javaChecker.StartAsync(cancellationToken);
-            return Task.CompletedTask;
+            await ProbeJavaAsync(realJavaPath, cancellationToken).ConfigureAwait(false);
+            return;
         }
 
         PrintJavaInfo(stored.Version, stored.Architecture, stored.RealArchitecture, stored.Vendor);
         Parent.Instance.UpdateRuntimeContext();
         EmitSucceeded();
-        return Task.CompletedTask;
     }
 
-    private void CheckJavaFinished(JavaChecker.Result result)
+    /// <summary>Probes the selected binary through JdkFind.FromExecutable: path-keyed, the
+    /// child running with JVM-affecting environment variables removed, the verdict on
+    /// <see cref="JavaExecutable.StartFailure"/> (spawn error, timeout, non-zero exit —
+    /// the old JavaCheck.jar checker's Errored), and the probed properties feeding the
+    /// launcher-state quintet. A null return (no runnable JVM and no release file) maps to
+    /// the same refusal; a binary that ran but reported an incomplete trio maps to the old
+    /// ReturnedInvalidData semantics (warn and proceed, nothing cached).</summary>
+    private async Task ProbeJavaAsync(string realJavaPath, CancellationToken cancellationToken)
     {
-        switch (result.Validity)
+        EmitLogLine("Checking Java version...", MessageLevel.Launcher);
+        var executable = await JdkFinder.Default.FromExecutableAsync(realJavaPath, cancellationToken).ConfigureAwait(false);
+        if (executable is null || executable.StartFailure is not null)
         {
-            case JavaChecker.Validity.Errored:
-                {
-                    // Error message displayed if java can't start
-                    EmitLogLine("Could not start java:", MessageLevel.Error);
-                    EmitLogLines(result.ErrorLog.Split('\n'), MessageLevel.Error);
-                    EmitLogLine("\nCheck your Java settings.", MessageLevel.Launcher);
-                    EmitFailed("Could not start java!");
-                    return;
-                }
-            case JavaChecker.Validity.ReturnedInvalidData:
-                {
-                    EmitLogLine("Java checker returned some invalid data we don't understand:", MessageLevel.Error);
-                    EmitLogLines(result.OutLog.Split('\n'), MessageLevel.Warning);
-                    EmitLogLine("\nMinecraft might not start properly.", MessageLevel.Launcher);
-                    Parent.Instance.UpdateRuntimeContext();
-                    EmitSucceeded();
-                    return;
-                }
-            case JavaChecker.Validity.Valid:
-                {
-                    var instance = Parent.Instance;
-                    PrintJavaInfo(result.JavaVersion.ToString(), result.MojangPlatform, result.RealPlatform, result.JavaVendor);
-                    // write the probe result into the path-keyed state cache (S5), then
-                    // refresh the runtime context from it — settings are out of the loop (C9)
-                    Services.LauncherState?.Update(state =>
-                    {
-                        var detections = new Dictionary<string, State.JavaDetectEntry>(
-                            state.Java.Detections, StringComparer.Ordinal)
-                        {
-                            [_detectKey] = new State.JavaDetectEntry(
-                                _javaSignature,
-                                result.MojangPlatform,
-                                result.RealPlatform,
-                                result.JavaVersion.ToString(),
-                                result.JavaVendor),
-                        };
-                        return state with { Java = state.Java with { Detections = detections } };
-                    });
-                    instance.UpdateRuntimeContext();
-                    EmitSucceeded();
-                    return;
-                }
-            default:
-                return;
+            // Error message displayed if java can't start
+            EmitLogLine("Could not start java:", MessageLevel.Error);
+            if (executable?.StartFailure is { } failure)
+            {
+                EmitLogLines(failure.Split('\n'), MessageLevel.Error);
+            }
+            EmitLogLine("\nCheck your Java settings.", MessageLevel.Launcher);
+            EmitFailed("Could not start java!");
+            return;
         }
+
+        var osArch = executable.Architecture;
+        var version = executable.Version.Original;
+        var vendor = executable.VendorRaw;
+        if (osArch.Length == 0 || version.Length == 0 || vendor.Length == 0)
+        {
+            EmitLogLine("The java probe returned some data we don't understand:", MessageLevel.Error);
+            EmitLogLine($"java.version=\"{version}\" java.vendor=\"{vendor}\" os.arch=\"{osArch}\"", MessageLevel.Warning);
+            EmitLogLine("\nMinecraft might not start properly.", MessageLevel.Launcher);
+            Parent.Instance.UpdateRuntimeContext();
+            EmitSucceeded();
+            return;
+        }
+
+        var mojangPlatform = JavaUtils.Is64BitArchitecture(osArch) ? "64" : "32";
+        PrintJavaInfo(version, mojangPlatform, osArch, vendor);
+        // write the probe result into the path-keyed state cache (S5), then
+        // refresh the runtime context from it — settings are out of the loop (C9)
+        var signature = _javaSignature;
+        var detectKey = _detectKey;
+        Services.LauncherState?.Update(state =>
+        {
+            var detections = new Dictionary<string, State.JavaDetectEntry>(
+                state.Java.Detections, StringComparer.Ordinal)
+            {
+                [detectKey] = new State.JavaDetectEntry(
+                    signature,
+                    mojangPlatform,
+                    osArch,
+                    version,
+                    vendor),
+            };
+            return state with { Java = state.Java with { Detections = detections } };
+        });
+        Parent.Instance.UpdateRuntimeContext();
+        EmitSucceeded();
     }
 
     private void PrintJavaInfo(string version, string architecture, string realArchitecture, string vendor)

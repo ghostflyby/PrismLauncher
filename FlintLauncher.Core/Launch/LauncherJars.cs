@@ -46,7 +46,7 @@ public static class LauncherJars
         }
 
         // nothing installed: extract the embedded copy to the per-user cache
-        if (jarFile is NewLaunchJarName or NewLaunchLegacyJarName or Java.JavaCheckJar.JarFileName)
+        if (jarFile is NewLaunchJarName or NewLaunchLegacyJarName)
         {
             var extracted = Java.EmbeddedJars.EnsureExtracted(jarFile, installRoot);
             return File.Exists(extracted) ? extracted : "";

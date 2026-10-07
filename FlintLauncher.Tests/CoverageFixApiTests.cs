@@ -354,8 +354,7 @@ public class CoverageFixLaunchJoinApiTests
     {
         var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
         var launcherRoot = Path.Combine(repoRoot, "build");
-        return File.Exists(Path.Combine(launcherRoot, "jars", "JavaCheck.jar")) &&
-               File.Exists(Path.Combine(launcherRoot, "jars", "NewLaunch.jar"))
+        return File.Exists(Path.Combine(launcherRoot, "jars", "NewLaunch.jar"))
             ? launcherRoot
             : null;
     }
@@ -456,7 +455,7 @@ public class CoverageFixLaunchJoinApiTests
     {
         if (!IsUnix || LauncherJarsRoot() is not { } launcherRoot)
         {
-            return; // needs the unix fake-java + the built NewLaunch.jar/JavaCheck.jar
+            return; // needs the unix fake-java + the built NewLaunch.jar
         }
 
         // the paste stub: records the last decoded content, answers mclo.gs-style

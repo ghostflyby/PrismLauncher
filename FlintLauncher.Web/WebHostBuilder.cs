@@ -116,10 +116,7 @@ public static class WebHostBuilder
             // semantics, and the managed-versions javalist scans it (the C++
             // APPLICATION->javalist() the AutoInstallJava "no download" branch reads)
             JavaRootProvider = () => runtime.JavaRoot,
-            JavaInstallListProvider = () => new Core.Java.JavaInstallList(
-                maxConcurrent: runtime.Config.Current.Launcher.NumberOfConcurrentTasks
-                    ?? Core.Tasks.ConcurrentTask.DefaultMaxConcurrent,
-                javaRoot: runtime.JavaRoot),
+            JavaInstallListProvider = () => new Core.Java.JavaInstallList(javaRoot: runtime.JavaRoot),
             // the C++ LaunchTask always parses log4j XML events out of the game output
             // (LaunchTask::parseXmlLogs); the port keeps it behind an opt-in gate for
             // pure-core consumers and this host turns it on (fix-3)

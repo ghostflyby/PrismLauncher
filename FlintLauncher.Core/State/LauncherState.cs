@@ -64,7 +64,7 @@ public sealed record JavaDetectState
     public Dictionary<string, JavaDetectEntry> Detections { get; init; } = new();
 }
 
-/// <summary>One probed java binary (CheckJava writes it after a successful JavaChecker run).</summary>
+/// <summary>One probed java binary (CheckJava writes it after a successful JdkFind probe).</summary>
 public sealed record JavaDetectEntry(
     string Signature,
     string Architecture,

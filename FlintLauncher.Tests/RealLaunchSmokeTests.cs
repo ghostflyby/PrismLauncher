@@ -40,11 +40,11 @@ public class RealLaunchSmokeTests
         instance.Settings().Set("JavaPath", javaPath);
         fixture.SeedJavaDetection(javaPath, javaUnixTime, vendor: "smoke");
 
-        // Resolve the REAL NewLaunch.jar/JavaCheck.jar built by the BuildJavaJars MSBuild target
-        // (the fake java ignores the classpath; CheckJava requires JavaCheck.jar to exist).
+        // Resolve the REAL NewLaunch.jar built by the BuildJavaJars MSBuild target (the fake
+        // java ignores the classpath; the launch pipeline extracts the launcher jars).
         var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
         var launcherRoot = Path.Combine(repoRoot, "build");
-        if (!File.Exists(Path.Combine(launcherRoot, "jars", "JavaCheck.jar")))
+        if (!File.Exists(Path.Combine(launcherRoot, "jars", "NewLaunch.jar")))
         {
             return; // jars not built on this machine — run docs/tools/newlaunch-build.sh first
         }

@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/java/JavaInstallList.{h,cpp}: a list of discovered JavaInstall entries plus
-// the JavaListLoadTask that fills it. Detection moved to JavaDetection (JdkFind primary +
-// checker-validated fallback); this task maps the candidates onto JavaInstall entries.
+// the JavaListLoadTask that fills it. Detection lives in JavaDetection (JdkFind LocateAsync
+// primary + FromExecutable fallback); this task maps the candidates onto JavaInstall entries.
 //
 // Deviations from the C++ original:
 //  - The BaseVersionList/QAbstractListModel surface (data() roles, VersionPointerRole, ...)
 //    is UI plumbing and is not ported. RecommendedRole upstream is a constant `false` in this
 //    revision (m_current_recommended is initialised to NULL and never assigned), so there is
 //    no recommendation logic to port; consumers that need a default pick the newest entry.
-//  - The APPLICATION->settings()->get("NumberOfConcurrentTasks") lookup becomes the
-//    maxConcurrent constructor parameter (the host wires the settings value).
 //  - Detection no longer runs JavaCheck.jar per candidate (see JavaDetection); the list
 //    metadata comes from the release file + runtime probe instead of the checker output.
+//  - The APPLICATION->settings()->get("NumberOfConcurrentTasks") lookup died with the
+//    JavaCheck fan-out: the JdkFind pipeline manages its own parallelism.
 using JdkFind;
 using FlintLauncher.Core.Tasks;
 
@@ -27,7 +27,6 @@ public sealed class JavaInstallList
     }
 
     private readonly bool _onlyManagedVersions;
-    private readonly int _maxConcurrent;
     private readonly string? _javaRoot;
     private Status _status = Status.NotDone;
     private JavaListLoadTask? _loadTask;
@@ -36,11 +35,9 @@ public sealed class JavaInstallList
     /// <summary><paramref name="javaRoot"/> is the launcher-managed java dir (the JavaDir
     /// setting under E2 store semantics — the host passes the resolved root; the default
     /// keeps the C++ cwd-relative behavior for bare fixtures).</summary>
-    public JavaInstallList(bool onlyManagedVersions = false, int maxConcurrent = ConcurrentTask.DefaultMaxConcurrent,
-        string? javaRoot = null)
+    public JavaInstallList(bool onlyManagedVersions = false, string? javaRoot = null)
     {
         _onlyManagedVersions = onlyManagedVersions;
-        _maxConcurrent = maxConcurrent;
         _javaRoot = javaRoot;
     }
 
@@ -61,7 +58,7 @@ public sealed class JavaInstallList
         if (_status != Status.InProgress)
         {
             _status = Status.InProgress;
-            _loadTask = new JavaListLoadTask(this, _onlyManagedVersions, _maxConcurrent, _javaRoot);
+            _loadTask = new JavaListLoadTask(this, _onlyManagedVersions, _javaRoot);
             // C++ starts the task immediately; the returned Task tracks the in-flight run.
             _ = _loadTask.StartAsync();
         }
@@ -96,23 +93,21 @@ public sealed class JavaInstallList
 }
 
 /// <summary>Port of JavaListLoadTask. The detection itself lives in
-/// <see cref="JavaDetection"/> (JdkFind primary + checker-validated fallback); this task is
-/// the list-model shell around it and maps the candidates onto <see cref="JavaInstall"/>.</summary>
+/// <see cref="JavaDetection"/> (JdkFind LocateAsync primary + FromExecutable fallback); this
+/// task is the list-model shell around it and maps the candidates onto
+/// <see cref="JavaInstall"/>.</summary>
 public sealed class JavaListLoadTask : FlintTask
 {
     private readonly JavaInstallList _list;
     private readonly bool _onlyManagedVersions;
-    private readonly int _maxConcurrent;
     private readonly string? _javaRoot;
     private readonly IReadOnlyList<IJvmProvider>? _providers;
 
     public JavaListLoadTask(JavaInstallList vlist, bool onlyManagedVersions = false,
-        int maxConcurrent = ConcurrentTask.DefaultMaxConcurrent, string? javaRoot = null,
-        IReadOnlyList<IJvmProvider>? providers = null)
+        string? javaRoot = null, IReadOnlyList<IJvmProvider>? providers = null)
     {
         _list = vlist;
         _onlyManagedVersions = onlyManagedVersions;
-        _maxConcurrent = maxConcurrent;
         _javaRoot = javaRoot;
         _providers = providers;
     }
@@ -121,14 +116,14 @@ public sealed class JavaListLoadTask : FlintTask
     {
         EmitStatus("Detecting Java installations...");
 
-        var candidates = await JavaDetection.DetectAsync(_javaRoot, _maxConcurrent, cancellationToken,
-            providers: _providers, progress: EmitProgress, managedOnly: _onlyManagedVersions).ConfigureAwait(false);
+        var candidates = await JavaDetection.DetectAsync(_javaRoot, cancellationToken,
+            providers: _providers, managedOnly: _onlyManagedVersions).ConfigureAwait(false);
 
         var installs = candidates
             .Where(candidate => candidate.Valid)
             .Select(candidate => new JavaInstall(new JavaVersion(candidate.Version), candidate.Architecture, candidate.Path)
             {
-                Is64Bit = JavaChecker.Is64BitArchitecture(candidate.Architecture),
+                Is64Bit = JavaUtils.Is64BitArchitecture(candidate.Architecture),
             })
             .ToList();
 

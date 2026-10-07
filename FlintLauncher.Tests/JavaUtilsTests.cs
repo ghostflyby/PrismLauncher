@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Tests for the JVM discovery (macOS-first, matching the host machine), the process environment
-// cleaner and the JavaCheck.jar lookup. The macOS discovery is a filesystem scan (upstream does
-// not call java_home), so the "real JDK" test is guarded like RealDataSmokeTests: it only
-// asserts when this machine actually has a JDK installed. Discovery is layered — the JdkFind
-// provider suite on top of the C++-parity filesystem scan — and both layers are tested here.
+// cleaner. Discovery runs on the JdkFind facilities (LocateAsync primary + FromExecutable
+// fallback) and both layers are tested here with synthetic homes; real-machine assertions are
+// guarded like RealDataSmokeTests.
 using JdkFind;
 using JdkFind.Providers;
 using FlintLauncher.Core.Instances;
@@ -133,14 +132,22 @@ public class JavaUtilsTests : IDisposable
     public async Task DetectAsync_MapsAndDeduplicatesTheLayers()
     {
         // a synthetic plain-layout JDK home reported by an injected provider is the primary
-        // candidate; an env-provided copy of the same path collapses into it, and an env
-        // path that leads nowhere survives as an invalid fallback candidate
+        // candidate; an env-provided copy of the same path collapses into it, a second env
+        // home (outside the scanned root, so purely a fallback candidate) with a release
+        // file but a dead binary survives as an invalid fallback candidate, and an env path
+        // with no establishable JVM drops entirely
         var root = TempRoot();
+        var brokenRoot = TempRoot();
         var home = Path.Combine(root, "jdk-21.0.5");
         Directory.CreateDirectory(Path.Combine(home, "bin"));
         File.WriteAllText(Path.Combine(home, "bin",
             OperatingSystem.IsWindows() ? "java.exe" : "java"), "");
         File.WriteAllText(Path.Combine(home, "release"), "JAVA_VERSION=\"21.0.5\"\n");
+        var brokenHome = Path.Combine(brokenRoot, "jdk-broken");
+        Directory.CreateDirectory(Path.Combine(brokenHome, "bin"));
+        File.WriteAllText(Path.Combine(brokenHome, "bin",
+            OperatingSystem.IsWindows() ? "java.exe" : "java"), "");
+        File.WriteAllText(Path.Combine(brokenHome, "release"), "JAVA_VERSION=\"11.0.1\"\n");
 
         IJvmProvider provider = OperatingSystem.IsWindows()
             ? new WindowsProgramFilesJvmProvider([root])
@@ -148,8 +155,9 @@ public class JavaUtilsTests : IDisposable
                 ? new MacOsJvmProvider([root])
                 : new UnixJvmProvider(root);
         var executable = Path.Combine(home, "bin", JavaUtils.JavaExecutable);
+        var broken = Path.Combine(brokenHome, "bin", JavaUtils.JavaExecutable);
         SetEnv($"{FlintLauncher.Core.FlintConfig.Default.LauncherAppBinaryEnvName}_JAVA_PATHS",
-            string.Join(Path.PathSeparator, executable, Path.Combine(root, "nonexistent", "java")));
+            string.Join(Path.PathSeparator, executable, broken, Path.Combine(root, "nonexistent", "java")));
 
         var candidates = await JavaDetection.DetectAsync(providers: [provider]);
 
@@ -160,9 +168,13 @@ public class JavaUtilsTests : IDisposable
         // file; OS_ARCH is absent from the fixture
         Assert.Equal("unknown", primary.Architecture);
 
-        var dead = Assert.Single(candidates, c => c.Path == Path.Combine(root, "nonexistent", "java"));
+        // release-backed but unable to run: listed, marked invalid
+        var dead = Assert.Single(candidates, c => c.Path == broken);
         Assert.False(dead.Valid);
         Assert.Equal("unknown", dead.Version);
+
+        // nothing behind it: dropped instead of listed
+        Assert.DoesNotContain(candidates, c => c.Path == Path.Combine(root, "nonexistent", "java"));
     }
 
     [Fact]
@@ -186,7 +198,7 @@ public class JavaUtilsTests : IDisposable
             c => c.Path == Path.Combine(home, "bin", JavaUtils.JavaExecutable));
         Assert.True(candidate.Valid);
         Assert.Equal("aarch64", candidate.Architecture);
-        Assert.True(JavaChecker.Is64BitArchitecture(candidate.Architecture));
+        Assert.True(JavaUtils.Is64BitArchitecture(candidate.Architecture));
     }
 
     [Fact]
@@ -206,7 +218,7 @@ public class JavaUtilsTests : IDisposable
                 : new UnixJvmProvider(root);
 
         var list = new JavaInstallList();
-        var task = new JavaListLoadTask(list, providers: [provider], maxConcurrent: 16);
+        var task = new JavaListLoadTask(list, providers: [provider]);
         await task.StartAsync();
 
         var install = Assert.Single(list.Versions(), j => j.Path == Path.Combine(home, "bin", JavaUtils.JavaExecutable));
@@ -277,16 +289,5 @@ public class JavaUtilsTests : IDisposable
         Assert.Equal("a:c", JavaUtils.StripVariableEntries("PATH", "a:b:c", "b"));
         Assert.Equal("a:b:c", JavaUtils.StripVariableEntries("PATH", "a:b:c", "missing"));
         Assert.Equal("b", JavaUtils.StripVariableEntries("PATH", "a:b:a", "a:a"));
-    }
-
-    // ---------------------------------------------------------- JavaCheck lookup
-
-    [Fact]
-    public void GetJavaCheckPath_IsEmptyOrAnExistingFile()
-    {
-        var path = JavaUtils.GetJavaCheckPath();
-
-        Assert.True(path.Length == 0 || File.Exists(path),
-            "GetJavaCheckPath must return either the P5-a stub empty string or a real jar path");
     }
 }
