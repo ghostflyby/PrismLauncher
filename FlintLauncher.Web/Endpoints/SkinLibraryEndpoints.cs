@@ -21,17 +21,18 @@ namespace FlintLauncher.Web.Endpoints;
 
 public static class SkinLibraryEndpoints
 {
-    public static void MapSkinLibrary(this IEndpointRouteBuilder api)
+    public static void MapSkinLibrary(this RouteGroupBuilder api)
     {
+        api.WithTags("Skins");
         api.MapGet("/skins", (LauncherRuntime runtime) =>
             Results.Ok(runtime.Skins.List()
                 .Select(ToView)
-                .ToArray()));
+                .ToArray())).Produces<SkinView[]>(200);
 
         api.MapGet("/skins/{name}", (string name, LauncherRuntime runtime) =>
             runtime.Skins.Get(name) is { } skin
                 ? Results.Ok(ToView(skin))
-                : ApiJson.NotFound("skin_not_found", $"no stored skin '{name}'"));
+                : ApiJson.NotFound("skin_not_found", $"no stored skin '{name}'")).Produces<SkinView>(200);
 
         api.MapPost("/skins", async (HttpRequest request, LauncherRuntime runtime) =>
         {
@@ -87,12 +88,12 @@ public static class SkinLibraryEndpoints
                 {
                 }
             }
-        });
+        }).WithMetadata(new FlintLauncher.Web.OpenApi.FormUploadMarker("multipart form: skin image file (png) + optional name/model fields")).Produces<SkinStoredResponse>(201);
 
         api.MapDelete("/skins/{name}", (string name, LauncherRuntime runtime) =>
             runtime.Skins.Delete(name)
                 ? Results.NoContent()
-                : ApiJson.NotFound("skin_not_found", $"no stored skin '{name}'"));
+                : ApiJson.NotFound("skin_not_found", $"no stored skin '{name}'")).Produces(204);
 
         // apply = the D6 composition: SkinUpload (the account upload core) over the stored
         // texture; the model override picks classic/slim, defaulting to the stored variant
@@ -127,7 +128,7 @@ public static class SkinLibraryEndpoints
             return upload.WasSuccessful
                 ? Results.NoContent()
                 : ApiJson.Error("skin_upload_failed", upload.FailReason, 400);
-        });
+        }).Produces(204);
     }
 
     private static SkinView ToView(SkinModel skin) => new(

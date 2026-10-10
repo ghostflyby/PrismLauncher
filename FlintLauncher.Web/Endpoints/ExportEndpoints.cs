@@ -23,8 +23,9 @@ public static class ExportEndpoints
     /// (tail — the last bytes of the file, starting at the next line break).</summary>
     public const int MaxLogBytes = 512 * 1024;
 
-    public static void MapExport(this IEndpointRouteBuilder api)
+    public static void MapExport(this RouteGroupBuilder api)
     {
+        api.WithTags("Export");
         // -------------------------------------------------------------------- export
         api.MapPost("/instances/{id}/export", async (string id, ExportRequest request,
             LauncherRuntime runtime, FlintTaskRegistry registry) =>
@@ -121,7 +122,7 @@ public static class ExportEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<TaskAcceptedResponse>(202);
 
         // ----------------------------------------------------------------- log listing
         api.MapGet("/instances/{id}/logs", async (string id, LauncherRuntime runtime) =>
@@ -139,7 +140,7 @@ public static class ExportEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<LogFileView[]>(200);
 
         // ---------------------------------------------------------------- log contents
         api.MapGet("/instances/{id}/logs/{dir}/{name}", async (string id, string dir, string name,
@@ -168,7 +169,7 @@ public static class ExportEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).WithMetadata(new FlintLauncher.Web.OpenApi.PlainTextMarker());
     }
 
     // ----------------------------------------------------------------------- helpers

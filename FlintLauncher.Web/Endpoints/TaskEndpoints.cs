@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Task endpoints: list/get/abort/proceed/log/SSE-stream over the in-memory FlintTaskRegistry.
 using System.Text.Json;
+using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 using Microsoft.AspNetCore.Http.Json;
 
@@ -8,10 +9,12 @@ namespace FlintLauncher.Web.Endpoints;
 
 public static class TaskEndpoints
 {
-    public static void MapTasks(this IEndpointRouteBuilder api)
+    public static void MapTasks(this RouteGroupBuilder api)
     {
+        api.WithTags("Tasks");
         api.MapGet("/tasks", (FlintTaskRegistry registry) =>
-            Results.Ok(registry.All().Select(registry.View).ToArray()));
+            Results.Ok(registry.All().Select(registry.View).ToArray()))
+            .Produces<TaskView[]>(200);
 
         api.MapGet("/tasks/{id}", (string id, FlintTaskRegistry registry) =>
         {
@@ -19,7 +22,7 @@ public static class TaskEndpoints
             return entry is null
                 ? ApiJson.NotFound("task_not_found", $"no task '{id}'")
                 : Results.Ok(registry.View(entry));
-        });
+        }).Produces<TaskView>(200);
 
         api.MapPost("/tasks/{id}/abort", (string id, FlintTaskRegistry registry) =>
         {
@@ -34,7 +37,7 @@ public static class TaskEndpoints
             }
             registry.Abort(entry);
             return Results.NoContent();
-        });
+        }).Produces(204);
 
         api.MapPost("/tasks/{id}/proceed", (string id, FlintTaskRegistry registry) =>
         {
@@ -62,7 +65,7 @@ public static class TaskEndpoints
             }
             registry.Proceed(entry);
             return Results.Ok(registry.View(entry));
-        });
+        }).Produces<TaskView>(200);
 
         api.MapGet("/tasks/{id}/log", (string id, int? since, FlintTaskRegistry registry) =>
         {
@@ -73,7 +76,7 @@ public static class TaskEndpoints
             }
             var lines = registry.ReadLog(entry, since ?? 0);
             return Results.Ok(new Models.TaskLogResponse(lines));
-        });
+        }).Produces<TaskLogResponse>(200);
 
         // SSE: log lines as data events, the terminal state as a final "state" event.
         api.MapGet("/tasks/{id}/stream", async Task (string id, HttpContext ctx,
@@ -145,6 +148,6 @@ public static class TaskEndpoints
             {
                 // client disconnected — the response is gone, nothing to write
             }
-        });
+        }).WithMetadata(new FlintLauncher.Web.OpenApi.SseMarker());
     }
 }

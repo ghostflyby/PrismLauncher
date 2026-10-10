@@ -28,8 +28,9 @@ namespace FlintLauncher.Web.Endpoints;
 
 public static class ComponentEndpoints
 {
-    public static void MapComponents(this IEndpointRouteBuilder api)
+    public static void MapComponents(this RouteGroupBuilder api)
     {
+        api.WithTags("Components");
         // ------------------------------------------------------------------ list
         api.MapGet("/instances/{id}/components", async (string id, LauncherRuntime runtime) =>
         {
@@ -50,7 +51,7 @@ public static class ComponentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<ComponentView[]>(200);
 
         // ------------------------------------------------- change version / important
         api.MapPatch("/instances/{id}/components/{uid}", async (string id, string uid,
@@ -101,7 +102,7 @@ public static class ComponentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces(204);
 
         // ---------------------------------------------------------------- install loader
         api.MapPost("/instances/{id}/components", async (string id, ComponentInstallRequest request,
@@ -145,7 +146,7 @@ public static class ComponentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<ComponentView>(201);
 
         // -------------------------------------------------------------- customize/revert
         api.MapPost("/instances/{id}/components/{uid}/customize", async (string id, string uid,
@@ -177,7 +178,7 @@ public static class ComponentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces(204);
 
         api.MapPost("/instances/{id}/components/{uid}/revert", async (string id, string uid,
             LauncherRuntime runtime) =>
@@ -208,7 +209,7 @@ public static class ComponentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces(204);
 
         // ----------------------------------------------------------------------- remove
         api.MapDelete("/instances/{id}/components/{uid}", async (string id, string uid,
@@ -239,7 +240,7 @@ public static class ComponentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces(204);
 
         // ------------------------------------------------------------------------- move
         api.MapPost("/instances/{id}/components/{uid}/move", async (string id, string uid,
@@ -276,7 +277,7 @@ public static class ComponentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces(204);
     }
 
     // ----------------------------------------------------------------------- helpers

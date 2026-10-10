@@ -12,8 +12,9 @@ namespace FlintLauncher.Web.Endpoints;
 
 public static class LaunchEndpoints
 {
-    public static void MapLaunch(this IEndpointRouteBuilder api)
+    public static void MapLaunch(this RouteGroupBuilder api)
     {
+        api.WithTags("Launch");
         api.MapPost("/instances/{ref}/launch", async (string @ref, LaunchRequest request,
                                                      LauncherRuntime runtime,
                                                      FlintTaskRegistry registry) =>
@@ -116,6 +117,6 @@ public static class LaunchEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<TaskAcceptedResponse>(202);
     }
 }

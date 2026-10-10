@@ -157,8 +157,9 @@ public static class SettingsAndIconsEndpoints
             ],
         };
 
-    public static void MapSettingsAndIcons(this IEndpointRouteBuilder api)
+    public static void MapSettingsAndIcons(this RouteGroupBuilder api)
     {
+        api.WithTags("Settings");
         api.MapGet("/settings", (LauncherRuntime runtime) =>
         {
             var groups = new Dictionary<string, object>(StringComparer.Ordinal);
@@ -176,7 +177,7 @@ public static class SettingsAndIconsEndpoints
                 groups[group] = values;
             }
             return Results.Ok(new SettingsGroupsResponse(groups));
-        });
+        }).Produces<SettingsGroupsResponse>(200);
 
         api.MapPut("/settings", (LauncherRuntime runtime, GlobalSettingsPutRequest? body) =>
         {
@@ -219,7 +220,7 @@ public static class SettingsAndIconsEndpoints
             // re-reads the store-backed secrets and the mod-platform API credentials
             RuntimeNetConfig.Apply(runtime);
             return Results.NoContent();
-        });
+        }).Produces(204);
 
         // ---- global icon library (IconPickerDialog) ------------------------------------
         // D5: the surface talks to the injected IconPool model (key→path index, scan,
@@ -232,7 +233,7 @@ public static class SettingsAndIconsEndpoints
             return Results.Ok(icons.Entries()
                 .Select(entry => new IconView(entry.Key, entry.DisplayName))
                 .ToArray());
-        });
+        }).Produces<IconView[]>(200);
 
         api.MapPost("/icons", async (HttpRequest request, IconPool icons) =>
         {
@@ -262,12 +263,12 @@ public static class SettingsAndIconsEndpoints
                 installed.Add(name);
             }
             return Results.Ok(new IconInstalledResponse(installed[0]));
-        });
+        }).WithMetadata(new FlintLauncher.Web.OpenApi.FormUploadMarker("multipart form: icon file (png/jpg/svg)")).Produces<IconInstalledResponse>(200);
 
         api.MapDelete("/icons/{key}", (string key, IconPool icons) =>
             icons.Delete(key)
                 ? Results.NoContent()
-                : ApiJson.NotFound("icon_not_found", $"no icon '{key}'"));
+                : ApiJson.NotFound("icon_not_found", $"no icon '{key}'")).Produces(204);
 
         api.MapPut("/instances/{ref}/icon", async (string @ref, HttpRequest request,
             LauncherRuntime runtime) =>
@@ -304,7 +305,7 @@ public static class SettingsAndIconsEndpoints
             instance.SetIconKey(key);
             instance.SaveNow();
             return Results.NoContent();
-        });
+        }).WithMetadata(new FlintLauncher.Web.OpenApi.FormUploadMarker("multipart form: icon file, or form field iconKey referencing an installed icon")).Produces(204);
     }
 
     /// <summary>Coerce the incoming JSON value to the declared default's kind, like the

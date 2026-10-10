@@ -8,8 +8,9 @@ namespace FlintLauncher.Web.Endpoints;
 
 public static class AccountEndpoints
 {
-    public static void MapAccounts(this IEndpointRouteBuilder api)
+    public static void MapAccounts(this RouteGroupBuilder api)
     {
+        api.WithTags("Accounts");
         // ---------------------------------------------------- accounts/{id}/skin + cape
         // the AccountPage/SkinManageDialog skin surface (read/upload/delete + cape
         // equip/remove; see SkinEndpoints for the mapping)
@@ -18,7 +19,8 @@ public static class AccountEndpoints
         api.MapGet("/accounts", (LauncherRuntime runtime) =>
             Results.Ok(Enumerable.Range(0, runtime.Accounts.Count)
                 .Select(i => View(runtime.Accounts.At(i), runtime.Accounts))
-                .ToArray()));
+                .ToArray()))
+            .Produces<AccountView[]>(200);
 
         api.MapPost("/accounts/offline", (OfflineAccountRequest request, LauncherRuntime runtime) =>
         {
@@ -30,7 +32,7 @@ public static class AccountEndpoints
             runtime.Accounts.AddAccount(account);
             return Results.Created($"/api/v1/accounts/{account.ProfileId()}",
                 View(account, runtime.Accounts));
-        });
+        }).Produces<AccountView>(201);
 
         api.MapDelete("/accounts/{profileId}", (string profileId, LauncherRuntime runtime) =>
         {
@@ -41,7 +43,7 @@ public static class AccountEndpoints
             }
             runtime.Accounts.RemoveAccount(index);
             return Results.NoContent();
-        });
+        }).Produces(204);
 
         api.MapPut("/accounts/{profileId}/default", (string profileId, LauncherRuntime runtime) =>
         {
@@ -52,7 +54,7 @@ public static class AccountEndpoints
             }
             runtime.Accounts.SetDefaultAccount(runtime.Accounts.At(index));
             return Results.NoContent();
-        });
+        }).Produces(204);
 
         // ------------------------------------------------------- MSA device-code login
         api.MapPost("/accounts/msa/devicecode", async (DeviceCodeSessionStore store,
@@ -73,7 +75,7 @@ public static class AccountEndpoints
                     session.VerificationUri,
                     session.ExpiresInSeconds,
                     session.DeviceId));
-        });
+        }).Produces<DeviceCodeStartResponse>(202);
 
         api.MapPost("/accounts/msa/devicecode/{deviceId}/poll", (string deviceId,
                                                                  DeviceCodeSessionStore store,
@@ -83,7 +85,7 @@ public static class AccountEndpoints
             return session is null
                 ? ApiJson.NotFound("device_not_found", $"no device-code session '{deviceId}'")
                 : Results.Ok(store.Poll(session, runtime.Accounts));
-        });
+        }).Produces<DeviceCodePollResponse>(200);
     }
 
     public static AccountView View(FlintLauncher.Core.Auth.MinecraftAccount account,

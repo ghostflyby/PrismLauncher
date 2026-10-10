@@ -17,8 +17,9 @@ namespace FlintLauncher.Web.Endpoints;
 
 public static class InstanceContentEndpoints
 {
-    public static void MapInstanceContent(this IEndpointRouteBuilder api)
+    public static void MapInstanceContent(this RouteGroupBuilder api)
     {
+        api.WithTags("InstanceContent");
         MapWorlds(api);
         MapServers(api);
         MapResources(api);
@@ -50,7 +51,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<WorldView[]>(200);
 
         api.MapDelete("/instances/{id}/worlds/{folderName}", async (string id, string folderName,
             LauncherRuntime runtime) =>
@@ -77,7 +78,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces(204);
 
         // world detail: the listing view plus the parsed seed and the icon.png path
         // (WorldPage's info pane / "reset icon" target)
@@ -115,7 +116,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<WorldDetailView>(200);
 
         // world copy (WorldPage's "copy" action -> CopyWorldTask): the copy lands in the same
         // saves folder under the given name (folder rename + level.dat LevelName rewrite)
@@ -159,7 +160,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<WorldView>(201);
 
         api.MapPost("/instances/{id}/worlds/{folderName}/rename", async (string id, string folderName,
             WorldRenameRequest request, LauncherRuntime runtime) =>
@@ -195,7 +196,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces(204);
 
         // multipart zip upload (WorldListPage's "add world" drag & drop / file dialog)
         api.MapPost("/instances/{id}/worlds/install", async (string id, HttpRequest request,
@@ -273,7 +274,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).WithMetadata(new FlintLauncher.Web.OpenApi.FormUploadMarker("multipart form: world archive file (zip)")).Produces<WorldView>(201);
     }
 
     // ----------------------------------------------------------------------- servers
@@ -297,7 +298,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<ServerEntryView[]>(200);
 
         api.MapPost("/instances/{id}/servers", async (string id, ServerAddRequest request,
             LauncherRuntime runtime) =>
@@ -327,7 +328,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<ServerEntryView>(201);
 
         api.MapDelete("/instances/{id}/servers/{index}", async (string id, int index,
             LauncherRuntime runtime) =>
@@ -352,7 +353,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces(204);
 
         // status ping (ServersPage's queryServersStatus): SRV-resolve then the minimal
         // McClient handshake; synchronous with a 5s bound, like the page's single query
@@ -387,7 +388,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<ServerPingView>(200);
     }
 
     // --------------------------------------------------------------------- resources
@@ -423,15 +424,15 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<ResourceView[]>(200);
 
         api.MapPost("/instances/{id}/resources/{type}/{name}/enable", async (string id, string type,
             string name, LauncherRuntime runtime) =>
-            await SetResourceEnabled(id, type, name, EnableAction.Enable, runtime));
+            await SetResourceEnabled(id, type, name, EnableAction.Enable, runtime)).Produces(204);
 
         api.MapPost("/instances/{id}/resources/{type}/{name}/disable", async (string id, string type,
             string name, LauncherRuntime runtime) =>
-            await SetResourceEnabled(id, type, name, EnableAction.Disable, runtime));
+            await SetResourceEnabled(id, type, name, EnableAction.Disable, runtime)).Produces(204);
 
         api.MapDelete("/instances/{id}/resources/{type}/{name}", async (string id, string type,
             string name, LauncherRuntime runtime) =>
@@ -463,7 +464,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces(204);
     }
 
     private static async Task<IResult> SetResourceEnabled(string id, string type, string name,
@@ -518,11 +519,11 @@ public static class InstanceContentEndpoints
     {
         api.MapPost("/instances/{id}/mods/{name}/enable", async (string id, string name,
             LauncherRuntime runtime) =>
-            await SetModEnabled(id, name, EnableAction.Enable, runtime));
+            await SetModEnabled(id, name, EnableAction.Enable, runtime)).Produces(204);
 
         api.MapPost("/instances/{id}/mods/{name}/disable", async (string id, string name,
             LauncherRuntime runtime) =>
-            await SetModEnabled(id, name, EnableAction.Disable, runtime));
+            await SetModEnabled(id, name, EnableAction.Disable, runtime)).Produces(204);
 
         api.MapDelete("/instances/{id}/mods/{name}", async (string id, string name,
             LauncherRuntime runtime) =>
@@ -544,7 +545,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces(204);
     }
 
     private static async Task<IResult> SetModEnabled(string id, string name, EnableAction action,
@@ -599,7 +600,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<ScreenshotView[]>(200);
 
         // ScreenshotsPage's imgur upload: each named file uploads as an image; more than one
         // also creates an album (the C++ SequentialTask shape)
@@ -654,7 +655,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<TaskAcceptedResponse>(202);
 
         api.MapDelete("/instances/{id}/screenshots/{name}", async (string id, string name,
             LauncherRuntime runtime) =>
@@ -686,7 +687,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces(204);
     }
 
     // ------------------------------------------------------------------- game options
@@ -710,7 +711,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<GameOptionView[]>(200);
 
         api.MapPut("/instances/{id}/gameoptions", async (string id, GameOptionsPutRequest? request,
             LauncherRuntime runtime) =>
@@ -743,7 +744,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces(204);
     }
 
     // ----------------------------------------------------------------------- helpers

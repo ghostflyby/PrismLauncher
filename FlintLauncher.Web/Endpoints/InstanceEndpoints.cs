@@ -13,8 +13,9 @@ namespace FlintLauncher.Web.Endpoints;
 
 public static class InstanceEndpoints
 {
-    public static void MapInstances(this IEndpointRouteBuilder api)
+    public static void MapInstances(this RouteGroupBuilder api)
     {
+        api.WithTags("Instances");
         api.MapGet("/instances", async (LauncherRuntime runtime, string? search, string? group) =>
         {
             await runtime.InstanceLock.WaitAsync();
@@ -40,7 +41,7 @@ public static class InstanceEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<InstanceSummary[]>(200);
 
         // the group index of the instance list (MainWindow's group view)
         api.MapGet("/instances/groups", async (LauncherRuntime runtime) =>
@@ -71,7 +72,7 @@ public static class InstanceEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<InstanceGroupView[]>(200);
 
         // {ref} resolves through the D2 chain (inode → uuid → dirname); direct
         // GetInstanceById is banned at the API boundary (GLOBAL §1 review rule)
@@ -89,7 +90,7 @@ public static class InstanceEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<InstanceDetail>(200);
 
         api.MapPost("/instances/vanilla", async (VanillaCreateRequest request, LauncherRuntime runtime) =>
         {
@@ -135,7 +136,7 @@ public static class InstanceEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<InstanceCreatedResponse>(201);
 
         api.MapPost("/instances/import", async (ImportRequest request, LauncherRuntime runtime,
                                                 FlintTaskRegistry registry) =>
@@ -186,7 +187,7 @@ public static class InstanceEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<TaskAcceptedResponse>(202);
 
         // CopyInstanceDialog: a selective copy runs as a staged instance task (the copy is
         // committed into instances/ on success) and is tracked like import
@@ -256,7 +257,7 @@ public static class InstanceEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<TaskAcceptedResponse>(202);
 
         api.MapDelete("/instances/{ref}", async (string @ref, LauncherRuntime runtime) =>
         {
@@ -275,7 +276,7 @@ public static class InstanceEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces(204);
 
         // D3: a rename is a pure METADATA write — the directory name stays (it is the
         // display form, not the identity); references hold through the D2 chain (uuid),
@@ -316,7 +317,7 @@ public static class InstanceEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces(204);
 
         // ------------------------------------------------------------ instance settings
         api.MapGet("/instances/{ref}/settings", async (string @ref, LauncherRuntime runtime) =>
@@ -353,13 +354,22 @@ public static class InstanceEndpoints
                     node["lastTimePlayed"] = typed.StateStore.Current.LastTimePlayed;
                     node["totalTimePlayed"] = typed.StateStore.Current.TotalTimePlayed;
                 }
-                return ApiJson.Node(node);
+                var dict = new Dictionary<string, JsonElement>();
+                foreach (var pair in node)
+                {
+                    dict[pair.Key] = pair.Value is null
+                        ? JsonDocument.Parse("null").RootElement.Clone()
+                        : JsonDocument.Parse(pair.Value.ToJsonString()).RootElement.Clone();
+                }
+                // flat wire shape (the keys at the top level, exactly what ApiJson.Node used
+                // to write) — a wrapper record would nest it behind a "settings" property
+                return Results.Ok(dict);
             }
             finally
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<Dictionary<string, JsonElement>>(200);
 
         api.MapPut("/instances/{ref}/settings", async (string @ref, SettingsPutRequest request,
                                                       LauncherRuntime runtime) =>
@@ -395,7 +405,7 @@ public static class InstanceEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces(204);
     }
 
     // ----------------------------------------------------------------- DTO mapping

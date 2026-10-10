@@ -18,8 +18,9 @@ namespace FlintLauncher.Web.Endpoints;
 
 public static class StoreEndpoints
 {
-    public static void MapStore(this IEndpointRouteBuilder api)
+    public static void MapStore(this RouteGroupBuilder api)
     {
+        api.WithTags("Store");
         var group = api.MapGroup("/store");
 
         group.MapGet("/status/libraries/{versionRef}", (LauncherRuntime runtime, string versionRef) =>
@@ -39,7 +40,7 @@ public static class StoreEndpoints
                 ? ApiJson.NotFound("version_not_found",
                     $"no meta version manifest for 'net.minecraft/{versionRef}' — the version must be loaded first")
                 : Results.Ok(report);
-        });
+        }).Produces<StoreStatusReport>(200);
 
         group.MapGet("/status/assets/{assetsId}", (LauncherRuntime runtime, string assetsId) =>
         {
@@ -48,6 +49,6 @@ public static class StoreEndpoints
                 ? ApiJson.NotFound("index_not_found",
                     $"no asset index '{assetsId}' under the store's indexes — the assets must be installed first")
                 : Results.Ok(report);
-        });
+        }).Produces<StoreStatusReport>(200);
     }
 }

@@ -20,12 +20,14 @@ namespace FlintLauncher.Web.Endpoints;
 
 public static class AtLauncherEndpoints
 {
-    public static void MapAtLauncher(this IEndpointRouteBuilder api)
+    public static void MapAtLauncher(this RouteGroupBuilder api)
     {
+        api.WithTags("ModPlatform");
         // ------------------------------------------------ modplatform/atlauncher/packs
         // the packsnew.json pass-through (AtlListModel::loadIndexedPack's mapping)
         api.MapGet("/modplatform/atlauncher/packs", (LauncherRuntime runtime) => WithIndexAsync(
-            runtime, packs => Results.Ok(packs.Select(PackView).ToArray())));
+            runtime, packs => Results.Ok(packs.Select(PackView).ToArray())))
+            .Produces<AtLauncherPackView[]>(200);
 
         // ---------------------------------------- modplatform/atlauncher/packs/{name}/versions
         // the index carries each pack's version list (the ATL CDN has no per-pack index URL,
@@ -42,7 +44,8 @@ public static class AtLauncherEndpoints
                     : Results.Ok(pack.Versions
                         .Select(version => new AtLauncherPackVersionView(version.Version, version.Minecraft))
                         .ToArray());
-            }));
+            }))
+            .Produces<AtLauncherPackVersionView[]>(200);
 
         // ------------------------------------------------ modplatform/atlauncher/install
         api.MapPost("/modplatform/atlauncher/install", async Task<IResult> (
@@ -109,7 +112,7 @@ public static class AtLauncherEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<InstanceCreatedResponse>(201);
     }
 
     // ----------------------------------------------------------------- helpers

@@ -22,8 +22,9 @@ namespace FlintLauncher.Web.Endpoints;
 
 public static class ModPlatformEndpoints
 {
-    public static void MapModPlatform(this IEndpointRouteBuilder api)
+    public static void MapModPlatform(this RouteGroupBuilder api)
     {
+        api.WithTags("ModPlatform");
         // ------------------------------------------------ modplatform/atlauncher/*
         // the ATLauncher surface (packsnew.json pass-through + staged pack install)
         api.MapAtLauncher();
@@ -68,7 +69,7 @@ public static class ModPlatformEndpoints
             return parsedProvider == ResourceProvider.FLAME
                 ? await FlameSearchAsync(resourceType, query, version, loader, index, offset, runtime)
                 : await ModrinthSearchAsync(resourceType, query, version, loader, index, offset, runtime);
-        });
+        }).Produces<FlameSearchResult[]>(200).Produces<ModrinthSearchResult[]>(200);
 
         // ----------------------------------------------------- modplatform/{provider}/categories
         // GET /categories?gameId=432&classId=... (Flame) or GET /tag/category filtered by
@@ -137,7 +138,7 @@ public static class ModPlatformEndpoints
             }
 
             return Results.Ok(ParseModrinthCategories(modrinthRequest.BodyAsString, projectType).ToArray());
-        });
+        }).Produces<ProviderCategoryView[]>(200);
 
         // --------------------------------------------------- modplatform/{provider}/mods/{projectId}/description
         api.MapGet("/modplatform/{provider}/mods/{projectId}/description",
@@ -163,7 +164,7 @@ public static class ModPlatformEndpoints
                 body = await runtime.Modrinth.GetProjectDescription(projectId);
             }
             return Results.Ok(new ProviderBodyView(body));
-        });
+        }).Produces<ProviderBodyView>(200);
 
         // ------------------------------------------------ modplatform/{provider}/mods/{projectId}/changelog
         api.MapGet("/modplatform/{provider}/mods/{projectId}/changelog",
@@ -191,7 +192,7 @@ public static class ModPlatformEndpoints
 
             var body = await runtime.Flame.GetModFileChangelog(modId, fileIdNum);
             return Results.Ok(new ProviderBodyView(body));
-        });
+        }).Produces<ProviderBodyView>(200);
 
         // ------------------------------------------------ modplatform/{provider}/versions
         api.MapGet("/modplatform/{provider}/versions", async Task<IResult> (
@@ -294,7 +295,7 @@ public static class ModPlatformEndpoints
 
                 return Results.Ok(pack.Versions.Select(VersionView).ToArray());
             }
-        });
+        }).Produces<ProviderVersionView[]>(200);
 
         // ------------------------------------------------------ instances/{id}/mods
         api.MapGet("/instances/{id}/mods", async (string id, LauncherRuntime runtime) =>
@@ -332,7 +333,7 @@ public static class ModPlatformEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<InstalledModView[]>(200);
 
         api.MapPost("/instances/{id}/mods/install", async (string id, List<ModInstallSelection>? selections,
             LauncherRuntime runtime, FlintTaskRegistry registry) =>
@@ -388,7 +389,7 @@ public static class ModPlatformEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<TaskAcceptedResponse>(202);
 
         api.MapPost("/instances/{id}/mods/update", async (string id, ModsUpdateRequest? filter,
             LauncherRuntime runtime, FlintTaskRegistry registry) =>
@@ -425,7 +426,7 @@ public static class ModPlatformEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<TaskAcceptedResponse>(202);
     }
 
     // ----------------------------------------------------------------- helpers

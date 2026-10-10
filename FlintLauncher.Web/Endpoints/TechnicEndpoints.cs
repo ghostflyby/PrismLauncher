@@ -25,20 +25,23 @@ namespace FlintLauncher.Web.Endpoints;
 
 public static class TechnicEndpoints
 {
-    public static void MapTechnic(this IEndpointRouteBuilder api)
+    public static void MapTechnic(this RouteGroupBuilder api)
     {
+        api.WithTags("ModPlatform");
         // ------------------------------------------------- modplatform/technic/search
         // ListModel::performSearch: a query selects the search URL, an empty one trending
         // (GET /modplatform/technic/trending below). Results map through
         // TechnicApi.LoadSearchResults (the "vanilla" slug exclusion included).
         api.MapGet("/modplatform/technic/search", async Task<IResult> (string? query, string? serverUrl,
             LauncherRuntime runtime) =>
-            await SearchAsync(string.IsNullOrWhiteSpace(query) ? "" : query.Trim(), serverUrl, runtime));
+            await SearchAsync(string.IsNullOrWhiteSpace(query) ? "" : query.Trim(), serverUrl, runtime))
+            .Produces<TechnicSearchResultView[]>(200);
 
         // ----------------------------------------------- modplatform/technic/trending
         api.MapGet("/modplatform/technic/trending", async Task<IResult> (string? serverUrl,
             LauncherRuntime runtime) =>
-            await SearchAsync("", serverUrl, runtime));
+            await SearchAsync("", serverUrl, runtime))
+            .Produces<TechnicSearchResultView[]>(200);
 
         // --------------------------------------------- modplatform/technic/modpack/{slug}
         // TechnicPage::suggestCurrent's metadata step (+ metadataLoaded's Solder build
@@ -116,7 +119,7 @@ public static class TechnicEndpoints
                 versions,
                 recommended,
                 latest));
-        });
+        }).Produces<TechnicPackView>(200);
 
         // ------------------------------------------------- modplatform/technic/install
         api.MapPost("/modplatform/technic/install", async Task<IResult> (
@@ -227,7 +230,7 @@ public static class TechnicEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<InstanceCreatedResponse>(201);
     }
 
     // ------------------------------------------------------------------ helpers

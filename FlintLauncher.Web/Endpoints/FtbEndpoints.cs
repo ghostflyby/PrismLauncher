@@ -20,8 +20,9 @@ namespace FlintLauncher.Web.Endpoints;
 
 public static class FtbEndpoints
 {
-    public static void MapFtb(this IEndpointRouteBuilder api)
+    public static void MapFtb(this RouteGroupBuilder api)
     {
+        api.WithTags("ModPlatform");
         // ---------------------------------------------------- modplatform/ftb/packs
         // the /modpack/all index pass-through (FtbListModel::requestFinished's parse): the
         // index payload only carries pack ids, so the response is {"packs":[{"id"},...]}
@@ -47,13 +48,14 @@ public static class FtbEndpoints
             }
             return Results.Ok(new FtbPackIndexResponse(
                 ids.Select(id => new FtbPackIndexEntry(id)).ToArray()));
-        });
+        }).Produces<FtbPackIndexResponse>(200);
 
         // ---------------------------------------------- modplatform/ftb/packs/{id}
         // the /modpack/{id} description (FtbListModel::packRequestFinished's mapping)
         api.MapGet("/modplatform/ftb/packs/{id}", async Task<IResult> (int id,
             LauncherRuntime runtime) =>
-            await WithPackAsync(runtime, id, pack => Results.Ok(PackView(pack))));
+            await WithPackAsync(runtime, id, pack => Results.Ok(PackView(pack))))
+            .Produces<FtbPackView>(200);
 
         // -------------------------------------- modplatform/ftb/packs/{id}/versions
         // the description's version list (the FTB App API has no separate version index)
@@ -62,7 +64,8 @@ public static class FtbEndpoints
             await WithPackAsync(runtime, id, pack => Results.Ok(pack.Versions
                 .Select(version => new FtbPackVersionView(version.Id, version.Name,
                     version.Type, version.Updated))
-                .ToArray())));
+                .ToArray())))
+            .Produces<FtbPackVersionView[]>(200);
 
         // -------------------------------------------------- modplatform/ftb/install
         api.MapPost("/modplatform/ftb/install", async Task<IResult> (
@@ -158,7 +161,7 @@ public static class FtbEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<InstanceCreatedResponse>(201);
     }
 
     // ----------------------------------------------------------------- helpers

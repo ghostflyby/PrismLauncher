@@ -63,6 +63,10 @@ public static class WebHostBuilder
             options.SerializerOptions.TypeInfoResolverChain.Insert(0, FlintJsonContext.Default);
         });
 
+        // machine-readable API surface (G3): source-generated under Native AOT, served
+        // unauthenticated next to /healthz as a discovery-plane artifact
+        builder.Services.AddOpenApi("v1", FlintLauncher.Web.OpenApi.ApiOpenApi.Configure);
+
         LauncherRuntime runtime;
         try
         {
@@ -201,7 +205,11 @@ public static class WebHostBuilder
             }
         });
 
-        app.MapGet("/healthz", () => Results.Ok(new Models.HealthResponse("ok")));
+        app.MapOpenApi("/openapi/{documentName}.json");
+
+        app.MapGet("/healthz", () => Results.Ok(new Models.HealthResponse("ok")))
+            .WithTags("Meta")
+            .Produces<Models.HealthResponse>(200);
 
         var api = app.MapGroup("/api/v1");
         api.AddApiAuth(apiAuth);
@@ -210,7 +218,8 @@ public static class WebHostBuilder
             config.PrintableVersionString(),
             config.UserAgent,
             config.MetaUrl,
-            config.JavaDownloaderEnabled));
+            config.JavaDownloaderEnabled))
+            .WithTags("Meta");
 
         api.MapInstances();
         api.MapLaunch();

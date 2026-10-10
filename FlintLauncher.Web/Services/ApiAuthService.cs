@@ -102,8 +102,9 @@ public static class ApiAuthMiddleware
         api.AddEndpointFilter(async (EndpointFilterInvocationContext context, EndpointFilterDelegate next) =>
         {
             var request = context.HttpContext.Request;
-            // /api/v1/info stays open for client discovery (like /healthz outside the group)
-            var isDiscovery = request.Path == "/api/v1/info";
+            // /api/v1/info and the OpenAPI document stay open for client discovery (like
+            // /healthz outside the group)
+            var isDiscovery = request.Path == "/api/v1/info" || request.Path.StartsWithSegments("/openapi");
             if (auth.Enabled && !isDiscovery)
             {
                 var candidate =

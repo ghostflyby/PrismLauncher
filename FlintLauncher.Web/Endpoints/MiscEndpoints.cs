@@ -13,16 +13,17 @@ namespace FlintLauncher.Web.Endpoints;
 
 public static class MiscEndpoints
 {
-    public static void MapMisc(this IEndpointRouteBuilder api)
+    public static void MapMisc(this RouteGroupBuilder api)
     {
+        api.WithTags("Misc");
         // --------------------------------------------------------------- java
         api.MapGet("/java", async (JavaScanService scan) =>
-            Results.Ok((await scan.GetAsync()).ToArray()));
+            Results.Ok((await scan.GetAsync()).ToArray())).Produces<JavaView[]>(200);
 
         // discovery is a fast filesystem scan plus a bounded concurrent `java` probe —
         // synchronous by design (documented decision)
         api.MapPost("/java/scan", async (JavaScanService scan) =>
-            Results.Ok((await scan.ScanAsync()).ToArray()));
+            Results.Ok((await scan.ScanAsync()).ToArray())).Produces<JavaView[]>(200);
 
         // (CACHE E7: the /news endpoint is gone — the news checker was GUI-bound and the
         // user decision retired it whole: checker, feed base, FLINT_NEWS_RSS_URL)
@@ -87,7 +88,7 @@ public static class MiscEndpoints
                     upload.WasSuccessful
                         ? "the paste server returned no link"
                         : upload.FailReason, 502);
-        });
+        }).Produces<PasteCreatedResponse>(201);
 
         // --------------------------------------------------------------- meta cache
         // evict every cached download (index entries + cached files at the base roots);
@@ -96,7 +97,7 @@ public static class MiscEndpoints
             runtime.MetaCache.EvictAll()
                 ? Results.NoContent()
                 : ApiJson.Error("meta_cache_evict_failed",
-                    "some cached files could not be deleted", 500));
+                    "some cached files could not be deleted", 500)).Produces(204);
     }
 }
 

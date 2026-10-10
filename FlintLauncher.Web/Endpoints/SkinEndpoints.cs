@@ -24,8 +24,9 @@ namespace FlintLauncher.Web.Endpoints;
 
 public static class SkinEndpoints
 {
-    public static void MapSkins(this IEndpointRouteBuilder api)
+    public static void MapSkins(this RouteGroupBuilder api)
     {
+        api.WithTags("Accounts");
         // ------------------------------------------------- accounts/{id}/skin (read)
         api.MapGet("/accounts/{profileId}/skin", (string profileId, LauncherRuntime runtime) =>
         {
@@ -39,7 +40,7 @@ public static class SkinEndpoints
             // (AccountData::MinecraftProfile::skin)
             var skin = account.AccountData.MinecraftProfile.SkinField;
             return Results.Ok(new AccountSkinView(skin.Url, skin.Variant));
-        });
+        }).Produces<AccountSkinView>(200);
 
         // ------------------------------------------------- accounts/{id}/skin (upload)
         api.MapPut("/accounts/{profileId}/skin", async Task<IResult> (string profileId,
@@ -75,7 +76,7 @@ public static class SkinEndpoints
             return upload.WasSuccessful
                 ? Results.NoContent()
                 : ApiJson.Error("skin_upload_failed", upload.FailReason, 400);
-        });
+        }).WithMetadata(new FlintLauncher.Web.OpenApi.FormUploadMarker("multipart form: skin image file (png) + optional model field (slim/classic)")).Produces(204);
 
         // ------------------------------------------------- accounts/{id}/skin (delete)
         api.MapDelete("/accounts/{profileId}/skin", async Task<IResult> (string profileId,
@@ -92,7 +93,7 @@ public static class SkinEndpoints
             return request.WasSuccessful
                 ? Results.NoContent()
                 : ApiJson.Error("skin_delete_failed", request.FailReason, 400);
-        });
+        }).Produces(204);
 
         // ------------------------------------------------- accounts/{id}/cape (equip)
         api.MapPut("/accounts/{profileId}/cape", async Task<IResult> (string profileId,
@@ -119,7 +120,7 @@ public static class SkinEndpoints
             return change.WasSuccessful
                 ? Results.NoContent()
                 : ApiJson.Error("cape_change_failed", change.FailReason, 400);
-        });
+        }).WithMetadata(new FlintLauncher.Web.OpenApi.FormUploadMarker("form field capeId")).Produces(204);
 
         // ------------------------------------------------- accounts/{id}/cape (remove)
         // CapeChange's delete semantics: the empty cape id turns the request into a bare
@@ -138,7 +139,7 @@ public static class SkinEndpoints
             return change.WasSuccessful
                 ? Results.NoContent()
                 : ApiJson.Error("cape_change_failed", change.FailReason, 400);
-        });
+        }).Produces(204);
     }
 
     /// <summary>The account for a profile id, or the uniform 404 through

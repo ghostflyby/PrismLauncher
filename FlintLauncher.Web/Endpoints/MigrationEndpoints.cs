@@ -29,13 +29,15 @@ public sealed record PrismImportPlanResponse(
 
 public static class MigrationEndpoints
 {
-    public static void MapMigration(this IEndpointRouteBuilder api)
+    public static void MapMigration(this RouteGroupBuilder api)
     {
+        api.WithTags("Migration");
         var group = api.MapGroup("/migration/prism");
 
         group.MapGet("/candidates", (LauncherRuntime runtime) =>
             Results.Ok(PrismSourceDetector.Detect(runtime.Paths.DataDir, runtime.MigrationDecisions,
-                runtime.Paths.ConfigFile).ToArray()));
+                runtime.Paths.ConfigFile).ToArray()))
+            .Produces<PrismSourceDetector.PrismSourceCandidate[]>(200);
 
         group.MapGet("/plan", (LauncherRuntime runtime, string source, string? mode) =>
         {
@@ -52,7 +54,7 @@ public static class MigrationEndpoints
             var totalBytes = plan.Sum(item => item.Bytes);
             return Results.Ok(new PrismImportPlanResponse(source, importMode.ToString(), totalFiles, totalBytes,
                 plan.ToArray()));
-        });
+        }).Produces<PrismImportPlanResponse>(200);
 
         group.MapPost("/", async (LauncherRuntime runtime, FlintTaskRegistry registry, PrismImportRequest request) =>
         {
@@ -109,7 +111,7 @@ public static class MigrationEndpoints
             var entry = registry.Register("prism-import", task, onFinished: null);
             _ = task.StartAsync();
             return Results.Accepted($"/api/v1/tasks/{entry.Id}", new TaskAcceptedResponse(entry.Id));
-        });
+        }).Produces<PrismImportDryRunResponse>(200).Produces<TaskAcceptedResponse>(202);
 
         group.MapPost("/decline", (LauncherRuntime runtime, PrismDeclineRequest request) =>
         {
@@ -139,7 +141,7 @@ public static class MigrationEndpoints
             {
             }
             return Results.NoContent();
-        });
+        }).Produces(204);
     }
 
     /// <summary>Instances/meta appear under the data dir as files land — reload the live

@@ -19,8 +19,9 @@ namespace FlintLauncher.Web.Endpoints;
 
 public static class ManagedPackEndpoints
 {
-    public static void MapManagedPack(this IEndpointRouteBuilder api)
+    public static void MapManagedPack(this RouteGroupBuilder api)
     {
+        api.WithTags("ManagedPack");
         api.MapGet("/instances/{ref}/managedpack", async (string @ref, LauncherRuntime runtime) =>
         {
             await runtime.InstanceLock.WaitAsync();
@@ -43,7 +44,7 @@ public static class ManagedPackEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<ManagedPackView>(200);
 
         api.MapPost("/instances/{ref}/managedpack/update-check", async (string @ref,
             HttpContext httpContext, LauncherRuntime runtime) =>
@@ -106,6 +107,6 @@ public static class ManagedPackEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        });
+        }).Produces<ManagedPackUpdateResponse>(200);
     }
 }

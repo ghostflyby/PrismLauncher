@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using FlintLauncher.Web.Models;
@@ -22,6 +23,7 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(TaskAcceptedResponse))]
 [JsonSerializable(typeof(PatchInstanceRequest))]
 [JsonSerializable(typeof(SettingsPutRequest))]
+[JsonSerializable(typeof(Dictionary<string, JsonElement>))]
 [JsonSerializable(typeof(LaunchRequest))]
 [JsonSerializable(typeof(TaskProgressDto))]
 [JsonSerializable(typeof(TaskView))]
