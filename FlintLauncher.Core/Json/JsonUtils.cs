@@ -289,25 +289,27 @@ public static class JsonUtils
     }
 
     // (parent, key, what) forms — the static invocation convention the parsers use
-    // (JsonUtils.RequireX(parent, key, what)). The `what` default mirrors the C++
-    // "__placeholder__" pattern upstream: the label becomes the quoted key unless overridden.
+    // (JsonUtils.RequireX(parent, key, what)). `what` is REQUIRED on the JsonNode? form:
+    // an optional `what` here is hidden by the (value, what = "Value") overload above —
+    // a 2-argument call would silently bind to the value form and read the whole parent
+    // as a value instead of extracting by key. All callers pass `what` explicitly.
 
-    public static string RequireString(JsonNode? parent, string key, string what = "__placeholder__")
+    public static string RequireString(JsonNode? parent, string key, string what)
         => RequireString(GetPropertyNode(parent, key, what), what);
 
-    public static bool RequireBoolean(JsonNode? parent, string key, string what = "__placeholder__")
+    public static bool RequireBoolean(JsonNode? parent, string key, string what)
         => RequireBoolean(GetPropertyNode(parent, key, what), what);
 
-    public static double RequireDouble(JsonNode? parent, string key, string what = "__placeholder__")
+    public static double RequireDouble(JsonNode? parent, string key, string what)
         => RequireDouble(GetPropertyNode(parent, key, what), what);
 
-    public static int RequireInteger(JsonNode? parent, string key, string what = "__placeholder__")
+    public static int RequireInteger(JsonNode? parent, string key, string what)
         => RequireInteger(GetPropertyNode(parent, key, what), what);
 
-    public static JsonObject RequireObject(JsonNode? parent, string key, string what = "__placeholder__")
+    public static JsonObject RequireObject(JsonNode? parent, string key, string what)
         => RequireObject(GetPropertyNode(parent, key, what), what);
 
-    public static JsonArray RequireArray(JsonNode? parent, string key, string what = "__placeholder__")
+    public static JsonArray RequireArray(JsonNode? parent, string key, string what)
         => RequireArray(GetPropertyNode(parent, key, what), what);
 
     // JsonObject-keyed forms: the identity conversion must beat the JsonNode upcast, or a
