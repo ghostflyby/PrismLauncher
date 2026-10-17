@@ -69,6 +69,7 @@ public sealed class LegacyFmlLibrariesTask : FlintTask
             {
                 continue;
             }
+
             _fmlLibsToProcess.Add(lib);
         }
 
@@ -101,6 +102,7 @@ public sealed class LegacyFmlLibrariesTask : FlintTask
             FmllibsFailed(dlJob.FailReason);
             return;
         }
+
         FmllibsFinished();
     }
 
@@ -132,6 +134,7 @@ public sealed class LegacyFmlLibrariesTask : FlintTask
                     EmitFailed("Failed creating FML library folder inside the instance.");
                     return;
                 }
+
                 try
                 {
                     File.Copy(entry.GetFullPath(), FileSystem.PathCombine(inst.LibDir(), lib.Filename), overwrite: true);
@@ -141,10 +144,13 @@ public sealed class LegacyFmlLibrariesTask : FlintTask
                     EmitFailed($"Failed copying Forge/FML library: {lib.Filename}.");
                     return;
                 }
+
                 index++;
             }
+
             SetProgress(index, _fmlLibsToProcess.Count);
         }
+
         EmitSucceeded();
     }
 

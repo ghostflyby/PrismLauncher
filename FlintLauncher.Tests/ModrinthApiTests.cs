@@ -55,9 +55,7 @@ public class ModrinthApiTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private string TempPath(string name) => Path.Combine(_root, name);
@@ -218,9 +216,9 @@ public class ModrinthApiTests : IDisposable
     }
 
     [Theory]
-    [InlineData("https://modrinth.com/modpack/fabulously-optimized")] // wrong scheme
-    [InlineData("modrinth://modpack/")]                              // missing slug
-    [InlineData("modrinth://mod/sodium")]                            // unsupported resource
+    [InlineData("https://modrinth.com/modpack/fabulously-optimized")]      // wrong scheme
+    [InlineData("modrinth://modpack/")]                                    // missing slug
+    [InlineData("modrinth://mod/sodium")]                                  // unsupported resource
     [InlineData("modrinth://modpack/fabulously-optimized/version/latest")] // extra path
     public void GetModpackIdFromUrl_RejectsInvalidLinks(string link)
     {
@@ -308,6 +306,7 @@ public class ModrinthApiTests : IDisposable
                 .Select(c => c.GetProperty("uid").GetString()!).ToList();
             Assert.Equal(["net.minecraft", "net.fabricmc.fabric-loader"], uids);
         }
+
         // D4: the staged instance's identity lives in instance.json (Flint format)
         Assert.Contains("Imported Pack", await File.ReadAllTextAsync(Path.Combine(staging, "instance.json")));
 
@@ -372,6 +371,7 @@ public class ModrinthApiTests : IDisposable
         {
             _server.Downloads["optional.bin"] = optionalBytes;
         }
+
         var mrpackPath = TempPath("pack-optional.mrpack");
         Assert.True(pack.WriteZip(mrpackPath));
         UnpackInto(mrpackPath, staging);
@@ -497,6 +497,7 @@ public class ModrinthApiTests : IDisposable
         {
             indexJson = await reader.ReadToEndAsync();
         }
+
         var index = JsonNode.Parse(indexJson)!.AsObject();
         Assert.Equal(1, index["formatVersion"]!.GetValue<int>());
         Assert.Equal("minecraft", index["game"]!.GetValue<string>());
@@ -623,9 +624,7 @@ public class ModrinthCreationTaskManifestTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     [Fact]

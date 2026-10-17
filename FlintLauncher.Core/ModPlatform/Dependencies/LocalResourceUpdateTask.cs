@@ -74,6 +74,7 @@ public sealed class LocalResourceUpdateTask : FlintTask
             // "Tried to update an invalid resource!"
             EmitFailed("Invalid metadata");
         }
+
         return Task.CompletedTask;
     }
 

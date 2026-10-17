@@ -91,6 +91,7 @@ internal sealed class StubAtlServer : IDisposable
                 ctx.Response.StatusCode = 404;
                 return;
             }
+
             body = Encoding.UTF8.GetBytes(shareCode);
         }
         else if (path.StartsWith("/packs/", StringComparison.Ordinal)
@@ -102,6 +103,7 @@ internal sealed class StubAtlServer : IDisposable
                 ctx.Response.StatusCode = 404;
                 return;
             }
+
             body = Encoding.UTF8.GetBytes(configsJson);
         }
         else if (path.StartsWith("/packs/", StringComparison.Ordinal)
@@ -113,6 +115,7 @@ internal sealed class StubAtlServer : IDisposable
                 ctx.Response.StatusCode = 404;
                 return;
             }
+
             body = configsZip;
         }
         else
@@ -123,6 +126,7 @@ internal sealed class StubAtlServer : IDisposable
                 ctx.Response.StatusCode = 404;
                 return;
             }
+
             body = payload;
         }
 
@@ -134,7 +138,7 @@ internal sealed class StubAtlServer : IDisposable
     /// <summary>"/packs/{safe}/versions/{ver}/Configs.json" -> "{safe}/{ver}".</summary>
     private static string ConfigsKey(string path, string suffix)
     {
-        var relative = path.TrimStart('/'); // packs/{safe}/versions/{ver}{suffix}
+        var relative = path.TrimStart('/');                     // packs/{safe}/versions/{ver}{suffix}
         var middle = relative["packs/".Length..^suffix.Length]; // {safe}/versions/{ver}
         var separator = middle.IndexOf("/versions/", StringComparison.Ordinal);
         return middle[..separator] + "/" + middle[(separator + "/versions/".Length)..];
@@ -146,9 +150,7 @@ internal sealed class StubAtlServer : IDisposable
         {
             _listener.Close();
         }
-        catch (ObjectDisposedException)
-        {
-        }
+        catch (ObjectDisposedException) { }
     }
 }
 
@@ -205,10 +207,9 @@ internal sealed class AtlPackFixture
             {
                 Directory.Delete(srcDir, recursive: true);
             }
-            catch (DirectoryNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
         }
+
         fixture.ConfigsSha1 = Convert.ToHexString(SHA1.HashData(fixture.ConfigsZipBytes)).ToLowerInvariant();
 
         var mods = new JsonArray(
@@ -281,6 +282,7 @@ internal sealed class AtlPackFixture
         {
             configsObj["loader"] = JsonNode.Parse(loaderJson);
         }
+
         fixture.ConfigsJson = configsObj.ToJsonString();
         return fixture;
     }

@@ -31,6 +31,7 @@ public static class ProfileUtils
             // qWarning() << "Order file doesn't exist. Ignoring.";
             return false;
         }
+
         string data;
         try
         {
@@ -52,6 +53,7 @@ public static class ProfileUtils
             {
                 throw new JsonParseException($"Invalid order file version, expected {CurrentOrderFileVersion}");
             }
+
             var orderArray = JsonUtils.RequireArray(obj, "order");
             foreach (var item in orderArray)
             {
@@ -64,6 +66,7 @@ public static class ProfileUtils
             order.Clear();
             return false;
         }
+
         return true;
     }
 
@@ -105,11 +108,12 @@ public static class ProfileUtils
             data = File.ReadAllText(filePath);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException
-                                  or ArgumentException)
+                                      or ArgumentException)
         {
             var errorStr = $"Unable to open the version file {Path.GetFileName(filePath)}: {e.Message}.";
             return CreateErrorVersionFile(CompleteBaseName(filePath), filePath, errorStr);
         }
+
         JsonNode? root;
         try
         {
@@ -124,6 +128,7 @@ public static class ProfileUtils
             var errorStr = $"Unable to process the version file {Path.GetFileName(filePath)}: {e.Message} at line {line} column {column}.";
             return CreateErrorVersionFile(CompleteBaseName(filePath), filePath, errorStr);
         }
+
         return GuardedParseJson(root, CompleteBaseName(filePath), filePath, requireOrder);
     }
 
@@ -137,7 +142,7 @@ public static class ProfileUtils
             return true;
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
-                                  or NotSupportedException)
+                                      or NotSupportedException)
         {
             // qWarning() << "Couldn't open/save" << filename
             return false;

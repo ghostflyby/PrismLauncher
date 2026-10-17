@@ -31,13 +31,12 @@ public class ApiAuthServiceTests : IDisposable
         {
             Environment.SetEnvironmentVariable(name, value);
         }
+
         try
         {
             Directory.Delete(_home, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private static (string, string?) PinEnv(string name) =>

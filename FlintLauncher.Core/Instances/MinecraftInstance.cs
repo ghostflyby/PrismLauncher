@@ -221,11 +221,13 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             return new HashSet<string> { "version-incomplete" };
         }
+
         var profile = components.GetProfile();
         if (profile is null)
         {
             return new HashSet<string> { "version-incomplete" };
         }
+
         return profile.GetTraits();
     }
 
@@ -286,6 +288,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             return dotMcDir;
         }
+
         return mcDir;
     }
 
@@ -455,14 +458,17 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             step.SetWorkingDirectory(GameRoot());
             process.AppendStep(step);
         }
+
         if (session is not null)
         {
             process.SetCensorFilter(CreateCensorFilterFromSession(session));
         }
+
         if (Variant.AsBool(_settings.Get("QuitAfterGameStop")))
         {
             process.AppendStep(new QuitAfterGameStop(process));
         }
+
         LaunchProcess = process;
         RaiseLaunchTaskChanged();
         return process;
@@ -492,6 +498,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             return "";
         }
+
         var profile = Components.GetProfile();
         if (profile is null)
         {
@@ -503,6 +510,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             launchScript += "mainClass " + mainClass + "\n";
         }
+
         var appletClass = profile.GetAppletClass();
         if (appletClass.Length != 0)
         {
@@ -540,8 +548,8 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                     // window frame margins; the headless core has no screen, so the injected
                     // UI hook (or the configured window size) fills in
                     var (width, height) = (services ?? LaunchServices)?.Ui.PrimaryScreenSize?.Invoke() ??
-                        (Variant.AsInt(Settings.Get("MinecraftWinWidth")),
-                         Variant.AsInt(Settings.Get("MinecraftWinHeight")));
+                                          (Variant.AsInt(Settings.Get("MinecraftWinWidth")),
+                                              Variant.AsInt(Settings.Get("MinecraftWinHeight")));
                     windowParams = FormattableString.Invariant($"{width}x{height}");
                 }
                 else
@@ -554,6 +562,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                 windowParams = FormattableString.Invariant(
                     $"{Variant.AsInt(Settings.Get("MinecraftWinWidth"))}x{Variant.AsInt(Settings.Get("MinecraftWinHeight"))}");
             }
+
             launchScript += "windowTitle " + WindowTitle() + "\n";
             launchScript += "windowParams " + windowParams + "\n";
         }
@@ -601,12 +610,14 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             return list;
         }
+
         var jarMods = GetJarMods();
         if (jarMods.Count != 0)
         {
             list.Add("-Dfml.ignoreInvalidMinecraftCertificates=true");
             list.Add("-Dfml.ignorePatchDiscrepancies=true");
         }
+
         var profile = version.GetProfile();
         if (profile is not null)
         {
@@ -620,6 +631,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                     list.Add(ReplaceTokensIn(item, tokenMapping));
                 }
             }
+
             foreach (var agent in profile.GetAgents())
             {
                 var jar = new List<string>();
@@ -645,6 +657,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                     openAlPath = customPath;
                 }
             }
+
             if (Variant.AsBool(Settings.Get("UseNativeGLFW")))
             {
                 glfwPath = DetectedGlfwPath;
@@ -654,6 +667,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                     glfwPath = customPath;
                 }
             }
+
             if (Variant.AsBool(Settings.Get("UseNativeSDL")))
             {
                 sdlPath = DetectedSdlPath;
@@ -668,10 +682,12 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             {
                 list.Add("-Dorg.lwjgl.openal.libname=" + Path.GetFullPath(openAlPath));
             }
+
             if (glfwPath.Length != 0 && FsExists(glfwPath))
             {
                 list.Add("-Dorg.lwjgl.glfw.libname=" + Path.GetFullPath(glfwPath));
             }
+
             if (sdlPath.Length != 0 && FsExists(sdlPath))
             {
                 list.Add("-Dorg.lwjgl.sdl.libname=" + Path.GetFullPath(sdlPath));
@@ -694,6 +710,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             args.Add("-Xdock:icon=icon.png");
             args.Add($"-Xdock:name=\"{WindowTitle()}\"");
         }
+
         var instanceTraits = Traits();
         // HACK: fix issues on macOS with 1.13 snapshots
         // NOTE: Oracle Java option. if there are alternate jvm implementations, this would be the place to customize this for them
@@ -780,6 +797,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                 outVars["DYLD_INSERT_LIBRARIES"] = steamDyldInsertLibraries;
             }
         }
+
         return outVars;
     }
 
@@ -794,6 +812,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             env.Insert(key, value);
         }
+
         // custom env
         InsertCustomEnv(env, Variant.AsString(Settings.Get("Env")));
         return env;
@@ -842,6 +861,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                 env.Insert("LIBGL_KOPPER_DRI2", "1");
             }
         }
+
         return env;
     }
 
@@ -904,6 +924,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             args[i] = ReplaceTokensIn(args[i], tokenMapping);
         }
+
         return args;
     }
 
@@ -922,6 +943,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             outList.Add(indent + FormattableString.Invariant(
                 $"{i + 1}) {component.GetName()} ({component.GetId()}) {component.GetVersion()}"));
         }
+
         outList.Add(emptyLine);
 
         outList.Add("Launcher: " + GetLauncher());
@@ -961,6 +983,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                         outList.Add("  [✘] " + CompleteBaseName(mod.Fileinfo.Name) + " (disabled)");
                     }
                 }
+
                 outList.Add(emptyLine);
             }
         }
@@ -983,6 +1006,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                         ? indent + displayname + " (" + realname + ")"
                         : indent + realname);
                 }
+
                 outList.Add(emptyLine);
             }
         }
@@ -996,6 +1020,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             {
                 outList.Add(indent + trait);
             }
+
             outList.Add(emptyLine);
         }
 
@@ -1010,14 +1035,17 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             {
                 outList.Add("Using system OpenAL.");
             }
+
             if (nativeGlfw)
             {
                 outList.Add("Using system GLFW.");
             }
+
             if (nativeSdl)
             {
                 outList.Add("Using system SDL.");
             }
+
             outList.Add(emptyLine);
         }
 
@@ -1032,12 +1060,14 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             {
                 outList.Add(indent + file);
             }
+
             outList.Add(emptyLine);
             outList.Add("Native libraries:");
             foreach (var file in nativeJars)
             {
                 outList.Add(indent + file);
             }
+
             outList.Add(emptyLine);
         }
 
@@ -1064,6 +1094,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             windowParams = FormattableString.Invariant(
                 $"{Variant.AsInt(settings.Get("MinecraftWinWidth"))} x {Variant.AsInt(settings.Get("MinecraftWinHeight"))}");
         }
+
         outList.Add("Window size: " + windowParams);
         outList.Add(emptyLine);
 
@@ -1077,6 +1108,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             {
                 outList.Add(indent + key + "=" + value);
             }
+
             outList.Add(emptyLine);
         }
 
@@ -1090,6 +1122,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             return filter;
         }
+
         void AddToFilter(string key, string value)
         {
             if (key.Trim().Length != 0)
@@ -1097,14 +1130,17 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                 filter[key] = value;
             }
         }
+
         if (session.Session != "-")
         {
             AddToFilter(session.Session, "<SESSION ID>");
         }
+
         if (session.AccessToken != "0")
         {
             AddToFilter(session.AccessToken, "<ACCESS TOKEN>");
         }
+
         AddToFilter(session.Uuid, "<PROFILE ID>");
 
         return filter;
@@ -1180,10 +1216,12 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                 description += ", total played for " + PrettifyDuration(TotalTimePlayed(), withoutDays);
             }
         }
+
         if (HasCrashed)
         {
             description += ", has crashed.";
         }
+
         return description;
     }
 
@@ -1249,6 +1287,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             return null;
         }
+
         return LauncherState?.Current.Java.Detections.GetValueOrDefault(key);
     }
 
@@ -1261,6 +1300,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
             loaderModList = new ModFolderModel(ModsRoot(), isIndexed, createDir: true);
         }
+
         return loaderModList;
     }
 
@@ -1271,6 +1311,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
             coreModList = new ModFolderModel(CoreModsDir(), isIndexed, createDir: true);
         }
+
         return coreModList;
     }
 
@@ -1282,6 +1323,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             // NOTE: upstream does not create the folder for the nil mod list (4th arg false)
             nilModList = new ModFolderModel(NilModsDir(), isIndexed, createDir: false);
         }
+
         return nilModList;
     }
 
@@ -1302,6 +1344,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             jarmod.GetApplicableFiles(RuntimeContext, jar, temp1, temp2, temp3, JarModsDir());
             mods.Add(new Mod(new FileInfo(jar[0])));
         }
+
         return mods;
     }
 
@@ -1342,8 +1385,10 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             {
                 result.Append(replacement);
             }
+
             lastCapturedEnd = match.Index + match.Length;
         }
+
         result.Append(text[lastCapturedEnd..]);
         return result.ToString();
     }
@@ -1363,6 +1408,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             // (upstream logs qCritical here)
             return virtualRoot;
         }
+
         bool isVirtual;
         bool mapToResources;
         try
@@ -1387,10 +1433,12 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             return virtualRoot;
         }
+
         if (mapToResources)
         {
             return resourcesFolder;
         }
+
         return virtualRoot;
     }
 
@@ -1402,6 +1450,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             return "";
         }
+
         var suffix = OperatingSystem.IsWindows() ? ".exe" : "";
         foreach (var dir in pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
         {
@@ -1411,6 +1460,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                 return candidate;
             }
         }
+
         return "";
     }
 
@@ -1432,10 +1482,12 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             return FileSystem.PathCombine(Directory.GetCurrentDirectory(), "");
         }
+
         if (path.StartsWith('/') || (path.Length >= 2 && path[1] == ':'))
         {
             return FileSystem.PathCombine(path, "");
         }
+
         return FileSystem.PathCombine(Directory.GetCurrentDirectory(), path);
     }
 
@@ -1455,10 +1507,12 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             return $"{minutes}min {seconds}s";
         }
+
         if (days == 0)
         {
             return $"{hours}h {minutes}min";
         }
+
         return $"{days}d {hours}h {minutes}min";
     }
 
@@ -1467,6 +1521,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     protected readonly PackProfile? Components; // unique_ptr<PackProfile> m_components (set in ctor)
     private ModFolderModel? loaderModList;
     private ModFolderModel? coreModList;
+
     private ModFolderModel? nilModList;
     // (the resource pack / texture pack / shader pack / data pack models and the world list
     //  arrive with the remaining P3b folder-model ports)

@@ -58,8 +58,8 @@ public sealed partial class InstanceImportTask : InstanceTask
         new Dictionary<string, bool>();
 
     public InstanceImportTask(Uri sourceUrl, bool trustedSource,
-                              IReadOnlyDictionary<string, string>? extraInfo = null,
-                              ModrinthApi? modrinth = null, FlameApi? flame = null)
+        IReadOnlyDictionary<string, string>? extraInfo = null,
+        ModrinthApi? modrinth = null, FlameApi? flame = null)
     {
         _modrinth = modrinth ?? new ModrinthApi();
         _flame = flame ?? new FlameApi();
@@ -142,6 +142,7 @@ public sealed partial class InstanceImportTask : InstanceTask
                     modpackType = ModpackType.Modrinth;
                     break;
                 }
+
                 if (fileName is "bin/modpack.jar" or "bin/version.json")
                 {
                     // process as Technic pack
@@ -150,11 +151,13 @@ public sealed partial class InstanceImportTask : InstanceTask
                     modpackType = ModpackType.Technic;
                     break;
                 }
+
                 if (fileName == "manifest.json")
                 {
                     modpackType = ModpackType.Flame;
                     break;
                 }
+
                 if (Path.GetFileName(fileName) == "instance.cfg")
                 {
                     modpackType = ModpackType.MultiMc;
@@ -164,7 +167,7 @@ public sealed partial class InstanceImportTask : InstanceTask
             }
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                 or ArgumentException or NotSupportedException)
+                                      or ArgumentException or NotSupportedException)
         {
             EmitFailed("Unable to open supplied modpack zip file.");
             return;
@@ -175,6 +178,7 @@ public sealed partial class InstanceImportTask : InstanceTask
             EmitFailed("Archive does not contain a recognized modpack type.");
             return;
         }
+
         EmitStatus("Extracting modpack");
 
         // make sure we extract just the pack
@@ -350,11 +354,13 @@ public sealed partial class InstanceImportTask : InstanceTask
         {
             return "";
         }
+
         var result = path;
         if (result.StartsWith("./", StringComparison.Ordinal))
         {
             result = result[2..];
         }
+
         return result;
     }
 

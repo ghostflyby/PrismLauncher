@@ -65,6 +65,7 @@ public static class GZip
             {
                 gzip.Write(uncompressedBytes, 0, uncompressedBytes.Length);
             }
+
             compressedBytes = output.ToArray();
             return true;
         }
@@ -98,12 +99,15 @@ public static class GZip
                     {
                         break;
                     }
+
                     read += n;
                 }
+
                 if (read == 0)
                 {
                     return null; // Z_STREAM_END
                 }
+
                 if (read < chunk)
                 {
                     // The inner loop only exits early at end of stream, so this is the
@@ -113,6 +117,7 @@ public static class GZip
                     handleBlock(tail);
                     return null;
                 }
+
                 if (!handleBlock(buffer))
                 {
                     return null; // early stop, Z_OK

@@ -108,6 +108,7 @@ internal sealed class StubTechnicServer : IDisposable
                     ctx.Response.StatusCode = 404;
                     return;
                 }
+
                 body = Encoding.UTF8.GetBytes(buildJson);
             }
             else if (LastQuery.ContainsKey("build"))
@@ -118,6 +119,7 @@ internal sealed class StubTechnicServer : IDisposable
                     ctx.Response.StatusCode = 404;
                     return;
                 }
+
                 body = Encoding.UTF8.GetBytes(metaJson);
             }
             else
@@ -128,6 +130,7 @@ internal sealed class StubTechnicServer : IDisposable
                     ctx.Response.StatusCode = 404;
                     return;
                 }
+
                 body = Encoding.UTF8.GetBytes(packJson);
             }
         }
@@ -139,6 +142,7 @@ internal sealed class StubTechnicServer : IDisposable
                 ctx.Response.StatusCode = 404;
                 return;
             }
+
             body = payload;
         }
 
@@ -153,9 +157,7 @@ internal sealed class StubTechnicServer : IDisposable
         {
             _listener.Close();
         }
-        catch (ObjectDisposedException)
-        {
-        }
+        catch (ObjectDisposedException) { }
     }
 }
 
@@ -212,9 +214,7 @@ internal sealed class TechnicZipPackBuilder
             {
                 Directory.Delete(dir, recursive: true);
             }
-            catch (DirectoryNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
         }
     }
 
@@ -230,6 +230,7 @@ internal sealed class TechnicZipPackBuilder
                 writer.Write(VersionJson);
             }
         }
+
         if (FmlVersionProperties.Length != 0)
         {
             var entry = zip.CreateEntry("fmlversion.properties");
@@ -238,6 +239,7 @@ internal sealed class TechnicZipPackBuilder
                 writer.Write(FmlVersionProperties);
             }
         }
+
         if (ForgeVersionProperties.Length != 0)
         {
             var entry = zip.CreateEntry("forgeversion.properties");
@@ -267,9 +269,7 @@ internal sealed class TechnicZipPackBuilder
             {
                 Directory.Delete(dir, recursive: true);
             }
-            catch (DirectoryNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
         }
     }
 }

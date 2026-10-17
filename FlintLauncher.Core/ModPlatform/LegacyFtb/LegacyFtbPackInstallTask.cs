@@ -155,8 +155,9 @@ public sealed class LegacyFtbPackInstallTask : InstanceTask
                         foreach (var value in libs.EnumerateArray())
                         {
                             var nameValue = value.TryGetProperty("name", out var nameNode)
-                                && nameNode.ValueKind == JsonValueKind.String
-                                ? nameNode.GetString() ?? "" : "";
+                                            && nameNode.ValueKind == JsonValueKind.String
+                                ? nameNode.GetString() ?? ""
+                                : "";
                             if (!nameValue.StartsWith("net.minecraftforge", StringComparison.Ordinal))
                             {
                                 continue;

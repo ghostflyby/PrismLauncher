@@ -44,18 +44,22 @@ public static partial class OneSixVersionFormat
         {
             libRoot["MMC-absoluteUrl"] = library.AbsoluteUrl;
         }
+
         if (library.Hint.Length != 0)
         {
             libRoot["MMC-hint"] = library.Hint;
         }
+
         if (library.FilenameOverride.Length != 0)
         {
             libRoot["MMC-filename"] = library.FilenameOverride;
         }
+
         if (library.DisplayNameValue.Length != 0)
         {
             libRoot["MMC-displayname"] = library.DisplayNameValue;
         }
+
         return libRoot;
     }
 
@@ -243,6 +247,7 @@ public static partial class OneSixVersionFormat
                 outInfo.AddProblem(ProblemSeverity.Error,
                     "URL for the main jar could not be determined - Mojang removed the server that we used as fallback.");
             }
+
             outInfo.MainJar = lib;
         }
 
@@ -250,6 +255,7 @@ public static partial class OneSixVersionFormat
         {
             MetaJsonFormat.ParseRequires(root, outInfo.Requires);
         }
+
         var dependsOnMinecraftVersion = root.StringOr("mcVersion");
         if (dependsOnMinecraftVersion.Length != 0)
         {
@@ -263,10 +269,12 @@ public static partial class OneSixVersionFormat
                 outInfo.Requires.Add(mcReq);
             }
         }
+
         if (root.Contains("conflicts"))
         {
             MetaJsonFormat.ParseRequires(root, outInfo.Conflicts, "conflicts");
         }
+
         if (root.Contains("volatile"))
         {
             outInfo.Volatile = JsonUtils.RequireBoolean(root, "volatile", "Value");
@@ -286,22 +294,27 @@ public static partial class OneSixVersionFormat
         {
             outInfo.AddProblem(ProblemSeverity.Error, "Version file contains unsupported element 'tweakers'");
         }
+
         if (root.Contains("-libraries"))
         {
             outInfo.AddProblem(ProblemSeverity.Error, "Version file contains unsupported element '-libraries'");
         }
+
         if (root.Contains("-tweakers"))
         {
             outInfo.AddProblem(ProblemSeverity.Error, "Version file contains unsupported element '-tweakers'");
         }
+
         if (root.Contains("-minecraftArguments"))
         {
             outInfo.AddProblem(ProblemSeverity.Error, "Version file contains unsupported element '-minecraftArguments'");
         }
+
         if (root.Contains("+minecraftArguments"))
         {
             outInfo.AddProblem(ProblemSeverity.Error, "Version file contains unsupported element '+minecraftArguments'");
         }
+
         return outInfo;
     }
 
@@ -323,6 +336,7 @@ public static partial class OneSixVersionFormat
         {
             root["mainJar"] = LibraryToJson(patch.MainJar);
         }
+
         JsonUtils.WriteString(root, "appletClass", patch.AppletClass);
         JsonUtils.WriteStringList(root, "+tweakers", patch.AddTweakers);
         // QSet iteration order is unspecified upstream; a sorted list keeps the output deterministic
@@ -338,10 +352,13 @@ public static partial class OneSixVersionFormat
                 {
                     agentOut["argument"] = value.Argument;
                 }
+
                 array.Add((JsonNode)agentOut);
             }
+
             root["+agents"] = array;
         }
+
         if (patch.Libraries.Count != 0)
         {
             var array = new JsonArray();
@@ -349,8 +366,10 @@ public static partial class OneSixVersionFormat
             {
                 array.Add((JsonNode)LibraryToJson(value));
             }
+
             root["libraries"] = array;
         }
+
         if (patch.MavenFiles.Count != 0)
         {
             var array = new JsonArray();
@@ -358,8 +377,10 @@ public static partial class OneSixVersionFormat
             {
                 array.Add((JsonNode)LibraryToJson(value));
             }
+
             root["mavenFiles"] = array;
         }
+
         if (patch.JarMods.Count != 0)
         {
             var array = new JsonArray();
@@ -367,8 +388,10 @@ public static partial class OneSixVersionFormat
             {
                 array.Add((JsonNode)JarModToJson(value));
             }
+
             root["jarMods"] = array;
         }
+
         if (patch.Mods.Count != 0)
         {
             var array = new JsonArray();
@@ -377,20 +400,25 @@ public static partial class OneSixVersionFormat
             {
                 array.Add((JsonNode)ModToJson(value));
             }
+
             root["mods"] = array;
         }
+
         if (!patch.Requires.IsEmpty)
         {
             MetaJsonFormat.SerializeRequires(root, patch.Requires);
         }
+
         if (!patch.Conflicts.IsEmpty)
         {
             MetaJsonFormat.SerializeRequires(root, patch.Conflicts, "conflicts");
         }
+
         if (patch.Volatile)
         {
             root["volatile"] = true;
         }
+
         return root;
     }
 
@@ -428,6 +456,7 @@ public static partial class OneSixVersionFormat
         {
             outLib.SetDisplayName(displayName);
         }
+
         return outLib;
     }
 

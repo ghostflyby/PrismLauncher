@@ -105,6 +105,7 @@ public sealed class ComponentUpdateTask : FlintTask
         {
             status.Task?.Abort();
         }
+
         base.Abort();
     }
 
@@ -117,7 +118,7 @@ public sealed class ComponentUpdateTask : FlintTask
     // ---------------------------------------------------------------- loading
 
     private LoadResult LoadComponent(Component component, out FlintTask? loadTask,
-                                     NetMode netmode, CancellationToken cancellationToken)
+        NetMode netmode, CancellationToken cancellationToken)
     {
         loadTask = null;
         if (component.Loaded)
@@ -139,6 +140,7 @@ public sealed class ComponentUpdateTask : FlintTask
                 file.Uid = component.Uid;
                 fileChanged = true;
             }
+
             if (fileChanged)
             {
                 // FIXME upstream @QUALITY: do not ignore return value
@@ -177,6 +179,7 @@ public sealed class ComponentUpdateTask : FlintTask
                 }
             }
         }
+
         return result;
     }
 
@@ -207,6 +210,7 @@ public sealed class ComponentUpdateTask : FlintTask
             {
                 component.UpdateCachedData();
             }
+
             result = ComposeLoadResult(result, singleResult);
             if (loadTask is not null)
             {
@@ -220,8 +224,10 @@ public sealed class ComponentUpdateTask : FlintTask
                 waitTasks.Add(AwaitRemoteLoadAsync(taskIndex, status));
                 taskIndex++;
             }
+
             componentIndex++;
         }
+
         remoteTasksInProgress = taskIndex;
         SetProgress(0, taskIndex);
         switch (result)
@@ -263,6 +269,7 @@ public sealed class ComponentUpdateTask : FlintTask
             // "Got multiple results from remote load task" guard; nothing to record
             return;
         }
+
         if (loadTask.State == TaskState.Succeeded)
         {
             RemoteLoadFinished(status, loadSucceeded: true);
@@ -290,6 +297,7 @@ public sealed class ComponentUpdateTask : FlintTask
             remoteLoadSuccessful = false;
             status.Succeeded = false;
         }
+
         status.Finished = true;
         remoteTasksInProgress--;
 
@@ -313,6 +321,7 @@ public sealed class ComponentUpdateTask : FlintTask
             // not yet...
             return;
         }
+
         if (remoteLoadSuccessful)
         {
             // nothing bad happened... clear the temp load status and proceed with looking at dependencies
@@ -333,6 +342,7 @@ public sealed class ComponentUpdateTask : FlintTask
                         $"Could not download metadata for {component?.GetName()} {component?.Version}. Please change the version or try again later.");
                 }
             }
+
             _remoteLoadStatusList.Clear();
 
             EmitFailed("Component metadata update task failed while downloading from remote server:\n"
@@ -381,6 +391,7 @@ public sealed class ComponentUpdateTask : FlintTask
             var bVer = new McVersion(b.Suggests);
             outcome = outcome with { Suggests = aVer < bVer ? b.Suggests : a.Suggests };
         }
+
         return (true, outcome);
     }
 
@@ -423,8 +434,10 @@ public sealed class ComponentUpdateTask : FlintTask
                     output.Add(componentRequireEx);
                 }
             }
+
             componentNum++;
         }
+
         return succeeded;
     }
 
@@ -433,7 +446,7 @@ public sealed class ComponentUpdateTask : FlintTask
     /// anymore (and they are installed as deps).
     /// </summary>
     private static void GetTrivialRemovals(IReadOnlyList<Component> components, SortedSet<RequireEx> reqs,
-                                           List<string> toRemove)
+        List<string> toRemove)
     {
         foreach (var component in components)
         {
@@ -441,10 +454,12 @@ public sealed class ComponentUpdateTask : FlintTask
             {
                 continue;
             }
+
             if (!component.CachedVolatile)
             {
                 continue;
             }
+
             if (!reqs.Any(req => req.Uid == component.Uid))
             {
                 toRemove.Add(component.Uid);
@@ -458,8 +473,8 @@ public sealed class ComponentUpdateTask : FlintTask
     /// installed is different).
     /// </summary>
     private static bool GetTrivialComponentChanges(IReadOnlyDictionary<string, Component> index,
-                                                   SortedSet<RequireEx> input, SortedSet<RequireEx> toAdd,
-                                                   SortedSet<RequireEx> toChange)
+        SortedSet<RequireEx> input, SortedSet<RequireEx> toAdd,
+        SortedSet<RequireEx> toChange)
     {
         var succeeded = true;
         // list the composed requirements and say if they are met or unmet
@@ -500,6 +515,7 @@ public sealed class ComponentUpdateTask : FlintTask
                 // else: Met
             }
         }
+
         return succeeded;
     }
 
@@ -515,6 +531,7 @@ public sealed class ComponentUpdateTask : FlintTask
                 linked.Add(comp);
             }
         }
+
         if (_profile.ComponentIndex.TryGetValue(uid, out var component))
         {
             component.UpdateCachedData();
@@ -526,6 +543,7 @@ public sealed class ComponentUpdateTask : FlintTask
                 }
             }
         }
+
         return linked;
     }
 
@@ -561,6 +579,7 @@ public sealed class ComponentUpdateTask : FlintTask
                 EmitFailed("Conflicting requirements detected during dependency checking!");
                 return;
             }
+
             GetTrivialRemovals(components, allRequires, toRemove);
             if (toRemove.Count != 0)
             {
@@ -580,6 +599,7 @@ public sealed class ComponentUpdateTask : FlintTask
             EmitFailed("Instance has conflicting dependencies.");
             return;
         }
+
         if (checkOnly)
         {
             FinalizeComponents();
@@ -591,6 +611,7 @@ public sealed class ComponentUpdateTask : FlintTask
             {
                 EmitSucceeded();
             }
+
             return;
         }
 
@@ -639,13 +660,16 @@ public sealed class ComponentUpdateTask : FlintTask
                     // what version to use. For now, it is hardcoded.
                     // ####################################################################
                 }
+
                 component.DependencyOnly = true;
                 // FIXME upstream: this should not work directly with the component list
                 _profile.InsertComponent(add.IndexOfFirstDependee, component);
                 // (the C++ also re-assigns componentIndex[add.uid]; InsertComponent did that already)
             }
+
             recursionNeeded = true;
         }
+
         if (toChange.Count != 0)
         {
             // change a version of something that exists
@@ -656,6 +680,7 @@ public sealed class ComponentUpdateTask : FlintTask
                     component.SetVersion(change.EqualsVersion);
                 }
             }
+
             recursionNeeded = true;
         }
 
@@ -706,6 +731,7 @@ public sealed class ComponentUpdateTask : FlintTask
                         {
                             await versionList.LoadTask(_netmode).StartAsync(cancellationToken);
                         }
+
                         var recommended = versionList.GetRecommendedForParent(lrc.ParentUid, lrc.Version)
                                           ?? versionList.GetLatestForParent(lrc.ParentUid, lrc.Version);
                         if (recommended is not null)
@@ -714,6 +740,7 @@ public sealed class ComponentUpdateTask : FlintTask
                             await component.WaitLoadMetaAsync(_netmode, cancellationToken);
                             break;
                         }
+
                         component.AddComponentProblem(ProblemSeverity.Error,
                             $"No compatible version of {component.GetName()} found for {lrc.ParentName} {lrc.Version}");
                         break;
@@ -738,6 +765,7 @@ public sealed class ComponentUpdateTask : FlintTask
                                 addedActions = true;
                             }
                         }
+
                         var linked = CollectTreeLinked(component.GetId());
                         foreach (var comp in linked)
                         {
@@ -745,6 +773,7 @@ public sealed class ComponentUpdateTask : FlintTask
                             {
                                 continue;
                             }
+
                             var compUid = comp.GetId();
                             var parentReq = component.CachedRequires.FirstOrDefault(req => req.Uid == compUid);
                             if (parentReq is not null)
@@ -767,11 +796,14 @@ public sealed class ComponentUpdateTask : FlintTask
                                 comp.SetUpdateAction(new UpdateAction.LatestRecommendedCompatible(
                                     component.GetId(), component.GetName(), component.GetVersion()));
                             }
+
                             addedActions = true;
                         }
+
                         break;
                     }
                 }
+
                 component.ClearUpdateAction();
                 foreach (var uid in toRemove)
                 {
@@ -801,6 +833,7 @@ public sealed class ComponentUpdateTask : FlintTask
                         component.AddComponentProblem(reqComp.GetProblemSeverity(),
                             $"{reqComp.GetName()}, a dependency of this component, has reported issues");
                     }
+
                     if (req.EqualsVersion.Length != 0 && req.EqualsVersion != reqComp.GetVersion())
                     {
                         component.AddComponentProblem(ProblemSeverity.Error,
@@ -813,6 +846,7 @@ public sealed class ComponentUpdateTask : FlintTask
                     }
                 }
             }
+
             foreach (var conflict in component.KnownConflictingComponents())
             {
                 if (componentIndex.TryGetValue(conflict, out var foundComp))
@@ -821,6 +855,7 @@ public sealed class ComponentUpdateTask : FlintTask
                     {
                         continue;
                     }
+
                     component.AddComponentProblem(ProblemSeverity.Warning,
                         $"{component.GetName()} and {foundComp.GetName()} are known to not work together. It is recommended to remove one of them.");
                 }

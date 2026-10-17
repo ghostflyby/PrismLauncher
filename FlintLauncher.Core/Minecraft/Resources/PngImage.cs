@@ -7,6 +7,7 @@
 // Deviation: only PNG data is recognized as a valid pack image, while QImage::fromData
 // would also decode other formats (pack.png is PNG by Minecraft convention, so all real
 // inputs are covered).
+
 namespace FlintLauncher.Core.Minecraft.Resources;
 
 /// <summary>The parsed header info of a pack image (PNG).</summary>
@@ -35,6 +36,7 @@ public static class PngImageReader
         {
             return false;
         }
+
         if (data[12] != (byte)'I' || data[13] != (byte)'H' || data[14] != (byte)'D' || data[15] != (byte)'R')
         {
             return false;

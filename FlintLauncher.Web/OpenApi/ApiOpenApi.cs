@@ -110,6 +110,7 @@ internal static class ApiOpenApi
                     },
                 };
             }
+
             if (metadata?.OfType<PlainTextMarker>().Any() == true)
             {
                 operation.Responses["200"] = new OpenApiResponse
@@ -124,6 +125,7 @@ internal static class ApiOpenApi
                     },
                 };
             }
+
             if (metadata?.OfType<FormUploadMarker>().FirstOrDefault() is { } form)
             {
                 operation.RequestBody = new OpenApiRequestBody

@@ -336,9 +336,7 @@ public class FileSystemTests
             {
                 Directory.Delete(Path, recursive: true);
             }
-            catch (IOException)
-            {
-            }
+            catch (IOException) { }
         }
     }
 }

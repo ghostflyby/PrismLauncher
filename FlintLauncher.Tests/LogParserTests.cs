@@ -17,10 +17,10 @@ public class LogParserTests
         string thread = "Server thread",
         string message = "Starting minecraft server") =>
         $"""
-        <log4j:event logger="{logger}" timestamp="{timestamp}" level="{level}" thread="{thread}">
-          <log4j:Message>{message}</log4j:Message>
-        </log4j:event>
-        """;
+         <log4j:event logger="{logger}" timestamp="{timestamp}" level="{level}" thread="{thread}">
+           <log4j:Message>{message}</log4j:Message>
+         </log4j:event>
+         """;
 
     // ---------------------------------------------------------------- plain text
 

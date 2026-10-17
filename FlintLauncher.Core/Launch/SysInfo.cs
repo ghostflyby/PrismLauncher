@@ -15,18 +15,22 @@ public static class SysInfo
         {
             return "osx";
         }
+
         if (OperatingSystem.IsWindows())
         {
             return "windows";
         }
+
         if (OperatingSystem.IsLinux())
         {
             return "linux";
         }
+
         if (OperatingSystem.IsFreeBSD())
         {
             return "freebsd";
         }
+
         return "unknown";
     }
 
@@ -51,43 +55,53 @@ public static class SysInfo
             {
                 return "windows-x64";
             }
+
             if (arch == "i386")
             {
                 return "windows-x86";
             }
+
             // Unknown, maybe arm, appending arch
             return "windows-" + arch;
         }
+
         if (sys == "osx")
         {
             if (arch == "arm64")
             {
                 return "mac-os-arm64";
             }
+
             if (arch.Contains("64"))
             {
                 return "mac-os-x64";
             }
+
             if (arch.Contains("86"))
             {
                 return "mac-os-x86";
             }
+
             // Unknown, maybe something new, appending arch
             return "mac-os-" + arch;
         }
+
         if (sys == "linux")
         {
             if (arch == "x86_64")
             {
                 return "linux-x64";
             }
+
             if (arch == "i386")
             {
                 return "linux-x86";
             }
+
             // will work for arm32 arm(64)
             return "linux-" + arch;
         }
+
         return "";
     }
 }

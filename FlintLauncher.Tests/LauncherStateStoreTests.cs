@@ -23,9 +23,7 @@ public class LauncherStateStoreTests : IDisposable
         {
             Directory.Delete(_dir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private string StateFile => Path.Combine(_dir, "launcher-state.json");
@@ -219,8 +217,10 @@ public class LaunchControllerOfflineNameStateTests
             {
                 throw new InvalidOperationException($"offline name never became '{expected}' (last: '{fixture.State.Current.LastOfflinePlayerName}')");
             }
+
             await Task.Delay(20);
         }
+
         return fixture.State.Current.LastOfflinePlayerName;
     }
 }

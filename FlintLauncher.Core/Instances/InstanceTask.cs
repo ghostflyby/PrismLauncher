@@ -112,10 +112,12 @@ public abstract class InstanceTask : FlintTask
         {
             return ModifiedName();
         }
+
         if (originalVersion.Length != 0)
         {
             return originalName + " " + originalVersion;
         }
+
         return originalName;
     }
 
@@ -150,6 +152,7 @@ public abstract class InstanceTask : FlintTask
         {
             return;
         }
+
         if (path.StartsWith("saves/", StringComparison.Ordinal))
         {
             if (ShouldDeleteSaves == ShouldDeleteSaves.NotAsked)
@@ -157,11 +160,13 @@ public abstract class InstanceTask : FlintTask
                 // (upstream opens the askIfShouldDeleteSaves() dialog here)
                 ShouldDeleteSaves = ShouldDeleteSaves.No;
             }
+
             if (ShouldDeleteSaves == ShouldDeleteSaves.No)
             {
                 return;
             }
         }
+
         _filesToRemove.Add(FileSystem.PathCombine(dir, path));
         if (checkDisabled)
         {

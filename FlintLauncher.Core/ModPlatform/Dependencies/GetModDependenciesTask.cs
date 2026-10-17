@@ -42,9 +42,7 @@ public class GetModDependenciesTask : SequentialTask
         public IndexedPack Pack { get; set; } = new();
         public IndexedVersion Version { get; set; } = new();
 
-        public PackDependency()
-        {
-        }
+        public PackDependency() { }
 
         public PackDependency(IndexedPack pack, IndexedVersion version)
         {
@@ -56,7 +54,7 @@ public class GetModDependenciesTask : SequentialTask
     public sealed record PackDependencyExtraInfo(bool MaybeInstalled, List<string> RequiredByNames, List<string> RequiredByIds);
 
     public GetModDependenciesTask(MinecraftInstance instance, ModFolderModel folder, List<PackDependency> selected,
-                                  ModrinthApi? modrinth = null, FlameApi? flame = null)
+        ModrinthApi? modrinth = null, FlameApi? flame = null)
     {
         _selected = selected;
         _flame = flame ?? new FlameApi();
@@ -99,6 +97,7 @@ public class GetModDependenciesTask : SequentialTask
         {
             return _flame;
         }
+
         return _modrinth;
     }
 
@@ -131,6 +130,7 @@ public class GetModDependenciesTask : SequentialTask
                 }
             }
         }
+
         return dep;
     }
 
@@ -143,6 +143,7 @@ public class GetModDependenciesTask : SequentialTask
             {
                 continue;
             }
+
             // the C++ iterates by value; getOverride may replace the entry wholesale
             var verDep = new Dependency { AddonId = verDepSource.AddonId, Type = verDepSource.Type, Version = verDepSource.Version };
             verDep = GetOverride(verDep, providerName);
@@ -154,16 +155,19 @@ public class GetModDependenciesTask : SequentialTask
             {
                 continue; // check the current dependency list
             }
+
             if (_selected.Exists(i => i.Pack.Provider == providerName &&
                                       (isOnlyVersion ? i.Version.Version == verDep.Version : i.Pack.AddonId == verDep.AddonId)))
             {
                 continue; // check the selected versions
             }
+
             if (_mods.Exists(i => i.Provider == providerName &&
                                   (isOnlyVersion ? i.FileId == verDep.Version : i.ProjectId == verDep.AddonId)))
             {
                 continue; // check the existing mods
             }
+
             if (_packDependencies.Exists(i => i.Pack.Provider == providerName &&
                                               (isOnlyVersion ? i.Version.Version == verDep.Version : i.Pack.AddonId == verDep.AddonId)))
             {
@@ -172,6 +176,7 @@ public class GetModDependenciesTask : SequentialTask
 
             cDependencies.Add(verDep);
         }
+
         return cDependencies;
 
         static bool IsSameDependency(Dependency i, Dependency verDep, bool isOnlyVersion) =>
@@ -186,6 +191,7 @@ public class GetModDependenciesTask : SequentialTask
             var (job, request) = _flame.GetProject(addonId);
             return (job, request);
         }
+
         return _modrinth.GetProject(addonId);
     }
 
@@ -228,7 +234,7 @@ public class GetModDependenciesTask : SequentialTask
             try
             {
                 root = JsonNode.Parse(request.BodyAsString)
-                    ?? throw new JsonException("empty response");
+                       ?? throw new JsonException("empty response");
             }
             catch (JsonException)
             {
@@ -399,9 +405,11 @@ public class GetModDependenciesTask : SequentialTask
                     }
                 }
             }
+
             RemovePack(dep.AddonId);
             return;
         }
+
         pDep.Version.IsCurrentlySelected = true;
         pDep.Pack.Versions.Clear();
         pDep.Pack.Versions.Add(pDep.Version);
@@ -413,6 +421,7 @@ public class GetModDependenciesTask : SequentialTask
             // qWarning("Dependency cycle exceeded") upstream
             return;
         }
+
         if (dep.AddonId.Length == 0 && pDep.Version.AddonId.Length != 0)
         {
             pDep.Pack.AddonId = pDep.Version.AddonId;
@@ -428,11 +437,13 @@ public class GetModDependenciesTask : SequentialTask
                 AddTask(GetProjectInfoTask(pDep));
             }
         }
+
         if (IsLocallyInstalled(pDep))
         {
             RemovePack(pDep.Version.AddonId);
             return;
         }
+
         foreach (var dependency in GetDependenciesForVersion(pDep.Version, provider))
         {
             AddTask(PrepareDependencyTask(dependency, provider, level - 1));
@@ -461,17 +472,20 @@ public class GetModDependenciesTask : SequentialTask
                 {
                     continue;
                 }
+
                 var deps = smod.Version.Dependencies;
                 var isRequiredByOther = deps.Any(d => d.Type.Value == DependencyTypeValue.Required &&
-                    (provider == ResourceProvider.Modrinth && d.AddonId.Length == 0 ? version == d.Version : d.AddonId == addonId));
+                                                      (provider == ResourceProvider.Modrinth && d.AddonId.Length == 0 ? version == d.Version : d.AddonId == addonId));
                 if (isRequiredByOther)
                 {
                     reqNames.Add(smod.Pack.Name);
                     reqIds.Add(smod.Version.FileId);
                 }
             }
+
             rby[addonId] = new PackDependencyExtraInfo(MaybeInstalled(mod), reqNames, reqIds);
         }
+
         return rby;
     }
 

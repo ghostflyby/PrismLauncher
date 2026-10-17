@@ -278,12 +278,15 @@ public sealed record MemoryConfig
             {
                 return 4096;
             }
+
             return totalRam < 6144UL ? (int)(totalRam / 1.5) : 4096;
         }
     }
 
     public int? MinMemAlloc { get; init; }
+
     public int? MaxMemAlloc { get; init; }
+
     // PermGen died with the Java <8 support floor (2026-10-05): PermSize is a pre-8 concept.
     public bool? LowMemWarning { get; init; }
 }

@@ -35,14 +35,14 @@ public static class TechnicEndpoints
         // (GET /modplatform/technic/trending below). Results map through
         // TechnicApi.LoadSearchResults (the "vanilla" slug exclusion included).
         api.MapGet("/modplatform/technic/search", async Task<IResult> (string? query, string? serverUrl,
-            LauncherRuntime runtime) =>
-            await SearchAsync(string.IsNullOrWhiteSpace(query) ? "" : query.Trim(), serverUrl, runtime))
+                    LauncherRuntime runtime) =>
+                await SearchAsync(string.IsNullOrWhiteSpace(query) ? "" : query.Trim(), serverUrl, runtime))
             .Produces<TechnicSearchResultView[]>();
 
         // ----------------------------------------------- modplatform/technic/trending
         api.MapGet("/modplatform/technic/trending", async Task<IResult> (string? serverUrl,
-            LauncherRuntime runtime) =>
-            await SearchAsync("", serverUrl, runtime))
+                    LauncherRuntime runtime) =>
+                await SearchAsync("", serverUrl, runtime))
             .Produces<TechnicSearchResultView[]>();
 
         // --------------------------------------------- modplatform/technic/modpack/{slug}
@@ -97,6 +97,7 @@ public static class TechnicEndpoints
                     recommended = NullIfEmpty(listing.Recommended);
                     latest = NullIfEmpty(listing.Latest);
                 }
+
                 if (versions.Count == 0 && pack.CurrentVersion.Length != 0)
                 {
                     // onSolderLoaded's fallback: the platform's "version" field
@@ -137,18 +138,21 @@ public static class TechnicEndpoints
                 return ApiJson.Error("invalid_body",
                     "either 'url' (zip pack) or 'solder' + 'slug' (Solder pack) is required", 400);
             }
+
             if (zipUrl is { Length: > 0 } zip &&
                 (!Uri.TryCreate(zip.Trim(), UriKind.Absolute, out var zipUri) ||
                  zipUri.Scheme is not ("http" or "https")))
             {
                 return ApiJson.Error("invalid_url", "'url' must be an absolute http(s) URL", 400);
             }
+
             if (!string.IsNullOrWhiteSpace(solderUrl) &&
                 (!Uri.TryCreate(solderUrl.Trim(), UriKind.Absolute, out var solderUri) ||
                  solderUri.Scheme is not ("http" or "https")))
             {
                 return ApiJson.Error("invalid_url", "'solder' must be an absolute http(s) URL", 400);
             }
+
             if (string.IsNullOrWhiteSpace(zipUrl) && string.IsNullOrWhiteSpace(slug))
             {
                 return ApiJson.Error("invalid_body", "'slug' is required with 'solder'", 400);
@@ -191,8 +195,10 @@ public static class TechnicEndpoints
                         {
                             return resolveError;
                         }
+
                         build = resolved;
                     }
+
                     task = new SolderPackInstallTask(new Uri(solder), slug!, build,
                         request.MinecraftVersion ?? "")
                     {
@@ -247,6 +253,7 @@ public static class TechnicEndpoints
         {
             return runtime.Technic;
         }
+
         var trimmed = serverUrl.Trim();
         if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var server) ||
             server.Scheme is not ("http" or "https"))
@@ -255,6 +262,7 @@ public static class TechnicEndpoints
                 "'serverUrl' must be an absolute http(s) URL", 400);
             return runtime.Technic;
         }
+
         // the URL builders concatenate directly onto the base, so keep the slash
         return new TechnicApi(runtime.Technic.Net)
         {
@@ -318,6 +326,7 @@ public static class TechnicEndpoints
             return (ApiJson.Error("creation_failed",
                 $"fetching the Solder pack listing failed: {failReason}", 500), "");
         }
+
         var listing = TechnicApi.LoadSolderPack(body);
         var build = NullIfEmpty(listing?.Recommended) ?? NullIfEmpty(listing?.Latest) ??
             listing?.Builds.FirstOrDefault();
@@ -336,6 +345,7 @@ public static class TechnicEndpoints
             {
                 return null;
             }
+
             foreach (var key in new[] { "displayName", "name" })
             {
                 if (obj[key] is JsonValue value && value.TryGetValue<string>(out var str))
@@ -348,6 +358,7 @@ public static class TechnicEndpoints
         {
             // already surfaced through the metadata parse; the name falls back to the slug
         }
+
         return null;
     }
 

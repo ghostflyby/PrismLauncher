@@ -8,9 +8,7 @@ namespace FlintLauncher.Core.Net;
 public class NetJob : ConcurrentTask
 {
     public NetJob(string name = "", int maxConcurrent = DefaultMaxConcurrent)
-        : base(name, maxConcurrent)
-    {
-    }
+        : base(name, maxConcurrent) { }
 
     public void AddNetRequest(NetRequest request) => AddTask(request);
 

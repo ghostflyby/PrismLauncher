@@ -23,9 +23,7 @@ public class ServersDatTests : IDisposable
         {
             Directory.Delete(_tempDir, recursive: true);
         }
-        catch (IOException)
-        {
-        }
+        catch (IOException) { }
     }
 
     private static List<ServerEntry> SampleServers()

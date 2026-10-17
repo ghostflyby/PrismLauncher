@@ -45,8 +45,10 @@ public enum ModProcessingLevel
 public static class ModUtils
 {
     private static readonly Regex NewlineRegex = new("\r\n|\n|\r");
+
     private static readonly Regex QdcssRulesetRegex = new("[#.]?(@?\\w+?)\\s*\\{(.*?)\\}",
         RegexOptions.Singleline, TimeSpan.FromSeconds(1));
+
     private static readonly Regex QdcssRuleRegex = new(
         "(\\S+?)\\s*:\\s*(?:\"(.*?)(?<!\\\\)\"|'(.*?)(?<!\\\\)'|(\\S+?))\\s*(?:;|$)",
         RegexOptions.None, TimeSpan.FromSeconds(1));
@@ -81,7 +83,7 @@ public static class ModUtils
             zip = ZipFile.OpenRead(mod.Fileinfo.FullName);
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                 or ArgumentException or NotSupportedException)
+                                      or ArgumentException or NotSupportedException)
         {
             return false; // can't open the archive
         }
@@ -110,14 +112,17 @@ public static class ModUtils
                     {
                         details.Version = manifestVersion;
                     }
+
                     stop = details.Version != "${file.jarVersion}";
                     baseForgePopulated = true;
                     if (stop)
                     {
                         break;
                     }
+
                     continue;
                 }
+
                 if (filePath == "META-INF/MANIFEST.MF")
                 {
                     // quick and dirty line-by-line parser
@@ -138,41 +143,49 @@ public static class ModUtils
                     {
                         manifestVersion = "NONE";
                     }
+
                     if (baseForgePopulated)
                     {
                         details.Version = manifestVersion;
                         stop = true;
                     }
+
                     if (stop)
                     {
                         break;
                     }
+
                     continue;
                 }
+
                 if (filePath == "mcmod.info")
                 {
                     details = ReadMcModInfo(Encoding.UTF8.GetString(ReadEntry(entry)));
                     isValid = true;
                     break; // stop
                 }
+
                 if (filePath == "quilt.mod.json")
                 {
                     details = ReadQuiltModInfo(Encoding.UTF8.GetString(ReadEntry(entry)));
                     isValid = true;
                     break; // stop
                 }
+
                 if (filePath == "fabric.mod.json")
                 {
                     details = ReadFabricModInfo(Encoding.UTF8.GetString(ReadEntry(entry)));
                     isValid = true;
                     break; // stop
                 }
+
                 if (filePath == "forgeversion.properties")
                 {
                     details = ReadForgeInfo(Encoding.UTF8.GetString(ReadEntry(entry)));
                     isValid = true;
                     break; // stop
                 }
+
                 if (filePath == "META-INF/nil/mappings.json")
                 {
                     // nilloader uses the filename of the metadata file for the modid, so we can't know the exact filename
@@ -182,8 +195,10 @@ public static class ModUtils
                     {
                         break; // stop
                     }
+
                     continue; // file->skip()
                 }
+
                 // nilmods can shade nilloader to be able to run as a standalone agent - which includes nilloader's own meta file
                 if (filePath.EndsWith(".nilmod.css", StringComparison.Ordinal) && filePath != "nilloader.nilmod.css")
                 {
@@ -226,7 +241,7 @@ public static class ModUtils
                 data = File.ReadAllBytes(mcmodInfo.FullName);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                     or NotSupportedException)
+                                          or NotSupportedException)
             {
                 return false; // can't open mcmod.info
             }
@@ -263,7 +278,7 @@ public static class ModUtils
             return true;
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                 or ArgumentException or NotSupportedException)
+                                      or ArgumentException or NotSupportedException)
         {
             return false; // can't open the archive
         }
@@ -335,6 +350,7 @@ public static class ModUtils
         {
             details.Name = name;
         }
+
         details.Version = StringOr(firstObj["version"]);
         var homeurl = StringOr(firstObj["url"]).Trim();
         if (homeurl.Length != 0)
@@ -347,6 +363,7 @@ public static class ModUtils
                 homeurl = "http://" + homeurl;
             }
         }
+
         details.Homeurl = homeurl;
         details.Description = StringOr(firstObj["description"]);
         var authors = firstObj["authorList"] as JsonArray;
@@ -380,18 +397,22 @@ public static class ModUtils
             {
                 return;
             }
+
             if (dep.Contains(':'))
             {
                 dep = dep[(dep.IndexOf(':') + 1)..];
             }
+
             if (dep.Contains('@'))
             {
                 dep = dep[..dep.IndexOf('@')];
             }
+
             if (dep.StartsWith("mod_", StringComparison.Ordinal))
             {
                 dep = dep[4..];
             }
+
             details.Dependencies.Add(dep);
         }
 
@@ -458,6 +479,7 @@ public static class ModUtils
         {
             authors = modsTable.GetString("authors");
         }
+
         if (authors.Length != 0)
         {
             details.Authors.Add(authors);
@@ -468,13 +490,15 @@ public static class ModUtils
         {
             homeurl = modsTable.GetString("displayURL");
         }
+
         // fix up url.
         if (homeurl.Length != 0 && !homeurl.StartsWith("http://", StringComparison.Ordinal)
-            && !homeurl.StartsWith("https://", StringComparison.Ordinal)
-            && !homeurl.StartsWith("ftp://", StringComparison.Ordinal))
+                                && !homeurl.StartsWith("https://", StringComparison.Ordinal)
+                                && !homeurl.StartsWith("ftp://", StringComparison.Ordinal))
         {
             homeurl = "http://" + homeurl;
         }
+
         details.Homeurl = homeurl;
 
         var issueTrackerUrl = tomlData.GetString("issueTrackerURL");
@@ -482,6 +506,7 @@ public static class ModUtils
         {
             issueTrackerUrl = modsTable.GetString("issueTrackerURL");
         }
+
         details.IssueTracker = issueTrackerUrl;
 
         var license = tomlData.GetString("license");
@@ -489,6 +514,7 @@ public static class ModUtils
         {
             license = modsTable.GetString("license");
         }
+
         if (license.Length != 0)
         {
             details.Licenses.Add(new ModLicense(license));
@@ -499,6 +525,7 @@ public static class ModUtils
         {
             logoFile = modsTable.GetString("logoFile");
         }
+
         details.IconFile = logoFile;
 
         void ParseDep(IReadOnlyList<TomlTable>? dependencies)
@@ -508,6 +535,7 @@ public static class ModUtils
             {
                 return;
             }
+
             foreach (var depTable in dependencies)
             {
                 var modId = depTable.GetString("modId");
@@ -515,6 +543,7 @@ public static class ModUtils
                 {
                     continue;
                 }
+
                 var isNeoForgeDep = depTable.GetString("type") == "required";
                 var isForgeDep = depTable.GetBoolean("mandatory");
                 if (isNeoForgeDep || isForgeDep)
@@ -541,6 +570,7 @@ public static class ModUtils
                         expectedKey = firstKey;
                     }
                 }
+
                 ParseDep(depTable.GetTableArray(expectedKey));
             }
         }
@@ -586,6 +616,7 @@ public static class ModUtils
                 {
                     details.Homeurl = StringOr(contact["homepage"]);
                 }
+
                 if (contact.ContainsKey("issues"))
                 {
                     details.IssueTracker = StringOr(contact["issues"]);
@@ -610,6 +641,7 @@ public static class ModUtils
                                     StringOr(licenseObj["description"])));
                             }
                         }
+
                         break;
                     case JsonValue:
                         details.Licenses.Add(new ModLicense(StringOr(license)));
@@ -637,6 +669,7 @@ public static class ModUtils
                             bestIcon = StringOr(value);
                         }
                     }
+
                     if (bestIcon.Length != 0)
                     {
                         details.IconFile = bestIcon;
@@ -675,7 +708,7 @@ public static class ModUtils
         try
         {
             var object0 = ParseJsonOrThrow(contents) as JsonObject
-                ?? throw new JsonParseException("quilt.mod.jsons parent does not contain 'quilt.mod.json'");
+                          ?? throw new JsonParseException("quilt.mod.jsons parent does not contain 'quilt.mod.json'");
             var schemaVersion = QJsonValueToInt(object0["schema_version"], 0);
 
             // https://github.com/QuiltMC/rfcs/blob/be6ba280d785395fefa90a43db48e5bfc1d15eb4/specification/0002-quilt.mod.json.md
@@ -703,6 +736,7 @@ public static class ModUtils
                     {
                         details.Homeurl = RequireString(modContact, "homepage", "'homepage'");
                     }
+
                     if (modContact.ContainsKey("issues"))
                     {
                         details.IssueTracker = RequireString(modContact, "issues", "'issues'");
@@ -727,6 +761,7 @@ public static class ModUtils
                                         StringOr(licenseObj["description"])));
                                 }
                             }
+
                             break;
                         case JsonValue:
                             details.Licenses.Add(new ModLicense(StringOr(license)));
@@ -752,13 +787,15 @@ public static class ModUtils
                                 largest = size;
                             }
                         }
+
                         if (largest > 0)
                         {
                             var key = largest + "x" + largest;
                             details.IconFile = iconObj.Contains(key) ? StringOr(iconObj[key]) : "";
                         }
                         else
-                        {  // parsing the sizes failed
+                        {
+                            // parsing the sizes failed
                             // take the first
                             if (!iconObj.IsEmpty())
                             {
@@ -785,7 +822,7 @@ public static class ModUtils
                         {
                             modId = StringOr(entryObj["id"]);
                             if (entryObj.Contains("optional") && entryObj["optional"] is JsonValue optional
-                                && optional.TryGetValue<bool>(out var optionalValue) && optionalValue)
+                                                              && optional.TryGetValue<bool>(out var optionalValue) && optionalValue)
                             {
                                 continue;
                             }
@@ -794,6 +831,7 @@ public static class ModUtils
                         {
                             continue;
                         }
+
                         if (modId != "minecraft" && !modId.StartsWith("quilt_", StringComparison.Ordinal))
                         {
                             details.Dependencies.Add(modId);
@@ -806,6 +844,7 @@ public static class ModUtils
         {
             // qWarning() << "Unable to parse mod info:" << e.cause();
         }
+
         return details;
     }
 
@@ -837,6 +876,7 @@ public static class ModUtils
         {
             details.ModId = details.Name = StringOr(object0["name"]);
         }
+
         if (object0.Contains("version"))
         {
             details.Version = StringOr(object0["version"]);
@@ -845,12 +885,14 @@ public static class ModUtils
         {
             details.Version = StringOr(object0["revision"]);
         }
+
         details.McVersion = StringOr(object0["mcversion"]);
         var author = StringOr(object0["author"]);
         if (author.Length != 0)
         {
             details.Authors.Add(author);
         }
+
         details.Description = StringOr(object0["description"]);
         details.Homeurl = StringOr(object0["url"]);
         return details;
@@ -870,14 +912,17 @@ public static class ModUtils
         {
             details.Name = name;
         }
+
         if (desc is not null)
         {
             details.Description = desc;
         }
+
         if (authors is not null)
         {
             details.Authors.Add(authors);
         }
+
         details.Version = cssData.Get("@nilmod.version") ?? "?";
 
         details.ModId = fname.Replace(".nilmod.css", string.Empty, StringComparison.Ordinal);
@@ -921,12 +966,14 @@ public static class ModUtils
                     {
                         value = rule.Groups[4].Value;
                     }
+
                     var key = selector + "." + property;
                     if (!_data.TryGetValue(key, out var values))
                     {
                         values = [];
                         _data[key] = values;
                     }
+
                     values.Add(value);
                 }
             }
@@ -966,16 +1013,18 @@ public static class ModUtils
         {
             throw new JsonParseException(what + " is not an object");
         }
+
         return obj;
     }
 
     private static string RequireString(JsonObject parent, string key, string what)
     {
         if (!parent.TryGetPropertyValue(key, out var node) || node is not JsonValue value
-            || !value.TryGetValue<string>(out var result))
+                                                           || !value.TryGetValue<string>(out var result))
         {
             throw new JsonParseException(what + " is not a string");
         }
+
         return result;
     }
 
@@ -994,11 +1043,13 @@ public static class ModUtils
             {
                 return i;
             }
+
             if (value.TryGetValue<double>(out var d))
             {
                 return (int)d;
             }
         }
+
         return defaultValue;
     }
 
@@ -1025,13 +1076,16 @@ public static class ModUtils
             {
                 continue;
             }
+
             var eq = trimmed.IndexOf('=');
             if (eq <= 0)
             {
                 continue;
             }
+
             result[trimmed[..eq].Trim()] = trimmed[(eq + 1)..].Trim();
         }
+
         return result;
     }
 
@@ -1067,6 +1121,7 @@ internal static class LocalModParseExtensions
         {
             return key;
         }
+
         return null;
     }
 }

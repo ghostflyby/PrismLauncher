@@ -61,6 +61,7 @@ public sealed class WorldList
         {
             return false;
         }
+
         foreach (var entry in entries)
         {
             var world = new World(entry);
@@ -69,6 +70,7 @@ public sealed class WorldList
                 newWorlds.Add(world);
             }
         }
+
         _worlds.Clear();
         _worlds.AddRange(newWorlds);
         return true;
@@ -91,6 +93,7 @@ public sealed class WorldList
         {
             return false;
         }
+
         return world.Install(Dir);
     }
 
@@ -107,9 +110,11 @@ public sealed class WorldList
             {
                 continue;
             }
+
             _worlds.RemoveAt(i);
             return true;
         }
+
         return false;
     }
 
@@ -120,6 +125,7 @@ public sealed class WorldList
         {
             _ = _worlds[i].Destroy(); // individual failures ignored, like the C++
         }
+
         _worlds.RemoveRange(first, last - first + 1);
         return true;
     }
@@ -131,6 +137,7 @@ public sealed class WorldList
         {
             return false;
         }
+
         return _worlds[index].ResetIcon();
     }
 
@@ -158,6 +165,7 @@ public sealed class WorldList
             Update();
             await LoadWorldsAsync();
         }
+
         return ok;
     }
 
@@ -168,6 +176,7 @@ public sealed class WorldList
         {
             return false;
         }
+
         var world = _worlds[index];
         var ok = world.IsValid && world.Install(Dir, name);
         if (ok)
@@ -175,6 +184,7 @@ public sealed class WorldList
             Update();
             await LoadWorldsAsync();
         }
+
         return ok;
     }
 
@@ -185,12 +195,14 @@ public sealed class WorldList
         {
             return Task.FromResult(false);
         }
+
         var world = _worlds[index];
         var ok = world.Destroy();
         if (ok)
         {
             RemoveWorld(world.ContainerPath);
         }
+
         return Task.FromResult(ok);
     }
 
@@ -201,6 +213,7 @@ public sealed class WorldList
         {
             return new FileInfo(file).Length;
         }
+
         if (Directory.Exists(file))
         {
             long total = 0;
@@ -216,8 +229,10 @@ public sealed class WorldList
             {
                 return total; // partial count is the best effort
             }
+
             return total;
         }
+
         return -1;
     }
 }

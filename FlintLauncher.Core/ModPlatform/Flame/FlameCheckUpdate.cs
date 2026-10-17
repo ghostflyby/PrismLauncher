@@ -55,11 +55,11 @@ public sealed class FlameCheckUpdate : FlintTask
     private readonly List<Update> _updates = [];
 
     public FlameCheckUpdate(IReadOnlyList<Resource> resources,
-                            IReadOnlyList<McVersion> mcVersions,
-                            IReadOnlyList<ModLoaderType> loadersList,
-                            Func<Resource, MetadataHandler.ModStruct?> metadataLookup,
-                            IReadOnlyList<IndexedVersionType>? releaseTypes = null,
-                            FlameApi? flame = null)
+        IReadOnlyList<McVersion> mcVersions,
+        IReadOnlyList<ModLoaderType> loadersList,
+        Func<Resource, MetadataHandler.ModStruct?> metadataLookup,
+        IReadOnlyList<IndexedVersionType>? releaseTypes = null,
+        FlameApi? flame = null)
     {
         _flame = flame ?? new FlameApi();
         _resources = resources;
@@ -106,6 +106,7 @@ public sealed class FlameCheckUpdate : FlintTask
             {
                 continue; // (the C++ reports per-request failures through the NetJob callbacks)
             }
+
             await GetLatestVersionCallback(resource, metadata, request.BodyAsString, cancellationToken);
         }
 
@@ -220,6 +221,7 @@ public sealed class FlameCheckUpdate : FlintTask
             {
                 continue;
             }
+
             var addonId = metadata.ProjectId;
             addonIds.Add(addonId);
             quickSearch[addonId] = resource;
@@ -275,7 +277,6 @@ public sealed class FlameCheckUpdate : FlintTask
 
                         foreach (var entryObj in entries.Where(e => e is not null))
                         {
-
                             var id = FlameJson.RequireInteger(entryObj, "id").ToString(CultureInfo.InvariantCulture);
                             if (!quickSearch.TryGetValue(id, out var resource))
                             {
@@ -293,17 +294,14 @@ public sealed class FlameCheckUpdate : FlintTask
                                     "Resource has a new update available, but is not downloadable using CurseForge.",
                                     recoverUrl);
                             }
-                            catch (JsonParseException)
-                            {
-                            }
+                            catch (JsonParseException) { }
                         }
                     }
-                    catch (JsonParseException)
-                    {
-                    }
+                    catch (JsonParseException) { }
                 }
             }
         }
+
         // do not care much about errors (the C++ finishes the task regardless)
         EmitSucceeded();
     }

@@ -55,6 +55,7 @@ public sealed class ModListExportTask : FlintTask
             extension = entry.Extension;
             return true;
         }
+
         // the C++ dialog default is HTML
         format = ModListFormat.Html;
         extension = "html";
@@ -75,6 +76,7 @@ public sealed class ModListExportTask : FlintTask
             {
                 continue; // hidden/scratch files, like the mods listing
             }
+
             var metadata = folder.GetMetadata(mod);
             mods.Add(new ModListMod
             {
@@ -94,7 +96,7 @@ public sealed class ModListExportTask : FlintTask
             File.WriteAllText(_outputPath, ExportToModList.ExportModsToString(mods, _format, _extraData));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException
-                                  or SecurityException)
+                                      or SecurityException)
         {
             EmitFailed("Could not write the mod list: " + e.Message);
             return Task.CompletedTask;

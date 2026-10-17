@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of the QVariant values stored by launcher/settings/INIFile (QSettings IniFormat subset).
+
 namespace FlintLauncher.Core.Settings;
 
 /// <summary>

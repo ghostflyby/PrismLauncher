@@ -3,6 +3,7 @@
 //
 // Upstream ignores the parseMinecraftEntitlements() return value and always reports success
 // ("Got entitlements") — ported as-is.
+
 namespace FlintLauncher.Core.Auth;
 
 public sealed class EntitlementsStep : AuthStep

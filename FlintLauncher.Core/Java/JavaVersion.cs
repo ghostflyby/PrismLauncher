@@ -35,6 +35,7 @@ public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<J
             Prerelease = build.ToString();
             versions.Insert(0, Prerelease);
         }
+
         if (Security != 0)
         {
             versions.Insert(0, Security.ToString());
@@ -52,6 +53,7 @@ public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<J
         {
             versions.Insert(0, "0");
         }
+
         versions.Insert(0, Major.ToString());
         _string = string.Join(".", versions);
         Parse();
@@ -76,6 +78,7 @@ public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<J
         {
             return 0;
         }
+
         return int.Parse(str, CultureInfo.InvariantCulture);
     }
 
@@ -108,14 +111,17 @@ public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<J
         {
             return 1;
         }
+
         if (this < other)
         {
             return -1;
         }
+
         if (other < this)
         {
             return 1;
         }
+
         return 0;
     }
 
@@ -125,10 +131,12 @@ public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<J
         {
             return false;
         }
+
         if (parseable && other.parseable)
         {
             return Major == other.Major && Minor == other.Minor && Security == other.Security && Prerelease == other.Prerelease;
         }
+
         return string.Equals(_string, other._string, StringComparison.Ordinal);
     }
 
@@ -147,22 +155,27 @@ public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<J
             {
                 return true;
             }
+
             if (left.Major > right.Major)
             {
                 return false;
             }
+
             if (left.Minor < right.Minor)
             {
                 return true;
             }
+
             if (left.Minor > right.Minor)
             {
                 return false;
             }
+
             if (left.Security < right.Security)
             {
                 return true;
             }
+
             if (left.Security > right.Security)
             {
                 return false;
@@ -176,19 +189,23 @@ public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<J
                 // this is a prerelease and the other one isn't -> lesser
                 return true;
             }
+
             if (!thisPre && rhsPre)
             {
                 // this isn't a prerelease and the other one is -> greater
                 return false;
             }
+
             if (thisPre && rhsPre)
             {
                 // both are prereleases - use natural compare
                 return StringUtils.NaturalCompare(left.Prerelease, right.Prerelease) < 0;
             }
+
             // neither is prerelease, so they are the same -> this cannot be less than rhs
             return false;
         }
+
         return StringUtils.NaturalCompare(left._string, right._string) < 0;
     }
 

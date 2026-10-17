@@ -67,7 +67,7 @@ public sealed class LogModel
     private int numLines;
     private bool suspended;
     public bool StopOnOverflow { get; set; }
-    public string OverflowMessage { get;  set; } = "";
+    public string OverflowMessage { get; set; } = "";
 
     public LogModel()
     {

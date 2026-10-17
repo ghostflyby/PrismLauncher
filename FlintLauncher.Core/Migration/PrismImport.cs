@@ -29,8 +29,10 @@ public enum PlannedMethod
 {
     /// <summary>Whole subtree moves with one same-volume rename.</summary>
     RenameDirectory,
+
     /// <summary>Per-file transfer (clone/copy/rename per the chosen mode).</summary>
     PerFile,
+
     /// <summary>Destination already has this item — nothing to do (idempotent resume).</summary>
     DestinationExists,
 }
@@ -75,6 +77,7 @@ public static class PrismImportPlanner
             {
                 continue;
             }
+
             var dst = Path.Combine(targetDataDir, dir);
             if (Directory.Exists(dst))
             {
@@ -93,6 +96,7 @@ public static class PrismImportPlanner
                     CountFiles(src), SizeOf(src)));
                 continue;
             }
+
             var moveRename = mode == ImportMode.Move && FileTransfer.SameVolume(src, dst);
             items.Add(new PrismImportPlanItem(dir, IsDirectory: true,
                 moveRename ? PlannedMethod.RenameDirectory : PlannedMethod.PerFile,
@@ -106,14 +110,17 @@ public static class PrismImportPlanner
             {
                 continue;
             }
+
             var dst = Path.Combine(targetDataDir, file);
-            var method = File.Exists(dst) ? PlannedMethod.DestinationExists
+            var method = File.Exists(dst)
+                ? PlannedMethod.DestinationExists
                 : mode == ImportMode.Move && FileTransfer.SameVolume(src, dst)
                     ? PlannedMethod.RenameDirectory
                     : PlannedMethod.PerFile;
             items.Add(new PrismImportPlanItem(file, IsDirectory: false, method, Files: 1,
                 new FileInfo(src).Length));
         }
+
         return items;
     }
 
@@ -124,6 +131,7 @@ public static class PrismImportPlanner
         {
             count++;
         }
+
         return count;
     }
 
@@ -136,10 +144,9 @@ public static class PrismImportPlanner
             {
                 total += new FileInfo(file).Length;
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-            {
-            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         }
+
         return total;
     }
 
@@ -158,6 +165,7 @@ public static class PrismImportPlanner
                 return true;
             }
         }
+
         return false;
     }
 }
@@ -275,10 +283,8 @@ public sealed class PrismImportTask : FlintTask
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
-                                     or SecurityException or ArgumentException
-                                     or NotSupportedException)
-        {
-        }
+                                      or SecurityException or ArgumentException
+                                      or NotSupportedException) { }
 
         RecordImportDecision(plan, sourceInstances);
         EmitSucceeded();
@@ -295,6 +301,7 @@ public sealed class PrismImportTask : FlintTask
         {
             return;
         }
+
         try
         {
             _decisions.Write(new MigrationDecisionRecord
@@ -313,7 +320,7 @@ public sealed class PrismImportTask : FlintTask
             });
         }
         catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException
-                                  or NotSupportedException or SecurityException)
+                                      or NotSupportedException or SecurityException)
         {
             // best-effort (the legacy marker write was the same, DataMigration.Decide's
             // upgrade path included): the data has fully landed — a failed decision-record
@@ -341,10 +348,12 @@ public sealed class PrismImportTask : FlintTask
         {
             return [dir];
         }
+
         if (!Directory.Exists(dir))
         {
             return [];
         }
+
         // B4: the transfer enumeration — file symlinks are yielded (copied by content,
         // like the C++ ResolveSymlinks walk), directory links are not descended into
         return FileTransfer.EnumerateFilesDeep(dir);
@@ -380,11 +389,13 @@ public static class PrismSourceDetector
         {
             return [Path.Combine(home, "Library", "Application Support")];
         }
+
         if (OperatingSystem.IsWindows())
         {
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             return [appData];
         }
+
         var xdgDataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
         var baseDir = string.IsNullOrWhiteSpace(xdgDataHome)
             ? Path.Combine(home, ".local", "share")
@@ -423,6 +434,7 @@ public static class PrismSourceDetector
             {
                 continue;
             }
+
             foreach (var (name, configFile) in KnownLaunchers)
             {
                 var dir = Path.Combine(parent, NameToDirectory(name));
@@ -430,12 +442,14 @@ public static class PrismSourceDetector
                 {
                     continue;
                 }
+
                 var hasConfig = File.Exists(Path.Combine(dir, configFile))
-                    || File.Exists(Path.Combine(dir, "prismlauncher.cfg"));
+                                || File.Exists(Path.Combine(dir, "prismlauncher.cfg"));
                 if (!hasConfig)
                 {
                     continue;
                 }
+
                 var instances = Path.Combine(dir, "instances");
                 var instancesFound = Directory.Exists(instances)
                     ? Directory.EnumerateDirectories(instances).Count()
@@ -448,6 +462,7 @@ public static class PrismSourceDetector
                     decision, instancesFound));
             }
         }
+
         return found;
     }
 

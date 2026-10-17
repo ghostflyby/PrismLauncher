@@ -46,9 +46,11 @@ public sealed class VersionList : MetaEntity
             {
                 outVersion.SetMetaCache(cache);
             }
+
             _lookup[version] = outVersion;
             _versions.Add(outVersion);
         }
+
         return outVersion;
     }
 
@@ -85,6 +87,7 @@ public sealed class VersionList : MetaEntity
                 version.SetMetaCache(cache);
             }
         }
+
         _versions.AddRange(versions);
         // newest first by raw time (std::sort upstream, so ties may reorder either way)
         _versions.Sort((a, b) => b.RawTime().CompareTo(a.RawTime()));
@@ -104,6 +107,7 @@ public sealed class VersionList : MetaEntity
         {
             Name = other.name;
         }
+
         if (other.Sha256.Length != 0)
         {
             Sha256 = other.Sha256;
@@ -116,6 +120,7 @@ public sealed class VersionList : MetaEntity
         {
             Name = other.name;
         }
+
         if (other.Sha256.Length != 0)
         {
             Sha256 = other.Sha256;
@@ -125,6 +130,7 @@ public sealed class VersionList : MetaEntity
         {
             // qWarning() << "Empty list loaded ...";
         }
+
         foreach (var otherVersion in other._versions)
         {
             MetaVersion version;
@@ -140,10 +146,12 @@ public sealed class VersionList : MetaEntity
                 {
                     otherVersion.SetMetaCache(cache);
                 }
+
                 _lookup[otherVersion.Version()] = otherVersion;
                 _versions.Add(otherVersion);
                 version = otherVersion;
             }
+
             recommended = GetBetterVersion(recommended, version);
         }
     }
@@ -155,15 +163,18 @@ public sealed class VersionList : MetaEntity
         {
             return b;
         }
+
         if (b is null)
         {
             return a;
         }
+
         if (a.Type() == b.Type())
         {
             // newer of same type wins
             return a.RawTime() > b.RawTime() ? a : b;
         }
+
         // 'release' type wins
         return a.Type() == "release" ? a : b;
     }
@@ -181,6 +192,7 @@ public sealed class VersionList : MetaEntity
                     return ver.IsRecommended();
                 }
             }
+
             return false;
         });
         return foundExplicit;
@@ -200,6 +212,7 @@ public sealed class VersionList : MetaEntity
                 }
             }
         }
+
         return latestCompat;
     }
 
@@ -213,6 +226,7 @@ public sealed class VersionList : MetaEntity
                 latestCompat = GetLatestVersion(latestCompat, ver);
             }
         }
+
         return latestCompat;
     }
 
@@ -222,10 +236,12 @@ public sealed class VersionList : MetaEntity
         {
             return b;
         }
+
         if (b is null)
         {
             return a;
         }
+
         return a.RawTime() > b.RawTime() ? a : b;
     }
 

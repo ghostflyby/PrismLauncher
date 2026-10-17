@@ -22,9 +22,7 @@ public class MmcZipTests : IDisposable
         {
             Directory.Delete(_tempDir, recursive: true);
         }
-        catch (IOException)
-        {
-        }
+        catch (IOException) { }
     }
 
     /// <summary>
@@ -100,8 +98,10 @@ public class MmcZipTests : IDisposable
             {
                 w.Write("one");
             }
+
             z.CreateEntry("only1.txt");
         }
+
         using (var s = File.Create(zip2))
         using (var z = new ZipArchive(s, ZipArchiveMode.Create))
         {
@@ -110,6 +110,7 @@ public class MmcZipTests : IDisposable
             {
                 w.Write("two");
             }
+
             z.CreateEntry("META-INF/x");
         }
 
@@ -159,6 +160,7 @@ public class MmcZipTests : IDisposable
         {
             // zero entries; the resulting EOCD-only file is 22 bytes
         }
+
         Assert.Equal(22, new FileInfo(zipPath).Length);
         var extracted = MmcZip.ExtractDir(zipPath, Path.Combine(_tempDir, "dst-empty"));
         Assert.NotNull(extracted);

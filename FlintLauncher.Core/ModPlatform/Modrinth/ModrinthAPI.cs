@@ -51,18 +51,22 @@ public sealed class ModrinthApi : ResourceApi
             {
                 obj["reason"] = JsonValue.Create(Reason);
             }
+
             if (!string.IsNullOrEmpty(GameVersion))
             {
                 obj["game_version"] = JsonValue.Create(GameVersion);
             }
+
             if (!string.IsNullOrEmpty(Loader))
             {
                 obj["loader"] = JsonValue.Create(Loader);
             }
+
             if (!string.IsNullOrEmpty(DependentOn))
             {
                 obj["dependent_on"] = JsonValue.Create(DependentOn);
             }
+
             return obj.ToJsonString();
         }
     }
@@ -150,10 +154,10 @@ public sealed class ModrinthApi : ResourceApi
     /// <summary>Port of ModrinthAPI::latestVersion (POST /version_file/{hash}/update); the
     /// optional release types become the body's "version_types" list (#3404).</summary>
     public (NetJob Job, NetRequest Request) LatestVersion(string hash,
-                                                           string hashFormat,
-                                                           IReadOnlyList<McVersion>? mcVersions,
-                                                           ModLoaderType? loaders,
-                                                           IReadOnlyList<IndexedVersionType>? releaseTypes = null)
+        string hashFormat,
+        IReadOnlyList<McVersion>? mcVersions,
+        ModLoaderType? loaders,
+        IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     {
         var netJob = new NetJob("Modrinth::GetLatestVersion");
 
@@ -162,11 +166,13 @@ public sealed class ModrinthApi : ResourceApi
         {
             JsonUtils.WriteStringList(bodyObj, "loaders", GetModLoaderStrings(loaderValue));
         }
+
         if (mcVersions is not null)
         {
             JsonUtils.WriteStringList(bodyObj, "game_versions",
                 mcVersions.Select(MapMcVersionToModrinth).ToList());
         }
+
         AddVersionTypes(bodyObj, releaseTypes);
 
         var bodyRaw = Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
@@ -179,10 +185,10 @@ public sealed class ModrinthApi : ResourceApi
     /// <summary>Port of ModrinthAPI::latestVersions (POST /version_files/update); the
     /// optional release types become the body's "version_types" list (#3404).</summary>
     public (NetJob Job, NetRequest Request) LatestVersions(IReadOnlyList<string> hashes,
-                                                           string hashFormat,
-                                                           IReadOnlyList<McVersion>? mcVersions,
-                                                           ModLoaderType? loaders,
-                                                           IReadOnlyList<IndexedVersionType>? releaseTypes = null)
+        string hashFormat,
+        IReadOnlyList<McVersion>? mcVersions,
+        ModLoaderType? loaders,
+        IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     {
         var netJob = new NetJob("Modrinth::GetLatestVersions");
 
@@ -193,11 +199,13 @@ public sealed class ModrinthApi : ResourceApi
         {
             JsonUtils.WriteStringList(bodyObj, "loaders", GetModLoaderStrings(loaderValue));
         }
+
         if (mcVersions is not null)
         {
             JsonUtils.WriteStringList(bodyObj, "game_versions",
                 mcVersions.Select(MapMcVersionToModrinth).ToList());
         }
+
         AddVersionTypes(bodyObj, releaseTypes);
 
         var bodyRaw = Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
@@ -215,6 +223,7 @@ public sealed class ModrinthApi : ResourceApi
         {
             return;
         }
+
         var versionTypes = IndexedVersionType.ToModrinthList(releaseTypes);
         if (versionTypes.Count != 0)
         {
@@ -240,6 +249,7 @@ public sealed class ModrinthApi : ResourceApi
         {
             return (null, null);
         }
+
         var netJob = new NetJob("Modrinth::GetProject");
         var request = MakeByteArrayRequest(url);
         netJob.AddNetRequest(request);
@@ -273,18 +283,21 @@ public sealed class ModrinthApi : ResourceApi
         {
             return categories;
         }
+
         foreach (var cat in arr)
         {
             if (cat is not JsonObject)
             {
                 continue;
             }
+
             var name = JsonUtils.EnsureString(cat.GetPropertySafe("name"));
             if (cat.GetPropertySafe("project_type").AsString() == projectType)
             {
                 categories.Add(new Category(name, name));
             }
         }
+
         return categories;
     }
 
@@ -302,6 +315,7 @@ public sealed class ModrinthApi : ResourceApi
         {
             return "";
         }
+
         return request.BodyAsString;
     }
 
@@ -327,6 +341,7 @@ public sealed class ModrinthApi : ResourceApi
                 l.Add(ModIndex.GetModLoaderAsString(loader));
             }
         }
+
         return l;
     }
 
@@ -357,11 +372,13 @@ public sealed class ModrinthApi : ResourceApi
         {
             v = v.Replace("-pre", preString);
         }
+
         v = v.Replace("-", " ");
         if (pre)
         {
             v = v.Replace(" Pre Release ", preString);
         }
+
         return v;
     }
 
@@ -395,10 +412,12 @@ public sealed class ModrinthApi : ResourceApi
         {
             facetsList.Add($"[{GetModLoaderFilters(loaders)}]");
         }
+
         if (args.Versions is { } versions && versions.Count != 0)
         {
             facetsList.Add($"[{GetGameVersionsArray(versions)}]");
         }
+
         if (args.Side is { } side)
         {
             var sideFilter = GetSideFilters(side);
@@ -407,6 +426,7 @@ public sealed class ModrinthApi : ResourceApi
                 facetsList.Add($"[{sideFilter}]");
             }
         }
+
         if (args.CategoryIds is { } categoryIds && categoryIds.Count != 0)
         {
             // #6099: every search category gets a facet array of its own (a category list is
@@ -416,10 +436,12 @@ public sealed class ModrinthApi : ResourceApi
                 facetsList.Add($"[\"categories:{category}\"]");
             }
         }
+
         foreach (var d in args.ExcludeDisclosureTypes)
         {
             facetsList.Add($"[\"disclosure_types!={d}\"]");
         }
+
         if (args.OpenSource)
         {
             facetsList.Add("[\"open_source:true\"]");
@@ -450,10 +472,12 @@ public sealed class ModrinthApi : ResourceApi
         {
             getArguments.Add($"query={Uri.EscapeDataString(search)}");
         }
+
         if (args.Sorting is { } sorting)
         {
             getArguments.Add($"index={sorting.Name}");
         }
+
         getArguments.Add($"facets={Uri.EscapeDataString(CreateFacets(args))}");
 
         return BaseUrl + "/search?" + string.Join("&", getArguments);
@@ -474,10 +498,12 @@ public sealed class ModrinthApi : ResourceApi
         {
             getArguments.Add($"game_versions=[{GetGameVersionsString(mcVersions)}]");
         }
+
         if (args.Loaders is { } loaders)
         {
             getArguments.Add($"loaders=[\"{string.Join("\",\"", GetModLoaderStrings(loaders))}\"]");
         }
+
         getArguments.Add($"include_changelog={(args.IncludeChangelog ? "true" : "false")}");
 
         return $"{BaseUrl}/project/{args.Pack.AddonId}/version{(getArguments.Count != 0 ? "?" : "")}{string.Join("&", getArguments)}";
@@ -491,10 +517,12 @@ public sealed class ModrinthApi : ResourceApi
         {
             s.Append("\"versions:").Append(MapMcVersionToModrinth(ver)).Append("\",");
         }
+
         if (s.Length == 0)
         {
             return "";
         }
+
         s.Length -= 1; // remove last comma
         return s.ToString();
     }
@@ -552,7 +580,6 @@ public sealed class ModrinthApi : ResourceApi
         AddApiHeaders(request, meta);
         return request;
     }
-
 }
 
 /// <summary>Small QJsonObject-style accessor helpers shared by the Modrinth loaders

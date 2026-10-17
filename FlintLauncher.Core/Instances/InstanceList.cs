@@ -71,6 +71,7 @@ public class InstanceList
     private readonly List<string> _instDirs = [];
 
     private readonly List<BaseInstance> _instances = [];
+
     // C++ m_instanceRootDirMap: id -> instance dir that provided it
     private readonly Dictionary<string, string> _instanceRootDirMap = new(StringComparer.Ordinal);
     private readonly HashSet<string> _instanceSet = new(StringComparer.Ordinal);
@@ -211,15 +212,18 @@ public class InstanceList
                 removedAny = true;
             }
         }
+
         if (removedAny)
         {
             InstanceListChanged?.Invoke();
         }
+
         if (newList.Count != 0)
         {
             Add(newList);
         }
-        RebuildInodeIndex(); // D2: the inode index follows every (re)discovery
+
+        RebuildInodeIndex();               // D2: the inode index follows every (re)discovery
         ConvertLinkedInstanceReferences(); // D3: persisted link references are uuids
         if (groupsLoaded)
         {
@@ -228,6 +232,7 @@ public class InstanceList
             // conversion waits for the next process). Never forces the lazy group load.
             _groups.ConvertUnresolvedMembers(ResolveMemberUuid);
         }
+
         MigrateTotalPlayTime();
         return InstListError.NoError;
     }
@@ -269,6 +274,7 @@ public class InstanceList
         {
             return null;
         }
+
         // inode link: a numeric miss falls through (the reference may be a numeric dirname
         // whose inode is not tracked, or the platform may not track inodes at all)
         if (long.TryParse(reference, NumberStyles.Integer, CultureInfo.InvariantCulture, out var inode) &&
@@ -277,6 +283,7 @@ public class InstanceList
         {
             return byInode;
         }
+
         return FindByUuidOrDirname(reference);
     }
 
@@ -298,6 +305,7 @@ public class InstanceList
             {
                 continue; // platform without inode support (Windows) or a vanished dir
             }
+
             _inodeByUuid[inst.Uuid] = inode;
             _uuidByInode[inode] = inst.Uuid;
         }
@@ -310,6 +318,7 @@ public class InstanceList
         {
             return null;
         }
+
         foreach (var inst in _instances)
         {
             if (inst.Id() == id || inst.Uuid == id)
@@ -317,6 +326,7 @@ public class InstanceList
                 return inst;
             }
         }
+
         return null;
     }
 
@@ -331,6 +341,7 @@ public class InstanceList
                 return inst;
             }
         }
+
         return null;
     }
 
@@ -341,6 +352,7 @@ public class InstanceList
         {
             return null;
         }
+
         foreach (var inst in _instances)
         {
             if (inst.GetManagedPackName() == managedName)
@@ -348,6 +360,7 @@ public class InstanceList
                 return inst;
             }
         }
+
         return null;
     }
 
@@ -362,11 +375,12 @@ public class InstanceList
         foreach (var inst in _instances)
         {
             if (inst.GetLinkedInstances()
-                    .Any(item => item == id || (uuid is { Length: > 0 } && item == uuid)))
+                .Any(item => item == id || (uuid is { Length: > 0 } && item == uuid)))
             {
                 linkedInstances.Add(inst.Id());
             }
         }
+
         return linkedInstances;
     }
 
@@ -386,6 +400,7 @@ public class InstanceList
             {
                 continue;
             }
+
             var converted = new List<string>(linked.Count);
             var changed = false;
             foreach (var entry in linked)
@@ -398,6 +413,7 @@ public class InstanceList
                     converted.Add(entry);
                     continue;
                 }
+
                 changed |= replacement != entry;
                 // the uuid form may already sit in a half-converted list — keep one
                 if (!converted.Contains(replacement))
@@ -405,6 +421,7 @@ public class InstanceList
                     converted.Add(replacement);
                 }
             }
+
             if (changed || converted.Count != linked.Count)
             {
                 inst.SetLinkedInstances(converted);
@@ -425,6 +442,7 @@ public class InstanceList
         {
             return "";
         }
+
         EnsureGroupsLoaded();
         // the member key is the uuid (D3); the dirname fallback covers a staged commit's
         // transient not-yet-converted member
@@ -439,11 +457,13 @@ public class InstanceList
             // qDebug() << "Attempt to set a null instance's group"
             return;
         }
+
         EnsureGroupsLoaded();
         if (_groups.SetMemberGroup(inst.Uuid, name))
         {
             InstanceDataChanged?.Invoke(inst);
         }
+
         // dedupe: a staged commit whose uuid was unprovable left a dirname-keyed member —
         // assigned under the uuid now, so the transient form goes (the uuid member keeps
         // the count above zero, so this cannot uncollapse the group)
@@ -529,10 +549,12 @@ public class InstanceList
         {
             return GroupFilePath;
         }
+
         if (Paths is { } paths)
         {
             return paths.GroupsFile;
         }
+
         // legacy CWD anchor — bare fixtures only (the process working directory is not
         // load-bearing anywhere else)
         return Path.Combine(Directory.GetCurrentDirectory(), "groups.json");
@@ -548,6 +570,7 @@ public class InstanceList
         {
             legacy.Add(paths.InstgroupsFile);
         }
+
         legacy.Add(FileSystem.PathCombine(PrimaryDir(), "instgroups.json"));
         return legacy;
     }
@@ -607,8 +630,10 @@ public class InstanceList
                 // qCritical: requested instance directory is no longer configured or accessible
                 return null;
             }
+
             root = targetDir;
         }
+
         var tempRoot = FileSystem.PathCombine(root, ".tmp");
 
         string result;
@@ -619,6 +644,7 @@ public class InstanceList
             {
                 return null;
             }
+
             // QUuid::createUuid().toString(QUuid::Id128).left(6)
             var key = Guid.NewGuid().ToString("N")[..6];
             result = FileSystem.PathCombine(tempRoot, key);
@@ -628,6 +654,7 @@ public class InstanceList
         {
             return null;
         }
+
         return result;
     }
 
@@ -648,6 +675,7 @@ public class InstanceList
             // qCritical: target directory for instance is no longer configured or accessible
             return false;
         }
+
         if (targetDir.Length == 0)
         {
             targetDir = PrimaryDir();
@@ -677,6 +705,7 @@ public class InstanceList
             {
                 return false;
             }
+
             if (!FileSystem.Copy(path, destination, overwrite: true))
             {
                 // qWarning() << "Failed to override" << path << "to" << destination
@@ -707,6 +736,7 @@ public class InstanceList
             {
                 member = instId;
             }
+
             _groups.SetMemberGroup(member, groupName);
         }
 
@@ -728,6 +758,7 @@ public class InstanceList
             {
                 continue;
             }
+
             FileSystem.EnsureFolderPathExists(dir);
             var canonical = QDirCanonicalPath(dir);
             if (canonical.Length != 0 && !newDirs.Contains(canonical))
@@ -745,6 +776,7 @@ public class InstanceList
         {
             _groups.Save();
         }
+
         _instDirs.Clear();
         _instDirs.AddRange(newDirs);
         groupsLoaded = false;
@@ -767,6 +799,7 @@ public class InstanceList
             {
                 continue;
             }
+
             // QDirIterator(rootDir, Dirs | NoDot | NoDotDot | Readable | Hidden, FollowSymlinks)
             var options = new EnumerationOptions
             {
@@ -785,6 +818,7 @@ public class InstanceList
                 {
                     continue;
                 }
+
                 // if it is a symlink, ignore it if it goes to ANY configured instance
                 var finalTarget = entry.ResolveLinkTarget(returnFinalTarget: true);
                 if (finalTarget is not null)
@@ -802,21 +836,25 @@ public class InstanceList
                         continue;
                     }
                 }
+
                 var id = entry.Name;
                 if (_instanceRootDirMap.ContainsKey(id))
                 {
                     // qWarning: duplicate instance ID found - already claimed, skipping
                     continue;
                 }
+
                 _instanceRootDirMap[id] = rootDir;
                 outList.Add(id);
             }
         }
+
         _instanceSet.Clear();
         foreach (var id in outList)
         {
             _instanceSet.Add(id);
         }
+
         instancesProbed = true;
         return outList;
     }
@@ -829,8 +867,8 @@ public class InstanceList
     private BaseInstance LoadInstance(string id)
     {
         var environment = Environment ??
-            throw new InvalidOperationException(
-                "InstanceList.Environment (the typed instance.json stack) must be stamped before LoadList.");
+                          throw new InvalidOperationException(
+                              "InstanceList.Environment (the typed instance.json stack) must be stamped before LoadList.");
 
         var instanceRoot = FileSystem.PathCombine(RootDirOf(id), id);
         // the typed layer stack (D4): instance.json when present (Flint format), otherwise
@@ -861,6 +899,7 @@ public class InstanceList
                 LauncherState = LauncherState,
             };
         }
+
         // D3: the write-side uuid convention — a dirname handed to AddLinkedInstanceId
         // resolves to the uuid at write time; an unresolvable input appends verbatim and
         // converts at the next LoadList round (same deferral as the group members).
@@ -875,6 +914,7 @@ public class InstanceList
             inst.PropertiesChanged += () => InstanceDataChanged?.Invoke(inst);
             _instances.Add(inst);
         }
+
         InstanceListChanged?.Invoke();
     }
 
@@ -902,8 +942,10 @@ public class InstanceList
                 {
                     return uuid.GetString() ?? "";
                 }
+
                 return "";
             }
+
             var cfgPath = FileSystem.PathCombine(instanceRoot, InstanceIniImporter.LegacyFileName);
             if (File.Exists(cfgPath))
             {
@@ -912,10 +954,11 @@ public class InstanceList
             }
         }
         catch (Exception e) when (e is JsonException or FileSystemException or IOException
-                                  or UnauthorizedAccessException)
+                                      or UnauthorizedAccessException)
         {
             // a broken commit payload simply loses its group assignment until the next load
         }
+
         return "";
     }
 
@@ -927,6 +970,7 @@ public class InstanceList
         {
             return; // no state root to migrate into
         }
+
         if (LauncherState.Current.Playtime.Migrated)
         {
             return;
@@ -962,13 +1006,14 @@ public class InstanceList
         {
             return "";
         }
+
         try
         {
             var full = Path.GetFullPath(dir);
             return full.Length > 1 ? full.TrimEnd('/', Path.DirectorySeparatorChar) : full;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                  or NotSupportedException)
+                                      or NotSupportedException)
         {
             return "";
         }
@@ -997,8 +1042,8 @@ public class InstanceList
             // D4: the typed instance environment (user flint.json store + instance.json
             // type infos) replaces the former parent SettingsObject handle
             child.SetParentEnvironment(parent.Environment ??
-                throw new InvalidOperationException(
-                    "InstanceList.Environment (the typed instance.json stack) must be stamped before staging instances."));
+                                       throw new InvalidOperationException(
+                                           "InstanceList.Environment (the typed instance.json stack) must be stamped before staging instances."));
 
             await child.StartAsync(cancellationToken);
 
@@ -1012,21 +1057,25 @@ public class InstanceList
                         EmitSucceeded();
                         return;
                     }
+
                     if (backoff == MaxBackoff)
                     {
                         EmitFailed("Failed to commit instance, even after multiple retries. It is being blocked by something.");
                         return;
                     }
+
                     await Task.Delay(backoff * 500, cancellationToken);
                     backoff = Math.Min(backoff * 2, MaxBackoff);
                 }
             }
+
             if (child.State == TaskState.AbortedByUser)
             {
                 FileSystem.DeletePath(_stagingPath);
                 EmitAborted();
                 return;
             }
+
             FileSystem.DeletePath(_stagingPath);
             EmitFailed(child.FailReason);
         }

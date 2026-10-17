@@ -19,9 +19,9 @@ public static class AccountEndpoints
         api.MapSkins();
 
         api.MapGet("/accounts", (LauncherRuntime runtime) =>
-            Results.Ok(Enumerable.Range(0, runtime.Accounts.Count)
-                .Select(i => View(runtime.Accounts.At(i), runtime.Accounts))
-                .ToArray()))
+                Results.Ok(Enumerable.Range(0, runtime.Accounts.Count)
+                    .Select(i => View(runtime.Accounts.At(i), runtime.Accounts))
+                    .ToArray()))
             .Produces<AccountView[]>();
 
         api.MapPost("/accounts/offline", (OfflineAccountRequest request, LauncherRuntime runtime) =>
@@ -30,6 +30,7 @@ public static class AccountEndpoints
             {
                 return ApiJson.Error("invalid_body", "'name' is required", 400);
             }
+
             var account = MinecraftAccount.CreateOffline(request.Name);
             runtime.Accounts.AddAccount(account);
             return Results.Created($"/api/v1/accounts/{account.ProfileId()}",
@@ -43,6 +44,7 @@ public static class AccountEndpoints
             {
                 return ApiJson.NotFound("account_not_found", $"no account with profile id '{profileId}'");
             }
+
             runtime.Accounts.RemoveAccount(index);
             return Results.NoContent();
         }).Produces(204);
@@ -54,13 +56,14 @@ public static class AccountEndpoints
             {
                 return ApiJson.NotFound("account_not_found", $"no account with profile id '{profileId}'");
             }
+
             runtime.Accounts.SetDefaultAccount(runtime.Accounts.At(index));
             return Results.NoContent();
         }).Produces(204);
 
         // ------------------------------------------------------- MSA device-code login
         api.MapPost("/accounts/msa/devicecode", async (DeviceCodeSessionStore store,
-                                                       LauncherRuntime runtime) =>
+            LauncherRuntime runtime) =>
         {
             var session = store.Start(runtime.Auth);
             // wait (bounded) for Microsoft to hand out the device/user code pair
@@ -71,6 +74,7 @@ public static class AccountEndpoints
                     ? $"device authorization failed: {reason}"
                     : "device authorization failed", 502);
             }
+
             return Results.Accepted($"/api/v1/accounts/msa/devicecode/{session.DeviceId}/poll",
                 new DeviceCodeStartResponse(
                     session.UserCode,
@@ -80,8 +84,8 @@ public static class AccountEndpoints
         }).Produces<DeviceCodeStartResponse>(202);
 
         api.MapPost("/accounts/msa/devicecode/{deviceId}/poll", (string deviceId,
-                                                                 DeviceCodeSessionStore store,
-                                                                 LauncherRuntime runtime) =>
+            DeviceCodeSessionStore store,
+            LauncherRuntime runtime) =>
         {
             var session = store.Get(deviceId);
             return session is null
@@ -91,7 +95,7 @@ public static class AccountEndpoints
     }
 
     public static AccountView View(MinecraftAccount account,
-                                   AccountList list) => new(
+        AccountList list) => new(
         account.ProfileId(),
         account.ProfileName(),
         account.TypeString(),

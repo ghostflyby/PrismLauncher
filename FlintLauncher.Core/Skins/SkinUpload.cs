@@ -71,6 +71,7 @@ public sealed class SkinUpload : FlintTask
             EmitFailed($"HTTP status {statusCode} for {message.RequestUri}");
             return;
         }
+
         EmitSucceeded();
     }
 

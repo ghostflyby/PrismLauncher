@@ -12,7 +12,7 @@ namespace FlintLauncher.Tests;
 public class JavaMetadataSortTests
 {
     private static JavaMetadata Meta(string name, string version, string releaseTime, string vendor = "vendor",
-                                     string downloadType = "archive", string runtimeOs = "osx")
+        string downloadType = "archive", string runtimeOs = "osx")
     {
         // mirror the meta format: the numeric fields are parsed out of the dotted version
         var parts = version.Split('.');
@@ -117,7 +117,7 @@ public class JavaMetadataSortTests
     // -------------------------------------------------------------- comparators
 
     [Theory]
-    [InlineData("17.0.8", "17.0.9", true)]  // version decides
+    [InlineData("17.0.8", "17.0.9", true)] // version decides
     [InlineData("17.0.9", "17.0.8", false)]
     [InlineData("17.0.9", "17.0.9", false)] // equal versions fall through to release time
     public void LessThan_ByVersion(string lhsVersion, string rhsVersion, bool lhsSmaller)

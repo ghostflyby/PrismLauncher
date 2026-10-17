@@ -36,9 +36,7 @@ public class FlameCheckUpdateTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private string TempPath(string name) => Path.Combine(_root, name);

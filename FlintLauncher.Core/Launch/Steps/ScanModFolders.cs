@@ -5,6 +5,7 @@
 // Deviation from the C++ original: the C# ResourceFolderModel::update() is synchronous and
 // returns whether it ran, so the three updateFinished signals the C++ waits for collapse into
 // three synchronous calls (checkDone() always fires right after).
+
 namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class ScanModFolders : LaunchStep
@@ -13,9 +14,7 @@ public sealed class ScanModFolders : LaunchStep
     private bool coreModsDone;
     private bool nilModsDone;
 
-    public ScanModFolders(LaunchTask parent) : base(parent)
-    {
-    }
+    public ScanModFolders(LaunchTask parent) : base(parent) { }
 
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {

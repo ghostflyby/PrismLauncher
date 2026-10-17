@@ -58,6 +58,7 @@ public sealed class LogParser
             buffer += "\n";
             partialData = "";
         }
+
         buffer += data;
     }
 
@@ -96,6 +97,7 @@ public sealed class LogParser
                     {
                         break; // EOF: the event is incomplete
                     }
+
                     switch (parser.NodeType)
                     {
                         case XmlNodeType.Element:
@@ -108,6 +110,7 @@ public sealed class LogParser
                         // which the EOF break above treats as an incomplete event.)
                     }
                 }
+
                 isCompleteLog4J = depth == 0 && !eod;
             }
         }
@@ -135,6 +138,7 @@ public sealed class LogParser
             {
                 break;
             }
+
             var slice = buffer[pos..];
             if (IsPotentialLog4JStart(slice))
             {
@@ -147,9 +151,11 @@ public sealed class LogParser
                         return new PlainText(text);
                     }
                 }
+
                 partialData = buffer;
                 return new Partial(buffer);
             }
+
             start = pos + 1;
         }
 
@@ -172,12 +178,14 @@ public sealed class LogParser
             {
                 return [];
             }
+
             if (item is not null)
             {
                 if (item is Partial)
                 {
                     break;
                 }
+
                 items.Add(item);
             }
             else
@@ -185,6 +193,7 @@ public sealed class LogParser
                 doNext = false;
             }
         }
+
         return items;
     }
 
@@ -216,6 +225,7 @@ public sealed class LogParser
                 {
                     return null; // EOF without the closing event element
                 }
+
                 switch (parser.NodeType)
                 {
                     case XmlNodeType.Element:
@@ -231,6 +241,7 @@ public sealed class LogParser
                                 {
                                     return null; // parse fail (EndDocument/EOF)
                                 }
+
                                 switch (parser.NodeType)
                                 {
                                     case XmlNodeType.Text:
@@ -244,14 +255,17 @@ public sealed class LogParser
                                         {
                                             messageComplete = true;
                                         }
+
                                         break;
                                     // (no EndDocument token in System.Xml; EOF returns null above)
                                 }
                             }
+
                             entry = entry with { Message = message.ToString() };
                             foundMessage = true;
                             depth -= 1;
                         }
+
                         break;
                     }
                     case XmlNodeType.EndElement:
@@ -267,12 +281,15 @@ public sealed class LogParser
                                     buffer = buffer[consumed..];
                                     // potential whitespace preserved for next item
                                 }
+
                                 error = null; // clearError
                                 return entry; // entryReady
                             }
+
                             error = new ParseError("log4j:Event Missing required attribute: message");
                             return null;
                         }
+
                         break;
                     }
                     // (no EndDocument token in System.Xml; Read() returning false ends the loop)
@@ -310,6 +327,7 @@ public sealed class LogParser
                             error = new ParseError("log4j:Event Missing required attribute: timestamp");
                             return null;
                         }
+
                         entry = entry with { Timestamp = FromMSecsSinceEpoch(value) };
                         break;
                     case "level":
@@ -321,12 +339,14 @@ public sealed class LogParser
                 }
             } while (parser.MoveToNextAttribute());
         }
+
         parser.MoveToElement();
         if (logger.Length == 0)
         {
             error = new ParseError("log4j:Event Missing required attribute: logger");
             return null;
         }
+
         return entry with { Logger = logger };
     }
 
@@ -340,6 +360,7 @@ public sealed class LogParser
         {
             msecs = 0;
         }
+
         try
         {
             return DateTimeOffset.FromUnixTimeMilliseconds(msecs).UtcDateTime;
@@ -364,10 +385,12 @@ public sealed class LogParser
         {
             return false;
         }
+
         if (buffer.Length == TargetStart.Length)
         {
             return true; // the name is complete, whatever follows it is on the next line
         }
+
         var next = buffer[TargetStart.Length];
         return char.IsWhiteSpace(next) || next == '>' || next == '/';
     }
@@ -386,6 +409,7 @@ public sealed class LogParser
                 return true;
             }
         }
+
         return false;
     }
 
@@ -415,6 +439,7 @@ public sealed class LogParser
         {
             context = new XmlParserContext(null, null, "", XmlSpace.None);
         }
+
         return XmlReader.Create(new StringReader(data), settings, context);
     }
 
@@ -426,20 +451,24 @@ public sealed class LogParser
         {
             return "";
         }
+
         var i = lt + 1;
         if (!char.IsAsciiLetter(data[i]))
         {
             return "";
         }
+
         var nameStart = i;
         while (i < data.Length && (char.IsAsciiLetterOrDigit(data[i]) || data[i] == '_' || data[i] == '.' || data[i] == '-'))
         {
             i++;
         }
+
         if (i < data.Length && data[i] == ':')
         {
             return data[nameStart..i];
         }
+
         return "";
     }
 
@@ -455,6 +484,7 @@ public sealed class LogParser
         {
             return buffer.Length;
         }
+
         var gt = buffer.IndexOf('>', tagStart);
         return gt < 0 ? buffer.Length : gt + 1;
     }
@@ -465,6 +495,7 @@ public sealed class LogParser
         {
             return position - 1;
         }
+
         var index = 0;
         var currentLine = 1;
         while (currentLine < line && index < buffer.Length)
@@ -474,9 +505,11 @@ public sealed class LogParser
             {
                 return position - 1;
             }
+
             index = newline + 1;
             currentLine++;
         }
+
         return index + position - 1;
     }
 }

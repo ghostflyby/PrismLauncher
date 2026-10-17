@@ -86,6 +86,7 @@ public abstract class BaseInstance
         {
             _settings.Reset("totalTimePlayed");
         }
+
         _settings.RegisterSetting("lastTimePlayed", 0L);
 
         // D4: a real string list (the old JSON text form parses through GetLinkedInstances)
@@ -187,11 +188,13 @@ public abstract class BaseInstance
             conversionOk = true;
             maxLines = Variant.AsInt(value);
         }
+
         if (!conversionOk)
         {
             // (upstream logs a qWarning here)
             maxLines = Variant.AsInt(lineSetting?.Default);
         }
+
         return maxLines;
     }
 
@@ -288,6 +291,7 @@ public abstract class BaseInstance
             var timeNow = DateTimeOffset.Now;
             return current + (TimeStarted is { } timeStarted ? (long)(timeNow - timeStarted).TotalSeconds : 0);
         }
+
         return current;
     }
 
@@ -298,6 +302,7 @@ public abstract class BaseInstance
             var timeNow = DateTimeOffset.Now;
             return TimeStarted is { } timeStarted ? (long)(timeNow - timeStarted).TotalSeconds : 0;
         }
+
         return Variant.AsLong(_settings.Get("lastTimePlayed"));
     }
 
@@ -336,7 +341,6 @@ public abstract class BaseInstance
     // human-readable, a rename is a pure metadata write, and references hold via uuid.
 
 
-
     /// <summary>Register a created shortcut.</summary>
     public void RegisterShortcut(ShortcutData data)
     {
@@ -352,6 +356,7 @@ public abstract class BaseInstance
         {
             return [];
         }
+
         JsonDocument document;
         try
         {
@@ -361,6 +366,7 @@ public abstract class BaseInstance
         {
             return [];
         }
+
         using (document)
         {
             if (document.RootElement.ValueKind != JsonValueKind.Array)
@@ -375,11 +381,13 @@ public abstract class BaseInstance
                 {
                     continue;
                 }
+
                 if (!elem.TryGetProperty("name", out var name) || !elem.TryGetProperty("filePath", out var filePath) ||
                     !elem.TryGetProperty("target", out var target))
                 {
                     continue;
                 }
+
                 var value = target.ValueKind == JsonValueKind.Number ? target.GetInt32() : -1;
                 if (name.ValueKind != JsonValueKind.String || filePath.ValueKind != JsonValueKind.String ||
                     value < 0 || value >= 3)
@@ -394,8 +402,10 @@ public abstract class BaseInstance
                     // (upstream logs a qWarning here)
                     continue;
                 }
+
                 results.Add(new ShortcutData(shortcutName, path, (ShortcutTarget)value));
             }
+
             return results;
         }
     }
@@ -414,6 +424,7 @@ public abstract class BaseInstance
             };
             array.Add((JsonNode?)obj); // non-generic Add: AOT/trimming clean
         }
+
         _settings.Set("shortcuts", array.ToJsonString()); // QJsonDocument::Compact
     }
 
@@ -683,11 +694,14 @@ public abstract class BaseInstance
     // ---------------------------------------------------------------------- data
 
     protected readonly string RootDir;
+
     /// <summary>The backing store of <see cref="Settings"/>; shared with subclasses that
     /// register their instance-type keys (MinecraftInstance).</summary>
     protected readonly SettingsObject _settings;
+
     /// <summary>std::unique_ptr&lt;LaunchTask&gt; m_launchProcess.</summary>
     protected LaunchTask? LaunchProcess;
+
     protected DateTimeOffset? TimeStarted;
 
     /// <summary>The launcher runtime state (launcher-state.json, S5) — the playtime

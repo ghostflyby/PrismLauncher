@@ -34,6 +34,7 @@ public class Setting
         {
             return Default;
         }
+
         var test = storage.RetrieveValue(this);
         return test is null ? Default : test;
     }

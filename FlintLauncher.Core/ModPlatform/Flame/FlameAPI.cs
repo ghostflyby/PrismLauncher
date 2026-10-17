@@ -58,6 +58,7 @@ public sealed class FlameApi : ResourceApi
         {
             fingerprintsArr.Add((JsonNode?)JsonValue.Create(fp.ToString(CultureInfo.InvariantCulture)));
         }
+
         bodyObj["fingerprints"] = fingerprintsArr;
 
         var bodyRaw = Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
@@ -77,6 +78,7 @@ public sealed class FlameApi : ResourceApi
         {
             return "";
         }
+
         try
         {
             return JsonNode.Parse(request.BodyAsString)?["data"]?.GetValue<string>() ?? "";
@@ -96,6 +98,7 @@ public sealed class FlameApi : ResourceApi
         {
             return "";
         }
+
         try
         {
             return JsonNode.Parse(request.BodyAsString)?["data"]?.GetValue<string>() ?? "";
@@ -117,6 +120,7 @@ public sealed class FlameApi : ResourceApi
         {
             addonsArr.Add((JsonNode?)JsonValue.Create(addonId));
         }
+
         bodyObj["modIds"] = addonsArr;
 
         var bodyRaw = Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
@@ -146,6 +150,7 @@ public sealed class FlameApi : ResourceApi
         {
             filesArr.Add((JsonNode?)JsonValue.Create(fileId));
         }
+
         bodyObj["fileIds"] = filesArr;
 
         var bodyRaw = Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
@@ -222,10 +227,10 @@ public sealed class FlameApi : ResourceApi
     /// loaders (with the no-loader and stale-unspecified-loader tie-breaks of the C++); when
     /// release types are given, files on other channels are skipped (#3404).</summary>
     public static IndexedVersion? GetLatestVersion(IReadOnlyList<IndexedVersion> versions,
-                                                   IReadOnlyList<ModLoaderType> instanceLoaders,
-                                                   ModLoaderType fallback,
-                                                   bool checkLoaders,
-                                                   IReadOnlyList<IndexedVersionType>? releaseTypes = null)
+        IReadOnlyList<ModLoaderType> instanceLoaders,
+        ModLoaderType fallback,
+        bool checkLoaders,
+        IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     {
         const ModLoaderType noLoader = ModLoaderType.None;
         if (!checkLoaders)
@@ -237,15 +242,18 @@ public sealed class FlameApi : ResourceApi
                 {
                     continue;
                 }
+
                 if (ver is null || string.CompareOrdinal(fileTmp.Date, ver.Date) > 0)
                 {
                     ver = fileTmp;
                 }
             }
+
             return ver;
         }
 
         var bestMatch = new Dictionary<ModLoaderType, IndexedVersion>();
+
         void CheckVersion(IndexedVersion version, ModLoaderType loader)
         {
             if (bestMatch.TryGetValue(loader, out var best))
@@ -267,6 +275,7 @@ public sealed class FlameApi : ResourceApi
             {
                 continue;
             }
+
             var loaders = ModIndex.ModLoaderTypesToList(fileTmp.Loaders);
             if (loaders.Count == 0)
             {
@@ -293,14 +302,16 @@ public sealed class FlameApi : ResourceApi
             {
                 // awkward case where the mod has only two loaders and one of them is not specified
                 if (loader != noLoader && bestMatch.TryGetValue(noLoader, out var bestForNoLoader)
-                    && bestMatch.Count == 2
-                    && string.CompareOrdinal(bestForNoLoader.Date, bestForLoader.Date) > 0)
+                                       && bestMatch.Count == 2
+                                       && string.CompareOrdinal(bestForNoLoader.Date, bestForLoader.Date) > 0)
                 {
                     return bestForNoLoader;
                 }
+
                 return bestForLoader;
             }
         }
+
         return null;
     }
 
@@ -333,6 +344,7 @@ public sealed class FlameApi : ResourceApi
                 l.Add(GetMappedModLoader(loader).ToString(CultureInfo.InvariantCulture));
             }
         }
+
         return l;
     }
 
@@ -359,6 +371,7 @@ public sealed class FlameApi : ResourceApi
                 return classId;
             }
         }
+
         return 0;
     }
 
@@ -371,6 +384,7 @@ public sealed class FlameApi : ResourceApi
                 return type;
             }
         }
+
         return ResourceType.Unknown;
     }
 
@@ -388,10 +402,12 @@ public sealed class FlameApi : ResourceApi
         {
             getArguments.Add($"searchFilter={Uri.EscapeDataString(search)}");
         }
+
         if (args.Sorting is { } sorting)
         {
             getArguments.Add($"sortField={sorting.Index}");
         }
+
         getArguments.Add("sortOrder=desc");
         if (args.Loaders is { } loaders)
         {
@@ -401,10 +417,12 @@ public sealed class FlameApi : ResourceApi
                 getArguments.Add($"modLoaderTypes={GetModLoaderFilters(loaders)}");
             }
         }
+
         if (args.CategoryIds is { } categoryIds && categoryIds.Count != 0)
         {
             getArguments.Add($"categoryIds=[{string.Join(",", categoryIds)}]");
         }
+
         if (args.Versions is { } versions && versions.Count != 0)
         {
             getArguments.Add($"gameVersion={versions[0]}");
@@ -424,11 +442,12 @@ public sealed class FlameApi : ResourceApi
         }
 
         if (args.Loaders is { } loaders && loaders != ModLoaderType.DataPack
-            && ModIndex.HasSingleModLoaderSelected(loaders))
+                                        && ModIndex.HasSingleModLoaderSelected(loaders))
         {
             var mappedModLoader = GetMappedModLoader(loaders);
             url += $"&modLoaderType={mappedModLoader}";
         }
+
         return url;
     }
 
@@ -443,6 +462,7 @@ public sealed class FlameApi : ResourceApi
             var mappedModLoader = GetMappedModLoader(args.Loader);
             url += $"&modLoaderType={mappedModLoader}";
         }
+
         return url;
     }
 
@@ -479,6 +499,7 @@ public sealed class FlameApi : ResourceApi
         {
             return arr;
         }
+
         // FIXME upstream: client-side version filtering, ignoring user-selected filters
         foreach (var mcVersion in arr.McVersion)
         {
@@ -487,6 +508,7 @@ public sealed class FlameApi : ResourceApi
                 return arr;
             }
         }
+
         return new IndexedVersion();
     }
 

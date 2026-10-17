@@ -41,12 +41,14 @@ public sealed class PrintServers : LaunchStep
                 {
                     addresses += "N/A";
                 }
+
                 addresses += "\n";
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
                 addresses = server + " resolves to:\n  N/A\n";
             }
+
             _serverToAddress[server] = addresses;
         }
 
@@ -55,6 +57,7 @@ public sealed class PrintServers : LaunchStep
         {
             EmitLogLine(_serverToAddress.GetValueOrDefault(server, ""), MessageLevel.Launcher);
         }
+
         EmitSucceeded();
     }
 

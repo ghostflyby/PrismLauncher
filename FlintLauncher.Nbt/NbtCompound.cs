@@ -31,6 +31,7 @@ public sealed class NbtCompound : NbtTag
             {
                 return value;
             }
+
             throw new KeyNotFoundException($"No NBT tag with key \"{key}\"");
         }
     }
@@ -73,6 +74,7 @@ public sealed class NbtCompound : NbtTag
             {
                 return;
             }
+
             _map[key] = value;
             var index = _entries.FindIndex(kv => kv.Key == key);
             _entries[index] = new KeyValuePair<string, NbtTag>(key, value);
@@ -95,6 +97,7 @@ public sealed class NbtCompound : NbtTag
         {
             return false;
         }
+
         _map.Add(key, value);
         _entries.Add(new KeyValuePair<string, NbtTag>(key, value));
         return true;
@@ -107,6 +110,7 @@ public sealed class NbtCompound : NbtTag
         {
             return false;
         }
+
         _entries.RemoveAll(kv => kv.Key == key);
         return true;
     }
@@ -128,6 +132,7 @@ public sealed class NbtCompound : NbtTag
         {
             copy.Put(key, value.Clone());
         }
+
         return copy;
     }
 
@@ -139,6 +144,7 @@ public sealed class NbtCompound : NbtTag
         {
             return false;
         }
+
         foreach (var (key, value) in _entries)
         {
             if (!other._map.TryGetValue(key, out var otherValue) || !NbtList.NbtTagEquals(value, otherValue))
@@ -146,6 +152,7 @@ public sealed class NbtCompound : NbtTag
                 return false;
             }
         }
+
         return true;
     }
 
@@ -157,6 +164,7 @@ public sealed class NbtCompound : NbtTag
             hash.Add(key);
             hash.Add(value);
         }
+
         return hash.ToHashCode();
     }
 }

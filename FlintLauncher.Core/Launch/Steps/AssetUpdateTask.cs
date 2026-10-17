@@ -34,6 +34,7 @@ public sealed class AssetUpdateTask : FlintTask
             EmitFailed("The instance profile is missing.");
             return;
         }
+
         var assets = profile.GetMinecraftAssets();
         var indexUrl = assets.Url;
         var localPath = assets.Id + ".json";
@@ -52,6 +53,7 @@ public sealed class AssetUpdateTask : FlintTask
         {
             dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, assets.Sha1));
         }
+
         job.AddNetRequest(dl);
 
         downloadJob = job;
@@ -61,6 +63,7 @@ public sealed class AssetUpdateTask : FlintTask
             EmitFailed($"Failed to download the assets index:\n{job.FailReason}");
             return;
         }
+
         await AssetIndexFinished(cancellationToken).ConfigureAwait(false);
     }
 
@@ -73,6 +76,7 @@ public sealed class AssetUpdateTask : FlintTask
             EmitFailed("The instance profile is missing.");
             return;
         }
+
         var assets = profile.GetMinecraftAssets();
 
         var assetFname = FileSystem.PathCombine(
@@ -91,7 +95,7 @@ public sealed class AssetUpdateTask : FlintTask
         }
 
         var job = index.GetDownloadJob(ResourceUrl(), _inst.Paths?.AssetsRoot
-            ?? FileSystem.PathCombine("assets", ""));
+                                                      ?? FileSystem.PathCombine("assets", ""));
         if (job is not null)
         {
             var resourceUrl = ResourceUrl();
@@ -100,6 +104,7 @@ public sealed class AssetUpdateTask : FlintTask
             {
                 source = new Uri(resourceUrl).Host;
             }
+
             EmitStatus($"Getting the asset files from {source}...");
             downloadJob = job;
             await job.StartAsync(cancellationToken).ConfigureAwait(false);
@@ -109,6 +114,7 @@ public sealed class AssetUpdateTask : FlintTask
                 return;
             }
         }
+
         EmitSucceeded();
     }
 
@@ -120,6 +126,7 @@ public sealed class AssetUpdateTask : FlintTask
         {
             return urlOverride;
         }
+
         return FlintConfig.Default.DefaultResourceBase;
     }
 

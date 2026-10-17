@@ -106,6 +106,7 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
             var build = IntegerOr(versionObj, "build");
             meta.Version = new JavaVersion(major, minor, security, build, name);
         }
+
         return meta;
     }
 
@@ -124,10 +125,12 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
         {
             return true;
         }
+
         if (rhs.Version < Version)
         {
             return false;
         }
+
         var date = ReleaseTime;
         var rhsDate = rhs.ReleaseTime;
         // Qt compares an invalid QDateTime as smaller than any valid one
@@ -135,17 +138,20 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
         {
             return !date.HasValue;
         }
+
         if (date.HasValue)
         {
             if (date.Value < rhsDate!.Value)
             {
                 return true;
             }
+
             if (rhsDate.Value < date.Value)
             {
                 return false;
             }
         }
+
         return StringUtils.NaturalCompare(name, rhs.name, ignoreCase: true) < 0;
     }
 
@@ -156,6 +162,7 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
         {
             return false;
         }
+
         return Version == other.Version && name == other.name;
     }
 
@@ -168,14 +175,17 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
         {
             return -1;
         }
+
         if (LessThan(other))
         {
             return -1;
         }
+
         if (other.LessThan(this))
         {
             return 1;
         }
+
         return 0;
     }
 

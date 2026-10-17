@@ -78,6 +78,7 @@ public sealed class InstanceJsonSettingsObject : SettingsObject
             ChangeSetting(setting, 0L);
             return;
         }
+
         ConfigStore.Update(current => Apply(setting.Id, current, null));
         StateStore.EnsureMaterialized();
     }
@@ -93,10 +94,12 @@ public sealed class InstanceJsonSettingsObject : SettingsObject
                 _ => StateStore.Current.TotalTimePlayed,
             };
         }
+
         if (InstanceConfigKeys.Resolve(setting.Id) is not { } entry)
         {
             return null; // registered but unmapped would be a registry gap — Setting falls back
         }
+
         return entry.Get(UserLayer, ConfigStore.Current);
     }
 
@@ -111,5 +114,5 @@ public sealed class InstanceJsonSettingsObject : SettingsObject
         InstanceConfigKeys.Resolve(key) is { } entry
             ? entry.Apply(current, value)
             : // unknown key with no registry entry: refuse loudly rather than silently dropping
-              throw new InvalidOperationException($"unknown instance settings key '{key}'");
+            throw new InvalidOperationException($"unknown instance settings key '{key}'");
 }

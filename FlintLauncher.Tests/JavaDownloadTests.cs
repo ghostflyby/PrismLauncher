@@ -27,9 +27,7 @@ public class JavaDownloadTests : IDisposable
         {
             Directory.Delete(_dir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private string TempPath(string name) => Path.Combine(_dir, name);
@@ -168,6 +166,7 @@ public class JavaDownloadTests : IDisposable
                     ctx.Response.StatusCode = 404;
                     return;
             }
+
             ctx.Response.StatusCode = 200;
             ctx.Response.ContentLength64 = body.Length;
             ctx.Response.OutputStream.Write(body);
@@ -176,34 +175,34 @@ public class JavaDownloadTests : IDisposable
         // is not invoked before the task starts. NOTE: braces are kept apart so no "}}" run
         // collides with the $$ interpolation delimiters.
         manifestBody = Encoding.UTF8.GetBytes($$"""
-            {
-              "files": {
-                "bin/": {"type": "directory"},
-                "bin/java": {
-                  "type": "file",
-                  "executable": true,
-                  "downloads": {
-                    "raw": {
-                      "url": "{{server.Url}}/files/java",
-                      "sha1": "{{Sha1(javaBytes)}}"
-                    }
-                  }
-                },
-                "bin/javac": {"type": "link", "target": "java"},
-                "lib/": {"type": "directory"},
-                "release": {
-                  "type": "file",
-                  "executable": false,
-                  "downloads": {
-                    "raw": {
-                      "url": "{{server.Url}}/files/release",
-                      "sha1": ""
-                    }
-                  }
-                }
-              }
-            }
-            """);
+                                                {
+                                                  "files": {
+                                                    "bin/": {"type": "directory"},
+                                                    "bin/java": {
+                                                      "type": "file",
+                                                      "executable": true,
+                                                      "downloads": {
+                                                        "raw": {
+                                                          "url": "{{server.Url}}/files/java",
+                                                          "sha1": "{{Sha1(javaBytes)}}"
+                                                        }
+                                                      }
+                                                    },
+                                                    "bin/javac": {"type": "link", "target": "java"},
+                                                    "lib/": {"type": "directory"},
+                                                    "release": {
+                                                      "type": "file",
+                                                      "executable": false,
+                                                      "downloads": {
+                                                        "raw": {
+                                                          "url": "{{server.Url}}/files/release",
+                                                          "sha1": ""
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                                """);
 
         var finalPath = TempPath("install-manifest");
         var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), finalPath);
@@ -259,21 +258,21 @@ public class JavaDownloadTests : IDisposable
             ctx.Response.OutputStream.Write(body);
         });
         manifestBody = Encoding.UTF8.GetBytes($$"""
-            {
-              "files": {
-                "bin/java": {
-                  "type": "file",
-                  "executable": true,
-                  "downloads": {
-                    "raw": {
-                      "url": "{{server.Url}}/files/java",
-                      "sha1": "{{new string('9', 40)}}"
-                    }
-                  }
-                }
-              }
-            }
-            """);
+                                                {
+                                                  "files": {
+                                                    "bin/java": {
+                                                      "type": "file",
+                                                      "executable": true,
+                                                      "downloads": {
+                                                        "raw": {
+                                                          "url": "{{server.Url}}/files/java",
+                                                          "sha1": "{{new string('9', 40)}}"
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                                """);
 
         var finalPath = TempPath("install-manifest-badfile");
         var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), finalPath);
@@ -304,6 +303,7 @@ public class JavaDownloadTests : IDisposable
         {
             return; // symlink creation needs privileges on Windows; the C++ path is macOS-gated too
         }
+
         Assert.True(Directory.Exists(Path.Combine(target, "bin")));
         Assert.Equal("java-binary", await File.ReadAllTextAsync(Path.Combine(target, "bin", "java")));
         Assert.Equal("dylib", await File.ReadAllTextAsync(Path.Combine(target, "lib", "native.dylib")));
@@ -347,6 +347,7 @@ public class JavaDownloadTests : IDisposable
                 }
             }
         }
+
         tar.Write(new byte[1024]); // two zero blocks end the archive
         GZip.Compress(tar.ToArray(), out var gz);
         return gz;
@@ -365,6 +366,7 @@ public class JavaDownloadTests : IDisposable
         {
             header[i] = (byte)' '; // checksum placeholder
         }
+
         header[156] = (byte)typeFlag;
         Encoding.ASCII.GetBytes(linkTarget).CopyTo(header, 157);
         Encoding.ASCII.GetBytes("ustar\0").CopyTo(header, 257);
@@ -431,9 +433,7 @@ public class JavaDownloadTests : IDisposable
             {
                 _listener.Close();
             }
-            catch (ObjectDisposedException)
-            {
-            }
+            catch (ObjectDisposedException) { }
         }
     }
 }

@@ -51,9 +51,7 @@ public class InstanceCopyTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private MinecraftInstance CreateSource() =>

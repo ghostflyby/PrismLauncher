@@ -55,6 +55,7 @@ public class McVersionTests
             {
                 continue;
             }
+
             testNumber += 1;
 
             var splitLine = line.Split('<');
@@ -63,18 +64,21 @@ public class McVersionTests
                 yield return new object[] { splitLine[0].Trim(), splitLine[1].Trim(), true, false };
                 continue;
             }
+
             splitLine = line.Split('=');
             if (splitLine.Length == 2)
             {
                 yield return new object[] { splitLine[0].Trim(), splitLine[1].Trim(), false, true };
                 continue;
             }
+
             splitLine = line.Split('>');
             if (splitLine.Length == 2)
             {
                 yield return new object[] { splitLine[0].Trim(), splitLine[1].Trim(), false, false };
                 continue;
             }
+
             throw new InvalidOperationException($"Unexpected separator in the test vector: {line}");
         }
     }

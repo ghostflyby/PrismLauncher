@@ -57,6 +57,7 @@ public static class JavaDetection
                 {
                     continue;
                 }
+
                 results.Add(new JavaCandidate(executable.Path, executable.Version.Original,
                     Architecture(executable), Valid: true));
             }
@@ -78,15 +79,15 @@ public static class JavaDetection
         {
             var probed = new JavaExecutable?[fallback.Count];
             await Parallel.ForEachAsync(
-                Enumerable.Range(0, fallback.Count),
-                new ParallelOptions
-                {
-                    MaxDegreeOfParallelism = Environment.ProcessorCount,
-                    CancellationToken = cancellationToken,
-                },
-                async (index, token) =>
-                    probed[index] = await JdkFinder.Default.FromExecutableAsync(fallback[index], token)
-                        .ConfigureAwait(false))
+                    Enumerable.Range(0, fallback.Count),
+                    new ParallelOptions
+                    {
+                        MaxDegreeOfParallelism = Environment.ProcessorCount,
+                        CancellationToken = cancellationToken,
+                    },
+                    async (index, token) =>
+                        probed[index] = await JdkFinder.Default.FromExecutableAsync(fallback[index], token)
+                            .ConfigureAwait(false))
                 .ConfigureAwait(false);
 
             foreach (var executable in probed.OfType<JavaExecutable>())
@@ -95,11 +96,13 @@ public static class JavaDetection
                 {
                     continue;
                 }
+
                 if (executable.StartFailure is not null)
                 {
                     results.Add(new JavaCandidate(executable.Path, "unknown", "unknown", Valid: false));
                     continue;
                 }
+
                 results.Add(new JavaCandidate(executable.Path, executable.Version.Original,
                     Architecture(executable), Valid: true));
             }

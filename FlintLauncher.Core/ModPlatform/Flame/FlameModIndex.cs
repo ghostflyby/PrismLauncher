@@ -134,7 +134,7 @@ public static class FlameMod
             int.Parse(pack.AddonId, CultureInfo.InvariantCulture), cancellationToken);
 
         if (pack.ExtraData.IssuesUrl.Length != 0 || pack.ExtraData.SourceUrl.Length != 0
-            || pack.ExtraData.WikiUrl.Length != 0)
+                                                 || pack.ExtraData.WikiUrl.Length != 0)
         {
             pack.ExtraDataLoaded = true;
         }
@@ -156,7 +156,7 @@ public static class FlameMod
         foreach (var versionIter in arr)
         {
             var obj = versionIter as JsonObject
-                ?? throw new JsonParseException("file entry is not an object");
+                      ?? throw new JsonParseException("file entry is not an object");
 
             var file = LoadIndexedPackVersion(obj);
             if (file.AddonId.Length == 0)
@@ -271,12 +271,12 @@ public static class FlameMod
             };
             dependency.Type = FlameJson.RequireInteger(dep, "relationType") switch
             {
-                1 => new DependencyType(DependencyTypeValue.Embedded), // EmbeddedLibrary
-                2 => new DependencyType(DependencyTypeValue.Optional), // OptionalDependency
-                3 => new DependencyType(DependencyTypeValue.Required), // RequiredDependency
-                4 => new DependencyType(DependencyTypeValue.Tool), // Tool
+                1 => new DependencyType(DependencyTypeValue.Embedded),     // EmbeddedLibrary
+                2 => new DependencyType(DependencyTypeValue.Optional),     // OptionalDependency
+                3 => new DependencyType(DependencyTypeValue.Required),     // RequiredDependency
+                4 => new DependencyType(DependencyTypeValue.Tool),         // Tool
                 5 => new DependencyType(DependencyTypeValue.Incompatible), // Incompatible
-                6 => new DependencyType(DependencyTypeValue.Include), // Include
+                6 => new DependencyType(DependencyTypeValue.Include),      // Include
                 _ => DependencyType.Invalid,
             };
             file.Dependencies.Add(dependency);

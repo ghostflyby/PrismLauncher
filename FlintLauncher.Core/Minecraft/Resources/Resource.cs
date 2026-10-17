@@ -26,12 +26,16 @@ public enum ResourceType : byte
 {
     /// <summary>Indicates an unspecified resource type.</summary>
     Unknown,
+
     /// <summary>The resource is a zip file containing the resource's class files.</summary>
     ZipFile,
+
     /// <summary>The resource is a single file (not a zip file).</summary>
     SingleFile,
+
     /// <summary>The resource is in a folder on the filesystem.</summary>
     Folder,
+
     /// <summary>The resource is a litemod.</summary>
     LiteMod,
 }
@@ -41,10 +45,13 @@ public enum ResourceStatus : byte
 {
     /// <summary>Both JAR and Metadata are present.</summary>
     Installed,
+
     /// <summary>Only the Metadata is present.</summary>
     NotInstalled,
+
     /// <summary>Only the JAR is present.</summary>
     NoMetadata,
+
     /// <summary>Default status.</summary>
     Unknown,
 }
@@ -90,7 +97,9 @@ public partial class Resource
         Fileinfo = fileInfo;
     }
 
-    public FileInfo Fileinfo { get;
+    public FileInfo Fileinfo
+    {
+        get;
         set
         {
             field = value;
@@ -149,6 +158,7 @@ public partial class Resource
         {
             fileName = fileName[..^9]; // chop ".disabled"
         }
+
         return fileName;
     }
 
@@ -221,10 +231,12 @@ public partial class Resource
                 {
                     return 1;
                 }
+
                 if (!Enabled && other.Enabled)
                 {
                     return -1;
                 }
+
                 break;
             case SortType.Name:
             {
@@ -242,10 +254,12 @@ public partial class Resource
                 {
                     return 1;
                 }
+
                 if (DateTimeChanged < other.DateTimeChanged)
                 {
                     return -1;
                 }
+
                 break;
             case SortType.Filename:
                 return string.Compare(Fileinfo.Name, other.Fileinfo.Name, StringComparison.CurrentCulture);
@@ -257,6 +271,7 @@ public partial class Resource
                     {
                         return -1;
                     }
+
                     if (other.Type == ResourceType.Folder)
                     {
                         return 1;
@@ -267,10 +282,12 @@ public partial class Resource
                 {
                     return 1;
                 }
+
                 if (SizeInfo < other.SizeInfo)
                 {
                     return -1;
                 }
+
                 break;
             }
             case SortType.Provider:
@@ -280,6 +297,7 @@ public partial class Resource
                 {
                     return compareResult;
                 }
+
                 break;
             }
         }
@@ -297,10 +315,12 @@ public partial class Resource
         {
             return true;
         }
+
         if (filter.IsMatch(Fileinfo.Name))
         {
             return true;
         }
+
         return false;
     }
 
@@ -337,6 +357,7 @@ public partial class Resource
             {
                 return false;
             }
+
             path = path[..^9];
         }
         else
@@ -353,7 +374,7 @@ public partial class Resource
             File.Move(Fileinfo.FullName, path);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                 or NotSupportedException)
+                                      or NotSupportedException)
         {
             return false;
         }
@@ -417,7 +438,7 @@ public partial class Resource
             return finalTarget is null ? Path.GetFullPath(path) : finalTarget.FullName;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                 or NotSupportedException)
+                                      or NotSupportedException)
         {
             return path;
         }
@@ -432,6 +453,7 @@ public partial class Resource
             var str = count != 1 ? "items" : "item";
             return ($"{count.ToString(CultureInfo.InvariantCulture)} {str}", count);
         }
+
         var size = File.Exists(file.FullName) ? file.Length : 0;
         return (HumanReadableFileSize(size, useSi: true), size);
     }

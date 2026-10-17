@@ -44,9 +44,7 @@ internal sealed class PeripheralStubServer : IDisposable
         {
             _listener.Close();
         }
-        catch (ObjectDisposedException)
-        {
-        }
+        catch (ObjectDisposedException) { }
     }
 
     private async Task ListenLoop()
@@ -62,6 +60,7 @@ internal sealed class PeripheralStubServer : IDisposable
             {
                 break;
             }
+
             try
             {
                 Handle(context);
@@ -150,6 +149,7 @@ internal static class MultipartAssertions
             {
                 break;
             }
+
             // headers until an empty line
             var payloadStart = lineEnd + 2;
             var headerLines = new List<string>();
@@ -163,14 +163,17 @@ internal static class MultipartAssertions
                 {
                     break;
                 }
+
                 headerLines.Add(line);
             }
+
             var nextBoundary = IndexOf(body, delimiter, payloadStart);
             Assert.True(nextBoundary >= 0, "missing closing boundary");
             var payload = body[payloadStart..(nextBoundary - 2)]; // strip the trailing CRLF
             parts.Add((headerLines.ToArray(), payload));
             index = nextBoundary;
         }
+
         return parts;
     }
 
@@ -187,11 +190,13 @@ internal static class MultipartAssertions
                     break;
                 }
             }
+
             if (match)
             {
                 return i;
             }
         }
+
         return -1;
     }
 }

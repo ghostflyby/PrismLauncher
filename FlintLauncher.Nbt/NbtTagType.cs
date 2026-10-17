@@ -40,6 +40,7 @@ public static class NbtTagTypes
         {
             return allowEnd;
         }
+
         return type >= (int)NbtTagType.Byte && type <= (int)NbtTagType.LongArray;
     }
 }

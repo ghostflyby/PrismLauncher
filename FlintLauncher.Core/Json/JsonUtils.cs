@@ -24,9 +24,7 @@ using FlintLauncher.Core.IO;
 namespace FlintLauncher.Core.Json;
 
 /// <summary>Port of Json::JsonException (aliased JSONValidationError upstream).</summary>
-public sealed class JsonParseException(string message) : Exception(message)
-{
-}
+public sealed class JsonParseException(string message) : Exception(message) { }
 
 public static class JsonUtils
 {
@@ -39,7 +37,7 @@ public static class JsonUtils
         try
         {
             return JsonNode.Parse(Encoding.UTF8.GetString(FileSystem.Read(filename)))
-                ?? throw new JsonParseException(what + ": Error parsing JSON: document is null");
+                   ?? throw new JsonParseException(what + ": Error parsing JSON: document is null");
         }
         catch (JsonException e)
         {
@@ -54,7 +52,7 @@ public static class JsonUtils
         try
         {
             return JsonNode.Parse(json)
-                ?? throw new JsonParseException(what + ": Error parsing JSON: document is null");
+                   ?? throw new JsonParseException(what + ": Error parsing JSON: document is null");
         }
         catch (JsonException e)
         {
@@ -73,6 +71,7 @@ public static class JsonUtils
         {
             return null;
         }
+
         try
         {
             var node = JsonNode.Parse(json[..end]);
@@ -80,10 +79,12 @@ public static class JsonUtils
             {
                 return null;
             }
+
             if (end < json.Length)
             {
                 garbage = json[end..];
             }
+
             return node;
         }
         catch (JsonException)
@@ -102,6 +103,7 @@ public static class JsonUtils
         {
             return -1;
         }
+
         var depth = 0;
         var inString = false;
         var escaped = false;
@@ -127,8 +129,10 @@ public static class JsonUtils
                         return i + 1;
                     }
                 }
+
                 continue;
             }
+
             switch (c)
             {
                 case '"':
@@ -147,6 +151,7 @@ public static class JsonUtils
                     {
                         return i + 1;
                     }
+
                     break;
                 default:
                     if (depth == 0 && started && (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == ',' ||
@@ -154,13 +159,16 @@ public static class JsonUtils
                     {
                         return i;
                     }
+
                     if (!char.IsWhiteSpace(c))
                     {
                         started = true;
                     }
+
                     break;
             }
         }
+
         return started && depth == 0 && !inString ? n : -1;
     }
 
@@ -193,6 +201,7 @@ public static class JsonUtils
             {
                 array.Add((JsonNode?)JsonValue.Create(value)); // non-generic Add: AOT/trimming clean
             }
+
             to[key] = array;
         }
     }
@@ -233,6 +242,7 @@ public static class JsonUtils
         {
             throw new JsonParseException(what + " is not an integer");
         }
+
         return (int)doubl;
     }
 
@@ -341,6 +351,7 @@ public static class JsonUtils
         {
             throw new JsonParseException(localWhat + "s parent does not contain " + localWhat);
         }
+
         return node;
     }
 
@@ -361,15 +372,18 @@ public static class JsonUtils
         {
             return null;
         }
+
         if (value.TryGetValue<bool>(out var b))
         {
             return b;
         }
+
         if (value.TryGetValue<JsonElement>(out var el) &&
             el.ValueKind is JsonValueKind.True or JsonValueKind.False)
         {
             return el.GetBoolean();
         }
+
         return null;
     }
 
@@ -383,6 +397,7 @@ public static class JsonUtils
         {
             return null;
         }
+
         return double.TryParse(
             value.ToJsonString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var number)
             ? number
@@ -404,10 +419,12 @@ public static class JsonUtils
         {
             return [];
         }
+
         if (root is not JsonArray array)
         {
             return [];
         }
+
         var outList = new List<string>();
         foreach (var val in array)
         {
@@ -415,8 +432,10 @@ public static class JsonUtils
             {
                 return [];
             }
+
             outList.Add(str);
         }
+
         return outList;
     }
 
@@ -428,6 +447,7 @@ public static class JsonUtils
         {
             array.Add((JsonNode?)JsonValue.Create(str)); // non-generic Add: AOT/trimming clean
         }
+
         return JsonNodeToCompactString(array);
     }
 
@@ -449,10 +469,12 @@ public static class JsonUtils
         {
             return map;
         }
+
         if (root is not JsonObject obj)
         {
             return map;
         }
+
         foreach (var (key, node) in obj)
         {
             map[key] = node switch
@@ -464,6 +486,7 @@ public static class JsonUtils
                 _ => node.ToJsonString(),
             };
         }
+
         return map;
     }
 
@@ -475,6 +498,7 @@ public static class JsonUtils
         {
             obj[key] = JsonValue.Create(value);
         }
+
         return JsonNodeToCompactString(obj);
     }
 
@@ -485,6 +509,7 @@ public static class JsonUtils
         {
             node.WriteTo(writer);
         }
+
         return Encoding.UTF8.GetString(stream.ToArray());
     }
 }

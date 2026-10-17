@@ -33,6 +33,7 @@ public static class LauncherJars
             potentialPaths.Add(FileSystem.PathCombine(root, "share",
                 FlintConfig.Default.LauncherName));
         }
+
         potentialPaths.Add(FileSystem.PathCombine(root, "jars"));
         potentialPaths.Add(FileSystem.PathCombine(AppContext.BaseDirectory, "jars"));
         potentialPaths.Add(FileSystem.PathCombine(AppContext.BaseDirectory, "..", "jars")); // from inside build dir, for debugging
@@ -52,6 +53,7 @@ public static class LauncherJars
             var extracted = EmbeddedJars.EnsureExtracted(jarFile, installRoot);
             return File.Exists(extracted) ? extracted : "";
         }
+
         return "";
     }
 
@@ -63,6 +65,7 @@ public static class LauncherJars
         {
             return "";
         }
+
         var suffix = OperatingSystem.IsWindows() ? ".exe" : "";
         var hasExtension = name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) && suffix.Length != 0;
         foreach (var dir in pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
@@ -72,11 +75,13 @@ public static class LauncherJars
             {
                 candidate += suffix;
             }
+
             if (IsExecutableFile(candidate))
             {
                 return Path.GetFullPath(candidate);
             }
         }
+
         return "";
     }
 
@@ -88,14 +93,17 @@ public static class LauncherJars
         {
             return "";
         }
+
         if (!path.Contains('/'))
         {
             path = FindExecutable(path);
         }
+
         if (path.Length == 0)
         {
             return "";
         }
+
         var fullPath = Path.GetFullPath(path);
         return IsExecutableFile(fullPath) ? fullPath : "";
     }
@@ -107,10 +115,12 @@ public static class LauncherJars
         {
             return false;
         }
+
         if (OperatingSystem.IsWindows())
         {
             return true; // QFileInfo::isExecutable on Windows checks the extension; File.Exists is enough here
         }
+
         try
         {
             var mode = fileInfo.UnixFileMode;

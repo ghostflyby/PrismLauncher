@@ -31,9 +31,7 @@ public class StoreCompletenessTests : IDisposable
         {
             Directory.Delete(_home, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private FlintPaths Paths() => FlintPaths.FromRoots(
@@ -57,10 +55,10 @@ public class StoreCompletenessTests : IDisposable
     {
         Directory.CreateDirectory(Path.Combine(metaDir, "net.minecraft"));
         File.WriteAllText(Path.Combine(metaDir, "net.minecraft", version + ".json"), $$"""
-            {"formatVersion":1,"uid":"net.minecraft","version":"{{version}}",
-             "releaseTime":"2024-12-03T10:15:07+00:00","type":"release",
-             "libraries":{{librariesJson}}}
-            """);
+                                                                                       {"formatVersion":1,"uid":"net.minecraft","version":"{{version}}",
+                                                                                        "releaseTime":"2024-12-03T10:15:07+00:00","type":"release",
+                                                                                        "libraries":{{librariesJson}}}
+                                                                                       """);
     }
 
     private static string WriteFile(string path, string content)
@@ -83,9 +81,9 @@ public class StoreCompletenessTests : IDisposable
         // brigadier: file on the store root AND a live ledger entry → counted
         WriteFile(Path.Combine(paths.LibrariesRoot, brigadier), "jar!");
         using var cache = CacheWithLedger($$"""
-            {"version":"1","entries":[
-              {"base":"libraries","path":"{{brigadier}}","md5sum":"","etag":"","last_changed_timestamp":0,"eternal":true}]}
-            """);
+                                            {"version":"1","entries":[
+                                              {"base":"libraries","path":"{{brigadier}}","md5sum":"","etag":"","last_changed_timestamp":0,"eternal":true}]}
+                                            """);
         // dfu: neither file nor entry → missing
 
         var report = StoreCompleteness.LibrariesStatus(paths, cache, "1.21.4", Context());
@@ -236,9 +234,7 @@ public class StoreStatusApiTests
             {
                 Directory.Delete(home, recursive: true);
             }
-            catch (DirectoryNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
         }
     }
 }

@@ -58,6 +58,7 @@ public sealed class LauncherPartLaunch : LaunchStep
             closeAfterLaunchTriggered = true;
             Services.Ui.CloseAfterLaunch?.Invoke();
         }
+
         EmitLogLines(lines, level);
     }
 
@@ -130,6 +131,7 @@ public sealed class LauncherPartLaunch : LaunchStep
                 EmitFailed(reason);
                 return Task.CompletedTask;
             }
+
             EmitLogLine("Wrapper command is:\n" + wrapperCommandStr + "\n\n", MessageLevel.Launcher);
             args.Insert(0, javaPath);
             _process.Start(wrapperCommand, wrapperArgs.Concat(args).ToList());
@@ -186,6 +188,7 @@ public sealed class LauncherPartLaunch : LaunchStep
                     CompleteExit();
                     return;
                 }
+
                 // FIXME: make this work again
                 //  m_postlaunchprocess.processEnvironment().insert("INST_EXITCODE", QString(exitCode));
                 //  run post-exit
@@ -248,6 +251,7 @@ public sealed class LauncherPartLaunch : LaunchStep
                 _process.Kill();
             }
         }
+
         return true;
     }
 }

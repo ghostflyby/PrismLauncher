@@ -34,6 +34,7 @@ public static class QtJson
         {
             SortObjectKeys(node).WriteTo(writer);
         }
+
         return Encoding.UTF8.GetString(stream.ToArray());
     }
 
@@ -49,6 +50,7 @@ public static class QtJson
                 {
                     sorted[property.Key] = property.Value is null ? null : SortObjectKeys(property.Value);
                 }
+
                 return sorted;
             }
             case JsonArray array:
@@ -58,6 +60,7 @@ public static class QtJson
                 {
                     sorted.Add(item is null ? null : SortObjectKeys(item));
                 }
+
                 return sorted;
             }
             default:

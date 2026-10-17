@@ -98,8 +98,10 @@ internal sealed class WaveApiHost : IAsyncDisposable
                 Assert.Equal("succeeded", state);
                 return task;
             }
+
             await Task.Delay(50);
         }
+
         throw new Exception($"task {taskId} never finished, last: {task.GetRawText()}");
     }
 
@@ -119,9 +121,7 @@ internal sealed class WaveApiHost : IAsyncDisposable
             {
                 Directory.Delete(HomeDir, recursive: true);
             }
-            catch (DirectoryNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
         }
     }
 }
@@ -194,13 +194,12 @@ public class InstanceQueryApiTests : IAsyncDisposable
         {
             await host.DisposeAsync();
         }
+
         try
         {
             Directory.Delete(_dataDir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     [Fact]
@@ -293,13 +292,12 @@ public class InstanceCopyApiTests : IAsyncDisposable
         {
             await host.DisposeAsync();
         }
+
         try
         {
             Directory.Delete(_dataDir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     [Fact]
@@ -322,8 +320,11 @@ public class InstanceCopyApiTests : IAsyncDisposable
 
         // copy without saves/mods, resetting playtime, into its own group
         var copy = await host.PostAsync($"/api/v1/instances/{Uri.EscapeDataString(srcId)}/copy",
-            new { name = "Copy Tgt", group = "Copies", copySaves = false, copyMods = false,
-                  keepPlaytime = false });
+            new
+            {
+                name = "Copy Tgt", group = "Copies", copySaves = false, copyMods = false,
+                keepPlaytime = false
+            });
         Assert.Equal(HttpStatusCode.Accepted, copy.StatusCode);
         var taskId = JsonDocument.Parse(await copy.Content.ReadAsStringAsync())
             .RootElement.GetProperty("taskId").GetString()!;
@@ -365,13 +366,12 @@ public class WorldApiTests : IAsyncDisposable
         {
             await host.DisposeAsync();
         }
+
         try
         {
             Directory.Delete(_dataDir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private async Task<WaveApiHost> StartHostWithInstance()
@@ -484,13 +484,12 @@ public class ServerApiTests : IAsyncDisposable
         {
             await host.DisposeAsync();
         }
+
         try
         {
             Directory.Delete(_dataDir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private async Task<WaveApiHost> StartHostWithInstance()
@@ -614,6 +613,7 @@ public class ServerApiTests : IAsyncDisposable
             stream.WriteByte((byte)((value & 0x7F) | 0x80));
             value >>= 7;
         }
+
         stream.WriteByte((byte)value);
     }
 
@@ -654,6 +654,7 @@ public class ServerApiTests : IAsyncDisposable
                 {
                     return;
                 }
+
                 _ = Task.Run(async () =>
                 {
                     using (client)
@@ -669,9 +670,8 @@ public class ServerApiTests : IAsyncDisposable
                                 received = await stream.ReadAsync(buffer);
                             } while (received > 0 && stream.DataAvailable);
                         }
-                        catch (IOException)
-                        {
-                        }
+                        catch (IOException) { }
+
                         ReceivedHandshake = true;
                         await stream.WriteAsync(Reply);
                         await stream.FlushAsync();
@@ -686,14 +686,13 @@ public class ServerApiTests : IAsyncDisposable
             {
                 return;
             }
+
             disposed = true;
             try
             {
                 _listener.Stop();
             }
-            catch (ObjectDisposedException)
-            {
-            }
+            catch (ObjectDisposedException) { }
         }
     }
 }
@@ -710,13 +709,12 @@ public class ResourceApiTests : IAsyncDisposable
         {
             await host.DisposeAsync();
         }
+
         try
         {
             Directory.Delete(_dataDir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private async Task<WaveApiHost> StartHostWithInstance()
@@ -811,13 +809,12 @@ public class ScreenshotApiTests : IAsyncDisposable
         {
             await host.DisposeAsync();
         }
+
         try
         {
             Directory.Delete(_dataDir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private async Task<WaveApiHost> StartHostWithScreenshots()
@@ -935,13 +932,12 @@ public class GameOptionsApiTests : IAsyncDisposable
         {
             await host.DisposeAsync();
         }
+
         try
         {
             Directory.Delete(_dataDir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     [Fact]
@@ -951,8 +947,14 @@ public class GameOptionsApiTests : IAsyncDisposable
         host = await WaveApiHost.StartAsync(_dataDir);
 
         var put = await host.PutAsync("/api/v1/instances/opts-inst/gameoptions",
-            new { options = new[] { new { key = "difficulty", value = "hard" },
-                                    new { key = "renderDistance", value = "12" } } });
+            new
+            {
+                options = new[]
+                {
+                    new { key = "difficulty", value = "hard" },
+                    new { key = "renderDistance", value = "12" }
+                }
+            });
         Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
 
         // the file itself is the options.txt of the game root

@@ -24,9 +24,7 @@ public class IconFilesTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private static void WriteFile(string path, string content = "fake png bytes")

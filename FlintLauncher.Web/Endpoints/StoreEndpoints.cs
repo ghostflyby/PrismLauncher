@@ -36,6 +36,7 @@ public static class StoreEndpoints
                 return ApiJson.Error("invalid_version_manifest",
                     $"the version manifest for '{versionRef}' is not parseable: {e.Message}", 422);
             }
+
             return report is null
                 ? ApiJson.NotFound("version_not_found",
                     $"no meta version manifest for 'net.minecraft/{versionRef}' — the version must be loaded first")

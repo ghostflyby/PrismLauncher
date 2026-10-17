@@ -42,10 +42,10 @@ public class ExportToModListTests
     public void Html_AllFlags()
     {
         var expected = "<html><body><ul>\n\t" +
-            "<li><a href=\"https://modrinth.com/mod/jei\">jei</a> [11.6.0.1016] by mezz " +
-            "(jei-1.20.1-forge-11.6.0.1016.jar)</li>\n\t" +
-            "<li>JEI &lt;addons&gt; &amp; &quot;stuff&quot; [1.2.3] by author one, author two (addons.jar)</li>" +
-            "\n</ul></body></html>";
+                       "<li><a href=\"https://modrinth.com/mod/jei\">jei</a> [11.6.0.1016] by mezz " +
+                       "(jei-1.20.1-forge-11.6.0.1016.jar)</li>\n\t" +
+                       "<li>JEI &lt;addons&gt; &amp; &quot;stuff&quot; [1.2.3] by author one, author two (addons.jar)</li>" +
+                       "\n</ul></body></html>";
 
         Assert.Equal(expected, ExportToModList.ToHtml(Mods, All));
     }
@@ -54,7 +54,7 @@ public class ExportToModListTests
     public void Html_NoFlags_JustEscapedNames()
     {
         var expected = "<html><body><ul>\n\t<li>jei</li>\n\t" +
-            "<li>JEI &lt;addons&gt; &amp; &quot;stuff&quot;</li>\n</ul></body></html>";
+                       "<li>JEI &lt;addons&gt; &amp; &quot;stuff&quot;</li>\n</ul></body></html>";
 
         Assert.Equal(expected, ExportToModList.ToHtml(Mods, OptionalData.None));
     }
@@ -65,8 +65,8 @@ public class ExportToModListTests
     public void Markdown_AllFlags_EscapesSpecials()
     {
         var expected = "- [jei](https://modrinth.com/mod/jei) [11\\.6\\.0\\.1016] by mezz " +
-            "(jei\\-1\\.20\\.1\\-forge\\-11\\.6\\.0\\.1016\\.jar)\n" +
-            "- JEI \\<addons\\> & \"stuff\" [1\\.2\\.3] by author one, author two (addons\\.jar)";
+                       "(jei\\-1\\.20\\.1\\-forge\\-11\\.6\\.0\\.1016\\.jar)\n" +
+                       "- JEI \\<addons\\> & \"stuff\" [1\\.2\\.3] by author one, author two (addons\\.jar)";
 
         Assert.Equal(expected, ExportToModList.ToMarkdown(Mods, All));
     }
@@ -77,8 +77,8 @@ public class ExportToModListTests
     public void PlainTxt_AllFlags_NoEscaping()
     {
         var expected = "jei (https://modrinth.com/mod/jei) [11.6.0.1016] by mezz " +
-            "(jei-1.20.1-forge-11.6.0.1016.jar)\n" +
-            "JEI <addons> & \"stuff\" [1.2.3] by author one, author two (addons.jar)";
+                       "(jei-1.20.1-forge-11.6.0.1016.jar)\n" +
+                       "JEI <addons> & \"stuff\" [1.2.3] by author one, author two (addons.jar)";
 
         Assert.Equal(expected, ExportToModList.ToPlainTxt(Mods, All));
     }
@@ -145,7 +145,7 @@ public class ExportToModListTests
     public void Csv_AllFlags_QuotesMultiAuthor()
     {
         var expected = "jei,https://modrinth.com/mod/jei,11.6.0.1016,mezz,jei-1.20.1-forge-11.6.0.1016.jar\n" +
-            "JEI <addons> & \"stuff\",,1.2.3,\"author one,author two\",addons.jar";
+                       "JEI <addons> & \"stuff\",,1.2.3,\"author one,author two\",addons.jar";
 
         Assert.Equal(expected, ExportToModList.ToCsv(Mods, All));
     }
@@ -167,8 +167,8 @@ public class ExportToModListTests
     public void CustomTemplate_ReplacesAllPlaceholders()
     {
         var expected = "jei v11.6.0.1016 by mezz [238222] https://modrinth.com/mod/jei " +
-            "jei-1.20.1-forge-11.6.0.1016.jar\n" +
-            "JEI <addons> & \"stuff\" v1.2.3 by author one, author two [abc]  addons.jar";
+                       "jei-1.20.1-forge-11.6.0.1016.jar\n" +
+                       "JEI <addons> & \"stuff\" v1.2.3 by author one, author two [abc]  addons.jar";
 
         Assert.Equal(expected, ExportToModList.ExportModsToString(Mods,
             "{name} v{version} by {authors} [{mod_id}] {url} {filename}"));

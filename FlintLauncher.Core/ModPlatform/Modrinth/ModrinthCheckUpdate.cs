@@ -55,11 +55,11 @@ public sealed class ModrinthCheckUpdate : FlintTask
     private int initialSize;
 
     public ModrinthCheckUpdate(IReadOnlyList<Resource> resources,
-                               IReadOnlyList<McVersion> mcVersions,
-                               IReadOnlyList<ModLoaderType> loadersList,
-                               Func<Resource, MetadataHandler.ModStruct?> metadataLookup,
-                               IReadOnlyList<IndexedVersionType>? releaseTypes = null,
-                               ModrinthApi? modrinth = null)
+        IReadOnlyList<McVersion> mcVersions,
+        IReadOnlyList<ModLoaderType> loadersList,
+        Func<Resource, MetadataHandler.ModStruct?> metadataLookup,
+        IReadOnlyList<IndexedVersionType>? releaseTypes = null,
+        ModrinthApi? modrinth = null)
     {
         _modrinth = modrinth ?? new ModrinthApi();
         _resources = resources;
@@ -69,17 +69,20 @@ public sealed class ModrinthCheckUpdate : FlintTask
         _releaseTypes = releaseTypes ?? [];
 
         if (_loadersList.Count != 0)
-        { // this is for mods so append all the other posible loaders to the initial list
+        {
+            // this is for mods so append all the other posible loaders to the initial list
             initialSize = _loadersList.Count;
             ModLoaderType modLoaders = ModLoaderType.None;
             foreach (var m in resources)
             {
                 modLoaders |= _metadataLookup(m)?.Loaders ?? ModLoaderType.None;
             }
+
             foreach (var l in _loadersList)
             {
                 modLoaders &= ~l;
             }
+
             _loadersList.AddRange(ModIndex.ModLoaderTypesToList(modLoaders));
         }
     }
@@ -100,6 +103,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
                 EmitFailed($"Resource {resource.Name} has no metadata to check against.");
                 return;
             }
+
             var hash = metadata.Hash;
 
             if (metadata.HashFormat != _hashType)
@@ -111,8 +115,10 @@ public sealed class ModrinthCheckUpdate : FlintTask
                     EmitFailed("Failed to generate hash");
                     return;
                 }
+
                 hash = hashTask.GetResult();
             }
+
             _mappings[hash] = resource;
         }
 
@@ -151,6 +157,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
             await CheckNextLoader(cancellationToken);
             return;
         }
+
         await CheckVersionsResponse(request.BodyAsString, loader, cancellationToken);
     }
 
@@ -183,6 +190,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
                     // stays in the mappings for the next loader pass
                     continue;
                 }
+
                 processed.Add(hash);
 
                 // Sometimes a version may have multiple files, one with "forge" and one with "fabric",
@@ -251,13 +259,17 @@ public sealed class ModrinthCheckUpdate : FlintTask
             EmitSucceeded();
             return;
         }
+
         if (loaderIdx < _loadersList.Count)
-        { // this are mods so check with loaders
+        {
+            // this are mods so check with loaders
             await GetUpdateModsForLoader(_loadersList[loaderIdx], loaderIdx > initialSize, cancellationToken);
             return;
         }
+
         if (_loadersList.Count == 0 && loaderIdx == 0)
-        { // this are other resources no need to check more than once with empty loader
+        {
+            // this are other resources no need to check more than once with empty loader
             await GetUpdateModsForLoader(null, forceModLoaderCheck: false, cancellationToken);
             return;
         }

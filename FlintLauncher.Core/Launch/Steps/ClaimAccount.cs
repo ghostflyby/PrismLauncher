@@ -44,9 +44,7 @@ public sealed class ClaimAccount : LaunchStep
             _usable = usable;
         }
 
-        public void Dispose()
-        {
-        }
+        public void Dispose() { }
     }
 
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
@@ -55,6 +53,7 @@ public sealed class ClaimAccount : LaunchStep
         {
             @lock = new UseLock(Account);
         }
+
         EmitSucceeded();
         return Task.CompletedTask;
     }

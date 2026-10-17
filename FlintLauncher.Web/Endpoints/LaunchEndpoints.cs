@@ -17,8 +17,8 @@ public static class LaunchEndpoints
     {
         api.WithTags("Launch");
         api.MapPost("/instances/{ref}/launch", async (string @ref, LaunchRequest request,
-                                                     LauncherRuntime runtime,
-                                                     FlintTaskRegistry registry) =>
+            LauncherRuntime runtime,
+            FlintTaskRegistry registry) =>
         {
             var mode = (request.Mode ?? "normal").ToLowerInvariant() switch
             {
@@ -40,16 +40,19 @@ public static class LaunchEndpoints
                 return ApiJson.Error("invalid_request",
                     "'server' and 'world' are mutually exclusive join targets", 400);
             }
+
             if (request.Server is not null)
             {
                 if (string.IsNullOrWhiteSpace(request.Server.Address))
                 {
                     return ApiJson.Error("invalid_request", "'server.address' is required", 400);
                 }
+
                 if (request.Server.Port is { } port && port is < 0 or > 65535)
                 {
                     return ApiJson.Error("invalid_request", "'server.port' must be 0-65535", 400);
                 }
+
                 // MinecraftTarget.Parse(fullAddress): "host:port" parsing with the 25565 default
                 targetToJoin = MinecraftTarget.Parse(
                     request.Server.Port is { } p ? $"{request.Server.Address}:{p}" : request.Server.Address,
@@ -69,11 +72,13 @@ public static class LaunchEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
                 }
+
                 if (inst is not MinecraftInstance instance)
                 {
                     return ApiJson.Conflict("not_launchable",
                         $"instance '{@ref}' is of type '{inst.InstanceType()}' and cannot be launched");
                 }
+
                 // core CanLaunch: refuses broken versions and already-running instances —
                 // this also guards against two concurrent API launches of the same instance
                 // (creating a LaunchTask marks the instance running).
@@ -93,6 +98,7 @@ public static class LaunchEndpoints
                     {
                         return ApiJson.Error("unknown_account", $"no account with profile id '{profileId}'", 400);
                     }
+
                     account = runtime.Accounts.At(index);
                 }
 

@@ -151,18 +151,18 @@ public sealed class LaunchFixture : IDisposable
 
     /// <summary>The default profile fixture: main class, minecraft arguments, a trait and assets.</summary>
     public const string DefaultPatchJson = """
-        {
-            "formatVersion": 1,
-            "name": "Minecraft",
-            "uid": "net.minecraft",
-            "version": "1.20.1",
-            "mainClass": "net.minecraft.client.main.Main",
-            "type": "release",
-            "assets": "5",
-            "minecraftArguments": "--username ${auth_player_name} --version ${version_name} --gameDir ${game_directory} --assetsDir ${assets_root} --assetIndex ${assets_index_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --userType ${user_type} --userProperties ${user_properties}",
-            "+traits": ["FirstThreadOnMacOS"]
-        }
-        """;
+                                           {
+                                               "formatVersion": 1,
+                                               "name": "Minecraft",
+                                               "uid": "net.minecraft",
+                                               "version": "1.20.1",
+                                               "mainClass": "net.minecraft.client.main.Main",
+                                               "type": "release",
+                                               "assets": "5",
+                                               "minecraftArguments": "--username ${auth_player_name} --version ${version_name} --gameDir ${game_directory} --assetsDir ${assets_root} --assetIndex ${assets_index_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --userType ${user_type} --userProperties ${user_properties}",
+                                               "+traits": ["FirstThreadOnMacOS"]
+                                           }
+                                           """;
 
     /// <summary>
     /// LaunchServices for this fixture's data dir (headless: null logger unless the test
@@ -200,6 +200,7 @@ public sealed class LaunchFixture : IDisposable
                 }
                 """);
         }
+
         // the typed instance layer (D4): the adapter over the fixture root folds the
         // fixture's user-layer store (Global) with the instance's own instance.json
         var instance = new MinecraftInstance(
@@ -247,8 +248,6 @@ public sealed class LaunchFixture : IDisposable
         {
             Directory.Delete(Root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 }

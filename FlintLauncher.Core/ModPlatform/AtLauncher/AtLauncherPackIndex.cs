@@ -51,6 +51,7 @@ public static partial class AtLauncherPackIndex
             LoadIndexedVersion(version, AtLauncherJson.Object(versionRaw));
             m.Versions.Add(version);
         }
+
         m.System = JsonUtils.EnsureBoolean(obj["system"]);
         m.Description = JsonUtils.EnsureString(obj["description"]);
 

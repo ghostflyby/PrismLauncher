@@ -26,6 +26,7 @@ public static class CapeChange
             request = new NetRequest(new Uri(url), RequestOptions.NoOptions, HttpMethodValue.Put,
                 Encoding.UTF8.GetBytes(body));
         }
+
         request.AddHeader("Authorization", $"Bearer {token}");
         return request;
     }

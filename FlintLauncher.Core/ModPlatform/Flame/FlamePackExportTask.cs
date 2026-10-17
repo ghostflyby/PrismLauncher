@@ -99,6 +99,7 @@ public sealed class FlamePackExportTask : FlintTask
         {
             return;
         }
+
         await CollectHashes(cancellationToken);
         await MakeApiRequest(cancellationToken);
     }
@@ -114,6 +115,7 @@ public sealed class FlamePackExportTask : FlintTask
             EmitFailed("Could not search for files");
             return false;
         }
+
         return true;
     }
 
@@ -164,6 +166,7 @@ public sealed class FlamePackExportTask : FlintTask
                 {
                     continue;
                 }
+
                 var metadata = modList.GetMetadata(mod);
                 if (metadata is not null && metadata.Provider == ResourceProvider.Flame)
                 {
@@ -218,6 +221,7 @@ public sealed class FlamePackExportTask : FlintTask
         {
             ParseApiResponse(response.BodyAsString);
         }
+
         _pendingHashes.Clear();
         await GetProjectsInfo(cancellationToken);
     }
@@ -246,6 +250,7 @@ public sealed class FlamePackExportTask : FlintTask
                     // "No matches found for fingerprint search!"
                     return;
                 }
+
                 foreach (var matchObj in dataArr)
                 {
                     if (matchObj is not JsonObject)
@@ -253,6 +258,7 @@ public sealed class FlamePackExportTask : FlintTask
                         // "Fingerprint match is empty!"
                         return;
                     }
+
                     var fileObj = FlameJson.Ptr(matchObj, "file");
                     if (fileObj is not JsonObject)
                     {
@@ -270,7 +276,7 @@ public sealed class FlamePackExportTask : FlintTask
 
                     EmitStatus($"Parsing API response from CurseForge for '{mod.Name}'...");
                     var isAvailable = fileObj["isAvailable"] is JsonValue { } available
-                        && available.TryGetValue<bool>(out var flag) && flag;
+                                      && available.TryGetValue<bool>(out var flag) && flag;
                     if (isAvailable)
                     {
                         _resolvedFiles[mod.Path] = new ResolvedFile
@@ -283,9 +289,7 @@ public sealed class FlamePackExportTask : FlintTask
                     }
                 }
             }
-            catch (JsonParseException)
-            {
-            }
+            catch (JsonParseException) { }
         }
     }
 
@@ -351,7 +355,6 @@ public sealed class FlamePackExportTask : FlintTask
 
                 foreach (var entryObj in entries)
                 {
-
                     try
                     {
                         EmitStatus($"Parsing API response from CurseForge for '{FlameJson.RequireString(entryObj, "name")}'...");
@@ -376,14 +379,10 @@ public sealed class FlamePackExportTask : FlintTask
                             }
                         }
                     }
-                    catch (JsonParseException)
-                    {
-                    }
+                    catch (JsonParseException) { }
                 }
             }
-            catch (JsonParseException)
-            {
-            }
+            catch (JsonParseException) { }
         }
         await BuildZipAsync(cancellationToken);
     }
@@ -412,6 +411,7 @@ public sealed class FlamePackExportTask : FlintTask
                 {
                     continue;
                 }
+
                 if (File.Exists(file))
                 {
                     zip.CreateEntryFromFile(file, "overrides/" + relative, CompressionLevel.Optimal);
@@ -431,7 +431,7 @@ public sealed class FlamePackExportTask : FlintTask
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                 or NotSupportedException)
+                                      or NotSupportedException)
         {
             EmitFailed("Could not write the export zip: " + e.Message);
             return;
@@ -485,12 +485,15 @@ public sealed class FlamePackExportTask : FlintTask
             {
                 id += "1.20.1-";
             }
+
             id += neoforge.Version;
         }
+
         if (minecraft is not null)
         {
             version["version"] = minecraft.Version;
         }
+
         var modLoaders = new JsonArray();
         if (id.Length != 0)
         {
@@ -501,6 +504,7 @@ public sealed class FlamePackExportTask : FlintTask
             };
             modLoaders.Add((JsonNode?)loader);
         }
+
         version["modLoaders"] = modLoaders;
 
         if (_options.RecommendedRam > 0)
@@ -521,6 +525,7 @@ public sealed class FlamePackExportTask : FlintTask
             };
             files.Add((JsonNode?)file);
         }
+
         obj["files"] = files;
 
         return obj.ToJsonString();
@@ -543,6 +548,7 @@ public sealed class FlamePackExportTask : FlintTask
                     .Replace("{authors}", authors);
             }
         }
+
         content = "<ul>" + content + "</ul>";
         return content;
     }

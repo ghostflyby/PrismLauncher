@@ -4,6 +4,7 @@
 // emitted (e.g. ConcurrentTask::subTaskFinished copies the entry out of its map before changing
 // the state). The upstream struct in this repository has no operator+, Weight or DoneTreatment
 // members, so none were invented here.
+
 namespace FlintLauncher.Core.Tasks;
 
 public enum TaskStepState
@@ -18,9 +19,7 @@ public enum TaskStepState
 public struct TaskStepProgress
 {
     public TaskStepProgress()
-        : this(Guid.NewGuid())
-    {
-    }
+        : this(Guid.NewGuid()) { }
 
     public TaskStepProgress(Guid uid)
     {

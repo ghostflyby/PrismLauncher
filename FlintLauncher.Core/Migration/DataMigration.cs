@@ -39,6 +39,7 @@ public static class Filters
                     return true;
                 }
             }
+
             return false;
         };
 
@@ -102,6 +103,7 @@ public sealed class DataMigrationTask : FlintTask
             {
                 shortenedName = relative[..20] + "…" + relative[^29..];
             }
+
             SetProgress(copied, toCopy);
             EmitStatus($"Copying {shortenedName}…");
             if (!CopyFile(relative))
@@ -140,6 +142,7 @@ public sealed class DataMigrationTask : FlintTask
         {
             return false;
         }
+
         foreach (var file in FileTransfer.EnumerateFilesDeep(_sourcePath))
         {
             var relative = Path.GetRelativePath(_sourcePath, file).Replace('\\', '/');
@@ -148,6 +151,7 @@ public sealed class DataMigrationTask : FlintTask
                 matched.Add(relative);
             }
         }
+
         return true;
     }
 
@@ -158,6 +162,7 @@ public sealed class DataMigrationTask : FlintTask
         {
             return false;
         }
+
         var srcPath = FileSystem.PathCombine(_sourcePath, relative);
         try
         {
@@ -165,7 +170,7 @@ public sealed class DataMigrationTask : FlintTask
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                 or NotSupportedException)
+                                      or NotSupportedException)
         {
             return false;
         }
@@ -226,10 +231,13 @@ public static class DataMigration
     {
         /// <summary>No legacy config at the old location (no migration needed).</summary>
         NoOldConfig = 0,
+
         /// <summary>The "name_nomigrate.txt" marker exists — declined or already migrated.</summary>
         MarkerPresent = 1,
+
         /// <summary>The current data directory already has its own launcher config.</summary>
         CurrentDataExists = 2,
+
         /// <summary>Set (alone) when a migration would run.</summary>
         ReadyToMigrate = 4,
     }
@@ -262,7 +270,7 @@ public static class DataMigration
         }
 
         var currentExists = File.Exists(currentConfigFile ??
-            FileSystem.PathCombine(currentData, launcherConfigFile));
+                                        FileSystem.PathCombine(currentData, launcherConfigFile));
         return currentExists ? MigrationDecision.CurrentDataExists : MigrationDecision.ReadyToMigrate;
     }
 
@@ -287,6 +295,7 @@ public static class DataMigration
         {
             return false;
         }
+
         if (decisions is not null)
         {
             // both steps are best-effort (the same filter PrismImportTask.RecordImportDecision
@@ -304,10 +313,9 @@ public static class DataMigration
                 File.Delete(legacyMarker);
             }
             catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException
-                                     or NotSupportedException or SecurityException)
-            {
-            }
+                                          or NotSupportedException or SecurityException) { }
         }
+
         return true;
     }
 
@@ -325,6 +333,7 @@ public static class DataMigration
         {
             return exact;
         }
+
         if (Directory.Exists(currentData))
         {
             foreach (var file in Directory.EnumerateFiles(currentData, "*_nomigrate.txt"))
@@ -336,6 +345,7 @@ public static class DataMigration
                 }
             }
         }
+
         return null;
     }
 }

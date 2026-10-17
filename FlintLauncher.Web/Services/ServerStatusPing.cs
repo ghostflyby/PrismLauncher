@@ -86,12 +86,14 @@ public static class ServerStatusPing
             {
                 host = srv.Target;
             }
+
             var addresses = await Dns.GetHostAddressesAsync(host, cancellationToken).ConfigureAwait(false);
             if (addresses.Length == 0)
             {
                 // "No A entries found for domain" (McResolver::pingWithDomainA)
                 throw new InvalidOperationException($"no A records for '{host}'");
             }
+
             return addresses[0].ToString();
         }
         catch (Exception e) when (e is SocketException or Win32Exception)
@@ -141,6 +143,7 @@ public static class ServerStatusPing
         {
             throw new InvalidOperationException($"invalid packet length {packetLength}");
         }
+
         var packet = await ReadExactlyAsync(stream, packetLength, cancellationToken).ConfigureAwait(false);
 
         // packet: varInt id (0x00) + varInt string length + the JSON string
@@ -150,6 +153,7 @@ public static class ServerStatusPing
         {
             throw new InvalidOperationException($"packet id does not match 0x00 (got 0x{packetId:x})");
         }
+
         var jsonLength = ReadVarInt(packet, ref offset);
         return Encoding.UTF8.GetString(packet, offset, Math.Min(jsonLength, packet.Length - offset));
     }
@@ -167,22 +171,27 @@ public static class ServerStatusPing
         {
             throw new InvalidOperationException("server sent an invalid status reply", e);
         }
+
         int online = 0, max = 0;
         if (root?["players"] is JsonObject players)
         {
             online = players["online"] is JsonValue o &&
                      int.TryParse(o.ToJsonString(), CultureInfo.InvariantCulture, out var onlineNumber)
-                ? onlineNumber : 0;
+                ? onlineNumber
+                : 0;
             max = players["max"] is JsonValue m &&
                   int.TryParse(m.ToJsonString(), CultureInfo.InvariantCulture, out var maxNumber)
-                ? maxNumber : 0;
+                ? maxNumber
+                : 0;
         }
+
         string? version = null;
         if (root?["version"] is JsonObject v && v["name"] is JsonValue vn &&
             vn.TryGetValue<string>(out var versionName))
         {
             version = versionName;
         }
+
         string? motd = null;
         if (root?["description"] is { } d)
         {
@@ -192,6 +201,7 @@ public static class ServerStatusPing
                     ? text
                     : d.ToJsonString();
         }
+
         return new ServerPingResult(ip, port, online, max, version, motd, latencyMs);
     }
 
@@ -205,6 +215,7 @@ public static class ServerStatusPing
             stream.WriteByte((byte)((value & 0x7F) | 0x80));
             value >>= 7;
         }
+
         stream.WriteByte((byte)value);
     }
 
@@ -247,8 +258,10 @@ public static class ServerStatusPing
             {
                 return value;
             }
+
             position += 7;
         }
+
         throw new InvalidOperationException("varint is too big");
     }
 
@@ -272,6 +285,7 @@ public static class ServerStatusPing
             {
                 throw new InvalidOperationException("the server closed the connection");
             }
+
             offset += read;
         }
     }
@@ -287,14 +301,17 @@ public static class ServerStatusPing
             {
                 throw new InvalidOperationException("no more bytes to read");
             }
+
             var current = buffer[offset++];
             value |= (current & 0x7F) << position;
             if ((current & 0x80) == 0)
             {
                 return value;
             }
+
             position += 7;
         }
+
         throw new InvalidOperationException("varint is too big");
     }
 }

@@ -121,6 +121,7 @@ public class LaunchTask : FlintTask
                                        "You may have to fix your mods because the game is still logging to files and" +
                                        " likely wasting harddrive space at an alarming rate!";
         }
+
         return logModel;
     }
 
@@ -156,6 +157,7 @@ public class LaunchTask : FlintTask
             terminalSignal.TrySetResult();
             return;
         }
+
         state = LaunchState.Running;
         OnStepFinishedCore();
         await terminalSignal.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -240,6 +242,7 @@ public class LaunchTask : FlintTask
         {
             _steps[step].FinalizeStep();
         }
+
         if (successful)
         {
             EmitSucceeded();
@@ -248,6 +251,7 @@ public class LaunchTask : FlintTask
         {
             EmitFailed(error);
         }
+
         terminalSignal?.TrySetResult();
     }
 
@@ -264,6 +268,7 @@ public class LaunchTask : FlintTask
             Log.ProceedIgnored(state.ToString());
             return;
         }
+
         Log.ProceedRouted(StepName(currentStep));
         _steps[currentStep].Proceed();
         state = LaunchState.Running;
@@ -310,6 +315,7 @@ public class LaunchTask : FlintTask
                     EmitAborted();
                     terminalSignal?.TrySetResult();
                 }
+
                 return;
             }
             case LaunchState.Running:
@@ -320,10 +326,12 @@ public class LaunchTask : FlintTask
                 {
                     return;
                 }
+
                 if (step.AbortStep())
                 {
                     state = LaunchState.Aborted;
                 }
+
                 return;
             }
             default:
@@ -359,6 +367,7 @@ public class LaunchTask : FlintTask
             {
                 newLevel = level.GuessLevel(line, GetLogModel().PreviousLevel());
             }
+
             line = CensorPrivateInfo(line);
             GetLogModel().Append(newLevel, line);
             return;
@@ -382,6 +391,7 @@ public class LaunchTask : FlintTask
         {
             return false;
         }
+
         LogParser? parser;
         switch (level)
         {
@@ -431,6 +441,7 @@ public class LaunchTask : FlintTask
                 {
                     newLevel = level.GuessLevel(line, model.PreviousLevel());
                 }
+
                 msg = CensorPrivateInfo(msg);
                 model.Append(newLevel, msg);
             }
@@ -476,6 +487,7 @@ public class LaunchTask : FlintTask
         {
             input = input.Replace(key, value, StringComparison.Ordinal);
         }
+
         return input;
     }
 }

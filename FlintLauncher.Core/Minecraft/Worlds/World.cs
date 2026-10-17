@@ -31,9 +31,7 @@ namespace FlintLauncher.Core.Minecraft.Worlds;
 /// <summary>Port of the GameType struct (launcher/minecraft/World.h).</summary>
 public sealed class GameType
 {
-    public GameType()
-    {
-    }
+    public GameType() { }
 
     public GameType(int? original)
     {
@@ -144,6 +142,7 @@ public sealed class World
             {
                 IconFile = Path.GetFullPath(assumedIconPath);
             }
+
             IsValid = File.Exists(Path.Combine(full, "level.dat"));
         }
         else
@@ -159,6 +158,7 @@ public sealed class World
         {
             return;
         }
+
         if (File.Exists(ContainerPath) && Path.GetExtension(ContainerPath) == ".zip")
         {
             ReadFromZip(ContainerPath);
@@ -167,6 +167,7 @@ public sealed class World
         {
             ReadFromFs(ContainerPath);
         }
+
         metadataLoaded = true;
     }
 
@@ -177,6 +178,7 @@ public sealed class World
         {
             return false;
         }
+
         try
         {
             File.Delete(IconFile);
@@ -200,6 +202,7 @@ public sealed class World
         {
             return false; // the C++ refuses to rename zipped worlds
         }
+
         var levelDatPath = Path.Combine(ContainerPath, "level.dat");
         if (!File.Exists(levelDatPath))
         {
@@ -221,10 +224,12 @@ public sealed class World
         {
             return false;
         }
+
         if (!worldData.TryGet("Data", out var val) || val is not NbtCompound dataCompound)
         {
             return false;
         }
+
         dataCompound.Put("LevelName", new NbtString(newName));
 
         try
@@ -272,11 +277,13 @@ public sealed class World
         {
             LoadMetadata();
         }
+
         var finalPath = FileSystem.PathCombine(to, FileSystem.DirNameFromString(Name, to));
         if (!FileSystem.EnsureFolderPathExists(finalPath))
         {
             return false;
         }
+
         bool ok;
         if (File.Exists(ContainerPath) && Path.GetExtension(ContainerPath) == ".zip")
         {
@@ -302,6 +309,7 @@ public sealed class World
                 newWorld.Rename(name);
             }
         }
+
         return ok;
     }
 
@@ -312,16 +320,19 @@ public sealed class World
         {
             return false;
         }
+
         var targetDir = Path.GetDirectoryName(ContainerPath);
         if (targetDir is null)
         {
             return false;
         }
+
         var success = FileSystem.Copy(with.ContainerPath, targetDir);
         if (success)
         {
             FolderName = with.FolderName;
         }
+
         return success;
     }
 
@@ -332,6 +343,7 @@ public sealed class World
         {
             return false;
         }
+
         // FS::trash is not available in the ported core; delete directly instead.
         return FileSystem.DeletePath(ContainerPath);
     }
@@ -361,6 +373,7 @@ public sealed class World
             IsValid = false;
             return;
         }
+
         try
         {
             LevelDatTime = Directory.GetLastWriteTimeUtc(dir);
@@ -369,6 +382,7 @@ public sealed class World
         {
             LevelDatTime = DateTimeOffset.UnixEpoch;
         }
+
         LoadFromLevelDat(bytes);
         if (Seed == 0)
         {
@@ -425,6 +439,7 @@ public sealed class World
             IsValid = false;
             return;
         }
+
         IsValid = true;
 
         var name = ReadString(dataCompound, "LevelName");
@@ -440,6 +455,7 @@ public sealed class World
         {
             randomSeed = ReadLong(worldGen, "seed");
         }
+
         randomSeed ??= ReadLong(dataCompound, "RandomSeed");
         Seed = randomSeed ?? 0;
     }
@@ -470,10 +486,12 @@ public sealed class World
         {
             return 0;
         }
+
         if (!levelData.TryGet("data", out var val) || val is not NbtCompound dataCompound)
         {
             return 0;
         }
+
         return ReadLong(dataCompound, "seed") ?? 0;
     }
 
@@ -498,6 +516,7 @@ public sealed class World
         {
             return null;
         }
+
         try
         {
             return File.ReadAllBytes(fullFilePath);

@@ -63,6 +63,7 @@ public sealed class GameOptions
         {
             Version = version;
         }
+
         return IsLoaded;
     }
 
@@ -103,10 +104,11 @@ public sealed class GameOptions
             content = File.ReadAllText(path);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                 or NotSupportedException or SecurityException)
+                                      or NotSupportedException or SecurityException)
         {
             return false;
         }
+
         version = 0;
         // QFile::readLine() splits on '\n' and chops only that character: split with
         // StringSplitOptions.None so empty lines still flow through (and get skipped by the
@@ -119,6 +121,7 @@ public sealed class GameOptions
             {
                 continue;
             }
+
             var key = line[..separatorIndex];
             var value = line[(separatorIndex + 1)..];
             if (key == "version")
@@ -126,8 +129,10 @@ public sealed class GameOptions
                 version = ParseInt(value);
                 continue;
             }
+
             contents.Add(new GameOptionItem(key, value));
         }
+
         return true;
     }
 
@@ -140,6 +145,7 @@ public sealed class GameOptions
         {
             return result;
         }
+
         return 0;
     }
 
@@ -155,6 +161,7 @@ public sealed class GameOptions
                     var versionLine = $"version:{version.ToString(CultureInfo.InvariantCulture)}\n";
                     @out.Write(Encoding.UTF8.GetBytes(versionLine));
                 }
+
                 foreach (var item in mapping)
                 {
                     @out.Write(Encoding.UTF8.GetBytes(item.Key));
@@ -163,11 +170,12 @@ public sealed class GameOptions
                     @out.Write("\n"u8);
                 }
             }
+
             File.Move(tempPath, path, overwrite: true);
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                 or NotSupportedException or SecurityException)
+                                      or NotSupportedException or SecurityException)
         {
             try
             {
@@ -177,6 +185,7 @@ public sealed class GameOptions
             {
                 // QSaveFile also silently cancels when it cannot clean up.
             }
+
             return false;
         }
     }

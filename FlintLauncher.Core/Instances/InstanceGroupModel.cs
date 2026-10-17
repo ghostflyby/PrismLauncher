@@ -96,6 +96,7 @@ public sealed class InstanceGroupModel
         {
             name = ""; // (upstream normalizes an empty non-null QString to null)
         }
+
         var changed = false;
         if (_memberGroups.TryGetValue(member, out var current))
         {
@@ -117,6 +118,7 @@ public sealed class InstanceGroupModel
             IncreaseGroupCount(name);
             Save();
         }
+
         return changed;
     }
 
@@ -128,6 +130,7 @@ public sealed class InstanceGroupModel
         {
             return false;
         }
+
         DecreaseGroupCount(group);
         Save();
         return true;
@@ -149,10 +152,12 @@ public sealed class InstanceGroupModel
             RenameInMemory(dst, src, out _);
             return [];
         }
+
         if (collapsedMoved)
         {
             PersistCollapsed();
         }
+
         return affected;
     }
 
@@ -174,6 +179,7 @@ public sealed class InstanceGroupModel
                 _memberGroups.Remove(member);
             }
         }
+
         var removed = affected.Count > 0;
 
         if (removed && !Save())
@@ -182,20 +188,25 @@ public sealed class InstanceGroupModel
             {
                 _memberGroups[member] = name;
             }
+
             if (cachedCount > 0)
             {
                 _groupCounts[name] = cachedCount;
             }
+
             if (collapsedRemoved)
             {
                 _collapsed.Add(name);
             }
+
             return [];
         }
+
         if (collapsedRemoved)
         {
             PersistCollapsed();
         }
+
         return affected;
     }
 
@@ -221,6 +232,7 @@ public sealed class InstanceGroupModel
                 affected.Add(member);
             }
         }
+
         return affected;
     }
 
@@ -239,6 +251,7 @@ public sealed class InstanceGroupModel
         {
             _collapsed.Remove(group);
         }
+
         PersistCollapsed();
     }
 
@@ -289,6 +302,7 @@ public sealed class InstanceGroupModel
                     _collapsed.Add(group);
                 }
             }
+
             if (state.Current.Ui.UngroupedHidden)
             {
                 // empty string represents ungrouped "group"
@@ -315,6 +329,7 @@ public sealed class InstanceGroupModel
                     break;
                 }
             }
+
             if (!migratingLegacyGroups)
             {
                 return false;
@@ -386,6 +401,7 @@ public sealed class InstanceGroupModel
                     // qWarning: redundant empty group found
                     continue;
                 }
+
                 if (groupProp.Value.ValueKind != JsonValueKind.Object)
                 {
                     // qWarning: group 'X' in the group list should be an object
@@ -432,6 +448,7 @@ public sealed class InstanceGroupModel
             {
                 ungroupedHidden = ungroupedHiddenValue.ValueKind == JsonValueKind.True;
             }
+
             if (ungroupedHidden)
             {
                 fileCarriedHidden = true;
@@ -441,6 +458,7 @@ public sealed class InstanceGroupModel
                     stateSeededHidden = true;
                 }
             }
+
             loaded = true;
         }
 
@@ -465,6 +483,7 @@ public sealed class InstanceGroupModel
         {
             Save();
         }
+
         return true;
     }
 
@@ -485,10 +504,12 @@ public sealed class InstanceGroupModel
                 changed = true;
             }
         }
+
         if (changed)
         {
             Save();
         }
+
         return changed;
     }
 
@@ -521,11 +542,13 @@ public sealed class InstanceGroupModel
             {
                 continue;
             }
+
             if (!reverseGroupMap.TryGetValue(group, out var set))
             {
                 set = new SortedSet<string>(StringComparer.Ordinal);
                 reverseGroupMap[group] = set;
             }
+
             set.Add(member);
         }
 
@@ -543,9 +566,11 @@ public sealed class InstanceGroupModel
             {
                 instanceArr.Add((JsonNode)JsonValue.Create(item)); // non-generic Add: AOT/trimming clean
             }
+
             groupObj["instances"] = instanceArr;
             groupsArr[name] = groupObj;
         }
+
         toplevel["groups"] = groupsArr;
         try
         {
@@ -554,7 +579,7 @@ public sealed class InstanceGroupModel
             return true;
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
-                                  or NotSupportedException)
+                                      or NotSupportedException)
         {
             // qCritical: failed to write instance group file — reported to the G4 ordering
             return false;
@@ -573,6 +598,7 @@ public sealed class InstanceGroupModel
             {
                 return;
             }
+
             if (topLevel["groups"] is JsonObject groups)
             {
                 foreach (var group in groups)
@@ -580,6 +606,7 @@ public sealed class InstanceGroupModel
                     (group.Value as JsonObject)?.Remove("hidden");
                 }
             }
+
             if (topLevel["ungrouped"] is JsonObject ungrouped)
             {
                 ungrouped.Remove("hidden");
@@ -588,11 +615,12 @@ public sealed class InstanceGroupModel
                     topLevel.Remove("ungrouped");
                 }
             }
+
             FileSystem.Write(groupFileName,
                 Encoding.UTF8.GetBytes(QtJson.ToIndentedString(topLevel) + "\n"));
         }
         catch (Exception e) when (e is JsonException or FileSystemException or IOException
-                                  or UnauthorizedAccessException or NotSupportedException)
+                                      or UnauthorizedAccessException or NotSupportedException)
         {
             // best-effort — see the summary
         }
@@ -605,6 +633,7 @@ public sealed class InstanceGroupModel
         {
             return false;
         }
+
         switch (value.ValueKind)
         {
             case JsonValueKind.Number:
@@ -612,6 +641,7 @@ public sealed class InstanceGroupModel
                 {
                     return false;
                 }
+
                 return true;
             case JsonValueKind.String:
                 return int.TryParse(value.GetString(), out version);
@@ -626,6 +656,7 @@ public sealed class InstanceGroupModel
         {
             return;
         }
+
         _groupCounts.TryGetValue(group, out var count);
         _groupCounts[group] = count + 1;
     }
@@ -636,6 +667,7 @@ public sealed class InstanceGroupModel
         {
             return;
         }
+
         _groupCounts.TryGetValue(group, out var count);
         count--;
         if (count < 1)

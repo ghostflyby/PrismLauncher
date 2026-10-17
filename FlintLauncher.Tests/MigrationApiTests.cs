@@ -94,6 +94,7 @@ public class MigrationApiTests
         {
             Directory.Delete(migrationDir, recursive: true);
         }
+
         await File.WriteAllTextAsync(migrationDir, "a file blocks the migration records directory");
         var source = MakePrismSource(TempRoot());
 
@@ -119,6 +120,7 @@ public class MigrationApiTests
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             Assert.Equal("invalid_source", ErrorCode(response));
         }
+
         Assert.False(File.Exists(PrismRecordPath(host)));
     }
 
@@ -189,8 +191,7 @@ public class MigrationApiTests
         await WaitUntilAsync(async () =>
         {
             var instances = await GetJsonAsync(host, "/api/v1/instances");
-            return instances.EnumerateArray().Any(
-                instance => instance.GetProperty("id").GetString() == "one");
+            return instances.EnumerateArray().Any(instance => instance.GetProperty("id").GetString() == "one");
         }, TimeSpan.FromSeconds(15), "the fresh-target import's instance reload");
     }
 
@@ -199,22 +200,22 @@ public class MigrationApiTests
     // Synthetic accounts.json in the upstream v3 layout (AccountListTests carries the full
     // one; this is the minimal offline shape the loader accepts).
     private static string OfflineAccountsJson(string profileName) => $$"""
-        {
-            "accounts": [
-                {
-                    "profile": {
-                        "capes": [],
-                        "id": "cb7ecbf7173e39428f9fb92995eab3d0",
-                        "name": "{{profileName}}",
-                        "skin": { "id": "", "url": "", "variant": "" }
-                    },
-                    "type": "Offline",
-                    "ygg": { "token": "0" }
-                }
-            ],
-            "formatVersion": 3
-        }
-        """;
+                                                                       {
+                                                                           "accounts": [
+                                                                               {
+                                                                                   "profile": {
+                                                                                       "capes": [],
+                                                                                       "id": "cb7ecbf7173e39428f9fb92995eab3d0",
+                                                                                       "name": "{{profileName}}",
+                                                                                       "skin": { "id": "", "url": "", "variant": "" }
+                                                                                   },
+                                                                                   "type": "Offline",
+                                                                                   "ygg": { "token": "0" }
+                                                                               }
+                                                                           ],
+                                                                           "formatVersion": 3
+                                                                       }
+                                                                       """;
 
     private static async Task<JsonElement> GetJsonAsync(FlintApiHost host, string path)
     {
@@ -236,8 +237,10 @@ public class MigrationApiTests
             {
                 return;
             }
+
             await Task.Delay(100);
         }
+
         Assert.True(probe(), $"timed out waiting for {what}");
     }
 
@@ -250,8 +253,10 @@ public class MigrationApiTests
             {
                 return;
             }
+
             await Task.Delay(100);
         }
+
         Assert.True(await probe(), $"timed out waiting for {what}");
     }
 
@@ -338,8 +343,7 @@ public class MigrationApiTests
         await WaitUntilAsync(async () =>
         {
             var accounts = await GetJsonAsync(host, "/api/v1/accounts");
-            return accounts.EnumerateArray().Any(
-                account => account.GetProperty("name").GetString() == "ImportedOne");
+            return accounts.EnumerateArray().Any(account => account.GetProperty("name").GetString() == "ImportedOne");
         }, TimeSpan.FromSeconds(15), "the imported accounts in the same session");
 
         // and the reloaded instance list discovered the imported instance too — this is the
@@ -347,8 +351,7 @@ public class MigrationApiTests
         await WaitUntilAsync(async () =>
         {
             var instances = await GetJsonAsync(host, "/api/v1/instances");
-            return instances.EnumerateArray().Any(
-                instance => instance.GetProperty("id").GetString() == "one");
+            return instances.EnumerateArray().Any(instance => instance.GetProperty("id").GetString() == "one");
         }, TimeSpan.FromSeconds(15), "the imported instance in the same session");
     }
 
@@ -411,8 +414,7 @@ public class MigrationApiTests
         await WaitUntilAsync(async () =>
         {
             var instances = await GetJsonAsync(host, "/api/v1/instances");
-            return instances.EnumerateArray().Any(
-                instance => instance.GetProperty("id").GetString() == "reloadme");
+            return instances.EnumerateArray().Any(instance => instance.GetProperty("id").GetString() == "reloadme");
         }, TimeSpan.FromSeconds(15), "the aborted import's instance reload");
     }
 }

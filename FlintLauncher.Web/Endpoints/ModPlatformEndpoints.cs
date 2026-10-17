@@ -60,15 +60,18 @@ public static class ModPlatformEndpoints
             {
                 return ApiJson.Error("unknown_provider", "provider must be 'modrinth' or 'flame'", 400);
             }
+
             if (!TryParseSearchType(type, out var resourceType, out var typeError))
             {
                 return ApiJson.Error("invalid_type", typeError!, 400);
             }
+
             resourceType = NormalizeSearchType(resourceType, parsedProvider, out var unsupportedReason);
             if (unsupportedReason is not null)
             {
                 return ApiJson.Error("invalid_type", unsupportedReason, 400);
             }
+
             return parsedProvider == ResourceProvider.Flame
                 ? await FlameSearchAsync(resourceType, query, version, loader, index, offset, runtime)
                 : await ModrinthSearchAsync(resourceType, query, version, loader, index, offset, runtime);
@@ -102,11 +105,13 @@ public static class ModPlatformEndpoints
                     {
                         return ApiJson.Error("invalid_type", typeError!, 400);
                     }
+
                     resourceType = NormalizeSearchType(resourceType, parsedProvider, out var unsupported);
                     if (unsupported is not null)
                     {
                         return ApiJson.Error("invalid_type", unsupported, 400);
                     }
+
                     effectiveClassId = FlameApi.GetClassId(resourceType);
                 }
 
@@ -126,6 +131,7 @@ public static class ModPlatformEndpoints
             {
                 return ApiJson.Error("invalid_type", modrinthTypeError!, 400);
             }
+
             var projectType = ModrinthProjectType(modrinthType, out var unsupportedType);
             if (unsupportedType is not null)
             {
@@ -146,56 +152,61 @@ public static class ModPlatformEndpoints
         // --------------------------------------------------- modplatform/{provider}/mods/{projectId}/description
         api.MapGet("/modplatform/{provider}/mods/{projectId}/description",
             async Task<IResult> (string provider, string projectId, LauncherRuntime runtime) =>
-        {
-            if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
             {
-                return ApiJson.Error("unknown_provider", "provider must be 'modrinth' or 'flame'", 400);
-            }
-
-            string body;
-            if (parsedProvider == ResourceProvider.Flame)
-            {
-                if (!int.TryParse(projectId, out var modId))
+                if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
                 {
-                    return ApiJson.Error("invalid_request", "'projectId' must be a CurseForge project id", 400);
+                    return ApiJson.Error("unknown_provider", "provider must be 'modrinth' or 'flame'", 400);
                 }
-                body = await runtime.Flame.GetModDescription(modId);
-            }
-            else
-            {
-                // the Modrinth body endpoint answers with plain text
-                body = await runtime.Modrinth.GetProjectDescription(projectId);
-            }
-            return Results.Ok(new ProviderBodyView(body));
-        }).Produces<ProviderBodyView>();
+
+                string body;
+                if (parsedProvider == ResourceProvider.Flame)
+                {
+                    if (!int.TryParse(projectId, out var modId))
+                    {
+                        return ApiJson.Error("invalid_request", "'projectId' must be a CurseForge project id", 400);
+                    }
+
+                    body = await runtime.Flame.GetModDescription(modId);
+                }
+                else
+                {
+                    // the Modrinth body endpoint answers with plain text
+                    body = await runtime.Modrinth.GetProjectDescription(projectId);
+                }
+
+                return Results.Ok(new ProviderBodyView(body));
+            }).Produces<ProviderBodyView>();
 
         // ------------------------------------------------ modplatform/{provider}/mods/{projectId}/changelog
         api.MapGet("/modplatform/{provider}/mods/{projectId}/changelog",
             async Task<IResult> (string provider, string projectId, string? fileId,
-            LauncherRuntime runtime) =>
-        {
-            if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
+                LauncherRuntime runtime) =>
             {
-                return ApiJson.Error("unknown_provider", "provider must be 'modrinth' or 'flame'", 400);
-            }
-            if (parsedProvider != ResourceProvider.Flame)
-            {
-                // Modrinth has no per-file changelog endpoint (changelogs ride on versions)
-                return ApiJson.Error("invalid_request",
-                    "'changelog' is only supported by CurseForge", 400);
-            }
-            if (string.IsNullOrWhiteSpace(fileId) || !int.TryParse(fileId, out var fileIdNum))
-            {
-                return ApiJson.Error("invalid_request", "'fileId' is required", 400);
-            }
-            if (!int.TryParse(projectId, out var modId))
-            {
-                return ApiJson.Error("invalid_request", "'projectId' must be a CurseForge project id", 400);
-            }
+                if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
+                {
+                    return ApiJson.Error("unknown_provider", "provider must be 'modrinth' or 'flame'", 400);
+                }
 
-            var body = await runtime.Flame.GetModFileChangelog(modId, fileIdNum);
-            return Results.Ok(new ProviderBodyView(body));
-        }).Produces<ProviderBodyView>();
+                if (parsedProvider != ResourceProvider.Flame)
+                {
+                    // Modrinth has no per-file changelog endpoint (changelogs ride on versions)
+                    return ApiJson.Error("invalid_request",
+                        "'changelog' is only supported by CurseForge", 400);
+                }
+
+                if (string.IsNullOrWhiteSpace(fileId) || !int.TryParse(fileId, out var fileIdNum))
+                {
+                    return ApiJson.Error("invalid_request", "'fileId' is required", 400);
+                }
+
+                if (!int.TryParse(projectId, out var modId))
+                {
+                    return ApiJson.Error("invalid_request", "'projectId' must be a CurseForge project id", 400);
+                }
+
+                var body = await runtime.Flame.GetModFileChangelog(modId, fileIdNum);
+                return Results.Ok(new ProviderBodyView(body));
+            }).Produces<ProviderBodyView>();
 
         // ------------------------------------------------ modplatform/{provider}/versions
         api.MapGet("/modplatform/{provider}/versions", async Task<IResult> (
@@ -206,6 +217,7 @@ public static class ModPlatformEndpoints
             {
                 return ApiJson.Error("invalid_request", "'projectId' is required", 400);
             }
+
             if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
             {
                 return ApiJson.Error("unknown_provider", "provider must be 'modrinth' or 'flame'", 400);
@@ -236,6 +248,7 @@ public static class ModPlatformEndpoints
             {
                 runtime.Modrinth.AddApiHeaders(request);
             }
+
             await request.StartAsync();
             if (request.State != TaskState.Succeeded)
             {
@@ -275,6 +288,7 @@ public static class ModPlatformEndpoints
                             {
                                 continue;
                             }
+
                             try
                             {
                                 var version = ModrinthPackIndex.LoadIndexedPackVersion(entryObj);
@@ -354,10 +368,12 @@ public static class ModPlatformEndpoints
                     return ApiJson.Error("unknown_provider",
                         $"provider '{selection.Provider}' must be 'modrinth' or 'flame'", 400);
                 }
+
                 if (string.IsNullOrWhiteSpace(selection.ProjectId))
                 {
                     return ApiJson.Error("invalid_body", "'projectId' is required for every selection", 400);
                 }
+
                 requests.Add(new ModInstallRequest(provider, selection.ProjectId, selection.VersionId ?? ""));
             }
 
@@ -447,6 +463,7 @@ public static class ModPlatformEndpoints
         {
             return true; // default mods, like the C++ mod search pages
         }
+
         resourceType = type.Trim().ToLowerInvariant() switch
         {
             "mods" => ResourceType.Mod,
@@ -463,6 +480,7 @@ public static class ModPlatformEndpoints
             error = $"type '{type}' must be one of mods, resourcepacks, texturepacks, shaderpacks, datapacks, modpacks, worlds";
             return false;
         }
+
         return true;
     }
 
@@ -479,10 +497,12 @@ public static class ModPlatformEndpoints
         {
             return ResourceType.ResourcePack;
         }
+
         if (provider == ResourceProvider.Modrinth && type == ResourceType.World)
         {
             error = "type 'worlds' is not supported by modrinth";
         }
+
         return type;
     }
 
@@ -495,6 +515,7 @@ public static class ModPlatformEndpoints
         {
             type = ResourceType.ResourcePack; // normalized like the search pass
         }
+
         var projectType = type switch
         {
             ResourceType.Mod => "mod",
@@ -508,6 +529,7 @@ public static class ModPlatformEndpoints
         {
             error = $"type '{type}' is not supported by modrinth";
         }
+
         return projectType;
     }
 
@@ -534,6 +556,7 @@ public static class ModPlatformEndpoints
                 {
                     continue;
                 }
+
                 var id = entryObj["id"] is JsonValue idValue &&
                          idValue.ToJsonString() is var idRaw &&
                          idRaw.Length != 0 && idRaw[0] != '"' && // numbers only (GetInt64 upstream)
@@ -543,6 +566,7 @@ public static class ModPlatformEndpoints
                 result.Add(new ProviderCategoryView(id, Str(entryObj, "name"), Str(entryObj, "icon")));
             }
         }
+
         return result;
     }
 
@@ -569,10 +593,12 @@ public static class ModPlatformEndpoints
                 {
                     continue;
                 }
+
                 var name = Str(entryObj, "name");
                 result.Add(new ProviderCategoryView(name, name, Str(entryObj, "icon")));
             }
         }
+
         return result;
     }
 
@@ -636,6 +662,7 @@ public static class ModPlatformEndpoints
                     {
                         continue;
                     }
+
                     // map the hit through the core loader, like the C++ search page does
                     var pack = new IndexedPack();
                     try
@@ -646,6 +673,7 @@ public static class ModPlatformEndpoints
                     {
                         continue;
                     }
+
                     results.Add(new FlameSearchResult(
                         pack.AddonId,
                         pack.Slug,
@@ -655,6 +683,7 @@ public static class ModPlatformEndpoints
                         Downloads(hitObj)));
                 }
             }
+
             return Results.Ok(results.ToArray());
         }
     }
@@ -715,6 +744,7 @@ public static class ModPlatformEndpoints
                     {
                         continue;
                     }
+
                     results.Add(new ModrinthSearchResult(
                         Str(hitObj, "project_id"),
                         Str(hitObj, "slug"),
@@ -729,6 +759,7 @@ public static class ModPlatformEndpoints
                             : 0));
                 }
             }
+
             return Results.Ok(results.ToArray());
         }
     }
@@ -758,6 +789,7 @@ public static class ModPlatformEndpoints
                 }
             }
         }
+
         return methods.FirstOrDefault(m => m.Name == "Popularity",
             new SortingMethod { Index = 2, Name = "Popularity", ReadableName = "Sort by Popularity" });
     }
@@ -776,6 +808,7 @@ public static class ModPlatformEndpoints
                 return number;
             }
         }
+
         return null;
     }
 

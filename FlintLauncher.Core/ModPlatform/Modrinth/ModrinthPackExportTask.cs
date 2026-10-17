@@ -46,13 +46,13 @@ public sealed class ModrinthPackExportTask : FlintTask
     private readonly ModrinthApi _modrinth;
 
     public ModrinthPackExportTask(string name,
-                                  string version,
-                                  string summary,
-                                  bool optionalFiles,
-                                  MinecraftInstance instance,
-                                  string output,
-                                  MmcZip.FilterFunction? filter = null,
-                                  ModrinthApi? modrinth = null)
+        string version,
+        string summary,
+        bool optionalFiles,
+        MinecraftInstance instance,
+        string output,
+        MmcZip.FilterFunction? filter = null,
+        ModrinthApi? modrinth = null)
     {
         _modrinth = modrinth ?? new ModrinthApi();
         _name = name;
@@ -75,6 +75,7 @@ public sealed class ModrinthPackExportTask : FlintTask
         {
             return;
         }
+
         await CollectHashes(cancellationToken);
         await MakeApiRequest(cancellationToken);
     }
@@ -88,6 +89,7 @@ public sealed class ModrinthPackExportTask : FlintTask
             EmitFailed("Could not search for files");
             return false;
         }
+
         return true;
     }
 
@@ -109,6 +111,7 @@ public sealed class ModrinthPackExportTask : FlintTask
             {
                 continue;
             }
+
             if (!FileExtensions.Any(extension =>
                     relative.EndsWith('.' + extension, StringComparison.Ordinal)
                     || relative.EndsWith('.' + extension + ".disabled", StringComparison.Ordinal)))
@@ -126,6 +129,7 @@ public sealed class ModrinthPackExportTask : FlintTask
                 // "Could not open {file} for hashing"
                 continue;
             }
+
             var sha512 = HashUtils.Hash(data, Algorithm.Sha512);
 
             var mod = modList.AllMods().Find(m => string.Equals(m.Fileinfo.FullName, file, StringComparison.Ordinal));
@@ -171,6 +175,7 @@ public sealed class ModrinthPackExportTask : FlintTask
             EmitFailed(request.FailReason);
             return;
         }
+
         ParseApiResponse(request.BodyAsString);
         BuildZip();
     }
@@ -199,6 +204,7 @@ public sealed class ModrinthPackExportTask : FlintTask
             {
                 continue;
             }
+
             foreach (var file in filesArray)
             {
                 var hash = file.GetPropertySafe("hashes").GetPropertySafe("sha512").AsString();
@@ -206,6 +212,7 @@ public sealed class ModrinthPackExportTask : FlintTask
                 {
                     continue;
                 }
+
                 // map the file to the url
                 _resolvedFiles[relative] = new ResolvedFile(
                     Sha1: file.GetPropertySafe("hashes").GetPropertySafe("sha1").AsString() ?? "",
@@ -216,6 +223,7 @@ public sealed class ModrinthPackExportTask : FlintTask
                 break;
             }
         }
+
         _pendingHashes.Clear();
     }
 
@@ -237,6 +245,7 @@ public sealed class ModrinthPackExportTask : FlintTask
                 {
                     continue;
                 }
+
                 if (File.Exists(file))
                 {
                     zip.CreateEntryFromFile(file, "overrides/" + relative, CompressionLevel.Optimal);
@@ -250,7 +259,7 @@ public sealed class ModrinthPackExportTask : FlintTask
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                 or NotSupportedException)
+                                      or NotSupportedException)
         {
             EmitFailed("Could not write the export zip: " + e.Message);
             return;
@@ -289,22 +298,27 @@ public sealed class ModrinthPackExportTask : FlintTask
         {
             dependencies["minecraft"] = minecraft.Version;
         }
+
         if (quilt is not null)
         {
             dependencies["quilt-loader"] = quilt.Version;
         }
+
         if (fabric is not null)
         {
             dependencies["fabric-loader"] = fabric.Version;
         }
+
         if (forge is not null)
         {
             dependencies["forge"] = forge.Version;
         }
+
         if (neoForge is not null)
         {
             dependencies["neoforge"] = neoForge.Version;
         }
+
         outObj["dependencies"] = dependencies;
 
         var filesOut = new JsonArray();
@@ -352,6 +366,7 @@ public sealed class ModrinthPackExportTask : FlintTask
             fileOut["fileSize"] = value.Size;
             filesOut.Add((JsonNode?)fileOut);
         }
+
         outObj["files"] = filesOut;
 
         return outObj.ToJsonString();

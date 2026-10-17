@@ -62,6 +62,7 @@ public sealed class AutoInstallJava : LaunchStep
             EmitSucceeded();
             return;
         }
+
         var packProfile = _instance.GetPackProfile();
         if (!(config.Current.Java.AutomaticJavaDownload ?? false))
         {
@@ -82,15 +83,18 @@ public sealed class AutoInstallJava : LaunchStep
                         {
                             EmitLogLine("The automatic Java mechanism detected a 32-bit installation of Java.", MessageLevel.Launcher);
                         }
+
                         SetJavaPath(java.Path);
                         return;
                     }
                 }
             }
+
             EmitLogLine("No compatible Java version was found. Using the default one.", MessageLevel.Warning);
             EmitSucceeded();
             return;
         }
+
         if (_supportedArch.Length == 0)
         {
             EmitLogLine($"Your system ({SysInfo.CurrentSystem()}-{SysInfo.UseQtForArch()}) is not compatible with automatic Java installation. Using the default Java path.",
@@ -98,6 +102,7 @@ public sealed class AutoInstallJava : LaunchStep
             EmitSucceeded();
             return;
         }
+
         var wantedJavaName = packProfile.GetProfile()?.GetCompatibleJavaName() ?? "";
         if (wantedJavaName.Length == 0)
         {
@@ -106,6 +111,7 @@ public sealed class AutoInstallJava : LaunchStep
             EmitSucceeded();
             return;
         }
+
         var javaDir = Services.JavaRoot;
         var relativeBinary = FileSystem.PathCombine(wantedJavaName, "bin", JavaUtils.JavaExecutable);
         var wantedJavaPath = FileSystem.PathCombine(javaDir, relativeBinary);
@@ -124,6 +130,7 @@ public sealed class AutoInstallJava : LaunchStep
             EmitFailed(currentTask.FailReason);
             return;
         }
+
         await TryNextMajorJava(cancellationToken).ConfigureAwait(false);
     }
 
@@ -192,12 +199,12 @@ public sealed class AutoInstallJava : LaunchStep
                                 FileSystem.DeletePath(finalPath);
                             }
                         }
-                        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-                        {
-                        }
+                        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+
                         EmitFailed("Could not determine Java download type!");
                         return;
                 }
+
                 if (OperatingSystem.IsMacOS())
                 {
                     var seq = new SequentialTask("Install Java");
@@ -205,6 +212,7 @@ public sealed class AutoInstallJava : LaunchStep
                     seq.AddTask(new SymlinkTask(finalPath));
                     currentTask = seq;
                 }
+
                 await currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
                 if (currentTask.WasSuccessful)
                 {
@@ -215,9 +223,11 @@ public sealed class AutoInstallJava : LaunchStep
                     // the C++ retries with the next major version on failure
                     await TryNextMajorJava(cancellationToken).ConfigureAwait(false);
                 }
+
                 return;
             }
         }
+
         await TryNextMajorJava(cancellationToken).ConfigureAwait(false);
     }
 
@@ -227,6 +237,7 @@ public sealed class AutoInstallJava : LaunchStep
         {
             return;
         }
+
         var packProfile = _instance.GetPackProfile();
         var wantedJavaName = packProfile.GetProfile()?.GetCompatibleJavaName() ?? "";
         var majorJavaVersions = MajorJavaVersions();
@@ -238,6 +249,7 @@ public sealed class AutoInstallJava : LaunchStep
             EmitSucceeded();
             return;
         }
+
         var majorJavaVersion = majorJavaVersions[majorJavaVersionIndex];
         majorJavaVersionIndex++;
 
@@ -273,6 +285,7 @@ public sealed class AutoInstallJava : LaunchStep
             EmitAborted();
             return true;
         }
+
         return base.AbortStep();
     }
 }

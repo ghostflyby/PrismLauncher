@@ -26,9 +26,7 @@ public class PackProfileTests : IDisposable
         {
             Directory.Delete(_root, true);
         }
-        catch (IOException)
-        {
-        }
+        catch (IOException) { }
     }
 
     private string WriteFile(string relativePath, string content)
@@ -52,6 +50,7 @@ public class PackProfileTests : IDisposable
         {
             obj["mainClass"] = mainClass;
         }
+
         return obj.ToJsonString();
     }
 
@@ -137,29 +136,29 @@ public class PackProfileTests : IDisposable
         Assert.False(profile.SaveIsScheduled());
 
         var expected = """
-            {
-                "components": [
-                    {
-                        "important": true,
-                        "uid": "net.minecraft",
-                        "version": "1.20.1"
-                    },
-                    {
-                        "cachedName": "Fabric Loader",
-                        "cachedRequires": [
-                            {
-                                "equals": "1.20.1",
-                                "uid": "net.minecraft"
-                            }
-                        ],
-                        "cachedVersion": "0.14.21",
-                        "uid": "net.fabricmc.fabric-loader",
-                        "version": "0.14.21"
-                    }
-                ],
-                "formatVersion": 1
-            }
-            """ + "\n"; // QJsonDocument::toJson() ends with a newline
+                       {
+                           "components": [
+                               {
+                                   "important": true,
+                                   "uid": "net.minecraft",
+                                   "version": "1.20.1"
+                               },
+                               {
+                                   "cachedName": "Fabric Loader",
+                                   "cachedRequires": [
+                                       {
+                                           "equals": "1.20.1",
+                                           "uid": "net.minecraft"
+                                       }
+                                   ],
+                                   "cachedVersion": "0.14.21",
+                                   "uid": "net.fabricmc.fabric-loader",
+                                   "version": "0.14.21"
+                               }
+                           ],
+                           "formatVersion": 1
+                       }
+                       """ + "\n"; // QJsonDocument::toJson() ends with a newline
         Assert.Equal(expected, File.ReadAllText(Path.Combine(_root, "mmc-pack.json")));
 
         // and the written file loads back identically

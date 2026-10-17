@@ -152,6 +152,7 @@ public class LaunchController : FlintTask
         {
             return;
         }
+
         var instanceAccountId = Variant.AsString(Instance!.Settings.Get("InstanceAccountId"));
         var instanceAccountIndex = accounts.FindAccountByProfileId(instanceAccountId);
         if (instanceAccountIndex == -1 || instanceAccountId.Length == 0)
@@ -224,6 +225,7 @@ public class LaunchController : FlintTask
             {
                 await refresh.StartAsync(cancellationToken).ConfigureAwait(false);
             }
+
             state = accountToCheck.AccountState;
         }
 
@@ -238,6 +240,7 @@ public class LaunchController : FlintTask
                 {
                     return LaunchDecision.Abort;
                 }
+
                 state = accountToCheck.AccountState;
             }
         }
@@ -280,6 +283,7 @@ public class LaunchController : FlintTask
         {
             return AskPlayDemoHandler();
         }
+
         return false;
     }
 
@@ -310,6 +314,7 @@ public class LaunchController : FlintTask
                         message = "You are not connected to the Internet, launching in offline mode.\n\n";
                     }
                 }
+
                 message += "Choose your offline mode player name";
                 break;
             default:
@@ -361,6 +366,7 @@ public class LaunchController : FlintTask
             EmitAborted();
             return;
         }
+
         if (decision == LaunchDecision.Abort)
         {
             EmitAborted();
@@ -399,6 +405,7 @@ public class LaunchController : FlintTask
                 EmitAborted();
                 return;
             }
+
             session.MakeOffline(name);
             LaunchInstance();
             return;
@@ -428,6 +435,7 @@ public class LaunchController : FlintTask
                         return;
                     }
                 }
+
                 session.MakeOffline(name);
             }
         }
@@ -446,6 +454,7 @@ public class LaunchController : FlintTask
             EmitFailed("Couldn't instantiate a launcher.");
             return;
         }
+
         Log.LaunchStarted(
             Instance.Id(),
             actualLaunchMode.ToString(),
@@ -520,10 +529,12 @@ public class LaunchController : FlintTask
             base.Abort();
             return;
         }
+
         if (!launcher.CanAbort())
         {
             return;
         }
+
         if (ConfirmKillHandler is null || ConfirmKillHandler())
         {
             launcher.Abort();

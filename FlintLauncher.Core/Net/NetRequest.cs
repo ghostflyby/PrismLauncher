@@ -138,7 +138,7 @@ public sealed class NetRequest : FlintTask
         // on the network level (connection refused/reset, DNS, the RequestTimeout idle timeout)
         // is retried up to the stack's ManualRetries times before it finally fails. HTTP error
         // statuses are not retried here (the AutoRetry option covers 429/503 like the C++).
-        for (var attempt = 0; ; attempt++)
+        for (var attempt = 0;; attempt++)
         {
             try
             {
@@ -195,6 +195,7 @@ public sealed class NetRequest : FlintTask
                 {
                     message.Headers.TryAddWithoutValidation(name, value);
                 }
+
                 if (_postData is not null)
                 {
                     message.Content = new ByteArrayContent(_postData);
@@ -222,15 +223,18 @@ public sealed class NetRequest : FlintTask
                     {
                         delay = date - DateTimeOffset.Now;
                     }
+
                     if (delay < TimeSpan.Zero)
                     {
                         delay = TimeSpan.Zero;
                     }
+
                     response.Dispose();
                     EmitStatus($"HTTP {statusCode}, retrying in {delay.TotalSeconds} seconds");
                     await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                     continue;
                 }
+
                 break;
             }
 
@@ -245,6 +249,7 @@ public sealed class NetRequest : FlintTask
                 {
                     responseInfo.Headers[header.Key] = string.Join(", ", header.Value);
                 }
+
                 foreach (var header in response.Content.Headers)
                 {
                     responseInfo.Headers[header.Key] = string.Join(", ", header.Value);
@@ -259,6 +264,7 @@ public sealed class NetRequest : FlintTask
                         EmitFailed(effectiveSink.FailReason);
                         return;
                     }
+
                     EmitSucceeded();
                     return;
                 }
@@ -270,13 +276,13 @@ public sealed class NetRequest : FlintTask
                     {
                         body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                     }
-                    catch (IOException)
-                    {
-                    }
+                    catch (IOException) { }
+
                     if (body.Length > 4096)
                     {
                         body = body[..4096];
                     }
+
                     EmitFailed($"HTTP status {statusCode} for {_url}\n{body}");
                     return;
                 }
@@ -296,11 +302,13 @@ public sealed class NetRequest : FlintTask
                         {
                             break;
                         }
+
                         if (effectiveSink is not null && !effectiveSink.Write(buffer[..read]))
                         {
                             EmitFailed(effectiveSink.FailReason);
                             return;
                         }
+
                         receivedBytes += read;
                         // throttle progress emission a bit, like the C++ downloadProgress path
                         if (lastProgressTime.ElapsedMilliseconds > 100 || receivedBytes == totalBytes)
@@ -321,11 +329,13 @@ public sealed class NetRequest : FlintTask
                     EmitFailed(effectiveSink.FailReason);
                     return;
                 }
+
                 // like Net::Download::downloadFinished: re-register the cache entry after success
                 if (MetaCache is not null && CachedEntry is not null)
                 {
                     _ = MetaCache.UpdateEntry(CachedEntry);
                 }
+
                 EmitSucceeded();
             }
         }

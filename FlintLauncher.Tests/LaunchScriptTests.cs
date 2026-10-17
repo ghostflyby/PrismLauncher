@@ -191,8 +191,8 @@ public class LaunchScriptTests
 
         // MinecraftInstance::createCensorFilterFromSession shape
         var filter = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        filter[session.Session] = "<SESSION ID>";       // "-" is filtered upstream; offline session is "-"
-        filter["0"] = "<ACCESS TOKEN>";                  // "0" would be filtered upstream
+        filter[session.Session] = "<SESSION ID>"; // "-" is filtered upstream; offline session is "-"
+        filter["0"] = "<ACCESS TOKEN>";           // "0" would be filtered upstream
         filter[session.Uuid] = "<PROFILE ID>";
         filter["super-secret-token"] = "<ACCESS TOKEN>";
         task.SetCensorFilter(filter);

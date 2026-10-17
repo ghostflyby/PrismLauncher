@@ -50,6 +50,7 @@ public sealed class LibrariesTask : FlintTask
         {
             libArtifactPool.Add(agent.Library);
         }
+
         libArtifactPool.Add(profile.GetMainJar());
         // (upstream ignores the processArtifactPool return value; the port stops before
         // starting a NetJob that would be useless after the task already failed)
@@ -82,6 +83,7 @@ public sealed class LibrariesTask : FlintTask
             EmitFailed($"Game update failed: it was impossible to fetch the required libraries.\nReason:\n{job.FailReason}");
             return;
         }
+
         EmitSucceeded();
     }
 
@@ -99,7 +101,7 @@ public sealed class LibrariesTask : FlintTask
     }
 
     private bool ProcessArtifactPool(IEnumerable<Library?> pool, List<string> errors, string localPath,
-                                     HttpMetaCache metacache, NetJob job)
+        HttpMetaCache metacache, NetJob job)
     {
         foreach (var lib in pool)
         {
@@ -108,12 +110,14 @@ public sealed class LibrariesTask : FlintTask
                 EmitFailed("Null jar is specified in the metadata, aborting.");
                 return false;
             }
+
             var dls = lib.GetDownloads(_inst.RuntimeContext, metacache, errors, localPath);
             foreach (var dl in dls)
             {
                 job.AddNetRequest(dl);
             }
         }
+
         return true;
     }
 }

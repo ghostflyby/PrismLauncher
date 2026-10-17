@@ -10,9 +10,7 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class VerifyJavaInstall : LaunchStep
 {
-    public VerifyJavaInstall(LaunchTask parent) : base(parent)
-    {
-    }
+    public VerifyJavaInstall(LaunchTask parent) : base(parent) { }
 
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -37,6 +35,7 @@ public sealed class VerifyJavaInstall : LaunchStep
             EmitFailed("The instance profile is missing.");
             return Task.CompletedTask;
         }
+
         var compatibleMajors = profile.GetCompatibleJavaMajors();
 
         var javaVersion = new JavaVersion(storedVersion);
@@ -60,6 +59,7 @@ public sealed class VerifyJavaInstall : LaunchStep
         {
             EmitLogLine($"Java version {major}", MessageLevel.Error);
         }
+
         EmitLogLine("Go to instance Java settings to change your Java version or disable the Java compatibility check if you know what " +
                     "you're doing.", MessageLevel.Error);
 

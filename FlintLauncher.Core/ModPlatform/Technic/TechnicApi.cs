@@ -100,6 +100,7 @@ public sealed class TechnicApi
             searchUrl = $"{BaseUrl}search?build={ApiBuild}&q={Uri.EscapeDataString(searchTerm)}";
             mode = TechnicSearchMode.List;
         }
+
         return (searchUrl, mode);
     }
 
@@ -138,6 +139,7 @@ public sealed class TechnicApi
         {
             return newList;
         }
+
         if (root is not JsonObject)
         {
             // the old Json::requireObject(doc) "Document is not an object" path
@@ -156,7 +158,7 @@ public sealed class TechnicApi
                         // the (JsonObject, key, what) element bridges); the downcast keeps the
                         // old hard-cast behavior for a non-object entry
                         JsonNode technicPack = (JsonObject)(technicPackRaw
-                            ?? throw new JsonParseException("modpacks entry is not an object"));
+                                                            ?? throw new JsonParseException("modpacks entry is not an object"));
                         var pack = new TechnicModpack
                         {
                             Name = JsonUtils.RequireString(technicPack, "name", "'name'"),
@@ -178,9 +180,11 @@ public sealed class TechnicApi
                             pack.LogoUrl = rawUrl;
                             pack.LogoName = pack.Slug + "." + UrlFileNameSuffix(rawUrl);
                         }
+
                         pack.Broken = false;
                         newList.Add(pack);
                     }
+
                     break;
                 }
                 case TechnicSearchMode.Single:
@@ -221,6 +225,7 @@ public sealed class TechnicApi
         {
             return [];
         }
+
         return newList;
     }
 
@@ -241,6 +246,7 @@ public sealed class TechnicApi
         {
             return false;
         }
+
         if (obj is not JsonObject)
         {
             // the old Json::requireObject(doc) "Document is not an object" path
@@ -264,6 +270,7 @@ public sealed class TechnicApi
             {
                 return false;
             }
+
             current.Url = solderUrl;
             current.IsSolder = true;
         }
@@ -290,6 +297,7 @@ public sealed class TechnicApi
         {
             return null;
         }
+
         if (obj is not JsonObject)
         {
             // the old Json::requireObject(doc) "Document is not an object" path
@@ -318,12 +326,14 @@ public sealed class TechnicApi
         {
             fileName = fileName[(slash + 1)..];
         }
+
         // strip a query string, if any
         var query = fileName.IndexOf('?');
         if (query >= 0)
         {
             fileName = fileName[..query];
         }
+
         var dot = fileName.LastIndexOf('.');
         return dot >= 0 ? fileName[(dot + 1)..] : "";
     }

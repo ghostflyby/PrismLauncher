@@ -120,9 +120,7 @@ public sealed class PackProfile : IDisposable
     }
 
     public PackProfile(string instanceRoot, Index? metadataIndex = null)
-        : this(new BasicPackProfileEnv(instanceRoot), metadataIndex)
-    {
-    }
+        : this(new BasicPackProfileEnv(instanceRoot), metadataIndex) { }
 
     public void Dispose()
     {
@@ -202,6 +200,7 @@ public sealed class PackProfile : IDisposable
             // "Component list should never save if it didn't successfully load"
             return;
         }
+
         // NOTE deviation: the C++ starts a 5s single-shot QTimer here; saving happens through
         // SaveNow()/Dispose() instead (no event loop at this layer)
         dirty = true;
@@ -215,6 +214,7 @@ public sealed class PackProfile : IDisposable
             dirty = false;
             return true;
         }
+
         return false;
     }
 
@@ -231,6 +231,7 @@ public sealed class PackProfile : IDisposable
         {
             return result;
         }
+
         _components.Clear();
         _componentIndex.Clear();
         foreach (var component in newComponents)
@@ -240,10 +241,12 @@ public sealed class PackProfile : IDisposable
                 // "Ignoring duplicate component entry"
                 continue;
             }
+
             component.DataChanged += OnComponentDataChanged;
             _components.Add(component);
             _componentIndex[component.Uid] = component;
         }
+
         loaded = true;
         return Result.Success();
     }
@@ -280,6 +283,7 @@ public sealed class PackProfile : IDisposable
         {
             return result;
         }
+
         await Resolve(netmode, cancellationToken);
         return Result.Success();
     }
@@ -326,14 +330,17 @@ public sealed class PackProfile : IDisposable
         {
             obj["version"] = component.Version;
         }
+
         if (component.DependencyOnly)
         {
             obj["dependencyOnly"] = true;
         }
+
         if (component.Important)
         {
             obj["important"] = true;
         }
+
         if (component.Disabled)
         {
             obj["disabled"] = true;
@@ -344,16 +351,19 @@ public sealed class PackProfile : IDisposable
         {
             obj["cachedVersion"] = component.CachedVersion;
         }
+
         if (component.CachedName.Length != 0)
         {
             obj["cachedName"] = component.CachedName;
         }
+
         MetaJsonFormat.SerializeRequires(obj, component.CachedRequires, "cachedRequires");
         MetaJsonFormat.SerializeRequires(obj, component.CachedConflicts, "cachedConflicts");
         if (component.CachedVolatile)
         {
             obj["cachedVolatile"] = true;
         }
+
         return obj;
     }
 
@@ -389,6 +399,7 @@ public sealed class PackProfile : IDisposable
         {
             orderArray.Add((JsonNode)ComponentToJsonV1(component));
         }
+
         obj["components"] = orderArray;
         try
         {
@@ -396,21 +407,23 @@ public sealed class PackProfile : IDisposable
             FileSystem.Write(filename, Encoding.UTF8.GetBytes(QtJson.ToIndentedString(obj) + "\n"));
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
-                                  or NotSupportedException)
+                                      or NotSupportedException)
         {
             return false;
         }
+
         return true;
     }
 
     /// <summary>Read the given file into the component container.</summary>
     private static Result LoadPackProfile(PackProfile parent, string filename, string componentJsonPattern,
-                                          List<Component> container)
+        List<Component> container)
     {
         if (!File.Exists(filename))
         {
             return Result.Error($"Components file {filename} doesn't exist. This should never happen.");
         }
+
         string data;
         try
         {
@@ -442,6 +455,7 @@ public sealed class PackProfile : IDisposable
             {
                 throw new JsonParseException($"Invalid component file version, expected {CurrentComponentsFileVersion}");
             }
+
             var orderArray = JsonUtils.RequireArray(obj, "components");
             foreach (var item in orderArray)
             {
@@ -454,6 +468,7 @@ public sealed class PackProfile : IDisposable
             container.Clear();
             return Result.Error($"Couldn't parse {filename} : bad file format");
         }
+
         return Result.Success();
     }
 
@@ -475,10 +490,12 @@ public sealed class PackProfile : IDisposable
         {
             return;
         }
+
         if (_componentIndex.ContainsKey(id))
         {
             return;
         }
+
         // QList::insert() would assert beyond the end upstream; clamp like the release build does
         index = Math.Clamp(index, 0, _components.Count);
         _components.Insert(index, component);
@@ -493,6 +510,7 @@ public sealed class PackProfile : IDisposable
         {
             MinecraftChanged?.Invoke(this);
         }
+
         // (the C++ emits the model row dataChanged here)
         DataChanged?.Invoke(this);
         ScheduleSave();
@@ -529,6 +547,7 @@ public sealed class PackProfile : IDisposable
                 return Remove(i);
             }
         }
+
         return false;
     }
 
@@ -539,10 +558,12 @@ public sealed class PackProfile : IDisposable
         {
             return false;
         }
+
         if (!patch.Customize())
         {
             return false;
         }
+
         InvalidateLaunchProfile();
         ScheduleSave();
         return true;
@@ -555,10 +576,12 @@ public sealed class PackProfile : IDisposable
         {
             return false;
         }
+
         if (!patch.Revert())
         {
             return false;
         }
+
         InvalidateLaunchProfile();
         ScheduleSave();
         return true;
@@ -592,14 +615,17 @@ public sealed class PackProfile : IDisposable
         {
             return;
         }
+
         if (theirIndex >= _components.Count)
         {
             theirIndex = _components.Count - 1;
         }
+
         if (theirIndex == -1)
         {
             theirIndex = _components.Count - 1;
         }
+
         if (index == theirIndex)
         {
             return;
@@ -612,6 +638,7 @@ public sealed class PackProfile : IDisposable
         {
             return;
         }
+
         (_components[index], _components[theirIndex]) = (_components[theirIndex], _components[index]);
         InvalidateLaunchProfile();
         ScheduleSave();
@@ -679,6 +706,7 @@ public sealed class PackProfile : IDisposable
         {
             return false;
         }
+
         var f = new VersionFile();
         f.Name = name;
         f.Uid = uid;
@@ -689,7 +717,7 @@ public sealed class PackProfile : IDisposable
             FileSystem.Write(patchFileName, Encoding.UTF8.GetBytes(QtJson.ToIndentedString(OneSixVersionFormat.VersionFileToJson(f)) + "\n"));
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
-                                  or NotSupportedException)
+                                      or NotSupportedException)
         {
             return false;
         }
@@ -717,6 +745,7 @@ public sealed class PackProfile : IDisposable
             {
                 return;
             }
+
             var jar = new List<string>();
             var temp1 = new List<string>();
             var temp2 = new List<string>();
@@ -736,6 +765,7 @@ public sealed class PackProfile : IDisposable
                 PreRemoveJarMod(jarmod);
             }
         }
+
         return ok;
     }
 
@@ -783,13 +813,14 @@ public sealed class PackProfile : IDisposable
                 FileSystem.Write(patchFileName, Encoding.UTF8.GetBytes(QtJson.ToIndentedString(OneSixVersionFormat.VersionFileToJson(f)) + "\n"));
             }
             catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
-                                      or NotSupportedException)
+                                          or NotSupportedException)
             {
                 return false;
             }
 
             AppendComponent(new Component(this, f.Uid, f));
         }
+
         ScheduleSave();
         InvalidateLaunchProfile();
         return true;
@@ -819,6 +850,7 @@ public sealed class PackProfile : IDisposable
         {
             return false;
         }
+
         if (!FileSystem.Copy(filepath, finalPath))
         {
             return false;
@@ -839,7 +871,7 @@ public sealed class PackProfile : IDisposable
             FileSystem.Write(patchFileName, Encoding.UTF8.GetBytes(QtJson.ToIndentedString(OneSixVersionFormat.VersionFileToJson(f)) + "\n"));
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
-                                  or NotSupportedException)
+                                      or NotSupportedException)
         {
             return false;
         }
@@ -897,7 +929,7 @@ public sealed class PackProfile : IDisposable
                     Encoding.UTF8.GetBytes(QtJson.ToIndentedString(OneSixVersionFormat.VersionFileToJson(versionFile)) + "\n"));
             }
             catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
-                                      or NotSupportedException)
+                                          or NotSupportedException)
             {
                 return false;
             }
@@ -933,6 +965,7 @@ public sealed class PackProfile : IDisposable
                 {
                     file.ApplyTo(profile);
                 }
+
                 this.profile = profile;
             }
             catch (Exception e) when (e is JsonParseException or MetaParseException or FileSystemException)
@@ -940,13 +973,14 @@ public sealed class PackProfile : IDisposable
                 return null;
             }
         }
+
         return profile;
     }
 
     // ---------------------------------------------------------------- versions
 
     public async Task<bool> SetComponentVersion(string uid, string version, bool important = false,
-                                                CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default)
     {
         if (_componentIndex.TryGetValue(uid, out var component))
         {
@@ -966,6 +1000,7 @@ public sealed class PackProfile : IDisposable
 
                 return true;
             }
+
             return false;
         }
 
@@ -1005,6 +1040,7 @@ public sealed class PackProfile : IDisposable
         {
             return null;
         }
+
         return result;
     }
 
@@ -1016,15 +1052,18 @@ public sealed class PackProfile : IDisposable
         {
             return null;
         }
+
         // TODO upstream: remove this or add version condition once Quilt drops official Fabric support
         if ((loaders & ModLoaderType.Quilt) != 0)
         {
             loaders |= ModLoaderType.Fabric;
         }
+
         if (GetComponentVersion("net.minecraft") == "1.20.1" && (loaders & ModLoaderType.NeoForge) != 0)
         {
             loaders |= ModLoaderType.Forge;
         }
+
         return loaders;
     }
 
@@ -1044,11 +1083,13 @@ public sealed class PackProfile : IDisposable
         {
             result.Add(ModLoaderType.Fabric);
         }
+
         if (GetComponentVersion("net.minecraft") == "1.20.1" && result.Contains(ModLoaderType.NeoForge) &&
             !result.Contains(ModLoaderType.Forge))
         {
             result.Add(ModLoaderType.Forge);
         }
+
         return result;
     }
 }

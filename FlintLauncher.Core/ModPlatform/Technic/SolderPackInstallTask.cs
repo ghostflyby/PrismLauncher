@@ -86,6 +86,7 @@ public sealed class SolderPackInstallTask : InstanceTask
                 {
                     dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.MD5, mod.Md5));
                 }
+
                 filesJob.AddNetRequest(dl);
 
                 i++;
@@ -106,9 +107,7 @@ public sealed class SolderPackInstallTask : InstanceTask
             {
                 Directory.Delete(outputDir, recursive: true);
             }
-            catch (DirectoryNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
         }
     }
 
@@ -127,6 +126,7 @@ public sealed class SolderPackInstallTask : InstanceTask
                 EmitFailed("Failed to extract modpack");
                 return;
             }
+
             i++;
         }
 
@@ -142,6 +142,7 @@ public sealed class SolderPackInstallTask : InstanceTask
             EmitFailed(failure);
             return;
         }
+
         EmitSucceeded();
     }
 }

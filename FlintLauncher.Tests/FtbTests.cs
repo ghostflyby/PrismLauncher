@@ -44,9 +44,7 @@ public class FtbTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private InstanceList CreateList()
@@ -61,7 +59,7 @@ public class FtbTests : IDisposable
         using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
         return doc.RootElement.GetProperty("components").EnumerateArray()
             .Select(c => (Uid: c.GetProperty("uid").GetString(),
-                          Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
+                Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
             .ToList();
     }
 
@@ -175,10 +173,10 @@ public class FtbTests : IDisposable
         // toString() -> "") and the optional refreshed truncates a fractional double like
         // Qt's toInt(), while a required int would reject it
         var pack = FtbApi.LoadModpack("""
-            {"id":7,"name":"P","synopsis":"s","description":"d","type":"public",
-             "featured":false,"installs":1,"plays":2,"updated":10,"refreshed":20.7,
-             "art":[],"authors":[],"versions":[],"tags":[]}
-            """);
+                                      {"id":7,"name":"P","synopsis":"s","description":"d","type":"public",
+                                       "featured":false,"installs":1,"plays":2,"updated":10,"refreshed":20.7,
+                                       "art":[],"authors":[],"versions":[],"tags":[]}
+                                      """);
         Assert.Equal(10, pack.Updated);
         Assert.Equal(20, pack.Refreshed); // the optional toInt() truncation
         Assert.Empty(pack.Art);
@@ -191,26 +189,22 @@ public class FtbTests : IDisposable
     public void Manifest_ErrorMessages_KeepTheCppShapes()
     {
         // parse errors keep the "{what}: Error parsing JSON: ..." wrapper
-        var parseError = Assert.Throws<JsonParseException>(
-            () => FtbApi.LoadModpack("not json"));
+        var parseError = Assert.Throws<JsonParseException>(() => FtbApi.LoadModpack("not json"));
         Assert.StartsWith("JSON response from FTB: Error parsing JSON: ", parseError.Message);
 
         // a non-object root document fails like the old Json::requireObject(doc)
-        var kindError = Assert.Throws<JsonParseException>(
-            () => FtbApi.LoadModpack("[1,2]"));
+        var kindError = Assert.Throws<JsonParseException>(() => FtbApi.LoadModpack("[1,2]"));
         Assert.Equal("Document is not an object", kindError.Message);
 
         // a missing required key keeps the "'key's parent does not contain 'key'" message
-        var missing = Assert.Throws<JsonParseException>(
-            () => FtbApi.LoadModpack("""{"id":1}"""));
+        var missing = Assert.Throws<JsonParseException>(() => FtbApi.LoadModpack("""{"id":1}"""));
         Assert.Equal("'name's parent does not contain 'name'", missing.Message);
 
         // a non-integer for a required int keeps the fmod check
-        var notInt = Assert.Throws<JsonParseException>(
-            () => FtbApi.LoadVersion("""
-                {"id":1.5,"parent":0,"name":"n","type":"t",
-                 "installs":0,"plays":0,"updated":0,"specs":{"id":1,"minimum":1,"recommended":1}}
-                """));
+        var notInt = Assert.Throws<JsonParseException>(() => FtbApi.LoadVersion("""
+                                                                                {"id":1.5,"parent":0,"name":"n","type":"t",
+                                                                                 "installs":0,"plays":0,"updated":0,"specs":{"id":1,"minimum":1,"recommended":1}}
+                                                                                """));
         Assert.Equal("'id' is not an integer", notInt.Message);
     }
 

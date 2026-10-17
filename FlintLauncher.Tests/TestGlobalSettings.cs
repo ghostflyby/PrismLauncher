@@ -111,16 +111,13 @@ internal static class TestLauncherState
                         {
                             Directory.Delete(d, recursive: true);
                         }
-                        catch (IOException)
-                        {
-                        }
-                        catch (UnauthorizedAccessException)
-                        {
-                        }
+                        catch (IOException) { }
+                        catch (UnauthorizedAccessException) { }
                     }
                 };
             }
         }
+
         Dirs.Add(dir);
         return new(Path.Combine(dir, "launcher-state.json"),
             FlintJsonContext.Default.LauncherState);

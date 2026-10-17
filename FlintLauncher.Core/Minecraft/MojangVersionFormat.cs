@@ -44,6 +44,7 @@ public static class MojangVersionFormat
         {
             outInfo.Path = JsonUtils.RequireString(Ptr(obj, "path"));
         }
+
         // required!
         outInfo.Sha1 = JsonUtils.RequireString(obj, "sha1", "'sha1'");
         outInfo.Url = JsonUtils.RequireString(obj, "url", "'url'");
@@ -81,6 +82,7 @@ public static class MojangVersionFormat
         {
             outObj["path"] = info.Path;
         }
+
         outObj["sha1"] = info.Sha1;
         outObj["size"] = info.Size;
         outObj["url"] = info.Url;
@@ -95,16 +97,18 @@ public static class MojangVersionFormat
         {
             outInfo.Artifact = DownloadInfoFromJson(JsonUtils.RequireObject(dlObj, "artifact", "'artifact'"));
         }
+
         if (Has(dlObj, "classifiers"))
         {
             var classifiersObj = JsonUtils.RequireObject(dlObj, "classifiers", "'classifiers'");
             foreach (var iter in classifiersObj)
             {
                 var classifierObj = iter.Value as JsonObject
-                    ?? throw new JsonParseException("Value is not an object");
+                                    ?? throw new JsonParseException("Value is not an object");
                 outInfo.Classifiers[iter.Key] = DownloadInfoFromJson(classifierObj);
             }
         }
+
         return outInfo;
     }
 
@@ -115,6 +119,7 @@ public static class MojangVersionFormat
         {
             outObj["artifact"] = DownloadInfoToJson(libinfo.Artifact);
         }
+
         if (libinfo.Classifiers.Count != 0)
         {
             var classifiersOut = new JsonObject();
@@ -122,8 +127,10 @@ public static class MojangVersionFormat
             {
                 classifiersOut[classifier] = DownloadInfoToJson(info);
             }
+
             outObj["classifiers"] = classifiersOut;
         }
+
         return outObj;
     }
 
@@ -134,6 +141,7 @@ public static class MojangVersionFormat
         {
             outObj["path"] = info.Path;
         }
+
         outObj["sha1"] = info.Sha1;
         outObj["size"] = info.Size;
         outObj["url"] = info.Url;
@@ -183,6 +191,7 @@ public static class MojangVersionFormat
                 outInfo.CompatibleJavaMajors.Add(JsonUtils.RequireInteger(compatible));
             }
         }
+
         if (Has(inObj, "compatibleJavaName"))
         {
             outInfo.CompatibleJavaName = JsonUtils.RequireString(Ptr(inObj, "compatibleJavaName"));
@@ -194,7 +203,7 @@ public static class MojangVersionFormat
             foreach (var iter in downloadsObj)
             {
                 var classifierObj = iter.Value as JsonObject
-                    ?? throw new JsonParseException("Value is not an object");
+                                    ?? throw new JsonParseException("Value is not an object");
                 outInfo.MojangDownloads[iter.Key] = DownloadInfoFromJson(classifierObj);
             }
         }
@@ -206,6 +215,7 @@ public static class MojangVersionFormat
         {
             throw new JsonParseException(filename + " is empty or null");
         }
+
         if (root is not JsonObject obj)
         {
             throw new JsonParseException(filename + " is not an object");
@@ -238,6 +248,7 @@ public static class MojangVersionFormat
                 outInfo.Libraries.Add(lib);
             }
         }
+
         return outInfo;
     }
 
@@ -252,19 +263,23 @@ public static class MojangVersionFormat
         {
             JsonUtils.WriteString(outObj, "releaseTime", ParseUtils.TimeToS3Time(inInfo.ReleaseTime.Value));
         }
+
         if (inInfo.UpdateTime is not null)
         {
             JsonUtils.WriteString(outObj, "time", ParseUtils.TimeToS3Time(inInfo.UpdateTime.Value));
         }
+
         if (inInfo.MinimumLauncherVersion != -1)
         {
             outObj["minimumLauncherVersion"] = inInfo.MinimumLauncherVersion;
         }
+
         JsonUtils.WriteString(outObj, "assets", inInfo.Assets);
         if (inInfo.MojangAssetIndex is { } assetIndex && assetIndex.Known)
         {
             outObj["assetIndex"] = AssetIndexToJson(assetIndex);
         }
+
         if (inInfo.MojangDownloads.Count != 0)
         {
             var downloadsOut = new JsonObject();
@@ -272,8 +287,10 @@ public static class MojangVersionFormat
             {
                 downloadsOut[classifier] = DownloadInfoToJson(info);
             }
+
             outObj["downloads"] = downloadsOut;
         }
+
         if (inInfo.CompatibleJavaMajors.Count != 0)
         {
             var compatibleJavaMajorsOut = new JsonArray();
@@ -281,8 +298,10 @@ public static class MojangVersionFormat
             {
                 compatibleJavaMajorsOut.Add((JsonNode)JsonValue.Create(compatibleJavaMajor));
             }
+
             outObj["compatibleJavaMajors"] = compatibleJavaMajorsOut;
         }
+
         if (inInfo.CompatibleJavaName.Length != 0)
         {
             JsonUtils.WriteString(outObj, "compatibleJavaName", inInfo.CompatibleJavaName);
@@ -301,8 +320,10 @@ public static class MojangVersionFormat
             {
                 array.Add((JsonNode)LibraryToJson(value));
             }
+
             root["libraries"] = array;
         }
+
         return root;
     }
 
@@ -315,6 +336,7 @@ public static class MojangVersionFormat
         {
             throw new JsonParseException(filename + "contains a library that doesn't have a 'name' field");
         }
+
         var rawName = Str(libObj, "name");
         outLib.Name = new GradleSpecifier(rawName);
         if (!outLib.Name.IsValid)
@@ -333,6 +355,7 @@ public static class MojangVersionFormat
                 outLib.ExtractExcludes.Add(JsonUtils.RequireString(excludeVal));
             }
         }
+
         if (Has(libObj, "natives"))
         {
             var nativesObj = JsonUtils.RequireObject(Ptr(libObj, "natives"));
@@ -342,10 +365,12 @@ public static class MojangVersionFormat
                 {
                     // qWarning() << filename << "contains an invalid native (skipping)";
                 }
+
                 // FIXME upstream: Skip unknown platforms
                 outLib.NativeClassifiers[it.Key] = JsonUtils.EnsureString(it.Value);
             }
         }
+
         if (Has(libObj, "rules"))
         {
             outLib.ApplyRules = true;
@@ -354,14 +379,16 @@ public static class MojangVersionFormat
             foreach (var rule in rulesArray)
             {
                 var ruleObj = rule as JsonObject
-                    ?? throw new JsonParseException("Value is not an object");
+                              ?? throw new JsonParseException("Value is not an object");
                 outLib.Rules.Add(Rule.FromJson(ruleObj));
             }
         }
+
         if (Has(libObj, "downloads"))
         {
             outLib.MojangDownloads = LibDownloadInfoFromJson(libObj);
         }
+
         return outLib;
     }
 
@@ -375,6 +402,7 @@ public static class MojangVersionFormat
         {
             libRoot["url"] = library.RepositoryUrl;
         }
+
         if (library.IsNative())
         {
             var nativeList = new JsonObject();
@@ -382,6 +410,7 @@ public static class MojangVersionFormat
             {
                 nativeList[os] = classifier;
             }
+
             libRoot["natives"] = nativeList;
             if (library.ExtractExcludes.Count != 0)
             {
@@ -390,12 +419,14 @@ public static class MojangVersionFormat
                 {
                     excludes.Add((JsonNode)JsonValue.Create(exclude));
                 }
+
                 libRoot["extract"] = new JsonObject
                 {
                     ["exclude"] = excludes,
                 };
             }
         }
+
         if (library.Rules.Count != 0)
         {
             var allRules = new JsonArray();
@@ -403,12 +434,15 @@ public static class MojangVersionFormat
             {
                 allRules.Add((JsonNode)rule.ToJson());
             }
+
             libRoot["rules"] = allRules;
         }
+
         if (library.MojangDownloads is not null)
         {
             libRoot["downloads"] = LibDownloadInfoToJson(library.MojangDownloads);
         }
+
         return libRoot;
     }
 }

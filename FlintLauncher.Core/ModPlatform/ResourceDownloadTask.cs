@@ -41,13 +41,13 @@ public class ResourceDownloadTask : SequentialTask
     private (string Name, string Filename) toDelete = ("", "");
 
     public ResourceDownloadTask(IndexedPack pack,
-                                IndexedVersion version,
-                                ResourceFolderModel packs,
-                                bool isIndexed = true,
-                                string downloadReason = "standalone",
-                                string dependentOn = "",
-                                MinecraftInstance? instance = null,
-                                ModrinthApi? modrinth = null)
+        IndexedVersion version,
+        ResourceFolderModel packs,
+        bool isIndexed = true,
+        string downloadReason = "standalone",
+        string dependentOn = "",
+        MinecraftInstance? instance = null,
+        ModrinthApi? modrinth = null)
     {
         _pack = pack;
         _packVersion = version;
@@ -76,6 +76,7 @@ public class ResourceDownloadTask : SequentialTask
                 action.AddValidator(validator);
             }
         }
+
         filesNetJob.AddNetRequest(action);
         filesNetJob.Succeeded += DownloadSucceeded;
         filesNetJob.Failed += DownloadFailed;

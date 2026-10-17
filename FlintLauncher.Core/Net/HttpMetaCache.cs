@@ -68,8 +68,10 @@ public sealed class MetaEntry
 public sealed class HttpMetaCache : IDisposable
 {
     private readonly Lock _lock = new();
+
     private readonly Dictionary<string, Dictionary<string, MetaEntry>> _entries =
         new(StringComparer.Ordinal);
+
     private readonly Dictionary<string, string> _basePaths = new(StringComparer.Ordinal);
     private readonly string? _indexFile;
     private Timer? saveTimer;
@@ -116,6 +118,7 @@ public sealed class HttpMetaCache : IDisposable
             {
                 return null;
             }
+
             return map.GetValueOrDefault(resourcePath);
         }
     }
@@ -177,6 +180,7 @@ public sealed class HttpMetaCache : IDisposable
                 // stat succeeded — a TOCTOU race), so a later resolve can still recover.
                 return StaleEntry(baseId, resourcePath);
             }
+
             if (entry.Md5Sum != md5Sum)
             {
                 Disown(baseId, resourcePath);
@@ -208,14 +212,17 @@ public sealed class HttpMetaCache : IDisposable
         {
             return false;
         }
+
         if (staleEntry.IsStale)
         {
             return false;
         }
+
         lock (_lock)
         {
             _entries[staleEntry.BaseId][staleEntry.RelativePath] = staleEntry;
         }
+
         SaveEventually();
         return true;
     }
@@ -226,6 +233,7 @@ public sealed class HttpMetaCache : IDisposable
         {
             return false;
         }
+
         entry.SetStale(true);
         SaveEventually();
         return true;
@@ -242,6 +250,7 @@ public sealed class HttpMetaCache : IDisposable
                 {
                     entry.SetStale(true);
                 }
+
                 map.Clear();
                 var basePath = _basePaths.GetValueOrDefault(baseId, "");
                 if (basePath.Length > 0 && Directory.Exists(basePath))
@@ -260,6 +269,7 @@ public sealed class HttpMetaCache : IDisposable
                 }
             }
         }
+
         return ret;
     }
 
@@ -292,6 +302,7 @@ public sealed class HttpMetaCache : IDisposable
         {
             return;
         }
+
         JsonNode? root;
         try
         {
@@ -309,18 +320,22 @@ public sealed class HttpMetaCache : IDisposable
             // ledger is rebuilt from scratch instead of failing startup.
             return;
         }
+
         if (root is not JsonObject rootObj)
         {
             return;
         }
+
         if (GetStr(rootObj, "version") != "1")
         {
             return;
         }
+
         if (rootObj["entries"] is not JsonArray array)
         {
             return;
         }
+
         lock (_lock)
         {
             foreach (var elementObj in array)
@@ -329,11 +344,13 @@ public sealed class HttpMetaCache : IDisposable
                 {
                     continue;
                 }
+
                 var baseId = GetStr(entryObj, "base");
                 if (!_basePaths.ContainsKey(baseId))
                 {
                     continue;
                 }
+
                 var entry = new MetaEntry
                 {
                     BaseId = baseId,
@@ -349,6 +366,7 @@ public sealed class HttpMetaCache : IDisposable
                     entry.CurrentAge = (long)GetDouble(entryObj, "current_age");
                     entry.MaxAge = (long)GetDouble(entryObj, "max_age");
                 }
+
                 // presumed innocent until closer examination
                 entry.SetOwner(this);
                 entry.SetStale(false);
@@ -382,6 +400,7 @@ public sealed class HttpMetaCache : IDisposable
         {
             return;
         }
+
         JsonObject entriesRoot;
         lock (_lock)
         {
@@ -399,6 +418,7 @@ public sealed class HttpMetaCache : IDisposable
                     {
                         continue;
                     }
+
                     var entryObj = new JsonObject
                     {
                         ["base"] = entry.BaseId,
@@ -411,6 +431,7 @@ public sealed class HttpMetaCache : IDisposable
                     {
                         entryObj["remote_changed_timestamp"] = entry.RemoteChangedTimestamp;
                     }
+
                     if (entry.IsEternal)
                     {
                         entryObj["eternal"] = true;
@@ -420,9 +441,11 @@ public sealed class HttpMetaCache : IDisposable
                         entryObj["current_age"] = entry.CurrentAge;
                         entryObj["max_age"] = entry.MaxAge;
                     }
+
                     entriesArr.Add((JsonNode)entryObj);
                 }
             }
+
             entriesRoot["entries"] = entriesArr;
         }
 
@@ -433,6 +456,7 @@ public sealed class HttpMetaCache : IDisposable
             {
                 _ = FileSystem.EnsureFolderPathExists(dir);
             }
+
             // Qt's QJsonDocument writes `"` as `\"` and leaves unicode alone; match that so
             // metacache files stay byte-compatible with PrismLauncher's.
             File.WriteAllText(
@@ -443,8 +467,6 @@ public sealed class HttpMetaCache : IDisposable
                     Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                 }));
         }
-        catch (IOException)
-        {
-        }
+        catch (IOException) { }
     }
 }

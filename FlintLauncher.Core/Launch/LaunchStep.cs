@@ -71,17 +71,13 @@ public abstract class LaunchStep : FlintTask
     /// Port of the proceed() slot: called when the UI (or the headless controller) confirms the
     /// launch. Steps that gate on user confirmation override this.
     /// </summary>
-    public virtual void Proceed()
-    {
-    }
+    public virtual void Proceed() { }
 
     /// <summary>
     /// Port of the finalize() slot: called in the opposite order than the start, used to clean
     /// up or otherwise undo things after the launch ends.
     /// </summary>
-    public virtual void FinalizeStep()
-    {
-    }
+    public virtual void FinalizeStep() { }
 
     /// <summary>Port of Task::canAbort() (default: not abortable, like the C++ m_can_abort).</summary>
     public virtual bool CanAbort() => false;

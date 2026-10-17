@@ -2,6 +2,7 @@
 // Port of launcher/tasks/SequentialTask.{h,cpp}. A ConcurrentTask with a single concurrency
 // slot: subtasks run one by one, and the first failure fails the whole task right away so the
 // remaining subtasks never start (the follow-up executeNextSubTask() sees a non-running parent).
+
 namespace FlintLauncher.Core.Tasks;
 
 /// <summary>
@@ -13,9 +14,7 @@ namespace FlintLauncher.Core.Tasks;
 public class SequentialTask : ConcurrentTask
 {
     public SequentialTask(string taskName = "")
-        : base(taskName, 1)
-    {
-    }
+        : base(taskName, 1) { }
 
     protected override void SubTaskFailed(FlintTask task, string msg)
     {

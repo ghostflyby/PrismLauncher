@@ -174,8 +174,10 @@ public static class SettingsAndIconsEndpoints
                         ? runtime.Secrets.Get(key) ?? ""
                         : TypedValue(runtime.Config.Get(key), FlintConfigKeys.Default(key));
                 }
+
                 groups[group] = values;
             }
+
             return Results.Ok(new SettingsGroupsResponse(groups));
         }).Produces<SettingsGroupsResponse>();
 
@@ -186,6 +188,7 @@ public static class SettingsAndIconsEndpoints
                 return ApiJson.Error("invalid_request",
                     $"'group' must be one of: {string.Join(", ", Groups.Keys)}", 400);
             }
+
             var keys = Groups[body.Group];
             foreach (var prop in body.Values.EnumerateObject())
             {
@@ -194,6 +197,7 @@ public static class SettingsAndIconsEndpoints
                     return ApiJson.Error("unknown_setting",
                         $"key '{prop.Name}' is not part of group '{body.Group}'", 400);
                 }
+
                 var value = TypedValue(
                     prop.Value.ValueKind == JsonValueKind.Null ? "" : prop.Value.Clone(),
                     FlintConfigKeys.Default(prop.Name));
@@ -215,6 +219,7 @@ public static class SettingsAndIconsEndpoints
                     runtime.Config.Set(prop.Name, value);
                 }
             }
+
             // proxy / retries / timeout / user-agent take effect immediately (Application
             // re-runs updateProxySettings from the ProxyPage the same way); the apply also
             // re-reads the store-backed secrets and the mod-platform API credentials
@@ -241,6 +246,7 @@ public static class SettingsAndIconsEndpoints
             {
                 return ApiJson.Error("invalid_request", "multipart file field is required", 400);
             }
+
             Directory.CreateDirectory(icons.IconsDir);
             var installed = new List<string>();
             foreach (var file in request.Form.Files)
@@ -250,18 +256,22 @@ public static class SettingsAndIconsEndpoints
                 {
                     return ApiJson.Error("invalid_icon", $"unsupported icon type: {file.FileName}", 400);
                 }
+
                 var temp = Path.Combine(Path.GetTempPath(), $"flint-icon-{Guid.NewGuid():N}{Path.GetExtension(file.FileName)}");
                 await using (var stream = File.Create(temp))
                 {
                     await file.CopyToAsync(stream);
                 }
+
                 var name = Path.GetFileNameWithoutExtension(file.FileName);
                 if (!icons.Install(temp, name))
                 {
                     return ApiJson.Error("invalid_icon", $"could not install {file.FileName}", 400);
                 }
+
                 installed.Add(name);
             }
+
             return Results.Ok(new IconInstalledResponse(installed[0]));
         }).WithMetadata(new FormUploadMarker("multipart form: icon file (png/jpg/svg)")).Produces<IconInstalledResponse>();
 
@@ -277,6 +287,7 @@ public static class SettingsAndIconsEndpoints
             {
                 return ApiJson.NotFound("instance_not_found", $"no launchable instance '{@ref}'");
             }
+
             string key;
             if (request.HasFormContentType && request.Form.Files.Count > 0)
             {
@@ -287,10 +298,12 @@ public static class SettingsAndIconsEndpoints
                 {
                     await file.CopyToAsync(stream);
                 }
+
                 if (!runtime.Icons.Install(temp, instance.Id()))
                 {
                     return ApiJson.Error("invalid_icon", $"could not install {file.FileName}", 400);
                 }
+
                 key = instance.Id();
             }
             else
@@ -302,6 +315,7 @@ public static class SettingsAndIconsEndpoints
                     return ApiJson.Error("invalid_request", "iconKey or multipart file is required", 400);
                 }
             }
+
             instance.SetIconKey(key);
             instance.SaveNow();
             return Results.NoContent();
@@ -331,6 +345,7 @@ public static class SettingsAndIconsEndpoints
         {
             return raw;
         }
+
         return element.ValueKind switch
         {
             JsonValueKind.True => true,

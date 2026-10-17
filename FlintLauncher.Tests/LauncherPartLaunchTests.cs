@@ -35,9 +35,7 @@ public class LauncherPartLaunchTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     /// <summary>
@@ -48,30 +46,31 @@ public class LauncherPartLaunchTests : IDisposable
     {
         var path = Path.Combine(_root, "fake-java");
         File.WriteAllText(path, """
-            #!/bin/sh
-            while IFS= read -r line || [ -n "$line" ]; do
-                printf '%s\n' "$line"
-                if [ "$line" = "launch" ]; then
-                    exit 0
-                fi
-                if [ "$line" = "abort" ]; then
-                    exit 42
-                fi
-            done
-            exit 1
-            """);
+                                #!/bin/sh
+                                while IFS= read -r line || [ -n "$line" ]; do
+                                    printf '%s\n' "$line"
+                                    if [ "$line" = "launch" ]; then
+                                        exit 0
+                                    fi
+                                    if [ "$line" = "abort" ]; then
+                                        exit 42
+                                    fi
+                                done
+                                exit 1
+                                """);
         if (!OperatingSystem.IsWindows())
         {
             File.SetUnixFileMode(path, File.GetUnixFileMode(path) | UnixFileMode.UserExecute |
-                UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
+                                       UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
         }
+
         return path;
     }
 
     private bool IsUnix => OperatingSystem.IsMacOS() || OperatingSystem.IsLinux();
 
     private LaunchTask BuildLaunchTask(LaunchFixture fixture, MinecraftInstance instance, string javaPath,
-                                       out LauncherPartLaunch step, string? installRoot = null)
+        out LauncherPartLaunch step, string? installRoot = null)
     {
         // JavaPath is the (gate-controlled) global override; the stub applies in both cases
         fixture.Global.StubSet("JavaPath", javaPath);
@@ -90,6 +89,7 @@ public class LauncherPartLaunchTests : IDisposable
         {
             return;
         }
+
         using var fixture = new LaunchFixture();
         fixture.SeedJavaDetection("java", 0, version: "17.0.2"); // C9: probe cache, not settings
         var instance = await fixture.CreateInstance();
@@ -134,6 +134,7 @@ public class LauncherPartLaunchTests : IDisposable
         {
             return;
         }
+
         using var fixture = new LaunchFixture();
         fixture.SeedJavaDetection("java", 0, version: "17.0.2"); // C9: probe cache, not settings
         var instance = await fixture.CreateInstance();
@@ -165,6 +166,7 @@ public class LauncherPartLaunchTests : IDisposable
         {
             return;
         }
+
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
         var javaPath = WriteFakeJava();

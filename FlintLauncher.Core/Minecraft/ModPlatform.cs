@@ -2,6 +2,7 @@
 // Port of the ModPlatform::ModLoaderType subset of launcher/modplatform/ModIndex.h that the
 // instance component stack (Component/PackProfile) needs. The rest of ModIndex (mod metadata
 // scraping types) belongs to the modplatform layer and is not ported here.
+
 namespace FlintLauncher.Core.Minecraft;
 
 /// <summary>Port of ModPlatform::ModLoaderType; combinations mirror the QFlags ModLoaderTypes.</summary>

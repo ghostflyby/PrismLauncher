@@ -33,9 +33,7 @@ public class InstanceListTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private InstanceList CreateList() =>
@@ -50,6 +48,7 @@ public class InstanceListTests : IDisposable
         {
             lines.Add("name=" + name);
         }
+
         File.WriteAllLines(Path.Combine(dir, "instance.cfg"), lines);
     }
 
@@ -143,6 +142,7 @@ public class InstanceListTests : IDisposable
             Assert.Equal(0, list.InodeOf(inst));
             return;
         }
+
         var inode = list.InodeOf(inst);
         Assert.NotEqual(0, inode);
         Assert.Same(inst, list.ResolveInstance(inode.ToString(CultureInfo.InvariantCulture))!);
@@ -188,6 +188,7 @@ public class InstanceListTests : IDisposable
                 .GetProperty("UuidGroup").GetProperty("instances").EnumerateArray()
                 .Select(v => v.GetString()).ToList());
         }
+
         // after discovery the group query goes through the uuid member…
         list.LoadList();
         Assert.Equal("UuidGroup", list.GetInstanceGroup("Uuid Staged"));
@@ -652,6 +653,7 @@ public class InstanceListTests : IDisposable
             Assert.True(inst.HasVersionBroken);
             Assert.False(inst.CanLaunch());
         }
+
         Assert.NotNull(list.GetInstanceById("legacy1"));
         Assert.NotNull(list.GetInstanceById("weird"));
     }
@@ -888,6 +890,7 @@ public class InstanceListTests : IDisposable
                 .GetProperty("misc").GetProperty("linkedInstances")
                 .EnumerateArray().Select(v => v.GetString()).ToList());
         }
+
         // consumers answer by either reference form
         Assert.Equal(["link"], list.GetLinkedInstancesById("base"));
         Assert.Equal(["link"], list.GetLinkedInstancesById(baseInst.Uuid));

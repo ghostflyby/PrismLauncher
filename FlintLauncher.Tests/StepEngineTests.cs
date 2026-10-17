@@ -21,7 +21,7 @@ public class StepEngineTests
         private readonly Action? _onFinalize;
 
         public RecordingStep(LaunchTask parent, string name, List<string>? order = null, bool fail = false,
-                             Action? onFinalize = null) : base(parent)
+            Action? onFinalize = null) : base(parent)
         {
             Name = name;
             _order = order;
@@ -42,6 +42,7 @@ public class StepEngineTests
             {
                 EmitSucceeded();
             }
+
             return Task.CompletedTask;
         }
 
@@ -143,6 +144,7 @@ public class StepEngineTests
         {
             await Task.Delay(10);
         }
+
         Assert.True(task.CanAbort());
         task.Abort();
 
@@ -218,9 +220,7 @@ public class StepEngineTests
         public TaskCompletionSource ProceedTask { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool Proceeded;
 
-        public GatedStep(LaunchTask parent) : base(parent)
-        {
-        }
+        public GatedStep(LaunchTask parent) : base(parent) { }
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
@@ -299,6 +299,7 @@ public class StepEngineTests
         {
             return; // /bin/echo is a unix fixture
         }
+
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
         Directory.CreateDirectory(instance.GameRoot()); // normally created by CreateGameFolders
@@ -325,6 +326,7 @@ public class StepEngineTests
         {
             return;
         }
+
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
         var task = LaunchTask.Create(instance, fixture.CreateServices());

@@ -9,9 +9,7 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class ExtractNatives : LaunchStep
 {
-    public ExtractNatives(LaunchTask parent) : base(parent)
-    {
-    }
+    public ExtractNatives(LaunchTask parent) : base(parent) { }
 
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -36,6 +34,7 @@ public sealed class ExtractNatives : LaunchStep
                 return Task.CompletedTask;
             }
         }
+
         EmitSucceeded();
         return Task.CompletedTask;
     }
@@ -63,6 +62,7 @@ public sealed class ExtractNatives : LaunchStep
         {
             return target;
         }
+
         return target[..^suffix.Length] + replacement;
     }
 
@@ -81,27 +81,32 @@ public sealed class ExtractNatives : LaunchStep
                 {
                     name = ReplaceSuffix(name, ".jnilib", ".dylib");
                 }
+
                 if (name.EndsWith('/'))
                 {
                     FileSystem.EnsureFolderPathExists(FileSystem.PathCombine(directory, name));
                     continue;
                 }
+
                 var absFilePath = FileSystem.PathCombine(directory, name);
                 // zip-slip guard (same invariant as MMCZip::ExtractSubDir)
                 if (!absFilePath.StartsWith(directory, OperatingSystem.IsWindows()
-                        ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                        ? StringComparison.OrdinalIgnoreCase
+                        : StringComparison.Ordinal))
                 {
                     return false;
                 }
+
                 FileSystem.EnsureFilePathExists(absFilePath);
                 using var entryStream = entry.Open();
                 using var output = File.Create(absFilePath);
                 entryStream.CopyTo(output);
             }
+
             return true;
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                 or ArgumentException or NotSupportedException)
+                                      or ArgumentException or NotSupportedException)
         {
             return false;
         }

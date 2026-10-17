@@ -68,10 +68,7 @@ public static class WebHostBuilder
         var fileLogger = new RollingFileLoggerProvider(paths.LogsDir);
         builder.Logging.AddProvider(fileLogger);
 
-        builder.Services.ConfigureHttpJsonOptions(options =>
-        {
-            options.SerializerOptions.TypeInfoResolverChain.Insert(0, FlintJsonContext.Default);
-        });
+        builder.Services.ConfigureHttpJsonOptions(options => { options.SerializerOptions.TypeInfoResolverChain.Insert(0, FlintJsonContext.Default); });
 
         // machine-readable API surface (G3): source-generated under Native AOT, served
         // unauthenticated next to /healthz as a discovery-plane artifact
@@ -92,6 +89,7 @@ public static class WebHostBuilder
             fileLogger.Dispose();
             throw;
         }
+
         builder.Services.AddSingleton(FlintConfig.Default);
         builder.Services.AddSingleton(runtime);
         // the D5/D6 data models are injectable like the rest of the runtime's singletons
@@ -224,11 +222,11 @@ public static class WebHostBuilder
         var api = app.MapGroup("/api/v1");
         api.AddApiAuth(apiAuth);
         api.MapGet("/info", (FlintConfig config) => new InfoResponse(
-            config.LauncherDisplayName,
-            config.PrintableVersionString(),
-            config.UserAgent,
-            config.MetaUrl,
-            config.JavaDownloaderEnabled))
+                config.LauncherDisplayName,
+                config.PrintableVersionString(),
+                config.UserAgent,
+                config.MetaUrl,
+                config.JavaDownloaderEnabled))
             .WithTags("Meta");
 
         api.MapInstances();
@@ -276,16 +274,16 @@ public static class WebHostBuilder
         }
 
         return FlintPaths.FromRoots(
-            FlagValue(args, "--config-dir", "FLINT_CONFIG_DIR") ?? config,
-            FlagValue(args, "--data-dir", "FLINT_DATA_DIR") ?? data,
-            FlagValue(args, "--store-dir", "FLINT_STORE_DIR") ?? store,
-            FlagValue(args, "--cache-dir", "FLINT_CACHE_DIR") ?? cache,
-            FlagValue(args, "--state-dir", "FLINT_STATE_DIR") ?? state) with
-        {
-            // G1: home mode records its origin so the flint-legacy probe can find the
-            // pre-reform flat files at the home root (the fresh X/data child cannot)
-            HomeRoot = home,
-        };
+                FlagValue(args, "--config-dir", "FLINT_CONFIG_DIR") ?? config,
+                FlagValue(args, "--data-dir", "FLINT_DATA_DIR") ?? data,
+                FlagValue(args, "--store-dir", "FLINT_STORE_DIR") ?? store,
+                FlagValue(args, "--cache-dir", "FLINT_CACHE_DIR") ?? cache,
+                FlagValue(args, "--state-dir", "FLINT_STATE_DIR") ?? state) with
+            {
+                // G1: home mode records its origin so the flint-legacy probe can find the
+                // pre-reform flat files at the home root (the fresh X/data child cannot)
+                HomeRoot = home,
+            };
     }
 
     /// <summary>The last occurrence of &lt;flag&gt; &lt;value&gt; / &lt;flag&gt;=&lt;value&gt;
@@ -305,6 +303,7 @@ public static class WebHostBuilder
                 value = args[i][(flag.Length + 1)..];
             }
         }
+
         if (value is null)
         {
             var env = Environment.GetEnvironmentVariable(envName);
@@ -313,6 +312,7 @@ public static class WebHostBuilder
                 value = env;
             }
         }
+
         return value is null ? null : Path.GetFullPath(value);
     }
 
@@ -334,11 +334,13 @@ public static class WebHostBuilder
                 raw = args[i]["--log-level=".Length..];
             }
         }
+
         raw ??= Environment.GetEnvironmentVariable("FLINT_LOG_LEVEL");
         if (string.IsNullOrWhiteSpace(raw))
         {
             return LogLevel.Information;
         }
+
         raw = raw.Trim() switch
         {
             "info" or "INFO" => nameof(LogLevel.Information),

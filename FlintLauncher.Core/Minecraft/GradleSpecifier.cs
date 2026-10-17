@@ -39,6 +39,7 @@ public readonly struct GradleSpecifier : IEquatable<GradleSpecifier>
             InvalidValue = value ?? "";
             return;
         }
+
         GroupId = match.Groups[1].Value;
         ArtifactId = match.Groups[2].Value;
         Version = match.Groups[3].Value;
@@ -86,15 +87,18 @@ public readonly struct GradleSpecifier : IEquatable<GradleSpecifier>
         {
             return InvalidValue;
         }
+
         var retval = GroupId + ":" + ArtifactId + ":" + Version;
         if (Classifier.Length != 0)
         {
             retval += ":" + Classifier;
         }
+
         if (Extension is not null)
         {
             retval += "@" + Extension;
         }
+
         return retval;
     }
 
@@ -104,11 +108,13 @@ public readonly struct GradleSpecifier : IEquatable<GradleSpecifier>
         {
             return null;
         }
+
         var filename = ArtifactId + '-' + Version;
         if (Classifier.Length != 0)
         {
             filename += "-" + Classifier;
         }
+
         filename += "." + (Extension ?? "jar");
         return filename;
     }
@@ -120,6 +126,7 @@ public readonly struct GradleSpecifier : IEquatable<GradleSpecifier>
         {
             return null;
         }
+
         var filename = filenameOverride.Length == 0 ? GetFileName()! : filenameOverride;
         var path = GroupId.Replace('.', '/');
         path += '/' + ArtifactId + '/' + Version + '/' + filename;
@@ -139,12 +146,12 @@ public readonly struct GradleSpecifier : IEquatable<GradleSpecifier>
     public readonly bool Equals(GradleSpecifier other)
     {
         return IsValid == other.IsValid
-            && InvalidValue == other.InvalidValue
-            && GroupId == other.GroupId
-            && ArtifactId == other.ArtifactId
-            && Version == other.Version
-            && Classifier == other.Classifier
-            && Extension == other.Extension;
+               && InvalidValue == other.InvalidValue
+               && GroupId == other.GroupId
+               && ArtifactId == other.ArtifactId
+               && Version == other.Version
+               && Classifier == other.Classifier
+               && Extension == other.Extension;
     }
 
     public override readonly bool Equals(object? obj) => obj is GradleSpecifier other && Equals(other);

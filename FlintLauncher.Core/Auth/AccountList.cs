@@ -43,6 +43,7 @@ public sealed class AccountList
                 return i;
             }
         }
+
         return -1;
     }
 
@@ -55,6 +56,7 @@ public sealed class AccountList
                 return account;
             }
         }
+
         return null;
     }
 
@@ -68,8 +70,10 @@ public sealed class AccountList
             {
                 continue;
             }
+
             outList.Add(profileName);
         }
+
         return outList;
     }
 
@@ -95,6 +99,7 @@ public sealed class AccountList
                 {
                     defaultAccount = account;
                 }
+
                 OnListChanged();
                 return;
             }
@@ -115,6 +120,7 @@ public sealed class AccountList
                 defaultAccount = null;
                 OnDefaultAccountChanged();
             }
+
             _accounts.RemoveAt(row);
             OnListChanged();
         }
@@ -149,6 +155,7 @@ public sealed class AccountList
             {
                 return;
             }
+
             defaultAccount = onList;
             OnDefaultAccountChanged();
         }
@@ -164,6 +171,7 @@ public sealed class AccountList
                 return true;
             }
         }
+
         return false;
     }
 
@@ -201,6 +209,7 @@ public sealed class AccountList
             // qCritical() << "Failed to parse account list file ..."
             return false;
         }
+
         if (node is not JsonObject root)
         {
             return false;
@@ -229,6 +238,7 @@ public sealed class AccountList
         {
             // best-effort rename: a leftover file at the old path is harmless
         }
+
         return false;
     }
 
@@ -240,12 +250,14 @@ public sealed class AccountList
         {
             return true;
         }
+
         foreach (var accountVal in accounts)
         {
             if (accountVal is not JsonObject accountObj)
             {
                 continue;
             }
+
             var account = MinecraftAccount.LoadFromJsonV3(accountObj);
             if (account is not null)
             {
@@ -257,6 +269,7 @@ public sealed class AccountList
                         continue;
                     }
                 }
+
                 _accounts.Add(account);
                 if (AccountData.EnsureBool(accountObj["active"]))
                 {
@@ -265,6 +278,7 @@ public sealed class AccountList
             }
             // qWarning() << "Failed to load an account.";
         }
+
         return true;
     }
 
@@ -309,8 +323,10 @@ public sealed class AccountList
             {
                 accountObj["active"] = true;
             }
+
             accounts.Add((JsonNode?)accountObj);
         }
+
         root["accounts"] = accounts;
 
         // Now that we're done building the JSON object, we can write it to the file.
@@ -323,16 +339,19 @@ public sealed class AccountList
             {
                 stream.Write(bytes);
             }
+
             if (!OperatingSystem.IsWindows())
             {
                 File.SetUnixFileMode(tmpPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
             }
+
             File.Move(tmpPath, listFilePath, overwrite: true);
         }
         catch (Exception)
         {
             return false;
         }
+
         return true;
     }
 
@@ -351,6 +370,7 @@ public sealed class AccountList
             // TODO: Alert the user if this fails.
             SaveList();
         }
+
         ListChanged?.Invoke();
     }
 
@@ -360,6 +380,7 @@ public sealed class AccountList
         {
             SaveList();
         }
+
         DefaultAccountChanged?.Invoke();
     }
 
@@ -377,15 +398,18 @@ public sealed class AccountList
             {
                 return i;
             }
+
             if (value.TryGetValue<double>(out var d) && (int)d == d)
             {
                 return (int)d;
             }
+
             if (value.TryGetValue<string>(out var s) && int.TryParse(s, out var parsed))
             {
                 return parsed;
             }
         }
+
         return 0;
     }
 }

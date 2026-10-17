@@ -45,6 +45,7 @@ public sealed class AuthFlow : FlintTask
                 oauthStep.AuthorizeWithBrowser += url => AuthorizeWithBrowser?.Invoke(url);
                 _steps.Add(oauthStep);
             }
+
             _steps.Add(new XboxUserStep(data, endpoints));
             _steps.Add(new XboxAuthorizationStep(data, token => data.MojangServicesToken = token,
                 "rp://api.minecraftservices.com/", "Mojang", endpoints));
@@ -53,6 +54,7 @@ public sealed class AuthFlow : FlintTask
             _steps.Add(new MinecraftProfileStep(data, endpoints));
             _steps.Add(new GetSkinStep(data));
         }
+
         ChangeState(AccountTaskState.Created);
     }
 
@@ -79,15 +81,18 @@ public sealed class AuthFlow : FlintTask
                 Succeed();
                 return;
             }
+
             currentStep = _steps[0];
             _steps.RemoveAt(0);
             EmitStatus(currentStep.Describe());
             var stepReported = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
             void Handler(AccountTaskState resultingState, string message)
             {
                 // NOTE: true -> non-terminal state, false -> terminal state
                 stepReported.TrySetResult(ChangeState(resultingState, message));
             }
+
             currentStep.Finished += Handler;
             try
             {
@@ -135,6 +140,7 @@ public sealed class AuthFlow : FlintTask
                 {
                     EmitStatus("Preparing to log in...");
                 }
+
                 Data.AccountState = AccountState.Working;
                 return true;
             case AccountTaskState.Succeeded:

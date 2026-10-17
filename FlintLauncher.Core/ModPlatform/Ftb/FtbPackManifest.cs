@@ -165,6 +165,7 @@ public static class FtbPackManifest
         {
             result.Add(RequireObject(item));
         }
+
         return result;
     }
 

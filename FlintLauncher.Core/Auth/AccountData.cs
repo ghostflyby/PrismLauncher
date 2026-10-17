@@ -64,6 +64,7 @@ public sealed class Token
         {
             copy.Extra[key] = value.DeepClone();
         }
+
         return copy;
     }
 }
@@ -163,6 +164,7 @@ public sealed class AccountData
             // qWarning() << "Failed to parse account data: type is missing.";
             return false;
         }
+
         if (typeS == "MSA")
         {
             Type = AccountType.Msa;
@@ -184,6 +186,7 @@ public sealed class AccountData
             {
                 MsaClientId = clientId;
             } // leave msaClientID empty if it doesn't exist or isn't a string
+
             MsaToken = TokenFromJsonv3(data, "msa");
             UserToken = TokenFromJsonv3(data, "utoken");
             MojangServicesToken = TokenFromJsonv3(data, "xrp-mc");
@@ -257,12 +260,13 @@ public sealed class AccountData
         {
             return false;
         }
+
         return value.TryGetValue<double>(out _) || value.TryGetValue<long>(out _) ||
-            value.TryGetValue<int>(out _) || value.TryGetValue<decimal>(out _) ||
-            value.TryGetValue<float>(out _) || value.TryGetValue<short>(out _) ||
-            value.TryGetValue<uint>(out _) || value.TryGetValue<ulong>(out _) ||
-            value.TryGetValue<ushort>(out _) || value.TryGetValue<byte>(out _) ||
-            value.TryGetValue<sbyte>(out _);
+               value.TryGetValue<int>(out _) || value.TryGetValue<decimal>(out _) ||
+               value.TryGetValue<float>(out _) || value.TryGetValue<short>(out _) ||
+               value.TryGetValue<uint>(out _) || value.TryGetValue<ulong>(out _) ||
+               value.TryGetValue<ushort>(out _) || value.TryGetValue<byte>(out _) ||
+               value.TryGetValue<sbyte>(out _);
     }
 
     internal static bool IsString(JsonNode? node)
@@ -283,23 +287,28 @@ public sealed class AccountData
             {
                 return d;
             }
+
             if (value.TryGetValue<long>(out var l))
             {
                 return l;
             }
+
             if (value.TryGetValue<int>(out var i))
             {
                 return i;
             }
+
             if (value.TryGetValue<decimal>(out var m))
             {
                 return (double)m;
             }
+
             if (value.TryGetValue<float>(out var f))
             {
                 return f;
             }
         }
+
         return 0;
     }
 
@@ -312,6 +321,7 @@ public sealed class AccountData
             var d = GetNumber(node);
             return (int)d == d ? (int)d : 0;
         }
+
         return 0;
     }
 
@@ -323,6 +333,7 @@ public sealed class AccountData
         {
             return;
         }
+
         var outObj = new JsonObject();
         if (t.IssueInstant is { } issueInstant)
         {
@@ -340,11 +351,13 @@ public sealed class AccountData
             outObj["token"] = t.Value;
             save = true;
         }
+
         if (t.RefreshToken.Length != 0)
         {
             outObj["refresh_token"] = t.RefreshToken;
             save = true;
         }
+
         if (t.Extra.Count != 0)
         {
             // QJsonObject::fromVariantMap(QVariantMap): keys sorted like QMap
@@ -353,9 +366,11 @@ public sealed class AccountData
             {
                 extra[key] = value?.DeepClone();
             }
+
             outObj["extra"] = extra;
             save = true;
         }
+
         if (save)
         {
             parent[tokenName] = outObj;
@@ -370,6 +385,7 @@ public sealed class AccountData
         {
             return outToken;
         }
+
         var issueInstant = Get(tokenObject, "iat");
         if (IsNumber(issueInstant))
         {
@@ -406,6 +422,7 @@ public sealed class AccountData
                 }
             }
         }
+
         return outToken;
     }
 
@@ -415,6 +432,7 @@ public sealed class AccountData
         {
             return;
         }
+
         var outObj = new JsonObject
         {
             ["id"] = p.Id,
@@ -436,6 +454,7 @@ public sealed class AccountData
             {
                 skinObj["data"] = Convert.ToBase64String(p.SkinField.Data);
             }
+
             outObj["skin"] = skinObj;
         }
 
@@ -452,8 +471,10 @@ public sealed class AccountData
             {
                 capeObj["data"] = Convert.ToBase64String(cape.Data);
             }
+
             capesArray.Add((JsonNode?)capeObj);
         }
+
         outObj["capes"] = capesArray;
         parent[tokenName] = outObj;
     }
@@ -472,6 +493,7 @@ public sealed class AccountData
         {
             return outProfile;
         }
+
         {
             var idV = Get(tokenObject, "id");
             var nameV = Get(tokenObject, "name");
@@ -480,6 +502,7 @@ public sealed class AccountData
                 // qWarning() << "mandatory profile attributes are missing or of unexpected type";
                 return new MinecraftProfile();
             }
+
             outProfile.Name = GetString(nameV);
             outProfile.Id = GetString(idV);
         }
@@ -491,6 +514,7 @@ public sealed class AccountData
                 // qWarning() << "skin is missing";
                 return new MinecraftProfile();
             }
+
             var idV = Get(skinObj, "id");
             var urlV = Get(skinObj, "url");
             var variantV = Get(skinObj, "variant");
@@ -499,6 +523,7 @@ public sealed class AccountData
                 // qWarning() << "mandatory skin attributes are missing or of unexpected type";
                 return new MinecraftProfile();
             }
+
             outProfile.SkinField.Id = GetString(idV);
             outProfile.SkinField.Url = RewriteTextureUrl(GetString(urlV));
             outProfile.SkinField.Variant = GetString(variantV);
@@ -524,6 +549,7 @@ public sealed class AccountData
                 // qWarning() << "capes is not an array!";
                 return new MinecraftProfile();
             }
+
             foreach (var capeV in capesArray)
             {
                 if (capeV is not JsonObject capeObj)
@@ -531,6 +557,7 @@ public sealed class AccountData
                     // qWarning() << "cape is not an object!";
                     return new MinecraftProfile();
                 }
+
                 var idV = Get(capeObj, "id");
                 var urlV = Get(capeObj, "url");
                 var aliasV = Get(capeObj, "alias");
@@ -539,6 +566,7 @@ public sealed class AccountData
                     // qWarning() << "mandatory skin attributes are missing or of unexpected type";
                     return new MinecraftProfile();
                 }
+
                 var cape = new Cape
                 {
                     Id = GetString(idV),
@@ -558,6 +586,7 @@ public sealed class AccountData
                     // qWarning() << "cape data is something unexpected";
                     return new MinecraftProfile();
                 }
+
                 outProfile.Capes[cape.Id] = cape;
             }
         }
@@ -588,6 +617,7 @@ public sealed class AccountData
                 sb.Append(c);
             }
         }
+
         return Convert.FromBase64String(sb.ToString());
     }
 
@@ -597,6 +627,7 @@ public sealed class AccountData
         {
             return;
         }
+
         var outObj = new JsonObject
         {
             ["ownsMinecraft"] = p.OwnsMinecraft,
@@ -611,6 +642,7 @@ public sealed class AccountData
         {
             return false;
         }
+
         {
             var ownsMinecraftV = Get(entitlementObject, "ownsMinecraft");
             var canPlayMinecraftV = Get(entitlementObject, "canPlayMinecraft");
@@ -619,6 +651,7 @@ public sealed class AccountData
                 // qWarning() << "mandatory attributes are missing or of unexpected type";
                 return false;
             }
+
             outEntitlement.CanPlayMinecraft = EnsureBool(canPlayMinecraftV);
             outEntitlement.OwnsMinecraft = EnsureBool(ownsMinecraftV);
             outEntitlement.Validity = Validity.Assumed;

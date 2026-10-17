@@ -141,6 +141,7 @@ public class Component : ProblemProvider
         {
             return;
         }
+
         var vfile = GetVersionFile();
         if (vfile is not null)
         {
@@ -161,6 +162,7 @@ public class Component : ProblemProvider
         {
             return Parent.MetadataIndex.Get(Uid);
         }
+
         return null;
     }
 
@@ -170,11 +172,13 @@ public class Component : ProblemProvider
         {
             return Order;
         }
+
         var vfile = GetVersionFile();
         if (vfile is not null)
         {
             return vfile.Order;
         }
+
         return 0;
     }
 
@@ -192,6 +196,7 @@ public class Component : ProblemProvider
         {
             return CachedName;
         }
+
         return Uid;
     }
 
@@ -205,11 +210,13 @@ public class Component : ProblemProvider
         {
             return MetaVersion.Time();
         }
+
         var vfile = GetVersionFile();
         if (vfile is not null && vfile.ReleaseTime is not null)
         {
             return vfile.ReleaseTime.Value;
         }
+
         // FIXME upstream: fake
         return DateTimeOffset.Now;
     }
@@ -227,12 +234,14 @@ public class Component : ProblemProvider
         {
             intendedDisabled = false;
         }
+
         if (intendedDisabled != Disabled)
         {
             Disabled = intendedDisabled;
             EmitDataChanged();
             return true;
         }
+
         return false;
     }
 
@@ -251,6 +260,7 @@ public class Component : ProblemProvider
                 return true;
             }
         }
+
         return false;
     }
 
@@ -271,6 +281,7 @@ public class Component : ProblemProvider
             // (for the Resolution flow it always is).
             return list.Versions().Count != 0;
         }
+
         return false;
     }
 
@@ -300,6 +311,7 @@ public class Component : ProblemProvider
             var severity = file.GetProblemSeverity();
             return componentProblemSeverity > severity ? componentProblemSeverity : severity;
         }
+
         return ProblemSeverity.Error;
     }
 
@@ -312,6 +324,7 @@ public class Component : ProblemProvider
             problems.AddRange(_componentProblems);
             return problems;
         }
+
         return [new PatchProblem(ProblemSeverity.Error, "Patch is not loaded yet.")];
     }
 
@@ -321,6 +334,7 @@ public class Component : ProblemProvider
         {
             componentProblemSeverity = severity;
         }
+
         _componentProblems.Add(new PatchProblem(severity, description));
         EmitDataChanged();
     }
@@ -340,6 +354,7 @@ public class Component : ProblemProvider
         {
             return;
         }
+
         Version = version;
         if (Loaded)
         {
@@ -365,6 +380,7 @@ public class Component : ProblemProvider
                     MetaVersion = null;
                     Loaded = false;
                 }
+
                 UpdateCachedData();
             }
         }
@@ -385,6 +401,7 @@ public class Component : ProblemProvider
         {
             return false;
         }
+
         // FIXME upstream: get rid of this try-catch.
         try
         {
@@ -393,6 +410,7 @@ public class Component : ProblemProvider
             {
                 return false;
             }
+
             var document = OneSixVersionFormat.VersionFileToJson(vfile);
             FileSystem.Write(filename, Encoding.UTF8.GetBytes(QtJson.ToIndentedString(document) + "\n"));
             File = vfile;
@@ -404,6 +422,7 @@ public class Component : ProblemProvider
             // NOTE upstream quirk kept: the exception is logged ("Version could not be loaded")
             // but Customize() still returns true (the catch does not set a failure result)
         }
+
         return true;
     }
 
@@ -414,6 +433,7 @@ public class Component : ProblemProvider
             // already not custom
             return true;
         }
+
         var filename = GetFilename();
         var result = true;
         // just kill the file and reload
@@ -421,6 +441,7 @@ public class Component : ProblemProvider
         {
             result = FileSystem.DeletePath(filename);
         }
+
         if (result)
         {
             // file gone...
@@ -440,8 +461,10 @@ public class Component : ProblemProvider
                     Loaded = false;
                 }
             }
+
             EmitDataChanged();
         }
+
         return result;
     }
 
@@ -453,6 +476,7 @@ public class Component : ProblemProvider
         {
             return false;
         }
+
         foreach (var reqA in a)
         {
             if (!b.Any(reqB => reqA.DeepEquals(reqB)))
@@ -460,6 +484,7 @@ public class Component : ProblemProvider
                 return false;
             }
         }
+
         return true;
     }
 
@@ -474,27 +499,32 @@ public class Component : ProblemProvider
                 CachedName = file.Name;
                 changed = true;
             }
+
             if (CachedVersion != file.Version)
             {
                 CachedVersion = file.Version;
                 changed = true;
             }
+
             if (CachedVolatile != file.Volatile)
             {
                 CachedVolatile = file.Volatile;
                 changed = true;
             }
+
             if (!DeepCompare(CachedRequires, file.Requires))
             {
                 // the C++ std::set assignment copies; clone so the component does not alias the file
                 CachedRequires = file.Requires.Clone();
                 changed = true;
             }
+
             if (!DeepCompare(CachedConflicts, file.Conflicts))
             {
                 CachedConflicts = file.Conflicts.Clone();
                 changed = true;
             }
+
             if (changed)
             {
                 EmitDataChanged();
@@ -523,6 +553,7 @@ public class Component : ProblemProvider
                 await Parent.MetadataIndex.LoadVersion(Uid, Version, mode).StartAsync(cancellationToken);
                 MetaVersion = Parent.MetadataIndex.Get(Uid, Version);
             }
+
             Loaded = true;
             UpdateCachedData();
         }

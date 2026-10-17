@@ -11,9 +11,7 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class ModMinecraftJar : LaunchStep
 {
-    public ModMinecraftJar(LaunchTask parent) : base(parent)
-    {
-    }
+    public ModMinecraftJar(LaunchTask parent) : base(parent) { }
 
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -24,6 +22,7 @@ public sealed class ModMinecraftJar : LaunchStep
             EmitSucceeded();
             return Task.CompletedTask;
         }
+
         // nuke obsolete stripped jar(s) if needed
         if (!FileSystem.EnsureFolderPathExists(inst.BinRoot()))
         {
@@ -46,6 +45,7 @@ public sealed class ModMinecraftJar : LaunchStep
             EmitFailed("The instance profile is missing.");
             return Task.CompletedTask;
         }
+
         var jarMods = inst.GetJarMods();
         if (jarMods.Count != 0)
         {
@@ -55,6 +55,7 @@ public sealed class ModMinecraftJar : LaunchStep
                 EmitFailed("Failed to create the custom Minecraft jar file.");
                 return Task.CompletedTask;
             }
+
             var jars = new List<string>();
             var temp1 = new List<string>();
             var temp2 = new List<string>();
@@ -68,6 +69,7 @@ public sealed class ModMinecraftJar : LaunchStep
                 return Task.CompletedTask;
             }
         }
+
         EmitSucceeded();
         return Task.CompletedTask;
     }
@@ -90,6 +92,7 @@ public sealed class ModMinecraftJar : LaunchStep
                 return false;
             }
         }
+
         return true;
     }
 
@@ -113,6 +116,7 @@ public sealed class ModMinecraftJar : LaunchStep
                 {
                     continue;
                 }
+
                 if (mod.Type == ResourceType.ZipFile)
                 {
                     if (!MmcZip.MergeZipFiles(zipOut, mod.Fileinfo.FullName, addedFiles))
@@ -166,10 +170,11 @@ public sealed class ModMinecraftJar : LaunchStep
                 FileSystem.DeletePath(targetJarPath);
                 return false;
             }
+
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException
-                                 or ArgumentException or NotSupportedException)
+                                      or ArgumentException or NotSupportedException)
         {
             try
             {
@@ -179,6 +184,7 @@ public sealed class ModMinecraftJar : LaunchStep
             {
                 // already failing; the C++ qCritical()s here
             }
+
             return false;
         }
     }

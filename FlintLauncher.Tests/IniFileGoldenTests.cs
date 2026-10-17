@@ -53,6 +53,7 @@ public class IniFileGoldenTests
                 // launch path never consumes them, so there is no decode to verify)
                 continue;
             }
+
             checkedKeys.Add(key);
 
             var value = map.GetValueOrDefault(key);
@@ -62,8 +63,10 @@ public class IniFileGoldenTests
             {
                 continue; // opaque @-type; see above
             }
+
             Assert.Equal(repr, ExpectedRepr(typeName, value));
         }
+
         // our parse must not contain extra keys either
         Assert.Equal(checkedKeys.Count, expected.Length - expected.Count(l => l.Split('\t')[1] == "QVariantList"));
     }
@@ -74,11 +77,11 @@ public class IniFileGoldenTests
     public void Legacy_NoConfigVersion_File_Parses()
     {
         var fileContent = "InstanceType=OneSix\n" +
-            "iconKey=vanillia_icon\n" +
-            "name=Minecraft Vanillia\n" +
-            "OverrideCommands=true\n" +
-            "PreLaunchCommand=\"$INST_JAVA\" -jar packwiz-installer-bootstrap.jar link\n" +
-            "Wrapperommand=" + "\"\\\"$INST_JAVA\\\" -jar packwiz-installer-bootstrap.jar link =\"" + "\n";
+                          "iconKey=vanillia_icon\n" +
+                          "name=Minecraft Vanillia\n" +
+                          "OverrideCommands=true\n" +
+                          "PreLaunchCommand=\"$INST_JAVA\" -jar packwiz-installer-bootstrap.jar link\n" +
+                          "Wrapperommand=" + "\"\\\"$INST_JAVA\\\" -jar packwiz-installer-bootstrap.jar link =\"" + "\n";
 
         var path = Path.Combine(Path.GetTempPath(), $"flint-ini-{Guid.NewGuid():N}.ini");
         try
@@ -102,11 +105,11 @@ public class IniFileGoldenTests
     public void Legacy_V11_File_Migrates()
     {
         var fileContent = "InstanceType=OneSix\n" +
-            "ConfigVersion=1.1\n" +
-            "iconKey=vanillia_icon\n" +
-            "name=Minecraft Vanillia\n" +
-            "OverrideCommands=true\n" +
-            "PreLaunchCommand=" + "\"\\\"env mesa=true\\\"\"" + "\n";
+                          "ConfigVersion=1.1\n" +
+                          "iconKey=vanillia_icon\n" +
+                          "name=Minecraft Vanillia\n" +
+                          "OverrideCommands=true\n" +
+                          "PreLaunchCommand=" + "\"\\\"env mesa=true\\\"\"" + "\n";
 
         var path = Path.Combine(Path.GetTempPath(), $"flint-ini-{Guid.NewGuid():N}.ini");
         try

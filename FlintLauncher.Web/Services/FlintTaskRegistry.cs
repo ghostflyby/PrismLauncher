@@ -62,7 +62,7 @@ public sealed class FlintTaskRegistry
     public const int MaxBufferedLines = 5000;
 
     public Entry Register(string kind, FlintTask task, string? instanceId = null,
-                          LaunchController? controller = null, Action? onFinished = null)
+        LaunchController? controller = null, Action? onFinished = null)
     {
         var entry = new Entry
         {
@@ -73,6 +73,7 @@ public sealed class FlintTaskRegistry
             Controller = controller,
             OnFinished = onFinished,
         };
+
         void RunHook()
         {
             try
@@ -84,11 +85,13 @@ public sealed class FlintTaskRegistry
                 // host bookkeeping must never break the task machinery
             }
         }
+
         void OnTerminal(FlintTask finishedTask)
         {
             _log.Finished(entry.Id, finishedTask.State.ToString());
             RunHook();
         }
+
         void OnTerminalFailed(FlintTask finishedTask, string _) => OnTerminal(finishedTask);
         task.Succeeded += OnTerminal;
         task.Failed += OnTerminalFailed;
@@ -98,6 +101,7 @@ public sealed class FlintTaskRegistry
         {
             _entries[entry.Id] = entry;
         }
+
         _log.Registered(entry.Id, kind);
         return entry;
     }
@@ -152,11 +156,13 @@ public sealed class FlintTaskRegistry
         {
             return MapState(entry.Task.State);
         }
+
         var launcher = entry.Controller?.Launcher;
         if (launcher is not null && launcher.IsWaitingForProceed)
         {
             return "waiting";
         }
+
         return "running";
     }
 
@@ -184,6 +190,7 @@ public sealed class FlintTaskRegistry
         {
             return false;
         }
+
         // LaunchController.Abort() kills the game (its own ConfirmKill default); plain
         // tasks are cancelled cooperatively.
         (entry.Controller as FlintTask ?? entry.Task).Abort();
@@ -198,11 +205,13 @@ public sealed class FlintTaskRegistry
         {
             return false;
         }
+
         var launcher = controller.Launcher;
         if (launcher is null)
         {
             return false;
         }
+
         launcher.Proceed();
         return true;
     }
@@ -224,6 +233,7 @@ public sealed class FlintTaskRegistry
             {
                 return entry.LogBuffer.ToArray();
             }
+
             return entry.LogBuffer.Where(l => l.Index > since).ToArray();
         }
     }
@@ -235,6 +245,7 @@ public sealed class FlintTaskRegistry
         {
             return;
         }
+
         lock (entry.LogLock)
         {
             var entries = model.Entries;
@@ -246,6 +257,7 @@ public sealed class FlintTaskRegistry
                 {
                     AppendLocked(entry, entries[i].Level, entries[i].Line);
                 }
+
                 entry.LastModelCount = entries.Count;
             }
             else if (entries.Count < entry.LastModelCount)
@@ -258,6 +270,7 @@ public sealed class FlintTaskRegistry
                     AppendLocked(entry, entries[i].Level, entries[i].Line);
                 }
             }
+
             if (entry.LogBuffer.Count > MaxBufferedLines)
             {
                 entry.LogBuffer.RemoveRange(0, entry.LogBuffer.Count - MaxBufferedLines);

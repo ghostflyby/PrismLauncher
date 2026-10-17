@@ -104,12 +104,14 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             {
                 throw new ModResolveException($"fetching the CurseForge project {projectId} failed: {job.FailReason}");
             }
+
             // Flame nests the project under "data" (the C++ Json::requireObject(doc, "data"))
             if (ParseBodyNode(request.BodyAsString, $"the CurseForge project {projectId}") is not JsonObject root ||
                 root["data"] is not JsonObject data)
             {
                 throw new ModResolveException($"the CurseForge project response for {projectId} has no data object");
             }
+
             try
             {
                 FlameMod.LoadIndexedPack(pack, data);
@@ -126,11 +128,13 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             {
                 throw new ModResolveException($"cannot build the Modrinth project request for {projectId}");
             }
+
             await job.StartAsync(cancellationToken);
             if (!job.WasSuccessful)
             {
                 throw new ModResolveException($"fetching the Modrinth project {projectId} failed: {job.FailReason}");
             }
+
             try
             {
                 ModrinthPackIndex.LoadIndexedPack(pack,
@@ -153,6 +157,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
                 $"no downloadable {(versionId.Length != 0 ? $"version '{versionId}' " : "version ")}of {projectId}" +
                 " matches this instance");
         }
+
         return (pack, version);
     }
 
@@ -170,11 +175,13 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
                 {
                     throw new ModResolveException($"fetching the CurseForge file {versionId} failed: {job.FailReason}");
                 }
+
                 if (ParseBodyNode(request.BodyAsString, $"the CurseForge file {versionId}") is not JsonObject root ||
                     root["data"] is not JsonObject data)
                 {
                     throw new ModResolveException($"the CurseForge file response for {versionId} has no data object");
                 }
+
                 return FlameMod.LoadIndexedPackVersion(data);
             }
 
@@ -185,6 +192,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             {
                 throw new ModResolveException($"fetching the Modrinth version {versionId} failed: {pinnedRequest.FailReason}");
             }
+
             return ModrinthPackIndex.LoadIndexedPackVersion(
                 ParseBodyNode(pinnedRequest.BodyAsString, $"the Modrinth version {versionId}")
                 ?? throw new ModResolveException($"the Modrinth version {versionId} is not a JSON object"));
@@ -231,6 +239,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             {
                 throw new ModResolveException($"the CurseForge version list of {pack.AddonId} has no data array");
             }
+
             try
             {
                 FlameMod.LoadIndexedPackVersions(pack, data);
@@ -239,6 +248,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             {
                 throw new ModResolveException($"the CurseForge version list of {pack.AddonId} is invalid: {e.Message}");
             }
+
             return FlameApi.GetLatestVersion(pack.Versions, loaderList, ModLoaderType.None,
                 checkLoaders: loaderList.Count != 0);
         }
@@ -254,6 +264,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
                 {
                     continue;
                 }
+
                 IndexedVersion file;
                 try
                 {
@@ -263,6 +274,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
                 {
                     continue;
                 }
+
                 if (file.FileId.Length != 0 &&
                     (file.Loaders == ModLoaderType.None || (loaders & file.Loaders) != 0))
                 {
@@ -270,6 +282,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
                 }
             }
         }
+
         versions.Sort((a, b) => string.CompareOrdinal(b.Date, a.Date));
         return versions.Count != 0 ? versions[0] : null;
     }
@@ -356,10 +369,12 @@ public sealed class ModInstallTask : FlintTask
             EmitFailed(dependencyTask.FailReason.Length != 0 ? dependencyTask.FailReason : "dependency resolution failed");
             return;
         }
+
         SetProgress(_selections.Count + 1, _selections.Count + 2);
 
         var dependencies = dependencyTask.GetDependencies();
         var extraInfo = dependencyTask.GetExtraInfo();
+
         void RecordInstalled(GetModDependenciesTask.PackDependency entry, bool isDependency, string? requiredBy)
         {
             _installed.Add(new ModInstallEntryView(
@@ -383,6 +398,7 @@ public sealed class ModInstallTask : FlintTask
             {
                 requiredBy = extra.RequiredByIds[0];
             }
+
             planned.Add((entry, isDependency, requiredBy));
 
             if (entry.Version.DownloadUrl.Length == 0)
@@ -408,15 +424,16 @@ public sealed class ModInstallTask : FlintTask
             EmitFailed(downloads.FailReason.Length != 0 ? downloads.FailReason : "the mod download failed");
             return;
         }
+
         // only entries whose download actually succeeded reach the result payload
         foreach (var (entry, isDependency, requiredBy) in planned)
         {
             RecordInstalled(entry, isDependency, requiredBy);
         }
+
         SetProgress(_selections.Count + 2, _selections.Count + 2);
         EmitSucceeded();
     }
-
 }
 
 /// <summary>
@@ -479,6 +496,7 @@ public sealed class ModsUpdateTask : FlintTask
             {
                 continue;
             }
+
             if (metadata.Provider == ResourceProvider.Modrinth)
             {
                 modrinth.Add(mod);
@@ -500,6 +518,7 @@ public sealed class ModsUpdateTask : FlintTask
                 EmitFailed(check.FailReason.Length != 0 ? check.FailReason : "the Modrinth update check failed");
                 return;
             }
+
             var byProject = MetadataByProject(modrinth);
             foreach (var update in check.GetUpdates())
             {
@@ -521,6 +540,7 @@ public sealed class ModsUpdateTask : FlintTask
                 EmitFailed(check.FailReason.Length != 0 ? check.FailReason : "the CurseForge update check failed");
                 return;
             }
+
             var byProject = MetadataByProject(flame);
             foreach (var update in check.GetUpdates())
             {
@@ -560,6 +580,7 @@ public sealed class ModsUpdateTask : FlintTask
             EmitFailed(apply.FailReason.Length != 0 ? apply.FailReason : "applying the updates failed");
             return;
         }
+
         EmitSucceeded();
     }
 
@@ -598,7 +619,7 @@ public sealed class ModsUpdateTask : FlintTask
                 map[value.ProjectId] = value;
             }
         }
+
         return map;
     }
-
 }

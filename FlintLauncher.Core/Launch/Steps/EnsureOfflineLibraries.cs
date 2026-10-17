@@ -23,6 +23,7 @@ public sealed class EnsureOfflineLibraries : LaunchStep
             EmitFailed("The instance profile is missing.");
             return Task.CompletedTask;
         }
+
         var allJars = new List<string>();
         profile.GetLibraryFiles(_instance.RuntimeContext, allJars, allJars, _instance.GetLocalLibraryPath(),
             _instance.BinRoot(), false, storageBase: _instance.LibraryStorageBase());
@@ -47,6 +48,7 @@ public sealed class EnsureOfflineLibraries : LaunchStep
         {
             EmitLogLine("  " + jar, MessageLevel.Error);
         }
+
         EmitLogLine("\nThis instance cannot be launched because some libraries are missing or have not been downloaded yet. Please " +
                     "try again in online mode with a working Internet connection", MessageLevel.Fatal);
         EmitFailed("Required libraries are missing");

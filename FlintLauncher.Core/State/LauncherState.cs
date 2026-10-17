@@ -6,6 +6,7 @@
 // records, source-generation registered in FlintJsonContext (AOT red line), persisted by
 // <see cref="LauncherStateStore"/> with immediate atomic writes — no layering: everything
 // here is process/machine-level (STATE S6).
+
 namespace FlintLauncher.Core.State;
 
 /// <summary>The single runtime-state file (S5). The record IS the schema version: new

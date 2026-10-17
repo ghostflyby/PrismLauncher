@@ -45,6 +45,7 @@ public sealed class TaskStepWrapper : LaunchStep
             EmitSucceeded();
             return;
         }
+
         await task.StartAsync(cancellationToken).ConfigureAwait(false);
 
         if (task.WasSuccessful)
@@ -72,6 +73,7 @@ public sealed class TaskStepWrapper : LaunchStep
             task.Abort();
             return true;
         }
+
         return base.AbortStep();
     }
 }

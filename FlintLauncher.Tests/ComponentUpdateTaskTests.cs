@@ -48,9 +48,7 @@ public class ComponentUpdateTaskTests : IDisposable
         {
             Directory.Delete(_root, true);
         }
-        catch (IOException)
-        {
-        }
+        catch (IOException) { }
     }
 
     /// <summary>A PackProfile over the fixture root, wired to the fixture's stamped cache
@@ -71,7 +69,7 @@ public class ComponentUpdateTaskTests : IDisposable
     }
 
     private static string VersionFileJson(string uid, string version, string name, string? mainClass = null,
-                                          (string uid, string equals)? requires = null, bool volatileValue = false)
+        (string uid, string equals)? requires = null, bool volatileValue = false)
     {
         var obj = new JsonObject
         {
@@ -84,6 +82,7 @@ public class ComponentUpdateTaskTests : IDisposable
         {
             obj["mainClass"] = mainClass;
         }
+
         if (requires is { } req)
         {
             obj["requires"] = new JsonArray
@@ -91,10 +90,12 @@ public class ComponentUpdateTaskTests : IDisposable
                 new JsonObject { ["uid"] = req.uid, ["equals"] = req.equals },
             };
         }
+
         if (volatileValue)
         {
             obj["volatile"] = true;
         }
+
         return obj.ToJsonString();
     }
 
@@ -109,12 +110,15 @@ public class ComponentUpdateTaskTests : IDisposable
             {
                 entry["version"] = version;
             }
+
             if (important)
             {
                 entry["important"] = true;
             }
+
             array.Add(entry);
         }
+
         pack["components"] = array;
         WriteInstanceFile("mmc-pack.json", pack.ToJsonString());
     }
@@ -128,7 +132,7 @@ public class ComponentUpdateTaskTests : IDisposable
     /// The test's Dispose owns the created folder.
     /// </summary>
     private async Task SeedLoadedMetaVersion(Index index, string uid, string version,
-                                             string json)
+        string json)
     {
         var metaDir = MetaDirFor(uid);
         var metaFile = Path.Combine(metaDir, version + ".json");
@@ -159,6 +163,7 @@ public class ComponentUpdateTaskTests : IDisposable
         {
             obj["mainClass"] = mainClass;
         }
+
         return obj.ToJsonString();
     }
 

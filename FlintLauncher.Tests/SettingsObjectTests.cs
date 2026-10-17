@@ -26,9 +26,7 @@ public class SettingsObjectTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private string JsonPath => Path.Combine(_root, "instance.json");
@@ -129,7 +127,11 @@ public class SettingsObjectTests : IDisposable
 
         Setting? changed = null;
         object? newValue = null;
-        settings.SettingChanged += (s, v) => { changed = s; newValue = v; };
+        settings.SettingChanged += (s, v) =>
+        {
+            changed = s;
+            newValue = v;
+        };
         Setting? reset = null;
         settings.SettingReset += s => reset = s;
 

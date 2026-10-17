@@ -49,6 +49,7 @@ public sealed class IniFile
         {
             return false;
         }
+
         string text;
         try
         {
@@ -58,6 +59,7 @@ public sealed class IniFile
         {
             return false;
         }
+
         return LoadText(text);
     }
 
@@ -74,6 +76,7 @@ public sealed class IniFile
             {
                 _map[key] = MigrateQByteArrayToBase64(key, value);
             }
+
             _map[QSettingsIniCodec.ConfigVersionKey] = IniValue.From(QSettingsIniCodec.CurrentConfigVersion);
         }
         else
@@ -94,8 +97,10 @@ public sealed class IniFile
                             continue;
                         }
                     }
+
                     _map[key] = migrated;
                 }
+
                 _map[QSettingsIniCodec.ConfigVersionKey] = IniValue.From(QSettingsIniCodec.CurrentConfigVersion);
             }
             else if (version == "1.2")
@@ -104,6 +109,7 @@ public sealed class IniFile
                 {
                     _map[key] = MigrateQByteArrayToBase64(key, value);
                 }
+
                 _map[QSettingsIniCodec.ConfigVersionKey] = IniValue.From(QSettingsIniCodec.CurrentConfigVersion);
             }
             else
@@ -114,6 +120,7 @@ public sealed class IniFile
                 }
             }
         }
+
         return true;
     }
 
@@ -136,15 +143,18 @@ public sealed class IniFile
                 {
                     break;
                 }
+
                 commentIndex = line.IndexOf('#', searchStart);
                 if (commentIndex == -1)
                 {
                     break;
                 }
+
                 if (commentIndex > 0 && line[commentIndex - 1] == '\\')
                 {
                     continue;
                 }
+
                 line = line[..lineRaw.IndexOf('#')].Trim();
             }
 
@@ -153,6 +163,7 @@ public sealed class IniFile
             {
                 continue;
             }
+
             var key = line[..eqPos].Trim();
             var valueStr = line[(eqPos + 1)..].Trim();
 
@@ -160,6 +171,7 @@ public sealed class IniFile
 
             map[key] = IniValue.From(valueStr);
         }
+
         return map;
     }
 
@@ -178,6 +190,7 @@ public sealed class IniFile
                     case '#': sb.Append('#'); break;
                     default: sb.Append(c); break;
                 }
+
                 prev = '\0';
             }
             else
@@ -187,10 +200,12 @@ public sealed class IniFile
                     prev = c;
                     continue;
                 }
+
                 sb.Append(c);
                 prev = '\0';
             }
         }
+
         return sb.ToString();
     }
 
@@ -200,6 +215,7 @@ public sealed class IniFile
         {
             str = str[1..^1];
         }
+
         return str;
     }
 
@@ -227,6 +243,7 @@ public sealed class IniFile
             {
                 return IniValue.From(Convert.ToBase64String(value.Bytes));
             }
+
             if (OtherByteArrays.Contains(key))
             {
                 var sb = new StringBuilder(value.Bytes.Length);
@@ -234,10 +251,13 @@ public sealed class IniFile
                 {
                     sb.Append((char)b);
                 }
+
                 return IniValue.From(sb.ToString());
             }
+
             return value;
         }
+
         if (key == "linkedInstances")
         {
             // Json::fromStringList over the string list (a single string converts to a 1-item list)
@@ -254,20 +274,24 @@ public sealed class IniFile
                 {
                     array.Add((JsonNode?)JsonValue.Create(item));
                 }
+
                 return IniValue.From(array.ToJsonString(new JsonSerializerOptions
                 {
                     WriteIndented = false,
                     Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                 }));
             }
+
             return value;
         }
+
         if (key == "Env")
         {
             // Json::fromMap over QVariantMap; INI-stored maps only come through @Variant blobs,
             // which we keep verbatim, so the only reachable shape is the empty map.
             return value.ValueKind == IniValue.Kind.Raw ? value : IniValue.From("{}");
         }
+
         return value;
     }
 }

@@ -55,7 +55,7 @@ public sealed class ManifestDownloadTask : FlintTask
         try
         {
             doc = JsonNode.Parse(download.BodyAsString) as JsonObject
-                ?? throw new JsonParseException("Manifest root is not a JSON object");
+                  ?? throw new JsonParseException("Manifest root is not a JSON object");
         }
         catch (Exception e) when (e is JsonParseException or JsonException)
         {
@@ -63,6 +63,7 @@ public sealed class ManifestDownloadTask : FlintTask
             EmitFailed(e.Message);
             return;
         }
+
         await DownloadJava(doc, cancellationToken).ConfigureAwait(false);
     }
 
@@ -81,6 +82,7 @@ public sealed class ManifestDownloadTask : FlintTask
                 {
                     continue; // toObject() on a non-object yields an empty object with no type
                 }
+
                 var type = meta.StringOr("type");
                 if (type == "directory")
                 {
@@ -123,11 +125,13 @@ public sealed class ManifestDownloadTask : FlintTask
             {
                 dl.AddValidator(new ChecksumValidator(HashAlgorithmName.SHA1, file.Hash));
             }
+
             var target = file.Path;
             if (file.IsExec)
             {
                 dl.Succeeded += _ => SetExecutable(target);
             }
+
             elementDownload.AddNetRequest(dl);
         }
 
@@ -137,6 +141,7 @@ public sealed class ManifestDownloadTask : FlintTask
             EmitFailed(elementDownload.FailReason);
             return;
         }
+
         EmitSucceeded();
     }
 
@@ -147,6 +152,7 @@ public sealed class ManifestDownloadTask : FlintTask
         {
             return; // no unix permission bits to apply
         }
+
         try
         {
             var mode = File.GetUnixFileMode(path);
@@ -167,6 +173,7 @@ public sealed class ManifestDownloadTask : FlintTask
             {
                 return;
             }
+
             FileSystem.EnsureFilePathExists(linkPath);
             if (!OperatingSystem.IsWindows())
             {

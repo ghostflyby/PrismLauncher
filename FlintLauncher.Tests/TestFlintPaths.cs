@@ -44,6 +44,7 @@ public sealed class TestFlintPaths : IDisposable
         {
             Directory.CreateDirectory(root);
         }
+
         return new TestFlintPaths(paths, home) { _created = { home } };
     }
 
@@ -72,9 +73,7 @@ public sealed class TestFlintPaths : IDisposable
             {
                 Directory.Delete(dir, recursive: true);
             }
-            catch (DirectoryNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
         }
     }
 }

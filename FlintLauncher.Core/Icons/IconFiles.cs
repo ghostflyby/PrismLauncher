@@ -37,6 +37,7 @@ public static class IconFiles
         {
             return "";
         }
+
         // QDirIterator(folder, NoDotAndDotDot | Files, NoIteratorFlags): files, non-recursive
         var options = new EnumerationOptions
         {
@@ -52,6 +53,7 @@ public static class IconFiles
                 return file;
             }
         }
+
         return "";
     }
 
@@ -77,6 +79,7 @@ public static class IconFiles
             {
                 continue;
             }
+
             foreach (var entry in Directory.EnumerateFileSystemEntries(first, "*", options)
                          .OrderBy(p => p, StringComparer.Ordinal))
             {
@@ -90,6 +93,7 @@ public static class IconFiles
                 }
             }
         }
+
         return iconFiles;
     }
 
@@ -118,6 +122,7 @@ public static class IconFiles
         {
             return baseName;
         }
+
         var relativeDir = Path.GetRelativePath(iconsDirFull, dir).Replace('\\', '/');
         return relativeDir + delimiter + baseName;
     }
@@ -134,6 +139,7 @@ public static class IconFiles
         {
             return false; // QFileInfo::isFile()/isReadable()
         }
+
         if (!IsIconSuffix(Suffix(Path.GetFileName(file))))
         {
             return false;
@@ -143,6 +149,7 @@ public static class IconFiles
         {
             return false;
         }
+
         var target = FileSystem.PathCombine(iconsDir, name.Length == 0 ? Path.GetFileName(file) : name);
         try
         {
@@ -152,6 +159,7 @@ public static class IconFiles
         {
             return false;
         }
+
         return true;
     }
 
@@ -173,6 +181,7 @@ public static class IconFiles
                 match = file; // addIcon() replaces the entry of an existing key
             }
         }
+
         return match;
     }
 

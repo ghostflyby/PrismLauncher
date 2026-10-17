@@ -68,6 +68,7 @@ public sealed class ChecksumValidator(HashAlgorithmName algorithm, byte[]? expec
         {
             return false;
         }
+
         return true;
     }
 
@@ -77,9 +78,9 @@ public sealed class ChecksumValidator(HashAlgorithmName algorithm, byte[]? expec
         {
             return [];
         }
+
         var result = hash.GetHashAndReset();
         hash = null;
         return result;
     }
-
 }

@@ -49,8 +49,7 @@ public class MojangVersionFormatTests
     [InlineData("\"text\"", " is not an object")]
     public void VersionFileFromJson_Rejects_NonObjectRoots(string json, string expectedSuffix)
     {
-        var e = Assert.Throws<JsonParseException>(
-            () => MojangVersionFormat.VersionFileFromJson(JsonNode.Parse(json), "test.json"));
+        var e = Assert.Throws<JsonParseException>(() => MojangVersionFormat.VersionFileFromJson(JsonNode.Parse(json), "test.json"));
         Assert.Equal("test.json" + expectedSuffix, e.Message);
     }
 
@@ -60,23 +59,23 @@ public class MojangVersionFormatTests
     public void ReadVersionProperties_ReadsAllSections()
     {
         var root = JsonNode.Parse("""
-        {
-            "id": "1.12.2",
-            "mainClass": "net.minecraft.client.main.Main",
-            "minecraftArguments": "--username x",
-            "type": "release",
-            "assets": "1.12",
-            "assetIndex": {"id": "1.12", "sha1": "abc", "size": 100, "totalSize": 200, "url": "https://example.com/idx"},
-            "releaseTime": "2017-06-02T09:59:14+00:00",
-            "time": "2017-06-02T10:00:00+00:00",
-            "minimumLauncherVersion": 18,
-            "compatibleJavaMajors": [8, 9],
-            "compatibleJavaName": "java-runtime",
-            "downloads": {
-                "client": {"path": "c.jar", "sha1": "d1", "size": 1000, "url": "https://example.com/client.jar"}
-            }
-        }
-        """)!;
+                                  {
+                                      "id": "1.12.2",
+                                      "mainClass": "net.minecraft.client.main.Main",
+                                      "minecraftArguments": "--username x",
+                                      "type": "release",
+                                      "assets": "1.12",
+                                      "assetIndex": {"id": "1.12", "sha1": "abc", "size": 100, "totalSize": 200, "url": "https://example.com/idx"},
+                                      "releaseTime": "2017-06-02T09:59:14+00:00",
+                                      "time": "2017-06-02T10:00:00+00:00",
+                                      "minimumLauncherVersion": 18,
+                                      "compatibleJavaMajors": [8, 9],
+                                      "compatibleJavaName": "java-runtime",
+                                      "downloads": {
+                                          "client": {"path": "c.jar", "sha1": "d1", "size": 1000, "url": "https://example.com/client.jar"}
+                                      }
+                                  }
+                                  """)!;
         var vfile = new VersionFile();
         MojangVersionFormat.ReadVersionProperties(root, vfile);
 
@@ -115,7 +114,7 @@ public class MojangVersionFormatTests
 
         Assert.Equal(99, vfile.MinimumLauncherVersion);
         Assert.Contains(vfile.GetProblems(), p => p.Severity == ProblemSeverity.Warning &&
-            p.Description.Contains("minimumLauncherVersion"));
+                                                  p.Description.Contains("minimumLauncherVersion"));
     }
 
     [Fact]
@@ -138,8 +137,7 @@ public class MojangVersionFormatTests
 
     private static string ReadError(string json)
     {
-        return Assert.Throws<JsonParseException>(
-            () => MojangVersionFormat.ReadVersionProperties(JsonNode.Parse(json)!, new VersionFile())).Message;
+        return Assert.Throws<JsonParseException>(() => MojangVersionFormat.ReadVersionProperties(JsonNode.Parse(json)!, new VersionFile())).Message;
     }
 
     // ------------------------------------------------------- library read behavior
@@ -148,21 +146,21 @@ public class MojangVersionFormatTests
     public void LibraryFromJson_ReadsAllSections()
     {
         var libObj = JsonNode.Parse("""
-        {
-            "name": "org.lwjgl.lwjgl:lwjgl:3.3.1",
-            "url": "https://libraries.minecraft.net/",
-            "extract": {"exclude": ["META-INF/", "windows/x86"]},
-            "natives": {"linux": "natives-linux", "osx": 3},
-            "rules": [
-                {"action": "allow"},
-                {"action": "disallow", "os": {"name": "windows"}}
-            ],
-            "downloads": {
-                "artifact": {"sha1": "art", "size": 10, "url": "https://example.com/a.jar"},
-                "classifiers": {"natives-linux": {"sha1": "cls", "size": 20, "url": "https://example.com/n.jar"}}
-            }
-        }
-        """)!;
+                                    {
+                                        "name": "org.lwjgl.lwjgl:lwjgl:3.3.1",
+                                        "url": "https://libraries.minecraft.net/",
+                                        "extract": {"exclude": ["META-INF/", "windows/x86"]},
+                                        "natives": {"linux": "natives-linux", "osx": 3},
+                                        "rules": [
+                                            {"action": "allow"},
+                                            {"action": "disallow", "os": {"name": "windows"}}
+                                        ],
+                                        "downloads": {
+                                            "artifact": {"sha1": "art", "size": 10, "url": "https://example.com/a.jar"},
+                                            "classifiers": {"natives-linux": {"sha1": "cls", "size": 20, "url": "https://example.com/n.jar"}}
+                                        }
+                                    }
+                                    """)!;
         var problems = new ProblemContainer();
         var lib = MojangVersionFormat.LibraryFromJson(problems, libObj, "lib.json");
 
@@ -186,8 +184,7 @@ public class MojangVersionFormatTests
     [Fact]
     public void LibraryFromJson_MissingName_KeepsTheUpstreamTypo()
     {
-        var e = Assert.Throws<JsonParseException>(
-            () => MojangVersionFormat.LibraryFromJson(new ProblemContainer(), JsonNode.Parse("{}")!, "lib.json"));
+        var e = Assert.Throws<JsonParseException>(() => MojangVersionFormat.LibraryFromJson(new ProblemContainer(), JsonNode.Parse("{}")!, "lib.json"));
         // upstream typo preserved: no space between the filename and "contains"
         Assert.Equal("lib.jsoncontains a library that doesn't have a 'name' field", e.Message);
     }
@@ -198,7 +195,7 @@ public class MojangVersionFormatTests
         var problems = new ProblemContainer();
         MojangVersionFormat.LibraryFromJson(problems, JsonNode.Parse("""{"name": "not-a-spec"}""")!, "lib.json");
         Assert.Contains(problems.GetProblems(), p => p.Severity == ProblemSeverity.Error &&
-            p.Description.Contains("name is broken"));
+                                                     p.Description.Contains("name is broken"));
     }
 
     [Fact]
@@ -218,7 +215,6 @@ public class MojangVersionFormatTests
 
     private static string LibraryError(string json)
     {
-        return Assert.Throws<JsonParseException>(
-            () => MojangVersionFormat.LibraryFromJson(new ProblemContainer(), JsonNode.Parse(json)!, "lib.json")).Message;
+        return Assert.Throws<JsonParseException>(() => MojangVersionFormat.LibraryFromJson(new ProblemContainer(), JsonNode.Parse(json)!, "lib.json")).Message;
     }
 }

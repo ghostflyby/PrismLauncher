@@ -23,11 +23,11 @@ public class Murmur2Tests
     }
 
     [Theory]
-    [InlineData(1540447798u, "")]           // empty input: h = 1 ^ 0, final mix only
-    [InlineData(626045324u, "a")]           // tail cases 1..4 bytes
+    [InlineData(1540447798u, "")] // empty input: h = 1 ^ 0, final mix only
+    [InlineData(626045324u, "a")] // tail cases 1..4 bytes
     [InlineData(1692487918u, "ab")]
     [InlineData(1621425345u, "abc")]
-    [InlineData(3376380438u, "abcd")]       // exact multiple of 4
+    [InlineData(3376380438u, "abcd")] // exact multiple of 4
     [InlineData(3469237630u, "abcde")]
     [InlineData(2788266382u, "hello")]
     [InlineData(2824650221u, "helloworld")]
@@ -85,6 +85,7 @@ public class Murmur2Tests
                 Murmur2.FourBytesMurmurHash2(block, ref h, ref len);
             }
         }
+
         Murmur2.FourBytesMurmurHash2(block, ref h, ref len);
 
         Assert.Equal(oneShot, h);

@@ -40,8 +40,10 @@ public sealed class AssetObject
             {
                 objectDl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, Hash));
             }
+
             return objectDl;
         }
+
         return null;
     }
 }
@@ -70,6 +72,7 @@ public sealed class AssetsIndex
                 job.AddNetRequest(dl);
             }
         }
+
         return job.Requests.Count != 0 ? job : null;
     }
 }
@@ -88,12 +91,14 @@ public static class AssetsUtils
         {
             return false;
         }
+
         using (document)
         {
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
                 return false;
             }
+
             index.Id = assetsId;
             var root = JsonNode.Parse(document.RootElement.GetRawText()) as JsonObject ?? [];
 
@@ -102,6 +107,7 @@ public static class AssetsUtils
             {
                 index.IsVirtual = virtualFlag;
             }
+
             if (root.TryGetPropertyValue("map_to_resources", out var mapToResources) && mapToResources is JsonValue mapValue &&
                 mapValue.TryGetValue<bool>(out var mapFlag))
             {
@@ -129,9 +135,11 @@ public static class AssetsUtils
                             }
                         }
                     }
+
                     index.Objects[key] = assetObject;
                 }
             }
+
             return true;
         }
     }
@@ -186,16 +194,19 @@ public static class AssetsUtils
             {
                 continue;
             }
+
             presentFiles.Remove(targetPathForMap);
             if (File.Exists(targetPathForMap))
             {
                 continue;
             }
+
             var targetDir = Path.GetDirectoryName(Path.GetFullPath(targetPathForMap));
             if (targetDir is not null)
             {
                 FileSystem.EnsureFolderPathExists(targetDir);
             }
+
             try
             {
                 File.Copy(originalPath, targetPathForMap);
@@ -211,6 +222,7 @@ public static class AssetsUtils
         {
             // (upstream only logs "Would remove <file>" here)
         }
+
         return true;
     }
 
@@ -222,6 +234,7 @@ public static class AssetsUtils
         {
             return result;
         }
+
         foreach (var file in Directory.EnumerateFiles(dirPath, "*", new EnumerationOptions
                  {
                      RecurseSubdirectories = true,
@@ -230,6 +243,7 @@ public static class AssetsUtils
         {
             result.Add(file);
         }
+
         return result;
     }
 }

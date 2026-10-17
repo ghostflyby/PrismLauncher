@@ -61,18 +61,18 @@ public class MetaJsonFormatTests
     public void ParseVersion_ReadsCommonFields()
     {
         var obj = (JsonObject)Parse("""
-        {
-            "formatVersion": 1,
-            "uid": "net.minecraft",
-            "version": "1.12.2",
-            "releaseTime": "2017-06-02T09:59:14+00:00",
-            "type": "release",
-            "recommended": true,
-            "volatile": true,
-            "requires": [{"uid": "org.lwjgl3", "equals": "3.2.2"}],
-            "conflicts": [{"uid": "net.fabricmc", "suggests": "9.9"}]
-        }
-        """);
+                                    {
+                                        "formatVersion": 1,
+                                        "uid": "net.minecraft",
+                                        "version": "1.12.2",
+                                        "releaseTime": "2017-06-02T09:59:14+00:00",
+                                        "type": "release",
+                                        "recommended": true,
+                                        "volatile": true,
+                                        "requires": [{"uid": "org.lwjgl3", "equals": "3.2.2"}],
+                                        "conflicts": [{"uid": "net.fabricmc", "suggests": "9.9"}]
+                                    }
+                                    """);
         var metaVersion = new MetaVersion("net.minecraft", "1.12.2");
         MetaJsonFormat.ParseVersion(obj, metaVersion);
 
@@ -195,14 +195,14 @@ public class MetaJsonFormatTests
     public void ParseIndex_MergesPackages()
     {
         var obj = (JsonObject)Parse("""
-        {
-            "formatVersion": 1,
-            "packages": [
-                {"uid": "net.minecraft", "name": "Minecraft"},
-                {"uid": "org.lwjgl3", "name": "LWJGL 3", "sha256": "aa"}
-            ]
-        }
-        """);
+                                    {
+                                        "formatVersion": 1,
+                                        "packages": [
+                                            {"uid": "net.minecraft", "name": "Minecraft"},
+                                            {"uid": "org.lwjgl3", "name": "LWJGL 3", "sha256": "aa"}
+                                        ]
+                                    }
+                                    """);
         var index = new FluentIndex();
         MetaJsonFormat.ParseIndex(obj, index);
 
@@ -249,16 +249,16 @@ public class MetaJsonFormatTests
     public void ParseVersionList_ReadsVersionsWithRecommendations()
     {
         var obj = (JsonObject)Parse("""
-        {
-            "formatVersion": 1,
-            "uid": "net.minecraft",
-            "name": "Minecraft",
-            "versions": [
-                {"uid": "net.minecraft", "version": "1.12.2", "releaseTime": "2017-06-02T09:59:14+00:00", "recommended": true, "type": "release"},
-                {"uid": "net.minecraft", "version": "1.13", "releaseTime": "2018-07-18T13:28:51+00:00"}
-            ]
-        }
-        """);
+                                    {
+                                        "formatVersion": 1,
+                                        "uid": "net.minecraft",
+                                        "name": "Minecraft",
+                                        "versions": [
+                                            {"uid": "net.minecraft", "version": "1.12.2", "releaseTime": "2017-06-02T09:59:14+00:00", "recommended": true, "type": "release"},
+                                            {"uid": "net.minecraft", "version": "1.13", "releaseTime": "2018-07-18T13:28:51+00:00"}
+                                        ]
+                                    }
+                                    """);
         var list = new VersionList("net.minecraft");
         MetaJsonFormat.ParseVersionList(obj, list);
 

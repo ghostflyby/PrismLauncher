@@ -23,7 +23,7 @@ public class VariantQtBoolTests
     [InlineData("True", true)]
     [InlineData("TRUE", true)]
     [InlineData("1", true)]
-    [InlineData("2", true)]       // Qt: not empty/"0"/"false" → true
+    [InlineData("2", true)] // Qt: not empty/"0"/"false" → true
     [InlineData("yes", true)]
     [InlineData("on", true)]
     [InlineData(" false ", true)] // the lowered WHOLE string is compared, no trimming

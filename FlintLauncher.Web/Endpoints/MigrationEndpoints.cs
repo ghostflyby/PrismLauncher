@@ -22,11 +22,17 @@ public sealed record PrismDeclineRequest(string Source);
 
 /// <summary>POST /migration/prism?dryRun=true response。</summary>
 public sealed record PrismImportDryRunResponse(
-    bool DryRun, long TotalFiles, long TotalBytes, PrismImportPlanItem[] Items);
+    bool DryRun,
+    long TotalFiles,
+    long TotalBytes,
+    PrismImportPlanItem[] Items);
 
 /// <summary>GET /migration/prism/plan response (named record: AOT 源生成需要具体类型)。</summary>
 public sealed record PrismImportPlanResponse(
-    string Source, string Mode, long TotalFiles, long TotalBytes,
+    string Source,
+    string Mode,
+    long TotalFiles,
+    long TotalBytes,
     PrismImportPlanItem[] Items);
 
 public static class MigrationEndpoints
@@ -37,8 +43,8 @@ public static class MigrationEndpoints
         var group = api.MapGroup("/migration/prism");
 
         group.MapGet("/candidates", (LauncherRuntime runtime) =>
-            Results.Ok(PrismSourceDetector.Detect(runtime.Paths.DataDir, runtime.MigrationDecisions,
-                runtime.Paths.ConfigFile).ToArray()))
+                Results.Ok(PrismSourceDetector.Detect(runtime.Paths.DataDir, runtime.MigrationDecisions,
+                    runtime.Paths.ConfigFile).ToArray()))
             .Produces<PrismSourceDetector.PrismSourceCandidate[]>();
 
         group.MapGet("/plan", (LauncherRuntime runtime, string source, string? mode) =>
@@ -47,10 +53,12 @@ public static class MigrationEndpoints
             {
                 return ApiJson.Error("invalid_mode", error, 400);
             }
+
             if (!Directory.Exists(source))
             {
                 return ApiJson.NotFound("source_not_found", $"source directory '{source}' does not exist");
             }
+
             var plan = PrismImportPlanner.Plan(source, runtime.Paths.DataDir, importMode);
             var totalFiles = plan.Sum(item => item.Files);
             var totalBytes = plan.Sum(item => item.Bytes);
@@ -64,10 +72,12 @@ public static class MigrationEndpoints
             {
                 return ApiJson.Error("invalid_mode", error, 400);
             }
+
             if (!Directory.Exists(request.Source))
             {
                 return ApiJson.NotFound("source_not_found", $"source directory '{request.Source}' does not exist");
             }
+
             // A3: an unknown directory never becomes a migration source — the old "prism"
             // fallback key would file ITS record under the canonical PrismLauncher source's
             // name and seal it away
@@ -124,6 +134,7 @@ public static class MigrationEndpoints
                 return ApiJson.Error("invalid_source",
                     $"source directory '{request.Source}' is not a known launcher data directory", 400);
             }
+
             // S3: the decline is an auditable decision record, not an empty marker file —
             // but the write is best-effort like the C++ setDoNotMigrate
             // (Application.cpp:2015-2026): the worst case is the source being re-proposed,
@@ -139,9 +150,8 @@ public static class MigrationEndpoints
                 });
             }
             catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException
-                                     or NotSupportedException or SecurityException)
-            {
-            }
+                                          or NotSupportedException or SecurityException) { }
+
             return Results.NoContent();
         }).Produces(204);
     }
@@ -177,6 +187,7 @@ public static class MigrationEndpoints
         {
             // a remount failure must not break the task terminal event
         }
+
         try
         {
             // the C5 single pass over what the import just landed. Runs against the LIVE
@@ -195,6 +206,7 @@ public static class MigrationEndpoints
         {
             // an import failure must not break the task terminal event
         }
+
         try
         {
             // accounts.json landed at its anchor (the data root) — reload so the same
@@ -206,6 +218,7 @@ public static class MigrationEndpoints
         {
             // a reload failure must not break the task terminal event
         }
+
         try
         {
             runtime.InstanceLock.Wait();
@@ -264,6 +277,7 @@ public static class MigrationEndpoints
                 return name;
             }
         }
+
         return null;
     }
 }

@@ -10,6 +10,7 @@
 // Qt queued connections become Task.Yield() plus a lock around the queue/step bookkeeping;
 // Abort() mirrors the C++ parent-side behavior of finishing immediately instead of waiting for
 // the subtasks (with `_aborting` playing the role of the disconnect(child, aborted, this)).
+
 namespace FlintLauncher.Core.Tasks;
 
 /// <summary>
@@ -24,7 +25,9 @@ public class ConcurrentTask : FlintTask
     private protected readonly object Gate = new();
     private protected readonly Queue<FlintTask> Queue = new();
     private protected readonly Dictionary<FlintTask, Task?> Doing = new();
+
     private protected readonly Dictionary<FlintTask, FlintTask> Done = new();
+
     // the C++ m_failed/m_succeeded maps — the names hide the FlintTask signal events on purpose
     private protected new readonly Dictionary<FlintTask, FlintTask> Failed = new();
     private protected new readonly Dictionary<FlintTask, FlintTask> Succeeded = new();
@@ -32,6 +35,7 @@ public class ConcurrentTask : FlintTask
     private protected int TotalMaxSize;
     private CancellationToken runToken;
     private volatile bool aborting;
+
     /// <summary>
     /// Subtask completions whose bookkeeping is still in flight (between RunSubTaskAsync's yield
     /// and OnSubTaskFinished returning). The driver loop must not start new work while this is
@@ -39,6 +43,7 @@ public class ConcurrentTask : FlintTask
     /// the outcome and start a subtask that should never have run (SequentialTask fail-fast).
     /// </summary>
     private int pendingCompletions;
+
     /// <summary>
     /// Gate-guarded stamp bumped on every composition mutation (subtask finished / next
     /// dequeued). UpdateState captures the stamp together with its snapshot; the emission is
@@ -48,6 +53,7 @@ public class ConcurrentTask : FlintTask
     /// the single-threaded event loop; ConcurrentTaskAggregatesProgressTotals caught it).
     /// </summary>
     private long stateStamp;
+
     private readonly object _emitLock = new();
 
     public ConcurrentTask(string taskName = "", int maxConcurrent = DefaultMaxConcurrent)
@@ -83,6 +89,7 @@ public class ConcurrentTask : FlintTask
             Queue.Clear();
             TaskProgress.Clear();
         }
+
         ResetProgress();
     }
 
@@ -106,6 +113,7 @@ public class ConcurrentTask : FlintTask
         {
             doing = Doing.Keys.ToArray();
         }
+
         foreach (var task in doing)
         {
             task.Abort();
@@ -184,6 +192,7 @@ public class ConcurrentTask : FlintTask
                             reserved = true;
                             continue;
                         }
+
                         if (!runTask.IsCompleted)
                         {
                             pending = runTask;
@@ -202,6 +211,7 @@ public class ConcurrentTask : FlintTask
                         await Task.Yield();
                         continue;
                     }
+
                     // Either everything drained (FinishLocked decides) or a subtask is between
                     // its reservation and its run task being stored.
                     ExecuteNextSubTask();
@@ -209,6 +219,7 @@ public class ConcurrentTask : FlintTask
                     {
                         break;
                     }
+
                     await Task.Yield();
                     continue;
                 }
@@ -358,6 +369,7 @@ public class ConcurrentTask : FlintTask
             {
                 Failed[task] = task;
             }
+
             Doing.Remove(task);
             stateStamp++;
 
@@ -379,6 +391,7 @@ public class ConcurrentTask : FlintTask
         {
             EmitProgress(finalProgress);
         }
+
         UpdateState();
     }
 
@@ -393,6 +406,7 @@ public class ConcurrentTask : FlintTask
             {
                 return;
             }
+
             progress.Status = msg;
             progress.State = TaskStepState.Running;
             TaskProgress[task.Uid] = progress;
@@ -417,6 +431,7 @@ public class ConcurrentTask : FlintTask
             {
                 return;
             }
+
             progress.Details = msg;
             progress.State = TaskStepState.Running;
             TaskProgress[task.Uid] = progress;
@@ -441,6 +456,7 @@ public class ConcurrentTask : FlintTask
             {
                 return;
             }
+
             progress.Update(taskProgress.Current, taskProgress.Total);
             TaskProgress[task.Uid] = progress;
             totalSize = TotalSizeLocked();
@@ -472,6 +488,7 @@ public class ConcurrentTask : FlintTask
             {
                 reason = "Task failed"; // "clearly a bug somewhere"
             }
+
             EmitFailed(reason);
             return;
         }
@@ -485,6 +502,7 @@ public class ConcurrentTask : FlintTask
                 failReasons.Add(reason);
             }
         }
+
         EmitFailed(failReasons.Count == 0
             ? "Multiple subtasks failed"
             : $"Multiple subtasks failed\n{string.Join("\n", failReasons)}");
@@ -529,6 +547,7 @@ public class ConcurrentTask : FlintTask
             {
                 status = "Task finished.";
             }
+
             EmitStateUpdate(stamp, () => EmitStatus(status));
         }
     }
@@ -549,6 +568,7 @@ public class ConcurrentTask : FlintTask
             {
                 return; // a newer snapshot exists — its own update supersedes this one
             }
+
             emit();
         }
     }

@@ -63,9 +63,7 @@ public class Library
     /// MOJANG: container with Mojang style download info
     public MojangLibraryDownloadInfo? MojangDownloads { get; set; }
 
-    public Library()
-    {
-    }
+    public Library() { }
 
     public Library(string name)
     {
@@ -94,6 +92,7 @@ public class Library
         {
             newlib.NativeClassifiers[os] = classifier;
         }
+
         newlib.Rules.AddRange(baseLib.Rules);
         return newlib;
     }
@@ -161,12 +160,15 @@ public class Library
                     ruleResult = temp;
                 }
             }
+
             result = result && ruleResult == Rule.Action.Allow;
         }
+
         if (IsNative())
         {
             result = result && GetCompatibleNative(runtimeContext) is not null;
         }
+
         return result;
     }
 
@@ -181,7 +183,6 @@ public class Library
     /// in Library.h but never defines or calls it in this checkout, so it is intentionally
     /// not implemented here.
     /// </summary>
-
     /// <summary>Get the compatible native classifier for the current runtime context, or null.</summary>
     public string? GetCompatibleNative(RuntimeContext runtimeContext)
     {
@@ -194,6 +195,7 @@ public class Library
                 NativeClassifiers.TryGetValue(runtimeContext.System, out entry);
             }
         }
+
         return entry;
     }
 
@@ -222,6 +224,7 @@ public class Library
                 var fileName = Path.GetFileName(outPath);
                 return Path.GetFullPath(FileSystem.PathCombine(overridePath, fileName));
             }
+
             // the default prefix is the C++-era relative "libraries/", which anchored on
             // the C++ process CWD (the application chdir'd into its data dir at startup);
             // the port has no chdir (DI-B), so an unstamped prefix must anchor on the
@@ -230,6 +233,7 @@ public class Library
             {
                 outPath = FileSystem.PathCombine(storageBase, outPath);
             }
+
             return Path.GetFullPath(outPath);
         }
 
@@ -278,6 +282,7 @@ public class Library
                 failedLocalFiles.Add(fullPath);
                 return false;
             }
+
             return true;
         }
 
@@ -288,15 +293,18 @@ public class Library
                 CheckLocalFile(storage);
                 return;
             }
+
             var entry = cache.ResolveEntry("libraries", storage);
             if (stale)
             {
                 entry.SetStale(true);
             }
+
             if (!entry.IsStale)
             {
                 return;
             }
+
             var options = RequestOptions.NoOptions;
             if (stale)
             {
@@ -314,6 +322,7 @@ public class Library
             {
                 dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, sha1));
             }
+
             result.Add(dl);
         }
 
@@ -335,6 +344,7 @@ public class Library
                             var cookedStorage = rawStorage.Replace("${arch}", "32");
                             AddDownload(cookedStorage, nat32Info.Url, nat32Info.Sha1);
                         }
+
                         var nat64Info = MojangDownloads.GetDownloadInfo(nat64Classifier);
                         if (nat64Info is not null)
                         {
@@ -390,6 +400,7 @@ public class Library
                 AddDownload(rawStorage, rawDl, "");
             }
         }
+
         return result;
     }
 
@@ -400,6 +411,7 @@ public class Library
         {
             return FilenameOverride;
         }
+
         // non-native? use only the gradle specifier
         if (!IsNative())
         {
@@ -418,6 +430,7 @@ public class Library
         {
             return DisplayNameValue;
         }
+
         return Filename(runtimeContext);
     }
 

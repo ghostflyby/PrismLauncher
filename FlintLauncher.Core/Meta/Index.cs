@@ -14,9 +14,7 @@ public sealed class Index : MetaEntity
     private readonly List<VersionList> _lists = [];
     private readonly Dictionary<string, VersionList> _uids = new(StringComparer.Ordinal);
 
-    public Index()
-    {
-    }
+    public Index() { }
 
     public Index(IReadOnlyList<VersionList> lists)
     {
@@ -42,9 +40,11 @@ public sealed class Index : MetaEntity
             {
                 outList.SetMetaCache(cache);
             }
+
             _uids[uid] = outList;
             _lists.Add(outList);
         }
+
         return outList;
     }
 
@@ -79,6 +79,7 @@ public sealed class Index : MetaEntity
                 {
                     list.SetMetaCache(cache);
                 }
+
                 if (_uids.TryGetValue(list.Uid(), out var existing) && existing is not null)
                 {
                     existing.MergeFromIndex(list);
@@ -119,6 +120,7 @@ public sealed class Index : MetaEntity
         {
             loadTask.AddTask(LoadTask(mode));
         }
+
         loadTask.AddTask(versionList.LoadTask(mode));
         loadTask.AddTask(versionList.GetVersion(version).LoadTask(mode));
         return loadTask;

@@ -45,6 +45,7 @@ public class ResourceFolderModel
     private bool firstFolderLoad = true;
 
     private readonly List<Resource> _resources = [];
+
     // Represents the relationship between a resource's internal ID and its row position on the model.
     private readonly Dictionary<string, int> _resourcesIndex = new();
 
@@ -131,7 +132,7 @@ public class ResourceFolderModel
                     File.Copy(originalPath, newPath, overwrite: false);
                 }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                         or NotSupportedException)
+                                              or NotSupportedException)
                 {
                     return false; // copy failed
                 }
@@ -169,6 +170,7 @@ public class ResourceFolderModel
                 return true;
             }
         }
+
         return false;
     }
 
@@ -195,6 +197,7 @@ public class ResourceFolderModel
                 return res;
             }
         }
+
         return false;
     }
 

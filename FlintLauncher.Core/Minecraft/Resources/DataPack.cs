@@ -74,6 +74,7 @@ public class DataPack : Resource
             {
                 return 1;
             }
+
             if (thisVer < otherVer)
             {
                 return -1;
@@ -83,6 +84,7 @@ public class DataPack : Resource
         {
             return base.Compare(other, type);
         }
+
         return 0;
     }
 
@@ -108,12 +110,14 @@ public class DataPack : Resource
                 {
                     return true;
                 }
+
                 if (filter.IsMatch(version.Max.ToString()))
                 {
                     return true;
                 }
             }
         }
+
         return base.ApplyFilter(filter);
     }
 
@@ -128,8 +132,10 @@ public class DataPack : Resource
             {
                 return packFormat.ToString();
             }
+
             return $"{packFormat} ({versionBounds.Min} - {versionBounds.Max})";
         }
+
         var minBound = Map(minFormat, mappings);
         var maxBound = Map(maxFormat, mappings);
         var minVersion = minBound.Min;
@@ -138,6 +144,7 @@ public class DataPack : Resource
         {
             return "Unrecognized";
         }
+
         var str = "[" + minFormat.Major;
         if (minFormat.Minor != 0)
         {
@@ -164,6 +171,7 @@ public class DataPack : Resource
         {
             return (EmptyVersion, EmptyVersion);
         }
+
         foreach (var range in versions)
         {
             if (range.Format.Major == format.Major && range.Format.Minor == format.Minor)
@@ -171,6 +179,7 @@ public class DataPack : Resource
                 return (range.Min, range.Max);
             }
         }
+
         return (EmptyVersion, EmptyVersion);
     }
 

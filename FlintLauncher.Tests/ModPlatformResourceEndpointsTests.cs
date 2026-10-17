@@ -241,9 +241,7 @@ internal sealed class StubModrinthResourceServer : IDisposable
         {
             _listener.Close();
         }
-        catch (ObjectDisposedException)
-        {
-        }
+        catch (ObjectDisposedException) { }
     }
 }
 

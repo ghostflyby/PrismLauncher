@@ -30,13 +30,14 @@ public static class MmcZip
         {
             return [];
         }
+
         try
         {
             using var zip = ZipFile.OpenRead(fileCompressed);
             return ExtractSubDir(zip, subdir: "", target: dir);
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                 or ArgumentException or NotSupportedException)
+                                      or ArgumentException or NotSupportedException)
         {
             return null;
         }
@@ -52,13 +53,14 @@ public static class MmcZip
         {
             return [];
         }
+
         try
         {
             using var zip = ZipFile.OpenRead(fileCompressed);
             return ExtractSubDir(zip, subdir, dir);
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                 or ArgumentException or NotSupportedException)
+                                      or ArgumentException or NotSupportedException)
         {
             return null;
         }
@@ -74,6 +76,7 @@ public static class MmcZip
         {
             return true;
         }
+
         try
         {
             using var zip = ZipFile.OpenRead(fileCompressed);
@@ -82,6 +85,7 @@ public static class MmcZip
             {
                 return false;
             }
+
             FileSystem.EnsureFilePathExists(target);
             using var source = entry.Open();
             using var output = File.Create(target);
@@ -89,7 +93,7 @@ public static class MmcZip
             return true;
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                 or ArgumentException or NotSupportedException)
+                                      or ArgumentException or NotSupportedException)
         {
             return false;
         }
@@ -173,6 +177,7 @@ public static class MmcZip
                     FileSystem.RemoveFiles(extracted);
                     return null;
                 }
+
                 extracted.Add(targetFilePath);
                 continue;
             }
@@ -185,14 +190,16 @@ public static class MmcZip
                 source.CopyTo(output);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                     or NotSupportedException)
+                                          or NotSupportedException)
             {
                 // Failed to extract file
                 FileSystem.RemoveFiles(extracted);
                 return null;
             }
+
             extracted.Add(targetFilePath);
         }
+
         return extracted;
     }
 
@@ -210,6 +217,7 @@ public static class MmcZip
         {
             return false;
         }
+
         using var stream = File.Create(zipFile);
         using var zip = new ZipArchive(stream, ZipArchiveMode.Create);
         return CompressDirFiles(zip, dir, files) && AddDirectoryEntries(zip, dir, excludeFilter);
@@ -225,6 +233,7 @@ public static class MmcZip
         {
             return false;
         }
+
         foreach (var file in files)
         {
             var filePath = GetRelativePath(dir, file);
@@ -233,11 +242,12 @@ public static class MmcZip
                 zip.CreateEntryFromFile(file, filePath, CompressionLevel.Optimal);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                     or NotSupportedException)
+                                          or NotSupportedException)
             {
                 return false;
             }
         }
+
         return true;
     }
 
@@ -247,7 +257,7 @@ public static class MmcZip
     /// filter rejects (filter returns true to keep).
     /// </summary>
     public static bool MergeZipFiles(ZipArchive into, string from, HashSet<string> contained,
-                                     Func<string, bool>? filter = null)
+        Func<string, bool>? filter = null)
     {
         try
         {
@@ -260,20 +270,23 @@ public static class MmcZip
                     // Skipping file - filtered
                     continue;
                 }
+
                 if (!contained.Add(filename))
                 {
                     // Skipping already contained file
                     continue;
                 }
+
                 var newEntry = into.CreateEntry(filename);
                 using var input = entry.Open();
                 using var output = newEntry.Open();
                 input.CopyTo(output);
             }
+
             return true;
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                 or ArgumentException or NotSupportedException)
+                                      or ArgumentException or NotSupportedException)
         {
             return false;
         }
@@ -285,12 +298,13 @@ public static class MmcZip
     /// The exclude filter receives the FileInfo and returns true to skip the file.
     /// </summary>
     public static bool CollectFileListRecursively(string rootDir, string? subDir, List<string> files,
-                                                  Func<FileSystemInfo, bool>? excludeFilter = null)
+        Func<FileSystemInfo, bool>? excludeFilter = null)
     {
         if (!Directory.Exists(rootDir))
         {
             return false;
         }
+
         var directory = subDir ?? rootDir;
         if (!Directory.Exists(directory))
         {
@@ -313,8 +327,10 @@ public static class MmcZip
             {
                 continue; // Skipping file
             }
+
             files.Add(file); // we want the original paths for CompressDirFiles
         }
+
         return true;
     }
 
@@ -334,8 +350,10 @@ public static class MmcZip
             {
                 continue;
             }
+
             zip.CreateEntry(relative.EndsWith('/') ? relative : relative + '/');
         }
+
         return true;
     }
 
@@ -354,12 +372,14 @@ public static class MmcZip
         {
             return true;
         }
+
         var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         if (!childFull.StartsWith(parentFull, comparison))
         {
             return false;
         }
+
         return childFull.Length == parentFull.Length || childFull[parentFull.Length] == Path.DirectorySeparatorChar
-            || childFull[parentFull.Length] == '/';
+                                                     || childFull[parentFull.Length] == '/';
     }
 }

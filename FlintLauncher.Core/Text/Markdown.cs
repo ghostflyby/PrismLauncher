@@ -66,12 +66,14 @@ public static partial class Markdown
                 {
                     html.Append(" class=\"language-").Append(Escape(info)).Append('"');
                 }
+
                 html.Append('>');
                 while (i < lines.Length && !IsFenceClose(lines[i], marker))
                 {
                     html.Append(Escape(lines[i])).Append('\n');
                     i++;
                 }
+
                 i++; // closing fence (or EOF)
                 html.Append("</code></pre>\n");
                 continue;
@@ -107,6 +109,7 @@ public static partial class Markdown
                     inner.Add(stripped.StartsWith(' ') ? stripped[1..] : stripped);
                     i++;
                 }
+
                 html.Append("<blockquote>\n").Append(RenderBlocks(string.Join('\n', inner))).Append("</blockquote>\n");
                 continue;
             }
@@ -129,6 +132,7 @@ public static partial class Markdown
                     html.Append(lines[i]).Append('\n');
                     i++;
                 }
+
                 continue;
             }
 
@@ -144,11 +148,14 @@ public static partial class Markdown
                 {
                     break;
                 }
+
                 paragraph.Add(current);
                 i++;
             }
+
             html.Append("<p>").Append(RenderParagraph(paragraph)).Append("</p>\n");
         }
+
         return html;
     }
 
@@ -168,14 +175,17 @@ public static partial class Markdown
                 {
                     break;
                 }
+
                 i = j;
                 continue;
             }
+
             var markerPos = MatchListMarker(line, out var itemOrdered, out var indent);
             if (markerPos < 0 || itemOrdered != ordered)
             {
                 break;
             }
+
             var firstContent = line.Length > indent ? line[indent..] : "";
             var itemLines = new List<string> { firstContent };
             i++;
@@ -187,6 +197,7 @@ public static partial class Markdown
                 {
                     break; // next item
                 }
+
                 if (contIndent >= contentIndent)
                 {
                     itemLines.Add(cont.Length > contentIndent ? cont[contentIndent..] : cont.TrimStart());
@@ -197,6 +208,7 @@ public static partial class Markdown
                     break;
                 }
             }
+
             html.Append("<li>");
             if (itemLines.Count == 1)
             {
@@ -206,8 +218,10 @@ public static partial class Markdown
             {
                 html.Append(RenderBlocks(string.Join('\n', itemLines)));
             }
+
             html.Append("</li>\n");
         }
+
         html.Append("</").Append(tag).Append(">\n");
         return (html.ToString(), i);
     }
@@ -222,10 +236,12 @@ public static partial class Markdown
         {
             indent++;
         }
+
         if (indent > 3 || indent >= line.Length)
         {
             return -1;
         }
+
         var rest = line[indent..];
         if (rest.Length >= 2 && (rest[0] is '*' or '-' or '+') && (rest[1] == ' ' || rest[1] == '\t'))
         {
@@ -233,11 +249,13 @@ public static partial class Markdown
             contentIndent = indent + 2;
             return indent;
         }
+
         var digits = 0;
         while (digits < rest.Length && char.IsAsciiDigit(rest[digits]))
         {
             digits++;
         }
+
         if (digits > 0 && digits <= 9 && digits + 1 < rest.Length && rest[digits] == '.' &&
             (rest[digits + 1] == ' ' || rest[digits + 1] == '\t'))
         {
@@ -245,6 +263,7 @@ public static partial class Markdown
             contentIndent = indent + digits + 2;
             return indent;
         }
+
         return -1;
     }
 
@@ -265,18 +284,21 @@ public static partial class Markdown
                 html.Append(RenderInline(line[..^1])).Append("<br />\n");
                 continue;
             }
+
             var stripped = line.TrimEnd();
             if (!isLast && stripped.Length != line.Length && line.Length - stripped.Length >= 2)
             {
                 html.Append(RenderInline(stripped)).Append("<br />\n");
                 continue;
             }
+
             html.Append(RenderInline(line));
             if (!isLast)
             {
                 html.Append(' '); // soft break with NOBREAKS
             }
         }
+
         return html.ToString();
     }
 
@@ -287,6 +309,7 @@ public static partial class Markdown
         {
             return false;
         }
+
         foreach (var c in trimmed)
         {
             if (c != marker)
@@ -294,6 +317,7 @@ public static partial class Markdown
                 return false;
             }
         }
+
         return true;
     }
 
@@ -313,6 +337,7 @@ public static partial class Markdown
                 i += 2;
                 continue;
             }
+
             if (c == '`')
             {
                 var run = RunLength(text, i, '`');
@@ -327,10 +352,12 @@ public static partial class Markdown
                     i = close + run;
                     continue;
                 }
+
                 html.Append(Escape(new string('`', run)));
                 i += run;
                 continue;
             }
+
             if (c == '<')
             {
                 // autolink <http://...> / <mailto or bare email>
@@ -346,6 +373,7 @@ public static partial class Markdown
                         i = close + 1;
                         continue;
                     }
+
                     // raw inline HTML: passed through (CMARK_OPT_UNSAFE)
                     if (IsValidHtmlTag(text, i, close))
                     {
@@ -354,10 +382,12 @@ public static partial class Markdown
                         continue;
                     }
                 }
+
                 html.Append("&lt;");
                 i++;
                 continue;
             }
+
             if (c == '!' && i + 1 < text.Length && text[i + 1] == '[')
             {
                 if (TryRenderLink(text, i + 1, html, image: true))
@@ -366,6 +396,7 @@ public static partial class Markdown
                     continue;
                 }
             }
+
             if (c == '[')
             {
                 if (TryRenderLink(text, i, html, image: false))
@@ -374,6 +405,7 @@ public static partial class Markdown
                     continue;
                 }
             }
+
             if (c is '*' or '_')
             {
                 var run = RunLength(text, i, c);
@@ -389,6 +421,7 @@ public static partial class Markdown
                     continue;
                 }
             }
+
             if (c == '&')
             {
                 var semi = text.IndexOf(';', i + 1);
@@ -399,9 +432,11 @@ public static partial class Markdown
                     continue;
                 }
             }
+
             html.Append(Escape(c));
             i++;
         }
+
         return html.ToString();
     }
 
@@ -413,15 +448,18 @@ public static partial class Markdown
         {
             return false;
         }
+
         if (labelEnd + 1 >= text.Length || text[labelEnd + 1] != '(')
         {
             return false;
         }
+
         var closeParen = text.IndexOf(')', labelEnd + 2);
         if (closeParen < 0)
         {
             return false;
         }
+
         var dest = text[(labelEnd + 2)..closeParen].Trim();
         var title = "";
         // [label](url "title") / (url 'title')
@@ -431,10 +469,12 @@ public static partial class Markdown
             dest = titleMatch.Groups["dest"].Value;
             title = titleMatch.Groups["title"].Value;
         }
+
         if (dest.StartsWith('<') && dest.EndsWith('>') && dest.Length >= 2)
         {
             dest = dest[1..^1];
         }
+
         var inner = RenderInline(text[(pos + 1)..labelEnd]);
         if (image)
         {
@@ -444,6 +484,7 @@ public static partial class Markdown
             {
                 html.Append(" title=\"").Append(Attr(title)).Append('"');
             }
+
             html.Append(" />");
         }
         else
@@ -453,8 +494,10 @@ public static partial class Markdown
             {
                 html.Append(" title=\"").Append(Attr(title)).Append('"');
             }
+
             html.Append('>').Append(inner).Append("</a>");
         }
+
         return true;
     }
 
@@ -476,6 +519,7 @@ public static partial class Markdown
                 i++;
                 continue;
             }
+
             if (c == '[')
             {
                 depth++;
@@ -489,6 +533,7 @@ public static partial class Markdown
                 }
             }
         }
+
         return -1;
     }
 
@@ -499,6 +544,7 @@ public static partial class Markdown
         {
             run++;
         }
+
         return run;
     }
 
@@ -514,11 +560,14 @@ public static partial class Markdown
                 {
                     return i;
                 }
+
                 i += r;
                 continue;
             }
+
             i++;
         }
+
         return -1;
     }
 
@@ -531,13 +580,16 @@ public static partial class Markdown
             {
                 continue;
             }
+
             var closeRun = RunLength(text, i, c);
             if (closeRun >= use && (i == 0 || text[i - 1] != ' '))
             {
                 return i;
             }
+
             i += closeRun - 1;
         }
+
         return -1;
     }
 
@@ -554,6 +606,7 @@ public static partial class Markdown
         {
             return false;
         }
+
         var body = text[(start + 1)..semi];
         if (body.StartsWith('#'))
         {
@@ -562,8 +615,10 @@ public static partial class Markdown
             {
                 return digits.Length > 1 && digits[1..].All(char.IsAsciiHexDigit);
             }
+
             return digits.Length > 0 && digits.All(char.IsAsciiDigit);
         }
+
         return body.Length > 0 && body.All(c => char.IsAsciiLetterOrDigit(c));
     }
 
@@ -605,6 +660,7 @@ public static partial class Markdown
                 _ => c.ToString(),
             });
         }
+
         return sb.ToString();
     }
 

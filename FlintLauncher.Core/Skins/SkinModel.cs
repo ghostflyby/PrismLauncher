@@ -26,9 +26,7 @@ public enum SkinModelKind
 /// <summary>Data subset of SkinModel.</summary>
 public sealed class SkinModel
 {
-    public SkinModel()
-    {
-    }
+    public SkinModel() { }
 
     public SkinModel(string skinsDir, JsonObject obj)
     {
@@ -82,6 +80,7 @@ public static class SkinListStore
         {
             return newSkins;
         }
+
         try
         {
             using var doc = JsonDocument.Parse(FileSystem.Read(manifestPath));
@@ -91,12 +90,14 @@ public static class SkinListStore
             {
                 return newSkins;
             }
+
             foreach (var skin in skins.EnumerateArray())
             {
                 if (skin.ValueKind != JsonValueKind.Object)
                 {
                     continue;
                 }
+
                 var node = JsonNode.Parse(skin.GetRawText());
                 if (node is JsonObject obj)
                 {
@@ -112,6 +113,7 @@ public static class SkinListStore
         {
             // qCritical() << "Couldn't load skins json:" << e.cause();
         }
+
         return newSkins;
     }
 
@@ -123,6 +125,7 @@ public static class SkinListStore
         {
             arr.Add((JsonNode?)skin.ToJson());
         }
+
         doc["skins"] = arr;
         // upstream goes through Json::write() (QJsonDocument::Indented): sorted keys, 4-space indent
         FileSystem.Write(Path.Combine(skinsDir, "index.json"),

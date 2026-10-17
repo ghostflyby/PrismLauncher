@@ -60,10 +60,12 @@ public class Mod : Resource
                 {
                     return 1;
                 }
+
                 if (thisVer < otherVer)
                 {
                     return -1;
                 }
+
                 break;
             }
             case SortType.Side:
@@ -73,6 +75,7 @@ public class Mod : Resource
                 {
                     return compareResult;
                 }
+
                 break;
             }
             case SortType.McVersions:
@@ -82,6 +85,7 @@ public class Mod : Resource
                 {
                     return compareResult;
                 }
+
                 break;
             }
             case SortType.Loaders:
@@ -91,6 +95,7 @@ public class Mod : Resource
                 {
                     return compareResult;
                 }
+
                 break;
             }
             case SortType.ReleaseType:
@@ -100,6 +105,7 @@ public class Mod : Resource
                 {
                     return compareResult;
                 }
+
                 break;
             }
             case SortType.RequiredBy:
@@ -108,10 +114,12 @@ public class Mod : Resource
                 {
                     return 1;
                 }
+
                 if (RequiredByCount < castOther.RequiredByCount)
                 {
                     return -1;
                 }
+
                 break;
             }
             case SortType.Requires:
@@ -120,13 +128,16 @@ public class Mod : Resource
                 {
                     return 1;
                 }
+
                 if (RequiresCount < castOther.RequiresCount)
                 {
                     return -1;
                 }
+
                 break;
             }
         }
+
         return 0;
     }
 

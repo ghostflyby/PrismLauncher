@@ -87,12 +87,14 @@ public static class SrvResolver
         {
             return records;
         }
+
         var flags = BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan(2, 2));
         if ((flags & 0x8000) != 0 || (flags & 0x000F) != 0)
         {
             // not a response or an error rcode
             return records;
         }
+
         var qdCount = BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan(4, 2));
         var anCount = BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan(6, 2));
 
@@ -102,6 +104,7 @@ public static class SrvResolver
             offset = SkipName(buffer, offset);
             offset += 4; // qtype + qclass
         }
+
         for (var i = 0; i < anCount && offset + 10 <= buffer.Length; i++)
         {
             offset = SkipName(buffer, offset);
@@ -114,18 +117,21 @@ public static class SrvResolver
                 offset += rdLength;
                 continue;
             }
+
             var rdata = buffer.AsSpan(offset, rdLength);
             offset += rdLength;
             if (rdata.Length < 7)
             {
                 continue;
             }
+
             var priority = BinaryPrimitives.ReadUInt16BigEndian(rdata);
             var weight = BinaryPrimitives.ReadUInt16BigEndian(rdata[2..]);
             var port = BinaryPrimitives.ReadUInt16BigEndian(rdata[4..]);
             var (target, _) = ReadName(buffer, offset - rdLength + 6);
             records.Add(new SrvRecord(priority, weight, port, target));
         }
+
         return records;
     }
 
@@ -140,6 +146,7 @@ public static class SrvResolver
             buffer[offset++] = (byte)part.Length;
             offset += Encoding.ASCII.GetBytes(part, buffer.AsSpan(offset));
         }
+
         buffer[offset] = 0;
         return buffer;
     }
@@ -153,12 +160,15 @@ public static class SrvResolver
             {
                 return offset + 1;
             }
+
             if ((length & 0xC0) == 0xC0)
             {
                 return offset + 2;
             }
+
             offset += 1 + length;
         }
+
         return offset;
     }
 
@@ -176,25 +186,30 @@ public static class SrvResolver
                 end = Math.Max(end, current + 1);
                 break;
             }
+
             if ((length & 0xC0) == 0xC0)
             {
                 if (current + 1 >= buffer.Length)
                 {
                     break;
                 }
+
                 var pointer = ((length & 0x3F) << 8) | buffer[current + 1];
                 if (jumps == 0)
                 {
                     end = current + 2;
                 }
+
                 current = pointer;
                 jumps++;
                 continue;
             }
+
             if (builder.Length != 0)
             {
                 builder.Append('.');
             }
+
             builder.Append(Encoding.ASCII.GetString(buffer, current + 1, Math.Min(length, buffer.Length - current - 1)));
             current += 1 + length;
             if (jumps == 0)
@@ -202,6 +217,7 @@ public static class SrvResolver
                 end = current;
             }
         }
+
         return (builder.ToString(), end);
     }
 
@@ -223,6 +239,7 @@ public static class SrvResolver
                 {
                     continue;
                 }
+
                 foreach (var line in File.ReadLines(candidate))
                 {
                     var trimmed = line.Trim();
@@ -230,6 +247,7 @@ public static class SrvResolver
                     {
                         continue;
                     }
+
                     var host = trimmed["nameserver ".Length..].Trim();
                     if (IPAddress.TryParse(host, out var address) &&
                         !address.Equals(IPAddress.Loopback) && !address.Equals(IPAddress.IPv6Loopback))
@@ -238,10 +256,9 @@ public static class SrvResolver
                     }
                 }
             }
-            catch (IOException)
-            {
-            }
+            catch (IOException) { }
         }
+
         return new IPEndPoint(IPAddress.Loopback, 53);
     }
 }

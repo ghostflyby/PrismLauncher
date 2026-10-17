@@ -52,7 +52,7 @@ public static class TexturePackUtils
                 data = File.ReadAllText(mcmetaFileInfo.FullName);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                     or NotSupportedException)
+                                          or NotSupportedException)
             {
                 return false; // can't open pack.txt
             }
@@ -82,7 +82,7 @@ public static class TexturePackUtils
                 data = File.ReadAllBytes(imageFileInfo.FullName);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                     or NotSupportedException)
+                                          or NotSupportedException)
             {
                 return false; // can't open pack.png file
             }
@@ -110,7 +110,7 @@ public static class TexturePackUtils
             zip = ZipFile.OpenRead(pack.Fileinfo.FullName);
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                 or ArgumentException or NotSupportedException)
+                                      or ArgumentException or NotSupportedException)
         {
             return false; // can't open zip file
         }
@@ -136,12 +136,15 @@ public static class TexturePackUtils
                     {
                         return false;
                     }
+
                     if (stop)
                     {
                         break;
                     }
+
                     continue;
                 }
+
                 if (!iconProcessed && filename == "pack.png")
                 {
                     iconProcessed = true;
@@ -152,6 +155,7 @@ public static class TexturePackUtils
                     {
                         return false;
                     }
+
                     if (stop)
                     {
                         break;
@@ -159,6 +163,7 @@ public static class TexturePackUtils
                 }
                 // else: file->skip()
             }
+
             return true;
         }
     }
@@ -182,6 +187,7 @@ public static class TexturePackUtils
             // qWarning() << "Failed to parse pack.png.";
             return false;
         }
+
         return true;
     }
 
@@ -205,7 +211,7 @@ public static class TexturePackUtils
                         data = File.ReadAllBytes(imageFileInfo.FullName);
                     }
                     catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                             or NotSupportedException)
+                                                  or NotSupportedException)
                     {
                         return false; // can't open pack.png file
                     }
@@ -219,6 +225,7 @@ public static class TexturePackUtils
                 {
                     return false; // pack.png does not exists or is not a valid file.
                 }
+
                 return false;
             }
             case ResourceType.ZipFile:
@@ -236,10 +243,11 @@ public static class TexturePackUtils
                     }
                 }
                 catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                         or ArgumentException or NotSupportedException)
+                                              or ArgumentException or NotSupportedException)
                 {
                     return false;
                 }
+
                 return false; // could not set pack.mcmeta as current file.
             }
             default:

@@ -149,7 +149,7 @@ public class AuthFlowTests : IDisposable
         Assert.Equal(AccountTaskState.FailedSoft, flow.TaskState);
         // 2148916238: underaged account not linked to a family (upstream message, verbatim)
         Assert.Equal("This Microsoft account is underaged and is not linked to a family.\n\n" +
-            "Please set up your account according to <a href=\"https://help.minecraft.net/hc/en-us/articles/4408968616077\">help.minecraft.net</a>.",
+                     "Please set up your account according to <a href=\"https://help.minecraft.net/hc/en-us/articles/4408968616077\">help.minecraft.net</a>.",
             flow.FailReason);
         Assert.Equal(AccountState.Errored, account.AccountData.AccountState);
         Assert.Contains("underaged", account.AccountData.LastError());
@@ -166,7 +166,7 @@ public class AuthFlowTests : IDisposable
 
         Assert.Equal(TaskState.Failed, flow.State);
         Assert.Contains("This Microsoft account does not have an Xbox Live profile. Buy the game on " +
-            "<a href=\"https://www.minecraft.net/en-us/store/minecraft-java-edition\">minecraft.net</a> first.",
+                        "<a href=\"https://www.minecraft.net/en-us/store/minecraft-java-edition\">minecraft.net</a> first.",
             flow.FailReason);
     }
 
@@ -248,6 +248,7 @@ public class AuthFlowTests : IDisposable
         {
             await Task.Delay(20);
         }
+
         await Task.Delay(200);
 
         flow.Abort();
@@ -366,7 +367,6 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task Silent_Refresh_With_Changed_Client_Id_Is_Disabled()
     {
-
         var account = MinecraftAccount.CreateBlankMsa();
         account.AccountData.MsaClientId = "another-client-id";
         account.AccountData.MsaToken.RefreshToken = "EXISTING_REFRESH";
@@ -384,7 +384,6 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task Silent_Refresh_With_Empty_Refresh_Token_Is_Disabled()
     {
-
         var account = MinecraftAccount.CreateBlankMsa();
         account.AccountData.MsaClientId = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
 
@@ -420,7 +419,6 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task MinecraftAccount_Offline_Refresh_Succeeds_And_Fills_Session()
     {
-
         var account = MinecraftAccount.CreateOffline("Notch");
         // offline accounts have no steps: the flow completes immediately
         var flow = account.Refresh(_auth);

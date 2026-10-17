@@ -9,6 +9,7 @@
 //    against a reference implementation for the vectors in Murmur2Tests).
 //  - The optional filter drops bytes from the hashed stream before size counting (this is
 //    what Hashing::hash(..., Murmur2) uses to skip tab/LF/CR/space).
+
 namespace FlintLauncher.Core.ModPlatform.Hashing;
 
 public static class Murmur2
@@ -19,6 +20,7 @@ public static class Murmur2
 
     /// <summary>MiB (the C++ header defines KiB/MiB; the default buffer is 4 MiB).</summary>
     public const int KiB = 1024;
+
     public const int MiB = 1024 * KiB;
 
     /// <summary>

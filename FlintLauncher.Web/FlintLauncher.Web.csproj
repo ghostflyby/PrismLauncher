@@ -8,17 +8,17 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FlintLauncher.Core\FlintLauncher.Core.csproj" />
+    <ProjectReference Include="..\FlintLauncher.Core\FlintLauncher.Core.csproj"/>
     <!-- .NET 10 built-in OpenAPI: source-generated documents under Native AOT (the
          reflection-based generator is not AOT-safe, the package's generator is). -->
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12"/>
   </ItemGroup>
 
   <ItemGroup>
     <!-- The tests exercise FlintJsonContext's source-generated roots directly (the AOT
          smoke: a root type missing from the context is a RUNTIME failure, not a compile
          error) — same pattern as Core's InternalsVisibleTo. -->
-    <InternalsVisibleTo Include="FlintLauncher.Tests" />
+    <InternalsVisibleTo Include="FlintLauncher.Tests"/>
   </ItemGroup>
 
 </Project>

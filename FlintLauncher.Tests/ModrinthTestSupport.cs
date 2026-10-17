@@ -102,6 +102,7 @@ internal sealed class StubModrinthServer : IDisposable
                 LastHeaders[key] = ctx.Request.Headers[key] ?? "";
             }
         }
+
         LastQuery.Clear();
         foreach (var key in ctx.Request.QueryString.AllKeys)
         {
@@ -110,6 +111,7 @@ internal sealed class StubModrinthServer : IDisposable
                 LastQuery[key] = ctx.Request.QueryString[key] ?? "";
             }
         }
+
         if (path.Contains(".bin", StringComparison.Ordinal))
         {
             LastDownloadHeaders.Clear();
@@ -121,6 +123,7 @@ internal sealed class StubModrinthServer : IDisposable
                 }
             }
         }
+
         if (ctx.Request.HasEntityBody)
         {
             using var ms = new MemoryStream();
@@ -199,6 +202,7 @@ internal sealed class StubModrinthServer : IDisposable
         {
             obj[hash] = JsonNode.Parse(version);
         }
+
         return Encoding.UTF8.GetBytes(obj.ToJsonString());
     }
 
@@ -208,9 +212,7 @@ internal sealed class StubModrinthServer : IDisposable
         {
             _listener.Close();
         }
-        catch (ObjectDisposedException)
-        {
-        }
+        catch (ObjectDisposedException) { }
     }
 }
 
@@ -351,6 +353,7 @@ internal sealed class MrPackBuilder
             {
                 File.WriteAllBytes(Path.Combine(dir, "mods", "optional.jar"), optionalBytes);
             }
+
             return MmcZip.CompressDir(path, dir);
         }
         finally
@@ -359,9 +362,7 @@ internal sealed class MrPackBuilder
             {
                 Directory.Delete(dir, recursive: true);
             }
-            catch (DirectoryNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
         }
     }
 }

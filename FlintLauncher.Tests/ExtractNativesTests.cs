@@ -28,28 +28,28 @@ namespace FlintLauncher.Tests;
 public class ExtractNativesTests
 {
     internal const string NativeLibrariesPatch = """
-        {
-            "formatVersion": 1,
-            "name": "Minecraft",
-            "uid": "net.minecraft",
-            "version": "1.20.1",
-            "mainClass": "net.minecraft.client.main.Main",
-            "type": "release",
-            "assets": "5",
-            "minecraftArguments": "--username ${auth_player_name}",
-            "libraries": [
-                {
-                    "name": "com.flint:testnatives:1.0",
-                    "MMC-hint": "local",
-                    "natives": {
-                        "osx-": "natives-osx", "osx": "natives-osx", "osx-arm64": "natives-osx", "osx-x86_64": "natives-osx",
-                        "linux": "natives-linux", "linux-arm64": "natives-linux", "linux-x86_64": "natives-linux",
-                        "windows": "natives-windows", "windows-x86_64": "natives-windows"
-                    }
-                }
-            ]
-        }
-        """;
+                                                 {
+                                                     "formatVersion": 1,
+                                                     "name": "Minecraft",
+                                                     "uid": "net.minecraft",
+                                                     "version": "1.20.1",
+                                                     "mainClass": "net.minecraft.client.main.Main",
+                                                     "type": "release",
+                                                     "assets": "5",
+                                                     "minecraftArguments": "--username ${auth_player_name}",
+                                                     "libraries": [
+                                                         {
+                                                             "name": "com.flint:testnatives:1.0",
+                                                             "MMC-hint": "local",
+                                                             "natives": {
+                                                                 "osx-": "natives-osx", "osx": "natives-osx", "osx-arm64": "natives-osx", "osx-x86_64": "natives-osx",
+                                                                 "linux": "natives-linux", "linux-arm64": "natives-linux", "linux-x86_64": "natives-linux",
+                                                                 "windows": "natives-windows", "windows-x86_64": "natives-windows"
+                                                             }
+                                                         }
+                                                     ]
+                                                 }
+                                                 """;
 
     /// <summary>Keeps the launch "running" so the steps' FinalizeStep can be observed while
     /// the extracted/merged artifacts still exist.</summary>
@@ -57,9 +57,7 @@ public class ExtractNativesTests
     {
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public GateStep(LaunchTask parent) : base(parent)
-        {
-        }
+        public GateStep(LaunchTask parent) : base(parent) { }
 
         public bool Started { get; private set; }
 
@@ -140,19 +138,19 @@ public class ExtractNativesTests
     // ------------------------------------------------------------------ ModMinecraftJar
 
     private const string JarModPatch = """
-        {
-            "formatVersion": 1,
-            "name": "Minecraft",
-            "uid": "net.minecraft",
-            "version": "1.20.1",
-            "mainClass": "net.minecraft.client.main.Main",
-            "type": "release",
-            "assets": "5",
-            "minecraftArguments": "--username ${auth_player_name}",
-            "mainJar": { "name": "com.flint:minecraft:1.20.1:client", "MMC-hint": "local", "MMC-filename": "client.jar" },
-            "+jarMods": [ { "name": "jarmod.zip" } ]
-        }
-        """;
+                                       {
+                                           "formatVersion": 1,
+                                           "name": "Minecraft",
+                                           "uid": "net.minecraft",
+                                           "version": "1.20.1",
+                                           "mainClass": "net.minecraft.client.main.Main",
+                                           "type": "release",
+                                           "assets": "5",
+                                           "minecraftArguments": "--username ${auth_player_name}",
+                                           "mainJar": { "name": "com.flint:minecraft:1.20.1:client", "MMC-hint": "local", "MMC-filename": "client.jar" },
+                                           "+jarMods": [ { "name": "jarmod.zip" } ]
+                                       }
+                                       """;
 
     private static void WriteJarModInputs(MinecraftInstance instance)
     {
@@ -306,6 +304,7 @@ public class ExtractNativesTests
                 context.Response.StatusCode = 404;
                 return;
             }
+
             context.Response.StatusCode = 200;
             context.Response.ContentLength64 = payload.Length;
             context.Response.OutputStream.Write(payload);
@@ -349,8 +348,8 @@ public class ExtractNativesTests
             await task.StartAsync();
 
             Assert.True(task.WasSuccessful, task.FailReason + " | indexFile=" +
-                File.Exists(Path.Combine(assetsRoot.Root, "indexes", assetsId + ".json")) +
-                " objectFile=" + File.Exists(Path.Combine(assetsRoot.Root, "objects", objectHash[..2], objectHash)));
+                                            File.Exists(Path.Combine(assetsRoot.Root, "indexes", assetsId + ".json")) +
+                                            " objectFile=" + File.Exists(Path.Combine(assetsRoot.Root, "objects", objectHash[..2], objectHash)));
         }
         finally
         {
@@ -397,10 +396,12 @@ internal sealed class AssetsRootRedirect : IDisposable
             {
                 File.Delete(_linkPath); // leftover symlink from a previous run
             }
+
             if (Directory.Exists(_linkPath))
             {
                 Directory.Delete(_linkPath, recursive: true);
             }
+
             Directory.CreateSymbolicLink(_linkPath, root);
             _target = root;
             _isLink = true;
@@ -439,6 +440,7 @@ internal sealed class AssetsRootRedirect : IDisposable
                 {
                     Directory.Delete(_target, recursive: true);
                 }
+
                 // remove the (possibly dangling) link itself; recursive delete would follow it
                 if (Directory.Exists(_linkPath) || File.Exists(_linkPath))
                 {
@@ -451,9 +453,7 @@ internal sealed class AssetsRootRedirect : IDisposable
             }
         }
         catch (Exception e) when (e is DirectoryNotFoundException or FileNotFoundException or IOException
-                                 or UnauthorizedAccessException)
-        {
-        }
+                                      or UnauthorizedAccessException) { }
     }
 }
 
@@ -507,8 +507,6 @@ internal sealed class TestHttpServer : IDisposable
         {
             _listener.Close();
         }
-        catch (ObjectDisposedException)
-        {
-        }
+        catch (ObjectDisposedException) { }
     }
 }

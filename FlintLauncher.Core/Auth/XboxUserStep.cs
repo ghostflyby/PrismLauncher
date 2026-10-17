@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/auth/steps/XboxUserStep.{h,cpp}.
+
 namespace FlintLauncher.Core.Auth;
 
 public sealed class XboxUserStep : AuthStep
@@ -27,16 +28,16 @@ public sealed class XboxUserStep : AuthStep
         // NOTE: the raw-string template (with its leading/trailing newline and the "d=" RpsTicket
         // prefix on the plain MSA token) is reproduced byte for byte.
         var xboxAuthTemplate = "\n" + """
-            {
-                "Properties": {
-                    "AuthMethod": "RPS",
-                    "SiteName": "user.auth.xboxlive.com",
-                    "RpsTicket": "d=%1"
-                },
-                "RelyingParty": "http://auth.xboxlive.com",
-                "TokenType": "JWT"
-            }
-            """ + "\n";
+                                      {
+                                          "Properties": {
+                                              "AuthMethod": "RPS",
+                                              "SiteName": "user.auth.xboxlive.com",
+                                              "RpsTicket": "d=%1"
+                                          },
+                                          "RelyingParty": "http://auth.xboxlive.com",
+                                          "TokenType": "JWT"
+                                      }
+                                      """ + "\n";
         var xboxAuthData = xboxAuthTemplate.Replace("%1", Data.MsaToken.Value);
 
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
@@ -58,6 +59,7 @@ public sealed class XboxUserStep : AuthStep
                 Data.NetworkError = response.Error;
                 EmitFinished(AccountTaskState.Offline, $"Xbox user authentication failed: {response.ErrorString}");
             }
+
             return;
         }
 
@@ -67,6 +69,7 @@ public sealed class XboxUserStep : AuthStep
             EmitFinished(AccountTaskState.FailedSoft, "Xbox user authentication response could not be understood.");
             return;
         }
+
         Data.UserToken = temp;
         EmitFinished(AccountTaskState.Working, "Got Xbox user token");
     }

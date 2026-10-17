@@ -35,7 +35,7 @@ public sealed class TestLogSink : ILoggerProvider
         public bool IsEnabled(LogLevel logLevel) => true;
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
-                                Func<TState, Exception?, string> formatter)
+            Func<TState, Exception?, string> formatter)
         {
             lock (sink._lock)
             {

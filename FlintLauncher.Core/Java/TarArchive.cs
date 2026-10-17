@@ -36,7 +36,7 @@ public static class TarArchive
             return ExtractTarStream(gzip, targetDir, stripFirstComponent, out error);
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                 or ArgumentException or NotSupportedException)
+                                      or ArgumentException or NotSupportedException)
         {
             error = $"Unable to read tar.gz archive {archivePath}: {e.Message}";
             return null;
@@ -52,7 +52,7 @@ public static class TarArchive
             return ExtractTarStream(source, targetDir, stripFirstComponent, out error);
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                 or ArgumentException or NotSupportedException)
+                                      or ArgumentException or NotSupportedException)
         {
             error = $"Unable to read tar archive {archivePath}: {e.Message}";
             return null;
@@ -72,7 +72,7 @@ public static class TarArchive
             return ExtractTarStream(gzip, targetDir: "", stripFirstComponent: null, out error, listOnly: true);
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                 or ArgumentException or NotSupportedException)
+                                      or ArgumentException or NotSupportedException)
         {
             error = $"Unable to read tar.gz archive {archivePath}: {e.Message}";
             return null;
@@ -81,7 +81,7 @@ public static class TarArchive
 
     /// <summary>Core streaming tar parser.</summary>
     public static List<string>? ExtractTarStream(Stream stream, string targetDir, string? stripFirstComponent, out string error,
-                                                 bool listOnly = false)
+        bool listOnly = false)
     {
         error = "";
         var extracted = new List<string>();
@@ -103,10 +103,12 @@ public static class TarArchive
             {
                 break; // clean end of stream
             }
+
             if (IsZeroBlock(header))
             {
                 break; // end-of-archive marker (lenient: a single zero block ends the archive)
             }
+
             if (!ParseHeader(header, out var name, out var mode, out var size, out var typeFlag, out var linkName))
             {
                 error = "Failed to parse tar header";
@@ -118,11 +120,13 @@ public static class TarArchive
                 longName = ReadSmallPayload(stream, size); // GNU long name for the next entry
                 continue;
             }
+
             if (typeFlag == 'K')
             {
                 longLink = ReadSmallPayload(stream, size); // GNU long link target for the next entry
                 continue;
             }
+
             if (typeFlag is 'x' or 'X' or 'g')
             {
                 var payload = ReadSmallPayload(stream, size);
@@ -130,6 +134,7 @@ public static class TarArchive
                 {
                     pax = ParsePax(payload, pax);
                 }
+
                 continue;
             }
 
@@ -161,6 +166,7 @@ public static class TarArchive
             {
                 relativeName = relativeName[1..];
             }
+
             // Fix weird "folders with a single file get squashed" thing
             string subPath;
             if (relativeName.Contains('/') && !relativeName.EndsWith('/'))
@@ -199,11 +205,12 @@ public static class TarArchive
                 return null;
             }
         }
+
         return extracted;
     }
 
     private static bool ExtractEntry(Stream stream, string targetFilePath, char typeFlag, long size, string linkTarget, int mode,
-                                     List<string> extracted, out string error)
+        List<string> extracted, out string error)
     {
         error = "";
         try
@@ -218,6 +225,7 @@ public static class TarArchive
                         error = $"Failed to create directory {dir}";
                         return false;
                     }
+
                     extracted.Add(targetFilePath);
                     return true;
                 }
@@ -228,6 +236,7 @@ public static class TarArchive
                     {
                         CopyExactly(stream, output, size);
                     }
+
                     SkipPadding(stream, size);
                     // 0b001001001 == 0o111: any of user/group/other execute
                     if (!OperatingSystem.IsWindows() && (mode & 0b001001001) != 0)
@@ -236,6 +245,7 @@ public static class TarArchive
                             File.GetUnixFileMode(targetFilePath) | UnixFileMode.UserExecute | UnixFileMode.GroupExecute |
                             UnixFileMode.OtherExecute);
                     }
+
                     extracted.Add(targetFilePath);
                     return true;
                 }
@@ -249,6 +259,7 @@ public static class TarArchive
                             // create_link upstream fails on existing targets; skip instead
                             return true;
                         }
+
                         FileSystem.EnsureFilePathExists(targetFilePath);
                         File.CreateSymbolicLink(targetFilePath, linkTarget);
                     }
@@ -256,6 +267,7 @@ public static class TarArchive
                     {
                         // best effort like the manifest link handling; never fatal
                     }
+
                     extracted.Add(targetFilePath);
                     return true;
                 }
@@ -269,6 +281,7 @@ public static class TarArchive
                         File.Copy(sourcePath, targetFilePath, overwrite: true);
                         extracted.Add(targetFilePath);
                     }
+
                     return true;
                 }
                 default:
@@ -277,7 +290,7 @@ public static class TarArchive
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                 or NotSupportedException)
+                                      or NotSupportedException)
         {
             error = $"Failed to extract entry {targetFilePath}: {e.Message}";
             return false;
@@ -287,7 +300,7 @@ public static class TarArchive
     // ------------------------------------------------------------------ parsing
 
     private static bool ParseHeader(byte[] block, out string name, out int mode, out long size, out char typeFlag,
-                                    out string linkName)
+        out string linkName)
     {
         name = ReadString(block, 0, 100) + ReadString(block, 345, 155); // name + ustar prefix
         mode = ParseOctal(block, 100, 8);
@@ -307,6 +320,7 @@ public static class TarArchive
         {
             end++;
         }
+
         return Encoding.UTF8.GetString(block, offset, end - offset).TrimEnd();
     }
 
@@ -323,15 +337,19 @@ public static class TarArchive
                 {
                     break;
                 }
+
                 continue;
             }
+
             if (b < (byte)'0' || b > (byte)'7')
             {
                 break;
             }
+
             started = true;
             value = (value << 3) + (b - (byte)'0');
         }
+
         return unchecked((int)value);
     }
 
@@ -361,6 +379,7 @@ public static class TarArchive
             {
                 break;
             }
+
             var record = payload[(space + 1)..(pos + len)].TrimEnd('\n');
             pos += len;
             var eq = record.IndexOf('=', StringComparison.Ordinal);
@@ -368,6 +387,7 @@ public static class TarArchive
             {
                 continue;
             }
+
             var key = record[..eq];
             var value = record[(eq + 1)..];
             switch (key)
@@ -383,6 +403,7 @@ public static class TarArchive
                     break;
             }
         }
+
         return overrides;
     }
 
@@ -394,6 +415,7 @@ public static class TarArchive
         {
             return "";
         }
+
         var buffer = new byte[size];
         CopyExactly(stream, buffer, size);
         SkipPadding(stream, size);
@@ -410,6 +432,7 @@ public static class TarArchive
             {
                 throw new EndOfStreamException("Unexpected end of tar data");
             }
+
             written += read;
         }
     }
@@ -425,6 +448,7 @@ public static class TarArchive
             {
                 throw new EndOfStreamException("Unexpected end of tar data");
             }
+
             target.Write(buffer, 0, read);
             count -= read;
         }
@@ -461,6 +485,7 @@ public static class TarArchive
             {
                 throw new EndOfStreamException("Unexpected end of tar data");
             }
+
             count -= read;
         }
     }
@@ -475,8 +500,10 @@ public static class TarArchive
             {
                 return offset == 0; // partial trailing block -> treat as EOF
             }
+
             offset += read;
         }
+
         return true;
     }
 
@@ -489,6 +516,7 @@ public static class TarArchive
                 return false;
             }
         }
+
         return true;
     }
 
@@ -501,12 +529,14 @@ public static class TarArchive
         {
             return true;
         }
+
         var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         if (!childFull.StartsWith(parentFull, comparison))
         {
             return false;
         }
+
         return childFull.Length == parentFull.Length || childFull[parentFull.Length] == Path.DirectorySeparatorChar
-            || childFull[parentFull.Length] == '/';
+                                                     || childFull[parentFull.Length] == '/';
     }
 }

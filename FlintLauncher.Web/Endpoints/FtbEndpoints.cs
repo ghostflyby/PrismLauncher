@@ -47,6 +47,7 @@ public static class FtbEndpoints
                 return ApiJson.Error("ftb_invalid_response",
                     $"ftb pack index is invalid: {e.Message}", 502);
             }
+
             return Results.Ok(new FtbPackIndexResponse(
                 ids.Select(id => new FtbPackIndexEntry(id)).ToArray()));
         }).Produces<FtbPackIndexResponse>();
@@ -54,18 +55,18 @@ public static class FtbEndpoints
         // ---------------------------------------------- modplatform/ftb/packs/{id}
         // the /modpack/{id} description (FtbListModel::packRequestFinished's mapping)
         api.MapGet("/modplatform/ftb/packs/{id}", async Task<IResult> (int id,
-            LauncherRuntime runtime) =>
-            await WithPackAsync(runtime, id, pack => Results.Ok(PackView(pack))))
+                    LauncherRuntime runtime) =>
+                await WithPackAsync(runtime, id, pack => Results.Ok(PackView(pack))))
             .Produces<FtbPackView>();
 
         // -------------------------------------- modplatform/ftb/packs/{id}/versions
         // the description's version list (the FTB App API has no separate version index)
         api.MapGet("/modplatform/ftb/packs/{id}/versions", async Task<IResult> (int id,
-            LauncherRuntime runtime) =>
-            await WithPackAsync(runtime, id, pack => Results.Ok(pack.Versions
-                .Select(version => new FtbPackVersionView(version.Id, version.Name,
-                    version.Type, version.Updated))
-                .ToArray())))
+                    LauncherRuntime runtime) =>
+                await WithPackAsync(runtime, id, pack => Results.Ok(pack.Versions
+                    .Select(version => new FtbPackVersionView(version.Id, version.Name,
+                        version.Type, version.Updated))
+                    .ToArray())))
             .Produces<FtbPackVersionView[]>();
 
         // -------------------------------------------------- modplatform/ftb/install
@@ -117,8 +118,10 @@ public static class FtbEndpoints
                 // pack version" message.
                 var versionName = request.VersionId is { } wanted
                     ? pack.Versions.FirstOrDefault(v => v.Id == wanted)?.Name
-                        ?? wanted.ToString()
-                    : pack.Versions.Count != 0 ? pack.Versions[0].Name : "";
+                      ?? wanted.ToString()
+                    : pack.Versions.Count != 0
+                        ? pack.Versions[0].Name
+                        : "";
 
                 var task = new FtbPackInstallTask(pack, versionName, runtime.Flame, ftb)
                 {
@@ -177,6 +180,7 @@ public static class FtbEndpoints
         {
             return runtime.Ftb;
         }
+
         var trimmed = serverUrl.Trim();
         if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var server) ||
             server.Scheme is not ("http" or "https"))
@@ -185,6 +189,7 @@ public static class FtbEndpoints
                 "'serverUrl' must be an absolute http(s) URL", 400);
             return runtime.Ftb;
         }
+
         // the FTB URL builders concatenate "/modpack/..." onto the base, so unlike the
         // ATLauncher one this derived base must NOT carry a trailing slash
         return new FtbApi(runtime.Ftb.Net) { BaseUrl = trimmed.TrimEnd('/') };
@@ -214,6 +219,7 @@ public static class FtbEndpoints
             return ApiJson.Error("ftb_invalid_response",
                 $"ftb pack manifest is invalid: {e.Message}", 502);
         }
+
         return map(pack);
     }
 

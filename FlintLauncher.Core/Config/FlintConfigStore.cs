@@ -59,7 +59,7 @@ public sealed class FlintConfigStore
     public void Set(string key, object? value)
     {
         var entry = FlintConfigKeys.Resolve(key) ??
-            throw new ArgumentException($"unknown settings key '{key}'", nameof(key));
+                    throw new ArgumentException($"unknown settings key '{key}'", nameof(key));
         Update(resolved => entry.Apply(resolved, value));
     }
 

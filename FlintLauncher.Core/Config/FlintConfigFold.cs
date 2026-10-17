@@ -12,6 +12,7 @@
 // NOTE: the source-generated deserializer does not honor property initializers for members
 // absent from a payload (the same finding FileSecretStore/LauncherStateStore fold around),
 // so a partially-written flint.json surfaces nulls that this fold replaces with defaults.
+
 namespace FlintLauncher.Core.Config;
 
 public static class FlintConfigFold
@@ -29,6 +30,7 @@ public static class FlintConfigFold
                 resolved = Merge(resolved, layer);
             }
         }
+
         return resolved;
     }
 

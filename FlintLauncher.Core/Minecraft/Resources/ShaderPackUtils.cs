@@ -46,6 +46,7 @@ public static class ShaderPackUtils
         {
             return false; // assets dir does not exists or isn't valid
         }
+
         pack.SetPackFormat(ShaderPackFormat.Valid);
 
         if (level == ShaderPackProcessingLevel.BasicInfoOnly)
@@ -67,7 +68,7 @@ public static class ShaderPackUtils
             files = zip.Entries.Select(e => e.FullName).ToList();
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                 or ArgumentException or NotSupportedException)
+                                      or ArgumentException or NotSupportedException)
         {
             return false; // can't open zip file
         }
@@ -92,6 +93,7 @@ public static class ShaderPackUtils
                 return false;
             }
         }
+
         pack.SetPackFormat(ShaderPackFormat.Valid);
 
         if (level == ShaderPackProcessingLevel.BasicInfoOnly)
@@ -120,10 +122,12 @@ public static class ShaderPackUtils
         {
             normalizedPath = normalizedPath[1..];
         }
+
         if (normalizedPath.Length == 0 || normalizedPath == ".")
         {
             return true;
         }
+
         if (normalizedPath == "..")
         {
             return false; // root only
@@ -145,6 +149,7 @@ public static class ShaderPackUtils
                 return true;
             }
         }
+
         return false;
     }
 }

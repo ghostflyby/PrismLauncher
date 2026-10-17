@@ -40,6 +40,7 @@ public abstract class Sink
                 return false;
             }
         }
+
         return true;
     }
 
@@ -52,6 +53,7 @@ public abstract class Sink
                 return false;
             }
         }
+
         return true;
     }
 
@@ -62,6 +64,7 @@ public abstract class Sink
         {
             success &= validator.Abort();
         }
+
         return success;
     }
 
@@ -74,6 +77,7 @@ public abstract class Sink
                 return false;
             }
         }
+
         return true;
     }
 }
@@ -106,6 +110,7 @@ public sealed class ByteArraySink : Sink
             FailReason = "Failed writing into " + (_name ?? "byte array") + ": validators failed";
             return false;
         }
+
         _stream.Write(data);
         return true;
     }

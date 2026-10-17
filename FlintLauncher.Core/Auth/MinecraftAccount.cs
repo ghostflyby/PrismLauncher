@@ -31,6 +31,7 @@ public sealed class MinecraftAccount
         {
             return account;
         }
+
         return null;
     }
 
@@ -94,6 +95,7 @@ public sealed class MinecraftAccount
             rfcBytes[8..].CopyTo(guid[8..]);
             return new Guid(guid);
         }
+
         return new Guid(rfcBytes.ToArray());
     }
 
@@ -161,6 +163,7 @@ public sealed class MinecraftAccount
                         Data.YggdrasilToken.Validity = Validity.None;
                         Data.Validity = Validity.None;
                     }
+
                     Changed?.Invoke();
                     break;
                 case AccountTaskState.FailedGone:
@@ -176,6 +179,7 @@ public sealed class MinecraftAccount
                     break;
             }
         }
+
         currentTask = null;
         ActivityChanged?.Invoke(false);
     }
@@ -186,6 +190,7 @@ public sealed class MinecraftAccount
         {
             return "⚠ " + ProfileName();
         }
+
         return ProfileName();
     }
 
@@ -224,6 +229,7 @@ public sealed class MinecraftAccount
             case Validity.Assumed:
                 return true;
         }
+
         var now = DateTime.UtcNow;
         var issuedTimestamp = Data.YggdrasilToken.IssueInstant;
         var expiresTimestamp = Data.YggdrasilToken.NotAfter;
@@ -233,6 +239,7 @@ public sealed class MinecraftAccount
         {
             return true;
         }
+
         return false;
     }
 
@@ -249,6 +256,7 @@ public sealed class MinecraftAccount
         {
             session.Uuid = UuidFromUsername(session.PlayerName).ToString("N");
         }
+
         // 'legacy' or 'mojang', depending on account type
         session.UserType = TypeString();
         if (session.AccessToken.Length != 0)

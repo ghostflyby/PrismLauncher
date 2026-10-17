@@ -43,6 +43,7 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 // a fresh WorldList per request (the C++ page model lives for the page)
                 var list = new WorldList(instance.WorldDir());
                 list.Update();
@@ -65,6 +66,7 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 var list = new WorldList(instance.WorldDir());
                 list.Update();
                 var index = IndexOfFolder(list, folderName);
@@ -72,9 +74,12 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("world_not_found", $"no world '{folderName}'");
                 }
+
                 var ok = await list.DeleteWorldAsync(index);
-                return ok ? Results.NoContent() : ApiJson.Error("world_delete_failed",
-                    $"world '{folderName}' could not be deleted", 500);
+                return ok
+                    ? Results.NoContent()
+                    : ApiJson.Error("world_delete_failed",
+                        $"world '{folderName}' could not be deleted", 500);
             }
             finally
             {
@@ -94,6 +99,7 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 var list = new WorldList(instance.WorldDir());
                 list.Update();
                 var index = IndexOfFolder(list, folderName);
@@ -101,6 +107,7 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("world_not_found", $"no world '{folderName}'");
                 }
+
                 var world = list[index];
                 world.LoadMetadata();
                 world.SetSize(WorldList.CalculateWorldSize(world.ContainerPath));
@@ -129,6 +136,7 @@ public static class InstanceContentEndpoints
             {
                 return ApiJson.Error("invalid_body", "'name' is required", 400);
             }
+
             await runtime.InstanceLock.WaitAsync();
             try
             {
@@ -136,6 +144,7 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 var list = new WorldList(instance.WorldDir());
                 list.Update();
                 var index = IndexOfFolder(list, folderName);
@@ -143,11 +152,13 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("world_not_found", $"no world '{folderName}'");
                 }
+
                 if (!await list.CopyWorldAsync(index, request.Name))
                 {
                     return ApiJson.Error("world_copy_failed",
                         $"world '{folderName}' could not be copied", 500);
                 }
+
                 // CopyWorldAsync refreshed the list; the copy carries the new name both in
                 // level.dat (World::rename rewrote it) and as its (sanitized) folder name
                 var copy = list.Worlds.FirstOrDefault(w =>
@@ -171,6 +182,7 @@ public static class InstanceContentEndpoints
             {
                 return ApiJson.Error("invalid_body", "'newName' is required", 400);
             }
+
             await runtime.InstanceLock.WaitAsync();
             try
             {
@@ -178,6 +190,7 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 var list = new WorldList(instance.WorldDir());
                 list.Update();
                 var index = IndexOfFolder(list, folderName);
@@ -185,6 +198,7 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("world_not_found", $"no world '{folderName}'");
                 }
+
                 var world = list[index];
                 world.LoadMetadata();
                 if (!world.Rename(request.NewName))
@@ -192,6 +206,7 @@ public static class InstanceContentEndpoints
                     return ApiJson.Error("world_rename_failed",
                         $"world '{folderName}' could not be renamed", 500);
                 }
+
                 return Results.NoContent();
             }
             finally
@@ -230,12 +245,14 @@ public static class InstanceContentEndpoints
                 {
                     extension = ".zip";
                 }
+
                 var tempPath = Path.Combine(Path.GetTempPath(),
                     $"flint-world-upload-{Guid.NewGuid():N}{extension}");
                 await using (var stream = File.Create(tempPath))
                 {
                     await file.CopyToAsync(stream);
                 }
+
                 try
                 {
                     if (!await list.InstallWorldAsync(tempPath))
@@ -245,7 +262,7 @@ public static class InstanceContentEndpoints
                     }
                 }
                 catch (Exception e) when (e is InvalidDataException or IOException
-                                          or UnauthorizedAccessException or NotSupportedException)
+                                              or UnauthorizedAccessException or NotSupportedException)
                 {
                     // a corrupt archive blows up inside the zip reader, not the validity check
                     return ApiJson.Error("world_install_failed",
@@ -257,9 +274,7 @@ public static class InstanceContentEndpoints
                     {
                         File.Delete(tempPath);
                     }
-                    catch (IOException)
-                    {
-                    }
+                    catch (IOException) { }
                 }
 
                 // report the world that appeared (folder name derives from the level.dat
@@ -292,6 +307,7 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 return Results.Ok(LoadServers(instance)
                     .Select((entry, index) => ToServerView(index, entry))
                     .ToArray());
@@ -309,6 +325,7 @@ public static class InstanceContentEndpoints
             {
                 return ApiJson.Error("invalid_body", "'address' is required", 400);
             }
+
             await runtime.InstanceLock.WaitAsync();
             try
             {
@@ -316,6 +333,7 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 var servers = LoadServers(instance);
                 var entry = new ServerEntry(
                     string.IsNullOrWhiteSpace(request.Name) ? "Minecraft Server" : request.Name,
@@ -342,11 +360,13 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 var servers = LoadServers(instance);
                 if (index < 0 || index >= servers.Count)
                 {
                     return ApiJson.NotFound("server_not_found", $"no server at index {index}");
                 }
+
                 servers.RemoveAt(index);
                 ServersDat.Save(ServersPath(instance), servers);
                 return Results.NoContent();
@@ -369,11 +389,13 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 var servers = LoadServers(instance);
                 if (index < 0 || index >= servers.Count)
                 {
                     return ApiJson.NotFound("server_not_found", $"no server at index {index}");
                 }
+
                 try
                 {
                     var result = await ServerStatusPing.PingAsync(servers[index].Address);
@@ -409,16 +431,19 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 if (type == "mods")
                 {
                     return ApiJson.Error("use_mods_endpoint",
                         "mods are served by /instances/{id}/mods; the resources endpoints do not list them", 400);
                 }
+
                 if (ResourceFolder(instance, type) is not { } folder)
                 {
                     return ApiJson.Error("unknown_type",
                         "type must be one of resourcepacks|texturepacks|shaderpacks|datapacks", 400);
                 }
+
                 folder.Update();
                 return Results.Ok(folder.Resources.Select(ToResourceView).ToArray());
             }
@@ -429,11 +454,11 @@ public static class InstanceContentEndpoints
         }).Produces<ResourceView[]>();
 
         api.MapPost("/instances/{id}/resources/{type}/{name}/enable", async (string id, string type,
-            string name, LauncherRuntime runtime) =>
+                string name, LauncherRuntime runtime) =>
             await SetResourceEnabled(id, type, name, EnableAction.Enable, runtime)).Produces(204);
 
         api.MapPost("/instances/{id}/resources/{type}/{name}/disable", async (string id, string type,
-            string name, LauncherRuntime runtime) =>
+                string name, LauncherRuntime runtime) =>
             await SetResourceEnabled(id, type, name, EnableAction.Disable, runtime)).Produces(204);
 
         api.MapDelete("/instances/{id}/resources/{type}/{name}", async (string id, string type,
@@ -446,16 +471,19 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 if (type == "mods")
                 {
                     return ApiJson.Error("use_mods_endpoint",
                         "mods are served by /instances/{id}/mods; the resources endpoints do not uninstall them", 400);
                 }
+
                 if (ResourceFolder(instance, type) is not { } folder)
                 {
                     return ApiJson.Error("unknown_type",
                         "type must be one of resourcepacks|texturepacks|shaderpacks|datapacks", 400);
                 }
+
                 folder.Update();
                 // UninstallResource resolves the ".disabled" suffixed file from the bare name
                 return folder.UninstallResource(name)
@@ -479,22 +507,26 @@ public static class InstanceContentEndpoints
             {
                 return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
             }
+
             if (type == "mods")
             {
                 return ApiJson.Error("use_mods_endpoint",
                     "mods are served by /instances/{id}/mods; the resources endpoints do not toggle them", 400);
             }
+
             if (ResourceFolder(instance, type) is not { } folder)
             {
                 return ApiJson.Error("unknown_type",
                     "type must be one of resourcepacks|texturepacks|shaderpacks|datapacks", 400);
             }
+
             folder.Update();
             var resource = FindResource(folder, name);
             if (resource is null)
             {
                 return ApiJson.NotFound("resource_not_found", $"no resource '{name}' in '{type}'");
             }
+
             // Resource.Enable performs the ".disabled" suffix rename on disk
             var verb = action == EnableAction.Enable ? "enabled" : "disabled";
             if (!resource.Enable(action))
@@ -502,6 +534,7 @@ public static class InstanceContentEndpoints
                 return ApiJson.Conflict("no_change",
                     $"resource '{name}' was not {verb} (already {verb}, or its type cannot be toggled)");
             }
+
             folder.Update();
             return Results.NoContent();
         }
@@ -520,11 +553,11 @@ public static class InstanceContentEndpoints
     private static void MapMods(IEndpointRouteBuilder api)
     {
         api.MapPost("/instances/{id}/mods/{name}/enable", async (string id, string name,
-            LauncherRuntime runtime) =>
+                LauncherRuntime runtime) =>
             await SetModEnabled(id, name, EnableAction.Enable, runtime)).Produces(204);
 
         api.MapPost("/instances/{id}/mods/{name}/disable", async (string id, string name,
-            LauncherRuntime runtime) =>
+                LauncherRuntime runtime) =>
             await SetModEnabled(id, name, EnableAction.Disable, runtime)).Produces(204);
 
         api.MapDelete("/instances/{id}/mods/{name}", async (string id, string name,
@@ -537,6 +570,7 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 var folder = instance.LoaderModList();
                 folder.Update();
                 return folder.UninstallResource(name)
@@ -560,6 +594,7 @@ public static class InstanceContentEndpoints
             {
                 return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
             }
+
             var folder = instance.LoaderModList();
             folder.Update();
             var mod = FindResource(folder, name);
@@ -567,6 +602,7 @@ public static class InstanceContentEndpoints
             {
                 return ApiJson.NotFound("mod_not_found", $"no mod '{name}'");
             }
+
             // Resource.Enable performs the ".disabled" suffix rename on disk (same rename
             // semantics as the resources family)
             var verb = action == EnableAction.Enable ? "enabled" : "disabled";
@@ -574,6 +610,7 @@ public static class InstanceContentEndpoints
             {
                 return ApiJson.Conflict("no_change", $"mod '{name}' was not {verb} (already {verb})");
             }
+
             folder.Update();
             return Results.NoContent();
         }
@@ -596,6 +633,7 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 return Results.Ok(ListScreenshots(instance).ToArray());
             }
             finally
@@ -621,6 +659,7 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 var dir = ScreenshotsDir(instance);
                 var shots = new List<ScreenShot>();
                 foreach (var name in request.Names)
@@ -630,6 +669,7 @@ public static class InstanceContentEndpoints
                     {
                         return ApiJson.NotFound("screenshot_not_found", $"no screenshot '{name}'");
                     }
+
                     shots.Add(new ScreenShot(path));
                 }
 
@@ -644,6 +684,7 @@ public static class InstanceContentEndpoints
                 {
                     task.AddTask(runtime.Imgur.MakeUpload(shot, baseUrl, clientId));
                 }
+
                 if (shots.Count > 1)
                 {
                     task.AddTask(runtime.Imgur.MakeAlbum(new ImgurApi.AlbumResult(), shots, baseUrl, clientId));
@@ -669,11 +710,13 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 var path = ResolveScreenshotPath(ScreenshotsDir(instance), name);
                 if (path is null)
                 {
                     return ApiJson.NotFound("screenshot_not_found", $"no screenshot '{name}'");
                 }
+
                 try
                 {
                     File.Delete(path);
@@ -683,6 +726,7 @@ public static class InstanceContentEndpoints
                     return ApiJson.Error("screenshot_delete_failed",
                         $"screenshot '{name}' could not be deleted", 500);
                 }
+
                 return Results.NoContent();
             }
             finally
@@ -705,6 +749,7 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 var options = new GameOptions(Path.Combine(instance.GameRoot(), "options.txt"));
                 return Results.Ok(options.Contents.Select(item =>
                     new GameOptionView(item.Key, item.Value)).ToArray());
@@ -722,6 +767,7 @@ public static class InstanceContentEndpoints
             {
                 return ApiJson.Error("invalid_body", "body must be {\"options\": [{key, value}]}", 400);
             }
+
             await runtime.InstanceLock.WaitAsync();
             try
             {
@@ -729,6 +775,7 @@ public static class InstanceContentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 // the save target is <gameRoot>/options.txt; the game root may not exist
                 // yet on a fresh instance (the C++ game folder appears on first launch)
                 var gameRoot = instance.GameRoot();
@@ -738,6 +785,7 @@ public static class InstanceContentEndpoints
                 {
                     options.Set(option.Key, option.Value);
                 }
+
                 return options.Save()
                     ? Results.NoContent()
                     : ApiJson.Error("gameoptions_save_failed", "options.txt could not be written", 500);
@@ -794,6 +842,7 @@ public static class InstanceContentEndpoints
                 return i;
             }
         }
+
         return -1;
     }
 
@@ -825,6 +874,7 @@ public static class InstanceContentEndpoints
                 return resource;
             }
         }
+
         return null;
     }
 
@@ -855,6 +905,7 @@ public static class InstanceContentEndpoints
         {
             return [];
         }
+
         var result = new List<ScreenshotView>();
         IEnumerable<string> files;
         try
@@ -865,16 +916,19 @@ public static class InstanceContentEndpoints
         {
             return result;
         }
+
         foreach (var file in files)
         {
             if (!ScreenshotExtensions.Contains(Path.GetExtension(file.ToLowerInvariant())))
             {
                 continue;
             }
+
             var info = new FileInfo(file);
             result.Add(new ScreenshotView(info.Name, info.Length,
                 new DateTimeOffset(info.LastWriteTimeUtc).ToUnixTimeMilliseconds()));
         }
+
         return result.OrderBy(view => view.Name, StringComparer.Ordinal).ToList();
     }
 
@@ -887,6 +941,7 @@ public static class InstanceContentEndpoints
         {
             return null;
         }
+
         var path = Path.Combine(dir, name);
         var fullDir = Path.GetFullPath(dir);
         var full = Path.GetFullPath(path);

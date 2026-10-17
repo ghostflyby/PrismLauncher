@@ -30,9 +30,7 @@ public class InstanceTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private string JsonPath => Path.Combine(_root, "instance.json");

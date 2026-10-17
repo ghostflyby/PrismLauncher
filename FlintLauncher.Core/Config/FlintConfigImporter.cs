@@ -61,6 +61,7 @@ public static class FlintConfigImporter
 
     /// <summary>C9 runtime-state keys: their INI names and the state fields they land in.</summary>
     private const string KeyTotalPlayTime = "TotalPlayTime";
+
     private const string KeyTotalPlayTimeMigrated = "TotalPlayTimeMigrated";
     private const string KeyUserAskedAboutAutomaticJavaDownload = "UserAskedAboutAutomaticJavaDownload";
     private const string KeyLastOfflinePlayerName = "LastOfflinePlayerName";
@@ -129,6 +130,7 @@ public static class FlintConfigImporter
             {
                 continue;
             }
+
             var value = ini.Get(iniKey);
             if (value is null || value.ValueKind == IniValue.Kind.Invalid)
             {
@@ -152,6 +154,7 @@ public static class FlintConfigImporter
                 {
                     secrets.Set(key, secret);
                 }
+
                 continue;
             }
 
@@ -163,24 +166,28 @@ public static class FlintConfigImporter
                 sawStateKeys = true;
                 continue;
             }
+
             if (key == KeyTotalPlayTimeMigrated)
             {
                 chainPlaytimeMigrated = Variant.AsBool(Variant.FromIniValue(value));
                 sawStateKeys = true;
                 continue;
             }
+
             if (key == KeyUserAskedAboutAutomaticJavaDownload)
             {
                 userAskedAboutAutomaticJavaDownload = Variant.AsBool(Variant.FromIniValue(value));
                 sawStateKeys = true;
                 continue;
             }
+
             if (key == KeyLastOfflinePlayerName)
             {
                 lastOfflinePlayerName = Variant.AsString(Variant.FromIniValue(value));
                 sawStateKeys = true;
                 continue;
             }
+
             if (key == KeyLastHostname || JavaProbeKeys.Contains(key))
             {
                 // LastHostname seeds the state's rescan anchor; the probe quintet is dropped
@@ -189,6 +196,7 @@ public static class FlintConfigImporter
                 {
                     lastHostname = Variant.AsString(Variant.FromIniValue(value));
                 }
+
                 sawStateKeys = true;
                 continue;
             }
@@ -199,6 +207,7 @@ public static class FlintConfigImporter
             {
                 sawExplicitAutomaticJavaSwitch = true;
             }
+
             if (key == "AutomaticJavaDownload")
             {
                 sawExplicitAutomaticJavaDownload = true;
@@ -223,6 +232,7 @@ public static class FlintConfigImporter
             {
                 resolved = resolved with { Java = resolved.Java with { AutomaticJavaSwitch = false } };
             }
+
             if (!sawExplicitAutomaticJavaDownload && resolved.Java.AutomaticJavaDownload == true)
             {
                 resolved = resolved with { Java = resolved.Java with { AutomaticJavaDownload = false } };
@@ -243,7 +253,7 @@ public static class FlintConfigImporter
                     Migrated = playtimeMigrated || current.Playtime.Migrated,
                 },
                 UserAskedAboutAutomaticJavaDownload = userAskedAboutAutomaticJavaDownload ||
-                    current.UserAskedAboutAutomaticJavaDownload,
+                                                      current.UserAskedAboutAutomaticJavaDownload,
                 LastOfflinePlayerName = lastOfflinePlayerName.Length != 0
                     ? lastOfflinePlayerName
                     : current.LastOfflinePlayerName,
@@ -274,6 +284,7 @@ public static class FlintConfigImporter
                 }
             }
         }
+
         return null;
     }
 
@@ -293,21 +304,25 @@ public static class FlintConfigImporter
         {
             return null;
         }
+
         var ini = new IniFile();
         if (!ini.LoadFile(file))
         {
             return null;
         }
+
         long? total = null;
         if (ini.Get("TotalPlayTime") is { ValueKind: not IniValue.Kind.Invalid } totalValue)
         {
             total = Variant.AsLong(Variant.FromIniValue(totalValue));
         }
+
         bool? migrated = null;
         if (ini.Get("TotalPlayTimeMigrated") is { ValueKind: not IniValue.Kind.Invalid } migratedValue)
         {
             migrated = Variant.AsBool(Variant.FromIniValue(migratedValue));
         }
+
         return total is null && migrated is null ? null : new PlaytimePair(total, migrated);
     }
 }

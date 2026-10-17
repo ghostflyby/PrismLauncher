@@ -37,10 +37,11 @@ public sealed class PrivatePackManager
             {
                 _currentPacks.Add(code);
             }
+
             dirty = false;
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
-                                  or SecurityException)
+                                      or SecurityException)
         {
             _currentPacks.Clear();
         }
@@ -54,15 +55,14 @@ public sealed class PrivatePackManager
         {
             return;
         }
+
         try
         {
             FileSystem.Write(_filename, Encoding.UTF8.GetBytes(string.Join('\n', _currentPacks)));
             dirty = false;
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
-                                  or SecurityException)
-        {
-        }
+                                      or SecurityException) { }
     }
 
     public void Add(string code)

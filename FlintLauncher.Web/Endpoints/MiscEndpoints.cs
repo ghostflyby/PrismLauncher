@@ -62,6 +62,7 @@ public static class MiscEndpoints
                 {
                     return ApiJson.NotFound("task_not_found", $"no task '{request.TaskId}'");
                 }
+
                 content = string.Join("\n", registry.ReadLog(entry, 0).Select(l => l.Line));
                 if (content.Length == 0)
                 {

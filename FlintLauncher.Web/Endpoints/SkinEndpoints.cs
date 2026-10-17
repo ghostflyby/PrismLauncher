@@ -60,12 +60,14 @@ public static class SkinEndpoints
             {
                 return ApiJson.Error("invalid_body", "a multipart 'file' part with a skin image is required", 400);
             }
+
             // the SkinManageDialog's model choice: classic (wide) or slim (Alex)
             var model = form["model"].ToString().Trim().ToLowerInvariant();
             if (model.Length == 0)
             {
                 model = "classic";
             }
+
             if (model is not ("classic" or "slim"))
             {
                 return ApiJson.Error("invalid_model", "'model' must be 'classic' or 'slim'", 400);
@@ -156,6 +158,7 @@ public static class SkinEndpoints
                 $"no account with profile id '{profileId}'");
             return null;
         }
+
         notFound = null;
         return runtime.Accounts.At(index);
     }

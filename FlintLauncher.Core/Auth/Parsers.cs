@@ -23,10 +23,12 @@ public static class Parsers
         {
             return false;
         }
+
         if (!DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed))
         {
             return false;
         }
+
         outDateTime = parsed;
         return true;
     }
@@ -38,6 +40,7 @@ public static class Parsers
         {
             return false;
         }
+
         outString = s;
         return true;
     }
@@ -49,6 +52,7 @@ public static class Parsers
         {
             return false;
         }
+
         outNumber = d;
         return true;
     }
@@ -60,6 +64,7 @@ public static class Parsers
         {
             return false;
         }
+
         outNumber = (long)d;
         return true;
     }
@@ -71,6 +76,7 @@ public static class Parsers
         {
             return false;
         }
+
         outBool = b;
         return true;
     }
@@ -114,6 +120,7 @@ public static class Parsers
             // qWarning() << "User IssueInstant is not a timestamp";
             return false;
         }
+
         output.IssueInstant = issueInstant.Kind == DateTimeKind.Unspecified
             ? DateTime.SpecifyKind(issueInstant, DateTimeKind.Utc)
             : issueInstant.ToUniversalTime();
@@ -122,6 +129,7 @@ public static class Parsers
             // qWarning() << "User NotAfter is not a timestamp";
             return false;
         }
+
         output.NotAfter = notAfter.Kind == DateTimeKind.Unspecified
             ? DateTime.SpecifyKind(notAfter, DateTimeKind.Utc)
             : notAfter.ToUniversalTime();
@@ -130,6 +138,7 @@ public static class Parsers
             // qWarning() << "User Token is not a string";
             return false;
         }
+
         output.Value = token;
         var arrayVal = (AccountData.Get(obj, "DisplayClaims") as JsonObject) is { } displayClaims
             ? AccountData.Get(displayClaims, "xui")
@@ -139,6 +148,7 @@ public static class Parsers
             // qWarning() << "Missing xui claims array";
             return false;
         }
+
         var foundUhs = false;
         foreach (var item in array)
         {
@@ -146,6 +156,7 @@ public static class Parsers
             {
                 continue;
             }
+
             if (claimObj.ContainsKey("uhs"))
             {
                 foundUhs = true;
@@ -154,6 +165,7 @@ public static class Parsers
             {
                 continue;
             }
+
             // consume all 'display claims' ... whatever that means
             foreach (var (key, claimValue) in claimObj)
             {
@@ -162,16 +174,19 @@ public static class Parsers
                     // qWarning() << "display claim" << key << "is not a string...";
                     return false;
                 }
+
                 output.Extra[key] = JsonValue.Create(claim);
             }
 
             break;
         }
+
         if (!foundUhs)
         {
             // qWarning() << "Missing uhs";
             return false;
         }
+
         output.Validity = Validity.Certain;
         return true;
     }
@@ -189,6 +204,7 @@ public static class Parsers
             // qWarning() << "Minecraft profile id is not a string";
             return false;
         }
+
         output.Id = id;
 
         if (!GetString(AccountData.Get(obj, "name"), out var name))
@@ -196,6 +212,7 @@ public static class Parsers
             // qWarning() << "Minecraft profile name is not a string";
             return false;
         }
+
         output.Name = name;
 
         var skinsArray = AccountData.Get(obj, "skins") as JsonArray ?? new JsonArray();
@@ -205,34 +222,41 @@ public static class Parsers
             {
                 continue;
             }
+
             var skinOut = new Skin();
             if (!GetString(AccountData.Get(skinObj, "id"), out var skinId))
             {
                 continue;
             }
+
             skinOut.Id = skinId;
             if (!GetString(AccountData.Get(skinObj, "state"), out var state))
             {
                 continue;
             }
+
             if (state != "ACTIVE")
             {
                 continue;
             }
+
             if (!GetString(AccountData.Get(skinObj, "url"), out var skinUrl))
             {
                 continue;
             }
+
             skinOut.Url = AccountData.RewriteTextureUrl(skinUrl);
             if (!GetString(AccountData.Get(skinObj, "variant"), out var variant))
             {
                 continue;
             }
+
             skinOut.Variant = variant;
             // we deal with only the active skin
             output.SkinField = skinOut;
             break;
         }
+
         var capesArray = AccountData.Get(obj, "capes") as JsonArray ?? new JsonArray();
 
         var currentCape = "";
@@ -242,33 +266,40 @@ public static class Parsers
             {
                 continue;
             }
+
             var capeOut = new Cape();
             if (!GetString(AccountData.Get(capeObj, "id"), out var capeId))
             {
                 continue;
             }
+
             capeOut.Id = capeId;
             if (!GetString(AccountData.Get(capeObj, "state"), out var capeState))
             {
                 continue;
             }
+
             if (capeState == "ACTIVE")
             {
                 currentCape = capeOut.Id;
             }
+
             if (!GetString(AccountData.Get(capeObj, "url"), out var capeUrl))
             {
                 continue;
             }
+
             capeOut.Url = AccountData.RewriteTextureUrl(capeUrl);
             if (!GetString(AccountData.Get(capeObj, "alias"), out var alias))
             {
                 continue;
             }
+
             capeOut.Alias = alias;
 
             output.Capes[capeOut.Id] = capeOut;
         }
+
         output.CurrentCape = currentCape;
         output.Validity = Validity.Certain;
         return true;
@@ -278,6 +309,7 @@ public static class Parsers
     // they are needed because the session server doesn't return skin urls for default skins
     private const string SkinUrlSteve =
         "https://textures.minecraft.net/texture/1a4af718455d4aab528e7a61f86fa25e6a369d1768dcb13f7df319a713eb810b";
+
     private const string SkinUrlAlex =
         "https://textures.minecraft.net/texture/83cee5ca6afcdb171285aa00e8049c297b2dbeba0efb8ff970a5677a1b644032";
 
@@ -300,6 +332,7 @@ public static class Parsers
         {
             return true;
         }
+
         var xored = most ^ least;
         return ((uint)(xored >> 32) ^ (uint)xored) % 2 == 0;
     }
@@ -349,12 +382,14 @@ public static class Parsers
         {
             return false;
         }
+
         output.Id = id;
 
         if (!GetString(AccountData.Get(obj, "name"), out var name))
         {
             return false;
         }
+
         output.Name = name;
 
         var propsArray = AccountData.Get(obj, "properties") as JsonArray ?? new JsonArray();
@@ -365,6 +400,7 @@ public static class Parsers
             {
                 continue;
             }
+
             var nameV = AccountData.Get(pObj, "name");
             if (!AccountData.IsString(nameV) || AccountData.GetString(nameV) != "textures")
             {
@@ -402,6 +438,7 @@ public static class Parsers
         {
             return false;
         }
+
         if (AccountData.Get(textureObj, "textures") is not JsonObject textures)
         {
             // qWarning() << "No textures array in response";
@@ -427,6 +464,7 @@ public static class Parsers
                         // qWarning() << "Skin url is not a string";
                         return false;
                     }
+
                     skinOut.Url = AccountData.RewriteTextureUrl(skinUrl);
 
                     if (AccountData.Get(textureEntry, "metadata") is JsonObject meta)
@@ -445,6 +483,7 @@ public static class Parsers
                         // qWarning() << "Cape url is not a string";
                         return false;
                     }
+
                     capeOut.Url = AccountData.RewriteTextureUrl(capeUrl);
 
                     // we don't know the cape ID as it is not returned from the session server
@@ -484,19 +523,23 @@ public static class Parsers
             {
                 continue;
             }
+
             if (!GetString(AccountData.Get(itemObj, "name"), out var itemName))
             {
                 continue;
             }
+
             if (itemName == "game_minecraft")
             {
                 output.CanPlayMinecraft = true;
             }
+
             if (itemName == "product_minecraft")
             {
                 output.OwnsMinecraft = true;
             }
         }
+
         output.Validity = Validity.Certain;
         return true;
     }
@@ -515,16 +558,19 @@ public static class Parsers
             // qWarning() << "Rollout feature is not a string";
             return false;
         }
+
         if (feature != "msamigration")
         {
             // qWarning() << "Rollout feature is not what we expected (msamigration)";
             return false;
         }
+
         if (!GetBool(AccountData.Get(obj, "rollout"), out var rollout))
         {
             // qWarning() << "Rollout feature is not a string";
             return false;
         }
+
         result = rollout;
         return true;
     }
@@ -542,6 +588,7 @@ public static class Parsers
             // qWarning() << "expires_in is not a valid number";
             return false;
         }
+
         var currentTime = DateTime.UtcNow;
         output.IssueInstant = currentTime;
         output.NotAfter = currentTime.AddSeconds(expiresIn);
@@ -558,6 +605,7 @@ public static class Parsers
             // qWarning() << "access_token is not valid";
             return false;
         }
+
         output.Value = accessToken;
         output.Validity = Validity.Certain;
         return true;

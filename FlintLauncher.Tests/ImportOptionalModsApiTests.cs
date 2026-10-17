@@ -37,9 +37,7 @@ public class ImportOptionalModsApiTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     /// <summary>A synthetic .mrpack with a required + an optional mod, with the API stub

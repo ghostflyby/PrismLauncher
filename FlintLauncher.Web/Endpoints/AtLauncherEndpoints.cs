@@ -28,25 +28,25 @@ public static class AtLauncherEndpoints
         // ------------------------------------------------ modplatform/atlauncher/packs
         // the packsnew.json pass-through (AtlListModel::loadIndexedPack's mapping)
         api.MapGet("/modplatform/atlauncher/packs", (LauncherRuntime runtime) => WithIndexAsync(
-            runtime, packs => Results.Ok(packs.Select(PackView).ToArray())))
+                runtime, packs => Results.Ok(packs.Select(PackView).ToArray())))
             .Produces<AtLauncherPackView[]>();
 
         // ---------------------------------------- modplatform/atlauncher/packs/{name}/versions
         // the index carries each pack's version list (the ATL CDN has no per-pack index URL,
         // so this re-reads packsnew.json and matches the pack by name, case-insensitively)
         api.MapGet("/modplatform/atlauncher/packs/{name}/versions", (string name,
-            LauncherRuntime runtime) => WithIndexAsync(
-            runtime,
-            packs =>
-            {
-                var pack = packs.FirstOrDefault(candidate =>
-                    string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
-                return pack is null
-                    ? ApiJson.NotFound("pack_not_found", $"no ATLauncher pack '{name}'")
-                    : Results.Ok(pack.Versions
-                        .Select(version => new AtLauncherPackVersionView(version.Version, version.Minecraft))
-                        .ToArray());
-            }))
+                LauncherRuntime runtime) => WithIndexAsync(
+                runtime,
+                packs =>
+                {
+                    var pack = packs.FirstOrDefault(candidate =>
+                        string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+                    return pack is null
+                        ? ApiJson.NotFound("pack_not_found", $"no ATLauncher pack '{name}'")
+                        : Results.Ok(pack.Versions
+                            .Select(version => new AtLauncherPackVersionView(version.Version, version.Minecraft))
+                            .ToArray());
+                }))
             .Produces<AtLauncherPackVersionView[]>();
 
         // ------------------------------------------------ modplatform/atlauncher/install
@@ -129,6 +129,7 @@ public static class AtLauncherEndpoints
         {
             return runtime.AtLauncher;
         }
+
         var trimmed = serverUrl.Trim();
         if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var server) ||
             server.Scheme is not ("http" or "https"))
@@ -137,6 +138,7 @@ public static class AtLauncherEndpoints
                 "'serverUrl' must be an absolute http(s) URL", 400);
             return runtime.AtLauncher;
         }
+
         // the URL builders concatenate directly onto the base, so keep the slash
         return new AtLauncherApi(runtime.AtLauncher.Net)
         {
@@ -169,6 +171,7 @@ public static class AtLauncherEndpoints
             return ApiJson.Error("atlauncher_invalid_response",
                 $"atlauncher pack index is invalid: {e.Message}", 502);
         }
+
         return map(packs);
     }
 

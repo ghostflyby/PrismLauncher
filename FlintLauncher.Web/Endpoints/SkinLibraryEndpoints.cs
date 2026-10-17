@@ -43,21 +43,25 @@ public static class SkinLibraryEndpoints
                 return ApiJson.Error("invalid_body",
                     "a multipart 'file' part with a skin png is required", 400);
             }
+
             var file = request.Form.Files.FirstOrDefault();
             if (file is null || file.Length == 0)
             {
                 return ApiJson.Error("invalid_body",
                     "a multipart 'file' part with a skin png is required", 400);
             }
+
             var name = request.Form["name"].ToString().Trim();
             if (name.Length == 0)
             {
                 name = Path.GetFileNameWithoutExtension(file.FileName);
             }
+
             if (name.Length == 0)
             {
                 return ApiJson.Error("invalid_body", "the skin needs a non-empty 'name'", 400);
             }
+
             if (!TryParseModel(request.Form["model"].ToString(), out var model, out var modelError))
             {
                 return modelError!;
@@ -70,6 +74,7 @@ public static class SkinLibraryEndpoints
             {
                 await file.CopyToAsync(stream);
             }
+
             try
             {
                 return runtime.Skins.Install(temp, name, model)
@@ -86,9 +91,7 @@ public static class SkinLibraryEndpoints
                 {
                     File.Delete(temp);
                 }
-                catch (IOException)
-                {
-                }
+                catch (IOException) { }
             }
         }).WithMetadata(new FormUploadMarker("multipart form: skin image file (png) + optional name/model fields")).Produces<SkinStoredResponse>(201);
 
@@ -106,23 +109,27 @@ public static class SkinLibraryEndpoints
             {
                 return ApiJson.Error("invalid_body", "'profileId' is required", 400);
             }
+
             var skin = runtime.Skins.Get(name);
             if (skin is null)
             {
                 return ApiJson.NotFound("skin_not_found", $"no stored skin '{name}'");
             }
+
             var texture = runtime.Skins.TextureFileOf(skin);
             if (texture.Length == 0)
             {
                 return ApiJson.Error("skin_texture_missing",
                     $"the texture of skin '{name}' is missing from {runtime.Skins.SkinsDir}", 409);
             }
+
             var index = runtime.Accounts.FindAccountByProfileId(request.ProfileId);
             if (index == -1)
             {
                 return ApiJson.Error("unknown_account",
                     $"no account with profile id '{request.ProfileId}'", 400);
             }
+
             var account = runtime.Accounts.At(index);
             var variant = ParseVariant(request.Model) ?? (skin.Model == SkinModelKind.Slim ? "slim" : "classic");
             var upload = SkinUpload.Make(account.AccessToken(), texture, variant, runtime.Auth, runtime.Net);

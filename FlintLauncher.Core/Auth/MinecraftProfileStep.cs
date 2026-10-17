@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/auth/steps/MinecraftProfileStep.{h,cpp}.
+
 namespace FlintLauncher.Core.Auth;
 
 public sealed class MinecraftProfileStep : AuthStep
@@ -41,6 +42,7 @@ public sealed class MinecraftProfileStep : AuthStep
             EmitFinished(AccountTaskState.Working, "Account has no Minecraft profile.");
             return;
         }
+
         if (!response.Success)
         {
             if (AuthNetUtils.IsApplicationError(response.Error) && !AuthNetUtils.IsServerError(response.Error))
@@ -54,8 +56,10 @@ public sealed class MinecraftProfileStep : AuthStep
                 EmitFinished(AccountTaskState.Offline,
                     $"Minecraft Java profile acquisition failed: {response.ErrorString}");
             }
+
             return;
         }
+
         if (!Parsers.ParseMinecraftProfile(response.Body, Data.MinecraftProfile))
         {
             Data.MinecraftProfile = new MinecraftProfile();

@@ -33,7 +33,6 @@ internal sealed class SkinApiHost : IAsyncDisposable
         _app = app;
         Client = client;
         HomeDir = homeDir;
-        DataDir = dataDir;
         _previousCwd = previousCwd;
     }
 
@@ -41,9 +40,6 @@ internal sealed class SkinApiHost : IAsyncDisposable
 
     /// <summary>The temp home root (passed as --home-dir; cleaned up on dispose).</summary>
     public string HomeDir { get; }
-
-    /// <summary>The data root (home layout: &lt;home&gt;/data).</summary>
-    public string DataDir { get; }
 
     public Task<HttpResponseMessage> GetAsync(string path) => Client.GetAsync(path);
 
@@ -63,6 +59,7 @@ internal sealed class SkinApiHost : IAsyncDisposable
         {
             await File.WriteAllTextAsync(Path.Combine(dataDir, name), content);
         }
+
         var previousCwd = Environment.CurrentDirectory;
         // S2: the token is host-injected (--api-token) — no token file exists to read
         var token = Guid.NewGuid().ToString("N");
@@ -94,9 +91,7 @@ internal sealed class SkinApiHost : IAsyncDisposable
             {
                 Directory.Delete(HomeDir, recursive: true);
             }
-            catch (DirectoryNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
         }
     }
 }
@@ -166,6 +161,7 @@ public class SkinApiEndpointsTests : IDisposable
         {
             form.Add(new StringContent(content), name);
         }
+
         return form;
     }
 
@@ -220,19 +216,19 @@ public class SkinApiEndpointsTests : IDisposable
         var boundary = contentType["multipart/form-data; boundary=".Length..];
         var body = recorded.Body;
         Assert.Contains($"""
-            --{boundary}
-            Content-Type: image/png
-            Content-Disposition: form-data; name="file"; filename="skin.png"
+                         --{boundary}
+                         Content-Type: image/png
+                         Content-Disposition: form-data; name="file"; filename="skin.png"
 
-            """.ReplaceLineEndings("\r\n"), body);
+                         """.ReplaceLineEndings("\r\n"), body);
         Assert.Contains($"""
 
-            --{boundary}
-            Content-Disposition: form-data; name="variant"
+                         --{boundary}
+                         Content-Disposition: form-data; name="variant"
 
-            slim
-            --{boundary}--
-            """.ReplaceLineEndings("\r\n"), body);
+                         slim
+                         --{boundary}--
+                         """.ReplaceLineEndings("\r\n"), body);
     }
 
     [Fact]

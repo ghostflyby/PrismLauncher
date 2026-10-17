@@ -49,6 +49,7 @@ public sealed class MetaVersion : MetaEntity
         {
             return data.Name;
         }
+
         return _uid;
     }
 
@@ -93,26 +94,32 @@ public sealed class MetaVersion : MetaEntity
                 SetRecommended(other.recommended);
             }
         }
+
         if (type != other.type)
         {
             SetType(other.type);
         }
+
         if (time != other.time)
         {
             SetTime(other.time);
         }
+
         if (!requires.SetEquals(other.requires))
         {
             requires = other.requires.Clone();
         }
+
         if (!conflicts.SetEquals(other.conflicts))
         {
             conflicts = other.conflicts.Clone();
         }
+
         if (@volatile != other.@volatile)
         {
             SetVolatile(other.@volatile);
         }
+
         if (other.Sha256.Length != 0)
         {
             Sha256 = other.Sha256;

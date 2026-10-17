@@ -36,14 +36,13 @@ internal static class SymlinkSupport
                 {
                     File.Delete(probe + ".lnk");
                 }
+
                 if (File.Exists(probe))
                 {
                     File.Delete(probe);
                 }
             }
-            catch (IOException)
-            {
-            }
+            catch (IOException) { }
         }
     }
 }
@@ -59,9 +58,7 @@ public class FileTransferTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private string WriteSrc(string rel, string content)
@@ -95,6 +92,7 @@ public class FileTransferTests : IDisposable
         {
             Assert.True(File.Exists(src)); // kept
         }
+
         Assert.NotEqual(TransferMethod.SkippedDestinationExists, method);
     }
 
@@ -170,7 +168,7 @@ public class FileTransferTests : IDisposable
 
         Assert.Equal("payload", File.ReadAllText(DstPath("a.txt")));
         Assert.Equal(TransferMethod.Copy, method); // not a false, and not a fake Reflink
-        Assert.True(File.Exists(src)); // CoW keeps the source
+        Assert.True(File.Exists(src));             // CoW keeps the source
     }
 
     // B5: the transferred file must carry the source's permission bits — accounts.json is
@@ -182,6 +180,7 @@ public class FileTransferTests : IDisposable
         {
             return; // no Unix permission bits on Windows
         }
+
         Directory.CreateDirectory(_root);
         var src = WriteSrc("accounts.json", "{}");
         File.SetUnixFileMode(src, UnixFileMode.UserRead | UnixFileMode.UserWrite);
@@ -208,6 +207,7 @@ public class FileTransferTests : IDisposable
         {
             return;
         }
+
         Directory.CreateDirectory(_root);
         Directory.CreateDirectory(DstPath(""));
         var src = WriteSrc("secret.txt", "s");
@@ -215,7 +215,7 @@ public class FileTransferTests : IDisposable
         File.WriteAllText(dst, "stale");
         File.SetUnixFileMode(src, UnixFileMode.UserRead | UnixFileMode.UserWrite);
         File.SetUnixFileMode(dst, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead
-            | UnixFileMode.OtherRead);
+                                  | UnixFileMode.OtherRead);
 
         FileTransfer.CarryUnixFileMode(src, dst);
 
@@ -232,6 +232,7 @@ public class FileTransferTests : IDisposable
         {
             return; // Windows without symlink privilege
         }
+
         Directory.CreateDirectory(_root);
         Directory.CreateDirectory(SrcPath("real/loopA"));
         Directory.CreateDirectory(SrcPath("real/loopB"));
@@ -284,8 +285,8 @@ public class PrismImportPlannerTests : IDisposable
         Assert.DoesNotContain("cache", names);
 
         var instances = plan.Single(p => p.Name == "instances");
-        Assert.Equal(PlannedMethod.PerFile, instances.Method); // CoW mode: per file
-        Assert.Equal(1, instances.Files); // instance.cfg only ("myinst" holds no files)
+        Assert.Equal(PlannedMethod.PerFile, instances.Method);                          // CoW mode: per file
+        Assert.Equal(1, instances.Files);                                               // instance.cfg only ("myinst" holds no files)
         Assert.Equal(PlannedMethod.PerFile, plan.Single(p => p.Name == "meta").Method); // dst has no meta
     }
 
@@ -333,7 +334,7 @@ public class PrismImportPlannerTests : IDisposable
 
         var instances = plan.Single(p => p.Name == "instances");
         Assert.Equal(PlannedMethod.PerFile, instances.Method); // NOT DestinationExists
-        Assert.Equal(1, instances.Files); // the source basis — the walk visits exactly these
+        Assert.Equal(1, instances.Files);                      // the source basis — the walk visits exactly these
     }
 
     // B2: a destination that already holds every source file stays an honest skip
@@ -361,6 +362,7 @@ public class PrismImportPlannerTests : IDisposable
         {
             return; // Windows without symlink privilege
         }
+
         Directory.CreateDirectory(_root);
         Directory.CreateDirectory(Path.Combine(_root, "src", "instances", "real"));
         Directory.CreateDirectory(Path.Combine(_root, "src", "instances", "other"));
@@ -399,9 +401,7 @@ public class PrismImportPlannerTests : IDisposable
         {
             Directory.Delete(path, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 }
 
@@ -451,6 +451,7 @@ public class PrismImportTaskTests : IDisposable
                               : "<missing>"));
             throw new XunitException("see " + Path.Combine(Path.GetTempPath(), "flint-probe-dump.txt"));
         }
+
         Assert.Equal("existing", await File.ReadAllTextAsync(Path.Combine(_root, "dst", "meta", "index.json"))); // idempotent skip
         Assert.True(File.Exists(Path.Combine(_root, "dst", "instances", "demo", "instance.cfg")));
         Assert.True(File.Exists(Path.Combine(_root, "dst", "accounts.json")));
@@ -563,9 +564,7 @@ public class PrismImportTaskTests : IDisposable
         {
             Directory.Delete(path, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 }
 
@@ -701,8 +700,6 @@ public class PrismSourceDetectorTests : IDisposable
         {
             Directory.Delete(path, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 }

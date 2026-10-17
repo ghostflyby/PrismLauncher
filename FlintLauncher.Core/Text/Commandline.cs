@@ -66,10 +66,12 @@ public static class Commandline
                 }
             }
         }
+
         if (current.Length != 0)
         {
             argv.Add(current.ToString());
         }
+
         return argv;
     }
 
@@ -98,6 +100,7 @@ public static class Commandline
                     {
                         state = maybeBrace;
                     }
+
                     break;
                 case maybeBrace:
                     if (c == '{')
@@ -114,6 +117,7 @@ public static class Commandline
                     {
                         state = @base;
                     }
+
                     break;
                 case brace:
                     if (c == '}')
@@ -124,8 +128,10 @@ public static class Commandline
                             Replace(result, startIdx - 2, i - startIdx + 2, res);
                             i = startIdx - 2 + res.Length;
                         }
+
                         state = @base;
                     }
+
                     break;
                 case variable:
                     if (!char.IsLetterOrDigit(c) && c != '_')
@@ -136,11 +142,14 @@ public static class Commandline
                             Replace(result, startIdx - 1, i - startIdx, res);
                             i = startIdx - 1 + res.Length;
                         }
+
                         state = @base;
                     }
+
                     break;
             }
         }
+
         if (state == variable)
         {
             var res = Lookup(dict, result.ToString(startIdx, result.Length - startIdx));
@@ -149,6 +158,7 @@ public static class Commandline
                 Replace(result, startIdx - 1, result.Length - startIdx + 1, res);
             }
         }
+
         return result.ToString();
     }
 
@@ -177,6 +187,7 @@ public static class Commandline
         {
             splited[i] = ExpandVariables(splited[i], dict);
         }
+
         return splited;
     }
 }

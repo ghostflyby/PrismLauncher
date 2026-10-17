@@ -56,6 +56,7 @@ public class LoggedProcessTests
         {
             return;
         }
+
         using var process = new LoggedProcess();
         var collector = new Collector();
         collector.Attach(process);
@@ -76,6 +77,7 @@ public class LoggedProcessTests
         {
             return;
         }
+
         using var process = new LoggedProcess();
         var collector = new Collector();
         collector.Attach(process);
@@ -94,6 +96,7 @@ public class LoggedProcessTests
         {
             return;
         }
+
         using var process = new LoggedProcess();
         var collector = new Collector();
         collector.Attach(process);
@@ -113,6 +116,7 @@ public class LoggedProcessTests
         {
             return;
         }
+
         using var process = new LoggedProcess();
         var collector = new Collector();
         collector.Attach(process);
@@ -131,6 +135,7 @@ public class LoggedProcessTests
         {
             return;
         }
+
         using var process = new LoggedProcess();
         var collector = new Collector();
         collector.Attach(process);
@@ -161,6 +166,7 @@ public class LoggedProcessTests
         {
             return;
         }
+
         using var process = new LoggedProcess();
         var collector = new Collector();
         collector.Attach(process);
@@ -182,6 +188,7 @@ public class LoggedProcessTests
         {
             return;
         }
+
         var sink = FlintLogTest.Attach();
         try
         {
@@ -237,6 +244,7 @@ public class LoggedProcessTests
         {
             return;
         }
+
         using var process = new LoggedProcess();
         var collector = new Collector();
         collector.Attach(process);
@@ -262,6 +270,7 @@ public class LoggedProcessTests
         {
             return;
         }
+
         using var process = new LoggedProcess();
         var collector = new Collector();
         collector.Attach(process);

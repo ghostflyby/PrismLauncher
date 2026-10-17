@@ -38,9 +38,7 @@ public class FlameExportTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private string TempPath(string name) => Path.Combine(_root, name);
@@ -136,6 +134,7 @@ public class FlameExportTests : IDisposable
         {
             manifestJson = await reader.ReadToEndAsync();
         }
+
         var manifest = JsonNode.Parse(manifestJson)!.AsObject();
         Assert.Equal("minecraftModpack", manifest["manifestType"]!.GetValue<string>());
         Assert.Equal(1, manifest["manifestVersion"]!.GetValue<int>());
@@ -164,6 +163,7 @@ public class FlameExportTests : IDisposable
         {
             modlist = await reader.ReadToEndAsync();
         }
+
         Assert.StartsWith("<ul>", modlist);
         Assert.EndsWith("</ul>", modlist);
         // the metadata-resolved mod has no parsed author details -> listed without authors

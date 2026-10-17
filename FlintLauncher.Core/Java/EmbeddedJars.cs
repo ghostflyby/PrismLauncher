@@ -56,11 +56,13 @@ public static class EmbeddedJars
         {
             return "";
         }
+
         FileSystem.EnsureFilePathExists(cached);
         using (var target = File.Create(cached))
         {
             stream.CopyTo(target);
         }
+
         return cached;
     }
 
@@ -73,6 +75,7 @@ public static class EmbeddedJars
             candidates.Add(FileSystem.PathCombine(root, "share",
                 FlintConfig.Default.LauncherName));
         }
+
         candidates.Add(FileSystem.PathCombine(root, "jars"));
         candidates.Add(FileSystem.PathCombine(AppContext.BaseDirectory, "jars"));
         foreach (var dir in candidates)
@@ -83,6 +86,7 @@ public static class EmbeddedJars
                 return path;
             }
         }
+
         return "";
     }
 }

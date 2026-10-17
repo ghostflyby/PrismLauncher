@@ -27,9 +27,11 @@ public enum ImportMode
     /// <summary>Reflink/CoW where the filesystem supports it, plain copy otherwise. Source
     /// is kept intact. The default.</summary>
     CopyOnWrite,
+
     /// <summary>Same-volume rename when possible, otherwise clone/copy + source delete after
     /// success.</summary>
     Move,
+
     /// <summary>Plain byte copy, source kept.</summary>
     Copy,
 }
@@ -58,6 +60,7 @@ public static class FileTransfer
         {
             return true;
         }
+
         try
         {
             switch (mode)
@@ -68,6 +71,7 @@ public static class FileTransfer
                         method = TransferMethod.SameVolumeRename;
                         return true;
                     }
+
                     if (TryClone(src, dst))
                     {
                         method = TransferMethod.Reflink;
@@ -84,6 +88,7 @@ public static class FileTransfer
                     {
                         method = TransferMethod.Copy;
                     }
+
                     // the content is in place; failing to delete the source is not a failure
                     TryDeleteFile(src);
                     return true;
@@ -93,6 +98,7 @@ public static class FileTransfer
                         method = TransferMethod.Reflink;
                         return true;
                     }
+
                     // reflink unavailable (ext4/Windows/cross-volume): degrade to a plain
                     // copy like the Move branch above — a hard false makes every per-file
                     // import fail wholesale on non-CoW volumes, with the whole task
@@ -101,6 +107,7 @@ public static class FileTransfer
                     {
                         return false;
                     }
+
                     method = TransferMethod.Copy;
                     return true;
                 default:
@@ -108,12 +115,13 @@ public static class FileTransfer
                     {
                         return false;
                     }
+
                     method = TransferMethod.Copy;
                     return true;
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                 or NotSupportedException)
+                                      or NotSupportedException)
         {
             return false;
         }
@@ -179,6 +187,7 @@ public static class FileTransfer
             {
                 continue; // unreadable directory — the IgnoreInaccessible stance, per directory
             }
+
             foreach (var entry in entries)
             {
                 FileAttributes attributes;
@@ -190,6 +199,7 @@ public static class FileTransfer
                 {
                     continue; // vanished between enumeration and stat — not transferable
                 }
+
                 if (attributes.HasFlag(FileAttributes.Directory))
                 {
                     if (!attributes.HasFlag(FileAttributes.ReparsePoint))
@@ -219,15 +229,18 @@ public static class FileTransfer
         {
             return hook(src, dst);
         }
+
         EnsureDirectoryFor(dst);
         if (OperatingSystem.IsMacOS())
         {
             return CloneFileMacOs(src, dst);
         }
+
         if (OperatingSystem.IsLinux())
         {
             return CloneLinux(src, dst);
         }
+
         return false;
     }
 
@@ -256,6 +269,7 @@ public static class FileTransfer
         {
             return 0;
         }
+
         try
         {
             var buf = new byte[StatBufferSize];
@@ -284,7 +298,7 @@ public static class FileTransfer
     {
         // EEXIST (17): destination already there — idempotent success, like FS::copy
         return clonefile(NullTerminatedUtf8(src), NullTerminatedUtf8(dst), 0) == 0
-            || Marshal.GetLastWin32Error() == 17;
+               || Marshal.GetLastWin32Error() == 17;
     }
 
     // ------------------------------------------------------------------ Linux FICLONE
@@ -307,14 +321,14 @@ public static class FileTransfer
             CarryUnixFileMode(src, dst);
             return true;
         }
+
         dstHandle.Dispose(); // release before removing the half-written clone
         try
         {
             File.Delete(dst);
         }
-        catch (IOException)
-        {
-        }
+        catch (IOException) { }
+
         return false;
     }
 
@@ -356,14 +370,13 @@ public static class FileTransfer
         {
             return;
         }
+
         try
         {
             File.SetUnixFileMode(dst, File.GetUnixFileMode(src));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
-                                 or SecurityException or NotSupportedException)
-        {
-        }
+                                      or SecurityException or NotSupportedException) { }
     }
 
     private static void EnsureDirectoryFor(string dst)
@@ -373,6 +386,7 @@ public static class FileTransfer
         {
             return; // root-level destination, nothing to create
         }
+
         Directory.CreateDirectory(dir);
     }
 
@@ -382,8 +396,6 @@ public static class FileTransfer
         {
             File.Delete(path);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
     }
 }

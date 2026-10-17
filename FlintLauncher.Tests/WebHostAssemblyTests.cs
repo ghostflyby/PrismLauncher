@@ -26,6 +26,7 @@ public class WebHostAssemblyTests
             {
                 return; // the unreadable-file sabotage is a POSIX mode trick
             }
+
             File.SetUnixFileMode(ini, UnixFileMode.None);
 
             // the unreadable chain INI makes the C5 import throw inside the runtime
@@ -47,11 +48,10 @@ public class WebHostAssemblyTests
                 {
                     File.SetUnixFileMode(ini, UnixFileMode.UserRead | UnixFileMode.UserWrite);
                 }
+
                 Directory.Delete(home, recursive: true);
             }
-            catch (DirectoryNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
         }
     }
 }

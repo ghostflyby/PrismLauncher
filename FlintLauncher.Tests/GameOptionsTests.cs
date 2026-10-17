@@ -18,9 +18,7 @@ public class GameOptionsTests : IDisposable
         {
             Directory.Delete(_dir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private string OptionsPath(string content)

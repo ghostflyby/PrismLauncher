@@ -38,9 +38,7 @@ public class ResourceDownloadTaskTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private string ModsDir => Path.Combine(_root, "mods");

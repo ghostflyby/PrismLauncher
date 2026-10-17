@@ -23,15 +23,14 @@ public class JavaUtilsTests : IDisposable
         {
             Environment.SetEnvironmentVariable(name, value);
         }
+
         foreach (var root in _tempRoots)
         {
             try
             {
                 Directory.Delete(root, recursive: true);
             }
-            catch (DirectoryNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
         }
     }
 
@@ -54,6 +53,7 @@ public class JavaUtilsTests : IDisposable
         {
             return true;
         }
+
         return Directory.Exists("/Library/Java/JavaVirtualMachines") &&
                Directory.GetDirectories("/Library/Java/JavaVirtualMachines").Length > 0;
     }

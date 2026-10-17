@@ -116,6 +116,7 @@ public class ProfilerTests
             {
                 File.WriteAllText(Path.Combine(dir, "bin", "jprofiler"), "");
             }
+
             File.WriteAllText(Path.Combine(dir, "bin", "agent.jar"), "");
             Assert.True(factory.Check(dir, out var okError));
             Assert.Equal("", okError);
@@ -165,6 +166,7 @@ public class ProfilerTests
                 File.SetUnixFileMode(tool,
                     UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
             }
+
             Assert.True(factory.Check(tool, out var okError));
             Assert.Equal("", okError);
 
@@ -175,6 +177,7 @@ public class ProfilerTests
                 File.SetUnixFileMode(wrongName,
                     UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
             }
+
             Assert.False(factory.Check(wrongName, out var nameError));
             Assert.Equal("Invalid path to VisualVM", nameError);
         }
@@ -197,6 +200,7 @@ public class ProfilerTests
         {
             expected = JVisualVmFactory.FindExecutable("visualvm");
         }
+
         Assert.Equal(expected, Variant.AsString(settings.Get("JVisualVMPath")));
     }
 

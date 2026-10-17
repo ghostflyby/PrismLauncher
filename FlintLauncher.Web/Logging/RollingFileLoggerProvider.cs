@@ -30,8 +30,10 @@ public sealed class RollingFileLoggerProvider : ILoggerProvider
                 {
                     continue;
                 }
+
                 File.Move(source, Path.Combine(directory, FileName(generation + 1)), overwrite: true);
             }
+
             _writer = new StreamWriter(
                 File.Open(Path.Combine(directory, FileName(0)), FileMode.Create, FileAccess.Write, FileShare.Read))
             {
@@ -39,7 +41,7 @@ public sealed class RollingFileLoggerProvider : ILoggerProvider
             };
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                  or SecurityException or NotSupportedException)
+                                      or SecurityException or NotSupportedException)
         {
             _writer = null;
         }
@@ -64,19 +66,21 @@ public sealed class RollingFileLoggerProvider : ILoggerProvider
         public bool IsEnabled(LogLevel logLevel) => logLevel != LogLevel.None;
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
-                                Func<TState, Exception?, string> formatter)
+            Func<TState, Exception?, string> formatter)
         {
             var writer = provider._writer;
             if (writer is null || !IsEnabled(logLevel))
             {
                 return;
             }
+
             var line = $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)} " +
                        $"[{LevelName(logLevel)}] [{category}] {formatter(state, exception)}";
             if (exception is not null)
             {
                 line += Environment.NewLine + exception;
             }
+
             lock (provider._lock)
             {
                 writer.WriteLine(line);

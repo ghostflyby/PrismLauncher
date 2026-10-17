@@ -335,13 +335,13 @@ public class LibraryTests
     {
         var problems = new ProblemContainer();
         var test = MojangVersionFormat.LibraryFromJson(problems, JsonNode.Parse("""
-        {
-            "name": "test.package:testname:testversion",
-            "rules": [
-                {"action": "allow", "os": {"name": "linux"}}
-            ]
-        }
-        """)!, "rules.json");
+                                                                                {
+                                                                                    "name": "test.package:testname:testversion",
+                                                                                    "rules": [
+                                                                                        {"action": "allow", "os": {"name": "linux"}}
+                                                                                    ]
+                                                                                }
+                                                                                """)!, "rules.json");
 
         Assert.True(test.ApplyRules);
         Assert.Single(test.Rules);

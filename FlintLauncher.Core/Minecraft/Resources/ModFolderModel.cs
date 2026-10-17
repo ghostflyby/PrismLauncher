@@ -30,9 +30,7 @@ public class ModFolderModel : ResourceFolderModel
     private readonly Dictionary<string, MetadataHandler.ModStruct> _metadata = new(StringComparer.Ordinal);
 
     public ModFolderModel(string dir, bool isIndexed = false, bool createDir = false)
-        : base(dir, isIndexed, createDir)
-    {
-    }
+        : base(dir, isIndexed, createDir) { }
 
     public override string Id => "mods";
 
@@ -46,6 +44,7 @@ public class ModFolderModel : ResourceFolderModel
         {
             result.Add((Mod)resource);
         }
+
         return result;
     }
 
@@ -100,10 +99,12 @@ public class ModFolderModel : ResourceFolderModel
             {
                 resourceFileName = resourceFileName[..^9];
             }
+
             if (resourceFileName != fileName)
             {
                 continue;
             }
+
             metadata = GetMetadata(resource);
             break;
         }

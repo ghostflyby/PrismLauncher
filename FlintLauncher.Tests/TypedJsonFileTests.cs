@@ -20,9 +20,7 @@ public class TypedJsonFileTests : IDisposable
         {
             Directory.Delete(_dir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private string FilePath(string name = "state.json") => Path.Combine(_dir, name);
@@ -125,6 +123,7 @@ public class TypedJsonFileTests : IDisposable
         {
             return;
         }
+
         var file = File("private.json");
         file.Save(new SampleState { StateVersion = 2 }, UnixFileMode.UserRead | UnixFileMode.UserWrite);
 

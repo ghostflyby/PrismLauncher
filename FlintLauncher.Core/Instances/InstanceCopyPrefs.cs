@@ -7,6 +7,7 @@
 // mentioned in older revisions does not exist here; AllTrue() is the aggregate used
 // upstream. Note that the link-related switches do not gate AllTrue() (they are transport
 // modes, not content choices) — exactly like the C++.
+
 namespace FlintLauncher.Core.Instances;
 
 public sealed class InstanceCopyPrefs

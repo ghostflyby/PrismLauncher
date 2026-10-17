@@ -46,6 +46,7 @@ public sealed class SkinsLibrary
                 return skin;
             }
         }
+
         return null;
     }
 
@@ -63,16 +64,19 @@ public sealed class SkinsLibrary
         {
             return false;
         }
+
         var dir = _skinsDir();
         if (!FileSystem.EnsureFolderPathExists(dir))
         {
             return false;
         }
+
         var target = Path.Combine(dir, name + ".png");
         if (File.Exists(target))
         {
             return false;
         }
+
         try
         {
             File.Copy(sourceFile, target, overwrite: false);
@@ -103,12 +107,14 @@ public sealed class SkinsLibrary
         {
             return false;
         }
+
         var dir = _skinsDir();
         var skins = SkinListStore.Load(dir);
         if (skins.RemoveAll(skin => skin.Name() == name) == 0)
         {
             return false;
         }
+
         SkinListStore.Save(dir, skins);
         var texture = Path.Combine(dir, name + ".png");
         if (File.Exists(texture))
@@ -123,6 +129,7 @@ public sealed class SkinsLibrary
                 // success anyway (matches the C++ remove-then-pragmatic-file-cleanup)
             }
         }
+
         return true;
     }
 

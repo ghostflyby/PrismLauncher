@@ -70,6 +70,7 @@ public static class JavaUtils
                 // qWarning() << "Entry" << item << "could not be stripped from variable" << name;
             }
         }
+
         return string.Join(delimiter, targetItems);
     }
 
@@ -115,10 +116,12 @@ public static class JavaUtils
             {
                 continue;
             }
+
             if (stripped.Contains(key))
             {
                 value = StripVariableEntries(key, value, (string?)rawenv["LAUNCHER_" + key] ?? "");
             }
+
             if (OperatingSystem.IsLinux() || OperatingSystem.IsFreeBSD() || IsOpenBsd())
             {
                 // Strip IBus (Linux IME framework; for some reason it breaks MC)
@@ -127,8 +130,10 @@ public static class JavaUtils
                     value = value.Replace("@im=ibus", "");
                 }
             }
+
             env.Insert(key, value);
         }
+
         if (OperatingSystem.IsLinux())
         {
             // HACK: Workaround for QTBUG-42500
@@ -245,6 +250,7 @@ public static class JavaUtils
                 candidates.Add(javaCandidate.Path);
             }
         }
+
         return candidates;
     }
 
@@ -264,11 +270,13 @@ public static class JavaUtils
                 {
                     continue;
                 }
+
                 var prefix = CanonicalPath(FileSystem.PathCombine(dirPath, entry));
                 javas.Add(FileSystem.PathCombine(prefix, "jre/bin/java"));
                 javas.Add(FileSystem.PathCombine(prefix, "bin/java"));
             }
         }
+
         // java installed in a snap is installed in the standard directory, but underneath $SNAP
         void ScanJavaDirs(string dirPath, Func<string, bool>? filter = null)
         {
@@ -287,12 +295,15 @@ public static class JavaUtils
             ScanJavaDirs("/usr/lib/jvm");
             ScanJavaDirs("/usr/lib64/jvm");
             ScanJavaDirs("/usr/lib32/jvm");
+
             // Gentoo's locations for openjdk and openjdk-bin respectively
             static bool GentooFilter(string fileName) =>
                 fileName.StartsWith("openjdk-", StringComparison.Ordinal) || fileName.StartsWith("openj9-", StringComparison.Ordinal);
+
             // AOSC OS's locations for openjdk
             static bool AoscFilter(string fileName) =>
                 fileName == "java" || fileName.StartsWith("java-", StringComparison.Ordinal);
+
             ScanJavaDir("/usr/lib64", GentooFilter);
             ScanJavaDir("/usr/lib", GentooFilter);
             ScanJavaDir("/opt", GentooFilter);
@@ -363,6 +374,7 @@ public static class JavaUtils
             {
                 continue;
             }
+
             var entries = Directory.GetDirectories(dirPath);
             var binFound = false;
             foreach (var entry in entries)
@@ -374,11 +386,13 @@ public static class JavaUtils
                     break;
                 }
             }
+
             if (!binFound)
             {
                 processpaths.AddRange(entries.Select(CanonicalPath));
             }
         }
+
         return javas;
     }
 
@@ -395,12 +409,14 @@ public static class JavaUtils
             javas.Add(FileSystem.PathCombine(prefix, "bin", JavaExecutable));
             javas.Add(FileSystem.PathCombine(prefix, JavaExecutable));
         }
+
         void ScanJavaDir(string dirPath)
         {
             if (!Directory.Exists(dirPath))
             {
                 return;
             }
+
             foreach (var entry in Directory.GetDirectories(dirPath))
             {
                 ScanDir(CanonicalPath(entry));
@@ -432,6 +448,7 @@ public static class JavaUtils
         {
             javaPaths = env.Split(':').ToList();
         }
+
         javas.AddRange(javaPaths);
         return javas;
     }
@@ -450,6 +467,7 @@ public static class JavaUtils
         {
             return [];
         }
+
         var names = new List<string>();
         try
         {
@@ -462,6 +480,7 @@ public static class JavaUtils
         {
             // unreadable directories simply contribute no candidates
         }
+
         return names;
     }
 
@@ -491,6 +510,7 @@ public static class JavaUtils
                 result.Add(java);
             }
         }
+
         return result;
     }
 }

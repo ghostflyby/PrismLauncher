@@ -19,6 +19,7 @@ public sealed class NbtList : NbtTag
         {
             throw new ArgumentException("tag_type::End cannot be used as a list element type", nameof(elementType));
         }
+
         ElementType = elementType;
     }
 
@@ -47,6 +48,7 @@ public sealed class NbtList : NbtTag
             throw new ArgumentException(
                 $"The tag type ({tag.Type}) does not match the list's content type ({ElementType})", nameof(tag));
         }
+
         _tags.Add(tag);
     }
 
@@ -57,6 +59,7 @@ public sealed class NbtList : NbtTag
         {
             throw new ArgumentException("tag_type::End cannot be used as a list element type", nameof(elementType));
         }
+
         _tags.Clear();
         ElementType = elementType;
     }
@@ -70,6 +73,7 @@ public sealed class NbtList : NbtTag
         {
             copy._tags.Add(tag.Clone());
         }
+
         return copy;
     }
 
@@ -81,6 +85,7 @@ public sealed class NbtList : NbtTag
         {
             return false;
         }
+
         for (var i = 0; i < _tags.Count; i++)
         {
             if (!NbtTagEquals(_tags[i], other._tags[i]))
@@ -88,6 +93,7 @@ public sealed class NbtList : NbtTag
                 return false;
             }
         }
+
         return true;
     }
 
@@ -99,6 +105,7 @@ public sealed class NbtList : NbtTag
         {
             hash.Add(tag);
         }
+
         return hash.ToHashCode();
     }
 
@@ -108,10 +115,12 @@ public sealed class NbtList : NbtTag
         {
             return true;
         }
+
         if (a is null || b is null || a.Type != b.Type)
         {
             return false;
         }
+
         return a switch
         {
             NbtByte t => t.Value == ((NbtByte)b).Value,

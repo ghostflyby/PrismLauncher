@@ -21,9 +21,7 @@ using System.Text;
 namespace FlintLauncher.Core.ModPlatform.Packwiz;
 
 /// <summary>Port of toml++'s parse_error for the subset parser.</summary>
-public sealed class TomlParseException(string message) : Exception(message)
-{
-}
+public sealed class TomlParseException(string message) : Exception(message) { }
 
 /// <summary>
 /// A parsed TOML table: an ordered map of keys to values, where a value is a
@@ -52,6 +50,7 @@ public sealed class TomlTable
         {
             return s;
         }
+
         return "";
     }
 
@@ -62,6 +61,7 @@ public sealed class TomlTable
         {
             return l;
         }
+
         return 0;
     }
 
@@ -72,6 +72,7 @@ public sealed class TomlTable
         {
             return b;
         }
+
         return false;
     }
 
@@ -82,6 +83,7 @@ public sealed class TomlTable
         {
             return table;
         }
+
         return null;
     }
 
@@ -92,6 +94,7 @@ public sealed class TomlTable
         {
             return array;
         }
+
         return null;
     }
 
@@ -109,6 +112,7 @@ public sealed class TomlTable
                 }
             }
         }
+
         return result;
     }
 
@@ -126,6 +130,7 @@ public sealed class TomlTable
                 }
             }
         }
+
         return result;
     }
 }
@@ -161,6 +166,7 @@ public static class MiniToml
                 {
                     return _root;
                 }
+
                 var c = Peek();
                 if (c == '[')
                 {
@@ -241,6 +247,7 @@ public static class MiniToml
                     Advance();
                     continue;
                 }
+
                 Expect(']');
                 break;
             }
@@ -255,16 +262,20 @@ public static class MiniToml
                     {
                         throw new TomlParseException($"Key '{part}' is not a table");
                     }
+
                     existing = new TomlTable();
                     table.Set(part, existing);
                 }
+
                 table = existing;
             }
+
             var header = string.Join('.', path);
             if (!_definedTables.Add(header))
             {
                 throw new TomlParseException($"Duplicate table definition: [{header}]");
             }
+
             current = table;
         }
 
@@ -289,6 +300,7 @@ public static class MiniToml
                     Advance();
                     continue;
                 }
+
                 Expect(']');
                 Expect(']');
                 break;
@@ -305,9 +317,11 @@ public static class MiniToml
                     {
                         throw new TomlParseException($"Key '{path[i]}' is not a table");
                     }
+
                     existing = new TomlTable();
                     parent.Set(path[i], existing);
                 }
+
                 parent = existing;
             }
 
@@ -319,6 +333,7 @@ public static class MiniToml
                 {
                     throw new TomlParseException($"Key '{lastKey}' is not an array of tables");
                 }
+
                 array = existingList;
             }
             else
@@ -350,12 +365,15 @@ public static class MiniToml
                         {
                             throw new TomlParseException($"Key '{part}' is not a table");
                         }
+
                         sub = new TomlTable();
                         target.Set(part, sub);
                     }
+
                     target = sub;
                     continue;
                 }
+
                 Expect('=');
                 SkipInlineWhitespace();
                 var value = ParseValue();
@@ -367,10 +385,12 @@ public static class MiniToml
                         Advance();
                     }
                 }
+
                 if (!inline && !AtEnd && Peek() is not ('\n' or '\r'))
                 {
                     throw new TomlParseException($"Unexpected trailing characters after value for key '{part}'");
                 }
+
                 target.Set(part, value);
                 return;
             }
@@ -382,24 +402,29 @@ public static class MiniToml
             {
                 throw new TomlParseException("Unexpected end of input while reading a key");
             }
+
             var c = Peek();
             if (c == '"')
             {
                 return ParseBasicString();
             }
+
             if (c == '\'')
             {
                 return ParseLiteralString();
             }
+
             var start = pos;
             while (!AtEnd && (char.IsAsciiLetterOrDigit(Peek()) || Peek() is '_' or '-'))
             {
                 Advance();
             }
+
             if (pos == start)
             {
                 throw new TomlParseException($"Invalid key character '{Peek()}'");
             }
+
             return text[start..pos];
         }
 
@@ -409,6 +434,7 @@ public static class MiniToml
             {
                 throw new TomlParseException("Unexpected end of input while reading a value");
             }
+
             return Peek() switch
             {
                 '"' => ParseBasicString(),
@@ -426,19 +452,23 @@ public static class MiniToml
             {
                 Advance();
             }
+
             var atom = text[start..pos].TrimEnd(' ', '\t');
             if (atom == "true")
             {
                 return true;
             }
+
             if (atom == "false")
             {
                 return false;
             }
+
             if (long.TryParse(atom, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var number))
             {
                 return number;
             }
+
             throw new TomlParseException($"Unsupported TOML value: '{atom}'");
         }
 
@@ -453,27 +483,32 @@ public static class MiniToml
                 {
                     throw new TomlParseException("Unterminated array");
                 }
+
                 if (Peek() == ']')
                 {
                     Advance();
                     return array;
                 }
+
                 array.Add(ParseValue());
                 SkipWhitespaceAndComments();
                 if (AtEnd)
                 {
                     throw new TomlParseException("Unterminated array");
                 }
+
                 if (Peek() == ',')
                 {
                     Advance();
                     continue;
                 }
+
                 if (Peek() == ']')
                 {
                     Advance();
                     return array;
                 }
+
                 throw new TomlParseException("Expected ',' or ']' in array");
             }
         }
@@ -488,6 +523,7 @@ public static class MiniToml
                 Advance();
                 return table;
             }
+
             while (true)
             {
                 SkipInlineWhitespace();
@@ -497,16 +533,19 @@ public static class MiniToml
                 {
                     throw new TomlParseException("Unterminated inline table");
                 }
+
                 if (Peek() == ',')
                 {
                     Advance();
                     continue;
                 }
+
                 if (Peek() == '}')
                 {
                     Advance();
                     return table;
                 }
+
                 throw new TomlParseException("Expected ',' or '}' in inline table");
             }
         }
@@ -522,20 +561,24 @@ public static class MiniToml
                 {
                     throw new TomlParseException("Unterminated string");
                 }
+
                 var c = Advance();
                 if (c == '"')
                 {
                     return sb.ToString();
                 }
+
                 if (c != '\\')
                 {
                     sb.Append(c);
                     continue;
                 }
+
                 if (AtEnd)
                 {
                     throw new TomlParseException("Unterminated escape sequence");
                 }
+
                 var escape = Advance();
                 switch (escape)
                 {
@@ -559,12 +602,14 @@ public static class MiniToml
             {
                 throw new TomlParseException("Invalid unicode escape");
             }
+
             var hex = text.Substring(pos, length);
             pos += length;
             if (!int.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var code))
             {
                 throw new TomlParseException($"Invalid unicode escape '\\u{hex}'");
             }
+
             try
             {
                 return char.ConvertFromUtf32(code);
@@ -587,6 +632,7 @@ public static class MiniToml
                     return text[start..(pos - 1)];
                 }
             }
+
             throw new TomlParseException("Unterminated literal string");
         }
 
@@ -596,6 +642,7 @@ public static class MiniToml
             {
                 throw new TomlParseException($"Expected '{expected}'");
             }
+
             Advance();
         }
     }

@@ -59,11 +59,13 @@ public sealed class AccountRefreshService(
             {
                 return;
             }
+
             var account = accounts.At(i);
             if (account is null || account.AccountType == AccountType.Offline || !account.ShouldRefresh())
             {
                 continue;
             }
+
             logger.LogInformation("Refreshing account '{Profile}'", account.ProfileName());
             try
             {

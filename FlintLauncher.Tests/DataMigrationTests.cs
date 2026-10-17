@@ -26,9 +26,7 @@ public class DataMigrationTests : IDisposable
         {
             Directory.Delete(_dir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private string MakeDir(params string[] relativePaths)
@@ -40,6 +38,7 @@ public class DataMigrationTests : IDisposable
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
             File.WriteAllText(fullPath, "content of " + relative);
         }
+
         return root;
     }
 
@@ -421,6 +420,7 @@ public class DataMigrationTests : IDisposable
         {
             return; // Windows without symlink privilege
         }
+
         var source = Path.Combine(_dir, "src-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(source, "instances", "demo"));
         // the link's target sits OUTSIDE the whitelisted tree — only link.cfg itself matches
@@ -439,7 +439,7 @@ public class DataMigrationTests : IDisposable
         var landed = Path.Combine(target, "instances", "demo", "link.cfg");
         Assert.Equal("marker-content", await File.ReadAllTextAsync(landed));
         Assert.Null(File.ResolveLinkTarget(landed, returnFinalTarget: false)); // content, not a re-link
-        Assert.Equal(1, progress.Last().total); // the plan count includes the link too
+        Assert.Equal(1, progress.Last().total);                                // the plan count includes the link too
     }
 
     // the C++ shortens long status names: left(20) + "…" + right(29)

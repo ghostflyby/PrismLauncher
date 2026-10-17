@@ -24,6 +24,7 @@ public class RealLaunchSmokeTests
         {
             return;
         }
+
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
         var root = Path.Combine(Path.GetTempPath(), $"flint-smoke-{Guid.NewGuid():N}");
@@ -75,8 +76,10 @@ public class RealLaunchSmokeTests
             {
                 throw new Exception($"controller never created a launcher: {controller.State} {controller.FailReason}");
             }
+
             await Task.Delay(50);
         }
+
         var launchTask = controller.Launcher;
         await launchTask.StartAsync(); // joins the in-flight run
         await controllerRun;
@@ -87,6 +90,7 @@ public class RealLaunchSmokeTests
                 "launch failed: " + launchTask.FailReason + " | log: "
                 + string.Join(" / ", launchTask.GetLogModel().Entries.Select(e => e.Line).TakeLast(12)));
         }
+
         Assert.Equal(TaskState.Succeeded, controller.State);
 
         // the launch script reached the fake EntryPoint and came back through the log
@@ -139,6 +143,7 @@ public class RealLaunchSmokeTests
         {
             return; // meta cache unavailable in this test layout; covered by fixture-based tests
         }
+
         var launchTask = instance.CreateLaunchTask(null, null);
         Assert.NotNull(launchTask);
         Assert.True(launchTask.IsMultiStep, "real instance launch task should contain the full step chain");
@@ -148,26 +153,27 @@ public class RealLaunchSmokeTests
     {
         var path = Path.Combine(root, "fake-java");
         File.WriteAllText(path, """
-            #!/bin/sh
-            exec 2>>/tmp/fj-stderr.log
-            while IFS= read -r line || [ -n "$line" ]; do
-                printf '%s\n' "$line"
-                echo "got: $line" >> /tmp/fj-stdin.log
-                if [ "$line" = "launch" ]; then
-                    exit 0
-                fi
-                if [ "$line" = "abort" ]; then
-                    exit 42
-                fi
-            done
-            echo "eof-exit" >> /tmp/fj-stdin.log
-            exit 1
-            """);
+                                #!/bin/sh
+                                exec 2>>/tmp/fj-stderr.log
+                                while IFS= read -r line || [ -n "$line" ]; do
+                                    printf '%s\n' "$line"
+                                    echo "got: $line" >> /tmp/fj-stdin.log
+                                    if [ "$line" = "launch" ]; then
+                                        exit 0
+                                    fi
+                                    if [ "$line" = "abort" ]; then
+                                        exit 42
+                                    fi
+                                done
+                                echo "eof-exit" >> /tmp/fj-stdin.log
+                                exit 1
+                                """);
         if (!OperatingSystem.IsWindows())
         {
             File.SetUnixFileMode(path, File.GetUnixFileMode(path) | UnixFileMode.UserExecute |
-                UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
+                                       UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
         }
+
         return path;
     }
 }

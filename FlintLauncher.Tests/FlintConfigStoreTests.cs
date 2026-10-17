@@ -33,9 +33,7 @@ public class FlintConfigStoreTests : IDisposable
         {
             Directory.Delete(_dir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private FlintConfigStore NewStore() =>
@@ -82,8 +80,8 @@ public class FlintConfigStoreTests : IDisposable
             FlintJsonContext.Default.FlintConfigFile);
 
         var resolved = FlintConfigFold.MergeOverDefault(FlintConfigFold.Merge(user!, instance!));
-        Assert.Equal(2048, resolved.Memory.MinMemAlloc);      // instance wins
-        Assert.Equal("/opt/jdk-21", resolved.Java.JavaPath);  // inherited from user
+        Assert.Equal(2048, resolved.Memory.MinMemAlloc);                            // instance wins
+        Assert.Equal("/opt/jdk-21", resolved.Java.JavaPath);                        // inherited from user
         Assert.Equal(MemoryConfig.DefaultMaxMemAlloc, resolved.Memory.MaxMemAlloc); // default
         Assert.Equal(FlintConfigFile.Default().Dirs.IconsDir, resolved.Dirs.IconsDir);
     }
@@ -181,25 +179,25 @@ public class FlintConfigStoreTests : IDisposable
         var paths = Paths;
         Directory.CreateDirectory(paths.DataRoot);
         File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"), """
-            [General]
-            ConfigVersion=1.3
-            NumberOfConcurrentTasks=4
-            MaxMemAlloc=8192
-            JavaPath=/opt/jdk
-            ProxyType=HTTP
-            ProxyAddr=proxy.corp
-            ProxyPort=3128
-            ProxyUser=corpus
-            ProxyPass=hunter2
-            ModrinthToken=mr-token
-            TotalPlayTime=123456
-            TotalPlayTimeMigrated=true
-            LastOfflinePlayerName=OfflineOne
-            UserAskedAboutAutomaticJavaDownload=true
-            Language=zh_CN
-            IconTheme=pebble
-            MainWindowGeometry=@ByteArray(\0\0)
-            """);
+                                                                             [General]
+                                                                             ConfigVersion=1.3
+                                                                             NumberOfConcurrentTasks=4
+                                                                             MaxMemAlloc=8192
+                                                                             JavaPath=/opt/jdk
+                                                                             ProxyType=HTTP
+                                                                             ProxyAddr=proxy.corp
+                                                                             ProxyPort=3128
+                                                                             ProxyUser=corpus
+                                                                             ProxyPass=hunter2
+                                                                             ModrinthToken=mr-token
+                                                                             TotalPlayTime=123456
+                                                                             TotalPlayTimeMigrated=true
+                                                                             LastOfflinePlayerName=OfflineOne
+                                                                             UserAskedAboutAutomaticJavaDownload=true
+                                                                             Language=zh_CN
+                                                                             IconTheme=pebble
+                                                                             MainWindowGeometry=@ByteArray(\0\0)
+                                                                             """);
 
         var store = NewStore();
         var (secrets, state) = NewSideStores();
@@ -292,14 +290,14 @@ public class FlintConfigStoreTests : IDisposable
         var paths = Paths;
         Directory.CreateDirectory(paths.DataRoot);
         File.WriteAllText(Path.Combine(paths.DataRoot, "flint.cfg"), """
-            [General]
-            JavaSignature=abc
-            JavaArchitecture=64
-            JavaRealArchitecture=x86_64
-            JavaVersion=17.0.2
-            JavaVendor=temurin
-            NumberOfManualRetries=2
-            """);
+                                                                     [General]
+                                                                     JavaSignature=abc
+                                                                     JavaArchitecture=64
+                                                                     JavaRealArchitecture=x86_64
+                                                                     JavaVersion=17.0.2
+                                                                     JavaVendor=temurin
+                                                                     NumberOfManualRetries=2
+                                                                     """);
         var store = NewStore();
         var (secrets, state) = NewSideStores();
 
@@ -321,11 +319,11 @@ public class FlintConfigStoreTests : IDisposable
         var paths = Paths;
         Directory.CreateDirectory(paths.DataRoot);
         File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"), """
-            [General]
-            TotalPlayTime=999
-            TotalPlayTimeMigrated=True
-            UserAskedAboutAutomaticJavaDownload=True
-            """);
+                                                                             [General]
+                                                                             TotalPlayTime=999
+                                                                             TotalPlayTimeMigrated=True
+                                                                             UserAskedAboutAutomaticJavaDownload=True
+                                                                             """);
         var store = NewStore();
         var (secrets, state) = NewSideStores();
 
@@ -365,6 +363,7 @@ public class FlintConfigStoreTests : IDisposable
             Assert.Equal(FlintConfigKeys.Default(primary), FlintConfigKeys.Default(alias));
             Assert.True(FlintConfigKeys.Resolve(alias) == FlintConfigKeys.Resolve(primary));
         }
+
         // the secret aliases read as secrets (the import redirects them with the primary, C4)
         Assert.True(FlintConfigKeys.IsSecret("ProxyPassword"));
         Assert.True(FlintConfigKeys.IsSecret("CFKeyOverride"));
@@ -383,22 +382,22 @@ public class FlintConfigStoreTests : IDisposable
         var paths = Paths;
         Directory.CreateDirectory(paths.DataRoot);
         File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"), """
-            [General]
-            ConfigVersion=1.3
-            MCWindowMaximize=true
-            MCWindowWidth=1024
-            MCWindowHeight=768
-            ProxyHostName=old.corp
-            ProxyUsername=olduser
-            ProxyPassword=oldpass
-            MinMemoryAlloc=2048
-            MaxMemoryAlloc=4096
-            PreLoadCmd=echo preload
-            PreLaunchCmd=echo prelaunch
-            PostExitCmd=echo postexit
-            ResourceURL=https://resources.example
-            CFKeyOverride=cf-old
-            """);
+                                                                             [General]
+                                                                             ConfigVersion=1.3
+                                                                             MCWindowMaximize=true
+                                                                             MCWindowWidth=1024
+                                                                             MCWindowHeight=768
+                                                                             ProxyHostName=old.corp
+                                                                             ProxyUsername=olduser
+                                                                             ProxyPassword=oldpass
+                                                                             MinMemoryAlloc=2048
+                                                                             MaxMemoryAlloc=4096
+                                                                             PreLoadCmd=echo preload
+                                                                             PreLaunchCmd=echo prelaunch
+                                                                             PostExitCmd=echo postexit
+                                                                             ResourceURL=https://resources.example
+                                                                             CFKeyOverride=cf-old
+                                                                             """);
         var store = NewStore();
         var (secrets, state) = NewSideStores();
 
@@ -433,12 +432,12 @@ public class FlintConfigStoreTests : IDisposable
         var paths = Paths;
         Directory.CreateDirectory(paths.DataRoot);
         File.WriteAllText(Path.Combine(paths.DataRoot, "flint.cfg"), """
-            [General]
-            MinMemAlloc=1111
-            MinMemoryAlloc=2222
-            ProxyPass=primary-secret
-            ProxyPassword=alias-secret
-            """);
+                                                                     [General]
+                                                                     MinMemAlloc=1111
+                                                                     MinMemoryAlloc=2222
+                                                                     ProxyPass=primary-secret
+                                                                     ProxyPassword=alias-secret
+                                                                     """);
         var store = NewStore();
         var (secrets, state) = NewSideStores();
 
@@ -463,10 +462,10 @@ public class FlintConfigStoreTests : IDisposable
         File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"),
             "[General]\nLanguage=zh_CN\n");
         File.WriteAllText(Path.Combine(paths.DataRoot, "playtime.cfg"), """
-            [General]
-            TotalPlayTime=654321
-            TotalPlayTimeMigrated=true
-            """);
+                                                                        [General]
+                                                                        TotalPlayTime=654321
+                                                                        TotalPlayTimeMigrated=true
+                                                                        """);
         var store = NewStore();
         var (secrets, state) = NewSideStores();
 
@@ -483,10 +482,10 @@ public class FlintConfigStoreTests : IDisposable
         var paths = Paths;
         Directory.CreateDirectory(paths.DataRoot);
         File.WriteAllText(Path.Combine(paths.DataRoot, "flint.cfg"), """
-            [General]
-            TotalPlayTime=111
-            TotalPlayTimeMigrated=true
-            """);
+                                                                     [General]
+                                                                     TotalPlayTime=111
+                                                                     TotalPlayTimeMigrated=true
+                                                                     """);
         // a half-populated playtime.cfg: only the total — the migrated flag falls back to
         // the in-chain branch, member by member
         File.WriteAllText(Path.Combine(paths.DataRoot, "playtime.cfg"),
@@ -531,10 +530,10 @@ public class FlintConfigStoreTests : IDisposable
         var paths = Paths;
         Directory.CreateDirectory(paths.DataRoot);
         File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"), """
-            [General]
-            JavaPath=/opt/pinned-jdk
-            AutomaticJavaSwitch=true
-            """);
+                                                                             [General]
+                                                                             JavaPath=/opt/pinned-jdk
+                                                                             AutomaticJavaSwitch=true
+                                                                             """);
         var store = NewStore();
         var (secrets, state) = NewSideStores();
 

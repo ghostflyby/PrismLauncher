@@ -31,7 +31,7 @@ public sealed class ArchiveDownloadTask : FlintTask
     private readonly HttpMetaCache? _cache;
 
     public ArchiveDownloadTask(Uri url, string finalPath, string checksumType = "", string checksumHash = "",
-                               HttpMetaCache? cache = null)
+        HttpMetaCache? cache = null)
     {
         _url = url;
         _finalPath = finalPath;
@@ -60,6 +60,7 @@ public sealed class ArchiveDownloadTask : FlintTask
             action = NetRequest.MakeFile(_url, fullPath);
             tempDownload = true;
         }
+
         if (_checksumHash.Length != 0 && _checksumType.Length != 0)
         {
             action.AddValidator(new ChecksumValidator(HashType(_checksumType), Convert.FromHexString(_checksumHash)));
@@ -106,6 +107,7 @@ public sealed class ArchiveDownloadTask : FlintTask
                 : "Unable to open supplied zip file.");
             return;
         }
+
         if (firstFolder.Length == 0)
         {
             EmitFailed(IsTarGz(input)
@@ -124,6 +126,7 @@ public sealed class ArchiveDownloadTask : FlintTask
                 EmitFailed(error);
                 return;
             }
+
             if (extracted.Count == 0)
             {
                 EmitFailed("No files were found in the supplied archive file.");
@@ -138,15 +141,17 @@ public sealed class ArchiveDownloadTask : FlintTask
                 extracted = MmcZip.ExtractSubDir(zip, firstFolder, _finalPath);
             }
             catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                     or ArgumentException or NotSupportedException)
+                                          or ArgumentException or NotSupportedException)
             {
                 extracted = null;
             }
+
             if (extracted is null)
             {
                 EmitFailed("Unable to open supplied zip file.");
                 return;
             }
+
             if (extracted.Count == 0)
             {
                 EmitFailed("No files were found in the supplied zip file.");
@@ -169,6 +174,7 @@ public sealed class ArchiveDownloadTask : FlintTask
             var names = TarArchive.ListTarGzFile(input, out _);
             return names is null ? null : names.Count == 0 ? "" : FirstComponent(names[0]);
         }
+
         try
         {
             using var zip = ZipFile.OpenRead(input);
@@ -177,10 +183,11 @@ public sealed class ArchiveDownloadTask : FlintTask
             {
                 return "";
             }
+
             return FirstComponent(entries[0].FullName.Replace('\\', '/'));
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                 or ArgumentException or NotSupportedException)
+                                      or ArgumentException or NotSupportedException)
         {
             return null;
         }

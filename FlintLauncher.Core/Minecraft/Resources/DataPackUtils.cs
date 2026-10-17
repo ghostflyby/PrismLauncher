@@ -70,7 +70,7 @@ public static class DataPackUtils
                 data = File.ReadAllText(mcmetaFileInfo.FullName);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                     or NotSupportedException)
+                                          or NotSupportedException)
             {
                 return McmetaInvalid(); // can't open mcmeta file
             }
@@ -106,7 +106,7 @@ public static class DataPackUtils
                 data = File.ReadAllBytes(imageFileInfo.FullName);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                     or NotSupportedException)
+                                          or NotSupportedException)
             {
                 return PngInvalid(); // can't open pack.png file
             }
@@ -134,7 +134,7 @@ public static class DataPackUtils
             zip = ZipFile.OpenRead(pack.Fileinfo.FullName);
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                 or ArgumentException or NotSupportedException)
+                                      or ArgumentException or NotSupportedException)
         {
             return false; // can't open zip file
         }
@@ -161,6 +161,7 @@ public static class DataPackUtils
                         return true; // mcmeta invalid (breakControl)
                     }
                 }
+
                 if (!iconParsed && level != DataPackProcessingLevel.BasicInfoOnly && filename == "pack.png")
                 {
                     iconParsed = true;
@@ -172,6 +173,7 @@ public static class DataPackUtils
                         return true; // pack.png invalid (breakControl)
                     }
                 }
+
                 if (metaParsed && (level == DataPackProcessingLevel.BasicInfoOnly || iconParsed))
                 {
                     break;
@@ -207,17 +209,21 @@ public static class DataPackUtils
             // Single integer -> [major, 0]
             return ((int)d, 0);
         }
+
         (int Major, int Minor) version = default;
-        if (value is JsonArray arr)        {
+        if (value is JsonArray arr)
+        {
             if (arr.Count >= 1)
             {
                 version.Major = QJsonValueToInt(arr[0]);
             }
+
             if (arr.Count >= 2)
             {
                 version.Minor = QJsonValueToInt(arr[1]);
             }
         }
+
         return version;
     }
 
@@ -249,14 +255,17 @@ public static class DataPackUtils
             {
                 packFormat = QJsonValueToInt(packObj["pack_format"]);
             }
+
             if (packObj.Contains("min_format"))
             {
                 minFormat = ParseVersion(packObj["min_format"]);
             }
+
             if (packObj.Contains("max_format"))
             {
                 maxFormat = ParseVersion(packObj["max_format"]);
             }
+
             pack.SetPackFormat(packFormat, minFormat, maxFormat);
             pack.SetDescription(ProcessComponent(packObj["description"]));
         }
@@ -265,6 +274,7 @@ public static class DataPackUtils
             // qWarning() << "JsonException:" << e.what() << e.cause();
             return false;
         }
+
         return true;
     }
 
@@ -276,11 +286,13 @@ public static class DataPackUtils
         {
             styles.Add($"color: {color};");
         }
+
         if (obj.Contains("bold"))
         {
             var weight = obj.BoolOr("bold") ? "bold" : "normal";
             styles.Add($"font-weight: {weight};");
         }
+
         if (obj.Contains("italic"))
         {
             var style = obj.BoolOr("italic") ? "italic" : "normal";
@@ -297,6 +309,7 @@ public static class DataPackUtils
         {
             result += ProcessComponent(current, strikethrough, underline);
         }
+
         return result;
     }
 
@@ -310,20 +323,24 @@ public static class DataPackUtils
         {
             result = $"<u>{result}</u>";
         }
+
         if (strikethrough)
         {
             result = $"<s>{result}</s>";
         }
+
         // the extra needs to be an array
         if (obj.TryGetPropertyValue("extra", out var extra) && extra is JsonArray extraArray)
         {
             result += ProcessComponent(extraArray, strikethrough, underline);
         }
+
         var style = BuildStyle(obj);
         if (style.Length != 0)
         {
             result = $"<span {style}>{result}</span>";
         }
+
         if (obj.TryGetPropertyValue("clickEvent", out var clickEvent) && clickEvent is JsonObject clickEventObj)
         {
             var action = clickEventObj.StringOr("action");
@@ -333,6 +350,7 @@ public static class DataPackUtils
                 result = $"<a href=\"{value}\">{result}</a>";
             }
         }
+
         return result;
     }
 
@@ -368,6 +386,7 @@ public static class DataPackUtils
             // qWarning() << "Failed to parse pack.png.";
             return false;
         }
+
         return true;
     }
 
@@ -392,7 +411,7 @@ public static class DataPackUtils
                         data = File.ReadAllBytes(imageFileInfo.FullName);
                     }
                     catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                             or NotSupportedException)
+                                                  or NotSupportedException)
                     {
                         return false; // can't open pack.png file
                     }
@@ -406,6 +425,7 @@ public static class DataPackUtils
                 {
                     return false; // pack.png does not exists or is not a valid file.
                 }
+
                 return false; // not processed correctly; https://github.com/PrismLauncher/PrismLauncher/issues/1740
             }
             case ResourceType.ZipFile:
@@ -418,16 +438,18 @@ public static class DataPackUtils
                     {
                         return false; // png_invalid
                     }
+
                     if (!ProcessPackPng(pack, ReadEntry(entry)))
                     {
                         return false; // pack.png invalid
                     }
                 }
                 catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                         or ArgumentException or NotSupportedException)
+                                              or ArgumentException or NotSupportedException)
                 {
                     return false;
                 }
+
                 return false; // not processed correctly; https://github.com/PrismLauncher/PrismLauncher/issues/1740
             }
             default:

@@ -42,6 +42,7 @@ public static class ComponentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 // offline resolve first (the EnsureProfileLoaded idiom: the synchronous part
                 // of the C++ reload(Offline) — re-read mmc-pack.json when not loaded yet)
                 ModPlatformTasks.EnsureProfileLoaded(instance);
@@ -62,6 +63,7 @@ public static class ComponentEndpoints
             {
                 return ApiJson.Error("invalid_body", "body must set 'version' and/or 'important'", 400);
             }
+
             if (request.Version is { Length: 0 })
             {
                 return ApiJson.Error("invalid_body", "'version' must not be empty", 400);
@@ -74,6 +76,7 @@ public static class ComponentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 ModPlatformTasks.EnsureProfileLoaded(instance);
                 var profile = instance.GetPackProfile();
                 var component = profile.GetComponent(uid);
@@ -92,10 +95,12 @@ public static class ComponentEndpoints
                             $"the version of '{uid}' could not be changed (its custom patch could not be reverted)");
                     }
                 }
+
                 if (request.Important is { } important)
                 {
                     component.SetImportant(important);
                 }
+
                 profile.SaveNow();
                 return Results.NoContent();
             }
@@ -113,6 +118,7 @@ public static class ComponentEndpoints
             {
                 return ApiJson.Error("invalid_body", "'uid' is required", 400);
             }
+
             if (request.Version is { Length: 0 })
             {
                 return ApiJson.Error("invalid_body", "'version' must not be empty", 400);
@@ -125,6 +131,7 @@ public static class ComponentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 ModPlatformTasks.EnsureProfileLoaded(instance);
                 var profile = instance.GetPackProfile();
 
@@ -137,12 +144,14 @@ public static class ComponentEndpoints
                     return ApiJson.Conflict("install_failed",
                         $"the version of '{request.Uid}' could not be installed (its custom patch could not be reverted)");
                 }
+
                 profile.SaveNow();
                 var component = profile.GetComponent(request.Uid);
                 if (component is null)
                 {
                     return ApiJson.NotFound("component_not_found", $"no component '{request.Uid}'");
                 }
+
                 return Results.Created(
                     $"/api/v1/instances/{Uri.EscapeDataString(id)}/components/{Uri.EscapeDataString(request.Uid)}",
                     ToView(component));
@@ -164,6 +173,7 @@ public static class ComponentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 ModPlatformTasks.EnsureProfileLoaded(instance);
                 var profile = instance.GetPackProfile();
                 var index = IndexOfUid(profile, uid);
@@ -171,11 +181,13 @@ public static class ComponentEndpoints
                 {
                     return ApiJson.NotFound("component_not_found", $"no component '{uid}'");
                 }
+
                 if (!profile.Customize(index))
                 {
                     return ApiJson.Conflict("not_customizable",
                         $"component '{uid}' cannot be customized (not loaded from metadata, or already customized)");
                 }
+
                 profile.SaveNow();
                 return Results.NoContent();
             }
@@ -195,6 +207,7 @@ public static class ComponentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 ModPlatformTasks.EnsureProfileLoaded(instance);
                 var profile = instance.GetPackProfile();
                 var index = IndexOfUid(profile, uid);
@@ -202,11 +215,13 @@ public static class ComponentEndpoints
                 {
                     return ApiJson.NotFound("component_not_found", $"no component '{uid}'");
                 }
+
                 if (!profile.RevertToBase(index))
                 {
                     return ApiJson.Conflict("not_revertible",
                         $"component '{uid}' cannot be reverted (no local patch, or no metadata to revert to)");
                 }
+
                 profile.SaveNow();
                 return Results.NoContent();
             }
@@ -227,17 +242,20 @@ public static class ComponentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 ModPlatformTasks.EnsureProfileLoaded(instance);
                 var profile = instance.GetPackProfile();
                 if (profile.GetComponent(uid) is null)
                 {
                     return ApiJson.NotFound("component_not_found", $"no component '{uid}'");
                 }
+
                 if (!profile.Remove(uid))
                 {
                     return ApiJson.Conflict("not_removable",
                         $"component '{uid}' cannot be removed (marked important)");
                 }
+
                 profile.SaveNow();
                 return Results.NoContent();
             }
@@ -263,6 +281,7 @@ public static class ComponentEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 ModPlatformTasks.EnsureProfileLoaded(instance);
                 var profile = instance.GetPackProfile();
                 var index = IndexOfUid(profile, uid);
@@ -270,6 +289,7 @@ public static class ComponentEndpoints
                 {
                     return ApiJson.NotFound("component_not_found", $"no component '{uid}'");
                 }
+
                 // PackProfile.Move silently ignores non-moveable pairs (like the C++ void
                 // Move()); the reorder result is observable through the next GET
                 profile.Move(index, request.Delta == -1
@@ -301,6 +321,7 @@ public static class ComponentEndpoints
                 return i;
             }
         }
+
         return -1;
     }
 
@@ -324,6 +345,7 @@ public static class ComponentEndpoints
                     p.Description)).ToArray();
             }
         }
+
         return new ComponentView(
             component.GetId(),
             component.GetVersion().Length != 0 ? component.GetVersion() : null,

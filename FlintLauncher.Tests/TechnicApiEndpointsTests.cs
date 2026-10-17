@@ -35,12 +35,12 @@ public class TechnicApiEndpointsTests : IDisposable
 
     private void SeedSearchList() =>
         _server.SearchListJson = """
-            {"modpacks":[
-                {"name":"Bevo's Tech Pack","slug":"bevo","iconUrl":"http://cdn.technicpack.net/bevo.png"},
-                {"name":"Vanilla","slug":"vanilla","iconUrl":"null"},
-                {"name":"No Icon","slug":"noicon"}
-            ]}
-            """;
+                                 {"modpacks":[
+                                     {"name":"Bevo's Tech Pack","slug":"bevo","iconUrl":"http://cdn.technicpack.net/bevo.png"},
+                                     {"name":"Vanilla","slug":"vanilla","iconUrl":"null"},
+                                     {"name":"No Icon","slug":"noicon"}
+                                 ]}
+                                 """;
 
     // ------------------------------------------------------------ search / trending
 

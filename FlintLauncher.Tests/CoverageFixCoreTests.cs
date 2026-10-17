@@ -134,8 +134,8 @@ public class CoverageFixCoreTests
         var task = LaunchTask.Create(instance, fixture.CreateServices());
 
         var xmlEvent = """
-            <log4j:event logger="net.minecraft" timestamp="1700000000" level="INFO" thread="Server thread"><log4j:Message>raw path</log4j:Message></log4j:event>
-            """;
+                       <log4j:event logger="net.minecraft" timestamp="1700000000" level="INFO" thread="Server thread"><log4j:Message>raw path</log4j:Message></log4j:event>
+                       """;
         task.OnLogLine(xmlEvent, MessageLevel.StdOut);
 
         Assert.Contains(task.GetLogModel().Entries, e => e.Line == xmlEvent);
@@ -149,15 +149,15 @@ public class CoverageFixCoreTests
         var task = LaunchTask.Create(instance, fixture.CreateServices(xmlLogParsing: true));
 
         task.OnLogLine("""
-            <log4j:event logger="net.minecraft.server" timestamp="1700000000" level="INFO" thread="Server thread"><log4j:Message>hello xml world</log4j:Message></log4j:event>
-            """, MessageLevel.StdOut);
+                       <log4j:event logger="net.minecraft.server" timestamp="1700000000" level="INFO" thread="Server thread"><log4j:Message>hello xml world</log4j:Message></log4j:event>
+                       """, MessageLevel.StdOut);
         task.OnLogLine("plain game line", MessageLevel.StdOut);
         task.OnLogLine("launcher side line");
 
         var entries = task.GetLogModel().Entries;
         // the structured entry: [HH:mm:ss] [thread/LEVEL] [logger]: message, level from the event
         Assert.Contains(entries, e => e.Level == MessageLevel.Info &&
-            e.Line.Contains("[Server thread/INFO] [net.minecraft.server]: hello xml world"));
+                                      e.Line.Contains("[Server thread/INFO] [net.minecraft.server]: hello xml world"));
         // plain lines stay separate entries (each line parses on its own)
         Assert.Contains(entries, e => e.Line == "plain game line");
         Assert.Contains(entries, e => e.Line == "launcher side line");
@@ -174,12 +174,12 @@ public class CoverageFixCoreTests
 
         // missing the required logger attribute -> parse error entry, line re-parsed plain
         task.OnLogLine("""
-            <log4j:event timestamp="1700000000" level="INFO"><log4j:Message>no logger</log4j:Message></log4j:event>
-            """, MessageLevel.StdOut);
+                       <log4j:event timestamp="1700000000" level="INFO"><log4j:Message>no logger</log4j:Message></log4j:event>
+                       """, MessageLevel.StdOut);
 
         var entries = task.GetLogModel().Entries;
         Assert.Contains(entries, e => e.Level == MessageLevel.Error &&
-            e.Line.StartsWith("[Log4j Parse Error]"));
+                                      e.Line.StartsWith("[Log4j Parse Error]"));
     }
 
     // --------------------------------------------------- net config application (fix-3)
@@ -220,9 +220,7 @@ public class CoverageFixCoreTests
             {
                 Directory.Delete(dataDir, recursive: true);
             }
-            catch (DirectoryNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
         }
     }
 
@@ -283,9 +281,7 @@ public class CoverageFixCoreTests
             {
                 Directory.Delete(dir, recursive: true);
             }
-            catch (DirectoryNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
         }
     }
 }

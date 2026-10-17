@@ -8,9 +8,7 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class CreateGameFolders : LaunchStep
 {
-    public CreateGameFolders(LaunchTask parent) : base(parent)
-    {
-    }
+    public CreateGameFolders(LaunchTask parent) : base(parent) { }
 
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -28,6 +26,7 @@ public sealed class CreateGameFolders : LaunchStep
         {
             EmitLogLine("Couldn't create the 'server-resource-packs' folder", MessageLevel.Error);
         }
+
         EmitSucceeded();
         return Task.CompletedTask;
     }

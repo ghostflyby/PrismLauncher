@@ -27,13 +27,17 @@ public class FlintPathsTests : IDisposable
     /// on dispose), so machine-level flags cannot skew the layer assertions.</summary>
     private void ClearResolverEnv()
     {
-        foreach (var name in (string[])["FLINT_HOME", "FLINT_CONFIG_DIR", "FLINT_DATA_DIR",
-                     "FLINT_STORE_DIR", "FLINT_CACHE_DIR", "FLINT_STATE_DIR"])
+        foreach (var name in (string[])
+                 [
+                     "FLINT_HOME", "FLINT_CONFIG_DIR", "FLINT_DATA_DIR",
+                     "FLINT_STORE_DIR", "FLINT_CACHE_DIR", "FLINT_STATE_DIR"
+                 ])
         {
             if (!_savedEnv.ContainsKey(name))
             {
                 _savedEnv[name] = Environment.GetEnvironmentVariable(name);
             }
+
             Environment.SetEnvironmentVariable(name, null);
         }
     }
@@ -112,6 +116,7 @@ public class FlintPathsTests : IDisposable
         {
             return; // the exception only exists in the macOS platform derivation
         }
+
         var paths = FlintPaths.FromRoots("/c", "/d", "/s", "/k",
             FlintPaths.PlatformDefaultStateRoot());
 
@@ -139,6 +144,7 @@ public class FlintPathsTests : IDisposable
         {
             Assert.True(Directory.Exists(root), root);
         }
+
         Directory.Delete(baseDir, recursive: true);
     }
 
@@ -149,6 +155,7 @@ public class FlintPathsTests : IDisposable
         {
             return; // posix chmod-based negative case
         }
+
         var readOnly = Path.Combine(Path.GetTempPath(), $"flint-ro-{Guid.NewGuid():N}");
         Directory.CreateDirectory(readOnly);
         var unixMode = File.GetUnixFileMode(readOnly);
@@ -314,6 +321,7 @@ public class FlintPathsTests : IDisposable
         {
             return; // posix chmod-based negative case
         }
+
         using var fixture = TestFlintPaths.UnderHome();
         var unixMode = File.GetUnixFileMode(fixture.Paths.ConfigRoot);
         File.SetUnixFileMode(fixture.Paths.ConfigRoot,

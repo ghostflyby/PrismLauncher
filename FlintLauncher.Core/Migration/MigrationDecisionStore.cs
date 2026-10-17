@@ -78,6 +78,7 @@ public sealed class MigrationDecisionStore
         {
             return null;
         }
+
         // load-or-default with a null default: exists ⇒ parse, corrupt ⇒ undecided
         return new TypedJsonFile<MigrationDecisionRecord>(path, _typeInfo).LoadOrDefault(() => null!);
     }
@@ -102,6 +103,7 @@ public sealed class MigrationDecisionStore
         {
             throw new ArgumentException($"'{source}' is not a valid migration source id", nameof(source));
         }
+
         return source;
     }
 }

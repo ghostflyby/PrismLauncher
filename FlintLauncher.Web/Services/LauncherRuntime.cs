@@ -29,48 +29,65 @@ public sealed class LauncherRuntime
 {
     public FlintPaths Paths { get; }
     public string DataDir => Paths.DataDir;
+
     /// <summary>The network stack this runtime's activity flows through (defaults to the
     /// canonical process-wide stack; tests may isolate by constructing their own).</summary>
     public NetStack Net { get; }
+
     /// <summary>The Modrinth client (injected into platform tasks/endpoints; tests construct
     /// a runtime with a client pointed at their stub).</summary>
     public ModrinthApi Modrinth { get; }
+
     /// <summary>The Flame (CurseForge) client — same injection story as Modrinth.</summary>
     public FlameApi Flame { get; }
+
     /// <summary>The Technic client — same injection story as Modrinth/Flame.</summary>
     public TechnicApi Technic { get; }
+
     /// <summary>The ATLauncher client — same injection story as Modrinth/Flame/Technic.</summary>
     public AtLauncherApi AtLauncher { get; }
+
     /// <summary>The FTB App API client — same injection story as Modrinth/Flame/Technic.</summary>
     public FtbApi Ftb { get; }
+
     /// <summary>The imgur screenshot-upload client — same injection story.</summary>
     public ImgurApi Imgur { get; }
+
     /// <summary>The Microsoft/Xbox/Minecraft auth + skins service endpoints (injected into the
     /// auth flow and the skin/cape calls; tests construct a runtime pointed at their stub).</summary>
     public AuthEndpointsOptions Auth { get; }
+
     /// <summary>The C++ APPLICATION->settings(): the typed flint.json store (CONFIG C5/C6 —
     /// load-or-default, atomic writes; the /settings surface and RuntimeNetConfig read the
     /// resolved fold through it). The instance layer folds it as the user layer of its own
     /// instance.json stack (D4) — the former SettingsObject adapter view retired with the D4
     /// batch.</summary>
     public FlintConfigStore Config { get; }
+
     /// <summary>The launcher runtime state (launcher-state.json, S5 — assembly step 4:
     /// loaded BEFORE the config so the C5 importer can strip state keys into it later).</summary>
     public LauncherStateStore State { get; }
+
     /// <summary>The transitional secret store (CONFIG C4, assembly step 3:
     /// &lt;data-root&gt;/secrets.json, 0600).</summary>
     public ISecretStore Secrets { get; }
+
     /// <summary>The per-source migration decision records (STATE S3:
     /// &lt;state-root&gt;/migration/&lt;source&gt;.json).</summary>
     public MigrationDecisionStore MigrationDecisions { get; }
+
     public InstanceList Instances { get; }
+
     /// <summary>The global icon library (DATA D5: the IconList port — key→path index,
     /// scan, install/delete — over the IconsDir setting).</summary>
     public IconPool Icons { get; }
+
     /// <summary>The local skin library (DATA D6 plan B) over the SkinsDir setting.</summary>
     public SkinsLibrary Skins { get; }
+
     public AccountList Accounts { get; }
     public HttpMetaCache MetaCache { get; }
+
     /// <summary>The flint-legacy eager pass outcome (assembly step 5, GLOBAL G2): what the
     /// startup remount did, so the host can log it and tests can assert it.</summary>
     public FlintLegacyMigration.Result LegacyMigration { get; }
@@ -137,14 +154,14 @@ public sealed class LauncherRuntime
         // resolved against the process CWD when they fired before any stamp — the defect E6
         // retires. The dead "screenshots" base is gone with it (DATA D8).
         MetaCache = new HttpMetaCache(paths.MetacacheFile);
-        MetaCache.AddBase("meta", paths.MetaDir);                       // cache/meta (E3)
-        MetaCache.AddBase("libraries", paths.LibrariesRoot);            // store/libraries (E2)
-        MetaCache.AddBase("assets", paths.AssetsRoot);                  // store/assets (E2)
-        MetaCache.AddBase("asset_indexes", paths.AssetIndexesDir);      // store/assets/indexes (E2)
-        MetaCache.AddBase("java", paths.JavaRoot);                      // store/java (E2)
-        MetaCache.AddBase("general", paths.CacheRoot);                  // import staging etc.
+        MetaCache.AddBase("meta", paths.MetaDir);                  // cache/meta (E3)
+        MetaCache.AddBase("libraries", paths.LibrariesRoot);       // store/libraries (E2)
+        MetaCache.AddBase("assets", paths.AssetsRoot);             // store/assets (E2)
+        MetaCache.AddBase("asset_indexes", paths.AssetIndexesDir); // store/assets/indexes (E2)
+        MetaCache.AddBase("java", paths.JavaRoot);                 // store/java (E2)
+        MetaCache.AddBase("general", paths.CacheRoot);             // import staging etc.
         MetaCache.AddBase("icons", Path.Combine(paths.CacheRoot, "icons"));
-        MetaCache.AddBase("fmllibs", paths.FmllibsCacheDir);            // cache/fmllibs (E3)
+        MetaCache.AddBase("fmllibs", paths.FmllibsCacheDir); // cache/fmllibs (E3)
         MetaCache.AddBase("ATLauncherPacks", Path.Combine(paths.CacheRoot, "ATLauncherPacks"));
         MetaCache.AddBase("FTBPacks", Path.Combine(paths.CacheRoot, "FTBPacks"));
         // E6: the ledger is READ at startup again (the "write-only ledger" defect — entries

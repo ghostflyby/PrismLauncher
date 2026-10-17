@@ -24,9 +24,7 @@ public class FileSecretStoreTests : IDisposable
         {
             Directory.Delete(_dir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private FileSecretStore Store() =>
@@ -77,6 +75,7 @@ public class FileSecretStoreTests : IDisposable
         {
             return;
         }
+
         var store = Store();
         store.Set("ProxyPass", "hunter2");
 
@@ -100,9 +99,7 @@ public class MigrationEngineTests : IDisposable
         {
             Directory.Delete(_dir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private MigrationDecisionStore Decisions() =>
@@ -114,9 +111,9 @@ public class MigrationEngineTests : IDisposable
         var engine = MigrationEngine.CreateDefault();
 
         Assert.Equal(["prism-family", "flint-legacy"], engine.Profiles.Select(p => p.Name).ToList());
-        Assert.False(engine.Find("prism-family")!.AutoRunAtStartup);  // API-driven (G2)
-        Assert.True(engine.Find("flint-legacy")!.AutoRunAtStartup);   // startup probe runs once
-        Assert.NotNull(engine.Find("FLINT-LEGACY"));                  // lookup is case-insensitive
+        Assert.False(engine.Find("prism-family")!.AutoRunAtStartup); // API-driven (G2)
+        Assert.True(engine.Find("flint-legacy")!.AutoRunAtStartup);  // startup probe runs once
+        Assert.NotNull(engine.Find("FLINT-LEGACY"));                 // lookup is case-insensitive
         Assert.Null(engine.Find("unknown"));
     }
 
@@ -231,6 +228,7 @@ public class MigrationEngineTests : IDisposable
         {
             Directory.CreateDirectory(root);
         }
+
         var decisions = new MigrationDecisionStore(Path.Combine(state, "migration"),
             FlintJsonContext.Default.MigrationDecisionRecord);
 
@@ -244,8 +242,8 @@ public class MigrationEngineTests : IDisposable
         var md5 = Convert.ToHexString(MD5.HashData("{}"u8.ToArray()))
             .ToLowerInvariant();
         var ledgerJson = """
-            {"version":"1","entries":[{"base":"meta","path":"net.minecraft/index.json","md5sum":"MD5","etag":"","last_changed_timestamp":0,"eternal":true}]}
-            """.Replace("MD5", md5);
+                         {"version":"1","entries":[{"base":"meta","path":"net.minecraft/index.json","md5sum":"MD5","etag":"","last_changed_timestamp":0,"eternal":true}]}
+                         """.Replace("MD5", md5);
         await File.WriteAllTextAsync(Path.Combine(data, "metacache.json"), ledgerJson);
         Directory.CreateDirectory(Path.Combine(data, "assets", "indexes"));
         await File.WriteAllTextAsync(Path.Combine(data, "assets", "indexes", "5.json"), "{}");
@@ -259,12 +257,12 @@ public class MigrationEngineTests : IDisposable
         Assert.True(result.Ran);
         Assert.Null(result.Error);
         Assert.True(result.LegacyLedgerCleaned);
-        Assert.False(File.Exists(Path.Combine(data, "metacache")));                      // E8
-        Assert.True(File.Exists(Path.Combine(config, "flint.cfg")));                     // config root
-        Assert.True(File.Exists(Path.Combine(cache, "metacache.json")));                 // cache root (E3)
+        Assert.False(File.Exists(Path.Combine(data, "metacache")));      // E8
+        Assert.True(File.Exists(Path.Combine(config, "flint.cfg")));     // config root
+        Assert.True(File.Exists(Path.Combine(cache, "metacache.json"))); // cache root (E3)
         Assert.True(File.Exists(Path.Combine(cache, "meta", "net.minecraft", "index.json")));
-        Assert.True(File.Exists(Path.Combine(store, "assets", "indexes", "5.json")));    // store (E2)
-        Assert.True(File.Exists(Path.Combine(cache, "fmllibs", "lib.jar")));             // cache (E3)
+        Assert.True(File.Exists(Path.Combine(store, "assets", "indexes", "5.json"))); // store (E2)
+        Assert.True(File.Exists(Path.Combine(cache, "fmllibs", "lib.jar")));          // cache (E3)
 
         // the pass sealed itself with the S3 record — a second run is a no-op
         var record = decisions.Read(FlintLegacyMigrationProfile.ProfileName);
@@ -343,8 +341,8 @@ public class MigrationEngineTests : IDisposable
         Assert.True(File.Exists(Path.Combine(paths.DataRoot, "skins", "steve.png")));
         Assert.True(File.Exists(Path.Combine(paths.ConfigRoot, "prismlauncher.cfg")));
         Assert.True(File.Exists(Path.Combine(paths.DataRoot, "prism_nomigrate.txt")));
-        Assert.False(File.Exists(Path.Combine(home, "api-token")));  // S2: dead stock, deleted
-        Assert.False(File.Exists(Path.Combine(home, "metacache")));  // E8: bare ledger, deleted
+        Assert.False(File.Exists(Path.Combine(home, "api-token"))); // S2: dead stock, deleted
+        Assert.False(File.Exists(Path.Combine(home, "metacache"))); // E8: bare ledger, deleted
         // under a home source the old cache root IS the new cache root — children stay
         Assert.True(File.Exists(Path.Combine(paths.CacheRoot, "icons", "i.png")));
         Assert.True(File.Exists(Path.Combine(paths.CacheRoot, "meta", "index.json")));
@@ -369,11 +367,15 @@ public class MigrationEngineTests : IDisposable
         var store = Path.Combine(home, "store");
         var paths = FlintPaths.FromRoots(Path.Combine(home, "config"), data, store,
             Path.Combine(home, "cache"), Path.Combine(home, "state"));
-        foreach (var root in new[] { paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
-                     paths.CacheRoot, paths.StateRoot })
+        foreach (var root in new[]
+                 {
+                     paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
+                     paths.CacheRoot, paths.StateRoot
+                 })
         {
             Directory.CreateDirectory(root);
         }
+
         var decisions = new MigrationDecisionStore(Path.Combine(paths.StateRoot, "migration"),
             FlintJsonContext.Default.MigrationDecisionRecord);
         Directory.CreateDirectory(Path.Combine(data, "assets", "indexes"));
@@ -412,11 +414,15 @@ public class MigrationEngineTests : IDisposable
         var data = Path.Combine(home, "data");
         var paths = FlintPaths.FromRoots(Path.Combine(home, "config"), data,
             Path.Combine(home, "store"), Path.Combine(home, "cache"), Path.Combine(home, "state"));
-        foreach (var root in new[] { paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
-                     paths.CacheRoot, paths.StateRoot })
+        foreach (var root in new[]
+                 {
+                     paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
+                     paths.CacheRoot, paths.StateRoot
+                 })
         {
             Directory.CreateDirectory(root);
         }
+
         Directory.CreateDirectory(Path.Combine(data, "assets", "indexes"));
         await File.WriteAllTextAsync(Path.Combine(data, "assets", "indexes", "5.json"), "{}");
 
@@ -442,6 +448,7 @@ public class MigrationEngineTests : IDisposable
         {
             Directory.CreateDirectory(root);
         }
+
         File.WriteAllText(store, "a file blocks the store assets root");
         var decisions = new MigrationDecisionStore(Path.Combine(paths.StateRoot, "migration"),
             FlintJsonContext.Default.MigrationDecisionRecord);
@@ -512,8 +519,11 @@ public class MigrationEngineTests : IDisposable
         var paths = FlintPaths.FromRoots(
             Path.Combine(home, "config"), Path.Combine(home, "data"), Path.Combine(home, "store"),
             Path.Combine(home, "cache"), Path.Combine(home, "state"));
-        foreach (var root in new[] { paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
-                     paths.CacheRoot, paths.StateRoot })
+        foreach (var root in new[]
+                 {
+                     paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
+                     paths.CacheRoot, paths.StateRoot
+                 })
         {
             Directory.CreateDirectory(root);
         }
@@ -538,11 +548,15 @@ public class MigrationEngineTests : IDisposable
         var data = Path.Combine(home, "data");
         var paths = FlintPaths.FromRoots(Path.Combine(home, "config"), data,
             Path.Combine(home, "store"), Path.Combine(home, "cache"), Path.Combine(home, "state"));
-        foreach (var root in new[] { paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
-                     paths.CacheRoot, paths.StateRoot })
+        foreach (var root in new[]
+                 {
+                     paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
+                     paths.CacheRoot, paths.StateRoot
+                 })
         {
             Directory.CreateDirectory(root);
         }
+
         // a FILE occupies the migration records path, so the seal write throws
         var blocker = Path.Combine(paths.StateRoot, "migration");
         await File.WriteAllTextAsync(blocker, "a file blocks the migration records directory");
@@ -574,11 +588,15 @@ public class MigrationEngineTests : IDisposable
         File.WriteAllText(Path.Combine(home, "assets", "indexes", "5.json"), "{}");
 
         var paths = FlintPaths.FromHomeDir(home);
-        foreach (var root in new[] { paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
-                     paths.CacheRoot, paths.StateRoot })
+        foreach (var root in new[]
+                 {
+                     paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
+                     paths.CacheRoot, paths.StateRoot
+                 })
         {
             Directory.CreateDirectory(root);
         }
+
         // the import-landed half sits at the data root: shared content the remount hook
         // never moved (the process died before OnImportFinished ran)
         Directory.CreateDirectory(Path.Combine(paths.DataRoot, "assets", "indexes"));
@@ -621,6 +639,7 @@ public class MigrationEngineTests : IDisposable
         {
             Directory.CreateDirectory(root);
         }
+
         // the placeholder-file method: a FILE occupies the config root so the home pass's
         // flint.cfg mount cannot transfer
         File.WriteAllText(paths.ConfigRoot, "a file blocks the config root");

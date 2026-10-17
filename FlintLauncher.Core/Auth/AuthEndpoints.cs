@@ -5,6 +5,7 @@
 // below are byte-identical to the upstream URLs, but every step resolves its endpoint through
 // an injected AuthEndpointsOptions instance so tests can point the whole flow at a local stub
 // server (pass the options through AuthFlow / the step constructors / LauncherRuntime.Auth).
+
 namespace FlintLauncher.Core.Auth;
 
 public sealed class AuthEndpointsOptions

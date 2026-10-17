@@ -9,6 +9,7 @@
  * that a shaderpack exists and is in the right format,
  * namely that they contain a folder named 'shaders'.
  */
+
 namespace FlintLauncher.Core.Minecraft.Resources;
 
 /// <summary>Port of ShaderPackFormat.</summary>

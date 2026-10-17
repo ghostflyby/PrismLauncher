@@ -2,6 +2,7 @@
 // Port of the QProcessEnvironment subset the instance layer uses (insert/value/contains/
 // isEmpty): an ordered string-to-string variable map handed to the launch pipeline. The
 // actual process spawning that consumes it is phase P5.
+
 namespace FlintLauncher.Core.Instances;
 
 /// <summary>Minimal port of QProcessEnvironment for the instance environment builders.</summary>

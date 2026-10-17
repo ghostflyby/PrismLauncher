@@ -56,6 +56,7 @@ public sealed class MsaDeviceCodeStep : AuthStep
                 await RequestDeviceAuthorization(cancellationToken).ConfigureAwait(false);
                 continue;
             }
+
             await Task.Delay(TimeSpan.FromSeconds(interval), cancellationToken).ConfigureAwait(false);
             if (await PollForToken(cancellationToken).ConfigureAwait(false))
             {
@@ -88,15 +89,18 @@ public sealed class MsaDeviceCodeStep : AuthStep
                 $"Device authorization failed: {(rsp.ErrorDescription.Length != 0 ? rsp.ErrorDescription : rsp.Error)}");
             return;
         }
+
         if (rsp.DeviceCode.Length == 0 || rsp.UserCode.Length == 0 || rsp.VerificationUri.Length == 0 || rsp.ExpiresIn == 0)
         {
             EmitFinished(AccountTaskState.FailedHard, "Device authorization failed: required fields missing");
             return;
         }
+
         if (rsp.Interval != 0)
         {
             interval = rsp.Interval;
         }
+
         deviceCode = rsp.DeviceCode;
         AuthorizeWithBrowser?.Invoke(rsp.VerificationUri, rsp.UserCode, rsp.ExpiresIn);
         expirationUtc = DateTime.UtcNow.AddSeconds(rsp.ExpiresIn);
@@ -125,6 +129,7 @@ public sealed class MsaDeviceCodeStep : AuthStep
             interval *= 2;
             return false;
         }
+
         var rsp = ParseAuthenticationResponse(response.Body);
         if (rsp.Error == "slow_down")
         {
@@ -135,17 +140,20 @@ public sealed class MsaDeviceCodeStep : AuthStep
             interval += 5;
             return false;
         }
+
         if (rsp.Error == "authorization_pending")
         {
             // keep trying - rfc8628#section-3.5
             return false;
         }
+
         if (rsp.Error.Length != 0 || rsp.ErrorDescription.Length != 0)
         {
             EmitFinished(AccountTaskState.FailedHard,
                 $"Device Access failed: {(rsp.ErrorDescription.Length != 0 ? rsp.ErrorDescription : rsp.Error)}");
             return true;
         }
+
         if (!response.Success)
         {
             return false; // it failed so just try again without increasing the interval
@@ -180,8 +188,10 @@ public sealed class MsaDeviceCodeStep : AuthStep
             {
                 sb.Append('&');
             }
+
             sb.Append(Uri.EscapeDataString(key)).Append('=').Append(Uri.EscapeDataString(value));
         }
+
         return sb.ToString();
     }
 
@@ -200,6 +210,7 @@ public sealed class MsaDeviceCodeStep : AuthStep
         {
             return new DeviceAuthorizationResponse("", "", "", 0, 0, "", "");
         }
+
         return new DeviceAuthorizationResponse(
             AccountData.GetString(AccountData.Get(obj, "device_code")),
             AccountData.GetString(AccountData.Get(obj, "user_code")),
@@ -225,6 +236,7 @@ public sealed class MsaDeviceCodeStep : AuthStep
         {
             return new AuthenticationResponse("", "", "", 0, "", "", new Dictionary<string, JsonNode>());
         }
+
         var extra = new Dictionary<string, JsonNode>();
         foreach (var (key, value) in obj)
         {
@@ -233,6 +245,7 @@ public sealed class MsaDeviceCodeStep : AuthStep
                 extra[key] = value.DeepClone();
             }
         }
+
         return new AuthenticationResponse(
             AccountData.GetString(AccountData.Get(obj, "access_token")),
             AccountData.GetString(AccountData.Get(obj, "token_type")),

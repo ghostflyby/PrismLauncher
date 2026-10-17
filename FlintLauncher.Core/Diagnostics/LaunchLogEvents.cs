@@ -18,18 +18,25 @@ public static class LogCategories
 {
     /// <summary>LoggedProcess: spawn command line, stdin writes, state, exit.</summary>
     public const string Process = "flint.process";
+
     /// <summary>LaunchTask step engine + LauncherPartLaunch gate events.</summary>
     public const string Launch = "flint.launch";
+
     /// <summary>LaunchController: account selection, launch outcome.</summary>
     public const string Controller = "flint.controller";
+
     /// <summary>FlintTaskRegistry: task lifecycle.</summary>
     public const string Tasks = "flint.tasks";
+
     /// <summary>Web request log.</summary>
     public const string Http = "flint.http";
+
     /// <summary>API auth: the S2 process-lifetime token announcement.</summary>
     public const string ApiAuth = "flint.apiauth";
+
     /// <summary>Migration (GLOBAL G2): the flint-legacy startup remount outcome.</summary>
     public const string Migration = "flint.migration";
+
     /// <summary>Startup assembly diagnostics (GLOBAL §2 step 2): the C5 INI import outcome
     /// and the mid-assembly crash report — everything the host logs after Build for steps
     /// the runtime constructor ran before any logger existed.</summary>
@@ -53,6 +60,7 @@ public static class Log
         {
             return NullLogger.Instance;
         }
+
         try
         {
             return factory.CreateLogger(category);

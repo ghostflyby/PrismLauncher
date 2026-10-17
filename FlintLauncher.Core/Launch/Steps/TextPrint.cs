@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/launch/steps/TextPrint.{h,cpp}: print static text into the launch log.
+
 namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class TextPrint : LaunchStep

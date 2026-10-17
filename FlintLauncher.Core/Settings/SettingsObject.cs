@@ -26,6 +26,7 @@ public abstract class SettingsObject
         {
             return null;
         }
+
         var setting = new Setting(synonyms, defVal) { Storage = this };
         _settings[setting.Id] = setting;
         OnSettingRegistered(setting);
@@ -48,6 +49,7 @@ public abstract class SettingsObject
         {
             return false;
         }
+
         setting.Set(value);
         return true;
     }
@@ -62,6 +64,7 @@ public abstract class SettingsObject
         {
             setting.Set(setting.Get());
         }
+
         return true;
     }
 

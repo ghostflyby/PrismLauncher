@@ -23,9 +23,7 @@ public class LocalModParseTests : IDisposable
         {
             Directory.Delete(_tempRoot, recursive: true);
         }
-        catch (IOException)
-        {
-        }
+        catch (IOException) { }
     }
 
     private string TempFile(string name) => Path.Combine(_tempRoot, name);
@@ -52,19 +50,19 @@ public class LocalModParseTests : IDisposable
     // ------------------------------------------------------------------ fabric
 
     public static string FabricJson => """
-        {
-            "schemaVersion": 1,
-            "id": "testmod",
-            "version": "1.2.3",
-            "name": "Test Mod",
-            "description": "A fabric test mod",
-            "authors": [ { "name": "alice", "url": "https://alice.example" }, "bob" ],
-            "contact": { "homepage": "https://example.org", "issues": "https://example.org/issues" },
-            "license": [ "MIT", { "name": "Apache", "id": "Apache-2.0", "url": "https://spdx.org/licenses/Apache-2.0.html" } ],
-            "icon": { "32x32": "icons/small.png", "64x64": "icons/big.png" },
-            "depends": { "fabricloader": ">=0.14", "minecraft": "1.20", "fabric-api": "*", "other-mod": "*" }
-        }
-        """;
+                                       {
+                                           "schemaVersion": 1,
+                                           "id": "testmod",
+                                           "version": "1.2.3",
+                                           "name": "Test Mod",
+                                           "description": "A fabric test mod",
+                                           "authors": [ { "name": "alice", "url": "https://alice.example" }, "bob" ],
+                                           "contact": { "homepage": "https://example.org", "issues": "https://example.org/issues" },
+                                           "license": [ "MIT", { "name": "Apache", "id": "Apache-2.0", "url": "https://spdx.org/licenses/Apache-2.0.html" } ],
+                                           "icon": { "32x32": "icons/small.png", "64x64": "icons/big.png" },
+                                           "depends": { "fabricloader": ">=0.14", "minecraft": "1.20", "fabric-api": "*", "other-mod": "*" }
+                                       }
+                                       """;
 
     [Fact]
     public void Fabric_FullManifest_ParsesAllFields()
@@ -96,8 +94,8 @@ public class LocalModParseTests : IDisposable
     {
         var jar = TempFile("fallback.jar");
         WriteJar(jar, ("fabric.mod.json", """
-            { "schemaVersion": 1, "id": "plainmod", "version": "0.1", "icon": "icon.png" }
-            """));
+                                          { "schemaVersion": 1, "id": "plainmod", "version": "0.1", "icon": "icon.png" }
+                                          """));
 
         var mod = Parsed(jar);
 
@@ -139,23 +137,23 @@ public class LocalModParseTests : IDisposable
     {
         var jar = TempFile("quilt.jar");
         WriteJar(jar, ("quilt.mod.json", """
-            {
-                "schema_version": 1,
-                "quilt_loader": {
-                    "id": "quiltmod",
-                    "version": "2.0.0",
-                    "metadata": {
-                        "name": "Quilt Mod",
-                        "description": "A quilt mod",
-                        "contributors": { "alice": "Author", "bob": "Contributor" },
-                        "contact": { "homepage": "https://quilt.example", "issues": "https://quilt.example/issues" },
-                        "license": "MIT",
-                        "icon": { "32x32": "assets/small.png", "64x64": "assets/big.png" }
-                    }
-                },
-                "depends": [ "minecraft", "quilt_loader", "plain_dep", { "id": "opt_dep", "optional": true }, { "id": "hard_dep" } ]
-            }
-            """));
+                                         {
+                                             "schema_version": 1,
+                                             "quilt_loader": {
+                                                 "id": "quiltmod",
+                                                 "version": "2.0.0",
+                                                 "metadata": {
+                                                     "name": "Quilt Mod",
+                                                     "description": "A quilt mod",
+                                                     "contributors": { "alice": "Author", "bob": "Contributor" },
+                                                     "contact": { "homepage": "https://quilt.example", "issues": "https://quilt.example/issues" },
+                                                     "license": "MIT",
+                                                     "icon": { "32x32": "assets/small.png", "64x64": "assets/big.png" }
+                                                 }
+                                             },
+                                             "depends": [ "minecraft", "quilt_loader", "plain_dep", { "id": "opt_dep", "optional": true }, { "id": "hard_dep" } ]
+                                         }
+                                         """));
 
         var mod = Parsed(jar);
 
@@ -191,36 +189,36 @@ public class LocalModParseTests : IDisposable
     {
         var jar = TempFile("forge.jar");
         WriteJar(jar, ("META-INF/mods.toml", """
-            modLoader = "javafml"
-            loaderVersion = "[41,)"
-            license = "LGPL-3.0"
-            issueTrackerURL = "https://github.com/example/issue"
-            authors = "The Forge Team"
-            displayURL = "example.org"
+                                             modLoader = "javafml"
+                                             loaderVersion = "[41,)"
+                                             license = "LGPL-3.0"
+                                             issueTrackerURL = "https://github.com/example/issue"
+                                             authors = "The Forge Team"
+                                             displayURL = "example.org"
 
-            [[mods]]
-            modId = "forgemod"
-            version = "3.2.1"
-            displayName = "Forge Mod"
-            description = "A forge mod"
-            logoFile = "logo.png"
+                                             [[mods]]
+                                             modId = "forgemod"
+                                             version = "3.2.1"
+                                             displayName = "Forge Mod"
+                                             description = "A forge mod"
+                                             logoFile = "logo.png"
 
-            [[dependencies.forgemod]]
-            modId = "forge"
-            mandatory = true
+                                             [[dependencies.forgemod]]
+                                             modId = "forge"
+                                             mandatory = true
 
-            [[dependencies.forgemod]]
-            modId = "minecraft"
-            mandatory = true
+                                             [[dependencies.forgemod]]
+                                             modId = "minecraft"
+                                             mandatory = true
 
-            [[dependencies.forgemod]]
-            modId = "required_lib"
-            mandatory = true
+                                             [[dependencies.forgemod]]
+                                             modId = "required_lib"
+                                             mandatory = true
 
-            [[dependencies.forgemod]]
-            modId = "optional_lib"
-            mandatory = false
-            """));
+                                             [[dependencies.forgemod]]
+                                             modId = "optional_lib"
+                                             mandatory = false
+                                             """));
 
         var mod = Parsed(jar);
 
@@ -243,23 +241,23 @@ public class LocalModParseTests : IDisposable
     {
         var jar = TempFile("neoforge.jar");
         WriteJar(jar, ("META-INF/neoforge.mods.toml", """
-            [[mods]]
-            modId = "neomod"
-            version = "1.0.0"
-            displayName = "Neo Mod"
+                                                      [[mods]]
+                                                      modId = "neomod"
+                                                      version = "1.0.0"
+                                                      displayName = "Neo Mod"
 
-            [[dependencies.neomod]]
-            modId = "neoforge"
-            type = "required"
+                                                      [[dependencies.neomod]]
+                                                      modId = "neoforge"
+                                                      type = "required"
 
-            [[dependencies.neomod]]
-            modId = "hard_lib"
-            type = "required"
+                                                      [[dependencies.neomod]]
+                                                      modId = "hard_lib"
+                                                      type = "required"
 
-            [[dependencies.neomod]]
-            modId = "soft_lib"
-            type = "optional"
-            """));
+                                                      [[dependencies.neomod]]
+                                                      modId = "soft_lib"
+                                                      type = "optional"
+                                                      """));
 
         var mod = Parsed(jar);
 
@@ -277,16 +275,16 @@ public class LocalModParseTests : IDisposable
         var jar = TempFile("jarversion.jar");
         WriteJar(jar,
             ("META-INF/mods.toml", """
-                [[mods]]
-                modId = "placeholder"
-                version = "${file.jarVersion}"
-                displayName = "Placeholder Mod"
-                """),
+                                   [[mods]]
+                                   modId = "placeholder"
+                                   version = "${file.jarVersion}"
+                                   displayName = "Placeholder Mod"
+                                   """),
             ("some/class/file.class", "irrelevant"),
             ("META-INF/MANIFEST.MF", """
-                Manifest-Version: 1.0
-                Implementation-Version: 9.9.9
-                """));
+                                     Manifest-Version: 1.0
+                                     Implementation-Version: 9.9.9
+                                     """));
 
         var mod = Parsed(jar);
 
@@ -300,10 +298,10 @@ public class LocalModParseTests : IDisposable
         var jar = TempFile("gradle-mess.jar");
         WriteJar(jar,
             ("META-INF/mods.toml", """
-                [[mods]]
-                modId = "messy"
-                version = "${file.jarVersion}"
-                """),
+                                   [[mods]]
+                                   modId = "messy"
+                                   version = "${file.jarVersion}"
+                                   """),
             ("META-INF/MANIFEST.MF", "Implementation-Version: task ':jar' property 'archiveVersion'.\n"));
 
         var mod = Parsed(jar);
@@ -329,19 +327,19 @@ public class LocalModParseTests : IDisposable
     {
         var jar = TempFile("legacy.jar");
         WriteJar(jar, ("mcmod.info", """
-            [
-                {
-                    "modid": "mod_legacy",
-                    "name": "Legacy Mod",
-                    "version": "1.7.10",
-                    "url": "legacy.example.org",
-                    "description": "An old mod",
-                    "authorList": [ "grandpa" ],
-                    "logoFile": "assets/logo.png",
-                    "requiredMods": [ "mod_MinecraftForge", "custom:1.2@mc1.7.10" ]
-                }
-            ]
-            """));
+                                     [
+                                         {
+                                             "modid": "mod_legacy",
+                                             "name": "Legacy Mod",
+                                             "version": "1.7.10",
+                                             "url": "legacy.example.org",
+                                             "description": "An old mod",
+                                             "authorList": [ "grandpa" ],
+                                             "logoFile": "assets/logo.png",
+                                             "requiredMods": [ "mod_MinecraftForge", "custom:1.2@mc1.7.10" ]
+                                         }
+                                     ]
+                                     """));
 
         var mod = Parsed(jar);
 
@@ -361,8 +359,8 @@ public class LocalModParseTests : IDisposable
     {
         var jar = TempFile("example.jar");
         WriteJar(jar, ("mcmod.info", """
-            [ { "modid": "copied", "name": "Example Mod", "version": "1.0" } ]
-            """));
+                                     [ { "modid": "copied", "name": "Example Mod", "version": "1.0" } ]
+                                     """));
 
         var mod = Parsed(jar);
 
@@ -375,11 +373,11 @@ public class LocalModParseTests : IDisposable
     {
         var jar = TempFile("modlist.jar");
         WriteJar(jar, ("mcmod.info", """
-            {
-                "modListVersion": 2,
-                "modList": [ { "modid": "objmod", "name": "Object Mod", "version": "2.0", "authors": [ "a", "b" ] } ]
-            }
-            """));
+                                     {
+                                         "modListVersion": 2,
+                                         "modList": [ { "modid": "objmod", "name": "Object Mod", "version": "2.0", "authors": [ "a", "b" ] } ]
+                                     }
+                                     """));
 
         var mod = Parsed(jar);
 
@@ -395,11 +393,11 @@ public class LocalModParseTests : IDisposable
     {
         var jar = TempFile("forge-old.jar");
         WriteJar(jar, ("forgeversion.properties", """
-            forge.major.number = 41
-            forge.minor.number = 0
-            forge.revision.number = 98
-            forge.build.number = 2
-            """));
+                                                  forge.major.number = 41
+                                                  forge.minor.number = 0
+                                                  forge.revision.number = 98
+                                                  forge.build.number = 2
+                                                  """));
 
         var mod = Parsed(jar);
 
@@ -414,8 +412,8 @@ public class LocalModParseTests : IDisposable
     {
         var path = TempFile("liteloader-mod.litemod");
         WriteJar(path, ("litemod.json", """
-            { "name": "litetest", "version": "1.4", "mcversion": "1.7.10", "author": "litemaster", "description": "lite" }
-            """));
+                                        { "name": "litetest", "version": "1.4", "mcversion": "1.7.10", "author": "litemaster", "description": "lite" }
+                                        """));
 
         var mod = Parsed(path);
 
@@ -436,15 +434,15 @@ public class LocalModParseTests : IDisposable
         WriteJar(jar,
             ("META-INF/nil/mappings.json", "{}"),
             ("custom.nilmod.css", """
-                /* NilLoader metadata */
-                @nilmod {
-                    name: "Nil Test";
-                    description: "A nil mod";
-                    authors: "unascribed";
-                    version: "1.0.0";
-                }
-                .some-class { color: red; }
-                """));
+                                  /* NilLoader metadata */
+                                  @nilmod {
+                                      name: "Nil Test";
+                                      description: "A nil mod";
+                                      authors: "unascribed";
+                                      version: "1.0.0";
+                                  }
+                                  .some-class { color: red; }
+                                  """));
 
         var mod = Parsed(jar);
 
@@ -478,8 +476,8 @@ public class LocalModParseTests : IDisposable
         var dir = Path.Combine(_tempRoot, "folder-mod");
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "mcmod.info"), """
-            [ { "modid": "foldermod", "name": "Folder Mod", "version": "0.5" } ]
-            """);
+                                                           [ { "modid": "foldermod", "name": "Folder Mod", "version": "0.5" } ]
+                                                           """);
 
         var mod = Parsed(dir);
 

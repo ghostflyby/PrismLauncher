@@ -40,6 +40,7 @@ public static class InstanceIniImporter
         {
             return result;
         }
+
         var ini = new IniFile();
         if (!ini.LoadFile(iniPath))
         {
@@ -73,22 +74,27 @@ public static class InstanceIniImporter
             {
                 continue;
             }
+
             if (InstanceConfigKeys.Resolve(key) is not { } entry)
             {
                 continue; // unknown INI keys stay unread in the cfg (GUI geometry, themes, …)
             }
+
             if (entry.GateKey is { } family &&
                 (!gates.TryGetValue(family, out var enabled) || !enabled))
             {
                 continue; // C7: the instance value is treated as unset — inherit
             }
+
             var value = ini.Get(key);
             if (value is null || value.ValueKind == IniValue.Kind.Invalid)
             {
                 continue;
             }
+
             result = entry.Apply(result, Variant.FromIniValue(value));
         }
+
         return result;
     }
 }

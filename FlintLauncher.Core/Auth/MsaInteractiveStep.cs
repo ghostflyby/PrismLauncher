@@ -63,12 +63,14 @@ public sealed class MsaInteractiveStep : AuthStep
                     "Microsoft user authentication failed - client identification has changed.");
                 return;
             }
+
             if (Data.MsaToken.RefreshToken.Length == 0)
             {
                 EmitFinished(AccountTaskState.Disabled,
                     "Microsoft user authentication failed - refresh token is empty.");
                 return;
             }
+
             await RefreshAccessTokenAsync(cancellationToken).ConfigureAwait(false);
             return;
         }
@@ -112,6 +114,7 @@ public sealed class MsaInteractiveStep : AuthStep
             EmitFinished(AccountTaskState.FailedHard, rsp.ErrorDescription.Length != 0 ? rsp.ErrorDescription : rsp.Error);
             return;
         }
+
         if (!response.Success)
         {
             // QOAuth2AuthorizationCodeFlow::requestFailed(Error) path: silent + granted means
@@ -136,11 +139,11 @@ public sealed class MsaInteractiveStep : AuthStep
 
         // QOAuth2AuthorizationCodeFlow::buildAuthenticateUrl() + modifyParametersFunction(prompt)
         var authorizeUrl = _auth.MsaAuthorize +
-            "?response_type=code" +
-            "&client_id=" + Uri.EscapeDataString(clientId) +
-            "&scope=" + Uri.EscapeDataString("XboxLive.SignIn XboxLive.offline_access") +
-            "&redirect_uri=" + Uri.EscapeDataString(redirectUri) +
-            "&prompt=select_account";
+                           "?response_type=code" +
+                           "&client_id=" + Uri.EscapeDataString(clientId) +
+                           "&scope=" + Uri.EscapeDataString("XboxLive.SignIn XboxLive.offline_access") +
+                           "&redirect_uri=" + Uri.EscapeDataString(redirectUri) +
+                           "&prompt=select_account";
 
         AuthorizeWithBrowser?.Invoke(authorizeUrl);
 
@@ -176,6 +179,7 @@ public sealed class MsaInteractiveStep : AuthStep
             EmitFinished(AccountTaskState.FailedHard, oauthError);
             return;
         }
+
         if (code is null)
         {
             EmitFinished(AccountTaskState.FailedHard, "Microsoft user authentication failed.");
@@ -200,6 +204,7 @@ public sealed class MsaInteractiveStep : AuthStep
             EmitFinished(AccountTaskState.FailedHard, rsp.ErrorDescription.Length != 0 ? rsp.ErrorDescription : rsp.Error);
             return;
         }
+
         if (!response.Success)
         {
             EmitFinished(AccountTaskState.FailedHard, "Microsoft user authentication failed.");
@@ -222,6 +227,7 @@ public sealed class MsaInteractiveStep : AuthStep
         {
             return false;
         }
+
         listener.CompleteExternally(new Uri(uri));
         return true;
     }
@@ -253,8 +259,10 @@ public sealed class MsaInteractiveStep : AuthStep
             {
                 sb.Append('&');
             }
+
             sb.Append(Uri.EscapeDataString(key)).Append('=').Append(Uri.EscapeDataString(value));
         }
+
         return sb.ToString();
     }
 
@@ -277,10 +285,12 @@ public sealed class MsaInteractiveStep : AuthStep
         {
             obj = null;
         }
+
         if (obj is null)
         {
             return new TokenResponse("", "", 0, "", "", new Dictionary<string, JsonNode>());
         }
+
         var extra = new Dictionary<string, JsonNode>();
         foreach (var (key, value) in obj)
         {
@@ -289,6 +299,7 @@ public sealed class MsaInteractiveStep : AuthStep
                 extra[key] = value.DeepClone();
             }
         }
+
         return new TokenResponse(
             AccountData.GetString(AccountData.Get(obj, "access_token")),
             AccountData.GetString(AccountData.Get(obj, "refresh_token")),
@@ -309,6 +320,7 @@ public sealed class MsaInteractiveStep : AuthStep
             var value = eq < 0 ? "" : pair[(eq + 1)..];
             result[Uri.UnescapeDataString(key.Replace('+', ' '))] = Uri.UnescapeDataString(value.Replace('+', ' '));
         }
+
         return result;
     }
 
@@ -316,8 +328,10 @@ public sealed class MsaInteractiveStep : AuthStep
     private sealed class LoopbackListener : IDisposable
     {
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
+
         private readonly TaskCompletionSource<Uri?> redirectSource =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         private readonly CancellationTokenSource acceptCts = new();
         private bool disposed;
 
@@ -325,7 +339,7 @@ public sealed class MsaInteractiveStep : AuthStep
         {
             _listener.Start();
             var port = ((IPEndPoint)_listener.LocalEndpoint).Port;
-_ = AcceptLoopAsync(acceptCts.Token);
+            _ = AcceptLoopAsync(acceptCts.Token);
             return $"http://127.0.0.1:{port}/";
         }
 
@@ -366,6 +380,7 @@ _ = AcceptLoopAsync(acceptCts.Token);
                 {
                     return;
                 }
+
                 _ = HandleClientAsync(client);
             }
         }
@@ -386,6 +401,7 @@ _ = AcceptLoopAsync(acceptCts.Token);
                     {
                         break;
                     }
+
                     received += read;
                     var text = Encoding.Latin1.GetString(buffer, 0, received);
                     var lineEnd = text.IndexOf("\r\n", StringComparison.Ordinal);
@@ -405,7 +421,7 @@ _ = AcceptLoopAsync(acceptCts.Token);
                 }
 
                 var page = "\n    <noscript>\n      <meta http-equiv=\"Refresh\" content=\"0; URL=%1\" />\n    </noscript>\n" +
-                    "    Login Successful, redirecting...\n    <script>\n      window.location.replace(\"%1\");\n    </script>\n    ";
+                           "    Login Successful, redirecting...\n    <script>\n      window.location.replace(\"%1\");\n    </script>\n    ";
                 page = page.Replace("%1", "https://prismlauncher.org/successful-login");
                 var body = Encoding.UTF8.GetBytes(page);
                 var header = Encoding.Latin1.GetBytes(
@@ -430,6 +446,7 @@ _ = AcceptLoopAsync(acceptCts.Token);
             {
                 return;
             }
+
             disposed = true;
             acceptCts.Cancel();
             try
@@ -440,6 +457,7 @@ _ = AcceptLoopAsync(acceptCts.Token);
             {
                 // best-effort stop: the loopback listener dies with the process anyway
             }
+
             redirectSource.TrySetResult(null);
         }
     }

@@ -20,6 +20,7 @@
 //
 // All types are registered into FlintJsonContext (AOT red line: a missing root registration
 // is a runtime failure, not a compile error).
+
 using System.Text.Json.Serialization;
 
 namespace FlintLauncher.Core.Config;
@@ -120,7 +121,9 @@ public sealed record InstanceJavaConfig
 public sealed record InstanceMemoryConfig
 {
     public int? MinMemAlloc { get; init; }
+
     public int? MaxMemAlloc { get; init; }
+
     // PermGen died with the Java <8 support floor (2026-10-05): PermSize is a pre-8 concept.
     public bool? LowMemWarning { get; init; }
 }
@@ -239,6 +242,7 @@ public sealed record InstanceMiscConfig
 
     /// <summary>OverrideMiscellaneous family.</summary>
     public bool? CloseAfterLaunch { get; init; }
+
     public bool? QuitAfterGameStop { get; init; }
 
     /// <summary>OverrideLegacySettings family.</summary>

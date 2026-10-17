@@ -44,9 +44,7 @@ public class FlameApiTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     // ---------------------------------------------------------------- API shapes

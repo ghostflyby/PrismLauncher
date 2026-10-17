@@ -4,9 +4,7 @@
 namespace FlintLauncher.Nbt;
 
 /// <summary>Port of nbt::tag_primitive — the shared shape of the six primitive tags.</summary>
-public abstract class NbtPrimitive : NbtTag
-{
-}
+public abstract class NbtPrimitive : NbtTag { }
 
 /// <summary>Port of nbt::tag_byte (signed 8-bit, like Java's byte).</summary>
 public sealed class NbtByte(sbyte value) : NbtPrimitive
@@ -90,7 +88,7 @@ public sealed class NbtFloat(float value) : NbtPrimitive
     public override string ToString() => $"tag_float({Value:R})";
 
     public override bool Equals(object? obj) => obj is NbtFloat other
-        && BitConverter.SingleToInt32Bits(Value) == BitConverter.SingleToInt32Bits(other.Value);
+                                                && BitConverter.SingleToInt32Bits(Value) == BitConverter.SingleToInt32Bits(other.Value);
 
     public override int GetHashCode() => BitConverter.SingleToInt32Bits(Value).GetHashCode();
 }
@@ -111,7 +109,7 @@ public sealed class NbtDouble(double value) : NbtPrimitive
     public override string ToString() => $"tag_double({Value:R})";
 
     public override bool Equals(object? obj) => obj is NbtDouble other
-        && BitConverter.DoubleToInt64Bits(Value) == BitConverter.DoubleToInt64Bits(other.Value);
+                                                && BitConverter.DoubleToInt64Bits(Value) == BitConverter.DoubleToInt64Bits(other.Value);
 
     public override int GetHashCode() => BitConverter.DoubleToInt64Bits(Value).GetHashCode();
 }

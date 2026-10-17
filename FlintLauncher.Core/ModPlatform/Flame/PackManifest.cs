@@ -71,11 +71,13 @@ public sealed class FlameManifest
         {
             throw new JsonParseException("Not a modpack manifest!");
         }
+
         m.ManifestVersion = RequireInteger(obj, "manifestVersion");
         if (m.ManifestVersion != 1)
         {
             throw new JsonParseException($"Unknown manifest version ({m.ManifestVersion})");
         }
+
         LoadManifestV1(m, obj);
     }
 
@@ -108,6 +110,7 @@ public sealed class FlameManifest
                 m.ModLoaders.Add(loader);
             }
         }
+
         m.RecommendedRam = OptInteger(minecraft, "recommendedRam");
     }
 
@@ -158,6 +161,7 @@ public sealed class FlameManifest
         {
             return 0;
         }
+
         // JSON numbers are doubles; mirror the QJsonValue::toInt truncation
         return value.TryGetValue<double>(out var d) ? (int)d : 0;
     }

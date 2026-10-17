@@ -84,6 +84,7 @@ public sealed class AtLauncherApi
             AtLauncherPackIndex.LoadIndexedPack(pack, AtLauncherJson.Object(packRaw));
             packs.Add(pack);
         }
+
         return packs;
     }
 
@@ -103,6 +104,7 @@ public sealed class AtLauncherApi
             errorMessage = parsed.Message;
             return null;
         }
+
         return parsed.Data;
     }
 

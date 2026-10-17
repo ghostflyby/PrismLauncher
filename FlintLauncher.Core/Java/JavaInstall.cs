@@ -47,14 +47,17 @@ public sealed class JavaInstall : IComparable<JavaInstall>, IEquatable<JavaInsta
         {
             return archCompare < 0;
         }
+
         if (Id < rhs.Id)
         {
             return true;
         }
+
         if (rhs.Id < Id)
         {
             return false;
         }
+
         return StringUtils.NaturalCompare(Path, rhs.Path, ignoreCase: true) < 0;
     }
 
@@ -65,6 +68,7 @@ public sealed class JavaInstall : IComparable<JavaInstall>, IEquatable<JavaInsta
         {
             return false;
         }
+
         return Arch == other.Arch && Id == other.Id && Path == other.Path;
     }
 
@@ -77,14 +81,17 @@ public sealed class JavaInstall : IComparable<JavaInstall>, IEquatable<JavaInsta
         {
             return 1;
         }
+
         if (LessThan(other))
         {
             return -1;
         }
+
         if (other.LessThan(this))
         {
             return 1;
         }
+
         return 0;
     }
 

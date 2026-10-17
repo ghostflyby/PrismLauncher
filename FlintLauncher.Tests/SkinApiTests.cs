@@ -31,9 +31,7 @@ public class SkinApiTests : IDisposable
         {
             Directory.Delete(_dir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     [Fact]
@@ -60,11 +58,11 @@ public class SkinApiTests : IDisposable
         var body = recorded.Body;
         // part 1: the file (Content-Type before Content-Disposition, like the C++ QHttpPart setup)
         var filePart = $"""
-            --{boundary}
-            Content-Type: image/png
-            Content-Disposition: form-data; name="file"; filename="skin.png"
+                        --{boundary}
+                        Content-Type: image/png
+                        Content-Disposition: form-data; name="file"; filename="skin.png"
 
-            """.ReplaceLineEndings("\r\n");
+                        """.ReplaceLineEndings("\r\n");
         var fileIdx = body.IndexOf(filePart, StringComparison.Ordinal);
         Assert.True(fileIdx >= 0, "file part header missing:\n" + body);
         var pngIdx = body.IndexOf(Encoding.UTF8.GetString(pngBytes), StringComparison.Ordinal);
@@ -73,12 +71,12 @@ public class SkinApiTests : IDisposable
         // part 2: the variant value follows
         var variantPart = $"""
 
-            --{boundary}
-            Content-Disposition: form-data; name="variant"
+                           --{boundary}
+                           Content-Disposition: form-data; name="variant"
 
-            classic
-            --{boundary}--
-            """.ReplaceLineEndings("\r\n");
+                           classic
+                           --{boundary}--
+                           """.ReplaceLineEndings("\r\n");
         Assert.Contains(variantPart, body);
 
         // the closing delimiter ends the body

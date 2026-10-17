@@ -29,11 +29,11 @@ public sealed class LauncherLoginStep : AuthStep
         var xToken = Data.MojangServicesToken.Value;
 
         var mcAuthTemplate = "\n" + """
-            {
-                "xtoken": "XBL3.0 x=%1;%2",
-                "platform": "PC_LAUNCHER"
-            }
-            """ + "\n";
+                                    {
+                                        "xtoken": "XBL3.0 x=%1;%2",
+                                        "platform": "PC_LAUNCHER"
+                                    }
+                                    """ + "\n";
         var requestBody = mcAuthTemplate.Replace("%1", uhs).Replace("%2", xToken);
 
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
@@ -55,6 +55,7 @@ public sealed class LauncherLoginStep : AuthStep
                 Data.NetworkError = response.Error;
                 EmitFinished(AccountTaskState.Offline, $"Failed to get Minecraft access token: {response.ErrorString}");
             }
+
             return;
         }
 
@@ -63,6 +64,7 @@ public sealed class LauncherLoginStep : AuthStep
             EmitFinished(AccountTaskState.FailedSoft, "Failed to parse the Minecraft access token response.");
             return;
         }
+
         EmitFinished(AccountTaskState.Working, "Got Minecraft access token");
     }
 

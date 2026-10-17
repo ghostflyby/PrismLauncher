@@ -42,6 +42,7 @@ public class RealDataSmokeTests
             {
                 continue; // instgroups.json and co.
             }
+
             found++;
             var instance = new MinecraftInstance(
                 new InstanceJsonSettingsObject(dir, environment), dir);
@@ -62,6 +63,7 @@ public class RealDataSmokeTests
                 withProfile++;
             }
         }
+
         Assert.True(found >= 3, $"expected several instances, found {found}");
         Assert.True(withProfile >= 3, $"expected several with components, got {withProfile}");
     }

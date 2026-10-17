@@ -47,10 +47,10 @@ public class JsonUtilsNodeTests
     public void EnsureInteger_TruncatesLikeQt()
     {
         JsonNode obj = Object("""{"a":1.9, "b":"7", "c":null}""");
-        Assert.Equal(1, JsonUtils.EnsureInteger(obj["a"]));   // truncation, like QJsonValue::toInt
-        Assert.Equal(0, JsonUtils.EnsureInteger(obj["b"]));   // string numbers are NOT coerced
-        Assert.Equal(0, JsonUtils.EnsureInteger(obj["c"]));   // JSON null -> default
-        Assert.Equal(0, JsonUtils.EnsureInteger(null));       // missing -> default
+        Assert.Equal(1, JsonUtils.EnsureInteger(obj["a"])); // truncation, like QJsonValue::toInt
+        Assert.Equal(0, JsonUtils.EnsureInteger(obj["b"])); // string numbers are NOT coerced
+        Assert.Equal(0, JsonUtils.EnsureInteger(obj["c"])); // JSON null -> default
+        Assert.Equal(0, JsonUtils.EnsureInteger(null));     // missing -> default
         Assert.Equal(5, JsonUtils.EnsureInteger(obj["b"], 5));
     }
 

@@ -42,6 +42,7 @@ public static class StoreCompleteness
         {
             return null;
         }
+
         var manifestPath = Path.Combine(paths.MetaDir, "net.minecraft", versionRef + ".json");
         if (!File.Exists(manifestPath))
         {
@@ -64,6 +65,7 @@ public static class StoreCompleteness
         {
             pool.Add(agent.Library);
         }
+
         pool.Add(manifest.MainJar);
 
         var missing = new List<string>();
@@ -74,12 +76,14 @@ public static class StoreCompleteness
             {
                 continue;
             }
+
             foreach (var storage in ExpandStorage(lib.StorageRelativePath(runtimeContext)))
             {
                 if (storage.Length == 0)
                 {
                     continue;
                 }
+
                 var file = new FileInfo(Path.Combine(paths.LibrariesRoot, storage));
                 var entry = metaCache.GetEntry("libraries", storage);
                 if (!file.Exists || entry is null || entry.IsStale)
@@ -92,6 +96,7 @@ public static class StoreCompleteness
                 }
             }
         }
+
         return new StoreStatusReport(missing.Count == 0, missing, bytes);
     }
 
@@ -104,6 +109,7 @@ public static class StoreCompleteness
         {
             return null;
         }
+
         var indexPath = Path.Combine(paths.AssetIndexesDir, assetsId + ".json");
         if (!File.Exists(indexPath))
         {
@@ -131,6 +137,7 @@ public static class StoreCompleteness
                 bytes += file.Length;
             }
         }
+
         return new StoreStatusReport(missing.Count == 0, missing, bytes);
     }
 

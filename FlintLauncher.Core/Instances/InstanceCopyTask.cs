@@ -49,6 +49,7 @@ public class InstanceCopyTask : InstanceTask
             {
                 filters += "|";
             }
+
             filters += "instance.cfg";
         }
 
@@ -69,6 +70,7 @@ public class InstanceCopyTask : InstanceTask
             EmitFailed("Reflink-based instance copies are not supported in this port.");
             return Task.CompletedTask;
         }
+
         if (_useLinks || _useHardLinks || _linkRecursively)
         {
             // FS::create_link (symlinks/hard links, optional privilege elevation on Windows)

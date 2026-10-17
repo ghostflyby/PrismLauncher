@@ -84,6 +84,7 @@ public class GetModDependenciesTaskTests : IDisposable
                 ["dependency_type"] = d[2],
             });
         }
+
         return new JsonObject
         {
             ["id"] = versionId,

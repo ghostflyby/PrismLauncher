@@ -75,6 +75,7 @@ public class NbtTests
             entry.Put("name", new NbtString($"item {i}"));
             list.Add(entry);
         }
+
         var root = new NbtCompound();
         root.Put("entries", list);
 
@@ -243,9 +244,9 @@ public class NbtTests
     [Fact]
     public void ModifiedUtf8_MalformedInput_Throws()
     {
-        Assert.Throws<NbtParseException>(() => ModifiedUtf8.Decode([0x80])); // lone continuation byte
-        Assert.Throws<NbtParseException>(() => ModifiedUtf8.Decode([0xC3])); // truncated 2-byte
-        Assert.Throws<NbtParseException>(() => ModifiedUtf8.Decode([0xE4, 0xBD])); // truncated 3-byte
+        Assert.Throws<NbtParseException>(() => ModifiedUtf8.Decode([0x80]));             // lone continuation byte
+        Assert.Throws<NbtParseException>(() => ModifiedUtf8.Decode([0xC3]));             // truncated 2-byte
+        Assert.Throws<NbtParseException>(() => ModifiedUtf8.Decode([0xE4, 0xBD]));       // truncated 3-byte
         Assert.Throws<NbtParseException>(() => ModifiedUtf8.Decode([0xE4, 0xBD, 0xC3])); // bad continuation
     }
 
@@ -276,11 +277,13 @@ public class NbtTests
                     break;
                 }
             }
+
             if (match)
             {
                 return true;
             }
         }
+
         return false;
     }
 
@@ -293,8 +296,7 @@ public class NbtTests
         for (var cut = 0; cut < full.Length; cut++)
         {
             var truncated = full[..cut];
-            Assert.Throws<NbtParseException>(
-                () => NbtIo.ReadCompound(new MemoryStream(truncated)));
+            Assert.Throws<NbtParseException>(() => NbtIo.ReadCompound(new MemoryStream(truncated)));
         }
     }
 
@@ -321,10 +323,10 @@ public class NbtTests
         // root compound containing a list whose length is negative (type, name, payload)
         buffer.WriteByte((byte)NbtTagType.Compound);
         WriteStringBytes(buffer, "");
-        buffer.WriteByte((byte)NbtTagType.List);          // child type
-        WriteStringBytes(buffer, "bad");                  // child name
-        WriteI32(buffer, -5);                             // negative length
-        buffer.WriteByte(0);                              // compound end
+        buffer.WriteByte((byte)NbtTagType.List); // child type
+        WriteStringBytes(buffer, "bad");         // child name
+        WriteI32(buffer, -5);                    // negative length
+        buffer.WriteByte(0);                     // compound end
         buffer.Position = 0;
 
         Assert.Throws<NbtParseException>(() => NbtIo.ReadCompound(buffer));
@@ -445,6 +447,7 @@ public class NbtTests
             current.Put("child", next);
             current = next;
         }
+
         current.Put("leaf", new NbtInt(1));
         return root;
     }
@@ -458,6 +461,7 @@ public class NbtTests
             depth++;
             current = child;
         }
+
         return depth;
     }
 }

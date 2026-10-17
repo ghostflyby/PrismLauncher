@@ -64,6 +64,7 @@ public sealed class TypedJsonFile<T> where T : class
         {
             Directory.CreateDirectory(directory);
         }
+
         var temp = FilePath + ".tmp-" + Guid.NewGuid().ToString("N");
         try
         {
@@ -76,8 +77,10 @@ public sealed class TypedJsonFile<T> where T : class
                 {
                     File.SetUnixFileMode(temp, mode);
                 }
+
                 JsonSerializer.Serialize(stream, value, _typeInfo);
             }
+
             File.Move(temp, FilePath, overwrite: true);
         }
         finally
@@ -103,16 +106,18 @@ public sealed class TypedJsonFile<T> where T : class
         {
             return false;
         }
+
         string json;
         try
         {
             json = File.ReadAllText(FilePath);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
-                                  or SecurityException or NotSupportedException)
+                                      or SecurityException or NotSupportedException)
         {
             return false;
         }
+
         try
         {
             value = JsonSerializer.Deserialize(json, _typeInfo);
@@ -125,10 +130,11 @@ public sealed class TypedJsonFile<T> where T : class
                 File.Copy(FilePath, FilePath + ".corrupt", overwrite: true);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException
-                                      or SecurityException or NotSupportedException)
+                                          or SecurityException or NotSupportedException)
             {
                 // the backup is best-effort; the default still applies
             }
+
             return false;
         }
     }

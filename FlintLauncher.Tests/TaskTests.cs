@@ -87,6 +87,7 @@ public class TaskTests
             {
                 _startOrder.Add(_name);
             }
+
             if (_succeeds)
             {
                 EmitSucceeded();
@@ -95,6 +96,7 @@ public class TaskTests
             {
                 EmitFailed($"failure of {_name}");
             }
+
             return Task.CompletedTask;
         }
     }
@@ -290,6 +292,7 @@ public class TaskTests
                     {
                         break;
                     }
+
                     currentMax = prev;
                 }
 

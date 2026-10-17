@@ -108,6 +108,7 @@ public static class AuthStepHttp
             {
                 message.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(request.Body));
             }
+
             foreach (var (name, value) in request.Headers)
             {
                 if (message.Content is not null && name.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
@@ -162,10 +163,12 @@ public static class AuthStepHttp
                     {
                         delay = TimeSpan.Zero;
                     }
+
                     if (delay > TimeSpan.Zero)
                     {
                         await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                     }
+
                     continue;
                 }
 

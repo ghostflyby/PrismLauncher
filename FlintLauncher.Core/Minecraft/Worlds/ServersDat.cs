@@ -64,6 +64,7 @@ public sealed class ServerEntry
                 Icon = null;
             }
         }
+
         if (server.HasKey("acceptTextures", NbtTagType.Byte))
         {
             var value = server.TryGet<NbtByte>("acceptTextures")!.Value;
@@ -80,6 +81,7 @@ public sealed class ServerEntry
         {
             server.Put("icon", new NbtString(Convert.ToBase64String(Icon)));
         }
+
         if (AcceptsTextures != AcceptsTextures.Ask)
         {
             server.Put("acceptTextures", new NbtByte(AcceptsTextures == AcceptsTextures.Always ? (sbyte)1 : (sbyte)0));
@@ -127,6 +129,7 @@ public static class ServersDat
         {
             return [];
         }
+
         return FromCompound(root);
     }
 
@@ -138,6 +141,7 @@ public static class ServersDat
         {
             return servers; // missing or not a list: empty (see deviations note)
         }
+
         foreach (var tag in list.Tags)
         {
             if (tag is NbtCompound compound)
@@ -145,6 +149,7 @@ public static class ServersDat
                 servers.Add(new ServerEntry(compound));
             }
         }
+
         return servers;
     }
 
@@ -167,6 +172,7 @@ public static class ServersDat
         {
             list.Add(server.ToNbt());
         }
+
         outTag.Put("servers", list);
         return NbtIo.WriteCompoundRaw(outTag);
     }

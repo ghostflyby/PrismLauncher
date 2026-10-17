@@ -94,6 +94,7 @@ public abstract class MetaEntity
         {
             return task;
         }
+
         task = new MetaEntityLoadTask(this, loadType, forceReload);
         return task;
     }
@@ -209,6 +210,7 @@ public abstract class MetaEntity
                     _entity.loadStatus = LoadStatus.NotLoaded;
                 }
             }
+
             // if we need remote update, run the update task
             var wasLoadedOffline = _entity.loadStatus != LoadStatus.NotLoaded && _mode == NetMode.Offline;
             // if hash is not present always fetch from remote (e.g. the main index file), else
@@ -230,6 +232,7 @@ public abstract class MetaEntity
                 entry.Etag = "";
                 entry.RemoteChangedTimestamp = "";
             }
+
             entry.SetStale(true);
             // Net::ApiRequest::makeCached == makeCached + AddAPIHeaders
             var dl = NetRequest.MakeCached(cache, _entity.Url(), entry, RequestOptions.AddApiHeaders);
@@ -241,6 +244,7 @@ public abstract class MetaEntity
             {
                 dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA256, _entity.Sha256));
             }
+
             dl.AddValidator(new ParsingValidator(_entity));
 
             await dl.StartAsync(cancellationToken).ConfigureAwait(false);

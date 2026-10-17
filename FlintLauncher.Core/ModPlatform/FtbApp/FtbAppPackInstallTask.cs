@@ -81,6 +81,7 @@ public sealed class FtbAppPackInstallTask : InstanceTask
                     break;
             }
         }
+
         components.SaveNow();
 
         instance.SetName(Name());

@@ -26,9 +26,7 @@ public class ComponentTests : IDisposable
         {
             Directory.Delete(_root, true);
         }
-        catch (IOException)
-        {
-        }
+        catch (IOException) { }
     }
 
     private static VersionFile MakeVersionFile(string uid, string version, string name)

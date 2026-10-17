@@ -110,6 +110,7 @@ public static class NbtIo
         {
             throw new ArgumentNullException(nameof(input));
         }
+
         toDispose = null;
         if (!detectCompression)
         {
@@ -125,8 +126,10 @@ public static class NbtIo
             {
                 break;
             }
+
             read += n;
         }
+
         var isGzip = read == 2 && header[0] == 0x1F && header[1] == 0x8B;
         if (isGzip)
         {
@@ -135,6 +138,7 @@ public static class NbtIo
             toDispose = decompressor;
             return decompressor;
         }
+
         return read > 0 ? new PushbackStream(input, header[..read]) : input;
     }
 
@@ -153,10 +157,12 @@ public static class NbtIo
                 served++;
                 count--;
             }
+
             if (count > 0)
             {
                 served += inner.Read(buffer, offset + served, count);
             }
+
             return served;
         }
 
@@ -164,7 +170,13 @@ public static class NbtIo
         public override bool CanSeek => false;
         public override bool CanWrite => false;
         public override long Length => throw new NotSupportedException();
-        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
         public override void Flush() { }
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
         public override void SetLength(long value) => throw new NotSupportedException();

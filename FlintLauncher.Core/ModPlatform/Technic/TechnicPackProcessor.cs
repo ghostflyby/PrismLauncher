@@ -65,7 +65,7 @@ public static class TechnicPackProcessor
                 zipFile = ZipFile.OpenRead(modpackJar);
             }
             catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-                                     or ArgumentException or NotSupportedException)
+                                          or ArgumentException or NotSupportedException)
             {
                 return "Unable to open \"bin/modpack.jar\" file!";
             }
@@ -81,16 +81,19 @@ public static class TechnicPackProcessor
                         {
                             return "Unable to open \"fmlversion.properties\"!";
                         }
+
                         var iniFile = new IniFile();
                         iniFile.LoadText(fmlVersionData);
                         // If not present, this evaluates to a null string
                         fmlMinecraftVersion = iniFile.GetString("fmlbuild.mcversion", "");
                     }
+
                     var versionData = ReadZipEntryText(zipFile, "version.json");
                     if (versionData is null)
                     {
                         return "Unable to open \"version.json\"!";
                     }
+
                     data = versionData;
                 }
                 else
@@ -99,8 +102,9 @@ public static class TechnicPackProcessor
                     {
                         return "Could not find \"version.json\" inside \"bin/modpack.jar\", but Minecraft version is unknown";
                     }
+
                     _ = await components.SetComponentVersion("net.minecraft", minecraftVersion, important: true,
-                            cancellationToken: cancellationToken);
+                        cancellationToken: cancellationToken);
                     _ = components.InstallJarMods([modpackJar]);
 
                     // Forge for 1.4.7 and for 1.5.2 require extra libraries.
@@ -114,6 +118,7 @@ public static class TechnicPackProcessor
                             // Really shouldn't happen, but error handling shall not be forgotten
                             return "Unable to open \"forgeversion.properties\"";
                         }
+
                         var iniFile = new IniFile();
                         iniFile.LoadText(forgeVersionData);
                         var major = iniFile.GetString("forge.major.number", "");
@@ -151,7 +156,7 @@ public static class TechnicPackProcessor
         {
             // This is the "Vanilla" modpack, excluded by the search code
             _ = await components.SetComponentVersion("net.minecraft", minecraftVersion, important: true,
-                    cancellationToken: cancellationToken);
+                cancellationToken: cancellationToken);
             components.SaveNow();
             return null;
         }
@@ -167,10 +172,12 @@ public static class TechnicPackProcessor
                 {
                     return "Could not understand \"version.json\":\ninheritsFrom is missing";
                 }
+
                 packMinecraftVersion = fmlMinecraftVersion;
             }
+
             _ = await components.SetComponentVersion("net.minecraft", packMinecraftVersion, important: true,
-                    cancellationToken: cancellationToken);
+                cancellationToken: cancellationToken);
             if (root["libraries"] is JsonArray libraries)
             {
                 foreach (var library in libraries)
@@ -199,14 +206,17 @@ public static class TechnicPackProcessor
                                     neoforgeVersion = argument;
                                     break;
                                 }
+
                                 isVersionArg = "--fml.neoForgeVersion" == argument || "--fml.forgeVersion" == argument;
                             }
                         }
+
                         if (neoforgeVersion.Length != 0)
                         {
                             _ = await components.SetComponentVersion("net.neoforged", neoforgeVersion,
-                                    cancellationToken: cancellationToken);
+                                cancellationToken: cancellationToken);
                         }
+
                         break;
                     }
 
@@ -226,6 +236,7 @@ public static class TechnicPackProcessor
                             _ = await components.SetComponentVersion("net.minecraftforge", Section(libraryName, '-', 1, 1),
                                 cancellationToken: cancellationToken);
                         }
+
                         break;
                     }
 
@@ -289,6 +300,7 @@ public static class TechnicPackProcessor
         {
             return null;
         }
+
         using var stream = entry.Open();
         using var reader = new StreamReader(stream, Encoding.UTF8);
         return reader.ReadToEnd();
@@ -301,6 +313,7 @@ public static class TechnicPackProcessor
         {
             name = name[1..];
         }
+
         return name;
     }
 }

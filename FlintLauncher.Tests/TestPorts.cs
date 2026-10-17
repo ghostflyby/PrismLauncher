@@ -32,13 +32,14 @@ internal static class PortAllocator
     public static (HttpListener Listener, string Url) StartHttpListener()
     {
         var listener = new HttpListener();
-        for (var attempt = 1; ; attempt++)
+        for (var attempt = 1;; attempt++)
         {
             string url;
             using (var lease = Reserve())
             {
                 url = $"http://127.0.0.1:{lease.Port}";
             }
+
             listener.Prefixes.Clear();
             listener.Prefixes.Add(url + "/");
             try

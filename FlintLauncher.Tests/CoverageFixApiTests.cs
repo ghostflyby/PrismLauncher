@@ -270,13 +270,12 @@ public class CoverageFixWorldsApiTests : IAsyncDisposable
         {
             await host.DisposeAsync();
         }
+
         try
         {
             Directory.Delete(_dataDir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     [Fact]
@@ -363,29 +362,30 @@ public class CoverageFixLaunchJoinApiTests
     {
         var path = Path.Combine(root, "fake-java");
         File.WriteAllText(path, """
-            #!/bin/sh
-            exec 2>>/tmp/fj-stderr.log
-            while IFS= read -r line || [ -n "$line" ]; do
-                printf '%s\n' "$line"
-                if [ "$line" = "launch" ]; then
-                    exit 0
-                fi
-                if [ "$line" = "abort" ]; then
-                    exit 42
-                fi
-            done
-            exit 1
-            """);
+                                #!/bin/sh
+                                exec 2>>/tmp/fj-stderr.log
+                                while IFS= read -r line || [ -n "$line" ]; do
+                                    printf '%s\n' "$line"
+                                    if [ "$line" = "launch" ]; then
+                                        exit 0
+                                    fi
+                                    if [ "$line" = "abort" ]; then
+                                        exit 42
+                                    fi
+                                done
+                                exit 1
+                                """);
         if (!OperatingSystem.IsWindows())
         {
             File.SetUnixFileMode(path, File.GetUnixFileMode(path) | UnixFileMode.UserExecute |
-                UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
+                                       UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
         }
+
         return path;
     }
 
     private static async Task<JsonElement> PollTaskState(HttpClient client, string taskId,
-                                                          string expected, TimeSpan timeout)
+        string expected, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         JsonElement task = default;
@@ -398,12 +398,15 @@ public class CoverageFixLaunchJoinApiTests
             {
                 return task;
             }
+
             if (state is "failed" or "aborted")
             {
                 throw new Exception($"launch task ended in '{state}': {task.GetProperty("failReason").GetString()}");
             }
+
             await Task.Delay(100);
         }
+
         throw new Exception($"task never reached '{expected}', last: {task.GetRawText()}");
     }
 
@@ -468,6 +471,7 @@ public class CoverageFixLaunchJoinApiTests
             {
                 lastPasteContent = Uri.UnescapeDataString(raw["content=".Length..]);
             }
+
             var bytes = Encoding.UTF8.GetBytes("""{"success":true,"url":"https://mclo.gs/FLINT1"}""");
             ctx.Response.ContentType = "application/json";
             await ctx.Response.OutputStream.WriteAsync(bytes);
@@ -498,14 +502,14 @@ public class CoverageFixLaunchJoinApiTests
             // S2: the token is host-injected (--api-token) — no token file exists to read
             var apiToken = Guid.NewGuid().ToString("N");
             var app = WebHostBuilder.BuildWebApplication(
-            [
-                "--home-dir", dataDir,
-                "--api-token", apiToken,
-                "--urls", "http://127.0.0.1:0",
-            ],
-            // the launch pipeline's jar lookups resolve against this install root (the former
-            // JavaUtils.LauncherRootPath static test hook, now LaunchServices.Paths.InstallRoot)
-            paths: FlintPaths.FromHomeDir(dataDir) with { InstallRoot = launcherRoot });
+                [
+                    "--home-dir", dataDir,
+                    "--api-token", apiToken,
+                    "--urls", "http://127.0.0.1:0",
+                ],
+                // the launch pipeline's jar lookups resolve against this install root (the former
+                // JavaUtils.LauncherRootPath static test hook, now LaunchServices.Paths.InstallRoot)
+                paths: FlintPaths.FromHomeDir(dataDir) with { InstallRoot = launcherRoot });
             await app.StartAsync();
             using var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
             client.DefaultRequestHeaders.Add("X-Api-Token", apiToken);
@@ -630,9 +634,7 @@ public class CoverageFixLaunchJoinApiTests
             {
                 Directory.Delete(dataDir, recursive: true);
             }
-            catch (DirectoryNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
         }
     }
 }

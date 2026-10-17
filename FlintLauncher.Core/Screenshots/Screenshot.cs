@@ -4,6 +4,7 @@
 //
 // Deviations: the C++ stores a QFileInfo; the port stores the path string (the helpers the
 // UI needs — fileName/baseName — are provided here, matching QFileInfo semantics).
+
 namespace FlintLauncher.Core.Screenshots;
 
 public sealed class ScreenShot

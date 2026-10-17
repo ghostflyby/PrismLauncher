@@ -12,8 +12,10 @@ public class FileSink : Sink
 {
     private readonly string _filename;
     private bool wroteAnyData;
+
     /// <summary>Writable by MetaCacheSink (C++: protected member access).</summary>
     private protected bool WroteAnyData => wroteAnyData;
+
     private string? tempFile;
 
     public FileSink(string filename)
@@ -54,6 +56,7 @@ public class FileSink : Sink
         {
             return true;
         }
+
         FailReason = "Failed to initialize validators";
         return false;
     }
@@ -65,6 +68,7 @@ public class FileSink : Sink
             FailReason = "Writing into a closed file sink";
             return false;
         }
+
         try
         {
             using var stream = File.Open(tempFile, FileMode.Append, FileAccess.Write);
@@ -77,6 +81,7 @@ public class FileSink : Sink
             wroteAnyData = false;
             return false;
         }
+
         if (!WriteAllValidators(data))
         {
             FailReason = $"Failed writing into {_filename}: validators failed";
@@ -84,6 +89,7 @@ public class FileSink : Sink
             wroteAnyData = false;
             return false;
         }
+
         wroteAnyData = true;
         return true;
     }
@@ -123,6 +129,7 @@ public class FileSink : Sink
                     CancelWriting();
                     return false;
                 }
+
                 tempFile = null;
             }
         }
@@ -145,11 +152,11 @@ public class FileSink : Sink
             {
                 File.Delete(tempFile);
             }
-            catch (IOException)
-            {
-            }
+            catch (IOException) { }
+
             tempFile = null;
         }
+
         wroteAnyData = false;
     }
 
@@ -192,15 +199,18 @@ public sealed class MetaCacheSink : FileSink
         {
             return true;
         }
+
         if (!HasLocalData() && _entry.Md5Sum.Length == 0)
         {
             return true;
         }
+
         // set the etag to revalidate against
         if (_entry.Etag.Length > 0)
         {
             request.Headers["If-None-Match"] = _entry.Etag;
         }
+
         return true;
     }
 
@@ -256,7 +266,7 @@ public sealed class MetaCacheSink : FileSink
         }
 
         _entry.CurrentAge = response.Headers.TryGetValue("Age", out var ageHeader)
-            && long.TryParse(ageHeader, out var age)
+                            && long.TryParse(ageHeader, out var age)
             ? age
             : 0;
 

@@ -35,6 +35,7 @@ public class OpenApiTests
             {
                 continue;
             }
+
             apiPaths++;
             foreach (var operation in path.Value.EnumerateObject())
             {
@@ -42,6 +43,7 @@ public class OpenApiTests
                 {
                     continue;
                 }
+
                 var responses = operation.Value.GetProperty("responses");
                 Assert.True(responses.EnumerateObject().Any(r => r.Name.StartsWith('2')),
                     $"{operation.Name.ToUpperInvariant()} {path.Name} lacks a 2xx response");
@@ -52,6 +54,7 @@ public class OpenApiTests
                 }
             }
         }
+
         Assert.True(apiPaths >= 75, $"only {apiPaths} /api/v1 paths in the document");
     }
 

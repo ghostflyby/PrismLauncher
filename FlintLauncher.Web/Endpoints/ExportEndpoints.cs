@@ -38,6 +38,7 @@ public static class ExportEndpoints
                 return ApiJson.Error("invalid_format",
                     "'format' must be one of modrinth|flame|modlist", 400);
             }
+
             if (format == "modlist")
             {
                 var format2 = request.Format2 is null ? "html" : request.Format2.Trim().ToLowerInvariant();
@@ -136,6 +137,7 @@ public static class ExportEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 return Results.Ok(ListLogFiles(instance).ToArray());
             }
             finally
@@ -152,6 +154,7 @@ public static class ExportEndpoints
             {
                 return ApiJson.Error("unknown_dir", "dir must be one of logs|crash-reports", 400);
             }
+
             await runtime.InstanceLock.WaitAsync();
             try
             {
@@ -159,11 +162,13 @@ public static class ExportEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
+
                 var path = ResolveLogFile(LogDir(instance, dir), name);
                 if (path is null)
                 {
                     return ApiJson.NotFound("log_not_found", $"no log file '{name}' in '{dir}'");
                 }
+
                 return Results.Text(ReadTail(path, MaxLogBytes), "text/plain",
                     Encoding.UTF8);
             }
@@ -194,6 +199,7 @@ public static class ExportEndpoints
             {
                 continue;
             }
+
             IEnumerable<string> files;
             try
             {
@@ -203,6 +209,7 @@ public static class ExportEndpoints
             {
                 continue;
             }
+
             foreach (var file in files)
             {
                 var info = new FileInfo(file);
@@ -210,6 +217,7 @@ public static class ExportEndpoints
                 {
                     continue;
                 }
+
                 result.Add(new LogFileView(
                     info.Name,
                     dir,
@@ -217,6 +225,7 @@ public static class ExportEndpoints
                     new DateTimeOffset(info.LastWriteTimeUtc).ToUnixTimeMilliseconds()));
             }
         }
+
         return result
             .OrderByDescending(view => view.ModifiedAt)
             .ThenBy(view => view.Dir, StringComparer.Ordinal)
@@ -233,6 +242,7 @@ public static class ExportEndpoints
         {
             return null;
         }
+
         var path = Path.Combine(dir, name);
         var fullDir = Path.GetFullPath(dir);
         var full = Path.GetFullPath(path);
@@ -254,6 +264,7 @@ public static class ExportEndpoints
                 using var reader = new StreamReader(stream, Encoding.UTF8);
                 return reader.ReadToEnd();
             }
+
             stream.Seek(length - maxBytes, SeekOrigin.Begin);
             var buffer = new byte[maxBytes];
             var read = 0;
@@ -264,8 +275,10 @@ public static class ExportEndpoints
                 {
                     break;
                 }
+
                 read += chunk;
             }
+
             var text = Encoding.UTF8.GetString(buffer, 0, read);
             // skip the (probably partial) first line
             var newline = text.IndexOf('\n');

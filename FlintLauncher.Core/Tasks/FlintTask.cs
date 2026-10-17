@@ -13,6 +13,7 @@
 // WasSuccessful (wasSuccessful), IsMultiStep (isMultiStep), Uid (getUid), GetDetails
 // (getDetails), CurrentProgress/TotalProgress (getProgress/getTotalProgress),
 // GetStepProgress (getStepProgress), SetProgress (setProgress) and Clear support.
+
 namespace FlintLauncher.Core.Tasks;
 
 public enum TaskState
@@ -170,6 +171,7 @@ public abstract class FlintTask
         {
             return;
         }
+
         State = TaskState.Succeeded;
         Succeeded?.Invoke(this);
     }
@@ -182,6 +184,7 @@ public abstract class FlintTask
         {
             return;
         }
+
         State = TaskState.Failed;
         FailReason = reason;
         Failed?.Invoke(this, reason);
@@ -198,6 +201,7 @@ public abstract class FlintTask
         {
             return;
         }
+
         State = TaskState.AbortedByUser;
         FailReason = "Aborted"; // tr("Aborted")
         Aborted?.Invoke(this);
@@ -210,6 +214,7 @@ public abstract class FlintTask
         {
             return;
         }
+
         Status = status;
         StatusChanged?.Invoke(this, status);
     }
@@ -221,6 +226,7 @@ public abstract class FlintTask
         {
             return;
         }
+
         this.details = details;
         Details?.Invoke(this, details);
     }
@@ -238,6 +244,7 @@ public abstract class FlintTask
         {
             return;
         }
+
         progress = current;
         progressTotal = total;
         EmitProgress(new TaskStepProgress(Uid)

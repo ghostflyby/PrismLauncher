@@ -2,6 +2,7 @@
 // Port of launcher/RuntimeContext.h plus the currentSystem() part of launcher/SysInfo.{h,cpp}
 // (the only SysInfo function the version-metadata layer needs). The SettingsObject hookup
 // (updateFromInstanceSettings) arrives with the instance layer and is not ported yet.
+
 namespace FlintLauncher.Core.Minecraft;
 
 /// <summary>Port of the currentSystem() part of the SysInfo namespace.</summary>
@@ -13,14 +14,17 @@ public static class SysInfo
         {
             return "linux";
         }
+
         if (OperatingSystem.IsMacOS())
         {
             return "osx";
         }
+
         if (OperatingSystem.IsWindows())
         {
             return "windows";
         }
+
         if (OperatingSystem.IsFreeBSD())
         {
             return "freebsd";
@@ -31,6 +35,7 @@ public static class SysInfo
         {
             return "openbsd";
         }
+
         return "unknown";
     }
 }
@@ -87,6 +92,7 @@ public struct RuntimeContext
         {
             x = target == System;
         }
+
         return x;
     }
 }

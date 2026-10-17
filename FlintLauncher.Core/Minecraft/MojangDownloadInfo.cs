@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/MojangDownloadInfo.h, including the hardcoded legacy/S3
 // fallback asset index URLs of MojangAssetIndexInfo.
+
 namespace FlintLauncher.Core.Minecraft;
 
 public class MojangDownloadInfo
@@ -20,9 +21,7 @@ public class MojangDownloadInfo
 
 public class MojangLibraryDownloadInfo
 {
-    public MojangLibraryDownloadInfo()
-    {
-    }
+    public MojangLibraryDownloadInfo() { }
 
     public MojangLibraryDownloadInfo(MojangDownloadInfo? artifact)
     {
@@ -39,15 +38,14 @@ public class MojangLibraryDownloadInfo
         {
             return Artifact;
         }
+
         return Classifiers.GetValueOrDefault(classifier);
     }
 }
 
 public class MojangAssetIndexInfo : MojangDownloadInfo
 {
-    public MojangAssetIndexInfo()
-    {
-    }
+    public MojangAssetIndexInfo() { }
 
     public MojangAssetIndexInfo(string id)
     {
@@ -64,6 +62,7 @@ public class MojangAssetIndexInfo : MojangDownloadInfo
         {
             Url = "https://s3.amazonaws.com/Minecraft.Download/indexes/" + id + ".json";
         }
+
         Known = false;
     }
 

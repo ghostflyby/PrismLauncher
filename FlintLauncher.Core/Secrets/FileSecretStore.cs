@@ -74,6 +74,7 @@ public sealed class FileSecretStore : ISecretStore
         {
             return false;
         }
+
         _file.Save(current, UnixFileMode.UserRead | UnixFileMode.UserWrite);
         return true;
     }

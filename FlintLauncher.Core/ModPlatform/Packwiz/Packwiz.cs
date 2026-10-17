@@ -156,6 +156,7 @@ public static class Packwiz
                     // "Did not write file {name} because missing information!"
                     return;
                 }
+
                 update = $"file-id = {mod.FileId}\nproject-id = {mod.ProjectId}";
                 break;
             case ResourceProvider.Modrinth:
@@ -164,6 +165,7 @@ public static class Packwiz
                     // "Did not write file {name} because missing information!"
                     return;
                 }
+
                 update = $"mod-id = {T(mod.ModId())}\nversion = {T(mod.Version())}";
                 break;
             default:
@@ -182,14 +184,17 @@ public static class Packwiz
             {
                 deps.Append(", ");
             }
+
             deps.Append("{ addonId = ").Append(T(dep.AddonId));
             deps.Append(", type = ").Append(T(dep.Type.ToString()));
             if (dep.Version.Length != 0)
             {
                 deps.Append(", version = ").Append(T(dep.Version));
             }
+
             deps.Append(" }");
         }
+
         deps.Append(']');
 
         var toml = new StringBuilder();
@@ -279,6 +284,7 @@ public static class Packwiz
             {
                 mod.Loaders |= ModIndex.GetModLoaderFromString(loader);
             }
+
             var versions = table.GetStringArray("x-prismlauncher-mc-versions");
             mod.McVersions.AddRange(versions.Where(v => v.Length != 0));
             RemoveDuplicates(mod.McVersions);
@@ -347,6 +353,7 @@ public static class Packwiz
                 {
                     dep.Version = depTable.GetString("version");
                 }
+
                 dep.Type = DependencyType.FromString(depTable.GetString("type"));
                 mod.Dependencies.Add(dep);
             }
@@ -369,6 +376,7 @@ public static class Packwiz
                 return mod;
             }
         }
+
         return new Mod();
     }
 
@@ -381,6 +389,7 @@ public static class Packwiz
         {
             return modSlug;
         }
+
         return $"{modSlug}.pw.toml";
     }
 
@@ -430,6 +439,7 @@ public static class Packwiz
         {
             return string.CompareOrdinal(a, b);
         }
+
         return cmp;
     }
 
@@ -465,9 +475,11 @@ public static class Packwiz
                     {
                         sb.Append(c);
                     }
+
                     break;
             }
         }
+
         sb.Append('"');
         return sb.ToString();
     }

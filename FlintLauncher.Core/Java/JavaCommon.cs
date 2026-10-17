@@ -36,6 +36,7 @@ public static partial class JavaCommon
                    "There are dedicated boxes for these in the settings (Java tab, in the Memory group at the top).\n" +
                    "This message will be displayed until you remove them from the JVM arguments.";
         }
+
         // block lunacy with passing required version to the JVM
         if (VersionRegex().IsMatch(jvmargs))
         {
@@ -43,6 +44,7 @@ public static partial class JavaCommon
                    "allowed.\n" +
                    "This message will be displayed until you remove this from the JVM arguments.";
         }
+
         return null;
     }
 }

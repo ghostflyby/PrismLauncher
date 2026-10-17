@@ -376,6 +376,7 @@ public static class FlintConfigKeys
         {
             map.Add(entry.Key, entry);
         }
+
         return map;
     }
 }

@@ -88,6 +88,7 @@ public class Rule
             {
                 osObj["version"] = JsonValue.Create(os.Version);
             }
+
             result["os"] = osObj;
         }
 

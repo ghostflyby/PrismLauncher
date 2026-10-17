@@ -25,9 +25,7 @@ public class WorldTests : IDisposable
         {
             Directory.Delete(_tempDir, recursive: true);
         }
-        catch (IOException)
-        {
-        }
+        catch (IOException) { }
     }
 
     /// <summary>Builds a minimal level.dat NBT structure like a real one's Data compound.</summary>
@@ -43,6 +41,7 @@ public class WorldTests : IDisposable
         {
             data.Put("RandomSeed", new NbtLong(randomSeed));
         }
+
         data.Put("Difficulty", new NbtInt(2));
         root.Put("Data", data);
         return root;
@@ -58,6 +57,7 @@ public class WorldTests : IDisposable
         {
             File.WriteAllBytes(Path.Combine(worldDir, "icon.png"), [0x89, 0x50, 0x4E, 0x47]);
         }
+
         return worldDir;
     }
 
@@ -101,7 +101,7 @@ public class WorldTests : IDisposable
         var world = new World(dir);
         Assert.False(world.IsValid);
         Assert.True(world.IsOnFs); // the (invalid) world folder still exists
-        world.LoadMetadata(); // must be a no-op-ish and not throw
+        world.LoadMetadata();      // must be a no-op-ish and not throw
         Assert.False(world.IsValid);
     }
 
@@ -154,6 +154,7 @@ public class WorldTests : IDisposable
             var bytes = NbtIo.WriteCompoundGzip(MakeLevelDat());
             s.Write(bytes, 0, bytes.Length);
         }
+
         var world = new World(zipPath);
         Assert.True(world.IsValid);
         Assert.False(world.Rename("Nope"));
@@ -282,7 +283,7 @@ public class WorldTests : IDisposable
         WriteWorldInto(saves, "alpha", "Alpha");
         WriteWorldInto(saves, "beta", "Beta");
         Directory.CreateDirectory(Path.Combine(saves, "not_a_world")); // no level.dat
-        File.WriteAllBytes(Path.Combine(saves, "stray.zip"), []); // files are skipped
+        File.WriteAllBytes(Path.Combine(saves, "stray.zip"), []);      // files are skipped
 
         var list = new WorldList(saves);
         Assert.True(list.Update());

@@ -39,6 +39,7 @@ public sealed class MinecraftLoadAndCheck : FlintTask
             EmitFailed(result.ErrorMessage);
             return;
         }
+
         EmitSucceeded();
     }
 

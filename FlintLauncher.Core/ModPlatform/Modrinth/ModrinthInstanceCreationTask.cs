@@ -43,19 +43,21 @@ public sealed class ModrinthCreationTask : InstanceTask
         public string Path { get; set; } = "";
 
         public HashAlgorithmName HashAlgorithm { get; set; } = HashAlgorithmName.SHA512;
+
         /// <summary>Hex-encoded hash, as stored in modrinth.index.json.</summary>
         public string Hash { get; set; } = "";
+
         public Queue<string> Downloads { get; } = new();
         public bool Required { get; set; } = true;
     }
 
     public ModrinthCreationTask(string stagingPath,
-                                bool trustedSource,
-                                InstanceEnvironment environment,
-                                string id = "",
-                                string versionId = "",
-                                string originalInstanceId = "",
-                                ModrinthApi? modrinth = null)
+        bool trustedSource,
+        InstanceEnvironment environment,
+        string id = "",
+        string versionId = "",
+        string originalInstanceId = "",
+        ModrinthApi? modrinth = null)
     {
         _modrinth = modrinth ?? new ModrinthApi();
         StagingPath = stagingPath;
@@ -172,16 +174,19 @@ public sealed class ModrinthCreationTask : InstanceTask
             await components.SetComponentVersion("net.fabricmc.fabric-loader", fabricVersion, important: false, cancellationToken);
             loader = ModIndex.GetModLoaderAsString(ModLoaderType.Fabric);
         }
+
         if (quiltVersion.Length != 0)
         {
             await components.SetComponentVersion("org.quiltmc.quilt-loader", quiltVersion, important: false, cancellationToken);
             loader = ModIndex.GetModLoaderAsString(ModLoaderType.Quilt);
         }
+
         if (forgeVersion.Length != 0)
         {
             await components.SetComponentVersion("net.minecraftforge", forgeVersion, important: false, cancellationToken);
             loader = ModIndex.GetModLoaderAsString(ModLoaderType.Forge);
         }
+
         if (neoForgeVersion.Length != 0)
         {
             await components.SetComponentVersion("net.neoforged", neoForgeVersion, important: false, cancellationToken);
@@ -219,6 +224,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                     $"One of the files has a path that leads to an arbitrary location ({fileName}). This is a security risk and isn't allowed.");
                 return;
             }
+
             if (fileName.StartsWith("mods/", StringComparison.Ordinal))
             {
                 var mod = new Mod(filePath);
@@ -229,6 +235,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                 mod.SetDetails(d);
                 _resources[file.Hash] = mod;
             }
+
             if (file.Downloads.Count == 0)
             {
                 EmitFailed($"The file '{fileName}' is missing a download link. This is invalid in the pack format.");
@@ -264,7 +271,7 @@ public sealed class ModrinthCreationTask : InstanceTask
     /// (after a failed emit) when the index could not be understood.
     /// </summary>
     internal bool ParseManifest(string indexPath, List<File> files, bool setInternalData = true,
-                                bool showOptionalDialog = false)
+        bool showOptionalDialog = false)
     {
         try
         {
@@ -287,6 +294,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                     {
                         managedVersionId = ObjString(obj, "versionId");
                     }
+
                     managedName = ObjString(obj, "name");
                 }
 
@@ -298,6 +306,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                     {
                         throw new JsonParseException("modrinth.index.json: files entry is not an object");
                     }
+
                     var file = new File
                     {
                         Path = modInfo.RequireString("path").Replace("\\", "/"),
@@ -311,6 +320,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                         {
                             continue;
                         }
+
                         if (support == "optional")
                         {
                             file.Required = false;
@@ -358,6 +368,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                         EmitAborted();
                         return false;
                     }
+
                     foreach (var file in optionalFiles)
                     {
                         if (OptionalModsSelection.TryGetValue(file.Path, out var selected) && selected)
@@ -370,9 +381,11 @@ public sealed class ModrinthCreationTask : InstanceTask
                         {
                             file.Path += ".disabled";
                         }
+
                         files.Add(file);
                     }
                 }
+
                 if (setInternalData)
                 {
                     var dependencies = JsonUtils.RequireObject(obj, "dependencies", "modrinth.index.json");
@@ -423,7 +436,9 @@ public sealed class ModrinthCreationTask : InstanceTask
     private static string ObjString(JsonNode? obj, string key)
     {
         return obj is JsonObject o && o.TryGetPropertyValue(key, out var node) && node is JsonValue value
-            && value.TryGetValue<string>(out var s) ? s : "";
+               && value.TryGetValue<string>(out var s)
+            ? s
+            : "";
     }
 
     private async Task EnsureMetaLoop(CancellationToken cancellationToken, MinecraftInstance newInstance)
@@ -440,6 +455,7 @@ public sealed class ModrinthCreationTask : InstanceTask
             EmitFailed(ensureMetadataTask.FailReason);
             return;
         }
+
         await FinishInstallAsync(newInstance);
     }
 
@@ -462,7 +478,7 @@ public sealed class ModrinthCreationTask : InstanceTask
             foreach (var url in file.Downloads)
             {
                 if (!Uri.TryCreate(url, UriKind.Absolute, out var parsed) || parsed.Scheme != "https"
-                    || parsed.Host != _modrinth.DownloadHost)
+                                                                          || parsed.Host != _modrinth.DownloadHost)
                 {
                     untrustedMods.Add(file.Path);
                     break;
@@ -532,6 +548,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                 return;
             }
         }
+
         _ = newInstance;
         // (upstream calls downloadFiles(m_newInstance.get()) here — the P5 update pipeline;
         //  like VanillaCreationTask, creation succeeds without fetching game files)
@@ -547,9 +564,10 @@ public sealed class ModrinthCreationTask : InstanceTask
         {
             return false;
         }
+
         return childFull.Length == parentFull.Length
-            || childFull[parentFull.Length] == Path.DirectorySeparatorChar
-            || childFull[parentFull.Length] == '/';
+               || childFull[parentFull.Length] == Path.DirectorySeparatorChar
+               || childFull[parentFull.Length] == '/';
     }
 
     /// <summary>
@@ -591,12 +609,14 @@ public sealed class ModrinthCreationTask : InstanceTask
                     EmitSucceeded();
                     return;
                 }
+
                 if (!IsRunning)
                 {
                     return; // aborted
                 }
                 // else: try the next URL
             }
+
             EmitFailed($"Failed to download {_file.Path}: {_file.Hash}");
         }
     }

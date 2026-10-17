@@ -29,6 +29,7 @@ public sealed class FtbPackModel
         {
             return _modpacks;
         }
+
         return _modpacks.Where(pack =>
             pack.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
     }
@@ -84,6 +85,7 @@ public sealed class FtbPackModel
                 {
                     continue;
                 }
+
                 _modpacks.Add(pack);
             }
             catch (JsonParseException)

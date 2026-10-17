@@ -37,6 +37,7 @@ internal static class QSettingsIniCodec
                 // likewise never produced by QSettings on any supported OS.
                 continue;
             }
+
             if (trimmed.StartsWith('[') && trimmed.EndsWith(']'))
             {
                 var sectionText = trimmed[1..^1].Trim();
@@ -64,17 +65,21 @@ internal static class QSettingsIniCodec
                     break;
                 }
             }
+
             if (eqPos == -1)
             {
                 continue;
             }
+
             var key = UnescapeKey(line[..eqPos].Trim());
             if (key.Length == 0)
             {
                 continue;
             }
+
             map[prefix + key] = ParseValue(line[(eqPos + 1)..]);
         }
+
         return map;
     }
 
@@ -86,11 +91,13 @@ internal static class QSettingsIniCodec
         {
             return StringToValue(trimmed);
         }
+
         var elements = ParseStringList(valueText);
         if (elements.Count > 1)
         {
             return IniValue.From(elements);
         }
+
         var s = elements.Count == 1 ? elements[0] : "";
         return StringToValue(s);
     }
@@ -101,6 +108,7 @@ internal static class QSettingsIniCodec
         {
             return IniValue.Invalid;
         }
+
         if (s.StartsWith("@ByteArray(", StringComparison.Ordinal) && s.EndsWith(')'))
         {
             var inner = UnescapeContent(s["@ByteArray(".Length..^1]);
@@ -109,8 +117,10 @@ internal static class QSettingsIniCodec
             {
                 bytes[i] = (byte)(inner[i] & 0xFF);
             }
+
             return IniValue.From(bytes);
         }
+
         if (s.StartsWith("@String(", StringComparison.Ordinal) && s.EndsWith(')'))
         {
             // @String(<escaped content>): Qt's wrapper for QStrings whose plain INI form would
@@ -119,10 +129,12 @@ internal static class QSettingsIniCodec
             // is the same ini escape set UnescapeContent covers (same as @ByteArray).
             return IniValue.From(UnescapeContent(s["@String(".Length..^1]));
         }
+
         if (s.StartsWith("@@", StringComparison.Ordinal))
         {
             return IniValue.From(s[1..]);
         }
+
         if (s.StartsWith('@'))
         {
             // @Variant/@Point/@Rect/@Size/@DateTime(...): keep verbatim; QDataStream-backed
@@ -134,6 +146,7 @@ internal static class QSettingsIniCodec
             // verbatim on purpose; decoding @Variant would require a QDataStream reader.
             return IniValue.Raw(s);
         }
+
         return IniValue.From(s);
     }
 
@@ -141,20 +154,21 @@ internal static class QSettingsIniCodec
     private static List<string> ParseStringList(string value)
     {
         var result = new List<string>();
-            var i = 0;
-            var n = value.Length;
-            while (true)
+        var i = 0;
+        var n = value.Length;
+        while (true)
+        {
+            // skip leading spaces of the element
+            while (i < n && value[i] == ' ')
             {
-                // skip leading spaces of the element
-                while (i < n && value[i] == ' ')
-                {
-                    i++;
-                }
-                if (i >= n)
-                {
-                    result.Add("");
-                    return result;
-                }
+                i++;
+            }
+
+            if (i >= n)
+            {
+                result.Add("");
+                return result;
+            }
 
             var current = new StringBuilder();
             var anyQuoted = false;
@@ -166,14 +180,17 @@ internal static class QSettingsIniCodec
                 {
                     i++;
                 }
+
                 if (i >= n)
                 {
                     break;
                 }
+
                 if (value[i] == ',')
                 {
                     break;
                 }
+
                 if (value[i] == '"')
                 {
                     anyQuoted = true;
@@ -187,16 +204,20 @@ internal static class QSettingsIniCodec
                             i++;
                             break;
                         }
+
                         if (c == '\\' && i + 1 < n)
                         {
                             i = ReadEscape(value, i + 1, current);
                             continue;
                         }
+
                         current.Append(c);
                         i++;
                     }
+
                     continue;
                 }
+
                 // unquoted chunk: runs until top-level comma or end
                 var chunkStart = current.Length;
                 var end = i;
@@ -204,6 +225,7 @@ internal static class QSettingsIniCodec
                 {
                     end++;
                 }
+
                 var chunk = UnescapeContent(value[i..end]);
                 // chop trailing spaces of unquoted chunks
                 var chopEnd = chunk.Length;
@@ -211,6 +233,7 @@ internal static class QSettingsIniCodec
                 {
                     chopEnd--;
                 }
+
                 current.Append(chunk[..chopEnd]);
                 i = end;
                 if (current.Length > chunkStart)
@@ -222,10 +245,12 @@ internal static class QSettingsIniCodec
                     hadContent = true;
                 }
             }
+
             if (!hadContent && current.Length == 0 && !anyQuoted)
             {
                 // keep empty element for e.g. ", b" at position 0
             }
+
             result.Add(current.ToString());
 
             // skip separator
@@ -234,11 +259,13 @@ internal static class QSettingsIniCodec
             {
                 j++;
             }
+
             if (j < n && value[j] == ',')
             {
                 i = j + 1;
                 continue;
             }
+
             return result;
         }
     }
@@ -250,6 +277,7 @@ internal static class QSettingsIniCodec
         {
             return i;
         }
+
         var c = s[i];
         if (c == 'x')
         {
@@ -262,9 +290,11 @@ internal static class QSettingsIniCodec
                 i++;
                 any = true;
             }
+
             sb.Append(any ? (char)val : 'x');
             return i;
         }
+
         if (c >= '0' && c <= '7')
         {
             var val = 0;
@@ -275,9 +305,11 @@ internal static class QSettingsIniCodec
                 i++;
                 digits++;
             }
+
             sb.Append((char)val);
             return i;
         }
+
         var decoded = c switch
         {
             'a' => '\a',
@@ -303,6 +335,7 @@ internal static class QSettingsIniCodec
         {
             return s;
         }
+
         var sb = new StringBuilder(s.Length);
         var i = 0;
         while (i < s.Length)
@@ -318,6 +351,7 @@ internal static class QSettingsIniCodec
                 i++;
             }
         }
+
         return sb.ToString();
     }
 
@@ -348,12 +382,14 @@ internal static class QSettingsIniCodec
                     i += 6;
                     continue;
                 }
+
                 if (i + 3 < key.Length && Uri.IsHexDigit(key[i + 1]) && Uri.IsHexDigit(key[i + 2]))
                 {
                     sb.Append((char)Convert.ToInt32(key.Substring(i + 1, 2), 16));
                     i += 3;
                     continue;
                 }
+
                 sb.Append(c);
                 i++;
             }
@@ -368,6 +404,7 @@ internal static class QSettingsIniCodec
                 i++;
             }
         }
+
         return sb.ToString();
     }
 }

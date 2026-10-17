@@ -85,6 +85,7 @@ internal sealed class StubFtbServer : IDisposable
                 ctx.Response.StatusCode = 404;
                 return;
             }
+
             body = Encoding.UTF8.GetBytes(modpackJson);
         }
         else if (segments.Length == 3 && segments[0] == "modpack")
@@ -95,6 +96,7 @@ internal sealed class StubFtbServer : IDisposable
                 ctx.Response.StatusCode = 404;
                 return;
             }
+
             body = Encoding.UTF8.GetBytes(versionJson);
         }
         else
@@ -105,6 +107,7 @@ internal sealed class StubFtbServer : IDisposable
                 ctx.Response.StatusCode = 404;
                 return;
             }
+
             body = payload;
         }
 
@@ -119,9 +122,7 @@ internal sealed class StubFtbServer : IDisposable
         {
             _listener.Close();
         }
-        catch (ObjectDisposedException)
-        {
-        }
+        catch (ObjectDisposedException) { }
     }
 }
 

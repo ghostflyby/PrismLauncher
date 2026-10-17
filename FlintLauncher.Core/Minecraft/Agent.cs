@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/Agent.h.
+
 namespace FlintLauncher.Core.Minecraft;
 
 public struct Agent

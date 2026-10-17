@@ -15,9 +15,7 @@ using System.Text;
 namespace FlintLauncher.Core.IO;
 
 /// <summary>Port of FS::FileSystemException.</summary>
-public sealed class FileSystemException(string message) : Exception(message)
-{
-}
+public sealed class FileSystemException(string message) : Exception(message) { }
 
 public static class FileSystem
 {
@@ -48,6 +46,7 @@ public static class FileSystem
         {
             EnsureExists(dir);
         }
+
         var temp = filename + "." + TempSuffix();
         try
         {
@@ -69,6 +68,7 @@ public static class FileSystem
         {
             EnsureExists(dir);
         }
+
         byte[] buffer;
         try
         {
@@ -78,6 +78,7 @@ public static class FileSystem
         {
             buffer = [];
         }
+
         var merged = new byte[buffer.Length + data.Length];
         buffer.CopyTo(merged, 0);
         data.CopyTo(merged, buffer.Length);
@@ -92,6 +93,7 @@ public static class FileSystem
         {
             EnsureExists(dir);
         }
+
         try
         {
             using var stream = new FileStream(filename, FileMode.Append, FileAccess.Write);
@@ -130,7 +132,7 @@ public static class FileSystem
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                 or NotSupportedException or PlatformNotSupportedException)
+                                      or NotSupportedException or PlatformNotSupportedException)
         {
             return false;
         }
@@ -150,7 +152,7 @@ public static class FileSystem
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                 or NotSupportedException)
+                                      or NotSupportedException)
         {
             return false;
         }
@@ -170,7 +172,7 @@ public static class FileSystem
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                 or NotSupportedException)
+                                      or NotSupportedException)
         {
             return false;
         }
@@ -187,15 +189,17 @@ public static class FileSystem
     /// default of not overwriting existing destination files.
     /// </summary>
     public static bool Copy(string src, string dst, Func<string, bool>? matcher = null, bool whitelist = false,
-                            bool overwrite = false, bool dryRun = false, List<string>? failedPaths = null)
+        bool overwrite = false, bool dryRun = false, List<string>? failedPaths = null)
     {
         var failed = false;
+
         void CopyFile(string srcPath, string relativeDstPath)
         {
             if (matcher != null && matcher(relativeDstPath) != whitelist)
             {
                 return;
             }
+
             var dstPath = PathCombine(dst, relativeDstPath);
             if (!dryRun)
             {
@@ -205,7 +209,7 @@ public static class FileSystem
                     File.Copy(srcPath, dstPath, overwrite);
                 }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                         or NotSupportedException)
+                                              or NotSupportedException)
                 {
                     failed = true;
                     failedPaths?.Add(dstPath);
@@ -237,6 +241,7 @@ public static class FileSystem
         {
             return false;
         }
+
         return !failed;
     }
 
@@ -256,16 +261,18 @@ public static class FileSystem
             {
                 File.Move(source, dest, overwrite: false);
             }
+
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                 or NotSupportedException)
+                                      or NotSupportedException)
         {
             // moveByCopy: copy then remove the original
             if (Copy(source, dest, overwrite: true) && DeletePath(source))
             {
                 return true;
             }
+
             return false;
         }
     }
@@ -283,10 +290,11 @@ public static class FileSystem
             {
                 File.Delete(path);
             }
+
             return true; // fs::remove_all on a missing path is a success
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                 or NotSupportedException)
+                                      or NotSupportedException)
         {
             return false;
         }
@@ -301,8 +309,10 @@ public static class FileSystem
             {
                 return false; // attempted to delete contents of a non-directory
             }
+
             return true;
         }
+
         var ret = true;
         try
         {
@@ -318,6 +328,7 @@ public static class FileSystem
         {
             return false;
         }
+
         return ret;
     }
 
@@ -343,6 +354,7 @@ public static class FileSystem
                 ret = false;
             }
         }
+
         return ret;
     }
 
@@ -355,10 +367,12 @@ public static class FileSystem
         {
             return path2;
         }
+
         if (path2.Length == 0)
         {
             return path1;
         }
+
         return CleanPath(path1 + '/' + path2);
     }
 
@@ -390,6 +404,7 @@ public static class FileSystem
         {
             return 0;
         }
+
         var parts = SplitSegments(FileInfoPath(path));
         var numParts = parts.Count;
         numParts -= parts.Count(p => p == ".");
@@ -404,20 +419,24 @@ public static class FileSystem
         {
             return "";
         }
+
         var trunc = FileInfoPath(path);
         if (PathDepth(trunc) > depth)
         {
             return PathTruncate(trunc, depth);
         }
+
         var parts = SplitSegments(trunc);
         if (parts.Count > 0 && parts[0] == "." && !path.StartsWith('.'))
         {
             parts.RemoveAt(0);
         }
+
         if (path.StartsWith('/'))
         {
             parts.Insert(0, "");
         }
+
         return string.Join('/', parts);
     }
 
@@ -433,6 +452,7 @@ public static class FileSystem
         {
             return RelativeFilePath(currentAbsolute, newAbsolute);
         }
+
         return newAbsolute;
     }
 
@@ -463,6 +483,7 @@ public static class FileSystem
                 sb.Append(c);
             }
         }
+
         return sb.ToString();
     }
 
@@ -506,13 +527,16 @@ public static class FileSystem
             {
                 dirName = baseName + "(" + num + ")";
             }
+
             // If it's over 9000
             if (num > 9000)
             {
                 return "";
             }
+
             num++;
         } while (inDirs.Any(dir => Directory.Exists(PathCombine(dir, dirName)) || File.Exists(PathCombine(dir, dirName))));
+
         return dirName;
     }
 
@@ -532,11 +556,13 @@ public static class FileSystem
         {
             return newFileName; // prioritize enabled mods
         }
+
         newFileName = newFileName[..^9];
         if (!File.Exists(newFileName) && !Directory.Exists(newFileName))
         {
             return filePath;
         }
+
         var fileInfo = new FileInfo(filePath);
         var baseName = Path.GetFileNameWithoutExtension(filePath);
         var path = fileInfo.DirectoryName ?? "";
@@ -550,6 +576,7 @@ public static class FileSystem
                 : PathCombine(path, baseName + ".duplicate" + counter);
             counter++;
         } while (File.Exists(candidate) || Directory.Exists(candidate));
+
         return candidate;
     }
 
@@ -560,11 +587,13 @@ public static class FileSystem
         {
             return path;
         }
+
         var dir = Path.GetFullPath(path);
         if (IsRoot(dir))
         {
             return Directory.Exists(dir) ? dir : "";
         }
+
         do
         {
             var parent = CleanPath(dir + "/..");
@@ -572,8 +601,10 @@ public static class FileSystem
             {
                 break; // reached the root
             }
+
             dir = parent;
         } while (!Directory.Exists(dir) && !File.Exists(dir) && !IsRoot(dir));
+
         return Directory.Exists(dir) || File.Exists(dir) ? dir : "";
     }
 
@@ -586,16 +617,19 @@ public static class FileSystem
         {
             return "";
         }
+
         var trimmed = path.TrimEnd('/');
         var idx = trimmed.LastIndexOf('/');
         if (idx < 0)
         {
             return ".";
         }
+
         if (idx == 0)
         {
             return "/";
         }
+
         return trimmed[..idx];
     }
 
@@ -625,6 +659,7 @@ public static class FileSystem
             {
                 continue;
             }
+
             if (part == "..")
             {
                 if (stack.Count > 0 && stack[^1] != "..")
@@ -635,9 +670,11 @@ public static class FileSystem
                 {
                     stack.Add("..");
                 }
+
                 // at the root of an absolute path ".." collapses away
                 continue;
             }
+
             stack.Add(part);
         }
 
@@ -646,10 +683,12 @@ public static class FileSystem
         {
             return "/" + joined;
         }
+
         if (drivePrefix != null)
         {
             return isDriveAbsolute ? drivePrefix + "/" + joined : drivePrefix + joined;
         }
+
         return joined.Length == 0 ? "." : joined;
     }
 
@@ -660,10 +699,12 @@ public static class FileSystem
         {
             return CleanPath(Directory.GetCurrentDirectory());
         }
+
         if (path[0] == '/' || (path.Length >= 2 && path[1] == ':'))
         {
             return CleanPath(path);
         }
+
         return CleanPath(Directory.GetCurrentDirectory() + "/" + path);
     }
 
@@ -677,15 +718,18 @@ public static class FileSystem
         {
             common++;
         }
+
         var result = new List<string>();
         for (var i = common; i < fromParts.Count; i++)
         {
             result.Add("..");
         }
+
         for (var i = common; i < toParts.Count; i++)
         {
             result.Add(toParts[i]);
         }
+
         return result.Count == 0 ? "." : string.Join('/', result);
     }
 
@@ -699,6 +743,7 @@ public static class FileSystem
                 parts.Add(part);
             }
         }
+
         return parts;
     }
 

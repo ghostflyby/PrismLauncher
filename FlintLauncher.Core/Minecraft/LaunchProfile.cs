@@ -100,6 +100,7 @@ public class LaunchProfile : ProblemProvider
         {
             return;
         }
+
         to = from;
     }
 
@@ -140,8 +141,10 @@ public class LaunchProfile : ProblemProvider
             {
                 continue;
             }
+
             newTweakers.Add(tweaker);
         }
+
         // then just append the new tweakers (or moved original ones)
         newTweakers.AddRange(tweakers);
         this.tweakers = newTweakers;
@@ -161,9 +164,11 @@ public class LaunchProfile : ProblemProvider
                 {
                     return -1;
                 }
+
                 retval = i;
             }
         }
+
         return retval;
     }
 
@@ -293,6 +298,7 @@ public class LaunchProfile : ProblemProvider
         {
             return new MojangAssetIndexInfo("legacy");
         }
+
         return minecraftAssets;
     }
 
@@ -339,6 +345,7 @@ public class LaunchProfile : ProblemProvider
         {
             lib.GetApplicableFiles(runtimeContext, jars, nativeJars, native32, native64, overridePath, storageBase);
         }
+
         // NOTE: order is important here, add main jar last to the lists
         if (mainJar is not null)
         {
@@ -352,10 +359,12 @@ public class LaunchProfile : ProblemProvider
                 mainJar.GetApplicableFiles(runtimeContext, jars, nativeJars, native32, native64, overridePath, storageBase);
             }
         }
+
         foreach (var lib in GetNativeLibraries())
         {
             lib.GetApplicableFiles(runtimeContext, jars, nativeJars, native32, native64, overridePath, storageBase);
         }
+
         if (runtimeContext.JavaArchitecture == "32")
         {
             nativeJars.AddRange(native32);

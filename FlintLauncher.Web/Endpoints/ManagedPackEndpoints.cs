@@ -33,6 +33,7 @@ public static class ManagedPackEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
                 }
+
                 return Results.Ok(new ManagedPackView(
                     instance.IsManagedPack(),
                     instance.GetManagedPackType(),
@@ -57,6 +58,7 @@ public static class ManagedPackEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{@ref}'");
                 }
+
                 var type = instance.GetManagedPackType().Trim().ToLowerInvariant();
                 if (!instance.IsManagedPack() ||
                     (type != ModPlatformTasks.ModrinthKey && type != ModPlatformTasks.FlameKey))

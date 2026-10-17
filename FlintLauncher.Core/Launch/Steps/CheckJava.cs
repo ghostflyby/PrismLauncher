@@ -22,9 +22,7 @@ public sealed class CheckJava : LaunchStep
     private string javaSignature = "";
     private string detectKey = "";
 
-    public CheckJava(LaunchTask parent) : base(parent)
-    {
-    }
+    public CheckJava(LaunchTask parent) : base(parent) { }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -52,6 +50,7 @@ public sealed class CheckJava : LaunchStep
                 EmitLogLine($"The Java binary \"{javaPathSetting}\" couldn't be found. Please set up Java in " +
                             "the settings.", MessageLevel.Warning);
             }
+
             EmitFailed("Java path is not valid.");
             return;
         }
@@ -103,6 +102,7 @@ public sealed class CheckJava : LaunchStep
             {
                 EmitLogLines(failure.Split('\n'), MessageLevel.Error);
             }
+
             EmitLogLine("\nCheck your Java settings.", MessageLevel.Launcher);
             EmitFailed("Could not start java!");
             return;

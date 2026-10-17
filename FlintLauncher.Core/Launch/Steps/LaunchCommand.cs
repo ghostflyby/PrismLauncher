@@ -31,6 +31,7 @@ public sealed class LaunchCommand : LaunchStep
             EmitFailed(emptyError);
             return Task.CompletedTask;
         }
+
         var program = args[0];
         args.RemoveAt(0);
         _process.Start(program, args);
@@ -64,6 +65,7 @@ public sealed class LaunchCommand : LaunchStep
                     EmitLogLine($"{_phaseName} command ran successfully.\n\n", MessageLevel.Launcher);
                     EmitSucceeded();
                 }
+
                 break;
             }
         }
@@ -80,6 +82,7 @@ public sealed class LaunchCommand : LaunchStep
         {
             _process.Kill();
         }
+
         return true;
     }
 }

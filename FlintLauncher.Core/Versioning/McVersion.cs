@@ -57,6 +57,7 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
             {
                 break; // Ignore appendices
             }
+
             // Custom: the space is special, to handle strings like "1.20 Pre-Release 1" (Modrinth versions).
             if (c == '-' || c == ' ')
             {
@@ -73,19 +74,22 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
             {
                 type = SectionType.Numeric;
             }
+
             for (; i < len; i++)
             {
                 var r = _string[i];
                 if (char.IsDigit(r) != (type == SectionType.Numeric) // starts a new section
-                    || (r == ' ' && type == SectionType.Numeric) // numeric section then a space is a pre-release
-                    || (r == '-' && type != SectionType.PreRelease) // "---" is a valid pre-release component
+                    || (r == ' ' && type == SectionType.Numeric)     // numeric section then a space is a pre-release
+                    || (r == '-' && type != SectionType.PreRelease)  // "---" is a valid pre-release component
                     || r == '+')
                 {
                     // Run completed (do not consume this char)
                     break;
                 }
+
                 value.Append(r);
             }
+
             if (value.Length > 0)
             {
                 var s = value.ToString();
@@ -93,9 +97,11 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
                 {
                     s = s.TrimStart('0');
                 }
+
                 sections.Add(new Section(type, s));
             }
         }
+
         this.sections = sections.ToArray();
     }
 
@@ -108,17 +114,21 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
             {
                 return a.Value.Length.CompareTo(b.Value.Length);
             }
+
             return string.CompareOrdinal(a.Value, b.Value);
         }
+
         // One or both are null
         if (a.Type == SectionType.Null)
         {
             return b.Type == SectionType.PreRelease ? 1 : -1;
         }
+
         if (b.Type == SectionType.Null)
         {
             return a.Type == SectionType.PreRelease ? -1 : 1;
         }
+
         // Textual comparison (differing type, or both textual/pre-release)
         var minLen = Math.Min(a.Value.Length, b.Value.Length);
         for (var i = 0; i < minLen; i++)
@@ -128,6 +138,7 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
                 return a.Value[i].CompareTo(b.Value[i]);
             }
         }
+
         return a.Value.Length.CompareTo(b.Value.Length);
     }
 
@@ -137,6 +148,7 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
         {
             return 1;
         }
+
         var size = Math.Max(sections.Length, other.sections.Length);
         for (var i = 0; i < size; i++)
         {
@@ -148,6 +160,7 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
                 return cmp;
             }
         }
+
         return 0;
     }
 
@@ -163,6 +176,7 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
             hash.Add((int)section.Type);
             hash.Add(section.Value, StringComparer.Ordinal);
         }
+
         return hash.ToHashCode();
     }
 
@@ -180,6 +194,7 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
         {
             return right is null;
         }
+
         return left.Equals(right);
     }
 

@@ -63,6 +63,7 @@ public sealed class SymlinkTask : FlintTask
             EmitFailed("Failed to find Java binary path");
             return Task.CompletedTask;
         }
+
         // relativePathToBin ends with ".../bin/java": chop the "bin/java" tail off
         var folderToLink = relativePathToBin[..^binPath.Length];
 
@@ -89,6 +90,7 @@ public sealed class SymlinkTask : FlintTask
                     return Task.CompletedTask;
                 }
             }
+
             linked++;
             SetProgress(linked, entries.Length);
         }

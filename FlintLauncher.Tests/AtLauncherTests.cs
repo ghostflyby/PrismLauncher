@@ -43,9 +43,7 @@ public class AtLauncherTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private InstanceList CreateList()
@@ -62,7 +60,7 @@ public class AtLauncherTests : IDisposable
         using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
         return doc.RootElement.GetProperty("components").EnumerateArray()
             .Select(c => (Uid: c.GetProperty("uid").GetString(),
-                          Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
+                Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
             .ToList();
     }
 

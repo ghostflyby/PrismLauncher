@@ -52,6 +52,7 @@ public static class OverrideUtils
         {
             previousOverrides.Add(entry.Trim());
         }
+
         return previousOverrides;
     }
 
@@ -76,6 +77,7 @@ public static class OverrideUtils
                 FileSystem.EnsureFilePathExists(target);
                 File.Copy(source, target, overwrite: true);
             }
+
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)

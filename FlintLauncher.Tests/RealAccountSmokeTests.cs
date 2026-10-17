@@ -21,9 +21,7 @@ public class RealAccountSmokeTests : IDisposable
         {
             Directory.Delete(_dir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     [Fact]
@@ -49,6 +47,7 @@ public class RealAccountSmokeTests : IDisposable
             {
                 Assert.False(string.IsNullOrEmpty(account.AccountData.MsaClientId));
             }
+
             if (account.HasProfile())
             {
                 Assert.False(string.IsNullOrEmpty(account.ProfileName()));

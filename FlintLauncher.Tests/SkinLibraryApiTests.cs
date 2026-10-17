@@ -49,14 +49,13 @@ public class SkinLibraryApiTests : IAsyncDisposable
             await app.StopAsync();
             app.DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
+
         client?.Dispose();
         try
         {
             Directory.Delete(_homeDir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private static readonly byte[] PngBytes =
@@ -145,7 +144,7 @@ public class SkinLibraryApiTests : IAsyncDisposable
             new { profileId = "abc" });
         Assert.Equal(HttpStatusCode.Conflict, missingTexture.StatusCode);
         Assert.Equal("skin_texture_missing", JsonDocument.Parse(
-            await missingTexture.Content.ReadAsStringAsync()).RootElement
+                await missingTexture.Content.ReadAsStringAsync()).RootElement
             .GetProperty("error").GetProperty("code").GetString());
 
         // a stored texture + unknown account
@@ -154,7 +153,7 @@ public class SkinLibraryApiTests : IAsyncDisposable
             new { profileId = "no-such-profile" });
         Assert.Equal(HttpStatusCode.BadRequest, unknownAccount.StatusCode);
         Assert.Equal("unknown_account", JsonDocument.Parse(
-            await unknownAccount.Content.ReadAsStringAsync()).RootElement
+                await unknownAccount.Content.ReadAsStringAsync()).RootElement
             .GetProperty("error").GetProperty("code").GetString());
 
         // missing body

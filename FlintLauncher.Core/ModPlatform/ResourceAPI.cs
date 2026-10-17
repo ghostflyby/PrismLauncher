@@ -94,6 +94,7 @@ public abstract class ResourceApi
         {
             verStr = verStr.Replace(preString, "-pre");
         }
+
         verStr = verStr.Replace(" ", "-");
         return verStr;
     }
@@ -106,10 +107,12 @@ public abstract class ResourceApi
         {
             s.Append('"').Append(MapMcVersionToModrinth(ver)).Append("\",");
         }
+
         if (s.Length > 0)
         {
             s.Length -= 1; // remove last comma
         }
+
         return s.ToString();
     }
 }

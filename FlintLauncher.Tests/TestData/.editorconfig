@@ -1,0 +1,16 @@
+# Test fixtures are TEST INPUTS, not code — several are byte-sensitive:
+#   - IniFile/*.ini are byte-level golden files produced by real QSettings (Qt 6.11),
+#     including @ByteArray values with raw non-UTF8 bytes (git treats them as binary)
+#   - Libraries/1.9.json embeds raw NUL bytes
+# A batch reformat rewrote them as text once already (spaces around '=', dropped NULs),
+# which corrupts exactly what these fixtures exist to preserve.
+#
+# This file pins the text-level styles so routine formatting is a no-op. The JetBrains
+# INI/JSON formatters have no "do not format" switch — DO NOT run batch reformat over
+# this directory; if a fixture must change, edit it by hand against the real output
+# it documents.
+
+[*]
+insert_final_newline = false
+trim_trailing_whitespace = false
+indent_style = unset

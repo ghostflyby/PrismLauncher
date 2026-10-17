@@ -32,8 +32,10 @@ public static class HardwareInfo
             {
                 return value;
             }
+
             return "";
         }
+
         if (OperatingSystem.IsLinux())
         {
             try
@@ -47,11 +49,11 @@ public static class HardwareInfo
                     }
                 }
             }
-            catch (IOException)
-            {
-            }
+            catch (IOException) { }
+
             return "unknown";
         }
+
         if (OperatingSystem.IsWindows())
         {
             try
@@ -65,6 +67,7 @@ public static class HardwareInfo
                 return "";
             }
         }
+
         return "";
     }
 
@@ -77,12 +80,15 @@ public static class HardwareInfo
                 // transforming bytes -> mib
                 return memsize / 1024 / 1024;
             }
+
             return 0;
         }
+
         if (OperatingSystem.IsLinux())
         {
             return ReadMemInfo("MemTotal");
         }
+
         if (OperatingSystem.IsWindows())
         {
             if (TryGetMemoryStatus(out var status))
@@ -90,6 +96,7 @@ public static class HardwareInfo
                 return status.ullTotalPhys / 1024 / 1024;
             }
         }
+
         return 0;
     }
 
@@ -99,10 +106,12 @@ public static class HardwareInfo
         {
             return 0;
         }
+
         if (OperatingSystem.IsLinux())
         {
             return ReadMemInfo("MemAvailable");
         }
+
         if (OperatingSystem.IsWindows())
         {
             if (TryGetMemoryStatus(out var status))
@@ -110,6 +119,7 @@ public static class HardwareInfo
                 return status.ullAvailPhys / 1024 / 1024;
             }
         }
+
         return 0;
     }
 
@@ -130,8 +140,10 @@ public static class HardwareInfo
             {
                 return ["GPU discovery failed: could not read from system_profiler"];
             }
+
             return outList;
         }
+
         if (OperatingSystem.IsLinux())
         {
             var success = ReadFromOutput("lspci", str =>
@@ -146,8 +158,10 @@ public static class HardwareInfo
             {
                 return outList; // the C++ returns an empty list when lspci produced nothing usable
             }
+
             return outList;
         }
+
         // Windows: the C++ enumerates DXGI adapters; COM interop is not AOT-safe, so the
         // discovery failure is reported the same way the C++ reports a failed DXGI factory.
         return ["GPU discovery failed: could not create DXGI factory"];
@@ -170,6 +184,7 @@ public static class HardwareInfo
         {
             return (MemoryPressureLevel)level;
         }
+
         return MemoryPressureLevel.Normal;
     }
 
@@ -202,19 +217,20 @@ public static class HardwareInfo
                 {
                     continue;
                 }
+
                 var simplified = string.Join(' ', line.Split(' ', StringSplitOptions.RemoveEmptyEntries));
                 var parts = simplified.Split(' ');
                 if (parts.Length < 2 || !ulong.TryParse(parts[1], out var total))
                 {
                     return 0;
                 }
+
                 // transforming kib -> mib
                 return total / 1024;
             }
         }
-        catch (IOException)
-        {
-        }
+        catch (IOException) { }
+
         return 0;
     }
 
@@ -242,15 +258,18 @@ public static class HardwareInfo
                 process.Kill();
                 return false;
             }
+
             var exitCode = process.WaitForExit(10000) ? process.ExitCode : -1;
             if (exitCode != 0)
             {
                 return false;
             }
+
             foreach (var line in output.Split('\n'))
             {
                 function(line);
             }
+
             return true;
         }
         catch (Exception e) when (e is Win32Exception or IOException or InvalidOperationException)
@@ -266,6 +285,7 @@ public static class HardwareInfo
         {
             return -1;
         }
+
         var nameBytes = Encoding.UTF8.GetBytes(name);
         var buffer = new byte[512];
         var size = (uint)buffer.Length;
@@ -274,6 +294,7 @@ public static class HardwareInfo
         {
             return result;
         }
+
         value = Encoding.UTF8.GetString(buffer, 0, (int)Math.Min(size, buffer.Length)).TrimEnd('\0');
         return 0;
     }
@@ -285,6 +306,7 @@ public static class HardwareInfo
         {
             return -1;
         }
+
         uint size = sizeof(uint);
         return sysctlbyname(Encoding.UTF8.GetBytes(name), out value, ref size, 0, 0);
     }
@@ -296,6 +318,7 @@ public static class HardwareInfo
         {
             return -1;
         }
+
         uint size = sizeof(ulong);
         return sysctlbyname(Encoding.UTF8.GetBytes(name), out value, ref size, 0, 0);
     }
@@ -333,6 +356,7 @@ public static class HardwareInfo
         {
             return false;
         }
+
         status.dwLength = (uint)Marshal.SizeOf<Memorystatusex>();
         return GlobalMemoryStatusEx(out status);
     }

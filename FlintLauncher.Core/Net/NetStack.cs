@@ -22,9 +22,7 @@ public sealed class NetStack
     private (string Ua, string Type, string Host, int Port, string User, string Pass)? applied;
     private volatile HttpClient client;
 
-    public NetStack() : this(FlintConfig.Default.UserAgent, manualRetries: 1, TimeSpan.FromSeconds(60))
-    {
-    }
+    public NetStack() : this(FlintConfig.Default.UserAgent, manualRetries: 1, TimeSpan.FromSeconds(60)) { }
 
     public NetStack(string userAgent, int manualRetries, TimeSpan requestTimeout)
     {
@@ -72,17 +70,20 @@ public sealed class NetStack
         {
             type = "None";
         }
+
         var next = (ua, type, host, port, user, pass);
         if (this.applied is { } applied && applied.Equals(next))
         {
             return;
         }
+
         lock (_lock)
         {
             if (this.applied is { } appliedAgain && appliedAgain.Equals(next))
             {
                 return;
             }
+
             this.applied = next;
             UserAgent = ua;
             proxy = (type, host, port, user, pass);
@@ -122,6 +123,7 @@ public sealed class NetStack
         {
             proxy.Credentials = new NetworkCredential(this.proxy.User, this.proxy.Pass);
         }
+
         return proxy;
     }
 }

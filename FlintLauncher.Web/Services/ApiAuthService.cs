@@ -49,14 +49,17 @@ public sealed class ApiAuthService
                 disabled = true;
             }
         }
+
         if (Environment.GetEnvironmentVariable("FLINT_API_TOKEN") is { Length: > 0 } envToken)
         {
             explicitToken = envToken;
         }
+
         if (Environment.GetEnvironmentVariable("FLINT_NO_AUTH") == "1")
         {
             disabled = true;
         }
+
         if (disabled)
         {
             return new ApiAuthService(false, "", tokenGenerated: false);
@@ -90,7 +93,7 @@ public sealed class ApiAuthService
             File.Delete(Path.Combine(dataDir, LegacyTokenFileName));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
-                                 or SecurityException)
+                                      or SecurityException)
         {
             // the leftover stays; it is inert (nothing reads it anymore)
         }
@@ -113,7 +116,7 @@ public static class ApiAuthMiddleware
             {
                 var candidate =
                     request.Headers["Authorization"].ToString() is { Length: > 0 } header
-                        && header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                    && header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
                         ? header["Bearer ".Length..].Trim()
                         : request.Headers["X-Api-Token"].ToString() is { Length: > 0 } apiToken
                             ? apiToken
@@ -132,6 +135,7 @@ public static class ApiAuthMiddleware
                     return Results.Empty;
                 }
             }
+
             return await next(context);
         });
         return api;

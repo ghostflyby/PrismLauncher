@@ -38,9 +38,7 @@ public class TechnicTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private InstanceList CreateList()
@@ -97,12 +95,12 @@ public class TechnicTests : IDisposable
     public async Task Search_ListParsing_SkipsVanillaAndMapsLogos()
     {
         _server.SearchListJson = """
-            {"modpacks":[
-                {"name":"Bevo's Tech Pack","slug":"bevo","iconUrl":"http://cdn.technicpack.net/bevo.png"},
-                {"name":"Vanilla","slug":"vanilla","iconUrl":"null"},
-                {"name":"No Icon","slug":"noicon"}
-            ]}
-            """;
+                                 {"modpacks":[
+                                     {"name":"Bevo's Tech Pack","slug":"bevo","iconUrl":"http://cdn.technicpack.net/bevo.png"},
+                                     {"name":"Vanilla","slug":"vanilla","iconUrl":"null"},
+                                     {"name":"No Icon","slug":"noicon"}
+                                 ]}
+                                 """;
         var (url, mode) = _api.SearchUrl("");
         var request = NetRequest.MakeByteArray(new Uri(url));
         var job = new NetJob("search");
@@ -127,8 +125,8 @@ public class TechnicTests : IDisposable
     public void Search_SingleParsing_AndErrorPayload()
     {
         var results = TechnicApi.LoadSearchResults("""
-            {"displayName":"Hexxit Updated","name":"hexxit-updated","icon":{"url":"http://cdn.technicpack.net/hexxit.jpg"}}
-            """, TechnicSearchMode.Single);
+                                                   {"displayName":"Hexxit Updated","name":"hexxit-updated","icon":{"url":"http://cdn.technicpack.net/hexxit.jpg"}}
+                                                   """, TechnicSearchMode.Single);
 
         var pack = Assert.Single(results);
         Assert.Equal("Hexxit Updated", pack.Name);
@@ -158,11 +156,11 @@ public class TechnicTests : IDisposable
 
         // JSON null / non-string members read like QJsonValue's toString(default) fallbacks
         var packs = TechnicApi.LoadSearchResults("""
-            {"modpacks":[
-                {"name":"Null Icon","slug":"nullicon","iconUrl":null},
-                {"name":"Number Icon","slug":"numicon","iconUrl":5}
-            ]}
-            """, TechnicSearchMode.List);
+                                                 {"modpacks":[
+                                                     {"name":"Null Icon","slug":"nullicon","iconUrl":null},
+                                                     {"name":"Number Icon","slug":"numicon","iconUrl":5}
+                                                 ]}
+                                                 """, TechnicSearchMode.List);
         Assert.Equal(2, packs.Count);
         Assert.Equal("null", packs[0].LogoUrl);
         Assert.Equal("null", packs[0].LogoName);
@@ -179,8 +177,8 @@ public class TechnicTests : IDisposable
     {
         var zipPack = new TechnicModpack { Slug = "zip-pack" };
         Assert.True(TechnicApi.LoadPackMetadata("""
-            {"url":"http://www.technicpack.net/download/zip-pack","minecraft":"1.12.2","platformUrl":"http://technicpack.net","user":"sarge","description":"A zip pack","version":"1.2.3"}
-            """, zipPack));
+                                                {"url":"http://www.technicpack.net/download/zip-pack","minecraft":"1.12.2","platformUrl":"http://technicpack.net","user":"sarge","description":"A zip pack","version":"1.2.3"}
+                                                """, zipPack));
         Assert.False(zipPack.IsSolder);
         Assert.Equal("http://www.technicpack.net/download/zip-pack", zipPack.Url);
         Assert.Equal("1.12.2", zipPack.MinecraftVersion);

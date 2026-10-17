@@ -114,6 +114,7 @@ public sealed class LegacyFtbPackFetchTask : FlintTask
             EmitFailed("Failed to download some pack lists: " + string.Join("\n- ", failedLists));
             return;
         }
+
         EmitSucceeded();
     }
 

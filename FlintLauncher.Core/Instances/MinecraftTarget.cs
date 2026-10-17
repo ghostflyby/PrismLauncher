@@ -13,9 +13,7 @@ namespace FlintLauncher.Core.Instances;
 
 public sealed class MinecraftTarget
 {
-    public MinecraftTarget()
-    {
-    }
+    public MinecraftTarget() { }
 
     public MinecraftTarget(string address, ushort port, string world)
     {

@@ -4,6 +4,7 @@
 // Deviation: the QPixmapCache image plumbing is replaced by the PngImage header info;
 // `valid()` (C++ `m_description != nullptr`, i.e. the description was set at least once)
 // is modeled with a nullable backing field.
+
 namespace FlintLauncher.Core.Minecraft.Resources;
 
 /// <summary>Port of the TexturePack class (the pre-pack.mcmeta texture pack model).</summary>

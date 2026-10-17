@@ -80,7 +80,7 @@ public sealed class FtbApi
         try
         {
             return JsonNode.Parse(json)
-                ?? throw new JsonParseException(what + ": Error parsing JSON: document is null");
+                   ?? throw new JsonParseException(what + ": Error parsing JSON: document is null");
         }
         catch (JsonException e)
         {
@@ -102,6 +102,7 @@ public sealed class FtbApi
                 packs.Add(JsonUtils.EnsureInteger(pack));
             }
         }
+
         return packs;
     }
 
@@ -113,6 +114,7 @@ public sealed class FtbApi
         {
             throw new JsonParseException("Document is not an object");
         }
+
         var pack = new FtbModpack();
         FtbPackManifest.LoadModpack(pack, root);
         return pack;
@@ -126,6 +128,7 @@ public sealed class FtbApi
         {
             throw new JsonParseException("Document is not an object");
         }
+
         var version = new FtbVersion();
         FtbPackManifest.LoadVersion(version, root);
         return version;

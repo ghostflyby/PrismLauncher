@@ -24,9 +24,7 @@ public class AccountListTests : IDisposable
         {
             Directory.Delete(_dir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private string TempPath(string name) => Path.Combine(_dir, name);
@@ -35,70 +33,70 @@ public class AccountListTests : IDisposable
     // "formatVersion": 3}, the default account carries "active": true, and every account object
     // uses the AccountData::saveState key set.
     private const string UpstreamAccountsJson = """
-        {
-            "accounts": [
-                {
-                    "active": true,
-                    "entitlement": {
-                        "canPlayMinecraft": true,
-                        "ownsMinecraft": true
-                    },
-                    "msa": {
-                        "exp": 1638990728,
-                        "iat": 1638904328,
-                        "refresh_token": "MSA_REFRESH",
-                        "token": "MSA_TOKEN"
-                    },
-                    "msa-client-id": "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb",
-                    "profile": {
-                        "capes": [],
-                        "id": "b50ad385829d3141a2167e7d7539ba7f",
-                        "name": "PlayerOne",
-                        "skin": {
-                            "id": "skin-id",
-                            "url": "https://textures.minecraft.net/texture/skinhash",
-                            "variant": "CLASSIC"
-                        }
-                    },
-                    "type": "MSA",
-                    "utoken": {
-                        "extra": {
-                            "uhs": "UHS123"
-                        },
-                        "token": "USER_TOKEN"
-                    },
-                    "xrp-mc": {
-                        "extra": {
-                            "uhs": "UHS123"
-                        },
-                        "token": "XSTS_TOKEN"
-                    },
-                    "ygg": {
-                        "exp": 1638907928,
-                        "iat": 1638904328,
-                        "token": "YGG_TOKEN"
-                    }
-                },
-                {
-                    "profile": {
-                        "capes": [],
-                        "id": "cb7ecbf7173e39428f9fb92995eab3d0",
-                        "name": "OfflinePlayer",
-                        "skin": {
-                            "id": "",
-                            "url": "",
-                            "variant": ""
-                        }
-                    },
-                    "type": "Offline",
-                    "ygg": {
-                        "token": "0"
-                    }
-                }
-            ],
-            "formatVersion": 3
-        }
-        """;
+                                                {
+                                                    "accounts": [
+                                                        {
+                                                            "active": true,
+                                                            "entitlement": {
+                                                                "canPlayMinecraft": true,
+                                                                "ownsMinecraft": true
+                                                            },
+                                                            "msa": {
+                                                                "exp": 1638990728,
+                                                                "iat": 1638904328,
+                                                                "refresh_token": "MSA_REFRESH",
+                                                                "token": "MSA_TOKEN"
+                                                            },
+                                                            "msa-client-id": "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb",
+                                                            "profile": {
+                                                                "capes": [],
+                                                                "id": "b50ad385829d3141a2167e7d7539ba7f",
+                                                                "name": "PlayerOne",
+                                                                "skin": {
+                                                                    "id": "skin-id",
+                                                                    "url": "https://textures.minecraft.net/texture/skinhash",
+                                                                    "variant": "CLASSIC"
+                                                                }
+                                                            },
+                                                            "type": "MSA",
+                                                            "utoken": {
+                                                                "extra": {
+                                                                    "uhs": "UHS123"
+                                                                },
+                                                                "token": "USER_TOKEN"
+                                                            },
+                                                            "xrp-mc": {
+                                                                "extra": {
+                                                                    "uhs": "UHS123"
+                                                                },
+                                                                "token": "XSTS_TOKEN"
+                                                            },
+                                                            "ygg": {
+                                                                "exp": 1638907928,
+                                                                "iat": 1638904328,
+                                                                "token": "YGG_TOKEN"
+                                                            }
+                                                        },
+                                                        {
+                                                            "profile": {
+                                                                "capes": [],
+                                                                "id": "cb7ecbf7173e39428f9fb92995eab3d0",
+                                                                "name": "OfflinePlayer",
+                                                                "skin": {
+                                                                    "id": "",
+                                                                    "url": "",
+                                                                    "variant": ""
+                                                                }
+                                                            },
+                                                            "type": "Offline",
+                                                            "ygg": {
+                                                                "token": "0"
+                                                            }
+                                                        }
+                                                    ],
+                                                    "formatVersion": 3
+                                                }
+                                                """;
 
     private AccountList LoadedList(string fileName = "accounts.json")
     {
@@ -210,14 +208,14 @@ public class AccountListTests : IDisposable
     {
         var path = TempPath("dupes.json");
         File.WriteAllText(path, """
-            {
-                "accounts": [
-                    { "type": "Offline", "profile": { "id": "same", "name": "First", "skin": { "id": "", "url": "", "variant": "" }, "capes": [] } },
-                    { "type": "Offline", "profile": { "id": "same", "name": "Second", "skin": { "id": "", "url": "", "variant": "" }, "capes": [] } }
-                ],
-                "formatVersion": 3
-            }
-            """);
+                                {
+                                    "accounts": [
+                                        { "type": "Offline", "profile": { "id": "same", "name": "First", "skin": { "id": "", "url": "", "variant": "" }, "capes": [] } },
+                                        { "type": "Offline", "profile": { "id": "same", "name": "Second", "skin": { "id": "", "url": "", "variant": "" }, "capes": [] } }
+                                    ],
+                                    "formatVersion": 3
+                                }
+                                """);
         var list = new AccountList();
         list.SetListFilePath(path);
         Assert.True(list.LoadList());

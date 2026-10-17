@@ -91,6 +91,7 @@ public sealed class PrismFamilyMigrationProfile : IMigrationSourceProfile
                 DecisionRecorded = candidate.MarkerPresent,
             });
         }
+
         return candidates;
     }
 
@@ -158,6 +159,7 @@ public sealed class FlintLegacyMigrationProfile : IMigrationSourceProfile
         {
             return [];
         }
+
         var decided = decisions?.Read(ProfileName) is not null;
         return
         [
@@ -179,10 +181,12 @@ public sealed class FlintLegacyMigrationProfile : IMigrationSourceProfile
         {
             return paths.DataRoot;
         }
+
         if (paths.HomeRoot is { } home && home != paths.DataRoot && HasLegacyAnchor(home))
         {
             return home;
         }
+
         return null;
     }
 
@@ -200,15 +204,19 @@ public sealed class FlintLegacyMigrationProfile : IMigrationSourceProfile
         {
             return null;
         }
+
         var items = new List<PrismImportPlanItem>();
+
         void PlanItem(string sourceItem, string destination, bool isDirectory)
         {
             if (isDirectory ? !Directory.Exists(sourceItem) : !File.Exists(sourceItem))
             {
                 return;
             }
+
             var exists = isDirectory ? Directory.Exists(destination) : File.Exists(destination);
-            var method = exists ? PlannedMethod.DestinationExists
+            var method = exists
+                ? PlannedMethod.DestinationExists
                 : mode == ImportMode.Move && FileTransfer.SameVolume(sourceItem, destination)
                     ? PlannedMethod.RenameDirectory
                     : PlannedMethod.PerFile;
@@ -221,6 +229,7 @@ public sealed class FlintLegacyMigrationProfile : IMigrationSourceProfile
         {
             PlanItem(Path.Combine(sourcePath, mount.Item), mount.Destination(paths), mount.IsDirectory);
         }
+
         // the old in-data cache area: every child moves 1:1 under the cache root
         var oldCacheDir = Path.Combine(sourcePath, "cache");
         if (Directory.Exists(oldCacheDir))
@@ -231,6 +240,7 @@ public sealed class FlintLegacyMigrationProfile : IMigrationSourceProfile
                     Directory.Exists(child));
             }
         }
+
         return items;
     }
 }
@@ -287,6 +297,7 @@ public static class FlintLegacyMigration
         {
             roots.Add(paths.DataRoot);
         }
+
         if (paths.HomeRoot is { } home && home != paths.DataRoot &&
             FlintLegacyMigrationProfile.HasLegacyAnchor(home))
         {
@@ -335,10 +346,9 @@ public static class FlintLegacyMigration
                 });
             }
             catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException
-                                     or NotSupportedException or SecurityException)
-            {
-            }
+                                          or NotSupportedException or SecurityException) { }
         }
+
         return new Result(ran, moved, bytes, ledgerCleaned, error);
     }
 
@@ -377,6 +387,7 @@ public static class FlintLegacyMigration
                 var src = Path.Combine(sourceRoot, mount.Item);
                 bytes += Transfer(src, mount.Destination(paths), mount.IsDirectory, ref moved, ref failedFiles);
             }
+
             // the old in-data cache area: children 1:1 into the cache root (the "general"
             // base content included). Under a home source the old cache root IS the new
             // cache root (home/cache), so the children skip as already-in-place — correct.
@@ -390,6 +401,7 @@ public static class FlintLegacyMigration
                         Directory.Exists(child), ref moved, ref failedFiles);
                 }
             }
+
             if (homeSource)
             {
                 // a G1 home source is the whole pre-reform total directory, not just the
@@ -418,15 +430,18 @@ public static class FlintLegacyMigration
                     {
                         continue; // already carried by the shared Mounts
                     }
+
                     bytes += Transfer(Path.Combine(sourceRoot, ini),
                         Path.Combine(paths.ConfigRoot, ini),
                         false, ref moved, ref failedFiles);
                 }
+
                 var token = Path.Combine(sourceRoot, "api-token");
                 if (File.Exists(token))
                 {
                     File.Delete(token); // S2: zero-persistence — the pre-reform token file is dead stock
                 }
+
                 foreach (var marker in Directory.EnumerateFiles(sourceRoot, "*_nomigrate.txt"))
                 {
                     bytes += Transfer(marker,
@@ -434,6 +449,7 @@ public static class FlintLegacyMigration
                         false, ref moved, ref failedFiles);
                 }
             }
+
             // E8: the Prism bare ledger is dead stock — the import whitelist never carried
             // it and nothing reads it; delete it once and for all
             var bareLedger = Path.Combine(sourceRoot, "metacache");
@@ -444,8 +460,8 @@ public static class FlintLegacyMigration
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
-                                     or ArgumentException or NotSupportedException
-                                     or SecurityException)
+                                      or ArgumentException or NotSupportedException
+                                      or SecurityException)
         {
             // no record — the next startup resumes the idempotent merge (destination
             // exists → skip), which is the honest outcome of a half-done remount
@@ -488,6 +504,7 @@ public static class FlintLegacyMigration
         {
             return 0;
         }
+
         var alreadyThere = isDirectory ? Directory.Exists(dst) : File.Exists(dst);
         if (alreadyThere)
         {
@@ -495,6 +512,7 @@ public static class FlintLegacyMigration
             {
                 return 0; // idempotent resume: the destination file won
             }
+
             // the destination directory exists (an earlier startup created it, or a
             // previous pass stopped halfway): merge the source into it file by file —
             // files already at the destination skip, missing ones transfer
@@ -512,6 +530,7 @@ public static class FlintLegacyMigration
                     failedFiles++;
                 }
             }
+
             moved++;
             return resumed;
         }
@@ -523,6 +542,7 @@ public static class FlintLegacyMigration
                 moved++;
                 return PrismImportPlanner.SizeOf(dst);
             }
+
             // volume differs — fall through to the per-file walk
             long bytes = 0;
             foreach (var file in FileTransfer.EnumerateFilesDeep(src))
@@ -538,6 +558,7 @@ public static class FlintLegacyMigration
                     failedFiles++;
                 }
             }
+
             moved++;
             return bytes;
         }
@@ -547,6 +568,7 @@ public static class FlintLegacyMigration
             failedFiles++;
             return 0;
         }
+
         moved++;
         return new FileInfo(dst).Length;
     }
@@ -563,6 +585,7 @@ public static class FlintLegacyMigration
         {
             return;
         }
+
         foreach (var entry in Directory.EnumerateFileSystemEntries(sourceDir).ToList())
         {
             bytes += Transfer(entry,
@@ -602,6 +625,7 @@ public sealed class MigrationEngine
         {
             found.AddRange(profile.Detect(paths, decisions));
         }
+
         return found;
     }
 

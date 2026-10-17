@@ -309,6 +309,7 @@ public static class AtLauncherPackManifest
                 p.Depends.Add(JsonUtils.RequireString(depends));
             }
         }
+
         p.Colour = JsonUtils.EnsureString(obj["colour"]);
         p.Warning = JsonUtils.EnsureString(obj["warning"]);
 

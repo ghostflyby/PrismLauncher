@@ -65,6 +65,7 @@ public sealed class DeviceCodeSessionStore
         {
             _sessions[session.DeviceId] = session;
         }
+
         _ = flow.StartAsync(); // background: polls Microsoft, then runs the remaining steps
         return session;
     }
@@ -79,8 +80,10 @@ public sealed class DeviceCodeSessionStore
             {
                 return false;
             }
+
             await Task.Delay(100).ConfigureAwait(false);
         }
+
         return true;
     }
 
@@ -105,10 +108,13 @@ public sealed class DeviceCodeSessionStore
                 {
                     accounts.AddAccount(session.Account);
                 }
+
                 return new DeviceCodePollResponse("done", ToView(session.Account));
             }
+
             return new DeviceCodePollResponse("expired", null);
         }
+
         return new DeviceCodePollResponse("pending", null);
     }
 

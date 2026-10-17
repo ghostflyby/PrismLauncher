@@ -33,9 +33,7 @@ public class FtbAppTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private InstanceList CreateList()
@@ -50,7 +48,7 @@ public class FtbAppTests : IDisposable
         using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
         return doc.RootElement.GetProperty("components").EnumerateArray()
             .Select(c => (Uid: c.GetProperty("uid").GetString(),
-                          Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
+                Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
             .ToList();
     }
 
@@ -79,18 +77,18 @@ public class FtbAppTests : IDisposable
     {
         File.WriteAllText(Path.Combine(packPath, "instance.json"),
             $$"""
-            {
-                "uuid": "0af88df9-6d80-4e34-9a3a-9d51cef93a0b",
-                "id": 5593,
-                "versionId": 81362,
-                "name": "My FTB Pack",
-                "version": "1.4.2",
-                "mcVersion": "1.18.2",
-                "modLoader": "{{modLoader}}",
-                "jvmArgs": "-Xmx2G -Dtest=1",
-                "totalPlayTime": 95514000
-            }
-            """);
+              {
+                  "uuid": "0af88df9-6d80-4e34-9a3a-9d51cef93a0b",
+                  "id": 5593,
+                  "versionId": 81362,
+                  "name": "My FTB Pack",
+                  "version": "1.4.2",
+                  "mcVersion": "1.18.2",
+                  "modLoader": "{{modLoader}}",
+                  "jvmArgs": "-Xmx2G -Dtest=1",
+                  "totalPlayTime": 95514000
+              }
+              """);
     }
 
     // ----------------------------------------------------------------------- paths
@@ -203,10 +201,7 @@ public class FtbAppTests : IDisposable
     [Fact]
     public void ParseDirectory_MissingInstanceJson_YieldsInvalid()
     {
-        var packPath = BuildFtbAppTree(pack =>
-        {
-            Directory.CreateDirectory(pack);
-        });
+        var packPath = BuildFtbAppTree(pack => { Directory.CreateDirectory(pack); });
 
         var modpack = FtbAppPackParse.ParseDirectory(packPath);
 
@@ -279,10 +274,7 @@ public class FtbAppTests : IDisposable
     [Fact]
     public async Task Install_NeoForgeLoader_UsesNeoForgeUid()
     {
-        var packPath = BuildFtbAppTree(pack =>
-        {
-            WriteInstanceJson(pack, "neoforge-20.4.237");
-        });
+        var packPath = BuildFtbAppTree(pack => { WriteInstanceJson(pack, "neoforge-20.4.237"); });
         var modpack = FtbAppPackParse.ParseDirectory(packPath);
 
         var list = CreateList();

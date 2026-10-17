@@ -42,14 +42,19 @@ public sealed class ModListMod
 {
     public string Name { get; init; } = "";
     public string ModId { get; init; } = "";
+
     /// <summary>Mod::homepage().</summary>
     public string Url { get; init; } = "";
+
     /// <summary>Mod::version() (the resolved details version).</summary>
     public string Version { get; init; } = "";
+
     /// <summary>metadata()-&gt;version().toString(): the .pw.toml version, used when the
     /// details version is empty.</summary>
     public string MetadataVersion { get; init; } = "";
+
     public IReadOnlyList<string> Authors { get; init; } = [];
+
     /// <summary>fileinfo().fileName().</summary>
     public string FileName { get; init; } = "";
 
@@ -93,6 +98,7 @@ public static class ExportToModList
         {
             src = src.Replace(ch.ToString(), "\\" + ch);
         }
+
         return src;
     }
 
@@ -111,6 +117,7 @@ public static class ExportToModList
                     modName = $"<a href=\"{url}\">{modName}</a>";
                 }
             }
+
             var line = modName;
             if ((extraData & OptionalData.Version) != 0)
             {
@@ -120,10 +127,12 @@ public static class ExportToModList
                     line += $" [{ToHtmlEscaped(ver)}]";
                 }
             }
+
             if ((extraData & OptionalData.Authors) != 0 && mod.Authors.Count != 0)
             {
                 line += " by " + ToHtmlEscaped(string.Join(", ", mod.Authors));
             }
+
             if ((extraData & OptionalData.FileName) != 0)
             {
                 line += $" ({ToHtmlEscaped(mod.FileName)})";
@@ -131,6 +140,7 @@ public static class ExportToModList
 
             lines.Add($"<li>{line}</li>");
         }
+
         return $"<html><body><ul>\n\t{string.Join("\n\t", lines)}\n</ul></body></html>";
     }
 
@@ -150,6 +160,7 @@ public static class ExportToModList
                     modName = $"[{modName}]({url})";
                 }
             }
+
             var line = modName;
             if ((extraData & OptionalData.Version) != 0)
             {
@@ -159,16 +170,20 @@ public static class ExportToModList
                     line += $" [{ver}]";
                 }
             }
+
             if ((extraData & OptionalData.Authors) != 0 && mod.Authors.Count != 0)
             {
                 line += " by " + ToMarkdownEscaped(string.Join(", ", mod.Authors));
             }
+
             if ((extraData & OptionalData.FileName) != 0)
             {
                 line += $" ({ToMarkdownEscaped(mod.FileName)})";
             }
+
             lines.Add("- " + line);
         }
+
         return string.Join("\n", lines);
     }
 
@@ -187,6 +202,7 @@ public static class ExportToModList
                     line += $" ({url})";
                 }
             }
+
             if ((extraData & OptionalData.Version) != 0)
             {
                 var ver = mod.EffectiveVersion;
@@ -195,16 +211,20 @@ public static class ExportToModList
                     line += $" [{ver}]";
                 }
             }
+
             if ((extraData & OptionalData.Authors) != 0 && mod.Authors.Count != 0)
             {
                 line += " by " + string.Join(", ", mod.Authors);
             }
+
             if ((extraData & OptionalData.FileName) != 0)
             {
                 line += $" ({mod.FileName})";
             }
+
             lines.Add(line);
         }
+
         return string.Join("\n", lines);
     }
 
@@ -227,6 +247,7 @@ public static class ExportToModList
                     line["url"] = url;
                 }
             }
+
             if ((extraData & OptionalData.Version) != 0)
             {
                 var ver = mod.EffectiveVersion;
@@ -235,6 +256,7 @@ public static class ExportToModList
                     line["version"] = ver;
                 }
             }
+
             if ((extraData & OptionalData.Authors) != 0 && mod.Authors.Count != 0)
             {
                 var authors = new JsonArray();
@@ -242,14 +264,18 @@ public static class ExportToModList
                 {
                     authors.Add((JsonNode?)JsonValue.Create(author)); // non-generic Add: AOT/trimming clean
                 }
+
                 line["authors"] = authors;
             }
+
             if ((extraData & OptionalData.FileName) != 0)
             {
                 line["filename"] = mod.FileName;
             }
+
             lines.Add((JsonNode?)line); // non-generic Add: AOT/trimming clean
         }
+
         return ToIndentedStringWithTrailingNewline(lines);
     }
 
@@ -270,10 +296,12 @@ public static class ExportToModList
             {
                 data.Add(mod.Url);
             }
+
             if ((extraData & OptionalData.Version) != 0)
             {
                 data.Add(mod.EffectiveVersion);
             }
+
             if ((extraData & OptionalData.Authors) != 0)
             {
                 string authors;
@@ -289,14 +317,18 @@ public static class ExportToModList
                 {
                     authors = "";
                 }
+
                 data.Add(authors);
             }
+
             if ((extraData & OptionalData.FileName) != 0)
             {
                 data.Add(mod.FileName);
             }
+
             lines.Add(string.Join(",", data));
         }
+
         return string.Join("\n", lines);
     }
 
@@ -330,6 +362,7 @@ public static class ExportToModList
                 .Replace("{authors}", string.Join(", ", mod.Authors))
                 .Replace("{filename}", mod.FileName));
         }
+
         return string.Join("\n", lines);
     }
 }

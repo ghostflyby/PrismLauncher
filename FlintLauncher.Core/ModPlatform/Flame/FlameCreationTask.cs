@@ -47,13 +47,13 @@ using ResourceType = ResourceType;
 public sealed partial class FlameCreationTask : InstanceTask
 {
     public FlameCreationTask(string stagingPath,
-                             bool trustedSource,
-                             InstanceEnvironment environment,
-                             string id = "",
-                             string versionId = "",
-                             ModrinthApi? modrinth = null,
-                             string originalInstanceId = "",
-                             FlameApi? flame = null)
+        bool trustedSource,
+        InstanceEnvironment environment,
+        string id = "",
+        string versionId = "",
+        ModrinthApi? modrinth = null,
+        string originalInstanceId = "",
+        FlameApi? flame = null)
     {
         _modrinth = modrinth ?? new ModrinthApi();
         _flame = flame ?? new FlameApi();
@@ -80,6 +80,7 @@ public sealed partial class FlameCreationTask : InstanceTask
 
     /// <summary>logWarning() output (no warningLogged signal in this port).</summary>
     public IReadOnlyList<string> Warnings => _warnings;
+
     private readonly List<string> _warnings = [];
 
     /// <summary>The blocked files reported after the resolver ran (BlockedModsDialog data).</summary>
@@ -109,6 +110,7 @@ public sealed partial class FlameCreationTask : InstanceTask
         {
             return true;
         }
+
         var normalized = relPath.Replace('\\', '/');
         return OptionalModsSelection.TryGetValue(normalized, out var selected) && selected;
     }
@@ -165,6 +167,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                            "This is a security risk and isn't allowed.");
                 return;
             }
+
             if (File.Exists(overridePath) || Directory.Exists(overridePath))
             {
                 // Create a list of overrides in "overrides.txt" inside flame/
@@ -204,6 +207,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                 {
                     id = id["1.20.1-".Length..]; // this is a mess for curseforge
                 }
+
                 loaderType = "neoforge";
                 loaderUid = "net.neoforged";
             }
@@ -230,6 +234,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                 LogWarning("Unknown mod loader in manifest: " + id);
                 continue;
             }
+
             loaderVersion = id;
         }
 
@@ -259,6 +264,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                 // because there is more info in GetVersionForLoader, the failure was emitted there
                 return;
             }
+
             await components.SetComponentVersion(loaderUid, version, cancellationToken: cancellationToken);
         }
 
@@ -332,6 +338,7 @@ public sealed partial class FlameCreationTask : InstanceTask
             {
                 EmitFailed("Unable to resolve mod IDs:\n" + modIdResolver.FailReason);
             }
+
             return;
         }
 
@@ -360,6 +367,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                 EmitFailed($"Failed to find version for {loaderType} loader");
                 return "";
             }
+
             return version;
         }
 
@@ -463,6 +471,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                 anyBlocked = true;
             }
         }
+
         BlockedMods = blockedMods;
 
         if (anyBlocked)
@@ -487,8 +496,10 @@ public sealed partial class FlameCreationTask : InstanceTask
                                .Select(mod => $"{mod.Name} ({mod.WebsiteUrl})")));
                 return;
             }
+
             await CopyBlockedMods(blockedMods, cancellationToken);
         }
+
         await SetupDownloadJob(modIdResolver, cancellationToken);
     }
 
@@ -604,6 +615,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                         return destPath;
                     }
                 }
+
                 return localPath;
             }
 
@@ -634,6 +646,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                     break;
             }
         }
+
         _ = zipMods; // (see the header note: without identify() the zip-mod special case is inert)
 
         // ---------------------------------------------------------- write mod metadata
@@ -675,6 +688,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                 return file.Pack.ResourceType;
             }
         }
+
         return ResourceType.Unknown;
     }
 
@@ -686,6 +700,7 @@ public sealed partial class FlameCreationTask : InstanceTask
             // (the C++ only logs; the world is skipped)
             return;
         }
+
         _ = world.Install(FileSystem.PathCombine(StagingPath, "minecraft", "saves"));
     }
 
@@ -719,6 +734,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                 return;
             }
         }
+
         // (upstream calls downloadFiles(m_newInstance.get()) here — the P5 update pipeline;
         //  like the other creation tasks, creation succeeds without fetching game files)
         EmitSucceeded();
@@ -732,7 +748,7 @@ public sealed partial class FlameCreationTask : InstanceTask
         var rootFull = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         var childFull = Path.GetFullPath(child).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         return childFull.StartsWith(rootFull + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-            || childFull.StartsWith(rootFull + Path.AltDirectorySeparatorChar, StringComparison.Ordinal);
+               || childFull.StartsWith(rootFull + Path.AltDirectorySeparatorChar, StringComparison.Ordinal);
     }
 
     [GeneratedRegex(@"[.]+$")]

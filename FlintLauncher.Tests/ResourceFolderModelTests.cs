@@ -27,9 +27,7 @@ public class ResourceFolderModelTests : IDisposable
         {
             Directory.Delete(_tempRoot, recursive: true);
         }
-        catch (IOException)
-        {
-        }
+        catch (IOException) { }
     }
 
     private string NewTempDir(string name)
@@ -194,8 +192,8 @@ public class ResourceFolderModelTests : IDisposable
 
         Assert.True(small.Compare(big) < 0); // "the beta" -> "beta" > "alpha"
         Assert.True(big.Compare(small) > 0);
-        Assert.True(big.Compare(small, SortType.Date) > 0); // modified later
-        Assert.True(big.Compare(small, SortType.Size) > 0); // larger
+        Assert.True(big.Compare(small, SortType.Date) > 0);     // modified later
+        Assert.True(big.Compare(small, SortType.Size) > 0);     // larger
         Assert.True(big.Compare(small, SortType.Filename) > 0); // "the beta.jar" vs "alpha.jar"
         Assert.Equal(0, small.Compare(small));
 

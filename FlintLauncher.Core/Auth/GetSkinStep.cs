@@ -6,13 +6,12 @@
 // Deviation: QUrl accepts an arbitrary (even empty) URL string while System.Uri throws on
 // unparseable input; an invalid/empty skin URL therefore takes the failure branch directly
 // (still ending in the upstream Working/"Got skin" report).
+
 namespace FlintLauncher.Core.Auth;
 
 public sealed class GetSkinStep : AuthStep
 {
-    public GetSkinStep(AccountData data) : base(data)
-    {
-    }
+    public GetSkinStep(AccountData data) : base(data) { }
 
     public override string Describe() => "Getting skin.";
 
@@ -30,6 +29,7 @@ public sealed class GetSkinStep : AuthStep
                 Data.MinecraftProfile.SkinField.Data = response.Body;
             }
         }
+
         EmitFinished(AccountTaskState.Working, "Got skin");
     }
 }

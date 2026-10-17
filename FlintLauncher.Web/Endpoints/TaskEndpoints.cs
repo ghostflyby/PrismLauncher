@@ -14,7 +14,7 @@ public static class TaskEndpoints
     {
         api.WithTags("Tasks");
         api.MapGet("/tasks", (FlintTaskRegistry registry) =>
-            Results.Ok(registry.All().Select(registry.View).ToArray()))
+                Results.Ok(registry.All().Select(registry.View).ToArray()))
             .Produces<TaskView[]>();
 
         api.MapGet("/tasks/{id}", (string id, FlintTaskRegistry registry) =>
@@ -32,10 +32,12 @@ public static class TaskEndpoints
             {
                 return ApiJson.NotFound("task_not_found", $"no task '{id}'");
             }
+
             if (registry.IsTerminal(entry))
             {
                 return ApiJson.Conflict("task_finished", $"task '{id}' already finished");
             }
+
             registry.Abort(entry);
             return Results.NoContent();
         }).Produces(204);
@@ -47,16 +49,19 @@ public static class TaskEndpoints
             {
                 return ApiJson.NotFound("task_not_found", $"no task '{id}'");
             }
+
             // launch tasks are registered with AutoProceed=false: the client drives the
             // ReadyForLaunch gate by POSTing here once the task reports state "waiting"
             if (entry.Controller is null)
             {
                 return ApiJson.Conflict("not_a_launch_task", $"task '{id}' has no proceed gate");
             }
+
             if (entry.Controller.Launcher is null)
             {
                 return ApiJson.Conflict("launch_not_ready", "the launch task has not armed a launcher yet");
             }
+
             // a premature or duplicate POST must be observable: LaunchTask.Proceed() no-ops
             // outside the Waiting state (matching the C++), and a silently dropped proceed
             // leaves the game waiting on its stdin "launch" line forever
@@ -64,6 +69,7 @@ public static class TaskEndpoints
             {
                 return ApiJson.Conflict("launch_not_waiting", $"task '{id}' is not waiting at a proceed gate");
             }
+
             registry.Proceed(entry);
             return Results.Ok(registry.View(entry));
         }).Produces<TaskView>();
@@ -75,14 +81,15 @@ public static class TaskEndpoints
             {
                 return ApiJson.NotFound("task_not_found", $"no task '{id}'");
             }
+
             var lines = registry.ReadLog(entry, since ?? 0);
             return Results.Ok(new TaskLogResponse(lines));
         }).Produces<TaskLogResponse>();
 
         // SSE: log lines as data events, the terminal state as a final "state" event.
         api.MapGet("/tasks/{id}/stream", async Task (string id, HttpContext ctx,
-                                                      FlintTaskRegistry registry,
-                                                      CancellationToken requestAborted) =>
+            FlintTaskRegistry registry,
+            CancellationToken requestAborted) =>
         {
             var entry = registry.Get(id);
             if (entry is null)

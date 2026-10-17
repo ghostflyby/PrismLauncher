@@ -6,12 +6,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="FlintLauncher.Tests" />
+    <InternalsVisibleTo Include="FlintLauncher.Tests"/>
   </ItemGroup>
 
   <ItemGroup>
     <!-- Worlds layer (Minecraft/Worlds) is built on the standalone NBT library. -->
-    <ProjectReference Include="..\FlintLauncher.Nbt\FlintLauncher.Nbt.csproj" />
+    <ProjectReference Include="..\FlintLauncher.Nbt\FlintLauncher.Nbt.csproj"/>
   </ItemGroup>
 
 
@@ -31,40 +31,40 @@
   <ItemGroup>
     <!-- NewLaunch.jar sources: org/prismlauncher EXCEPT legacy/, plus legacy/LegacyProxy.java
          (both in the upstream CMake SRC list). -->
-    <NewLaunchSource Include="$(LauncherSourceDir)/org/prismlauncher/**/*.java" />
-    <NewLaunchSource Remove="$(LauncherSourceDir)/org/prismlauncher/legacy/**/*.java" />
-    <NewLaunchSource Include="$(LauncherSourceDir)/org/prismlauncher/legacy/LegacyProxy.java" />
-    <NewLaunchLegacySource Include="$(LauncherSourceDir)/legacy/**/*.java" />
+    <NewLaunchSource Include="$(LauncherSourceDir)/org/prismlauncher/**/*.java"/>
+    <NewLaunchSource Remove="$(LauncherSourceDir)/org/prismlauncher/legacy/**/*.java"/>
+    <NewLaunchSource Include="$(LauncherSourceDir)/org/prismlauncher/legacy/LegacyProxy.java"/>
+    <NewLaunchLegacySource Include="$(LauncherSourceDir)/legacy/**/*.java"/>
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12"/>
     <!-- JVM enumeration (Apache-2.0, GPL-3.0-compatible): the provider suite backs the
          first discovery layer in JavaUtils.FindJavaPaths. -->
-    <PackageReference Include="JdkFind" Version="0.4.0" />
+    <PackageReference Include="JdkFind" Version="0.4.0"/>
   </ItemGroup>
 
   <Target Name="NewLaunchJar" Inputs="@(NewLaunchSource)" Outputs="$(JarOutputDir)NewLaunch.jar" Condition="'$(FlintSkipJarBuild)' != 'true'">
-    <MakeDir Directories="$(JarOutputDir)classes/newlaunch" />
-    <Exec Command="javac --release 8 -d &quot;$(JarOutputDir)classes/newlaunch&quot; @(NewLaunchSource->'&quot;%(FullPath)&quot;', ' ')" />
-    <Exec Command="jar --create --file &quot;$(JarOutputDir)NewLaunch.jar&quot; --main-class org.prismlauncher.EntryPoint -C &quot;$(JarOutputDir)classes/newlaunch&quot; ." />
+    <MakeDir Directories="$(JarOutputDir)classes/newlaunch"/>
+    <Exec Command="javac --release 8 -d &quot;$(JarOutputDir)classes/newlaunch&quot; @(NewLaunchSource->'&quot;%(FullPath)&quot;', ' ')"/>
+    <Exec Command="jar --create --file &quot;$(JarOutputDir)NewLaunch.jar&quot; --main-class org.prismlauncher.EntryPoint -C &quot;$(JarOutputDir)classes/newlaunch&quot; ."/>
   </Target>
 
   <!-- UseJava INCLUDE_JARS(NewLaunch): legacy compiles against NewLaunch.jar, manifest
        carries the matching Class-Path. -->
   <Target Name="NewLaunchLegacyJar" DependsOnTargets="NewLaunchJar" Inputs="@(NewLaunchLegacySource);$(JarOutputDir)NewLaunch.jar" Outputs="$(JarOutputDir)NewLaunchLegacy.jar" Condition="'$(FlintSkipJarBuild)' != 'true'">
-    <MakeDir Directories="$(JarOutputDir)classes/legacy" />
-    <WriteLinesToFile File="$(JarOutputDir)classes/legacy.mf" Lines="Class-Path: NewLaunch.jar" Overwrite="true" />
-    <Exec Command="javac --release 8 -cp &quot;$(JarOutputDir)NewLaunch.jar&quot; -d &quot;$(JarOutputDir)classes/legacy&quot; @(NewLaunchLegacySource->'&quot;%(FullPath)&quot;', ' ')" />
-    <Exec Command="jar --create --file &quot;$(JarOutputDir)NewLaunchLegacy.jar&quot; --main-class org.prismlauncher.EntryPoint --manifest &quot;$(JarOutputDir)classes/legacy.mf&quot; -C &quot;$(JarOutputDir)classes/legacy&quot; ." />
+    <MakeDir Directories="$(JarOutputDir)classes/legacy"/>
+    <WriteLinesToFile File="$(JarOutputDir)classes/legacy.mf" Lines="Class-Path: NewLaunch.jar" Overwrite="true"/>
+    <Exec Command="javac --release 8 -cp &quot;$(JarOutputDir)NewLaunch.jar&quot; -d &quot;$(JarOutputDir)classes/legacy&quot; @(NewLaunchLegacySource->'&quot;%(FullPath)&quot;', ' ')"/>
+    <Exec Command="jar --create --file &quot;$(JarOutputDir)NewLaunchLegacy.jar&quot; --main-class org.prismlauncher.EntryPoint --manifest &quot;$(JarOutputDir)classes/legacy.mf&quot; -C &quot;$(JarOutputDir)classes/legacy&quot; ."/>
   </Target>
 
   <!-- EmbeddedResource items are created INSIDE the target (generate-and-embed pattern):
        a static declaration made CSC read the jars before this target ran on clean trees. -->
   <Target Name="BuildJavaJars" DependsOnTargets="NewLaunchJar;NewLaunchLegacyJar" BeforeTargets="PrepareForBuild">
     <ItemGroup>
-      <EmbeddedResource Include="$(JarOutputDir)NewLaunch.jar" Link="jars/NewLaunch.jar" Condition="Exists('$(JarOutputDir)NewLaunch.jar')" />
-      <EmbeddedResource Include="$(JarOutputDir)NewLaunchLegacy.jar" Link="jars/NewLaunchLegacy.jar" Condition="Exists('$(JarOutputDir)NewLaunchLegacy.jar')" />
+      <EmbeddedResource Include="$(JarOutputDir)NewLaunch.jar" Link="jars/NewLaunch.jar" Condition="Exists('$(JarOutputDir)NewLaunch.jar')"/>
+      <EmbeddedResource Include="$(JarOutputDir)NewLaunchLegacy.jar" Link="jars/NewLaunchLegacy.jar" Condition="Exists('$(JarOutputDir)NewLaunchLegacy.jar')"/>
     </ItemGroup>
   </Target>
 </Project>

@@ -12,6 +12,7 @@
 // on its own (precise flags/env), or all at once via a home layout (--home-dir=X ⇒
 // X/{config,data,store,cache,state} — the only implicit-derivation site). Platform defaults
 // are absorbed HERE and nowhere else.
+
 namespace FlintLauncher.Core;
 
 /// <summary>Absolute filesystem layout of one Flint installation: the five independent roots
@@ -83,11 +84,13 @@ public sealed record FlintPaths
         {
             return Path.Combine(AppSupportFlint(), "config");
         }
+
         if (OperatingSystem.IsWindows())
         {
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "Flint", "config");
         }
+
         return Path.Combine(XdgBase("XDG_CONFIG_HOME", ".config"), "Flint");
     }
 
@@ -100,10 +103,12 @@ public sealed record FlintPaths
         {
             return AppSupportFlint();
         }
+
         if (OperatingSystem.IsWindows())
         {
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Flint");
         }
+
         return Path.Combine(XdgBase("XDG_DATA_HOME", ".local", "share"), "Flint");
     }
 
@@ -116,11 +121,13 @@ public sealed record FlintPaths
         {
             return Path.Combine(AppSupportFlint(), "store");
         }
+
         if (OperatingSystem.IsWindows())
         {
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "Flint", "store");
         }
+
         return Path.Combine(XdgBase("XDG_DATA_HOME", ".local", "share"), "Flint", "store");
     }
 
@@ -133,11 +140,13 @@ public sealed record FlintPaths
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 "Library", "Caches", "Flint");
         }
+
         if (OperatingSystem.IsWindows())
         {
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "Flint", "cache");
         }
+
         return Path.Combine(XdgBase("XDG_CACHE_HOME", ".cache"), "Flint");
     }
 
@@ -150,11 +159,13 @@ public sealed record FlintPaths
         {
             return Path.Combine(AppSupportFlint(), "state");
         }
+
         if (OperatingSystem.IsWindows())
         {
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "Flint", "state");
         }
+
         return Path.Combine(XdgBase("XDG_STATE_HOME", ".local", "state"), "Flint");
     }
 

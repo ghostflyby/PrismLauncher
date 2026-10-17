@@ -8,9 +8,7 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class ReconstructAssets : LaunchStep
 {
-    public ReconstructAssets(LaunchTask parent) : base(parent)
-    {
-    }
+    public ReconstructAssets(LaunchTask parent) : base(parent) { }
 
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -22,10 +20,11 @@ public sealed class ReconstructAssets : LaunchStep
             EmitFailed("The instance profile is missing.");
             return Task.CompletedTask;
         }
+
         var assets = profile.GetMinecraftAssets();
 
         var assetsRoot = instance.Paths?.AssetsRoot
-            ?? FileSystem.PathCombine("assets", "");
+                         ?? FileSystem.PathCombine("assets", "");
         if (!AssetsUtils.ReconstructAssets(assets.Id, instance.ResourcesDir(), assetsRoot))
         {
             EmitLogLine("Failed to reconstruct Minecraft assets.", MessageLevel.Error);

@@ -16,25 +16,25 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="xunit.v3" Version="4.0.0" />
+    <PackageReference Include="xunit.v3" Version="4.0.0"/>
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FlintLauncher.Core\FlintLauncher.Core.csproj" />
-    <ProjectReference Include="..\FlintLauncher.Nbt\FlintLauncher.Nbt.csproj" />
+    <ProjectReference Include="..\FlintLauncher.Core\FlintLauncher.Core.csproj"/>
+    <ProjectReference Include="..\FlintLauncher.Nbt\FlintLauncher.Nbt.csproj"/>
     <!-- API integration tests host FlintLauncher.Web in-process (BuildWebApplication). -->
-    <ProjectReference Include="..\FlintLauncher.Web\FlintLauncher.Web.csproj" />
+    <ProjectReference Include="..\FlintLauncher.Web\FlintLauncher.Web.csproj"/>
   </ItemGroup>
 
   <!-- Fixtures ported from the original C++ tests (tests/testdata). -->
   <ItemGroup>
-    <Content Include="TestData\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="TestData\**\*" CopyToOutputDirectory="PreserveNewest"/>
   </ItemGroup>
 
   <!-- Serialize test collections: several suites use process-global state (the API
        integration tests chdir into a temp data dir; others mutate static config hooks). -->
   <ItemGroup>
-    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest"/>
   </ItemGroup>
 
 </Project>

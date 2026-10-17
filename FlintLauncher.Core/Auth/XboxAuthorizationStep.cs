@@ -36,17 +36,17 @@ public sealed class XboxAuthorizationStep : AuthStep
     public override async Task PerformAsync(CancellationToken cancellationToken)
     {
         var xboxAuthTemplate = "\n" + """
-            {
-                "Properties": {
-                    "SandboxId": "RETAIL",
-                    "UserTokens": [
-                        "%1"
-                    ]
-                },
-                "RelyingParty": "%2",
-                "TokenType": "JWT"
-            }
-            """ + "\n";
+                                      {
+                                          "Properties": {
+                                              "SandboxId": "RETAIL",
+                                              "UserTokens": [
+                                                  "%1"
+                                              ]
+                                          },
+                                          "RelyingParty": "%2",
+                                          "TokenType": "JWT"
+                                      }
+                                      """ + "\n";
         var xboxAuthData = xboxAuthTemplate.Replace("%1", Data.UserToken.Value).Replace("%2", _relyingParty);
 
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
@@ -65,6 +65,7 @@ public sealed class XboxAuthorizationStep : AuthStep
                 {
                     return;
                 }
+
                 EmitFinished(AccountTaskState.FailedSoft,
                     $"Unknown STS error for {_authorizationKind} services: {response.ErrorString}");
             }
@@ -74,6 +75,7 @@ public sealed class XboxAuthorizationStep : AuthStep
                 EmitFinished(AccountTaskState.Offline,
                     $"Failed to get authorization for {_authorizationKind} services: {response.ErrorString}");
             }
+
             return;
         }
 
@@ -92,6 +94,7 @@ public sealed class XboxAuthorizationStep : AuthStep
                 $"Server has changed {_authorizationKind} authorization user hash in the reply. Something is wrong.");
             return;
         }
+
         _assignToken(temp);
 
         EmitFinished(AccountTaskState.Working, $"Got authorization to access {_relyingParty}");
@@ -109,6 +112,7 @@ public sealed class XboxAuthorizationStep : AuthStep
         {
             return false;
         }
+
         JsonObject? obj;
         try
         {
@@ -118,6 +122,7 @@ public sealed class XboxAuthorizationStep : AuthStep
         {
             obj = null;
         }
+
         if (obj is null)
         {
             EmitFinished(AccountTaskState.FailedSoft,
@@ -131,6 +136,7 @@ public sealed class XboxAuthorizationStep : AuthStep
                 $"XErr element is missing from {_authorizationKind} authorization error response.");
             return true;
         }
+
         switch (errorCode)
         {
             case 2148916233:

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/ProblemProvider.h.
+
 namespace FlintLauncher.Core.Minecraft;
 
 public enum ProblemSeverity
@@ -44,6 +45,7 @@ public class ProblemContainer : ProblemProvider
         {
             problemSeverity = severity;
         }
+
         _problems.Add(new PatchProblem(severity, description));
     }
 }

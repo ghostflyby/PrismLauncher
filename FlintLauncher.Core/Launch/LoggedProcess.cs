@@ -60,13 +60,16 @@ public sealed class LoggedProcess : IDisposable
     private string leftoverLine = "";
     private string errLeftoverLine = "";
     private bool isAborting;
+
     private bool isDetachable;
+
     // volatile: terminal states are applied on a continuation thread and read by waiters
     // that observed the StateChanged/TCS edge; keep the field reads fresh
     private volatile LoggedProcessState state = LoggedProcessState.NotRunning;
     private volatile int exitCode;
     private bool started;
     private bool disposed;
+
     /// <summary>Signalled by OnTerminated AFTER the terminal state is applied, so waiters never
     /// observe a stale Running state (Process.WaitForExitAsync races the exit continuation).</summary>
     private TaskCompletionSource<LoggedProcessState>? terminatedTcs;
@@ -155,6 +158,7 @@ public sealed class LoggedProcess : IDisposable
         {
             startInfo.ArgumentList.Add(arg);
         }
+
         // full command line into the diagnostics channel, like the upstream qDebug in
         // LauncherPartLaunch.cpp:131 (session tokens travel via the stdin script, not args)
         var log = DiagLog;
@@ -182,6 +186,7 @@ public sealed class LoggedProcess : IDisposable
             ChangeState(LoggedProcessState.FailedToStart);
             return false;
         }
+
         started = true;
         terminatedTcs = new TaskCompletionSource<LoggedProcessState>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -257,6 +262,7 @@ public sealed class LoggedProcess : IDisposable
         {
             return state;
         }
+
         try
         {
             await _process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
@@ -265,15 +271,15 @@ public sealed class LoggedProcess : IDisposable
         {
             throw;
         }
-        catch (Exception e) when (e is InvalidOperationException or Win32Exception)
-        {
-        }
+        catch (Exception e) when (e is InvalidOperationException or Win32Exception) { }
+
         // the process is gone, but OnTerminated applies the terminal state on its own
         // continuation — wait for it so callers always see Finished/Aborted here
         if (terminatedTcs is { } terminated)
         {
             return await terminated.Task.ConfigureAwait(false);
         }
+
         return state;
     }
 
@@ -283,12 +289,14 @@ public sealed class LoggedProcess : IDisposable
         {
             return;
         }
+
         disposed = true;
         if (isDetachable)
         {
             // LoggedProcess::~LoggedProcess: pretend the process is gone so nothing reaps it
             ChangeState(LoggedProcessState.NotRunning);
         }
+
         _process.Dispose();
     }
 
@@ -308,6 +316,7 @@ public sealed class LoggedProcess : IDisposable
             {
                 break;
             }
+
             if (read == 0)
             {
                 break;
@@ -370,6 +379,7 @@ public sealed class LoggedProcess : IDisposable
                 leftoverLine = "";
             }
         }
+
         if (finalLine.Length != 0)
         {
             Log?.Invoke([finalLine], isStdErr ? MessageLevel.StdErr : MessageLevel.StdOut);
@@ -382,6 +392,7 @@ public sealed class LoggedProcess : IDisposable
         {
             return;
         }
+
         int exitCode;
         try
         {
@@ -391,6 +402,7 @@ public sealed class LoggedProcess : IDisposable
         {
             return;
         }
+
         lock (_lock)
         {
             if (this.exitCode == 0)
@@ -412,6 +424,7 @@ public sealed class LoggedProcess : IDisposable
             Log?.Invoke(["Process was killed by user."], MessageLevel.Error);
             ChangeState(LoggedProcessState.Aborted);
         }
+
         terminatedTcs?.TrySetResult(state);
     }
 
@@ -421,6 +434,7 @@ public sealed class LoggedProcess : IDisposable
         {
             return;
         }
+
         this.state = state;
         DiagLog.StateChanged(state.ToString());
         StateChanged?.Invoke(state);

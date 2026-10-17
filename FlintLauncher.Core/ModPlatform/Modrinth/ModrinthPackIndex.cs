@@ -102,7 +102,7 @@ public static class ModrinthPackIndex
 
     /// <summary>Port of Modrinth::loadIndexedPackVersion.</summary>
     public static IndexedVersion LoadIndexedPackVersion(JsonNode obj, string preferredHashType = "sha512",
-                                                        string preferredFileName = "")
+        string preferredFileName = "")
     {
         var file = new IndexedVersion
         {
@@ -115,6 +115,7 @@ public static class ModrinthPackIndex
         {
             return new IndexedVersion();
         }
+
         foreach (var mcVer in versionArray)
         {
             var raw = mcVer.AsString() ?? "";
@@ -122,6 +123,7 @@ public static class ModrinthPackIndex
             file.McVersion.Add(ModrinthApi.MapMcVersionFromModrinth(raw));
             file.McVersion.Add(raw);
         }
+
         var loaders = obj.RequireArray("loaders");
         foreach (var loader in loaders)
         {
@@ -135,6 +137,7 @@ public static class ModrinthPackIndex
                 case "quilt": file.Loaders |= ModLoaderType.Quilt; break;
             }
         }
+
         file.Version = obj.RequireString("name");
         file.VersionNumber = obj.RequireString("version_number");
         file.VersionType = IndexedVersionType.FromString(obj.RequireString("version_type"));
@@ -249,6 +252,7 @@ public static class ModrinthPackIndex
         {
             fileName = fileName[..query];
         }
+
         var dot = fileName.LastIndexOf('.');
         return dot >= 0 ? fileName[(dot + 1)..] : "";
     }
@@ -260,6 +264,7 @@ public static class ModrinthPackIndex
             // obj.value(key).toArray({}) semantics: missing/other -> empty
             return false;
         }
+
         foreach (var item in arr)
         {
             if (item.AsString() == value)
@@ -267,6 +272,7 @@ public static class ModrinthPackIndex
                 return true;
             }
         }
+
         return false;
     }
 }

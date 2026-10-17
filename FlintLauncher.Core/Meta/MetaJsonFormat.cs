@@ -18,9 +18,7 @@ public enum MetadataVersion
 }
 
 /// <summary>Port of Meta::ParseException.</summary>
-public sealed class MetaParseException(string message) : Exception(message)
-{
-}
+public sealed class MetaParseException(string message) : Exception(message) { }
 
 /// <summary>Port of Meta::Require. Set identity is by uid only, like the C++ operator==/operator&lt;.</summary>
 public sealed class Require
@@ -72,6 +70,7 @@ public sealed class RequireSet : IEnumerable<Require>
         {
             result.Add(require);
         }
+
         return result;
     }
 
@@ -124,6 +123,7 @@ public static class MetaJsonFormat
             list.SetSha256(element.StringOr("sha256"));
             lists.Add(list);
         }
+
         return new Index(lists);
     }
 
@@ -149,6 +149,7 @@ public static class MetaJsonFormat
         {
             version.SetSha256(sha256);
         }
+
         return version;
     }
 
@@ -198,8 +199,10 @@ public static class MetaJsonFormat
             {
                 return MetadataVersion.Invalid;
             }
+
             return MetadataVersion.InitialRelease;
         }
+
         // isDouble(): any JSON number. Node-side read (raw token text) — not TryGetValue<T>,
         // whose result depends on whether the JsonValue is parsed-backed or created in code.
         var raw = JsonUtils.EnsureDouble(map["formatVersion"], double.NaN);
@@ -216,6 +219,7 @@ public static class MetaJsonFormat
         {
             return;
         }
+
         obj["formatVersion"] = (int)version;
     }
 
@@ -287,6 +291,7 @@ public static class MetaJsonFormat
         {
             return;
         }
+
         var arrOut = new JsonArray();
         foreach (var iter in ptr)
         {
@@ -298,12 +303,15 @@ public static class MetaJsonFormat
             {
                 reqOut["equals"] = iter.EqualsVersion;
             }
+
             if (iter.Suggests.Length != 0)
             {
                 reqOut["suggests"] = iter.Suggests;
             }
+
             arrOut.Add((JsonNode)reqOut);
         }
+
         obj[keyName] = arrOut;
     }
 
@@ -318,20 +326,24 @@ public static class MetaJsonFormat
         {
             throw new JsonParseException("'" + key + "'s parent does not contain '" + key + "'");
         }
+
         var result = new List<JsonObject>();
         var node = map[key];
         if (node is not JsonArray array)
         {
             return result;
         }
+
         foreach (var val in array)
         {
             if (val is not JsonObject obj)
             {
                 throw new JsonParseException("Document is not an object");
             }
+
             result.Add(obj);
         }
+
         return result;
     }
 }

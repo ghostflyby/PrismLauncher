@@ -49,8 +49,10 @@ public sealed class FtbAppIcon
     public enum Kind : byte
     {
         None,
+
         /// <summary>folder.jpg next to the instance.</summary>
         FolderJpg,
+
         /// <summary>.ftbapp/logo: first byte is the image type, then the raw image data.</summary>
         Logo,
     }
@@ -88,6 +90,7 @@ public static class FtbAppPackParse
         {
             return new FtbAppModpack();
         }
+
         try
         {
             var root = RequireObject(JsonUtils.RequireNodeFromFile(instanceFile, "FTB_APP instance JSON file"));
@@ -98,8 +101,10 @@ public static class FtbAppPackParse
             modpack.Version = JsonUtils.RequireString(root, "version", "version");
             modpack.McVersion = JsonUtils.RequireString(root, "mcVersion", "mcVersion");
             modpack.JvmArgs = root.TryGetPropertyValue("jvmArgs", out var jvmArgs)
-                && jvmArgs is JsonValue jvmValue
-                && jvmValue.TryGetValue<string>(out var jvmString) ? jvmString : "";
+                              && jvmArgs is JsonValue jvmValue
+                              && jvmValue.TryGetValue<string>(out var jvmString)
+                ? jvmString
+                : "";
             modpack.TotalPlayTime = JsonUtils.RequireInteger(root, "totalPlayTime", "totalPlayTime");
 
             var modLoader = JsonUtils.RequireString(root, "modLoader", "modLoader");
@@ -126,6 +131,7 @@ public static class FtbAppPackParse
         {
             return new FtbAppModpack();
         }
+
         if (modpack.LoaderType is null)
         {
             modpack.LoaderType = LegacyInstanceParsing(path, out var loaderVersion);
@@ -152,10 +158,12 @@ public static class FtbAppPackParse
         {
             versionsFile = FileSystem.PathCombine(path, "version.json");
         }
+
         if (!File.Exists(versionsFile))
         {
             return null;
         }
+
         try
         {
             var root = RequireObject(JsonUtils.RequireNodeFromFile(versionsFile, "FTB_APP version JSON file"));
@@ -183,9 +191,8 @@ public static class FtbAppPackParse
                 }
             }
         }
-        catch (Exception e) when (e is JsonParseException or JsonException or FormatException)
-        {
-        }
+        catch (Exception e) when (e is JsonParseException or JsonException or FormatException) { }
+
         return null;
     }
 
@@ -207,6 +214,7 @@ public static class FtbAppPackParse
         {
             return icon;
         }
+
         try
         {
             using var stream = File.OpenRead(logoPath);
@@ -215,15 +223,16 @@ public static class FtbAppPackParse
             {
                 return icon;
             }
+
             if (!ImageTypeMap.TryGetValue((byte)type, out var imageType))
             {
                 return icon;
             }
+
             icon.ImageType = imageType;
         }
-        catch (IOException)
-        {
-        }
+        catch (IOException) { }
+
         return icon;
     }
 
@@ -246,12 +255,13 @@ public static class FtbAppPackParse
                 modpacks.Add(modpack);
             }
         }
+
         return modpacks;
     }
 
     private static JsonObject RequireObject(JsonNode? node)
     {
         return node as JsonObject
-            ?? throw new JsonParseException("Value is not an object");
+               ?? throw new JsonParseException("Value is not an object");
     }
 }

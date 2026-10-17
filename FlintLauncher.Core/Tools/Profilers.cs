@@ -73,11 +73,13 @@ public sealed class JProfilerFactory : ProfilerFactory
             error = "Empty path";
             return false;
         }
+
         if (!Directory.Exists(path))
         {
             error = "Path does not exist";
             return false;
         }
+
         // dir.exists("bin") && (bin/jprofiler || bin/jprofiler.exe) && bin/agent.jar
         var bin = Path.Combine(path, "bin");
         if (!Directory.Exists(bin) ||
@@ -88,6 +90,7 @@ public sealed class JProfilerFactory : ProfilerFactory
             error = "Invalid JProfiler install";
             return false;
         }
+
         return true;
     }
 
@@ -120,6 +123,7 @@ public sealed class JVisualVmFactory : ProfilerFactory
         {
             defaultValue = FindExecutable("visualvm");
         }
+
         settings.RegisterSetting(PathKey, defaultValue);
     }
 
@@ -134,12 +138,14 @@ public sealed class JVisualVmFactory : ProfilerFactory
             error = "Empty path";
             return false;
         }
+
         // QFileInfo::isExecutable() && fileName().contains("visualvm")
         if (!IsExecutable(path) || !Path.GetFileName(path).Contains("visualvm", StringComparison.Ordinal))
         {
             error = "Invalid path to VisualVM";
             return false;
         }
+
         return true;
     }
 
@@ -157,6 +163,7 @@ public sealed class JVisualVmFactory : ProfilerFactory
         {
             return "";
         }
+
         var names = OperatingSystem.IsWindows()
             ? new[] { executableName + ".exe", executableName }
             : new[] { executableName };
@@ -166,6 +173,7 @@ public sealed class JVisualVmFactory : ProfilerFactory
             {
                 continue;
             }
+
             foreach (var name in names)
             {
                 var candidate = Path.Combine(dir, name);
@@ -175,6 +183,7 @@ public sealed class JVisualVmFactory : ProfilerFactory
                 }
             }
         }
+
         return "";
     }
 
@@ -186,12 +195,14 @@ public sealed class JVisualVmFactory : ProfilerFactory
             {
                 return false;
             }
+
             if (!OperatingSystem.IsWindows())
             {
                 var mode = File.GetUnixFileMode(path);
                 return mode.HasFlag(UnixFileMode.UserExecute) || mode.HasFlag(UnixFileMode.GroupExecute) ||
                        mode.HasFlag(UnixFileMode.OtherExecute);
             }
+
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or PlatformNotSupportedException)

@@ -100,6 +100,7 @@ public sealed class NbtWriter(Stream output)
             throw new ArgumentOutOfRangeException(nameof(value), bytes.Length,
                 $"String is too long for NBT ({bytes.Length} > {MaxStringLength})");
         }
+
         WriteNum((ushort)bytes.Length);
         _output.Write(bytes, 0, bytes.Length);
     }
@@ -110,6 +111,7 @@ public sealed class NbtWriter(Stream output)
         {
             WriteTag(key, value);
         }
+
         WriteType(NbtTagType.End);
     }
 
@@ -125,6 +127,7 @@ public sealed class NbtWriter(Stream output)
             {
                 throw new InvalidOperationException("The tags in the list do not all match the content type");
             }
+
             WritePayload(tag);
         }
     }

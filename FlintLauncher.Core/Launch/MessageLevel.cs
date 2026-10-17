@@ -19,24 +19,34 @@ public enum MessageLevel : byte
 {
     /// <summary>No idea what this is or where it came from</summary>
     Unknown,
+
     /// <summary>Undetermined stdout messages</summary>
     StdOut,
+
     /// <summary>Undetermined stderr messages</summary>
     StdErr,
+
     /// <summary>Launcher Messages</summary>
     Launcher,
+
     /// <summary>Trace Messages</summary>
     Trace,
+
     /// <summary>Debug Messages</summary>
     Debug,
+
     /// <summary>Info Messages</summary>
     Info,
+
     /// <summary>Standard Messages</summary>
     Message,
+
     /// <summary>Warnings</summary>
     Warning,
+
     /// <summary>Errors</summary>
     Error,
+
     /// <summary>Fatal Errors</summary>
     Fatal,
 }
@@ -69,6 +79,7 @@ public static class MessageLevelExtensions
                 return level;
             }
         }
+
         return MessageLevel.Unknown;
     }
 
@@ -84,6 +95,7 @@ public static class MessageLevelExtensions
             line = line[(endmark + 2)..];
             return level;
         }
+
         return MessageLevel.Unknown;
     }
 
@@ -97,6 +109,7 @@ public static class MessageLevelExtensions
         {
             startMark++;
         }
+
         var endmark = line.IndexOf(':', StringComparison.Ordinal);
         if (startMark < line.Length && endmark != -1)
         {
@@ -104,6 +117,7 @@ public static class MessageLevelExtensions
             line = line[(endmark + 2)..];
             return level;
         }
+
         return MessageLevel.Unknown;
     }
 
@@ -129,14 +143,17 @@ public static class MessageLevelExtensions
         {
             return MessageLevel.Info;
         }
+
         if (line.Contains("[SEVERE]", StringComparison.Ordinal) || line.Contains("[STDERR]", StringComparison.Ordinal))
         {
             return MessageLevel.Error;
         }
+
         if (line.Contains("[WARNING]", StringComparison.Ordinal))
         {
             return MessageLevel.Warning;
         }
+
         if (line.Contains("[DEBUG]", StringComparison.Ordinal))
         {
             return MessageLevel.Debug;

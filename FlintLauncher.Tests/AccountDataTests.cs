@@ -15,61 +15,61 @@ public class AccountDataTests
     // Synthetic MSA account in the exact layout upstream's AccountData::saveState() produces
     // (keys are shown sorted, like QJsonObject iterates them).
     private const string MsaAccountJson = """
-        {
-            "entitlement": {
-                "canPlayMinecraft": true,
-                "ownsMinecraft": true
-            },
-            "msa": {
-                "exp": 1638990728,
-                "extra": {
-                    "access_token": "MSA_TOKEN",
-                    "expires_in": 86400,
-                    "token_type": "Bearer"
-                },
-                "iat": 1638904328,
-                "refresh_token": "MSA_REFRESH",
-                "token": "MSA_TOKEN"
-            },
-            "msa-client-id": "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb",
-            "profile": {
-                "capes": [
-                    {
-                        "alias": "Migrator",
-                        "id": "cape-id",
-                        "url": "http://textures.minecraft.net/texture/capehash"
-                    }
-                ],
-                "cape": "cape-id",
-                "id": "b50ad385829d3141a2167e7d7539ba7f",
-                "name": "TestPlayer",
-                "skin": {
-                    "data": "aGVsbG8gc2tpbg==",
-                    "id": "skin-id",
-                    "url": "http://textures.minecraft.net/texture/skinhash",
-                    "variant": "CLASSIC"
-                }
-            },
-            "type": "MSA",
-            "utoken": {
-                "extra": {
-                    "uhs": "UHS123"
-                },
-                "token": "USER_TOKEN"
-            },
-            "xrp-mc": {
-                "extra": {
-                    "uhs": "UHS123"
-                },
-                "token": "XSTS_TOKEN"
-            },
-            "ygg": {
-                "exp": 1638907928,
-                "iat": 1638904328,
-                "token": "YGG_TOKEN"
-            }
-        }
-        """;
+                                          {
+                                              "entitlement": {
+                                                  "canPlayMinecraft": true,
+                                                  "ownsMinecraft": true
+                                              },
+                                              "msa": {
+                                                  "exp": 1638990728,
+                                                  "extra": {
+                                                      "access_token": "MSA_TOKEN",
+                                                      "expires_in": 86400,
+                                                      "token_type": "Bearer"
+                                                  },
+                                                  "iat": 1638904328,
+                                                  "refresh_token": "MSA_REFRESH",
+                                                  "token": "MSA_TOKEN"
+                                              },
+                                              "msa-client-id": "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb",
+                                              "profile": {
+                                                  "capes": [
+                                                      {
+                                                          "alias": "Migrator",
+                                                          "id": "cape-id",
+                                                          "url": "http://textures.minecraft.net/texture/capehash"
+                                                      }
+                                                  ],
+                                                  "cape": "cape-id",
+                                                  "id": "b50ad385829d3141a2167e7d7539ba7f",
+                                                  "name": "TestPlayer",
+                                                  "skin": {
+                                                      "data": "aGVsbG8gc2tpbg==",
+                                                      "id": "skin-id",
+                                                      "url": "http://textures.minecraft.net/texture/skinhash",
+                                                      "variant": "CLASSIC"
+                                                  }
+                                              },
+                                              "type": "MSA",
+                                              "utoken": {
+                                                  "extra": {
+                                                      "uhs": "UHS123"
+                                                  },
+                                                  "token": "USER_TOKEN"
+                                              },
+                                              "xrp-mc": {
+                                                  "extra": {
+                                                      "uhs": "UHS123"
+                                                  },
+                                                  "token": "XSTS_TOKEN"
+                                              },
+                                              "ygg": {
+                                                  "exp": 1638907928,
+                                                  "iat": 1638904328,
+                                                  "token": "YGG_TOKEN"
+                                              }
+                                          }
+                                          """;
 
     private static AccountData ResumedMsaAccount()
     {
@@ -162,17 +162,17 @@ public class AccountDataTests
     public void CurrentCape_Ignored_When_Not_In_Capes()
     {
         var json = JsonNode.Parse("""
-            {
-                "type": "MSA",
-                "profile": {
-                    "id": "abc",
-                    "name": "Name",
-                    "cape": "missing-cape",
-                    "skin": { "id": "s", "url": "https://x/y", "variant": "CLASSIC" },
-                    "capes": []
-                }
-            }
-            """)!.AsObject();
+                                  {
+                                      "type": "MSA",
+                                      "profile": {
+                                          "id": "abc",
+                                          "name": "Name",
+                                          "cape": "missing-cape",
+                                          "skin": { "id": "s", "url": "https://x/y", "variant": "CLASSIC" },
+                                          "capes": []
+                                      }
+                                  }
+                                  """)!.AsObject();
         var data = new AccountData();
         Assert.True(data.ResumeStateFromV3(json));
         Assert.Equal("", data.MinecraftProfile.CurrentCape);
@@ -182,11 +182,11 @@ public class AccountDataTests
     public void Legacy_Offline_Ygg_Token_Migrates_To_Zero()
     {
         var json = JsonNode.Parse("""
-            {
-                "type": "Offline",
-                "ygg": { "token": "offline" }
-            }
-            """)!.AsObject();
+                                  {
+                                      "type": "Offline",
+                                      "ygg": { "token": "offline" }
+                                  }
+                                  """)!.AsObject();
         var data = new AccountData();
         Assert.True(data.ResumeStateFromV3(json));
         Assert.Equal("0", data.AccessToken());
@@ -199,16 +199,16 @@ public class AccountDataTests
     {
         // no entitlement object, but a valid profile -> assumed ownership
         var json = JsonNode.Parse("""
-            {
-                "type": "MSA",
-                "profile": {
-                    "id": "abc",
-                    "name": "Name",
-                    "skin": { "id": "s", "url": "https://x/y", "variant": "CLASSIC" },
-                    "capes": []
-                }
-            }
-            """)!.AsObject();
+                                  {
+                                      "type": "MSA",
+                                      "profile": {
+                                          "id": "abc",
+                                          "name": "Name",
+                                          "skin": { "id": "s", "url": "https://x/y", "variant": "CLASSIC" },
+                                          "capes": []
+                                      }
+                                  }
+                                  """)!.AsObject();
         var data = new AccountData();
         Assert.True(data.ResumeStateFromV3(json));
         Assert.True(data.MinecraftEntitlement.OwnsMinecraft);
@@ -221,15 +221,15 @@ public class AccountDataTests
     {
         // profile present but missing the mandatory skin attributes -> profile invalid -> no fallback
         var json = JsonNode.Parse("""
-            {
-                "type": "MSA",
-                "profile": {
-                    "id": "abc",
-                    "name": "Name",
-                    "capes": []
-                }
-            }
-            """)!.AsObject();
+                                  {
+                                      "type": "MSA",
+                                      "profile": {
+                                          "id": "abc",
+                                          "name": "Name",
+                                          "capes": []
+                                      }
+                                  }
+                                  """)!.AsObject();
         var data = new AccountData();
         Assert.True(data.ResumeStateFromV3(json));
         Assert.Equal(Validity.None, data.MinecraftEntitlement.Validity);

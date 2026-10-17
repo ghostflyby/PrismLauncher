@@ -22,7 +22,7 @@ internal static class AtLauncherJson
         try
         {
             return JsonNode.Parse(json)
-                ?? throw new JsonParseException(what + ": Error parsing JSON: document is null");
+                   ?? throw new JsonParseException(what + ": Error parsing JSON: document is null");
         }
         catch (JsonException e)
         {

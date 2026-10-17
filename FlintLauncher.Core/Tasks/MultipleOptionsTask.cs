@@ -3,6 +3,7 @@
 // its subtasks in sequence, until one of them succeeds. When that happens, the remaining tasks
 // will not run. If all attempts fail, the parent fails with "All attempts have failed!" (not
 // with the subtasks' own reasons).
+
 namespace FlintLauncher.Core.Tasks;
 
 /// <summary>
@@ -12,9 +13,7 @@ namespace FlintLauncher.Core.Tasks;
 public class MultipleOptionsTask : ConcurrentTask
 {
     public MultipleOptionsTask(string taskName = "")
-        : base(taskName, 1)
-    {
-    }
+        : base(taskName, 1) { }
 
     protected override void ExecuteNextSubTask()
     {

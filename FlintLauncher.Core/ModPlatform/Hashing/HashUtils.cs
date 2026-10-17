@@ -112,9 +112,7 @@ public sealed class Hasher : FlintTask
     }
 
     public Hasher(string filePath, string alg)
-        : this(filePath, HashUtils.AlgorithmFromString(alg))
-    {
-    }
+        : this(filePath, HashUtils.AlgorithmFromString(alg)) { }
 
     public string Path { get; }
 
@@ -135,6 +133,7 @@ public sealed class Hasher : FlintTask
             EmitFailed("Empty hash!");
             return Task.CompletedTask;
         }
+
         ResultsReady?.Invoke(result);
         EmitSucceeded();
         return Task.CompletedTask;

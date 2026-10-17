@@ -34,6 +34,7 @@ public sealed class NbtReader(Stream input)
             {
                 throw new NbtParseException("Tag is not a compound");
             }
+
             var key = ReadString();
             var comp = new NbtCompound();
             ReadCompoundPayload(comp);
@@ -77,6 +78,7 @@ public sealed class NbtReader(Stream input)
         {
             throw new NbtParseException($"Too deeply nested (more than {MaxDepth} levels)");
         }
+
         try
         {
             return type switch
@@ -96,6 +98,7 @@ public sealed class NbtReader(Stream input)
                     {
                         result[i] = BinaryPrimitives.ReadInt32BigEndian(bytes.AsSpan(i * sizeof(int), sizeof(int)));
                     }
+
                     return result;
                 })),
                 NbtTagType.LongArray => new NbtLongArray(ReadNumericArrayPayload(sizeof(long), static bytes =>
@@ -105,6 +108,7 @@ public sealed class NbtReader(Stream input)
                     {
                         result[i] = BinaryPrimitives.ReadInt64BigEndian(bytes.AsSpan(i * sizeof(long), sizeof(long)));
                     }
+
                     return result;
                 })),
                 NbtTagType.List => ReadListPayload(),
@@ -132,8 +136,10 @@ public sealed class NbtReader(Stream input)
             {
                 throw new NbtParseException($"Error reading key of tag_{tt}");
             }
+
             compound.Put(key, ReadPayload(tt));
         }
+
         return compound;
     }
 
@@ -146,6 +152,7 @@ public sealed class NbtReader(Stream input)
         {
             throw new NbtParseException($"Negative tag_list length {length}");
         }
+
         var list = new NbtList();
         if (elementType != NbtTagType.End)
         {
@@ -155,6 +162,7 @@ public sealed class NbtReader(Stream input)
                 list.Add(ReadPayload(elementType));
             }
         }
+
         // elementType == End: ignore the length and leave the type undetermined, like libnbt++.
         return list;
     }
@@ -166,6 +174,7 @@ public sealed class NbtReader(Stream input)
         {
             throw new NbtParseException($"Negative tag_byte_array length {length}");
         }
+
         return ReadExact(length);
     }
 
@@ -176,6 +185,7 @@ public sealed class NbtReader(Stream input)
         {
             throw new NbtParseException($"Negative array tag length {length}");
         }
+
         // Bounds the allocation by what the stream actually contains: a corrupt huge
         // length hits end-of-stream here instead of allocating length * elementSize.
         return decode(ReadExact((long)length * elementSize));
@@ -190,6 +200,7 @@ public sealed class NbtReader(Stream input)
         {
             throw new NbtParseException($"Invalid tag type: {type}");
         }
+
         return (NbtTagType)type;
     }
 
@@ -250,6 +261,7 @@ public sealed class NbtReader(Stream input)
         {
             throw new NbtParseException($"Unexpected end of NBT data at offset {offset} while reading a tag type");
         }
+
         offset++;
         return (byte)b;
     }
@@ -265,6 +277,7 @@ public sealed class NbtReader(Stream input)
                 throw new NbtParseException(
                     $"Unexpected end of NBT data at offset {offset} (needed {buffer.Length - read} more bytes)");
             }
+
             read += n;
             offset += n;
         }
@@ -280,6 +293,7 @@ public sealed class NbtReader(Stream input)
         {
             throw new NbtParseException($"Invalid NBT read length {count} at offset {offset}");
         }
+
         if (count <= 64 * 1024)
         {
             var result = new byte[count];
@@ -297,6 +311,7 @@ public sealed class NbtReader(Stream input)
             chunks.Add(block);
             total += block.Length;
         }
+
         var combined = new byte[count];
         var pos = 0;
         foreach (var chunk in chunks)
@@ -304,6 +319,7 @@ public sealed class NbtReader(Stream input)
             chunk.CopyTo(combined, pos);
             pos += chunk.Length;
         }
+
         return combined;
     }
 }

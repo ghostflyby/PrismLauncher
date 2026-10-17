@@ -57,7 +57,7 @@ public sealed class SingleZipPackInstallTask : InstanceTask
             // (the C++ downloads through the global cache — outside the instance folder; the
             //  headless fallback mirrors that with a temporary file)
             archivePath = Path.Combine(Path.GetTempPath(), "flint-technic-" + Guid.NewGuid().ToString("N") +
-                                        Path.GetFileName(_sourceUrl.AbsolutePath));
+                                                           Path.GetFileName(_sourceUrl.AbsolutePath));
             FileSystem.EnsureFilePathExists(archivePath);
             var request = NetRequest.MakeFile(_sourceUrl, archivePath);
             await request.StartAsync(cancellationToken);
@@ -95,6 +95,7 @@ public sealed class SingleZipPackInstallTask : InstanceTask
             EmitFailed(failure);
             return;
         }
+
         EmitSucceeded();
     }
 }

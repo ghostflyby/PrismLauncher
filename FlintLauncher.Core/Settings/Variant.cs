@@ -52,6 +52,7 @@ public static class Variant
             {
                 sb.Append((char)b);
             }
+
             return sb.ToString();
         }
     }

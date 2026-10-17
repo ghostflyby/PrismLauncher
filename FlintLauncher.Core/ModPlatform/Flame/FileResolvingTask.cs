@@ -63,6 +63,7 @@ public sealed class FileResolvingTask : FlintTask
             EmitSucceeded();
             return;
         }
+
         EmitStatus("Resolving mod IDs...");
         SetProgress(0, 3);
 
@@ -75,6 +76,7 @@ public sealed class FileResolvingTask : FlintTask
             EmitFailed(job.FailReason);
             return;
         }
+
         await NetJobFinished(response.BodyAsString, cancellationToken);
     }
 
@@ -87,7 +89,7 @@ public sealed class FileResolvingTask : FlintTask
         try
         {
             doc = JsonUtils.RequireObject(JsonNode.Parse(responseBody)
-                ?? throw new JsonParseException("Document: empty response"), "Document");
+                                          ?? throw new JsonParseException("Document: empty response"), "Document");
             array = FlameJson.RequireArray(doc, "data");
         }
         catch (Exception e) when (e is JsonException or JsonParseException)
@@ -111,6 +113,7 @@ public sealed class FileResolvingTask : FlintTask
                     {
                         continue; // upstream asserts this cannot happen
                     }
+
                     manifestFile.Version = version;
                     var urlValid = Uri.TryCreate(version.DownloadUrl, UriKind.Absolute, out _);
                     if (!urlValid && "sha1" == version.HashType && version.Hash.Length != 0)
@@ -130,11 +133,13 @@ public sealed class FileResolvingTask : FlintTask
                     return;
                 }
             }
+
             if (hashes.Count == 0)
             {
                 await GetFlameProjects(cancellationToken);
                 return;
             }
+
             await ModrinthFallback(hashes, cancellationToken);
         }
     }
@@ -155,6 +160,7 @@ public sealed class FileResolvingTask : FlintTask
             {
                 // fall through to the Flame projects step, like the C++ parse-error path
             }
+
             if (doc is not null)
             {
                 {
@@ -175,19 +181,16 @@ public sealed class FileResolvingTask : FlintTask
                                         var file = ModrinthPackIndex.LoadIndexedPackVersion(entryNode);
                                         outFile.Version.DownloadUrl = file.DownloadUrl;
                                     }
-                                    catch (JsonParseException)
-                                    {
-                                    }
+                                    catch (JsonParseException) { }
                                 }
                             }
                         }
-                        catch (JsonException)
-                        {
-                        }
+                        catch (JsonException) { }
                     }
                 }
             }
         }
+
         // the C++ moves on to the projects step even when the Modrinth task failed
         await GetFlameProjects(cancellationToken);
     }
@@ -212,9 +215,7 @@ public sealed class FileResolvingTask : FlintTask
         {
             doc = JsonNode.Parse(response.BodyAsString);
         }
-        catch (JsonException)
-        {
-        }
+        catch (JsonException) { }
 
         if (doc is not null)
         {
@@ -229,6 +230,7 @@ public sealed class FileResolvingTask : FlintTask
                         {
                             continue;
                         }
+
                         var id = FlameJson.RequireInteger(entryObj, "id");
                         var file = _manifest.Files.Values.FirstOrDefault(f => f.ProjectId == id);
                         if (file is null)
@@ -244,11 +246,10 @@ public sealed class FileResolvingTask : FlintTask
                         }
                     }
                 }
-                catch (JsonParseException)
-                {
-                }
+                catch (JsonParseException) { }
             }
         }
+
         EmitSucceeded();
     }
 }

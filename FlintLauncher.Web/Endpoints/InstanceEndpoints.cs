@@ -32,11 +32,13 @@ public static class InstanceEndpoints
                     summaries = summaries.Where(summary =>
                         summary.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
                 }
+
                 if (!string.IsNullOrEmpty(group))
                 {
                     summaries = summaries.Where(summary =>
                         string.Equals(summary.Group, group, StringComparison.OrdinalIgnoreCase));
                 }
+
                 return Results.Ok(summaries.ToArray());
             }
             finally
@@ -59,13 +61,16 @@ public static class InstanceEndpoints
                     {
                         continue; // ungrouped instances are not a group
                     }
+
                     if (!byGroup.TryGetValue(group, out var uuids))
                     {
                         uuids = new List<string>();
                         byGroup[group] = uuids;
                     }
+
                     uuids.Add(inst.Uuid);
                 }
+
                 return Results.Ok(byGroup.Select(pair =>
                     new InstanceGroupView(pair.Key, pair.Value.OrderBy(id => id, StringComparer.Ordinal)
                         .ToArray())).ToArray());
@@ -141,7 +146,7 @@ public static class InstanceEndpoints
         }).Produces<InstanceCreatedResponse>(201);
 
         api.MapPost("/instances/import", async (ImportRequest request, LauncherRuntime runtime,
-                                                FlintTaskRegistry registry) =>
+            FlintTaskRegistry registry) =>
         {
             if (string.IsNullOrWhiteSpace(request.Url) ||
                 !Uri.TryCreate(request.Url, UriKind.Absolute, out var uri) ||
@@ -166,6 +171,7 @@ public static class InstanceEndpoints
                 {
                     importTask.SetName(request.Name);
                 }
+
                 var wrapped = runtime.Instances.WrapInstanceTask(importTask);
                 // NOTE: the hook runs via Task.Run — the fire-and-forget StartAsync below can
                 // complete synchronously on this thread (small/file packs), and an inline
@@ -271,6 +277,7 @@ public static class InstanceEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
                 }
+
                 runtime.Instances.DeleteInstance(inst.Id());
                 return Results.NoContent();
             }
@@ -300,18 +307,22 @@ public static class InstanceEndpoints
                 {
                     inst.SetName(name);
                 }
+
                 if (request.IconKey is { } icon)
                 {
                     inst.SetIconKey(icon);
                 }
+
                 if (request.Notes is { } notes)
                 {
                     inst.SetNotes(notes);
                 }
+
                 if (request.Group is { } group)
                 {
                     runtime.Instances.SetInstanceGroup(inst.Id(), group);
                 }
+
                 runtime.Instances.SaveNow();
                 return Results.NoContent();
             }
@@ -332,6 +343,7 @@ public static class InstanceEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
                 }
+
                 var settings = inst.Settings;
                 var node = new JsonObject();
                 if (settings is InstanceJsonSettingsObject typed)
@@ -352,10 +364,12 @@ public static class InstanceEndpoints
                             node[entry.Key] = ToNode(TypedByDefaultKind(setting));
                         }
                     }
+
                     node["lastLaunchTime"] = typed.StateStore.Current.LastLaunchTime;
                     node["lastTimePlayed"] = typed.StateStore.Current.LastTimePlayed;
                     node["totalTimePlayed"] = typed.StateStore.Current.TotalTimePlayed;
                 }
+
                 var dict = new Dictionary<string, JsonElement>();
                 foreach (var pair in node)
                 {
@@ -363,6 +377,7 @@ public static class InstanceEndpoints
                         ? JsonDocument.Parse("null").RootElement.Clone()
                         : JsonDocument.Parse(pair.Value.ToJsonString()).RootElement.Clone();
                 }
+
                 // flat wire shape (the keys at the top level, exactly what ApiJson.Node used
                 // to write) — a wrapper record would nest it behind a "settings" property
                 return Results.Ok(dict);
@@ -374,7 +389,7 @@ public static class InstanceEndpoints
         }).Produces<Dictionary<string, JsonElement>>();
 
         api.MapPut("/instances/{ref}/settings", async (string @ref, SettingsPutRequest request,
-                                                      LauncherRuntime runtime) =>
+            LauncherRuntime runtime) =>
         {
             if (request.Overrides.ValueKind != JsonValueKind.Object)
             {
@@ -389,6 +404,7 @@ public static class InstanceEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
                 }
+
                 var settings = inst.Settings;
 
                 foreach (var property in request.Overrides.EnumerateObject())
@@ -398,9 +414,11 @@ public static class InstanceEndpoints
                     {
                         return ApiJson.Error("unknown_setting", $"no registered setting '{property.Name}'", 400);
                     }
+
                     // value kind follows the current value (bool/int/long/double/string)
                     setting.Set(ConvertByKind(property.Value, setting.Get()));
                 }
+
                 return Results.NoContent();
             }
             finally

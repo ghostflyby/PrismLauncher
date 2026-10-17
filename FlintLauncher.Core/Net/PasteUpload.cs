@@ -32,10 +32,13 @@ public sealed class PasteUpload : FlintTask
     {
         // 0x0.st
         NullPointer,
+
         // hastebin.com
         Hastebin,
+
         // paste.gg
         PasteGg,
+
         // mclo.gs
         Mclogs,
     }
@@ -110,6 +113,7 @@ public sealed class PasteUpload : FlintTask
             EmitFailed($"Network error: {e.Message}");
             return;
         }
+
         using (response)
         {
             var statusCode = (int)response.StatusCode;
@@ -144,6 +148,7 @@ public sealed class PasteUpload : FlintTask
                     {
                         return;
                     }
+
                     if (obj.TryGetProperty("key", out var key) && key.ValueKind == JsonValueKind.String)
                     {
                         PasteLink = _baseUrl + "/" + key.GetString();
@@ -153,6 +158,7 @@ public sealed class PasteUpload : FlintTask
                         EmitFailed($"Error: {EndpointUrl} returned a malformed response body");
                         return;
                     }
+
                     break;
                 }
                 case PasteType.Mclogs:
@@ -161,6 +167,7 @@ public sealed class PasteUpload : FlintTask
                     {
                         return;
                     }
+
                     if (obj.TryGetProperty("success", out var success) &&
                         success.ValueKind is JsonValueKind.True or JsonValueKind.False)
                     {
@@ -184,6 +191,7 @@ public sealed class PasteUpload : FlintTask
                         EmitFailed($"Error: {EndpointUrl} returned a malformed response body");
                         return;
                     }
+
                     break;
                 }
                 case PasteType.PasteGg:
@@ -192,6 +200,7 @@ public sealed class PasteUpload : FlintTask
                     {
                         return;
                     }
+
                     if (obj.TryGetProperty("status", out var status) && status.ValueKind == JsonValueKind.String)
                     {
                         if (status.GetString() == "success")
@@ -202,6 +211,7 @@ public sealed class PasteUpload : FlintTask
                             {
                                 id = resultId.GetString() ?? "";
                             }
+
                             PasteLink = _baseUrl + "/p/anonymous/" + id;
                         }
                         else
@@ -221,6 +231,7 @@ public sealed class PasteUpload : FlintTask
                         EmitFailed($"Error: {EndpointUrl} returned a malformed response body");
                         return;
                     }
+
                     break;
                 }
             }
@@ -243,11 +254,13 @@ public sealed class PasteUpload : FlintTask
                 $"Failed to parse response from {provider} server: expected JSON but got an invalid response. Error: {e.Message}");
             return false;
         }
+
         obj = doc.RootElement.Clone();
         if (obj.ValueKind == JsonValueKind.Object)
         {
             return true;
         }
+
         EmitFailed($"Error: {EndpointUrl} returned a malformed response body");
         return false;
     }
@@ -291,6 +304,7 @@ public sealed class PasteUpload : FlintTask
                 break;
             }
         }
+
         return message;
     }
 
@@ -337,6 +351,7 @@ public sealed class PasteUpload : FlintTask
             writer.WriteEndArray();
             writer.WriteEndObject();
         }
+
         return stream.ToArray();
     }
 
@@ -369,6 +384,7 @@ public sealed class PasteUpload : FlintTask
         {
             log = reg.Replace(log, with);
         }
+
         return log;
     }
 }

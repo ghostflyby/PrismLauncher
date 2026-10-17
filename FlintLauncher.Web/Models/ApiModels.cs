@@ -66,7 +66,9 @@ public sealed record VanillaCreateRequest(
 
 public sealed record InstanceCreatedResponse(string Id, string Name);
 
-public sealed record ImportRequest(string Url, string? Name = null,
+public sealed record ImportRequest(
+    string Url,
+    string? Name = null,
     Dictionary<string, bool>? OptionalMods = null);
 
 public sealed record TaskAcceptedResponse(string TaskId);
@@ -80,12 +82,17 @@ public sealed record PatchInstanceRequest(
 // ------------------------------------------------------------------ settings
 
 public sealed record SettingsPutRequest(
-    [property: JsonPropertyName("overrides")] JsonElement Overrides);
+    [property: JsonPropertyName("overrides")]
+    JsonElement Overrides);
 
 // ------------------------------------------------------------------ launch / tasks
 
-public sealed record LaunchRequest(string Mode, string? OfflineName, string? AccountProfileId,
-    LaunchJoinServer? Server = null, string? World = null);
+public sealed record LaunchRequest(
+    string Mode,
+    string? OfflineName,
+    string? AccountProfileId,
+    LaunchJoinServer? Server = null,
+    string? World = null);
 
 /// <summary>POST /instances/{id}/launch optional direct join target ("server": {address,
 /// port?}): bypasses the instance JoinServerOnLaunch setting (LaunchController.setTargetToJoin).
@@ -190,7 +197,8 @@ public sealed record ModInstallSelection(string Provider, string ProjectId, stri
 /// <summary>POST /instances/{id}/mods/update optional body (filter by installed file names).
 /// ReleaseTypes are the channels allowed for this run ("Release"/"Beta"/"Alpha",
 /// case-insensitive); when omitted the global ModUpdateReleaseTypes setting applies.</summary>
-public sealed record ModsUpdateRequest(IReadOnlyList<string>? Mods,
+public sealed record ModsUpdateRequest(
+    IReadOnlyList<string>? Mods,
     IReadOnlyList<string>? ReleaseTypes = null);
 
 /// <summary>A provider category (Flame /categories or Modrinth /tag/category; Modrinth has
@@ -350,7 +358,9 @@ public sealed record ManagedPackView(
     string VersionName);
 
 /// <summary>POST /instances/{id}/managedpack/update-check response.</summary>
-public sealed record ManagedPackUpdateResponse(string CurrentVersion, string LatestVersion,
+public sealed record ManagedPackUpdateResponse(
+    string CurrentVersion,
+    string LatestVersion,
     bool UpdateAvailable);
 
 /// <summary>One icon of the global icon library (GET /api/v1/icons).</summary>
@@ -393,16 +403,25 @@ public sealed record AtLauncherPackVersionView(string Version, string Minecraft)
 
 /// <summary>One packsnew.json index pack, mapped through AtLauncherPackIndex.LoadIndexedPack
 /// (safeName is the normalized pack *image* name, "&lt;safe&gt;.png").</summary>
-public sealed record AtLauncherPackView(string Name, string SafeName, string Description, string Type,
+public sealed record AtLauncherPackView(
+    string Name,
+    string SafeName,
+    string Description,
+    string Type,
     IReadOnlyList<AtLauncherPackVersionView> Versions);
 
 /// <summary>POST /modplatform/atlauncher/install body: the pack to install (name+version),
 /// the new instance's metadata and the pre-set dialog answers (optional-mod selection and
 /// the loader "choose" mode's version). serverUrl overrides the ATL download-server static
 /// for the duration of the call (tests / mirrors).</summary>
-public sealed record AtLauncherInstallRequest(string Name, string Version, string? Group = null,
-    string? IconKey = null, Dictionary<string, bool>? OptionalMods = null,
-    string? ChooseLoaderVersion = null, string? ServerUrl = null);
+public sealed record AtLauncherInstallRequest(
+    string Name,
+    string Version,
+    string? Group = null,
+    string? IconKey = null,
+    Dictionary<string, bool>? OptionalMods = null,
+    string? ChooseLoaderVersion = null,
+    string? ServerUrl = null);
 
 // ----------------------------------------------------------------- FTB (fix-2b)
 

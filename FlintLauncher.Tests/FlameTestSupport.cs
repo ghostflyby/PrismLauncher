@@ -102,6 +102,7 @@ internal sealed class StubFlameServer : IDisposable
                 LastHeaders[key] = ctx.Request.Headers[key] ?? "";
             }
         }
+
         LastQuery.Clear();
         foreach (var key in ctx.Request.QueryString.AllKeys)
         {
@@ -110,6 +111,7 @@ internal sealed class StubFlameServer : IDisposable
                 LastQuery[key] = ctx.Request.QueryString[key] ?? "";
             }
         }
+
         if (ctx.Request.HasEntityBody)
         {
             using var ms = new MemoryStream();
@@ -192,6 +194,7 @@ internal sealed class StubFlameServer : IDisposable
         {
             return false;
         }
+
         var tail = path[(marker + "/files/".Length)..].Split('?')[0];
         return tail.Length != 0 && tail.All(char.IsDigit);
     }
@@ -202,9 +205,7 @@ internal sealed class StubFlameServer : IDisposable
         {
             _listener.Close();
         }
-        catch (ObjectDisposedException)
-        {
-        }
+        catch (ObjectDisposedException) { }
     }
 }
 
@@ -269,6 +270,7 @@ internal static class FlamePayloads
                 ["file"] = JsonObject.Parse(fileJson),
             });
         }
+
         return new JsonObject
         {
             ["data"] = new JsonObject { ["exactMatches"] = arr },
@@ -364,9 +366,7 @@ internal sealed class FlamePackBuilder
             {
                 Directory.Delete(dir, recursive: true);
             }
-            catch (DirectoryNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
         }
     }
 }

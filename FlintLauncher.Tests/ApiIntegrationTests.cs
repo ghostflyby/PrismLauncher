@@ -128,8 +128,10 @@ internal sealed class FlintApiHost : IAsyncDisposable
             {
                 return task;
             }
+
             await Task.Delay(100);
         }
+
         throw new Exception($"task {taskId} never reached '{expected}', last state: {task.GetRawText()}");
     }
 
@@ -151,9 +153,7 @@ internal sealed class FlintApiHost : IAsyncDisposable
             {
                 Directory.Delete(HomeDir, recursive: true);
             }
-            catch (DirectoryNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
         }
     }
 }
@@ -192,6 +192,7 @@ internal sealed class ApiStubServer : IDisposable
             {
                 return;
             }
+
             _ = Task.Run(async () =>
             {
                 try
@@ -212,15 +213,15 @@ internal sealed class ApiStubServer : IDisposable
         {
             return;
         }
+
         disposed = true;
         try
         {
             _listener.Stop();
             _listener.Close();
         }
-        catch (ObjectDisposedException)
-        {
-        }
+        catch (ObjectDisposedException) { }
+
         GC.KeepAlive(_loop);
     }
 }
@@ -373,7 +374,7 @@ public class FlintApiIntegrationTests
                 })).StatusCode);
 
         var settings = JsonDocument.Parse(await (await host.GetAsync(
-            $"/api/v1/instances/{Uri.EscapeDataString(id)}/settings")).Content.ReadAsStringAsync())
+                $"/api/v1/instances/{Uri.EscapeDataString(id)}/settings")).Content.ReadAsStringAsync())
             .RootElement;
         // the settings map exposes the derived gates, the instance-layer members (D4) and
         // the runtime time trio
@@ -545,14 +546,14 @@ public class FlintApiIntegrationTests
             // S2: the token is host-injected (--api-token) — no token file exists to read
             var apiToken = Guid.NewGuid().ToString("N");
             var app = WebHostBuilder.BuildWebApplication(
-            [
-                "--home-dir", dataDir,
-                "--api-token", apiToken,
-                "--urls", "http://127.0.0.1:0",
-            ],
-            // the launch pipeline's jar lookups resolve against this install root (the former
-            // JavaUtils.LauncherRootPath static test hook, now LaunchServices.Paths.InstallRoot)
-            paths: FlintPaths.FromHomeDir(dataDir) with { InstallRoot = launcherRoot });
+                [
+                    "--home-dir", dataDir,
+                    "--api-token", apiToken,
+                    "--urls", "http://127.0.0.1:0",
+                ],
+                // the launch pipeline's jar lookups resolve against this install root (the former
+                // JavaUtils.LauncherRootPath static test hook, now LaunchServices.Paths.InstallRoot)
+                paths: FlintPaths.FromHomeDir(dataDir) with { InstallRoot = launcherRoot });
             await app.StartAsync();
             using var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
             client.DefaultRequestHeaders.Add("X-Api-Token", apiToken);
@@ -602,7 +603,7 @@ public class FlintApiIntegrationTests
                 new { mode = "offline", offlineName = "ApiTester" });
             Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
             Assert.Equal("instance_unavailable", JsonDocument.Parse(
-                await second.Content.ReadAsStringAsync())
+                    await second.Content.ReadAsStringAsync())
                 .RootElement.GetProperty("error").GetProperty("code").GetString());
 
             // AutoProceed is false for API launches: the task parks in "waiting" --------
@@ -620,7 +621,7 @@ public class FlintApiIntegrationTests
             var dupe = await client.PostAsJsonAsync($"/api/v1/tasks/{taskId}/proceed", new { });
             Assert.Equal(HttpStatusCode.Conflict, dupe.StatusCode);
             Assert.Equal("launch_not_waiting", JsonDocument.Parse(
-                await dupe.Content.ReadAsStringAsync())
+                    await dupe.Content.ReadAsStringAsync())
                 .RootElement.GetProperty("error").GetProperty("code").GetString());
 
             // the launch script reached the fake EntryPoint and came back via the log --
@@ -645,7 +646,7 @@ public class FlintApiIntegrationTests
 
             // SSE stream: replays the buffered log and ends with the terminal state -----
             using (var stream = await client.GetAsync($"/api/v1/tasks/{taskId}/stream",
-                HttpCompletionOption.ResponseHeadersRead))
+                       HttpCompletionOption.ResponseHeadersRead))
             {
                 stream.EnsureSuccessStatusCode();
                 Assert.Contains("text/event-stream", stream.Content.Headers.ContentType!.ToString());
@@ -665,14 +666,12 @@ public class FlintApiIntegrationTests
             {
                 Directory.Delete(dataDir, recursive: true);
             }
-            catch (DirectoryNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
         }
     }
 
     private static async Task<JsonElement> PollTaskState(HttpClient client, string taskId,
-                                                          string expected, TimeSpan timeout)
+        string expected, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         JsonElement task = default;
@@ -685,12 +684,15 @@ public class FlintApiIntegrationTests
             {
                 return task;
             }
+
             if (state is "failed" or "aborted")
             {
                 throw new Exception($"launch task ended in '{state}': {task.GetProperty("failReason").GetString()}");
             }
+
             await Task.Delay(100);
         }
+
         throw new Exception($"task never reached '{expected}', last: {task.GetRawText()}");
     }
 
@@ -698,24 +700,25 @@ public class FlintApiIntegrationTests
     {
         var path = Path.Combine(root, "fake-java");
         File.WriteAllText(path, """
-            #!/bin/sh
-            exec 2>>/tmp/fj-stderr.log
-            while IFS= read -r line || [ -n "$line" ]; do
-                printf '%s\n' "$line"
-                if [ "$line" = "launch" ]; then
-                    exit 0
-                fi
-                if [ "$line" = "abort" ]; then
-                    exit 42
-                fi
-            done
-            exit 1
-            """);
+                                #!/bin/sh
+                                exec 2>>/tmp/fj-stderr.log
+                                while IFS= read -r line || [ -n "$line" ]; do
+                                    printf '%s\n' "$line"
+                                    if [ "$line" = "launch" ]; then
+                                        exit 0
+                                    fi
+                                    if [ "$line" = "abort" ]; then
+                                        exit 42
+                                    fi
+                                done
+                                exit 1
+                                """);
         if (!OperatingSystem.IsWindows())
         {
             File.SetUnixFileMode(path, File.GetUnixFileMode(path) | UnixFileMode.UserExecute |
-                UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
+                                       UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
         }
+
         return path;
     }
 }
@@ -728,8 +731,8 @@ public class FlintApiDeviceCodeTests : IDisposable
     private readonly AuthEndpointsOptions _auth = new();
 
     private const string MsaDeviceCode = """
-                                          {"device_code":"dev123","user_code":"FLNT-CODE","verification_uri":"https://microsoft.test/link","expires_in":900,"interval":1}
-                                          """;
+                                         {"device_code":"dev123","user_code":"FLNT-CODE","verification_uri":"https://microsoft.test/link","expires_in":900,"interval":1}
+                                         """;
 
     private string msaToken;
 
@@ -778,7 +781,7 @@ public class FlintApiDeviceCodeTests : IDisposable
 
         // pending while the user has not authorized
         var poll = JsonDocument.Parse(await (await host.PostAsync(
-            $"/api/v1/accounts/msa/devicecode/{deviceId}/poll", new { })).Content.ReadAsStringAsync())
+                $"/api/v1/accounts/msa/devicecode/{deviceId}/poll", new { })).Content.ReadAsStringAsync())
             .RootElement;
         Assert.Equal("pending", poll.GetProperty("state").GetString());
         Assert.True(poll.GetProperty("account").ValueKind is JsonValueKind.Null);
@@ -795,6 +798,7 @@ public class FlintApiDeviceCodeTests : IDisposable
             state = JsonDocument.Parse(await next.Content.ReadAsStringAsync())
                 .RootElement.GetProperty("state").GetString()!;
         }
+
         Assert.Equal("expired", state);
     }
 }

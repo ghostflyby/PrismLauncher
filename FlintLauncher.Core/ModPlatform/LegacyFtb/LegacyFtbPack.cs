@@ -2,6 +2,7 @@
 // Port of modplatform/legacy_ftb/PackHelpers.h: the legacy FTB modpack description parsed
 // from modpacks.xml/thirdparty.xml/{code}.xml (data layer only — the Qt models of the UI
 // are not ported).
+
 namespace FlintLauncher.Core.ModPlatform.LegacyFtb;
 
 /// <summary>Port of LegacyFTB::PackType.</summary>

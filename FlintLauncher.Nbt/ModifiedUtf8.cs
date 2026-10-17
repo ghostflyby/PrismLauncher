@@ -46,6 +46,7 @@ public static class ModifiedUtf8
             {
                 Array.Resize(ref bytes, bytes.Length * 2 + 8);
             }
+
             bytes[count++] = (byte)b;
         }
 
@@ -75,6 +76,7 @@ public static class ModifiedUtf8
                 Emit(0x80 | (ch & 0x3F));
             }
         }
+
         return count == bytes.Length ? bytes : bytes[..count];
     }
 
@@ -102,6 +104,7 @@ public static class ModifiedUtf8
                 {
                     throw new NbtParseException($"Malformed 2-byte modified UTF-8 sequence at byte {i}");
                 }
+
                 sb.Append((char)(((b0 & 0x1F) << 6) | (bytes[i + 1] & 0x3F)));
                 i += 2;
             }
@@ -111,6 +114,7 @@ public static class ModifiedUtf8
                 {
                     throw new NbtParseException($"Malformed 3-byte modified UTF-8 sequence at byte {i}");
                 }
+
                 sb.Append((char)(((b0 & 0x0F) << 12) | ((bytes[i + 1] & 0x3F) << 6) | (bytes[i + 2] & 0x3F)));
                 i += 3;
             }
@@ -118,16 +122,18 @@ public static class ModifiedUtf8
             {
                 // Lenient extension: standard 4-byte UTF-8 (astral plane) sequence.
                 if (i + 3 >= bytes.Length || (bytes[i + 1] & 0xC0) != 0x80
-                    || (bytes[i + 2] & 0xC0) != 0x80 || (bytes[i + 3] & 0xC0) != 0x80)
+                                          || (bytes[i + 2] & 0xC0) != 0x80 || (bytes[i + 3] & 0xC0) != 0x80)
                 {
                     throw new NbtParseException($"Malformed 4-byte UTF-8 sequence at byte {i}");
                 }
+
                 var codePoint = ((b0 & 0x07) << 18) | ((bytes[i + 1] & 0x3F) << 12)
-                    | ((bytes[i + 2] & 0x3F) << 6) | (bytes[i + 3] & 0x3F);
+                                                    | ((bytes[i + 2] & 0x3F) << 6) | (bytes[i + 3] & 0x3F);
                 if (codePoint < 0x10000 || codePoint > 0x10FFFF)
                 {
                     throw new NbtParseException($"Invalid UTF-8 code point U+{codePoint:X} at byte {i}");
                 }
+
                 codePoint -= 0x10000;
                 sb.Append((char)(0xD800 + (codePoint >> 10)));
                 sb.Append((char)(0xDC00 + (codePoint & 0x3FF)));
@@ -138,6 +144,7 @@ public static class ModifiedUtf8
                 throw new NbtParseException($"Invalid modified UTF-8 lead byte 0x{b0:X2} at byte {i}");
             }
         }
+
         return sb.ToString();
     }
 }

@@ -89,7 +89,7 @@ public sealed class ImgurUpload : FlintTask
             fileData = await File.ReadAllBytesAsync(_shot.FilePath, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException
-                                  or ArgumentException or SecurityException)
+                                      or ArgumentException or SecurityException)
         {
             EmitFailed($"Could not open file {_shot.FilePath} for reading: {e.Message}");
             return;
@@ -116,6 +116,7 @@ public sealed class ImgurUpload : FlintTask
         {
             responseBody = "";
         }
+
         if (statusCode is not 200 and not 201 and not 202 and not 203 and not 206)
         {
             EmitFailed($"HTTP status {statusCode} for {EndpointUrl}\n{Truncate(responseBody)}");
@@ -134,6 +135,7 @@ public sealed class ImgurUpload : FlintTask
             EmitFailed("Invalid json reply");
             return;
         }
+
         using (doc)
         {
             var root = doc.RootElement;
@@ -145,6 +147,7 @@ public sealed class ImgurUpload : FlintTask
                 EmitFailed("Screenshot was not uploaded successfully");
                 return;
             }
+
             if (root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object)
             {
                 _shot.ImgurId = data.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String
@@ -159,6 +162,7 @@ public sealed class ImgurUpload : FlintTask
                         : "";
             }
         }
+
         EmitSucceeded();
     }
 
@@ -244,6 +248,7 @@ public sealed class ImgurAlbumCreation : FlintTask
         {
             responseBody = "";
         }
+
         if (statusCode is not 200 and not 201 and not 202 and not 203 and not 206)
         {
             EmitFailed($"HTTP status {statusCode} for {EndpointUrl}");
@@ -261,6 +266,7 @@ public sealed class ImgurAlbumCreation : FlintTask
             EmitFailed("Invalid json reply");
             return;
         }
+
         using (doc)
         {
             var root = doc.RootElement;
@@ -272,6 +278,7 @@ public sealed class ImgurAlbumCreation : FlintTask
                 EmitFailed("Failed to create album");
                 return;
             }
+
             if (root.TryGetProperty("data", out var albumData) && albumData.ValueKind == JsonValueKind.Object)
             {
                 _result.DeleteHash = albumData.TryGetProperty("deletehash", out var deleteHash) &&
@@ -283,6 +290,7 @@ public sealed class ImgurAlbumCreation : FlintTask
                     : "";
             }
         }
+
         EmitSucceeded();
     }
 }

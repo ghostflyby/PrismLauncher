@@ -33,6 +33,7 @@ public sealed class FtbAppPaths
         {
             partialPath = FileSystem.PathCombine(partialPath, "Library/Application Support");
         }
+
         return FileSystem.PathCombine(partialPath, ".ftba");
     }
 
@@ -46,15 +47,18 @@ public sealed class FtbAppPaths
         {
             settingsPath = FileSystem.PathCombine(RootPath, "bin", "settings.json");
         }
+
         if (!File.Exists(settingsPath))
         {
             return "";
         }
+
         try
         {
             var root = JsonUtils.RequireNodeFromFile(settingsPath, "FTB App settings file");
             return root["instanceLocation"] is JsonValue value && value.TryGetValue<string>(out var location)
-                ? location : "";
+                ? location
+                : "";
         }
         catch (Exception e) when (e is JsonParseException or JsonException)
         {

@@ -34,9 +34,7 @@ public class LegacyFtbTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     /// <summary>A fetch task whose CDN points at the stub server.</summary>
@@ -55,7 +53,7 @@ public class LegacyFtbTests : IDisposable
         using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
         return doc.RootElement.GetProperty("components").EnumerateArray()
             .Select(c => (Uid: c.GetProperty("uid").GetString(),
-                          Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
+                Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
             .ToList();
     }
 
@@ -65,21 +63,21 @@ public class LegacyFtbTests : IDisposable
     public async Task Fetch_ParsesPublicAndThirdPartyLists()
     {
         _server.ModpacksXml = """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <modpacks>
-                <modpack name="Public Pack" version="1.2.3" mcVersion="1.7.10"
-                         description="a public pack" mods="42" logo="public.png"
-                         oldVersions="1.2.2;1.2.1" author="alice" dir="PublicPack" url="PublicPack-1.2.3.zip"/>
-            </modpacks>
-            """;
+                              <?xml version="1.0" encoding="UTF-8"?>
+                              <modpacks>
+                                  <modpack name="Public Pack" version="1.2.3" mcVersion="1.7.10"
+                                           description="a public pack" mods="42" logo="public.png"
+                                           oldVersions="1.2.2;1.2.1" author="alice" dir="PublicPack" url="PublicPack-1.2.3.zip"/>
+                              </modpacks>
+                              """;
         _server.ThirdPartyXml = """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <modpacks>
-                <modpack name="Third Party Pack" version="3.1" mcVersion="1.12.2"
-                         description="" mods="" logo="" oldVersions="" author="bob"
-                         dir="ThirdPartyPack" url="ThirdPartyPack-3.1.zip"/>
-            </modpacks>
-            """;
+                                <?xml version="1.0" encoding="UTF-8"?>
+                                <modpacks>
+                                    <modpack name="Third Party Pack" version="3.1" mcVersion="1.12.2"
+                                             description="" mods="" logo="" oldVersions="" author="bob"
+                                             dir="ThirdPartyPack" url="ThirdPartyPack-3.1.zip"/>
+                                </modpacks>
+                                """;
 
         var task = CreateFetchTask();
         await task.StartAsync();
@@ -114,11 +112,11 @@ public class LegacyFtbTests : IDisposable
     public async Task Fetch_PackWithoutAnyVersion_IsBroken()
     {
         _server.ModpacksXml = """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <modpacks>
-                <modpack name="Broken Pack" version="" mcVersion="1.7.10" oldVersions="" dir="Broken"/>
-            </modpacks>
-            """;
+                              <?xml version="1.0" encoding="UTF-8"?>
+                              <modpacks>
+                                  <modpack name="Broken Pack" version="" mcVersion="1.7.10" oldVersions="" dir="Broken"/>
+                              </modpacks>
+                              """;
         _server.ThirdPartyXml = """<modpacks></modpacks>""";
 
         var task = CreateFetchTask();
@@ -150,12 +148,12 @@ public class LegacyFtbTests : IDisposable
     public async Task FetchPrivate_CarriesPackCode()
     {
         _server.PrivateXmls["secret"] = """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <modpacks>
-                <modpack name="Private Pack" version="9.9" mcVersion="1.7.10"
-                         oldVersions="9.8" author="carol" dir="PrivatePack" url="PrivatePack-9.9.zip"/>
-            </modpacks>
-            """;
+                                        <?xml version="1.0" encoding="UTF-8"?>
+                                        <modpacks>
+                                            <modpack name="Private Pack" version="9.9" mcVersion="1.7.10"
+                                                     oldVersions="9.8" author="carol" dir="PrivatePack" url="PrivatePack-9.9.zip"/>
+                                        </modpacks>
+                                        """;
 
         var task = CreateFetchTask();
         var fetched = new List<LegacyFtbModpack>();
@@ -214,9 +212,8 @@ public class LegacyFtbTests : IDisposable
         {
             Directory.Delete(srcDir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
+
         return zipPath;
     }
 
@@ -240,13 +237,13 @@ public class LegacyFtbTests : IDisposable
         var pack = MakePack();
         _server.Archives["modpacks/TestPack/1_2_3/TestPack-1_2_3.zip"] = BuildArchive(
             Path.Combine(_root, "forge-pack.zip"), srcDir =>
-        {
-            Directory.CreateDirectory(Path.Combine(srcDir, "minecraft", "config"));
-            File.WriteAllText(Path.Combine(srcDir, "minecraft", "pack.json"),
-                """{"libraries":[{"name":"net.minecraftforge:forge:1.7.10-10.13.4.1614-1.7.10"}]}""");
-            File.WriteAllText(Path.Combine(srcDir, "minecraft", "config", "test.cfg"), "ftb=1\n");
-            Directory.CreateDirectory(Path.Combine(srcDir, "minecraft", "mods"));
-        });
+            {
+                Directory.CreateDirectory(Path.Combine(srcDir, "minecraft", "config"));
+                File.WriteAllText(Path.Combine(srcDir, "minecraft", "pack.json"),
+                    """{"libraries":[{"name":"net.minecraftforge:forge:1.7.10-10.13.4.1614-1.7.10"}]}""");
+                File.WriteAllText(Path.Combine(srcDir, "minecraft", "config", "test.cfg"), "ftb=1\n");
+                Directory.CreateDirectory(Path.Combine(srcDir, "minecraft", "mods"));
+            });
 
         var list = CreateList();
         var task = new LegacyFtbPackInstallTask(pack, "1.2.3") { CdnBaseUrl = _server.Url + "/" };
@@ -277,14 +274,14 @@ public class LegacyFtbTests : IDisposable
         var pack = MakePack(file: "TestPack-2_0_0.zip");
         _server.Archives["modpacks/TestPack/2_0_0/TestPack-2_0_0.zip"] = BuildArchive(
             Path.Combine(_root, "jarmod-pack.zip"), srcDir =>
-        {
-            Directory.CreateDirectory(Path.Combine(srcDir, "instMods"));
-            File.WriteAllBytes(Path.Combine(srcDir, "instMods", "legacycore.jar"),
-                "legacy jar mod payload"u8.ToArray());
-            Directory.CreateDirectory(Path.Combine(srcDir, "minecraft", "mods"));
-            File.WriteAllBytes(Path.Combine(srcDir, "minecraft", "mods", "oldmod.jar"),
-                "old mod payload"u8.ToArray());
-        });
+            {
+                Directory.CreateDirectory(Path.Combine(srcDir, "instMods"));
+                File.WriteAllBytes(Path.Combine(srcDir, "instMods", "legacycore.jar"),
+                    "legacy jar mod payload"u8.ToArray());
+                Directory.CreateDirectory(Path.Combine(srcDir, "minecraft", "mods"));
+                File.WriteAllBytes(Path.Combine(srcDir, "minecraft", "mods", "oldmod.jar"),
+                    "old mod payload"u8.ToArray());
+            });
 
         var list = CreateList();
         var task = new LegacyFtbPackInstallTask(pack, "2.0.0") { CdnBaseUrl = _server.Url + "/" };
@@ -309,10 +306,10 @@ public class LegacyFtbTests : IDisposable
         var pack = MakePack(dir: "SecretPack", file: "SecretPack-1_0.zip", type: PackType.Private);
         _server.Archives["privatepacks/SecretPack/1_0/SecretPack-1_0.zip"] = BuildArchive(
             Path.Combine(_root, "private-pack.zip"), srcDir =>
-        {
-            Directory.CreateDirectory(Path.Combine(srcDir, "instMods"));
-            File.WriteAllBytes(Path.Combine(srcDir, "instMods", "core.jar"), "core"u8.ToArray());
-        });
+            {
+                Directory.CreateDirectory(Path.Combine(srcDir, "instMods"));
+                File.WriteAllBytes(Path.Combine(srcDir, "instMods", "core.jar"), "core"u8.ToArray());
+            });
 
         var list = CreateList();
         var task = new LegacyFtbPackInstallTask(pack, "1.0") { CdnBaseUrl = _server.Url + "/" };
@@ -330,10 +327,10 @@ public class LegacyFtbTests : IDisposable
         var pack = MakePack(file: "TestPack-0_1.zip");
         _server.Archives["modpacks/TestPack/0_1/TestPack-0_1.zip"] = BuildArchive(
             Path.Combine(_root, "bare-pack.zip"), srcDir =>
-        {
-            Directory.CreateDirectory(Path.Combine(srcDir, "minecraft"));
-            File.WriteAllText(Path.Combine(srcDir, "minecraft", "options.txt"), "nothing:1\n");
-        });
+            {
+                Directory.CreateDirectory(Path.Combine(srcDir, "minecraft"));
+                File.WriteAllText(Path.Combine(srcDir, "minecraft", "options.txt"), "nothing:1\n");
+            });
 
         var list = CreateList();
         var task = new LegacyFtbPackInstallTask(pack, "0.1") { CdnBaseUrl = _server.Url + "/" };
@@ -423,6 +420,7 @@ internal sealed class StubLegacyFtbServer : IDisposable
                 ctx.Response.StatusCode = 404;
                 return;
             }
+
             body = Encoding.UTF8.GetBytes(privateXml);
         }
         else
@@ -432,6 +430,7 @@ internal sealed class StubLegacyFtbServer : IDisposable
                 ctx.Response.StatusCode = 404;
                 return;
             }
+
             LastArchivePath = path;
             body = File.ReadAllBytes(archivePath);
         }
@@ -447,8 +446,6 @@ internal sealed class StubLegacyFtbServer : IDisposable
         {
             _listener.Close();
         }
-        catch (ObjectDisposedException)
-        {
-        }
+        catch (ObjectDisposedException) { }
     }
 }

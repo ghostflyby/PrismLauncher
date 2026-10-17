@@ -3,6 +3,7 @@
 // value-for-value from the C++ constructor. The QDateTime fields use DateTimeOffset?
 // (null = invalid QDateTime); the C++ global instance g_VersionFilterData becomes the
 // VersionFilterData.Instance singleton.
+
 namespace FlintLauncher.Core.Minecraft;
 
 public readonly record struct FmlLib(string Filename, string Checksum);

@@ -27,7 +27,7 @@ public sealed class LookupServerAddress(LaunchTask parent, MinecraftTarget outpu
             EmitLogLine($"Failed to resolve server address (this is NOT an error!) {dnsName}: {e.Message}\n",
                 MessageLevel.Launcher);
             Resolve(LookupAddress, 25565); // Technically the task failed, however, we don't abort the launch
-            return;                         // and leave it up to minecraft to fail (or maybe not) when connecting
+            return;                        // and leave it up to minecraft to fail (or maybe not) when connecting
         }
 
         if (record is null)

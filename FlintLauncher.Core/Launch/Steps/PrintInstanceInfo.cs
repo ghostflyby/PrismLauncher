@@ -54,10 +54,12 @@ public sealed class PrintInstanceInfo : LaunchStep
         {
             return $"macOS {os.Version.ToString(2)}";
         }
+
         if (OperatingSystem.IsWindows())
         {
             return $"Windows {os.Version}";
         }
+
         return RuntimeInformation.OSDescription.Trim();
     }
 
@@ -68,14 +70,17 @@ public sealed class PrintInstanceInfo : LaunchStep
         {
             return "darwin";
         }
+
         if (OperatingSystem.IsLinux())
         {
             return "linux";
         }
+
         if (OperatingSystem.IsWindows())
         {
             return "nt";
         }
+
         return "unknown";
     }
 

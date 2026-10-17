@@ -83,6 +83,7 @@ public readonly record struct DependencyType
                 return new DependencyType(value);
             }
         }
+
         return Invalid;
     }
 }
@@ -127,6 +128,7 @@ public readonly record struct SideType
                 return new SideType(value);
             }
         }
+
         return Invalid;
     }
 }
@@ -171,6 +173,7 @@ public readonly record struct IndexedVersionType
                 return new IndexedVersionType(value);
             }
         }
+
         return Invalid;
     }
 
@@ -186,6 +189,7 @@ public readonly record struct IndexedVersionType
                 result.Add(type);
             }
         }
+
         return result;
     }
 
@@ -211,6 +215,7 @@ public readonly record struct IndexedVersionType
                 result.Add(s);
             }
         }
+
         return result;
     }
 }
@@ -260,6 +265,7 @@ public sealed class Dependency
 {
     /// <summary>QVariant addonId: a string (possibly numeric for Flame) or "" for null.</summary>
     public string AddonId { get; set; } = "";
+
     public DependencyType Type { get; set; } = DependencyType.Invalid;
     public string Version { get; set; } = "";
 }
@@ -299,11 +305,13 @@ public sealed class IndexedVersion
                 gameVersion = "";
                 break;
             }
+
             if (gameVersion.Length == 0)
             {
                 gameVersion = $" for {v}";
             }
         }
+
         return $"{Version}{gameVersion} — {versionStr}{releaseType}";
     }
 }
@@ -353,6 +361,7 @@ public sealed class IndexedPack
         {
             return false;
         }
+
         return Versions[index].IsCurrentlySelected;
     }
 
@@ -362,6 +371,7 @@ public sealed class IndexedPack
         {
             return false;
         }
+
         return Versions.Any(v => v.IsCurrentlySelected);
     }
 }
@@ -438,6 +448,7 @@ public static class ModIndex
                 flagList.Add(flag);
             }
         }
+
         return flagList;
     }
 

@@ -43,9 +43,7 @@ public class FlameImportTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private string TempPath(string name) => Path.Combine(_root, name);
@@ -114,6 +112,7 @@ public class FlameImportTests : IDisposable
             Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.18.2");
             Assert.Contains(components, c => c.Uid == "net.minecraftforge" && c.Version == "40.1.0");
         }
+
         Assert.Contains("Flame Imported", await File.ReadAllTextAsync(Path.Combine(staging, "instance.json")));
 
         // per-mod .pw.toml with the Flame ([update.curseforge]) table

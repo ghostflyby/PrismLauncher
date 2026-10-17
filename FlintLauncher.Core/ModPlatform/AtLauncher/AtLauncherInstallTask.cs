@@ -132,6 +132,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
             EmitFailed(netJob.FailReason);
             return;
         }
+
         await OnDownloadSucceeded(request.BodyAsString, cancellationToken);
     }
 
@@ -228,10 +229,12 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
             {
                 return minecraftPath;
             }
+
             if (baseName == "config")
             {
                 return FileSystem.PathCombine(minecraftPath, "config");
             }
+
             return minecraftPath;
         }
 
@@ -285,6 +288,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
             {
                 continue;
             }
+
             foreach (var path in Directory.EnumerateFileSystemEntries(fullPath, "*", SearchOption.AllDirectories))
             {
                 if (ShouldKeep(path))
@@ -373,8 +377,10 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
                     EmitFailed($"Failed to find version for {loader.Type} loader");
                     return null;
                 }
+
                 return found;
             }
+
             if (loader.Choose)
             {
                 // Fabric Loader doesn't depend on a given Minecraft version.
@@ -420,6 +426,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
             {
                 return "com.google.guava:guava:" + version;
             }
+
             if (name == "commons-lang3")
             {
                 return "org.apache.commons:commons-lang3:" + version;
@@ -465,6 +472,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
         {
             return false;
         }
+
         var patchFileName = FileSystem.PathCombine(patchDir, targetId + ".json");
 
         var f = new VersionFile
@@ -497,6 +505,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
                     libExempt = new McVersion(libSpecifier.Version).CompareTo(new McVersion(existingLib.Version)) >= 0;
                 }
             }
+
             if (libExempt)
             {
                 continue;
@@ -576,6 +585,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
         {
             return false;
         }
+
         var patchFileName = FileSystem.PathCombine(patchDir, targetId + ".json");
 
         var mainClasses = new List<string>();
@@ -589,6 +599,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
                 {
                     mainClasses.Add(componentData.MainClass);
                 }
+
                 tweakers.AddRange(componentData.AddTweakers);
             }
         }
@@ -601,6 +612,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
         {
             f.MainClass = mainClass;
         }
+
         var previous = "";
         foreach (var rawArg in extraArguments.Split(' '))
         {
@@ -615,6 +627,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
                     f.AddTweakers.Add(arg);
                 }
             }
+
             previous = arg;
         }
 
@@ -745,17 +758,17 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
                     url = _api.DownloadServerUrl + mod.Url;
                     break;
                 case DownloadType.Browser:
+                {
+                    blockedMods.Add((mod, new BlockedMod
                     {
-                        blockedMods.Add((mod, new BlockedMod
-                        {
-                            Name = mod.File,
-                            WebsiteUrl = mod.Url,
-                            Hash = mod.Md5,
-                            Matched = false,
-                            LocalPath = "",
-                        }));
-                        continue;
-                    }
+                        Name = mod.File,
+                        WebsiteUrl = mod.Url,
+                        Hash = mod.Md5,
+                        Matched = false,
+                        LocalPath = "",
+                    }));
+                    continue;
+                }
                 case DownloadType.Direct:
                     url = mod.Url;
                     break;
@@ -788,6 +801,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
                     {
                         return;
                     }
+
                     continue;
                 }
 
@@ -850,6 +864,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
                             {
                                 return;
                             }
+
                             continue;
                         }
 
@@ -907,6 +922,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
                 {
                     EmitFailed("Failed to extract mods...");
                 }
+
                 return;
             }
         }
@@ -937,6 +953,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
         {
             dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.MD5, mod.Md5));
         }
+
         modJob.AddNetRequest(dl);
         downloadRequests.Add(dl);
         return cachePath;
@@ -962,6 +979,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
                 {
                     return false;
                 }
+
                 extractToDir = dir;
             }
             else if (mod.Type == ModType.TexturePackExtract)
@@ -1005,6 +1023,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
             {
                 return false;
             }
+
             var extractToPath = FileSystem.PathCombine(StagingPath, "minecraft", dir, mod.DecompFile);
 
             if (IsPathTraversal(FileSystem.PathCombine(StagingPath, "minecraft", dir), mod.DecompFile))
@@ -1035,6 +1054,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
                 return false;
             }
         }
+
         return true;
     }
 

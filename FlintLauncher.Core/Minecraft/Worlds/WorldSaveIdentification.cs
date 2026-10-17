@@ -64,10 +64,12 @@ public static class WorldSaveIdentification
         {
             return ProcessFolder(save, level);
         }
+
         if (save.FileInfo.Exists && string.Equals(save.FileInfo.Extension, ".zip", StringComparison.Ordinal))
         {
             return ProcessZip(save, level);
         }
+
         return false; // invalid type for world save parse task
     }
 
@@ -102,6 +104,7 @@ public static class WorldSaveIdentification
         {
             return false;
         }
+
         if (saveDirName.EndsWith('/'))
         {
             saveDirName = saveDirName[..^1];
@@ -143,6 +146,7 @@ public static class WorldSaveIdentification
         {
             return (false, "", saves);
         }
+
         foreach (var entry in entries)
         {
             var fileName = Path.GetFileName(entry);
@@ -150,12 +154,14 @@ public static class WorldSaveIdentification
             {
                 return FolderContainsLevelDat(entry, true);
             }
+
             var levelDat = Path.Combine(entry, "level.dat");
             if (File.Exists(levelDat))
             {
                 return (true, fileName, saves);
             }
         }
+
         return (false, "", saves);
     }
 
@@ -172,14 +178,14 @@ public static class WorldSaveIdentification
             files = zip.Entries.Select(e => e.FullName).ToList();
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
-            or ArgumentException or NotSupportedException)
+                                      or ArgumentException or NotSupportedException)
         {
             return (false, "", false); // collectFiles failure
         }
 
         // zip.exists("/saves"): exact entry or any entry below that directory.
         var saves = files.Any(f => f.Equals("saves", StringComparison.OrdinalIgnoreCase)
-            || f.StartsWith("saves/", StringComparison.OrdinalIgnoreCase));
+                                   || f.StartsWith("saves/", StringComparison.OrdinalIgnoreCase));
 
         foreach (var file in files)
         {
@@ -190,8 +196,10 @@ public static class WorldSaveIdentification
                 {
                     continue;
                 }
+
                 relativePath = relativePath["saves/".Length..];
             }
+
             if (!relativePath.EndsWith("/level.dat", StringComparison.OrdinalIgnoreCase))
             {
                 continue;

@@ -77,6 +77,7 @@ public sealed class IconPool
             {
                 continue;
             }
+
             _byKey[IconFiles.IconKeyForFile(dir, file)] = file;
         }
     }
@@ -93,6 +94,7 @@ public sealed class IconPool
         {
             return false;
         }
+
         Rescan();
         return true;
     }
@@ -105,6 +107,7 @@ public sealed class IconPool
         {
             return false;
         }
+
         Rescan();
         return true;
     }

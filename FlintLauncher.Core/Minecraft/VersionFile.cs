@@ -142,14 +142,17 @@ public class VersionFile : ProblemContainer
         {
             profile.ApplyLibrary(library, runtimeContext);
         }
+
         foreach (var mavenFile in MavenFiles)
         {
             profile.ApplyMavenFile(mavenFile, runtimeContext);
         }
+
         foreach (var agent in Agents)
         {
             profile.ApplyAgent(agent, runtimeContext);
         }
+
         profile.ApplyProblemSeverity(GetProblemSeverity());
     }
 }

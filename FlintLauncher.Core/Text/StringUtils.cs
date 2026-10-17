@@ -2,6 +2,7 @@
 // Port of launcher/StringUtils.{h,cpp} (partial: only what has call sites and tests so far).
 // Per-char comparisons use ordinal ordering instead of Qt's locale-aware compare; relevant
 // call sites (version prerelease ordering) are ASCII, where both agree.
+
 namespace FlintLauncher.Core.Text;
 
 public static class StringUtils
@@ -35,6 +36,7 @@ public static class StringUtils
                 {
                     c1 = GetNextChar(s1, ++l1);
                 }
+
                 while (DigitValue(c2) == 0)
                 {
                     c2 = GetNextChar(s2, ++l2);
@@ -54,14 +56,17 @@ public static class StringUtils
                     {
                         break;
                     }
+
                     if (!is1ADigit)
                     {
                         return -1;
                     }
+
                     if (!is2ADigit)
                     {
                         return 1;
                     }
+
                     if (currentReturnValue == 0)
                     {
                         if (lookAhead1 < lookAhead2)
@@ -73,9 +78,11 @@ public static class StringUtils
                             currentReturnValue = 1;
                         }
                     }
+
                     lookAhead1 = GetNextChar(s1, ++lookAheadLocation1);
                     lookAhead2 = GetNextChar(s2, ++lookAheadLocation2);
                 }
+
                 if (currentReturnValue != 0)
                 {
                     return currentReturnValue;

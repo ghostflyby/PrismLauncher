@@ -21,9 +21,7 @@ public class NetStackTests : IDisposable
         {
             Directory.Delete(_dir, recursive: true);
         }
-        catch (DirectoryNotFoundException)
-        {
-        }
+        catch (DirectoryNotFoundException) { }
     }
 
     private string TempPath(string name) => Path.Combine(_dir, name);
@@ -149,6 +147,7 @@ public class NetStackTests : IDisposable
         {
             return; // posix chmod-based negative case
         }
+
         var indexPath = TempPath("metacache-unreadable");
         var basePath = TempPath("cache-root3");
         Directory.CreateDirectory(basePath);
@@ -238,6 +237,7 @@ public class NetStackTests : IDisposable
         {
             return; // posix chmod-based negative case
         }
+
         var indexPath = TempPath("metacache-unreadable-cache");
         var basePath = TempPath("cache-root5");
         Directory.CreateDirectory(basePath);
@@ -306,6 +306,7 @@ public class NetStackTests : IDisposable
                 ctx.Response.StatusCode = 304;
                 return;
             }
+
             ctx.Response.StatusCode = 200;
             ctx.Response.Headers["ETag"] = etag;
             ctx.Response.ContentLength64 = servedBody.Length;
@@ -350,6 +351,7 @@ public class NetStackTests : IDisposable
                 ctx.Response.Headers["Retry-After"] = "0";
                 return;
             }
+
             ctx.Response.StatusCode = 200;
             var body = "ok"u8.ToArray();
             ctx.Response.ContentLength64 = body.Length;
@@ -367,10 +369,7 @@ public class NetStackTests : IDisposable
     [Fact]
     public async Task NetRequest_Fails_On404_WithStatus()
     {
-        using var server = new TestHttpServer(ctx =>
-        {
-            ctx.Response.StatusCode = 404;
-        });
+        using var server = new TestHttpServer(ctx => { ctx.Response.StatusCode = 404; });
 
         var request = NetRequest.MakeByteArray(new Uri(server.Url + "/missing"));
         await request.StartAsync();
@@ -454,9 +453,7 @@ public class NetStackTests : IDisposable
             {
                 _listener.Close();
             }
-            catch (ObjectDisposedException)
-            {
-            }
+            catch (ObjectDisposedException) { }
         }
     }
 }

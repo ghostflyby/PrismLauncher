@@ -4,6 +4,7 @@
 // Deviation: QUrl validity ("scheme and host non-empty after stripping optional parens")
 // is approximated with Uri.TryCreate(UriKind.Absolute); strings like "www.x.com" (valid
 // relative QUrl, but empty scheme/host) are rejected by both.
+
 namespace FlintLauncher.Core.Minecraft.Resources;
 
 /// <summary>Port of the ModLicense struct.</summary>

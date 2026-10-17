@@ -21,8 +21,10 @@ public sealed class FlintConfig
     public string LauncherAppBinaryName { get; init; } = "flint";
     public string LauncherDisplayName { get; init; } = "Flint Launcher";
     public string LauncherCopyright { get; init; } = "© 2026 Flint Contributors";
+
     /// <summary>Domain of the upstream services Flint consumes (meta server, translations).</summary>
     public string LauncherDomain { get; init; } = "prismlauncher.org";
+
     /// <summary>
     /// Global config file name. Prism uses "prismlauncher.cfg"; Flint's own historical name
     /// was "flint.cfg" — since CONFIG C5 the global config is flint.json and this name is
@@ -30,6 +32,7 @@ public sealed class FlintConfig
     /// migration filter term; Flint never writes it.
     /// </summary>
     public string LauncherConfigFile { get; init; } = "flint.cfg";
+
     public string LauncherGit { get; init; } = "https://github.com/PrismLauncher/PrismLauncher";
     public string LauncherAppBinaryEnvName { get; init; } = "FLINT";
 
@@ -45,6 +48,7 @@ public sealed class FlintConfig
 
     /// <summary>Update channel; TODO(P0+): derive from git branch / SourceRevisionId at build time.</summary>
     public string VersionChannel { get; init; } = "develop";
+
     public string GitCommit { get; init; } = "";
     public string GitTag { get; init; } = "";
     public string GitRefspec { get; init; } = "";
@@ -59,6 +63,7 @@ public sealed class FlintConfig
     // ---- URLs (kept identical to Prism so data and metadata stay compatible) ---
 
     public string UpdaterGithubRepo { get; init; } = "https://github.com/PrismLauncher/PrismLauncher";
+
     // (the news feed URLs left with CACHE E7 — the checker they fed is deleted)
     public string WikiUrl { get; init; } = "https://prismlauncher.org/wiki/";
     public string HelpUrl { get; init; } = "https://prismlauncher.org/wiki/help-pages/%1";
@@ -92,6 +97,7 @@ public sealed class FlintConfig
 
     public string ModrinthStagingUrl { get; init; } = "https://staging-api.modrinth.com/v2";
     public string ModrinthProdUrl { get; init; } = "https://api.modrinth.com/v2";
+
     public ImmutableArray<string> ModrinthMrpackHosts { get; init; } =
     [
         "cdn.modrinth.com",
@@ -99,6 +105,7 @@ public sealed class FlintConfig
         "raw.githubusercontent.com",
         "gitlab.com",
     ];
+
     public string ModrinthDownloadHost { get; init; } = "cdn.modrinth.com";
 
     public string FlameBaseUrl { get; init; } = "https://api.curseforge.com/v1";
@@ -132,6 +139,7 @@ public sealed class FlintConfig
         {
             version += "-" + VersionChannel;
         }
+
         return version;
     }
 }
