@@ -56,7 +56,7 @@ public class LauncherStateStoreTests : IDisposable
         {
             UserAskedAboutAutomaticJavaDownload = true,
             LastOfflinePlayerName = "Steve",
-            Playtime = state.Playtime with { Total = 42, Migrated = true },
+            Playtime = new PlaytimeState { Total = 42, Migrated = true },
             Java = state.Java with
             {
                 LastHostname = "box",

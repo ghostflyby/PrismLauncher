@@ -18,7 +18,6 @@ public sealed class AccountRefreshService(
     ILogger<AccountRefreshService> logger) : BackgroundService
 {
     private static readonly TimeSpan StartupDelay = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan DefaultInterval = TimeSpan.FromMinutes(30);
 
     public static int? ResolveIntervalMinutes() =>
         int.TryParse(Environment.GetEnvironmentVariable("FLINT_ACCOUNT_REFRESH_MINUTES"),

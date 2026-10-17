@@ -68,7 +68,7 @@ public static class FlintConfigFold
     public static FlintConfigFile MergeOverDefault(FlintConfigFile payload) =>
         Merge(FlintConfigFile.Default(), payload);
 
-    private static LauncherConfig Merge(LauncherConfig lower, LauncherConfig upper) => lower with
+    private static LauncherConfig Merge(LauncherConfig lower, LauncherConfig upper) => new()
     {
         MenuBarInsteadOfToolBar = upper.MenuBarInsteadOfToolBar ?? lower.MenuBarInsteadOfToolBar,
         NumberOfConcurrentTasks = upper.NumberOfConcurrentTasks ?? lower.NumberOfConcurrentTasks,
@@ -78,85 +78,52 @@ public static class FlintConfigFold
         CloseAfterLaunch = upper.CloseAfterLaunch ?? lower.CloseAfterLaunch,
         QuitAfterGameStop = upper.QuitAfterGameStop ?? lower.QuitAfterGameStop,
         InstSortMode = upper.InstSortMode ?? lower.InstSortMode,
-        InstRenamingMode = upper.InstRenamingMode ?? lower.InstRenamingMode,
+        InstRenamingMode = upper.InstRenamingMode ?? lower.InstRenamingMode
     };
 
-    private static ConsoleConfig Merge(ConsoleConfig lower, ConsoleConfig upper) => lower with
+    private static ConsoleConfig Merge(ConsoleConfig lower, ConsoleConfig upper) => new()
     {
         ShowConsole = upper.ShowConsole ?? lower.ShowConsole,
         AutoCloseConsole = upper.AutoCloseConsole ?? lower.AutoCloseConsole,
         ShowConsoleOnError = upper.ShowConsoleOnError ?? lower.ShowConsoleOnError,
         LogPrePostOutput = upper.LogPrePostOutput ?? lower.LogPrePostOutput,
         ConsoleMaxLines = upper.ConsoleMaxLines ?? lower.ConsoleMaxLines,
-        ConsoleOverflowStop = upper.ConsoleOverflowStop ?? lower.ConsoleOverflowStop,
+        ConsoleOverflowStop = upper.ConsoleOverflowStop ?? lower.ConsoleOverflowStop
     };
 
-    private static GameTimeConfig Merge(GameTimeConfig lower, GameTimeConfig upper) => lower with
-    {
-        ShowGameTime = upper.ShowGameTime ?? lower.ShowGameTime,
-        ShowGlobalGameTime = upper.ShowGlobalGameTime ?? lower.ShowGlobalGameTime,
-        ShowGameTimeWithoutDays = upper.ShowGameTimeWithoutDays ?? lower.ShowGameTimeWithoutDays,
-        RecordGameTime = upper.RecordGameTime ?? lower.RecordGameTime,
-    };
+    private static GameTimeConfig Merge(GameTimeConfig lower, GameTimeConfig upper) => new() { ShowGameTime = upper.ShowGameTime ?? lower.ShowGameTime, ShowGlobalGameTime = upper.ShowGlobalGameTime ?? lower.ShowGlobalGameTime, ShowGameTimeWithoutDays = upper.ShowGameTimeWithoutDays ?? lower.ShowGameTimeWithoutDays, RecordGameTime = upper.RecordGameTime ?? lower.RecordGameTime };
 
-    private static WindowConfig Merge(WindowConfig lower, WindowConfig upper) => lower with
-    {
-        LaunchMaximized = upper.LaunchMaximized ?? lower.LaunchMaximized,
-        MinecraftWinWidth = upper.MinecraftWinWidth ?? lower.MinecraftWinWidth,
-        MinecraftWinHeight = upper.MinecraftWinHeight ?? lower.MinecraftWinHeight,
-    };
+    private static WindowConfig Merge(WindowConfig lower, WindowConfig upper) => new() { LaunchMaximized = upper.LaunchMaximized ?? lower.LaunchMaximized, MinecraftWinWidth = upper.MinecraftWinWidth ?? lower.MinecraftWinWidth, MinecraftWinHeight = upper.MinecraftWinHeight ?? lower.MinecraftWinHeight };
 
-    private static MemoryConfig Merge(MemoryConfig lower, MemoryConfig upper) => lower with
-    {
-        MinMemAlloc = upper.MinMemAlloc ?? lower.MinMemAlloc,
-        MaxMemAlloc = upper.MaxMemAlloc ?? lower.MaxMemAlloc,
-        LowMemWarning = upper.LowMemWarning ?? lower.LowMemWarning,
-    };
+    private static MemoryConfig Merge(MemoryConfig lower, MemoryConfig upper) => new() { MinMemAlloc = upper.MinMemAlloc ?? lower.MinMemAlloc, MaxMemAlloc = upper.MaxMemAlloc ?? lower.MaxMemAlloc, LowMemWarning = upper.LowMemWarning ?? lower.LowMemWarning };
 
-    private static PerformanceConfig Merge(PerformanceConfig lower, PerformanceConfig upper) => lower with
-    {
-        EnableFeralGamemode = upper.EnableFeralGamemode ?? lower.EnableFeralGamemode,
-        EnableMangoHud = upper.EnableMangoHud ?? lower.EnableMangoHud,
-        UseDiscreteGpu = upper.UseDiscreteGpu ?? lower.UseDiscreteGpu,
-        UseZink = upper.UseZink ?? lower.UseZink,
-    };
+    private static PerformanceConfig Merge(PerformanceConfig lower, PerformanceConfig upper) => new() { EnableFeralGamemode = upper.EnableFeralGamemode ?? lower.EnableFeralGamemode, EnableMangoHud = upper.EnableMangoHud ?? lower.EnableMangoHud, UseDiscreteGpu = upper.UseDiscreteGpu ?? lower.UseDiscreteGpu, UseZink = upper.UseZink ?? lower.UseZink };
 
-    private static NativeLibConfig Merge(NativeLibConfig lower, NativeLibConfig upper) => lower with
+    private static NativeLibConfig Merge(NativeLibConfig lower, NativeLibConfig upper) => new()
     {
         UseNativeOpenAl = upper.UseNativeOpenAl ?? lower.UseNativeOpenAl,
         CustomOpenAlPath = upper.CustomOpenAlPath ?? lower.CustomOpenAlPath,
         UseNativeGlfw = upper.UseNativeGlfw ?? lower.UseNativeGlfw,
         CustomGlfwPath = upper.CustomGlfwPath ?? lower.CustomGlfwPath,
         UseNativeSdl = upper.UseNativeSdl ?? lower.UseNativeSdl,
-        CustomSdlPath = upper.CustomSdlPath ?? lower.CustomSdlPath,
+        CustomSdlPath = upper.CustomSdlPath ?? lower.CustomSdlPath
     };
 
-    private static CommandsConfig Merge(CommandsConfig lower, CommandsConfig upper) => lower with
-    {
-        PreLoadCommand = upper.PreLoadCommand ?? lower.PreLoadCommand,
-        PreLaunchCommand = upper.PreLaunchCommand ?? lower.PreLaunchCommand,
-        WrapperCommand = upper.WrapperCommand ?? lower.WrapperCommand,
-        PostExitCommand = upper.PostExitCommand ?? lower.PostExitCommand,
-    };
+    private static CommandsConfig Merge(CommandsConfig lower, CommandsConfig upper) => new() { PreLoadCommand = upper.PreLoadCommand ?? lower.PreLoadCommand, PreLaunchCommand = upper.PreLaunchCommand ?? lower.PreLaunchCommand, WrapperCommand = upper.WrapperCommand ?? lower.WrapperCommand, PostExitCommand = upper.PostExitCommand ?? lower.PostExitCommand };
 
-    private static MinecraftMiscConfig Merge(MinecraftMiscConfig lower, MinecraftMiscConfig upper) => lower with
-    {
-        OnlineFixes = upper.OnlineFixes ?? lower.OnlineFixes,
-        Env = upper.Env ?? lower.Env,
-    };
+    private static MinecraftMiscConfig Merge(MinecraftMiscConfig lower, MinecraftMiscConfig upper) => new() { OnlineFixes = upper.OnlineFixes ?? lower.OnlineFixes, Env = upper.Env ?? lower.Env };
 
-    private static ModDownloadConfig Merge(ModDownloadConfig lower, ModDownloadConfig upper) => lower with
+    private static ModDownloadConfig Merge(ModDownloadConfig lower, ModDownloadConfig upper) => new()
     {
         ModMetadataDisabled = upper.ModMetadataDisabled ?? lower.ModMetadataDisabled,
         ModDependenciesDisabled = upper.ModDependenciesDisabled ?? lower.ModDependenciesDisabled,
         SkipModpackUpdatePrompt = upper.SkipModpackUpdatePrompt ?? lower.SkipModpackUpdatePrompt,
         ShowModIncompat = upper.ShowModIncompat ?? lower.ShowModIncompat,
-        DownloadGameFilesDuringInstanceCreation =
-            upper.DownloadGameFilesDuringInstanceCreation ?? lower.DownloadGameFilesDuringInstanceCreation,
-        ModUpdateReleaseTypes = upper.ModUpdateReleaseTypes ?? lower.ModUpdateReleaseTypes,
+        DownloadGameFilesDuringInstanceCreation = upper.DownloadGameFilesDuringInstanceCreation ?? lower.DownloadGameFilesDuringInstanceCreation,
+        ModUpdateReleaseTypes = upper.ModUpdateReleaseTypes ?? lower.ModUpdateReleaseTypes
     };
 
-    private static JavaConfig Merge(JavaConfig lower, JavaConfig upper) => lower with
+    private static JavaConfig Merge(JavaConfig lower, JavaConfig upper) => new()
     {
         JavaPath = upper.JavaPath ?? lower.JavaPath,
         JvmArgs = upper.JvmArgs ?? lower.JvmArgs,
@@ -164,53 +131,26 @@ public static class FlintConfigFold
         IgnoreJavaWizard = upper.IgnoreJavaWizard ?? lower.IgnoreJavaWizard,
         AutomaticJavaSwitch = upper.AutomaticJavaSwitch ?? lower.AutomaticJavaSwitch,
         AutomaticJavaDownload = upper.AutomaticJavaDownload ?? lower.AutomaticJavaDownload,
-        AutomaticJava = upper.AutomaticJava ?? lower.AutomaticJava,
+        AutomaticJava = upper.AutomaticJava ?? lower.AutomaticJava
     };
 
-    private static DirsConfig Merge(DirsConfig lower, DirsConfig upper) => lower with
+    private static DirsConfig Merge(DirsConfig lower, DirsConfig upper) => new()
     {
         IconsDir = upper.IconsDir ?? lower.IconsDir,
         SkinsDir = upper.SkinsDir ?? lower.SkinsDir,
         JavaDir = upper.JavaDir ?? lower.JavaDir,
         DownloadsDir = upper.DownloadsDir ?? lower.DownloadsDir,
         DownloadsDirWatchRecursive = upper.DownloadsDirWatchRecursive ?? lower.DownloadsDirWatchRecursive,
-        MoveModsFromDownloadsDir = upper.MoveModsFromDownloadsDir ?? lower.MoveModsFromDownloadsDir,
+        MoveModsFromDownloadsDir = upper.MoveModsFromDownloadsDir ?? lower.MoveModsFromDownloadsDir
     };
 
-    private static LanguageConfig Merge(LanguageConfig lower, LanguageConfig upper) => lower with
-    {
-        Language = upper.Language ?? lower.Language,
-        UseSystemLocale = upper.UseSystemLocale ?? lower.UseSystemLocale,
-    };
+    private static LanguageConfig Merge(LanguageConfig lower, LanguageConfig upper) => new() { Language = upper.Language ?? lower.Language, UseSystemLocale = upper.UseSystemLocale ?? lower.UseSystemLocale };
 
-    private static MirrorConfig Merge(MirrorConfig lower, MirrorConfig upper) => lower with
-    {
-        MetaUrlOverride = upper.MetaUrlOverride ?? lower.MetaUrlOverride,
-        ResourceUrlOverride = upper.ResourceUrlOverride ?? lower.ResourceUrlOverride,
-        LegacyFmlLibsUrlOverride = upper.LegacyFmlLibsUrlOverride ?? lower.LegacyFmlLibsUrlOverride,
-    };
+    private static MirrorConfig Merge(MirrorConfig lower, MirrorConfig upper) => new() { MetaUrlOverride = upper.MetaUrlOverride ?? lower.MetaUrlOverride, ResourceUrlOverride = upper.ResourceUrlOverride ?? lower.ResourceUrlOverride, LegacyFmlLibsUrlOverride = upper.LegacyFmlLibsUrlOverride ?? lower.LegacyFmlLibsUrlOverride };
 
-    private static ProxyConfig Merge(ProxyConfig lower, ProxyConfig upper) => lower with
-    {
-        ProxyType = upper.ProxyType ?? lower.ProxyType,
-        ProxyAddr = upper.ProxyAddr ?? lower.ProxyAddr,
-        ProxyPort = upper.ProxyPort ?? lower.ProxyPort,
-        ProxyUser = upper.ProxyUser ?? lower.ProxyUser,
-    };
+    private static ProxyConfig Merge(ProxyConfig lower, ProxyConfig upper) => new() { ProxyType = upper.ProxyType ?? lower.ProxyType, ProxyAddr = upper.ProxyAddr ?? lower.ProxyAddr, ProxyPort = upper.ProxyPort ?? lower.ProxyPort, ProxyUser = upper.ProxyUser ?? lower.ProxyUser };
 
-    private static ApiConfig Merge(ApiConfig lower, ApiConfig upper) => lower with
-    {
-        MsaClientIdOverride = upper.MsaClientIdOverride ?? lower.MsaClientIdOverride,
-        UserAgentOverride = upper.UserAgentOverride ?? lower.UserAgentOverride,
-        PastebinCustomApiBase = upper.PastebinCustomApiBase ?? lower.PastebinCustomApiBase,
-        PastebinType = upper.PastebinType ?? lower.PastebinType,
-    };
+    private static ApiConfig Merge(ApiConfig lower, ApiConfig upper) => new() { MsaClientIdOverride = upper.MsaClientIdOverride ?? lower.MsaClientIdOverride, UserAgentOverride = upper.UserAgentOverride ?? lower.UserAgentOverride, PastebinCustomApiBase = upper.PastebinCustomApiBase ?? lower.PastebinCustomApiBase, PastebinType = upper.PastebinType ?? lower.PastebinType };
 
-    private static ToolsConfig Merge(ToolsConfig lower, ToolsConfig upper) => lower with
-    {
-        JsonEditor = upper.JsonEditor ?? lower.JsonEditor,
-        JProfilerPath = upper.JProfilerPath ?? lower.JProfilerPath,
-        JVisualVmPath = upper.JVisualVmPath ?? lower.JVisualVmPath,
-        McEditPath = upper.McEditPath ?? lower.McEditPath,
-    };
+    private static ToolsConfig Merge(ToolsConfig lower, ToolsConfig upper) => new() { JsonEditor = upper.JsonEditor ?? lower.JsonEditor, JProfilerPath = upper.JProfilerPath ?? lower.JProfilerPath, JVisualVmPath = upper.JVisualVmPath ?? lower.JVisualVmPath, McEditPath = upper.McEditPath ?? lower.McEditPath };
 }

@@ -71,14 +71,7 @@ public sealed class LauncherStateStore
                     pair => pair.Key,
                     pair => pair.Value is null
                         ? new JavaDetectEntry("", "", "", "", "")
-                        : pair.Value with
-                        {
-                            Signature = pair.Value.Signature ?? "",
-                            Architecture = pair.Value.Architecture ?? "",
-                            RealArchitecture = pair.Value.RealArchitecture ?? "",
-                            Version = pair.Value.Version ?? "",
-                            Vendor = pair.Value.Vendor ?? "",
-                        }),
+                        : new JavaDetectEntry(Signature: pair.Value.Signature ?? "", Architecture: pair.Value.Architecture ?? "", RealArchitecture: pair.Value.RealArchitecture ?? "", Version: pair.Value.Version ?? "", Vendor: pair.Value.Vendor ?? "")),
                 StringComparer.Ordinal),
     };
 

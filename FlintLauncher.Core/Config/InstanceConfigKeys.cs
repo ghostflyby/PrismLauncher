@@ -215,11 +215,7 @@ public static class InstanceConfigKeys
         // the domain is materialized — "clear" resets its scalars to null (inherit)
         Misc = i.Misc with
         {
-            Console = i.Misc.Console with
-            {
-                ShowConsole = null, AutoCloseConsole = null,
-                ShowConsoleOnError = null, LogPrePostOutput = null,
-            }
+            Console = new InstanceConsoleConfig { ShowConsole = null, AutoCloseConsole = null, ShowConsoleOnError = null, LogPrePostOutput = null }
         }
     };
 
@@ -227,7 +223,7 @@ public static class InstanceConfigKeys
     {
         Misc = i.Misc with
         {
-            GameTime = i.Misc.GameTime with { ShowGameTime = null, RecordGameTime = null }
+            GameTime = new InstanceGameTimeConfig { ShowGameTime = null, RecordGameTime = null }
         }
     };
 

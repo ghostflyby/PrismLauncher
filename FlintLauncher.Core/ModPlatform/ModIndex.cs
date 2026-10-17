@@ -374,11 +374,11 @@ public static class ModIndex
     /// <summary>Port of ModPlatform::getOverrideDeps().</summary>
     public static List<OverrideDep> GetOverrideDeps() =>
     [
-        new OverrideDep(Quilt: "634179", Fabric: "306612", Slug: "API", Provider: ResourceProvider.Flame),
-        new OverrideDep(Quilt: "720410", Fabric: "308769", Slug: "KotlinLibraries", Provider: ResourceProvider.Flame),
+        new(Quilt: "634179", Fabric: "306612", Slug: "API", Provider: ResourceProvider.Flame),
+        new(Quilt: "720410", Fabric: "308769", Slug: "KotlinLibraries", Provider: ResourceProvider.Flame),
 
-        new OverrideDep(Quilt: "qvIfYCYJ", Fabric: "P7dR8mSH", Slug: "API", Provider: ResourceProvider.Modrinth),
-        new OverrideDep(Quilt: "lwVhp9o5", Fabric: "Ha28R6CL", Slug: "KotlinLibraries", Provider: ResourceProvider.Modrinth),
+        new(Quilt: "qvIfYCYJ", Fabric: "P7dR8mSH", Slug: "API", Provider: ResourceProvider.Modrinth),
+        new(Quilt: "lwVhp9o5", Fabric: "Ha28R6CL", Slug: "KotlinLibraries", Provider: ResourceProvider.Modrinth),
     ];
 
     public static string GetMetaUrl(ResourceProvider provider, string projectId)

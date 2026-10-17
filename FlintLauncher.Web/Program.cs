@@ -9,5 +9,5 @@ WebHostBuilder.BuildWebApplication(args).Run();
 // Exposed for WebApplicationFactory-based integration tests.
 namespace FlintLauncher.Web
 {
-    public partial class Program;
+    public class Program;
 }

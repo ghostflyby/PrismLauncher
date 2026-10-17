@@ -106,7 +106,7 @@ internal static class ApiOpenApi
                     Description = "Server-sent events: 'data:' frames carry LogLineDto JSON, a final 'event: state' frame carries TaskView.",
                     Content = new Dictionary<string, OpenApiMediaType>
                     {
-                        ["text/event-stream"] = new OpenApiMediaType(),
+                        ["text/event-stream"] = new(),
                     },
                 };
             }
@@ -117,7 +117,7 @@ internal static class ApiOpenApi
                     Description = "The log file tail (last 512 KiB).",
                     Content = new Dictionary<string, OpenApiMediaType>
                     {
-                        ["text/plain"] = new OpenApiMediaType
+                        ["text/plain"] = new()
                         {
                             Schema = new OpenApiSchema { Type = JsonSchemaType.String },
                         },
@@ -132,7 +132,7 @@ internal static class ApiOpenApi
                     Description = form.Description,
                     Content = new Dictionary<string, OpenApiMediaType>
                     {
-                        ["multipart/form-data"] = new OpenApiMediaType
+                        ["multipart/form-data"] = new()
                         {
                             Schema = new OpenApiSchema
                             {
@@ -153,7 +153,7 @@ internal static class ApiOpenApi
         Description = code,
         Content = new Dictionary<string, OpenApiMediaType>
         {
-            ["application/json"] = new OpenApiMediaType { Schema = ErrorEnvelopeSchema() },
+            ["application/json"] = new() { Schema = ErrorEnvelopeSchema() },
         },
     };
 }

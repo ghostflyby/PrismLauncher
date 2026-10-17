@@ -140,15 +140,15 @@ public sealed class FlintLegacyMigrationProfile : IMigrationSourceProfile
     [
         // config: the INI chain file lands on the config side (the C5 importer probes the
         // config root FIRST, so the import reads it in its new home; the file is kept, C5)
-        new LegacyMount("flint.cfg", p => Path.Combine(p.ConfigRoot, "flint.cfg"), IsDirectory: false),
+        new("flint.cfg", p => Path.Combine(p.ConfigRoot, "flint.cfg"), IsDirectory: false),
         // cache (E3): the pre-reform ledger and the metadata content; the old in-data cache
         // area's children follow below
-        new LegacyMount("metacache.json", p => p.MetacacheFile, IsDirectory: false),
-        new LegacyMount("meta", p => p.MetaDir, IsDirectory: true),
+        new("metacache.json", p => p.MetacacheFile, IsDirectory: false),
+        new("meta", p => p.MetaDir, IsDirectory: true),
         // store (E2): shared installed content
-        new LegacyMount("assets", p => p.AssetsRoot, IsDirectory: true),
-        new LegacyMount("libraries", p => p.LibrariesRoot, IsDirectory: true),
-        new LegacyMount("java", p => p.JavaRoot, IsDirectory: true),
+        new("assets", p => p.AssetsRoot, IsDirectory: true),
+        new("libraries", p => p.LibrariesRoot, IsDirectory: true),
+        new("java", p => p.JavaRoot, IsDirectory: true),
     ];
 
     public IReadOnlyList<MigrationSourceCandidate> Detect(FlintPaths paths, MigrationDecisionStore? decisions)

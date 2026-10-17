@@ -16,7 +16,6 @@ using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
-using static FlintLauncher.Core.Diagnostics.TasksLog;
 
 namespace FlintLauncher.Web.Services;
 

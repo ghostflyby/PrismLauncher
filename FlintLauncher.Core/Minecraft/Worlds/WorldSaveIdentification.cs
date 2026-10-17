@@ -38,7 +38,7 @@ public sealed class WorldSave(string file)
     /// <summary>The save file or folder this instance refers to.</summary>
     public string File { get; } = file;
 
-    public FileInfo FileInfo { get; } = new FileInfo(file);
+    public FileInfo FileInfo { get; } = new(file);
 
     /// <summary>Single (a bare world) or Multi (an archive/folder of saves).</summary>
     public WorldSaveFormat SaveFormat { get; set; } = WorldSaveFormat.Invalid;

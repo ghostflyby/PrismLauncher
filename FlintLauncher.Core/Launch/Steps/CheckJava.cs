@@ -132,7 +132,7 @@ public sealed class CheckJava : LaunchStep
             var detections = new Dictionary<string, JavaDetectEntry>(
                 state.Java.Detections, StringComparer.Ordinal)
             {
-                [detectKey] = new JavaDetectEntry(
+                [detectKey] = new(
                     signature,
                     mojangPlatform,
                     osArch,
