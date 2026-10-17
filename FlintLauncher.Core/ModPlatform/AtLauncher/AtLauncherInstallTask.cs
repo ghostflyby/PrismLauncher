@@ -398,7 +398,6 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
         {
             var lastSlash = library.Server.LastIndexOf('/');
             var locationAndVersion = library.Server[..lastSlash];
-            var fileName = library.Server[(lastSlash + 1)..];
 
             lastSlash = locationAndVersion.LastIndexOf('/');
             var location = locationAndVersion[..lastSlash];

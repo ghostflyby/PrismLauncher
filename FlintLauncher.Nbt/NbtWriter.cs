@@ -115,10 +115,7 @@ public sealed class NbtWriter(Stream output)
 
     private void WriteList(NbtList list)
     {
-        if (list.Count > MaxArrayLength)
-        {
-            throw new ArgumentOutOfRangeException(nameof(list), list.Count, "List is too large for NBT");
-        }
+        // list.Count > MaxArrayLength is unreachable: MaxArrayLength is int.MaxValue.
         // An empty/undetermined list is written with element type End, like libnbt++.
         WriteType(list.ElementType == NbtTagType.Null ? NbtTagType.End : list.ElementType);
         WriteNum(list.Count);
@@ -134,20 +131,14 @@ public sealed class NbtWriter(Stream output)
 
     private void WriteByteArray(byte[] value)
     {
-        if (value.Length > MaxArrayLength)
-        {
-            throw new ArgumentOutOfRangeException(nameof(value), value.Length, "Byte array is too large for NBT");
-        }
+        // value.Length > MaxArrayLength is unreachable: MaxArrayLength is int.MaxValue.
         WriteNum(value.Length);
         _output.Write(value, 0, value.Length);
     }
 
     private void WriteArray<T>(T[] value, int elementSize, SpanAction<T> write) where T : struct
     {
-        if (value.Length > MaxArrayLength)
-        {
-            throw new ArgumentOutOfRangeException(nameof(value), value.Length, "Array is too large for NBT");
-        }
+        // value.Length > MaxArrayLength is unreachable: MaxArrayLength is int.MaxValue.
         WriteNum(value.Length);
         var buffer = new byte[elementSize];
         foreach (var item in value)

@@ -13,7 +13,6 @@ public class JavaArgumentsTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-
         var args = instance.JavaArguments();
 
         Assert.Equal("-Duser.language=en", args[0]);
@@ -79,8 +78,6 @@ public class JavaArgumentsTests
         using var fixture = new LaunchFixture();
         fixture.SeedJavaDetection("java", 0, version: "1.7.0_80");
         var instance = await fixture.CreateInstance();
-
-        var args = instance.JavaArguments();
 
         Assert.DoesNotContain(instance.JavaArguments(), a => a.StartsWith("-XX:PermSize"));
 

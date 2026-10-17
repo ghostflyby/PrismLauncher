@@ -227,6 +227,7 @@ public sealed class AccountList
         }
         catch (Exception)
         {
+            // best-effort rename: a leftover file at the old path is harmless
         }
         return false;
     }

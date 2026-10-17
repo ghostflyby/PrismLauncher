@@ -438,6 +438,7 @@ _ = AcceptLoopAsync(acceptCts.Token);
             }
             catch (Exception)
             {
+                // best-effort stop: the loopback listener dies with the process anyway
             }
             redirectSource.TrySetResult(null);
         }

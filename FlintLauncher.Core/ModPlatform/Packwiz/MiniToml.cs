@@ -251,7 +251,7 @@ public static class MiniToml
                 var existing = table.GetTable(part);
                 if (existing is null)
                 {
-                    if (table.TryGetValue(part, out var clash))
+                    if (table.TryGetValue(part, out var _))
                     {
                         throw new TomlParseException($"Key '{part}' is not a table");
                     }
@@ -301,7 +301,7 @@ public static class MiniToml
                 var existing = parent.GetTable(path[i]);
                 if (existing is null)
                 {
-                    if (parent.TryGetValue(path[i], out var clash))
+                    if (parent.TryGetValue(path[i], out var _))
                     {
                         throw new TomlParseException($"Key '{path[i]}' is not a table");
                     }
@@ -346,7 +346,7 @@ public static class MiniToml
                     var sub = target.GetTable(part);
                     if (sub is null)
                     {
-                        if (target.TryGetValue(part, out var clash))
+                        if (target.TryGetValue(part, out var _))
                         {
                             throw new TomlParseException($"Key '{part}' is not a table");
                         }
@@ -403,7 +403,7 @@ public static class MiniToml
             return text[start..pos];
         }
 
-        private object? ParseValue()
+        private object ParseValue()
         {
             if (AtEnd)
             {

@@ -328,7 +328,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     /// <summary>Port of createLaunchTask() (2-arg form): builds the per-launch services from
     /// the instance-stamped LaunchServices (or headless defaults).</summary>
-    public override LaunchTask? CreateLaunchTask(AuthSession? session, MinecraftTarget? targetToJoin) =>
+    public override LaunchTask CreateLaunchTask(AuthSession? session, MinecraftTarget? targetToJoin) =>
         CreateLaunchTask(session, targetToJoin, services: null);
 
     /// <summary>Port of createLaunchTask(): builds the <see cref="Launch.LaunchServices"/> for

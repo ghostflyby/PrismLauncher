@@ -132,7 +132,7 @@ public class GetModDependenciesTaskTests : IDisposable
 
         // A (selected) requires B (required) and D (optional); B requires C (required, installed)
         _server.ProjectVersions["projB"] = new JsonArray(
-            (JsonNode?)JsonNode.Parse(VersionJson("projB", "verB1", "b.jar", "b.bin", "2.0.0", _server.Url,
+            JsonNode.Parse(VersionJson("projB", "verB1", "b.jar", "b.bin", "2.0.0", _server.Url,
                 dependencies:
                 [
                     ["projC", "verC1", "required"],
@@ -224,7 +224,7 @@ public class GetModDependenciesTaskTests : IDisposable
         var (instance, model) = SetupInstance(installC: false);
 
         _server.ProjectVersions["projB"] = new JsonArray(
-            (JsonNode?)JsonNode.Parse(VersionJson("projB", "verB1", "b.jar", "b.bin", "2.0.0", _server.Url))).ToJsonString();
+            JsonNode.Parse(VersionJson("projB", "verB1", "b.jar", "b.bin", "2.0.0", _server.Url))).ToJsonString();
         _server.Projects["projB"] = ProjectJson("projB", "b-mod", "B Mod");
 
         var packA = new IndexedPack { AddonId = "projA", Slug = "a-mod", Name = "A Mod", Provider = ResourceProvider.Modrinth };

@@ -297,7 +297,6 @@ public sealed class LoggedProcess : IDisposable
     private async Task PumpAsync(Stream stream, bool isStdErr)
     {
         var buffer = new byte[8192];
-        var leftover = new StringBuilder();
         while (true)
         {
             int read;

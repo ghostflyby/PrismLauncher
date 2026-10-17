@@ -53,7 +53,6 @@ internal sealed class AuthStubServer : IDisposable
         catch (ObjectDisposedException)
         {
         }
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>The last recorded request for a method+path, or null.</summary>
@@ -152,6 +151,7 @@ internal sealed class AuthStubServer : IDisposable
                 }
                 catch (Exception)
                 {
+                    // best-effort close: the client has already moved on
                 }
             }
         }

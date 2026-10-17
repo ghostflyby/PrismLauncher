@@ -155,7 +155,7 @@ public class MmcZipTests : IDisposable
     {
         var zipPath = Path.Combine(_tempDir, "empty.zip");
         using (var s = File.Create(zipPath))
-        using (var z = new ZipArchive(s, ZipArchiveMode.Create))
+        using (new ZipArchive(s, ZipArchiveMode.Create))
         {
             // zero entries; the resulting EOCD-only file is 22 bytes
         }

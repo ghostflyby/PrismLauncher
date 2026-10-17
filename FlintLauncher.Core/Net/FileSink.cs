@@ -97,9 +97,8 @@ public class FileSink : Sink
 
     public override bool Finalize(NetResponseInfo response)
     {
-        var gotFile = false;
         // this leaves out 304 Not Modified
-        gotFile = response.StatusCode is 200 or 203;
+        var gotFile = response.StatusCode is 200 or 203;
 
         // if we wrote any data to the save file, we try to commit the data to the real file.
         // if it actually got a proper file, we write it even if it was empty

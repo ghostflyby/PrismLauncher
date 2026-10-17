@@ -661,7 +661,7 @@ public class ServerApiTests : IAsyncDisposable
                         var buffer = new byte[256];
                         await using var stream = client.GetStream();
                         // drain the handshake + status request frames
-                        var received = 0;
+                        int received;
                         try
                         {
                             do

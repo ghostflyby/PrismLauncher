@@ -56,7 +56,7 @@ public static class QtJson
                 var sorted = new JsonArray();
                 foreach (var item in array)
                 {
-                    sorted.Add((JsonNode?)item is null ? null : SortObjectKeys(item));
+                    sorted.Add(item is null ? null : SortObjectKeys(item));
                 }
                 return sorted;
             }

@@ -47,7 +47,6 @@ internal sealed class PeripheralStubServer : IDisposable
         catch (ObjectDisposedException)
         {
         }
-        GC.SuppressFinalize(this);
     }
 
     private async Task ListenLoop()
@@ -79,6 +78,7 @@ internal sealed class PeripheralStubServer : IDisposable
                 }
                 catch (Exception)
                 {
+                    // best-effort close: the client has already moved on
                 }
             }
         }

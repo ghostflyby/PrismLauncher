@@ -189,7 +189,6 @@ public class CoverageFixCoreTests
     {
         var dataDir = Path.Combine(Path.GetTempPath(), $"flint-netcfg-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dataDir);
-        var previousUa = NetStack.Default.UserAgent;
         var previousRetries = NetStack.Default.ManualRetries;
         var previousTimeout = NetStack.Default.RequestTimeout;
         try
@@ -230,7 +229,6 @@ public class CoverageFixCoreTests
     [Fact]
     public void Http_Configure_Is_Idempotent_For_An_Unchanged_Config()
     {
-        var previousUa = NetStack.Default.UserAgent;
         try
         {
             NetStack.Default.Configure("Flint-Idempotent/1.0", "None", "", 0, "", "");

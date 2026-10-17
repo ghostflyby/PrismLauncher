@@ -185,7 +185,7 @@ public class ModUpdateTaskTests : IDisposable
     [Fact]
     public async Task ApplyUpdate_NoDownloads_StillRefreshesModel()
     {
-        var (instance, model, _) = SetupInstalledMod("jar content"u8.ToArray());
+        var (_, model, _) = SetupInstalledMod("jar content"u8.ToArray());
 
         var updateTask = new ModUpdateTask(model, []);
         await updateTask.StartAsync();

@@ -148,7 +148,6 @@ public class CoverageFixSettingsApiTests
     [Fact]
     public async Task Proxy_Retry_Timeout_Settings_Reach_The_Http_Stack()
     {
-        var previousUa = NetStack.Default.UserAgent;
         var previousRetries = NetStack.Default.ManualRetries;
         var previousTimeout = NetStack.Default.RequestTimeout;
         try
