@@ -5,9 +5,7 @@
 // Prism-format instance.cfg is READ-ONLY on load and only converts on the first write.
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Settings;
-using FlintLauncher.Web;
 using Xunit;
 
 namespace Flint.Tests;

@@ -9,7 +9,6 @@
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
-using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform.FtbApp;
 
@@ -44,7 +43,7 @@ public sealed class FtbAppPackInstallTask : InstanceTask
 
         // D4: the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
-            new Core.Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
+            new Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution.")),
             StagingPath);
 

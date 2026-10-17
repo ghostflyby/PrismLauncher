@@ -12,7 +12,7 @@
 //    AccountData::networkError and the isApplicationError/isServerError classification port 1:1.
 //  - QNetworkReply::errorString() texts are replaced by plain "HTTP status <code> for <url>" /
 //    exception messages; the user-visible step messages embed them only in generic failures.
-using System.Net;
+
 using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.Auth;
@@ -139,7 +139,7 @@ public static class AuthStepHttp
                     ErrorString = "Operation timed out",
                 };
             }
-            catch (Exception ex) when (ex is HttpRequestException or System.IO.IOException)
+            catch (Exception ex) when (ex is HttpRequestException or IOException)
             {
                 return new AuthStepResponse
                 {

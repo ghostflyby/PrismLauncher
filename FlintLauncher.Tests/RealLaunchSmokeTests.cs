@@ -3,9 +3,7 @@
 // entry point) with a fake java that speaks the EntryPoint stdin protocol — no network, no
 // real Minecraft. Also assembles the launch task of a real Prism instance (read-only).
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Launch;
-using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tasks;
 using Xunit;
 
@@ -130,10 +128,10 @@ public class RealLaunchSmokeTests
         // D4: the real Prism instance loads read-only through the typed layer stack (the
         // instance.cfg imports in memory; nothing materializes)
         var instance = new MinecraftInstance(
-            new FlintLauncher.Core.Config.InstanceJsonSettingsObject(instanceDir, global.Environment),
+            new Core.Config.InstanceJsonSettingsObject(instanceDir, global.Environment),
             instanceDir);
         _ = instance.Settings();
-        var reload = await instance.GetPackProfile().ReloadAsync(FlintLauncher.Core.Net.NetMode.Offline);
+        var reload = await instance.GetPackProfile().ReloadAsync(Core.Net.NetMode.Offline);
         if (!reload.Ok)
         {
             return; // meta cache unavailable in this test layout; covered by fixture-based tests

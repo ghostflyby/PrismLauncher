@@ -16,7 +16,6 @@
 //    significant digits (lowercase exponent); QtJson.NumberToString mirrors that.
 using System.IO.Compression;
 using System.Text;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
@@ -34,7 +33,7 @@ public enum DataPackProcessingLevel
 /// Port of the DataPackUtils namespace: pack.mcmeta/pack.png processing for data packs
 /// and resource packs.
 /// </summary>
-public static partial class DataPackUtils
+public static class DataPackUtils
 {
     /// <summary>Port of DataPackUtils::process (dispatch on the resource type).</summary>
     public static bool Process(DataPack pack, DataPackProcessingLevel level = DataPackProcessingLevel.Full)

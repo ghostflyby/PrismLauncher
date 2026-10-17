@@ -2,7 +2,7 @@
 // Port of launcher/minecraft/launch/VerifyJavaInstall.{h,cpp}: verify that the selected Java
 // major version is compatible with the instance profile. The probed version/architecture
 // come from the state-side probe cache (S5) via the instance, not from settings (C9).
-using FlintLauncher.Core.Instances;
+
 using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Launch.Steps;

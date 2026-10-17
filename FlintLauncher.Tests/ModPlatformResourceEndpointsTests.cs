@@ -12,7 +12,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Flint.Tests;
-using FlintLauncher.Core;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using Xunit;
@@ -81,7 +80,7 @@ public class FlintApiFlameResourceTests : IDisposable
     {
         await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
         var response = await host.GetAsync("/api/v1/modplatform/flame/search?type=floppies");
-        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var error = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
         Assert.Equal("invalid_type", error.GetProperty("error").GetProperty("code").GetString());
     }
@@ -149,7 +148,7 @@ public class FlintApiFlameResourceTests : IDisposable
     {
         await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
         var missing = await host.GetAsync("/api/v1/modplatform/flame/mods/306612/changelog");
-        Assert.Equal(System.Net.HttpStatusCode.BadRequest, missing.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
 
         var ok = await host.GetAsync("/api/v1/modplatform/flame/mods/306612/changelog?fileId=4446");
         ok.EnsureSuccessStatusCode();
@@ -294,7 +293,7 @@ public class FlintApiModrinthResourceTests : IDisposable
     {
         await using var host = await FlintApiHost.StartAsync();
         var response = await host.GetAsync("/api/v1/modplatform/modrinth/search?type=worlds");
-        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var error = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
         Assert.Equal("invalid_type", error.GetProperty("error").GetProperty("code").GetString());
     }
@@ -358,7 +357,7 @@ public class FlintApiModrinthResourceTests : IDisposable
     {
         await using var host = await FlintApiHost.StartAsync();
         var response = await host.GetAsync("/api/v1/modplatform/modrinth/mods/projId1/changelog?fileId=1");
-        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var error = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
         Assert.Equal("invalid_request", error.GetProperty("error").GetProperty("code").GetString());
     }

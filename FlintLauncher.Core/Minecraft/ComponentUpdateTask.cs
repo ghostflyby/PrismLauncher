@@ -115,7 +115,7 @@ public sealed class ComponentUpdateTask : FlintTask
 
     // ---------------------------------------------------------------- loading
 
-    private LoadResult LoadComponent(Component component, out FlintLauncher.Core.Tasks.FlintTask? loadTask,
+    private LoadResult LoadComponent(Component component, out FlintTask? loadTask,
                                      NetMode netmode, CancellationToken cancellationToken)
     {
         loadTask = null;

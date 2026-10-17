@@ -11,7 +11,6 @@
 //    and a GUI error dialog; creation succeeds without fetching game files.
 //  - D4: the staged instance is created through the typed instance.json adapter — new
 //    instances are Flint format from birth (no instance.cfg is written).
-using FlintLauncher.Core.Instances;
 
 namespace FlintLauncher.Core.Instances.Creation;
 
@@ -42,7 +41,7 @@ public sealed class VanillaCreationTask : InstanceTask
         // D4: a fresh Flint instance writes instance.json (the typed adapter) — the staged
         // folder commits as Flint format
         var instance = new MinecraftInstance(
-            new Core.Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
+            new Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution.")),
             StagingPath);
         {

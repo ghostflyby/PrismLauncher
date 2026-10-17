@@ -22,7 +22,6 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Instances;
 
@@ -272,7 +271,7 @@ public sealed partial class InstanceImportTask : InstanceTask
         // through the typed adapter — the committed folder is Flint format (instance.json);
         // the cfg inside the zip, if any, stays untouched
         var instance = new NullInstance(
-            new Core.Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
+            new Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution.")),
             StagingPath);
 

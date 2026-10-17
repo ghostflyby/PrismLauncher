@@ -2,7 +2,7 @@
 // Tests for the Log4j XML event parser port (launcher/logs/LogParser.{h,cpp}; guessLevel lives
 // in MessageLevel.cs and is covered by the launch tests): complete/partial/mixed event streams,
 // the required-attribute errors and the buffer bookkeeping across parseNext/parseAvailable.
-using System.Text;
+
 using FlintLauncher.Core.Launch;
 using Xunit;
 

@@ -7,7 +7,6 @@
 // fails with the download's reason).
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
@@ -107,7 +106,7 @@ public class ModUpdateTaskTests : IDisposable
             Name = update.Name,
             Provider = ResourceProvider.FLAME,
         };
-        var download = new FlintLauncher.Core.ModPlatform.ResourceDownloadTask(pack, update.Version, model,
+        var download = new ResourceDownloadTask(pack, update.Version, model,
             isIndexed: true, downloadReason: "update", instance: instance);
 
         var updateTask = new ModUpdateTask(model, [download]);
@@ -149,7 +148,7 @@ public class ModUpdateTaskTests : IDisposable
             HashType = "sha1",
             Hash = Sha1(goodBytes),
         };
-        var goodDownload = new FlintLauncher.Core.ModPlatform.ResourceDownloadTask(goodPack, goodVersion, model,
+        var goodDownload = new ResourceDownloadTask(goodPack, goodVersion, model,
             instance: instance);
 
         // ...and one whose checksum cannot match
@@ -164,7 +163,7 @@ public class ModUpdateTaskTests : IDisposable
             HashType = "sha1",
             Hash = Sha1("totally different content"u8.ToArray()),
         };
-        var badDownload = new FlintLauncher.Core.ModPlatform.ResourceDownloadTask(badPack, badVersion, model,
+        var badDownload = new ResourceDownloadTask(badPack, badVersion, model,
             instance: instance);
 
         var updateTask = new ModUpdateTask(model, [badDownload, goodDownload]);

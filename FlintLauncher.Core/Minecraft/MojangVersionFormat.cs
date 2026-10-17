@@ -7,7 +7,6 @@
 // preserved.
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
-using FlintLauncher.Core.Meta;
 
 namespace FlintLauncher.Core.Minecraft;
 

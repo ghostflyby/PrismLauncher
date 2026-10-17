@@ -11,7 +11,6 @@ using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Net;
-using System.Text.Json.Nodes;
 
 namespace FlintLauncher.Core.Store;
 

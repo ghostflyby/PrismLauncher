@@ -10,7 +10,6 @@
 // statics — the tests mutate and restore them, so they must not race the API-host suites.
 using FlintLauncher.Core;
 using FlintLauncher.Core.Config;
-using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;

@@ -11,11 +11,10 @@
 //    monotonically increasing per-entry index, so ?since=N and the SSE stream work even
 //    though LogModel itself is a ring buffer that drops old lines. The buffer is capped
 //    (oldest lines dropped, indexes preserved).
-using FlintLauncher.Core.Instances;
+
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
-using Microsoft.Extensions.Logging;
 using static FlintLauncher.Core.Diagnostics.TasksLog;
 
 namespace FlintLauncher.Web.Services;

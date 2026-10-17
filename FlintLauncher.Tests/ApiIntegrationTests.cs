@@ -19,7 +19,6 @@ using System.Text.Json;
 using Flint.Tests;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
-using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.ModPlatform.Flame;
@@ -564,7 +563,7 @@ public class FlintApiIntegrationTests
             {
                 Java = state.Java with
                 {
-                    Detections = new Dictionary<string, FlintLauncher.Core.State.JavaDetectEntry>(
+                    Detections = new Dictionary<string, Core.State.JavaDetectEntry>(
                         state.Java.Detections, StringComparer.Ordinal)
                     {
                         [javaPath] = new(CheckJava.ComputeJavaSignature(javaUnixTime, javaPath),

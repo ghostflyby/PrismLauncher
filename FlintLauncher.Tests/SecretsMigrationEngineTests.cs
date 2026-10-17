@@ -2,7 +2,7 @@
 // Tests for the new state-cluster infrastructure: the FileSecretStore (CONFIG C4:
 // data/secrets.json, 0600, named get/set/delete) and the G2 migration engine (profiles +
 // auto-run candidates + the flint-legacy eager remount pass with its E8 bare-ledger cleanup).
-using System.Text.Json;
+
 using FlintLauncher.Core;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Migration;
@@ -278,7 +278,7 @@ public class MigrationEngineTests : IDisposable
         // resolves against the moved content file (ResolveEntry verifies existence + md5 —
         // this pins the assembly-order guarantee: the eager pass runs before the runtime's
         // MetaCache.Load(), so the first ledger read sees the remounted file)
-        using var ledger = new FlintLauncher.Core.Net.HttpMetaCache(paths.MetacacheFile);
+        using var ledger = new Core.Net.HttpMetaCache(paths.MetacacheFile);
         ledger.AddBase("meta", paths.MetaDir);
         ledger.Load();
         var loaded = ledger.GetEntry("meta", "net.minecraft/index.json");

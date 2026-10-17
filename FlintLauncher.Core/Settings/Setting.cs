@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/settings/Setting.{h,cpp}. QVariant becomes object? with Variant helpers.
-using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Settings;
 

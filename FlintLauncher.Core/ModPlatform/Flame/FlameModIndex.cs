@@ -10,7 +10,6 @@
 //  - the upstream quirk that resets file.side to NoSide on every gameVersions iteration is
 //    kept verbatim (the "both sides" branch is unreachable, exactly like the C++).
 using System.Globalization;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;

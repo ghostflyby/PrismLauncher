@@ -12,7 +12,6 @@
 //    ("overrides/" prefix, modrinth.index.json as an extra entry, resolved files excluded).
 //  - The progress/step plumbing of the Qt signals is reduced to status/progress updates.
 using System.IO.Compression;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -20,7 +19,6 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft.Resources;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;

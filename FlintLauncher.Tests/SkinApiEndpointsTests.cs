@@ -10,13 +10,10 @@
 // MSA-shaped account with real profile skin data plus a token the stub can assert on.
 using System.Net;
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
 using Flint.Tests;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Web;
-using FlintLauncher.Web.Services;
 using Microsoft.AspNetCore.Builder;
 using Xunit;
 

@@ -23,7 +23,7 @@
 //    launcher-managed java root, the FLINT_JAVA_PATHS environment override.
 // The fallback and launcher-owned candidates flow through JavaDetection.DetectAsync, which
 // checker-validates whatever the primary layer did not already cover.
-using System.Runtime.InteropServices;
+
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 

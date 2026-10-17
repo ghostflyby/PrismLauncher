@@ -8,7 +8,6 @@
 // Every host gets its own AtLauncherApi client pointed at the stub (DownloadServerUrl/
 // ApiBaseUrl are per-instance state now, so no [Collection] serialization is needed).
 using System.Net;
-using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.ModPlatform.AtLauncher;

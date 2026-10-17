@@ -4,11 +4,8 @@
 // mapped (with the changelog fetched), and the blocked-update path (no download URL)
 // surfacing through checkFailed with the manual-download recover URL.
 using System.Text.Json.Nodes;
-using FlintLauncher.Core;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
-using FlintLauncher.Core.ModPlatform.Hashing;
-using FlintLauncher.Core.ModPlatform.Packwiz;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Versioning;

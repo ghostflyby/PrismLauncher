@@ -15,7 +15,6 @@
 //    getIconFileSizeLimit/m reapIcon edge is display-only).
 //  - installIcon() returned void upstream (failures silently ignored); the port returns
 //    bool, like <see cref="IconFiles.InstallIcon"/> (QFile::copy semantics — no overwrite).
-using FlintLauncher.Core.IO;
 
 namespace FlintLauncher.Core.Icons;
 

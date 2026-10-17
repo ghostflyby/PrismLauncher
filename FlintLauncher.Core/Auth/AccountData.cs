@@ -13,7 +13,7 @@
 //  - profileName()'s tr("No Minecraft profile") placeholder is kept as the English literal
 //    (the launcher core is not localized).
 //  - qWarning()/qDebug() diagnostics are dropped (comment markers where they carried meaning).
-using System.Text.Json;
+
 using System.Text.Json.Nodes;
 
 namespace FlintLauncher.Core.Auth;

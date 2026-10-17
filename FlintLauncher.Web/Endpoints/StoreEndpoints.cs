@@ -7,11 +7,11 @@
 //     the assets root.
 // Both are PURE derivations (StoreCompleteness): no downloads, no ledger writes. The inner
 // E5 layer (per-file ledger entry queries) is the metacache eviction surface that exists.
-using FlintLauncher.Core;
+
+using FlintLauncher.Core.Json;
+using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Minecraft;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Store;
-using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 
 namespace FlintLauncher.Web.Endpoints;
@@ -31,7 +31,7 @@ public static class StoreEndpoints
                 report = StoreCompleteness.LibrariesStatus(runtime.Paths, runtime.MetaCache, versionRef,
                     new RuntimeContext());
             }
-            catch (Exception e) when (e is Core.Meta.MetaParseException or Core.Json.JsonParseException)
+            catch (Exception e) when (e is MetaParseException or JsonParseException)
             {
                 return ApiJson.Error("invalid_version_manifest",
                     $"the version manifest for '{versionRef}' is not parseable: {e.Message}", 422);
@@ -40,7 +40,7 @@ public static class StoreEndpoints
                 ? ApiJson.NotFound("version_not_found",
                     $"no meta version manifest for 'net.minecraft/{versionRef}' — the version must be loaded first")
                 : Results.Ok(report);
-        }).Produces<StoreStatusReport>(200);
+        }).Produces<StoreStatusReport>();
 
         group.MapGet("/status/assets/{assetsId}", (LauncherRuntime runtime, string assetsId) =>
         {
@@ -49,6 +49,6 @@ public static class StoreEndpoints
                 ? ApiJson.NotFound("index_not_found",
                     $"no asset index '{assetsId}' under the store's indexes — the assets must be installed first")
                 : Results.Ok(report);
-        }).Produces<StoreStatusReport>(200);
+        }).Produces<StoreStatusReport>();
     }
 }

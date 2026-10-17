@@ -139,7 +139,7 @@ public sealed class DataMigrationTask : FlintTask
         }
         foreach (var file in FileTransfer.EnumerateFilesDeep(_sourcePath))
         {
-            var relative = System.IO.Path.GetRelativePath(_sourcePath, file).Replace('\\', '/');
+            var relative = Path.GetRelativePath(_sourcePath, file).Replace('\\', '/');
             if (_pathMatcher(relative))
             {
                 matched.Add(relative);
@@ -326,7 +326,7 @@ public static class DataMigration
         {
             foreach (var file in Directory.EnumerateFiles(currentData, "*_nomigrate.txt"))
             {
-                if (string.Equals(System.IO.Path.GetFileName(file), NoMigrateMarkerName(name),
+                if (string.Equals(Path.GetFileName(file), NoMigrateMarkerName(name),
                         StringComparison.OrdinalIgnoreCase))
                 {
                     return file;

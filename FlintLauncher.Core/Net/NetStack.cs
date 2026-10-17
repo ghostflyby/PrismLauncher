@@ -93,7 +93,7 @@ public sealed class NetStack
     {
         var handler = new SocketsHttpHandler
         {
-            AutomaticDecompression = System.Net.DecompressionMethods.All,
+            AutomaticDecompression = DecompressionMethods.All,
             PooledConnectionLifetime = TimeSpan.FromMinutes(10),
             Proxy = BuildProxy(),
         };
@@ -119,7 +119,7 @@ public sealed class NetStack
         var proxy = new WebProxy(uri);
         if (_proxy.User.Length != 0)
         {
-            proxy.Credentials = new System.Net.NetworkCredential(_proxy.User, _proxy.Pass);
+            proxy.Credentials = new NetworkCredential(_proxy.User, _proxy.Pass);
         }
         return proxy;
     }

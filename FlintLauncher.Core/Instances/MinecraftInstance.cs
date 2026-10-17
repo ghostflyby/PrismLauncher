@@ -101,7 +101,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// install root, UI hooks — the former static hooks). Stamped by the composition root
     /// (InstanceList) or set directly by tests; CreateLaunchTask uses it as the base for the
     /// per-launch services and falls back to headless defaults while null.</summary>
-    public Launch.LaunchServices? LaunchServices { get; set; }
+    public LaunchServices? LaunchServices { get; set; }
 
     public override void SaveNow()
     {
@@ -321,7 +321,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     /// <summary>Port of createLaunchTask() (2-arg form): builds the per-launch services from
     /// the instance-stamped LaunchServices (or headless defaults).</summary>
-    public override Launch.LaunchTask? CreateLaunchTask(AuthSession? session, MinecraftTarget? targetToJoin) =>
+    public override LaunchTask? CreateLaunchTask(AuthSession? session, MinecraftTarget? targetToJoin) =>
         CreateLaunchTask(session, targetToJoin, services: null);
 
     /// <summary>Port of createLaunchTask(): builds the <see cref="Launch.LaunchServices"/> for
@@ -329,18 +329,18 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// ones, then headless defaults), hands it to the LaunchTask (every step reads its
     /// environment from Parent.Services) and invokes the UI's saveIcon (C++
     /// APPLICATION->icons()->saveIcon) — the former SaveIconHook static.</summary>
-    public Launch.LaunchTask? CreateLaunchTask(AuthSession? session, MinecraftTarget? targetToJoin,
-        Launch.LaunchServices? services)
+    public LaunchTask? CreateLaunchTask(AuthSession? session, MinecraftTarget? targetToJoin,
+        LaunchServices? services)
     {
         var launchServices = services ?? LaunchServices ?? BuildLaunchServices();
         UpdateRuntimeContext();
-        var process = Launch.LaunchTask.Create(this, launchServices);
+        var process = LaunchTask.Create(this, launchServices);
 
         launchServices.Ui.SaveIcon?.Invoke(IconKey(), FileSystem.PathCombine(GameRoot(), "icon.png"));
 
         // print a header
         process.AppendStep(new Launch.Steps.TextPrint(process, "Minecraft folder is:\n  " + GameRoot() + "\n",
-            Launch.MessageLevel.Launcher));
+            MessageLevel.Launcher));
 
         // create the .minecraft folder and server-resource-packs (workaround for Minecraft bug MCL-3732)
         process.AppendStep(new Launch.Steps.CreateGameFolders(process));
@@ -381,7 +381,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // load meta
         {
             var mode = session?.LaunchMode != LaunchMode.Offline ? NetMode.Online : NetMode.Offline;
-            process.AppendStep(new Launch.TaskStepWrapper(process, new Launch.Steps.MinecraftLoadAndCheck(this, mode)));
+            process.AppendStep(new TaskStepWrapper(process, new Launch.Steps.MinecraftLoadAndCheck(this, mode)));
         }
 
         // check java
@@ -406,7 +406,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             process.AppendStep(new Launch.Steps.ClaimAccount(process, session));
             foreach (var t in CreateUpdateTask())
             {
-                process.AppendStep(new Launch.TaskStepWrapper(process, t));
+                process.AppendStep(new TaskStepWrapper(process, t));
             }
         }
         else
@@ -464,7 +464,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// <summary>Headless LaunchServices for bare fixtures (no stamped services, no explicit
     /// per-launch override): CWD-anchored paths, a null logger and the injected instance
     /// cache/settings — the same behavior the former unset static hooks produced.</summary>
-    private Launch.LaunchServices BuildLaunchServices() => new()
+    private LaunchServices BuildLaunchServices() => new()
     {
         Paths = Paths ?? FlintPaths.FromHomeDir(Directory.GetCurrentDirectory()),
         LoggerFactory = Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
@@ -477,7 +477,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         CreateLaunchScript(session, targetToJoin, services: null);
 
     public string CreateLaunchScript(AuthSession? session, MinecraftTarget? targetToJoin,
-        Launch.LaunchServices? services)
+        LaunchServices? services)
     {
         var launchScript = "";
 

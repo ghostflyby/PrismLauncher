@@ -418,7 +418,7 @@ public class LocalModParseTests : IDisposable
 
         var mod = Parsed(path);
 
-        Assert.Equal(Core.Minecraft.Resources.ResourceType.LiteMod, mod.Type);
+        Assert.Equal(ResourceType.LiteMod, mod.Type);
         Assert.Equal("litetest", mod.Details.ModId);
         Assert.Equal("litetest", mod.Details.Name);
         Assert.Equal("1.4", mod.Details.Version);
@@ -482,7 +482,7 @@ public class LocalModParseTests : IDisposable
 
         var mod = Parsed(dir);
 
-        Assert.Equal(Core.Minecraft.Resources.ResourceType.Folder, mod.Type);
+        Assert.Equal(ResourceType.Folder, mod.Type);
         Assert.Equal("foldermod", mod.Details.ModId);
         Assert.Equal("Folder Mod", mod.Details.Name);
     }

@@ -5,7 +5,6 @@
 using System.Globalization;
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Settings;
 using Xunit;
 
 namespace Flint.Tests;
@@ -664,7 +663,7 @@ public class InstanceListTests : IDisposable
 
         var list = CreateList();
         list.LoadList();
-        Assert.IsType<FlintLauncher.Core.Instances.MinecraftInstance>(list.GetInstanceById("notype"));
+        Assert.IsType<MinecraftInstance>(list.GetInstanceById("notype"));
         Assert.Equal("NoType", list.GetInstanceById("notype")!.Name());
     }
 

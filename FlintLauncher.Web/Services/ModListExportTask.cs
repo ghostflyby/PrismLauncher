@@ -9,7 +9,6 @@
 // target is always "<name>-mods.<ext>" inside the instance directory, exposed through the
 // task view's OutputPath result).
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform.Helpers;
 using FlintLauncher.Core.Tasks;
 

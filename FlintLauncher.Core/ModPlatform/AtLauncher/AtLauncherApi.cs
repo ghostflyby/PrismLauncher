@@ -9,7 +9,7 @@
 // at a stub); the client rides the injected NetStack (LauncherRuntime.AtLauncher — see the
 // Modrinth/Flame/Technic de-singletoning for the same story). The parsers are pure helpers
 // and stay static; reads go through the JsonNode model (see AtLauncherJson/JsonUtils).
-using System.Text.Json.Nodes;
+
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Net;
 

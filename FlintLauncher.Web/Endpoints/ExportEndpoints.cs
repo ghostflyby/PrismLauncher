@@ -5,9 +5,8 @@
 // mod list via the local ModListExportTask), and GET /instances/{id}/logs[/{dir}/{name}]
 // serves the OtherLogsPage surface (game logs + crash reports, content capped to a 512KB
 // tail).
-using System.Text.Json;
+
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Helpers;
 using FlintLauncher.Core.Tasks;
@@ -169,7 +168,7 @@ public static class ExportEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).WithMetadata(new FlintLauncher.Web.OpenApi.PlainTextMarker());
+        }).WithMetadata(new OpenApi.PlainTextMarker());
     }
 
     // ----------------------------------------------------------------------- helpers
@@ -204,7 +203,7 @@ public static class ExportEndpoints
             foreach (var file in files)
             {
                 var info = new FileInfo(file);
-                if ((info.Attributes & System.IO.FileAttributes.Directory) != 0)
+                if ((info.Attributes & FileAttributes.Directory) != 0)
                 {
                     continue;
                 }

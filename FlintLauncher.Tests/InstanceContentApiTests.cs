@@ -18,7 +18,6 @@ using Flint.Tests;
 using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Nbt;
 using FlintLauncher.Web;
-using FlintLauncher.Web.Services;
 using Microsoft.AspNetCore.Builder;
 using Xunit;
 

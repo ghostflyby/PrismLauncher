@@ -5,7 +5,6 @@
 // guarded like RealDataSmokeTests.
 using JdkFind;
 using JdkFind.Providers;
-using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Java;
 using Xunit;
 
@@ -110,7 +109,7 @@ public class JavaUtilsTests : IDisposable
     public void FindJavaPaths_PicksUpEnvProvidedPaths()
     {
         var extra = "/opt/flint-test-jdk/bin/java";
-        SetEnv($"{FlintLauncher.Core.FlintConfig.Default.LauncherAppBinaryEnvName}_JAVA_PATHS", extra);
+        SetEnv($"{Core.FlintConfig.Default.LauncherAppBinaryEnvName}_JAVA_PATHS", extra);
 
         var candidates = JavaUtils.FindJavaPaths();
 
@@ -156,7 +155,7 @@ public class JavaUtilsTests : IDisposable
                 : new UnixJvmProvider(root);
         var executable = Path.Combine(home, "bin", JavaUtils.JavaExecutable);
         var broken = Path.Combine(brokenHome, "bin", JavaUtils.JavaExecutable);
-        SetEnv($"{FlintLauncher.Core.FlintConfig.Default.LauncherAppBinaryEnvName}_JAVA_PATHS",
+        SetEnv($"{Core.FlintConfig.Default.LauncherAppBinaryEnvName}_JAVA_PATHS",
             string.Join(Path.PathSeparator, executable, broken, Path.Combine(root, "nonexistent", "java")));
 
         var candidates = await JavaDetection.DetectAsync(providers: [provider]);

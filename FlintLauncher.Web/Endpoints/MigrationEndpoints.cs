@@ -8,7 +8,6 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Migration;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
-using Microsoft.AspNetCore.Http.Json;
 
 namespace FlintLauncher.Web.Endpoints;
 
@@ -129,10 +128,10 @@ public static class MigrationEndpoints
             // as a 500.
             try
             {
-                runtime.MigrationDecisions.Write(new Core.Migration.MigrationDecisionRecord
+                runtime.MigrationDecisions.Write(new MigrationDecisionRecord
                 {
                     Source = name,
-                    Decision = Core.Migration.MigrationDecisionRecord.Declined,
+                    Decision = MigrationDecisionRecord.Declined,
                     At = DateTimeOffset.Now.ToString("o"),
                 });
             }

@@ -66,7 +66,7 @@ public sealed class SkinsLibrary
         {
             return false;
         }
-        var target = System.IO.Path.Combine(dir, name + ".png");
+        var target = Path.Combine(dir, name + ".png");
         if (File.Exists(target))
         {
             return false;
@@ -108,7 +108,7 @@ public sealed class SkinsLibrary
             return false;
         }
         SkinListStore.Save(dir, skins);
-        var texture = System.IO.Path.Combine(dir, name + ".png");
+        var texture = Path.Combine(dir, name + ".png");
         if (File.Exists(texture))
         {
             try
@@ -129,5 +129,5 @@ public sealed class SkinsLibrary
     private static bool IsPlainName(string name) =>
         name.Length != 0 && !name.Contains('/') && !name.Contains('\\') &&
         !name.Contains("..", StringComparison.Ordinal) && name != "." &&
-        name.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) < 0;
+        name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
 }

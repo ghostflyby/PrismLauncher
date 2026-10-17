@@ -8,9 +8,8 @@
 // The exact templates of the C++ are kept, including Qt specifics: toHtmlEscaped (only
 // & < > "), the QJsonDocument::toJson() indented shape (sorted keys, 4-space indent,
 // trailing newline) and the CSV quoting rule for multi-author entries.
-using System.Text.Json;
+
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 
 namespace FlintLauncher.Core.ModPlatform.Helpers;

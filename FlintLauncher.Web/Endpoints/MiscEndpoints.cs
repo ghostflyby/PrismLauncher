@@ -5,7 +5,6 @@
 using FlintLauncher.Core;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Settings;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 

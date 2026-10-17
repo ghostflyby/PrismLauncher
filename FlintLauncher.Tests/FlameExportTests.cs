@@ -4,13 +4,9 @@
 // metadata and from the fingerprint API), modlist.html and the overrides/ zip layout
 // (resolved files excluded).
 using System.IO.Compression;
-using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.Flame;
-using FlintLauncher.Core.ModPlatform.Hashing;
-using FlintLauncher.Core.Settings;
 using Xunit;
 
 namespace Flint.Tests;

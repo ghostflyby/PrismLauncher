@@ -23,7 +23,7 @@ namespace FlintLauncher.Tests;
 public class ComponentUpdateTaskTests : IDisposable
 {
     private readonly string _root;
-    private readonly FlintLauncher.Core.Net.HttpMetaCache _metaCache;
+    private readonly HttpMetaCache _metaCache;
 
     public ComponentUpdateTaskTests()
     {
@@ -32,7 +32,7 @@ public class ComponentUpdateTaskTests : IDisposable
         // the stamped fixture cache (E6 fixture injection): "meta" base inside the test root,
         // replacing the former CWD-anchored static fallback; every profile gets it via
         // SetMetadataCache so metadata entities resolve files under <_root>/meta
-        _metaCache = new FlintLauncher.Core.Net.HttpMetaCache(
+        _metaCache = new HttpMetaCache(
             Path.Combine(_root, "metacache.json"));
         _metaCache.AddBase("meta", Path.Combine(_root, "meta"));
     }
@@ -204,7 +204,7 @@ public class ComponentUpdateTaskTests : IDisposable
         var task = new ComponentUpdateTask(ComponentUpdateTask.Mode.Resolution, NetMode.Offline, profile);
         await task.StartAsync();
 
-        Assert.Equal(FlintLauncher.Core.Tasks.TaskState.Failed, task.State);
+        Assert.Equal(Core.Tasks.TaskState.Failed, task.State);
         Assert.Equal("Some component metadata load tasks failed.", task.FailReason);
 
         // cleanup the shared meta cache folder (the profile does not own it)

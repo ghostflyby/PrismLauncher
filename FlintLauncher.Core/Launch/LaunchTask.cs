@@ -36,9 +36,6 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Text;
 using Microsoft.Extensions.Logging;
-using static FlintLauncher.Core.Launch.MessageLevelExtensions;
-
-using System.IO;
 
 namespace FlintLauncher.Core.Launch;
 

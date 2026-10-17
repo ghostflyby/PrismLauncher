@@ -61,7 +61,7 @@ public abstract class InstanceTask : FlintTask
     /// instance.json/instance-state.json type infos. Set through
     /// <see cref="SetParentEnvironment"/> (the InstanceStaging wrapper does it before the
     /// task runs); the creation tasks build their staged instances with it.</summary>
-    protected Core.Config.InstanceEnvironment? Environment { get; private set; }
+    protected Config.InstanceEnvironment? Environment { get; private set; }
 
     /// <summary>C++ m_instIcon + setIcon().</summary>
     public string Icon { get; set; } = "";
@@ -82,7 +82,7 @@ public abstract class InstanceTask : FlintTask
     /// <summary>C++ m_filesToRemove (consumed by the import/update flows).</summary>
     protected IReadOnlyList<string> FilesToRemove => _filesToRemove;
 
-    public void SetParentEnvironment(Core.Config.InstanceEnvironment environment) => Environment = environment;
+    public void SetParentEnvironment(Config.InstanceEnvironment environment) => Environment = environment;
 
     /// <summary>C++ setIcon().</summary>
     public void SetIcon(string icon) => Icon = icon;

@@ -47,7 +47,6 @@ using System.Globalization;
 using System.Text.Json;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Launch;
-using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tasks;
@@ -111,7 +110,7 @@ public class InstanceList
     /// plus the instance.json / instance-state.json type infos. The C++ passed the global
     /// SettingsObject here; the typed stack replaced it (CONFIG C6/C7). Must be stamped
     /// before LoadList — discovery cannot build instances without it.</summary>
-    public Core.Config.InstanceEnvironment? Environment { get; set; }
+    public Config.InstanceEnvironment? Environment { get; set; }
 
     /// <summary>Injected data-directory layout — stamped onto discovered instances (their
     /// asset/library/java anchors) and used for instgroups.json. Set by the composition root.</summary>
@@ -144,7 +143,7 @@ public class InstanceList
     /// migration and the group collapse ("hidden") persistence land here; null skips both
     /// (no state root in a bare fixture).
     /// </summary>
-    public Core.State.LauncherStateStore? LauncherState { get; set; }
+    public State.LauncherStateStore? LauncherState { get; set; }
 
     /// <summary>
     /// Overrides the C8 groups-file location (tests/embedding). When set, it IS the
@@ -833,7 +832,7 @@ public class InstanceList
         var instanceRoot = FileSystem.PathCombine(RootDirOf(id), id);
         // the typed layer stack (D4): instance.json when present (Flint format), otherwise
         // the read-only instance.cfg import in memory — no write happens on discovery
-        var instanceSettings = new Core.Config.InstanceJsonSettingsObject(instanceRoot, environment);
+        var instanceSettings = new Config.InstanceJsonSettingsObject(instanceRoot, environment);
         // register the discriminator before dispatch (BaseInstance would only register it
         // inside the ctor, which the dispatch below decides)
         instanceSettings.RegisterSetting("InstanceType", "OneSix");
@@ -902,10 +901,10 @@ public class InstanceList
                 }
                 return "";
             }
-            var cfgPath = FileSystem.PathCombine(instanceRoot, Core.Config.InstanceIniImporter.LegacyFileName);
+            var cfgPath = FileSystem.PathCombine(instanceRoot, Config.InstanceIniImporter.LegacyFileName);
             if (File.Exists(cfgPath))
             {
-                var ini = new Settings.IniFile();
+                var ini = new IniFile();
                 return ini.LoadFile(cfgPath) ? ini.GetString("uuid", "") : "";
             }
         }

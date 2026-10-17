@@ -28,29 +28,26 @@
 //    phase); without a hook the install fails like the C++ does when the version list
 //    cannot be loaded.
 //  - logWarning() becomes a Warnings entry + a status line (no warningLogged signal).
-using System.Globalization;
+
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
-using FlintLauncher.Core.Minecraft;
-using FlintLauncher.Core.Minecraft.Worlds;
-using ResourceType = FlintLauncher.Core.ModPlatform.ResourceType;
+using Minecraft.Worlds;
+using ResourceType = ResourceType;
 
 public sealed partial class FlameCreationTask : InstanceTask
 {
     public FlameCreationTask(string stagingPath,
                              bool trustedSource,
-                             Core.Config.InstanceEnvironment environment,
+                             Config.InstanceEnvironment environment,
                              string id = "",
                              string versionId = "",
                              ModrinthApi? modrinth = null,
@@ -237,7 +234,7 @@ public sealed partial class FlameCreationTask : InstanceTask
 
         // D4: the staged instance is Flint format from birth (typed instance.json adapter)
         _newInstance = new MinecraftInstance(
-            new Core.Config.InstanceJsonSettingsObject(StagingPath, Environment ??
+            new Config.InstanceJsonSettingsObject(StagingPath, Environment ??
                 throw new InvalidOperationException(
                     "InstanceTask requires SetParentEnvironment before execution.")),
             StagingPath);

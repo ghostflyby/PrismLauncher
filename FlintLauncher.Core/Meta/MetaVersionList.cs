@@ -2,7 +2,6 @@
 // Port of launcher/meta/VersionList.{h,cpp} (the non-Qt subset). The QAbstractItemModel
 // machinery (data()/roles/roleNames/waitToLoad/QEventLoop), the BaseVersionList interface and
 // the change signals are UI-layer plumbing and are not ported; everything metadata-related is.
-using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.Meta;
 

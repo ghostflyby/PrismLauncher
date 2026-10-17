@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Tests for MinecraftInstance::javaArguments(): Xms/Xmx orderings, FirstThreadOnMacOS on
 // macOS, the PermGen hack for old Java and the --add-opens online-fixes rule.
-using FlintLauncher.Core.Instances;
+
 using Xunit;
 
 namespace FlintLauncher.Tests;

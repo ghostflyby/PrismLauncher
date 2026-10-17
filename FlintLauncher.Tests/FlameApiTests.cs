@@ -7,17 +7,14 @@
 //
 // The Flame base URL and API key are static override hooks (like ModrinthApi), so the whole
 // class is serialized through the "FlameApi" collection and restores the defaults in Dispose.
-using System.Security.Cryptography;
+
 using System.Text;
-using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Hashing;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using Xunit;

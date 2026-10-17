@@ -7,7 +7,6 @@
 // Linux "share/<launcher name>" variant) next to the application directory — the jars are
 // build outputs produced by the BuildJavaJars MSBuild target (javac/jar via Exec) and are NOT committed.
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Java;
 
 namespace FlintLauncher.Core.Launch;
 
@@ -113,8 +112,8 @@ public static class LauncherJars
         try
         {
             var mode = fileInfo.UnixFileMode;
-            return (mode & (System.IO.UnixFileMode.UserExecute | System.IO.UnixFileMode.GroupExecute |
-                            System.IO.UnixFileMode.OtherExecute)) != 0;
+            return (mode & (UnixFileMode.UserExecute | UnixFileMode.GroupExecute |
+                            UnixFileMode.OtherExecute)) != 0;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {

@@ -69,7 +69,7 @@ public sealed class HttpMetaCache : IDisposable
         new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _basePaths = new(StringComparer.Ordinal);
     private readonly string? _indexFile;
-    private System.Threading.Timer? _saveTimer;
+    private Timer? _saveTimer;
 
     public HttpMetaCache(string? path = null)
     {

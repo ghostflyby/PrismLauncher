@@ -2,7 +2,6 @@
 // Port of launcher/net/Request.{h,cpp} (HTTP methods, sinks, validators, 429/503 auto-retry)
 // on top of HttpClient instead of QNetworkAccessManager.
 using System.Diagnostics;
-using System.Net;
 using System.Security.Cryptography;
 using FlintLauncher.Core.Tasks;
 
@@ -339,16 +338,16 @@ public sealed class NetRequest : FlintTask
         }
     }
 
-    private static System.Net.Http.HttpMethod ToHttpMethod(HttpMethodValue method) => method switch
+    private static HttpMethod ToHttpMethod(HttpMethodValue method) => method switch
     {
-        HttpMethodValue.Get => System.Net.Http.HttpMethod.Get,
-        HttpMethodValue.Post => System.Net.Http.HttpMethod.Post,
-        HttpMethodValue.Put => System.Net.Http.HttpMethod.Put,
-        HttpMethodValue.Patch => System.Net.Http.HttpMethod.Patch,
-        HttpMethodValue.Delete => System.Net.Http.HttpMethod.Delete,
-        HttpMethodValue.Head => System.Net.Http.HttpMethod.Head,
-        HttpMethodValue.Options => System.Net.Http.HttpMethod.Options,
-        HttpMethodValue.Trace => System.Net.Http.HttpMethod.Trace,
-        _ => System.Net.Http.HttpMethod.Get,
+        HttpMethodValue.Get => HttpMethod.Get,
+        HttpMethodValue.Post => HttpMethod.Post,
+        HttpMethodValue.Put => HttpMethod.Put,
+        HttpMethodValue.Patch => HttpMethod.Patch,
+        HttpMethodValue.Delete => HttpMethod.Delete,
+        HttpMethodValue.Head => HttpMethod.Head,
+        HttpMethodValue.Options => HttpMethod.Options,
+        HttpMethodValue.Trace => HttpMethod.Trace,
+        _ => HttpMethod.Get,
     };
 }

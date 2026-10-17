@@ -6,7 +6,6 @@
 // delivery is observable through the log) and honours the launch/abort command vocabulary,
 // without any real Minecraft download.
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Tasks;

@@ -162,7 +162,7 @@ public static class AtLauncherEndpoints
         {
             packs = AtLauncherApi.LoadPackIndex(request.BodyAsString);
         }
-        catch (FlintLauncher.Core.Json.JsonParseException e)
+        catch (Core.Json.JsonParseException e)
         {
             return ApiJson.Error("atlauncher_invalid_response",
                 $"atlauncher pack index is invalid: {e.Message}", 502);

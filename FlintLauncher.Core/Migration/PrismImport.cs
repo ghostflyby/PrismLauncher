@@ -68,12 +68,12 @@ public static class PrismImportPlanner
         var items = new List<PrismImportPlanItem>();
         foreach (var dir in ImportDirectories)
         {
-            var src = System.IO.Path.Combine(sourceDir, dir);
+            var src = Path.Combine(sourceDir, dir);
             if (!Directory.Exists(src))
             {
                 continue;
             }
-            var dst = System.IO.Path.Combine(targetDataDir, dir);
+            var dst = Path.Combine(targetDataDir, dir);
             if (Directory.Exists(dst))
             {
                 // B2: Flint ALWAYS creates <data>/instances (InstanceList's constructor
@@ -99,12 +99,12 @@ public static class PrismImportPlanner
 
         foreach (var file in ImportFiles)
         {
-            var src = System.IO.Path.Combine(sourceDir, file);
+            var src = Path.Combine(sourceDir, file);
             if (!File.Exists(src))
             {
                 continue;
             }
-            var dst = System.IO.Path.Combine(targetDataDir, file);
+            var dst = Path.Combine(targetDataDir, file);
             var method = File.Exists(dst) ? PlannedMethod.DestinationExists
                 : mode == ImportMode.Move && FileTransfer.SameVolume(src, dst)
                     ? PlannedMethod.RenameDirectory
@@ -150,8 +150,8 @@ public static class PrismImportPlanner
     {
         foreach (var file in FileTransfer.EnumerateFilesDeep(srcDir))
         {
-            var relative = System.IO.Path.GetRelativePath(srcDir, file);
-            if (!File.Exists(System.IO.Path.Combine(dstDir, relative)))
+            var relative = Path.GetRelativePath(srcDir, file);
+            if (!File.Exists(Path.Combine(dstDir, relative)))
             {
                 return true;
             }
@@ -225,8 +225,8 @@ public sealed class PrismImportTask : FlintTask
                 continue;
             }
 
-            var srcItem = System.IO.Path.Combine(_sourceDir, item.Name);
-            var dstItem = System.IO.Path.Combine(_targetDataDir, item.Name);
+            var srcItem = Path.Combine(_sourceDir, item.Name);
+            var dstItem = Path.Combine(_targetDataDir, item.Name);
 
             if (item.IsDirectory && item.Method == PlannedMethod.RenameDirectory)
             {
@@ -244,8 +244,8 @@ public sealed class PrismImportTask : FlintTask
                 cancellationToken.ThrowIfCancellationRequested();
                 done++;
                 SetProgress(done, totalFiles);
-                var relative = System.IO.Path.GetRelativePath(_sourceDir, file).Replace('\\', '/');
-                var dst = System.IO.Path.Combine(_targetDataDir, relative);
+                var relative = Path.GetRelativePath(_sourceDir, file).Replace('\\', '/');
+                var dst = Path.Combine(_targetDataDir, relative);
                 EmitStatus($"Importing {Truncate(relative)}…");
                 if (!FileTransfer.TransferFile(file, dst, _mode, out _))
                 {
@@ -266,7 +266,7 @@ public sealed class PrismImportTask : FlintTask
         // stock, deleted once here. Best effort: the data has fully landed.
         try
         {
-            var legacyLedger = System.IO.Path.Combine(_targetDataDir, "metacache");
+            var legacyLedger = Path.Combine(_targetDataDir, "metacache");
             if (File.Exists(legacyLedger))
             {
                 File.Delete(legacyLedger);
@@ -326,7 +326,7 @@ public sealed class PrismImportTask : FlintTask
     /// undercount).</summary>
     private long CountSourceInstances()
     {
-        var instancesDir = System.IO.Path.Combine(_sourceDir, "instances");
+        var instancesDir = Path.Combine(_sourceDir, "instances");
         return Directory.Exists(instancesDir)
             ? Directory.EnumerateDirectories(instancesDir).Count()
             : 0;
@@ -376,7 +376,7 @@ public static class PrismSourceDetector
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         if (OperatingSystem.IsMacOS())
         {
-            return [System.IO.Path.Combine(home, "Library", "Application Support")];
+            return [Path.Combine(home, "Library", "Application Support")];
         }
         if (OperatingSystem.IsWindows())
         {
@@ -385,9 +385,9 @@ public static class PrismSourceDetector
         }
         var xdgDataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
         var baseDir = string.IsNullOrWhiteSpace(xdgDataHome)
-            ? System.IO.Path.Combine(home, ".local", "share")
+            ? Path.Combine(home, ".local", "share")
             : xdgDataHome;
-        return [baseDir, System.IO.Path.Combine(home, ".config")];
+        return [baseDir, Path.Combine(home, ".config")];
     }
 
     public sealed record PrismSourceCandidate(
@@ -423,18 +423,18 @@ public static class PrismSourceDetector
             }
             foreach (var (name, configFile) in KnownLaunchers)
             {
-                var dir = System.IO.Path.Combine(parent, NameToDirectory(name));
+                var dir = Path.Combine(parent, NameToDirectory(name));
                 if (!Directory.Exists(dir) || found.Any(c => string.Equals(c.Path, dir, StringComparison.OrdinalIgnoreCase)))
                 {
                     continue;
                 }
-                var hasConfig = File.Exists(System.IO.Path.Combine(dir, configFile))
-                    || File.Exists(System.IO.Path.Combine(dir, "prismlauncher.cfg"));
+                var hasConfig = File.Exists(Path.Combine(dir, configFile))
+                    || File.Exists(Path.Combine(dir, "prismlauncher.cfg"));
                 if (!hasConfig)
                 {
                     continue;
                 }
-                var instances = System.IO.Path.Combine(dir, "instances");
+                var instances = Path.Combine(dir, "instances");
                 var instancesFound = Directory.Exists(instances)
                     ? Directory.EnumerateDirectories(instances).Count()
                     : 0;

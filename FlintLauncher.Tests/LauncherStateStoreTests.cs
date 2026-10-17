@@ -177,10 +177,10 @@ public class LaunchControllerOfflineNameStateTests
         // The controller task only terminates with the game session, so poll for the name
         // decision (it happens before the launch task is built) and abort the pipeline.
         var instance = await fixture.CreateInstance();
-        var first = new FlintLauncher.Core.Launch.LaunchController
+        var first = new Core.Launch.LaunchController
         {
             Instance = instance,
-            WantedLaunchMode = FlintLauncher.Core.Instances.LaunchMode.Offline,
+            WantedLaunchMode = Core.Instances.LaunchMode.Offline,
             Services = fixture.CreateServices(),
         };
         await first.StartAsync();
@@ -190,10 +190,10 @@ public class LaunchControllerOfflineNameStateTests
         // the handler (dialog) path: the suggestion prefills from the stored name (C++
         // LastOfflinePlayerName parity) and the picked name is written back
         string? capturedSuggestion = null;
-        var second = new FlintLauncher.Core.Launch.LaunchController
+        var second = new Core.Launch.LaunchController
         {
             Instance = instance,
-            WantedLaunchMode = FlintLauncher.Core.Instances.LaunchMode.Offline,
+            WantedLaunchMode = Core.Instances.LaunchMode.Offline,
             Services = fixture.CreateServices(),
             AskOfflineNameHandler = (_, _, suggestion) =>
             {

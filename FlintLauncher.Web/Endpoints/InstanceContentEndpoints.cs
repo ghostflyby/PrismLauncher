@@ -274,7 +274,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).WithMetadata(new FlintLauncher.Web.OpenApi.FormUploadMarker("multipart form: world archive file (zip)")).Produces<WorldView>(201);
+        }).WithMetadata(new OpenApi.FormUploadMarker("multipart form: world archive file (zip)")).Produces<WorldView>(201);
     }
 
     // ----------------------------------------------------------------------- servers

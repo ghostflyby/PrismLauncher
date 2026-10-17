@@ -660,13 +660,13 @@ public abstract class BaseInstance
     /// <summary>The resolved user layer (flint.json) behind the typed settings stack — the
     /// C++ reads of APPLICATION->settings() on the instance side. Defaults when the settings
     /// object is not the typed adapter (bare test doubles).</summary>
-    protected Core.Config.FlintConfigFile UserLayer =>
-        (_settings as Core.Config.InstanceJsonSettingsObject)?.UserLayer ?? Core.Config.FlintConfigFile.Default();
+    protected Config.FlintConfigFile UserLayer =>
+        (_settings as Config.InstanceJsonSettingsObject)?.UserLayer ?? Config.FlintConfigFile.Default();
 
     /// <summary>The live user-layer store (flint.json) when the settings object is the typed
     /// adapter — handed to LaunchServices so the launch pipeline reads the same stack.</summary>
-    protected Core.Config.FlintConfigStore? UserConfigStore =>
-        (_settings as Core.Config.InstanceJsonSettingsObject)?.UserConfig;
+    protected Config.FlintConfigStore? UserConfigStore =>
+        (_settings as Config.InstanceJsonSettingsObject)?.UserConfig;
 
     protected bool IsSpecificSettingsLoaded() => _specificSettingsLoaded;
 

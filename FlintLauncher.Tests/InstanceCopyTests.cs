@@ -6,7 +6,6 @@
 // run through the typed adapter, so the staged folder commits as Flint format (instance.json
 // + instance-state.json) while the copied cfg stays untouched on disk.
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Settings;
 using Xunit;
 
 namespace Flint.Tests;
@@ -54,7 +53,7 @@ public class InstanceCopyTests : IDisposable
         }
     }
 
-    private FlintLauncher.Core.Instances.MinecraftInstance CreateSource() =>
+    private MinecraftInstance CreateSource() =>
         new(new FlintLauncher.Core.Config.InstanceJsonSettingsObject(_sourceDir, _global.Environment),
             _sourceDir);
 
@@ -175,7 +174,7 @@ public class InstanceCopyTests : IDisposable
         Assert.Contains("totalTimePlayed=1234",
             File.ReadAllText(Path.Combine(copyDir, "instance.cfg")));
         // …but the authoritative state file is zeroed
-        var copy = new FlintLauncher.Core.Instances.MinecraftInstance(
+        var copy = new MinecraftInstance(
             new FlintLauncher.Core.Config.InstanceJsonSettingsObject(copyDir, _global.Environment), copyDir);
         Assert.Equal(0, copy.TotalTimePlayed());
         Assert.Equal(0, copy.LastTimePlayed());

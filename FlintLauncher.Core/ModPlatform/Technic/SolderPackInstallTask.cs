@@ -10,7 +10,6 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform.Technic;
 

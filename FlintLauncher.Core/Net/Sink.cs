@@ -82,7 +82,7 @@ public abstract class Sink
 public sealed class ByteArraySink : Sink
 {
     private readonly string? _name;
-    private readonly System.IO.MemoryStream _stream = new();
+    private readonly MemoryStream _stream = new();
 
     public ByteArraySink(string? name = null)
     {

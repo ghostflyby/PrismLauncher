@@ -85,7 +85,7 @@ public class ResourceDownloadTaskTests : IDisposable
         var (pack, version) = MakeVersion("test.jar", "mod.bin");
         var model = CreateModel();
 
-        var task = new FlintLauncher.Core.ModPlatform.ResourceDownloadTask(pack, version, model, modrinth: _modrinth);
+        var task = new ResourceDownloadTask(pack, version, model, modrinth: _modrinth);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -133,7 +133,7 @@ public class ResourceDownloadTaskTests : IDisposable
         version.Hash = Convert.ToHexString(SHA1.HashData("not the payload"u8.ToArray())).ToLowerInvariant();
         var model = CreateModel();
 
-        var task = new FlintLauncher.Core.ModPlatform.ResourceDownloadTask(pack: new IndexedPack
+        var task = new ResourceDownloadTask(pack: new IndexedPack
         {
             AddonId = "projId1",
             Slug = "test-mod",
@@ -173,7 +173,7 @@ public class ResourceDownloadTaskTests : IDisposable
         Assert.NotNull(FindMod(model, "old.jar"));
 
         var (pack, version) = MakeVersion("new.jar", "newmod.bin", "brand new jar bytes"u8.ToArray());
-        var task = new FlintLauncher.Core.ModPlatform.ResourceDownloadTask(pack, version, model, modrinth: _modrinth);
+        var task = new ResourceDownloadTask(pack, version, model, modrinth: _modrinth);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -196,7 +196,7 @@ public class ResourceDownloadTaskTests : IDisposable
         _server.Downloads.Clear();
         var model = CreateModel();
 
-        var task = new FlintLauncher.Core.ModPlatform.ResourceDownloadTask(pack, version, model, modrinth: _modrinth);
+        var task = new ResourceDownloadTask(pack, version, model, modrinth: _modrinth);
         await task.StartAsync();
 
         Assert.False(task.WasSuccessful);

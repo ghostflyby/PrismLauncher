@@ -3,7 +3,7 @@
 // hook, atomic writes, and the stateVersion evolution gate. The sample record uses a
 // test-local source-generated context — production consumers pass FlintJsonContext's
 // JsonTypeInfo the same way.
-using System.Text.Json;
+
 using System.Text.Json.Serialization;
 using FlintLauncher.Core;
 using Xunit;

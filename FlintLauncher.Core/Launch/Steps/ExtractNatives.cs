@@ -2,7 +2,6 @@
 // Port of launcher/minecraft/launch/ExtractNatives.{h,cpp}: extract the native jars into the
 // instance's natives folder (with the .jnilib -> .dylib rename hack on Java 8+).
 using System.IO.Compression;
-using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 
 namespace FlintLauncher.Core.Launch.Steps;

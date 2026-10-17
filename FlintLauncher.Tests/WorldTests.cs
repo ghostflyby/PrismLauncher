@@ -4,7 +4,6 @@
 // the world_gen_settings seed fallback, icon handling and the WorldList directory ops.
 
 using System.IO.Compression;
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Nbt;
 using Xunit;

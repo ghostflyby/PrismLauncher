@@ -52,8 +52,8 @@ public sealed class MinecraftAccount
         account.Data.YggdrasilToken.Token_ = "0";
         account.Data.YggdrasilToken.Validity = Validity.Certain;
         account.Data.YggdrasilToken.IssueInstant = DateTime.UtcNow;
-        account.Data.YggdrasilToken.Extra["userName"] = System.Text.Json.Nodes.JsonValue.Create(username);
-        account.Data.YggdrasilToken.Extra["clientToken"] = System.Text.Json.Nodes.JsonValue.Create(Guid.NewGuid().ToString("N"));
+        account.Data.YggdrasilToken.Extra["userName"] = JsonValue.Create(username);
+        account.Data.YggdrasilToken.Extra["clientToken"] = JsonValue.Create(Guid.NewGuid().ToString("N"));
         account.Data.MinecraftProfile.Id = UuidFromUsername(username).ToString("N");
         account.Data.MinecraftProfile.Name = username;
         account.Data.MinecraftProfile.Validity = Validity.Certain;

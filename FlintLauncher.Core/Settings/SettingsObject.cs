@@ -5,7 +5,6 @@
 // (Core.Config.InstanceJsonSettingsObject: flint.json -> instance.json). The C++
 // RegisterOverride/RegisterPassthrough machinery (OverrideSetting/PassthroughSetting) is
 // retired with it — C7 degenerates the gates to "instance-layer member is non-null".
-using System.Collections.ObjectModel;
 
 namespace FlintLauncher.Core.Settings;
 

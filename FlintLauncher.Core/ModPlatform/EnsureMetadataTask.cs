@@ -19,8 +19,8 @@ using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform;
 
-using FlintLauncher.Core.ModPlatform.Flame;
-using FlintLauncher.Core.ModPlatform.Modrinth;
+using Flame;
+using Modrinth;
 
 public sealed class EnsureMetadataTask : FlintTask
 {

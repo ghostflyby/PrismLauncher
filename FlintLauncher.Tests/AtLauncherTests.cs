@@ -239,7 +239,7 @@ public class AtLauncherTests : IDisposable
     private static string? GetManagedType(string staging)
     {
         // D4: managed-pack registration lives in instance.json ("managedPackType")
-        var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "instance.json")));
+        var json = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "instance.json")));
         return json.RootElement.TryGetProperty("managed", out var managed) &&
                managed.TryGetProperty("type", out var type)
             ? type.GetString()

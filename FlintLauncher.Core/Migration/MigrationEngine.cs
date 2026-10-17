@@ -187,7 +187,7 @@ public sealed class FlintLegacyMigrationProfile : IMigrationSourceProfile
     public static bool HasLegacyAnchor(string root) =>
         LegacyAnchors.Any(anchor =>
         {
-            var full = System.IO.Path.Combine(root, anchor);
+            var full = Path.Combine(root, anchor);
             return Directory.Exists(full) || File.Exists(full);
         });
 
@@ -209,22 +209,22 @@ public sealed class FlintLegacyMigrationProfile : IMigrationSourceProfile
                 : mode == ImportMode.Move && FileTransfer.SameVolume(sourceItem, destination)
                     ? PlannedMethod.RenameDirectory
                     : PlannedMethod.PerFile;
-            items.Add(new PrismImportPlanItem(System.IO.Path.GetFileName(sourceItem), isDirectory, method,
+            items.Add(new PrismImportPlanItem(Path.GetFileName(sourceItem), isDirectory, method,
                 isDirectory ? PrismImportPlanner.CountFiles(sourceItem) : 1,
                 isDirectory ? PrismImportPlanner.SizeOf(sourceItem) : new FileInfo(sourceItem).Length));
         }
 
         foreach (var mount in Mounts)
         {
-            PlanItem(System.IO.Path.Combine(sourcePath, mount.Item), mount.Destination(paths), mount.IsDirectory);
+            PlanItem(Path.Combine(sourcePath, mount.Item), mount.Destination(paths), mount.IsDirectory);
         }
         // the old in-data cache area: every child moves 1:1 under the cache root
-        var oldCacheDir = System.IO.Path.Combine(sourcePath, "cache");
+        var oldCacheDir = Path.Combine(sourcePath, "cache");
         if (Directory.Exists(oldCacheDir))
         {
             foreach (var child in Directory.EnumerateFileSystemEntries(oldCacheDir))
             {
-                PlanItem(child, System.IO.Path.Combine(paths.CacheRoot, System.IO.Path.GetFileName(child)),
+                PlanItem(child, Path.Combine(paths.CacheRoot, Path.GetFileName(child)),
                     Directory.Exists(child));
             }
         }
@@ -325,8 +325,8 @@ public static class FlintLegacyMigration
                     Decision = MigrationDecisionRecord.Imported,
                     At = DateTimeOffset.Now.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
                     Mode = "move",
-                    Instances = Directory.Exists(System.IO.Path.Combine(paths.DataRoot, "instances"))
-                        ? Directory.EnumerateDirectories(System.IO.Path.Combine(paths.DataRoot, "instances")).Count()
+                    Instances = Directory.Exists(Path.Combine(paths.DataRoot, "instances"))
+                        ? Directory.EnumerateDirectories(Path.Combine(paths.DataRoot, "instances")).Count()
                         : 0,
                     Bytes = bytes,
                 });
@@ -371,19 +371,19 @@ public static class FlintLegacyMigration
         {
             foreach (var mount in FlintLegacyMigrationProfile.Mounts)
             {
-                var src = System.IO.Path.Combine(sourceRoot, mount.Item);
+                var src = Path.Combine(sourceRoot, mount.Item);
                 bytes += Transfer(src, mount.Destination(paths), mount.IsDirectory, ref moved, ref failedFiles);
             }
             // the old in-data cache area: children 1:1 into the cache root (the "general"
             // base content included). Under a home source the old cache root IS the new
             // cache root (home/cache), so the children skip as already-in-place — correct.
-            var oldCacheDir = System.IO.Path.Combine(sourceRoot, "cache");
+            var oldCacheDir = Path.Combine(sourceRoot, "cache");
             if (Directory.Exists(oldCacheDir))
             {
                 foreach (var child in Directory.EnumerateFileSystemEntries(oldCacheDir).ToList())
                 {
                     bytes += Transfer(child,
-                        System.IO.Path.Combine(paths.CacheRoot, System.IO.Path.GetFileName(child)),
+                        Path.Combine(paths.CacheRoot, Path.GetFileName(child)),
                         Directory.Exists(child), ref moved, ref failedFiles);
                 }
             }
@@ -399,15 +399,15 @@ public static class FlintLegacyMigration
                 // where DataMigration.Decide upgrades them to records
                 FileSystem.EnsureFolderPathExists(paths.InstancesDir);
                 MoveChildren(sourceRoot, "instances", paths.InstancesDir, ref moved, ref bytes, ref failedFiles);
-                bytes += Transfer(System.IO.Path.Combine(sourceRoot, "accounts.json"), paths.AccountsFile,
+                bytes += Transfer(Path.Combine(sourceRoot, "accounts.json"), paths.AccountsFile,
                     false, ref moved, ref failedFiles);
-                bytes += Transfer(System.IO.Path.Combine(sourceRoot, "instgroups.json"), paths.InstgroupsFile,
+                bytes += Transfer(Path.Combine(sourceRoot, "instgroups.json"), paths.InstgroupsFile,
                     false, ref moved, ref failedFiles);
-                FileSystem.EnsureFolderPathExists(System.IO.Path.Combine(paths.DataRoot, "icons"));
-                MoveChildren(sourceRoot, "icons", System.IO.Path.Combine(paths.DataRoot, "icons"),
+                FileSystem.EnsureFolderPathExists(Path.Combine(paths.DataRoot, "icons"));
+                MoveChildren(sourceRoot, "icons", Path.Combine(paths.DataRoot, "icons"),
                     ref moved, ref bytes, ref failedFiles);
-                FileSystem.EnsureFolderPathExists(System.IO.Path.Combine(paths.DataRoot, "skins"));
-                MoveChildren(sourceRoot, "skins", System.IO.Path.Combine(paths.DataRoot, "skins"),
+                FileSystem.EnsureFolderPathExists(Path.Combine(paths.DataRoot, "skins"));
+                MoveChildren(sourceRoot, "skins", Path.Combine(paths.DataRoot, "skins"),
                     ref moved, ref bytes, ref failedFiles);
                 foreach (var ini in FlintConfigImporter.IniChain)
                 {
@@ -415,11 +415,11 @@ public static class FlintLegacyMigration
                     {
                         continue; // already carried by the shared Mounts
                     }
-                    bytes += Transfer(System.IO.Path.Combine(sourceRoot, ini),
-                        System.IO.Path.Combine(paths.ConfigRoot, ini),
+                    bytes += Transfer(Path.Combine(sourceRoot, ini),
+                        Path.Combine(paths.ConfigRoot, ini),
                         false, ref moved, ref failedFiles);
                 }
-                var token = System.IO.Path.Combine(sourceRoot, "api-token");
+                var token = Path.Combine(sourceRoot, "api-token");
                 if (File.Exists(token))
                 {
                     File.Delete(token); // S2: zero-persistence — the pre-reform token file is dead stock
@@ -427,13 +427,13 @@ public static class FlintLegacyMigration
                 foreach (var marker in Directory.EnumerateFiles(sourceRoot, "*_nomigrate.txt"))
                 {
                     bytes += Transfer(marker,
-                        System.IO.Path.Combine(paths.DataRoot, System.IO.Path.GetFileName(marker)),
+                        Path.Combine(paths.DataRoot, Path.GetFileName(marker)),
                         false, ref moved, ref failedFiles);
                 }
             }
             // E8: the Prism bare ledger is dead stock — the import whitelist never carried
             // it and nothing reads it; delete it once and for all
-            var bareLedger = System.IO.Path.Combine(sourceRoot, "metacache");
+            var bareLedger = Path.Combine(sourceRoot, "metacache");
             if (File.Exists(bareLedger))
             {
                 File.Delete(bareLedger);
@@ -498,8 +498,8 @@ public static class FlintLegacyMigration
             long resumed = 0;
             foreach (var file in FileTransfer.EnumerateFilesDeep(src))
             {
-                var relative = System.IO.Path.GetRelativePath(src, file);
-                var target = System.IO.Path.Combine(dst, relative);
+                var relative = Path.GetRelativePath(src, file);
+                var target = Path.Combine(dst, relative);
                 if (FileTransfer.TransferFile(file, target, ImportMode.Move, out _))
                 {
                     resumed += new FileInfo(target).Length;
@@ -524,8 +524,8 @@ public static class FlintLegacyMigration
             long bytes = 0;
             foreach (var file in FileTransfer.EnumerateFilesDeep(src))
             {
-                var relative = System.IO.Path.GetRelativePath(src, file);
-                var target = System.IO.Path.Combine(dst, relative);
+                var relative = Path.GetRelativePath(src, file);
+                var target = Path.Combine(dst, relative);
                 if (FileTransfer.TransferFile(file, target, ImportMode.Move, out _))
                 {
                     bytes += new FileInfo(target).Length;
@@ -555,7 +555,7 @@ public static class FlintLegacyMigration
     private static void MoveChildren(string parent, string child, string destinationDir,
         ref int moved, ref long bytes, ref int failedFiles)
     {
-        var sourceDir = System.IO.Path.Combine(parent, child);
+        var sourceDir = Path.Combine(parent, child);
         if (!Directory.Exists(sourceDir))
         {
             return;
@@ -563,7 +563,7 @@ public static class FlintLegacyMigration
         foreach (var entry in Directory.EnumerateFileSystemEntries(sourceDir).ToList())
         {
             bytes += Transfer(entry,
-                System.IO.Path.Combine(destinationDir, System.IO.Path.GetFileName(entry)),
+                Path.Combine(destinationDir, Path.GetFileName(entry)),
                 Directory.Exists(entry), ref moved, ref failedFiles);
         }
     }

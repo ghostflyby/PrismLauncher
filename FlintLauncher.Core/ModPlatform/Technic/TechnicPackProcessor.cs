@@ -19,15 +19,13 @@ using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.ModPlatform.Technic;
 
-using FlintLauncher.Core.Minecraft;
-
 public static class TechnicPackProcessor
 {
     /// <summary>Port of Technic::TechnicPackProcessor::run (see the header note). Async:
     /// the important:true SetComponentVersion calls resolve against the meta index (network),
     /// so the flow awaits instead of blocking a thread (the former .GetAwaiter().GetResult()
     /// sync-over-async is retired).</summary>
-    public static async Task<string?> RunAsync(Core.Config.InstanceEnvironment environment,
+    public static async Task<string?> RunAsync(Config.InstanceEnvironment environment,
         string instName,
         string instIcon,
         string stagingPath,
@@ -39,7 +37,7 @@ public static class TechnicPackProcessor
         var minecraftPath = FileSystem.PathCombine(stagingPath, "minecraft");
         // D4: the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
-            new Core.Config.InstanceJsonSettingsObject(stagingPath, environment), stagingPath);
+            new Config.InstanceJsonSettingsObject(stagingPath, environment), stagingPath);
 
         instance.SetName(instName);
 

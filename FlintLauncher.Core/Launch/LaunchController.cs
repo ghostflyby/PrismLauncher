@@ -53,7 +53,7 @@ public enum LaunchDecision
 public class LaunchController : FlintTask
 {
     private AuthSession? _session;
-    private Launch.LaunchTask? _launcher;
+    private LaunchTask? _launcher;
     private LaunchMode _actualLaunchMode = LaunchMode.Normal;
 
     /// <summary>The injected launch dependencies: the controller reads/writes the offline
@@ -91,7 +91,7 @@ public class LaunchController : FlintTask
     public LaunchMode ActualLaunchMode => _actualLaunchMode;
 
     /// <summary>The built launch task once the session was decided (C++ m_launcher).</summary>
-    public Launch.LaunchTask? Launcher => _launcher;
+    public LaunchTask? Launcher => _launcher;
 
     public AuthSession? Session => _session;
 

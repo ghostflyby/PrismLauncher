@@ -91,7 +91,7 @@ public class ComponentTests : IDisposable
 
         var file = MakeVersionFile("test.a", "1.0", "Test A");
         file.Volatile = true;
-        file.Requires.Add(new FlintLauncher.Core.Meta.Require { Uid = "net.minecraft", EqualsVersion = "1.12.2" });
+        file.Requires.Add(new Core.Meta.Require { Uid = "net.minecraft", EqualsVersion = "1.12.2" });
         component.File = file;
         component.Loaded = true;
 
@@ -139,7 +139,7 @@ public class ComponentTests : IDisposable
 
         // meta-backed component: customization materializes the version file into patches/
         var file = MakeVersionFile("net.minecraft", "1.12.2", "Minecraft");
-        var metaVersion = new FlintLauncher.Core.Meta.MetaVersion("net.minecraft", "1.12.2");
+        var metaVersion = new Core.Meta.MetaVersion("net.minecraft", "1.12.2");
         metaVersion.SetData(file);
         component.MetaVersion = metaVersion;
         component.Loaded = true;

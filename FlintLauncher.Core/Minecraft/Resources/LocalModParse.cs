@@ -40,7 +40,7 @@ public enum ModProcessingLevel
 /// Port of the ModUtils namespace: best-effort mod metadata parsing. Failures leave
 /// filename-only details (the C++ parse is deliberately non-fatal for the folder model).
 /// </summary>
-public static partial class ModUtils
+public static class ModUtils
 {
     private static readonly Regex NewlineRegex = new("\r\n|\n|\r");
     private static readonly Regex QdcssRulesetRegex = new("[#.]?(@?\\w+?)\\s*\\{(.*?)\\}",

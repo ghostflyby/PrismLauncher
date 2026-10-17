@@ -323,7 +323,7 @@ public class FileSystemTests
     {
         public TempDirScope()
         {
-            Path = FileSystemTests.TempDir();
+            Path = TempDir();
         }
 
         public string Path { get; }

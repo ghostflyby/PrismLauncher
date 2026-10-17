@@ -25,16 +25,16 @@ public sealed class EnsureAvailableMemory : LaunchStep
             string text;
             switch (HardwareInfo.GetMemoryPressureLevel())
             {
-                case Launch.HardwareInfo.MemoryPressureLevel.Normal:
+                case HardwareInfo.MemoryPressureLevel.Normal:
                     EmitSucceeded();
                     return Task.CompletedTask;
-                case Launch.HardwareInfo.MemoryPressureLevel.Warning:
+                case HardwareInfo.MemoryPressureLevel.Warning:
                     text = "The system is under increased memory pressure.\n" +
                            "This may lead to lag or slowdowns.\n" +
                            "If possible, close other applications before continuing.\n\n" +
                            "Launch anyway?";
                     break;
-                case Launch.HardwareInfo.MemoryPressureLevel.Critical:
+                case HardwareInfo.MemoryPressureLevel.Critical:
                 default:
                     text = "Your system is under critical memory pressure.\n" +
                            "This may lead to severe slowdowns, crashes or system instability.\n" +

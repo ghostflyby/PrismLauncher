@@ -7,7 +7,7 @@
 // D4: the instance layer reads this store as the user layer of its instance.json stack, so
 // the double converts implicitly to the InstanceEnvironment the instance ctors take (type
 // infos from the host's FlintJsonContext — tests reference Web for it).
-using FlintLauncher.Core;
+
 using FlintLauncher.Core.Config;
 using FlintLauncher.Web;
 
@@ -121,6 +121,6 @@ internal static class TestLauncherState
         }
         Dirs.Add(dir);
         return new(Path.Combine(dir, "launcher-state.json"),
-            FlintLauncher.Web.FlintJsonContext.Default.LauncherState);
+            FlintJsonContext.Default.LauncherState);
     }
 }

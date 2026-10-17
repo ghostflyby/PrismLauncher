@@ -12,9 +12,7 @@
 //  - The dependency list (m_deps) is not ported.
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft.Resources;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 

@@ -150,8 +150,8 @@ public class FlintPathsTests : IDisposable
         }
         var readOnly = Path.Combine(Path.GetTempPath(), $"flint-ro-{Guid.NewGuid():N}");
         Directory.CreateDirectory(readOnly);
-        var unixMode = System.IO.File.GetUnixFileMode(readOnly);
-        System.IO.File.SetUnixFileMode(readOnly,
+        var unixMode = File.GetUnixFileMode(readOnly);
+        File.SetUnixFileMode(readOnly,
             UnixFileMode.UserRead | UnixFileMode.UserExecute); // no write anywhere
         try
         {
@@ -164,7 +164,7 @@ public class FlintPathsTests : IDisposable
         }
         finally
         {
-            System.IO.File.SetUnixFileMode(readOnly, unixMode);
+            File.SetUnixFileMode(readOnly, unixMode);
             Directory.Delete(readOnly, recursive: true);
         }
     }
@@ -314,8 +314,8 @@ public class FlintPathsTests : IDisposable
             return; // posix chmod-based negative case
         }
         using var fixture = TestFlintPaths.UnderHome();
-        var unixMode = System.IO.File.GetUnixFileMode(fixture.Paths.ConfigRoot);
-        System.IO.File.SetUnixFileMode(fixture.Paths.ConfigRoot,
+        var unixMode = File.GetUnixFileMode(fixture.Paths.ConfigRoot);
+        File.SetUnixFileMode(fixture.Paths.ConfigRoot,
             UnixFileMode.UserRead | UnixFileMode.UserExecute);
         try
         {
@@ -325,7 +325,7 @@ public class FlintPathsTests : IDisposable
         }
         finally
         {
-            System.IO.File.SetUnixFileMode(fixture.Paths.ConfigRoot, unixMode);
+            File.SetUnixFileMode(fixture.Paths.ConfigRoot, unixMode);
         }
     }
 
@@ -338,7 +338,7 @@ public class FlintPathsTests : IDisposable
         // the S4 anchor: the rolling provider opened its file under <state>/logs before any
         // service ran, and the old data-root anchor is gone
         Assert.True(Directory.Exists(Path.Combine(fixture.Paths.StateRoot, "logs")));
-        Assert.True(System.IO.File.Exists(
+        Assert.True(File.Exists(
             Path.Combine(fixture.Paths.StateRoot, "logs", "Flint-0.log")));
         Assert.False(Directory.Exists(Path.Combine(fixture.DataDir, "logs")));
     }

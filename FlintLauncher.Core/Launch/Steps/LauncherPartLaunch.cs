@@ -52,7 +52,7 @@ public sealed class LauncherPartLaunch : LaunchStep
 
     private void OnProcessLog(List<string> lines, MessageLevel level)
     {
-        if (_closeAfterLaunch && !_closeAfterLaunchTriggered && Launch.LaunchTask.MatchesCloseAfterLaunch(lines))
+        if (_closeAfterLaunch && !_closeAfterLaunchTriggered && LaunchTask.MatchesCloseAfterLaunch(lines))
         {
             _closeAfterLaunchTriggered = true;
             Services.Ui.CloseAfterLaunch?.Invoke();

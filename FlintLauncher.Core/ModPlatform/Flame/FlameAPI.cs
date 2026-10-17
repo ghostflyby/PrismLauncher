@@ -19,7 +19,7 @@ using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
-using FlintLauncher.Core.Minecraft;
+using Minecraft;
 
 public sealed class FlameApi : ResourceApi
 {

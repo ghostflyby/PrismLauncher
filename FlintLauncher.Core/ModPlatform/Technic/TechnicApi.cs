@@ -10,7 +10,7 @@
 // the client rides the injected NetStack (LauncherRuntime.Technic — see the Modrinth/Flame
 // de-singletoning for the same story). The parsers and the Solder URL builders are pure
 // helpers and stay static; reads go through the JsonNode model (see TechnicJson/JsonUtils).
-using System.Text.Json;
+
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Net;

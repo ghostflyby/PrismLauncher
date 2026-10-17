@@ -16,7 +16,6 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform.Ftb;
 
@@ -38,14 +37,14 @@ public sealed class FtbPackInstallTask : InstanceTask
 
     private readonly FtbVersion _version = new();
     private readonly List<long> _fileIds = [];
-    private readonly List<Flame.BlockedMod> _blockedMods = [];
+    private readonly List<BlockedMod> _blockedMods = [];
 
     /// <summary>The blocked (browser-download) files reported when the resolver ran.</summary>
-    public IReadOnlyList<Flame.BlockedMod> BlockedMods => _blockedMods;
+    public IReadOnlyList<BlockedMod> BlockedMods => _blockedMods;
 
     /// <summary>BlockedModsDialog stand-in: given a blocked mod, return a matching local file
     /// path (null when the user has none).</summary>
-    public Func<Flame.BlockedMod, string?>? BlockedModLocalFileResolver { get; set; }
+    public Func<BlockedMod, string?>? BlockedModLocalFileResolver { get; set; }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -118,7 +117,7 @@ public sealed class FtbPackInstallTask : InstanceTask
 
         _fileIds.Clear();
 
-        var manifest = new Flame.FlameManifest();
+        var manifest = new FlameManifest();
         foreach (var file in _version.Files)
         {
             if (!file.ServerOnly && file.Url.Length == 0)
@@ -129,7 +128,7 @@ public sealed class FtbPackInstallTask : InstanceTask
                     return;
                 }
 
-                var flameFile = new Flame.FlameFile
+                var flameFile = new FlameFile
                 {
                     ProjectId = file.Curseforge.ProjectId,
                     FileId = file.Curseforge.FileId,
@@ -144,7 +143,7 @@ public sealed class FtbPackInstallTask : InstanceTask
             }
         }
 
-        var modIdResolverTask = new Flame.FileResolvingTask(manifest, flame: _flame);
+        var modIdResolverTask = new FileResolvingTask(manifest, flame: _flame);
 
         EmitStatus("Resolving mods...");
         await modIdResolverTask.StartAsync(cancellationToken);
@@ -157,7 +156,7 @@ public sealed class FtbPackInstallTask : InstanceTask
         await OnResolveModsSucceeded(modIdResolverTask, cancellationToken);
     }
 
-    private async Task OnResolveModsSucceeded(Flame.FileResolvingTask modIdResolverTask,
+    private async Task OnResolveModsSucceeded(FileResolvingTask modIdResolverTask,
         CancellationToken cancellationToken)
     {
         var results = modIdResolverTask.GetResults();
@@ -175,7 +174,7 @@ public sealed class FtbPackInstallTask : InstanceTask
             // First check for blocked mods
             if (resultsFile.Version.DownloadUrl.Length == 0)
             {
-                _blockedMods.Add(new Flame.BlockedMod
+                _blockedMods.Add(new BlockedMod
                 {
                     Name = resultsFile.Version.FileName,
                     WebsiteUrl = $"{resultsFile.Pack.WebsiteUrl}/download/{resultsFile.FileId}",
@@ -224,7 +223,7 @@ public sealed class FtbPackInstallTask : InstanceTask
         EmitStatus("Creating the instance...");
         // D4: the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
-            new Core.Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
+            new Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution.")),
             StagingPath);
         var components = instance.GetPackProfile();

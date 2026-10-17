@@ -6,7 +6,6 @@
 // unwritable directory must not take the launcher down: the C++ shows a fatal dialog, the
 // port degrades to console-only logging.
 using System.Globalization;
-using Microsoft.Extensions.Logging;
 
 namespace FlintLauncher.Web.Logging;
 

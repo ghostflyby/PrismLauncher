@@ -13,7 +13,7 @@
 //    back to integers like the C++ toInt() calls.
 namespace FlintLauncher.Core.ModPlatform;
 
-using FlintLauncher.Core.Minecraft;
+using Minecraft;
 
 /// <summary>Port of ModPlatform::ResourceProvider.</summary>
 public enum ResourceProvider : byte

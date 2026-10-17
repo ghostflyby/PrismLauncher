@@ -57,7 +57,7 @@ public class ImportOptionalModsApiTests : IDisposable
         return new Uri(path).ToString();
     }
 
-    private async Task<string> ImportAndAwait(FlintLauncher.Tests.FlintApiHost host, string url,
+    private async Task<string> ImportAndAwait(FlintApiHost host, string url,
         string name, Dictionary<string, bool>? optionalMods)
     {
         var post = await host.PostAsync("/api/v1/instances/import",

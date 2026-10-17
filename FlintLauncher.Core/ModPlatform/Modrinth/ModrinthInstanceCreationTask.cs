@@ -23,14 +23,12 @@
 //    mark the file failed only after every URL was tried (the C++ chains new net actions
 //    from the failed signal).
 using System.Security.Cryptography;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
@@ -50,7 +48,7 @@ public sealed class ModrinthCreationTask : InstanceTask
 
     public ModrinthCreationTask(string stagingPath,
                                 bool trustedSource,
-                                Core.Config.InstanceEnvironment environment,
+                                Config.InstanceEnvironment environment,
                                 string id = "",
                                 string versionId = "",
                                 string originalInstanceId = "",
@@ -156,7 +154,7 @@ public sealed class ModrinthCreationTask : InstanceTask
 
         // D4: the staged instance is Flint format from birth (typed instance.json adapter)
         var newInstance = new MinecraftInstance(
-            new Core.Config.InstanceJsonSettingsObject(StagingPath, Environment ??
+            new Config.InstanceJsonSettingsObject(StagingPath, Environment ??
                 throw new InvalidOperationException(
                     "InstanceTask requires SetParentEnvironment before execution.")),
             StagingPath);

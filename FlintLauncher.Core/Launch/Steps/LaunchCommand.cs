@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/launch/steps/LaunchCommand.{h,cpp}: run the pre-load/pre-launch/post-exit
 // command through a LoggedProcess with the instance environment.
-using FlintLauncher.Core.Instances;
 
 namespace FlintLauncher.Core.Launch.Steps;
 

@@ -548,7 +548,7 @@ public sealed class InstanceGroupModel
         try
         {
             FileSystem.Write(groupFileName,
-                Encoding.UTF8.GetBytes(FlintLauncher.Core.Minecraft.QtJson.ToIndentedString(toplevel) + "\n"));
+                Encoding.UTF8.GetBytes(Minecraft.QtJson.ToIndentedString(toplevel) + "\n"));
             return true;
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
@@ -587,7 +587,7 @@ public sealed class InstanceGroupModel
                 }
             }
             FileSystem.Write(groupFileName,
-                Encoding.UTF8.GetBytes(FlintLauncher.Core.Minecraft.QtJson.ToIndentedString(topLevel) + "\n"));
+                Encoding.UTF8.GetBytes(Minecraft.QtJson.ToIndentedString(topLevel) + "\n"));
         }
         catch (Exception e) when (e is JsonException or FileSystemException or IOException
                                   or UnauthorizedAccessException or NotSupportedException)

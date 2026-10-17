@@ -33,7 +33,7 @@ public sealed class SkinModel
         Url = obj["url"]?.GetValue<string>() ?? "";
         Model = obj["model"]?.GetValue<string>() == "SLIM" ? SkinModelKind.SLIM : SkinModelKind.CLASSIC;
         var name = obj["name"]?.GetValue<string>() ?? "";
-        Path_ = System.IO.Path.Combine(skinsDir, name + ".png");
+        Path_ = Path.Combine(skinsDir, name + ".png");
     }
 
     public string Path_ = "";
@@ -47,7 +47,7 @@ public sealed class SkinModel
     /// <summary>QFileInfo::completeBaseName of the path.</summary>
     public string Name()
     {
-        var fileName = System.IO.Path.GetFileName(Path_);
+        var fileName = Path.GetFileName(Path_);
         var dot = fileName.LastIndexOf('.');
         return dot <= 0 ? fileName : fileName[..dot];
     }
@@ -74,7 +74,7 @@ public static class SkinListStore
     public static List<SkinModel> Load(string skinsDir)
     {
         var newSkins = new List<SkinModel>();
-        var manifestPath = System.IO.Path.Combine(skinsDir, "index.json");
+        var manifestPath = Path.Combine(skinsDir, "index.json");
         if (!File.Exists(manifestPath))
         {
             return newSkins;
@@ -122,8 +122,8 @@ public static class SkinListStore
         }
         doc["skins"] = arr;
         // upstream goes through Json::write() (QJsonDocument::Indented): sorted keys, 4-space indent
-        FileSystem.Write(System.IO.Path.Combine(skinsDir, "index.json"),
-            System.Text.Encoding.UTF8.GetBytes(FlintLauncher.Core.Minecraft.QtJson.ToIndentedString(doc)));
+        FileSystem.Write(Path.Combine(skinsDir, "index.json"),
+            System.Text.Encoding.UTF8.GetBytes(Minecraft.QtJson.ToIndentedString(doc)));
     }
 
     private static bool IsValid(SkinModel skin)

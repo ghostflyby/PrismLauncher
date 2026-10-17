@@ -115,8 +115,8 @@ public static class Packwiz
         // Ensure the corresponding mod's info exists, and create it if not
         var normalizedFname = IndexFileName(mod.Slug);
         var realFname = GetRealIndexName(indexDir, normalizedFname);
-        var realPath = System.IO.Path.Combine(indexDir, realFname);
-        var normalizedPath = System.IO.Path.Combine(indexDir, normalizedFname);
+        var realPath = Path.Combine(indexDir, realFname);
+        var normalizedPath = Path.Combine(indexDir, normalizedFname);
 
         if (realFname != normalizedFname && File.Exists(realPath))
         {
@@ -226,7 +226,7 @@ public static class Packwiz
             return;
         }
 
-        var path = System.IO.Path.Combine(indexDir, realFname);
+        var path = Path.Combine(indexDir, realFname);
         if (!File.Exists(path))
         {
             // "Tried to delete non-existent mod metadata for {slug}!"
@@ -251,7 +251,7 @@ public static class Packwiz
             return mod;
         }
 
-        var path = System.IO.Path.Combine(indexDir, realFname);
+        var path = Path.Combine(indexDir, realFname);
         TomlTable table;
         try
         {
@@ -385,7 +385,7 @@ public static class Packwiz
     private static string GetRealIndexName(string indexDir, string normalizedFname, bool shouldFindMatch = false)
     {
         var realFname = normalizedFname;
-        if (!File.Exists(System.IO.Path.Combine(indexDir, normalizedFname)))
+        if (!File.Exists(Path.Combine(indexDir, normalizedFname)))
         {
             // Tries to get similar entries
             foreach (var fileName in ListFiles(indexDir))

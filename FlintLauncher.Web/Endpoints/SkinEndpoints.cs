@@ -15,7 +15,7 @@
 // Cape equip by id is the whole upstream capability: neither the Mojang API nor the ported
 // CapeChange accepts a cape *file*, so a file-only PUT body is rejected (a file part may
 // accompany the id, mirroring the multipart shape, but it cannot be used).
-using FlintLauncher.Core.Net;
+
 using FlintLauncher.Core.Skins;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
@@ -76,7 +76,7 @@ public static class SkinEndpoints
             return upload.WasSuccessful
                 ? Results.NoContent()
                 : ApiJson.Error("skin_upload_failed", upload.FailReason, 400);
-        }).WithMetadata(new FlintLauncher.Web.OpenApi.FormUploadMarker("multipart form: skin image file (png) + optional model field (slim/classic)")).Produces(204);
+        }).WithMetadata(new OpenApi.FormUploadMarker("multipart form: skin image file (png) + optional model field (slim/classic)")).Produces(204);
 
         // ------------------------------------------------- accounts/{id}/skin (delete)
         api.MapDelete("/accounts/{profileId}/skin", async Task<IResult> (string profileId,
@@ -120,7 +120,7 @@ public static class SkinEndpoints
             return change.WasSuccessful
                 ? Results.NoContent()
                 : ApiJson.Error("cape_change_failed", change.FailReason, 400);
-        }).WithMetadata(new FlintLauncher.Web.OpenApi.FormUploadMarker("form field capeId")).Produces(204);
+        }).WithMetadata(new OpenApi.FormUploadMarker("form field capeId")).Produces(204);
 
         // ------------------------------------------------- accounts/{id}/cape (remove)
         // CapeChange's delete semantics: the empty cape id turns the request into a bare
@@ -144,7 +144,7 @@ public static class SkinEndpoints
 
     /// <summary>The account for a profile id, or the uniform 404 through
     /// <paramref name="notFound"/> (AccountList lookups are index-based).</summary>
-    private static FlintLauncher.Core.Auth.MinecraftAccount? LookupAccount(LauncherRuntime runtime,
+    private static Core.Auth.MinecraftAccount? LookupAccount(LauncherRuntime runtime,
         string profileId, out IResult? notFound)
     {
         var index = runtime.Accounts.FindAccountByProfileId(profileId);

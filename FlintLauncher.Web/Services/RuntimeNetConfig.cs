@@ -11,7 +11,6 @@
 // Flame (CurseForge) key provider and — from the config side (C4 keeps it public) — the MSA
 // client-id override for the auth options.
 using FlintLauncher.Core;
-using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Web.Services;
 

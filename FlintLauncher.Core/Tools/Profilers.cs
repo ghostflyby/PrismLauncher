@@ -77,11 +77,11 @@ public sealed class JProfilerFactory : ProfilerFactory
             return false;
         }
         // dir.exists("bin") && (bin/jprofiler || bin/jprofiler.exe) && bin/agent.jar
-        var bin = System.IO.Path.Combine(path, "bin");
+        var bin = Path.Combine(path, "bin");
         if (!Directory.Exists(bin) ||
-            !(FsExists(System.IO.Path.Combine(bin, "jprofiler")) ||
-              FsExists(System.IO.Path.Combine(bin, "jprofiler.exe"))) ||
-            !FsExists(System.IO.Path.Combine(bin, "agent.jar")))
+            !(FsExists(Path.Combine(bin, "jprofiler")) ||
+              FsExists(Path.Combine(bin, "jprofiler.exe"))) ||
+            !FsExists(Path.Combine(bin, "agent.jar")))
         {
             error = "Invalid JProfiler install";
             return false;
@@ -97,7 +97,7 @@ public sealed class JProfilerFactory : ProfilerFactory
         var listeningPort = settings.Get(PortKey).AsIntSetting(DefaultPort);
         var basePath = settings.Get(PathKey)?.ToString() ?? "";
         // QDir(basePath).absoluteFilePath("bin/jpenable[.exe]")
-        var profilerProgram = System.IO.Path.Combine(basePath, OperatingSystem.IsWindows() ? "bin/jpenable.exe" : "bin/jpenable");
+        var profilerProgram = Path.Combine(basePath, OperatingSystem.IsWindows() ? "bin/jpenable.exe" : "bin/jpenable");
         var arguments = new[] { "-d", pid.ToStringInvariant(), "--gui", "-p", listeningPort.ToStringInvariant() };
         return (profilerProgram, arguments);
     }
@@ -133,7 +133,7 @@ public sealed class JVisualVMFactory : ProfilerFactory
             return false;
         }
         // QFileInfo::isExecutable() && fileName().contains("visualvm")
-        if (!IsExecutable(path) || !System.IO.Path.GetFileName(path).Contains("visualvm", StringComparison.Ordinal))
+        if (!IsExecutable(path) || !Path.GetFileName(path).Contains("visualvm", StringComparison.Ordinal))
         {
             error = "Invalid path to VisualVM";
             return false;
@@ -158,7 +158,7 @@ public sealed class JVisualVMFactory : ProfilerFactory
         var names = OperatingSystem.IsWindows()
             ? new[] { executableName + ".exe", executableName }
             : new[] { executableName };
-        foreach (var dir in pathEnv.Split(System.IO.Path.PathSeparator))
+        foreach (var dir in pathEnv.Split(Path.PathSeparator))
         {
             if (dir.Length == 0)
             {
@@ -166,7 +166,7 @@ public sealed class JVisualVMFactory : ProfilerFactory
             }
             foreach (var name in names)
             {
-                var candidate = System.IO.Path.Combine(dir, name);
+                var candidate = Path.Combine(dir, name);
                 if (File.Exists(candidate))
                 {
                     return candidate;

@@ -88,7 +88,7 @@ public static class SkinLibraryEndpoints
                 {
                 }
             }
-        }).WithMetadata(new FlintLauncher.Web.OpenApi.FormUploadMarker("multipart form: skin image file (png) + optional name/model fields")).Produces<SkinStoredResponse>(201);
+        }).WithMetadata(new OpenApi.FormUploadMarker("multipart form: skin image file (png) + optional name/model fields")).Produces<SkinStoredResponse>(201);
 
         api.MapDelete("/skins/{name}", (string name, LauncherRuntime runtime) =>
             runtime.Skins.Delete(name)

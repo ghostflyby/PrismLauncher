@@ -127,7 +127,7 @@ public class PackProfileTests : IDisposable
             CachedVersion = "0.14.21",
             CachedName = "Fabric Loader",
         };
-        loader.CachedRequires.Add(new FlintLauncher.Core.Meta.Require { Uid = "net.minecraft", EqualsVersion = "1.20.1" });
+        loader.CachedRequires.Add(new Core.Meta.Require { Uid = "net.minecraft", EqualsVersion = "1.20.1" });
         profile.AppendComponent(minecraft);
         profile.AppendComponent(loader);
 
@@ -167,7 +167,7 @@ public class PackProfileTests : IDisposable
         Assert.Equal("net.minecraft", profile.Components[0].GetID());
         Assert.Equal("0.14.21", profile.Components[1].Version);
         Assert.True(profile.Components[1].CachedRequires.Contains(
-            new FlintLauncher.Core.Meta.Require { Uid = "net.minecraft", EqualsVersion = "1.20.1" }));
+            new Core.Meta.Require { Uid = "net.minecraft", EqualsVersion = "1.20.1" }));
     }
 
     [Fact]

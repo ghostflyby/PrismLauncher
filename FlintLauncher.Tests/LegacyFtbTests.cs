@@ -5,7 +5,7 @@
 // forge from pack.json, jar mods from instMods, the no-method failure). Each task is
 // constructed with its CdnBaseUrl pointed at the stub (per-instance, nothing
 // process-global to restore).
-using System.IO.Compression;
+
 using System.Text;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.LegacyFtb;

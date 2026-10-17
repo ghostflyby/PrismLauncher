@@ -293,8 +293,8 @@ public static class Parsers
         }
 
         // we need to use unsigned numbers to guarantee truncation below
-        if (!ulong.TryParse(uuid[..16], System.Globalization.NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var most) ||
-            !ulong.TryParse(uuid[^16..], System.Globalization.NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var least))
+        if (!ulong.TryParse(uuid[..16], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var most) ||
+            !ulong.TryParse(uuid[^16..], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var least))
         {
             return true;
         }

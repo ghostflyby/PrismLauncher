@@ -13,7 +13,6 @@
 using System.Net;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Java;
-using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.Launch;
@@ -34,7 +33,7 @@ public sealed class LaunchServices
     /// <summary>The typed flint.json store (the user layer of the C7 stack — D4 retired the
     /// SettingsObject adapter view). AutoInstallJava reads the java/download switches from
     /// it; null keeps the bare-fixture "feature off" behavior.</summary>
-    public Core.Config.FlintConfigStore? Config { get; init; }
+    public Config.FlintConfigStore? Config { get; init; }
 
     /// <summary>The launcher runtime state (launcher-state.json, S5): the java probe cache
     /// (CheckJava/VerifyJavaInstall) and the offline-name write-back (LaunchController) live
@@ -43,7 +42,7 @@ public sealed class LaunchServices
     /// launch re-probes) and VerifyJavaInstall sees an unprobed java, while the offline-name
     /// persistence silently degrades to per-launch defaults. All in-repo construction sites
     /// (WebHostBuilder, launch fixtures) wire it.</summary>
-    public Core.State.LauncherStateStore? LauncherState { get; init; }
+    public State.LauncherStateStore? LauncherState { get; init; }
 
     /// <summary>Parse log4j XML events out of the game output (LaunchTask::parseXmlLogs; the
     /// C++ had no switch — the host enables it).</summary>

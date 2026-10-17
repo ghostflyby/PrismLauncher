@@ -11,13 +11,11 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using FlintLauncher.Core;
-using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Nbt;
 using FlintLauncher.Web;
 using FlintLauncher.Web.Services;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -48,7 +46,7 @@ public class CoverageFixSettingsApiTests
         var minecraft = groups.GetProperty("minecraft");
         // RAM-derived (SysInfo::defaultMaxJvmMem port); the record property default is the
         // single source (CONFIG C6 — GlobalSettingsRegistration retired)
-        Assert.Equal(FlintLauncher.Core.Config.MemoryConfig.DefaultMaxMemAlloc,
+        Assert.Equal(Core.Config.MemoryConfig.DefaultMaxMemAlloc,
             minecraft.GetProperty("MaxMemAlloc").GetInt32());
         Assert.True(minecraft.GetProperty("LowMemWarning").GetBoolean());
         Assert.True(minecraft.GetProperty("ShowGlobalGameTime").GetBoolean());
@@ -517,7 +515,7 @@ public class CoverageFixLaunchJoinApiTests
             {
                 Java = state.Java with
                 {
-                    Detections = new Dictionary<string, FlintLauncher.Core.State.JavaDetectEntry>(
+                    Detections = new Dictionary<string, Core.State.JavaDetectEntry>(
                         state.Java.Detections, StringComparer.Ordinal)
                     {
                         [javaPath] = new(CheckJava.ComputeJavaSignature(javaUnixTime, javaPath),

@@ -6,7 +6,6 @@
 // launcher-state.json, the rest → the record domains) and the G4 wire rerouting (PUT/GET of
 // the secret trio through secrets.json, never flint.json).
 using System.Net;
-using System.Net.Http.Json;
 using System.Text.Json;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Config;
@@ -14,8 +13,6 @@ using FlintLauncher.Core.Secrets;
 using FlintLauncher.Core.State;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Web;
-using FlintLauncher.Web.Services;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -74,10 +71,10 @@ public class FlintConfigStoreTests : IDisposable
         // with their defaults, which is exactly why layers arrive from payloads):
         // user layer sets memory + java, the instance layer (typed payloads arrive with D4)
         // overrides only MinMemAlloc.
-        var user = System.Text.Json.JsonSerializer.Deserialize(
+        var user = JsonSerializer.Deserialize(
             """{"memory":{"minMemAlloc":1024},"java":{"javaPath":"/opt/jdk-21"}}""",
             FlintJsonContext.Default.FlintConfigFile);
-        var instance = System.Text.Json.JsonSerializer.Deserialize(
+        var instance = JsonSerializer.Deserialize(
             """{"memory":{"minMemAlloc":2048}}""",
             FlintJsonContext.Default.FlintConfigFile);
 

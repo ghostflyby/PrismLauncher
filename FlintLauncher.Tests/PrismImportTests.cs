@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Tests for the Prism→Flint import layer: transfer modes, idempotent resume, the planner
 // and the source detector, plus a full PrismImportTask run over a synthetic Prism layout.
-using System.Text.Json.Nodes;
+
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.Tasks;
@@ -431,7 +431,7 @@ public class PrismImportTaskTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "dst", "meta", "index.json"), "existing");
 
         var decisions = new MigrationDecisionStore(Path.Combine(_root, "state", "migration"),
-            FlintLauncher.Web.FlintJsonContext.Default.MigrationDecisionRecord);
+            Web.FlintJsonContext.Default.MigrationDecisionRecord);
         // S7: the task files under the ACTUAL source name — a polymc source must not be
         // recorded as "prism" (the old hardcode)
         var task = new PrismImportTask(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
@@ -513,7 +513,7 @@ public class PrismImportTaskTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "dst", "instances", "native", "instance.cfg"), "native");
 
         var decisions = new MigrationDecisionStore(Path.Combine(_root, "state", "migration"),
-            FlintLauncher.Web.FlintJsonContext.Default.MigrationDecisionRecord);
+            Web.FlintJsonContext.Default.MigrationDecisionRecord);
         var task = new PrismImportTask(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
             ImportMode.CopyOnWrite, "prism", decisions);
         await task.StartAsync();
@@ -541,7 +541,7 @@ public class PrismImportTaskTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "src", "prismlauncher.cfg"), "k=v");
 
         var decisions = new MigrationDecisionStore(Path.Combine(_root, "state-move", "migration"),
-            FlintLauncher.Web.FlintJsonContext.Default.MigrationDecisionRecord);
+            Web.FlintJsonContext.Default.MigrationDecisionRecord);
         var task = new PrismImportTask(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
             ImportMode.Move, "prism", decisions);
         await task.StartAsync();

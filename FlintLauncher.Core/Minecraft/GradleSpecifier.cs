@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 
 namespace FlintLauncher.Core.Minecraft;
 
-public readonly partial struct GradleSpecifier : IEquatable<GradleSpecifier>
+public readonly struct GradleSpecifier : IEquatable<GradleSpecifier>
 {
     /*
     org.gradle.test.classifiers : service : 1.0 : jdk15 @ jar

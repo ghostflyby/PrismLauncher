@@ -5,7 +5,6 @@
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Instances.Creation;
-using FlintLauncher.Core.Minecraft;
 using Xunit;
 
 namespace Flint.Tests;
@@ -90,7 +89,7 @@ public class VanillaCreationTests : IDisposable
 
         // reload from disk: the created folder is discoverable and loadable
         list.LoadList();
-        var inst = Assert.IsType<FlintLauncher.Core.Instances.MinecraftInstance>(list.GetInstanceById("Test Instance"));
+        var inst = Assert.IsType<MinecraftInstance>(list.GetInstanceById("Test Instance"));
         Assert.Equal("Test Instance", inst.Name());
         Assert.Equal("Vanilla", list.GetInstanceGroup("Test Instance"));
 

@@ -10,10 +10,7 @@ using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Web.Endpoints;
 using FlintLauncher.Web.Logging;
 using FlintLauncher.Web.Services;
-using Microsoft.AspNetCore.Http.Json;
-using Microsoft.Extensions.Logging;
 // extension-method log events (HttpLog.Request/Probe) live in the Core Diagnostics namespace
-using static FlintLauncher.Core.Diagnostics.HttpLog;
 
 namespace FlintLauncher.Web;
 
@@ -41,7 +38,7 @@ public static class WebHostBuilder
         // FLINT_API_TOKEN) wins, else a process-lifetime token is generated and logged at
         // startup; a pre-reform <dataRoot>/api-token leftover is dead weight and is removed
         ApiAuthService.RemoveLegacyTokenFile(paths.DataRoot);
-        var apiAuth = Services.ApiAuthService.Resolve(args);
+        var apiAuth = ApiAuthService.Resolve(args);
 
         var builder = WebApplication.CreateSlimBuilder(args);
 
@@ -65,7 +62,7 @@ public static class WebHostBuilder
 
         // machine-readable API surface (G3): source-generated under Native AOT, served
         // unauthenticated next to /healthz as a discovery-plane artifact
-        builder.Services.AddOpenApi("v1", FlintLauncher.Web.OpenApi.ApiOpenApi.Configure);
+        builder.Services.AddOpenApi("v1", OpenApi.ApiOpenApi.Configure);
 
         LauncherRuntime runtime;
         try
@@ -91,7 +88,7 @@ public static class WebHostBuilder
         builder.Services.AddSingleton<DeviceCodeSessionStore>();
         builder.Services.AddSingleton<JavaScanService>();
         builder.Services.AddSingleton(apiAuth);
-        builder.Services.AddHostedService<Services.AccountRefreshService>();
+        builder.Services.AddHostedService<AccountRefreshService>();
 
         var app = builder.Build();
         var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
@@ -162,7 +159,7 @@ public static class WebHostBuilder
 
         // request log, outermost so the status is final (the error middleware below may
         // rewrite it to 500); health probes log at Debug to keep the default view readable
-        var httpLog = loggerFactory.CreateLogger(Core.Diagnostics.LogCategories.Http);
+        var httpLog = loggerFactory.CreateLogger(LogCategories.Http);
         app.Use(async (context, next) =>
         {
             var start = Stopwatch.GetTimestamp();
@@ -182,7 +179,7 @@ public static class WebHostBuilder
 
         // fix-3: proxy / NumberOfManualRetries / RequestTimeout / UserAgentOverride reach the
         // shared Http stack (also re-applied after every settings write)
-        Services.RuntimeNetConfig.Apply(runtime);
+        RuntimeNetConfig.Apply(runtime);
 
         // uniform {"error":{...}} body for unhandled faults
         app.Use(async (context, next) =>
@@ -205,11 +202,11 @@ public static class WebHostBuilder
             }
         });
 
-        app.MapOpenApi("/openapi/{documentName}.json");
+        app.MapOpenApi();
 
         app.MapGet("/healthz", () => Results.Ok(new Models.HealthResponse("ok")))
             .WithTags("Meta")
-            .Produces<Models.HealthResponse>(200);
+            .Produces<Models.HealthResponse>();
 
         var api = app.MapGroup("/api/v1");
         api.AddApiAuth(apiAuth);

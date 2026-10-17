@@ -6,7 +6,6 @@
 using System.IO.Compression;
 using System.Net;
 using System.Text;
-using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using Xunit;
 

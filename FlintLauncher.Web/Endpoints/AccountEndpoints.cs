@@ -28,7 +28,7 @@ public static class AccountEndpoints
             {
                 return ApiJson.Error("invalid_body", "'name' is required", 400);
             }
-            var account = FlintLauncher.Core.Auth.MinecraftAccount.CreateOffline(request.Name);
+            var account = Core.Auth.MinecraftAccount.CreateOffline(request.Name);
             runtime.Accounts.AddAccount(account);
             return Results.Created($"/api/v1/accounts/{account.ProfileId()}",
                 View(account, runtime.Accounts));
@@ -88,8 +88,8 @@ public static class AccountEndpoints
         }).Produces<DeviceCodePollResponse>(200);
     }
 
-    public static AccountView View(FlintLauncher.Core.Auth.MinecraftAccount account,
-                                   FlintLauncher.Core.Auth.AccountList list) => new(
+    public static AccountView View(Core.Auth.MinecraftAccount account,
+                                   Core.Auth.AccountList list) => new(
         account.ProfileId(),
         account.ProfileName(),
         account.TypeString(),

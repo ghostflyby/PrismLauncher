@@ -7,9 +7,7 @@
 // behaviors.
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Tasks;
 using Xunit;

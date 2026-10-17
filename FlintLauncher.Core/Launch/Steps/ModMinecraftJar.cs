@@ -3,7 +3,6 @@
 // helper it is the only consumer of (launcher/MMCZip.cpp). createModdedJar lives here instead
 // of IO/MMCZip.cs because it depends on the minecraft/mod Mod model.
 using System.IO.Compression;
-using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft.Resources;
 

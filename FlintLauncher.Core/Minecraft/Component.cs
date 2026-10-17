@@ -14,7 +14,6 @@
 //  - The blocking waitToLoad()/waitLoadMeta() calls get async counterparts; the synchronous
 //    wait is only available through WaitLoadMetaAsync.
 using System.Text;
-using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Net;
@@ -154,7 +153,7 @@ public class Component : ProblemProvider
 
     public VersionFile? GetVersionFile() => MetaVersion is not null ? MetaVersion.Data() : File;
 
-    public Meta.VersionList? GetVersionList()
+    public VersionList? GetVersionList()
     {
         // FIXME upstream: what if the metadata index isn't loaded yet?
         if (Parent is not null && Parent.MetadataIndex.HasUid(Uid))

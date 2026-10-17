@@ -5,7 +5,6 @@
 // version-only) dependency that resolves its project through a second lookup, and the
 // Flame file-id based variant.
 using System.Text.Json.Nodes;
-using FlintLauncher.Core;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Dependencies;
@@ -13,7 +12,6 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
-using FlintLauncher.Core.Versioning;
 using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
 using Xunit;
 

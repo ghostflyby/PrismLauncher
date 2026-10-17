@@ -16,7 +16,6 @@
 //    reference form (the C++ passed id(), the dirname; that form is not carried over).
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Instances;
 
@@ -86,7 +85,7 @@ public class InstanceCopyTask : InstanceTask
         // copyFinished(): the copy's instance layer is rewritten through a generic (null
         // type) instance shell over the typed adapter — the staged folder commits as Flint
         // format (instance.json), whatever format the source was
-        var instanceSettings = new Core.Config.InstanceJsonSettingsObject(
+        var instanceSettings = new Config.InstanceJsonSettingsObject(
             StagingPath, Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution."));
         BaseInstance inst = new NullInstance(instanceSettings, StagingPath);

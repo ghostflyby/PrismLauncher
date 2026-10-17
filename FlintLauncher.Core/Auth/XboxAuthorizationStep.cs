@@ -110,7 +110,7 @@ public sealed class XboxAuthorizationStep : AuthStep
         JsonObject? obj;
         try
         {
-            obj = System.Text.Json.Nodes.JsonNode.Parse(response.Body) as JsonObject;
+            obj = JsonNode.Parse(response.Body) as JsonObject;
         }
         catch (Exception e) when (e is System.Text.Json.JsonException or ArgumentException)
         {

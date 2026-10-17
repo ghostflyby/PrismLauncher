@@ -3,7 +3,6 @@
 // FtbFilterModel search semantics): fetch /modpack/all, then each pack description
 // (/modpack/{id}) in sequence, dropping the "dud" packs without versions. The Qt
 // QAbstractListModel/logos machinery is not ported — this is the plain data layer.
-using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform.Ftb;
 

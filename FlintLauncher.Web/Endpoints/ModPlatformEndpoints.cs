@@ -280,14 +280,14 @@ public static class ModPlatformEndpoints
                                     pack.Versions.Add(version);
                                 }
                             }
-                            catch (FlintLauncher.Core.Json.JsonParseException)
+                            catch (JsonParseException)
                             {
                                 // skip malformed entries, like the dependency resolver
                             }
                         }
                     }
                 }
-                catch (FlintLauncher.Core.Json.JsonParseException e)
+                catch (JsonParseException e)
                 {
                     return ApiJson.Error($"{parsedProvider.ToString().ToLowerInvariant()}_invalid_response",
                         $"{provider} version list is invalid: {e.Message}", 502);
@@ -639,7 +639,7 @@ public static class ModPlatformEndpoints
                     {
                         FlameMod.LoadIndexedPack(pack, hitObj);
                     }
-                    catch (FlintLauncher.Core.Json.JsonParseException)
+                    catch (JsonParseException)
                     {
                         continue;
                     }

@@ -9,11 +9,10 @@
 // G4 secret rerouting: PUT of ProxyPass/ModrinthToken/FlameKeyOverride writes the
 // ISecretStore (C4 — flint.json carries no secret fields); GET serves the stored values so
 // the wire contract is unchanged for the host.
-using FlintLauncher.Core;
+
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Icons;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using System.Text.Json;
 using FlintLauncher.Web.Models;
@@ -263,7 +262,7 @@ public static class SettingsAndIconsEndpoints
                 installed.Add(name);
             }
             return Results.Ok(new IconInstalledResponse(installed[0]));
-        }).WithMetadata(new FlintLauncher.Web.OpenApi.FormUploadMarker("multipart form: icon file (png/jpg/svg)")).Produces<IconInstalledResponse>(200);
+        }).WithMetadata(new OpenApi.FormUploadMarker("multipart form: icon file (png/jpg/svg)")).Produces<IconInstalledResponse>(200);
 
         api.MapDelete("/icons/{key}", (string key, IconPool icons) =>
             icons.Delete(key)
@@ -305,7 +304,7 @@ public static class SettingsAndIconsEndpoints
             instance.SetIconKey(key);
             instance.SaveNow();
             return Results.NoContent();
-        }).WithMetadata(new FlintLauncher.Web.OpenApi.FormUploadMarker("multipart form: icon file, or form field iconKey referencing an installed icon")).Produces(204);
+        }).WithMetadata(new OpenApi.FormUploadMarker("multipart form: icon file, or form field iconKey referencing an installed icon")).Produces(204);
     }
 
     /// <summary>Coerce the incoming JSON value to the declared default's kind, like the
