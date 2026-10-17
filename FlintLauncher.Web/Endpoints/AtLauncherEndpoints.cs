@@ -60,7 +60,7 @@ public static class AtLauncherEndpoints
 
             // the request's client is resolved up front: a serverUrl override derives its own
             // client, the runtime's shared one is never mutated (nothing to restore)
-            var api = ResolveApi(runtime, request.ServerUrl, out var serverError);
+            var atlauncher = ResolveApi(runtime, request.ServerUrl, out var serverError);
             if (serverError is not null)
             {
                 return serverError;
@@ -69,7 +69,7 @@ public static class AtLauncherEndpoints
             await runtime.InstanceLock.WaitAsync();
             try
             {
-                var task = new AtLauncherPackInstallTask(request.Name, request.Version, api: api)
+                var task = new AtLauncherPackInstallTask(request.Name, request.Version, api: atlauncher)
                 {
                     TargetDir = "",
                     Group = request.Group ?? "",

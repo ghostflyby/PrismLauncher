@@ -12,7 +12,7 @@ namespace FlintLauncher.Tests;
 
 internal sealed class AuthStubServer : IDisposable
 {
-    private readonly HttpListener _listener = new();
+    private readonly HttpListener _listener;
 
     public AuthStubServer()
     {

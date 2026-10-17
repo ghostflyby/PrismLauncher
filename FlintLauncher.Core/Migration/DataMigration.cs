@@ -60,7 +60,7 @@ public static class Filters
 
 /// <summary>
 /// Port of DataMigrationTask: copies everything the whitelist matcher accepts from
-/// <paramref name="sourcePath"/> into <paramref name="targetPath"/> (relative paths preserved,
+/// <c>sourcePath</c> into <c>targetPath</c> (relative paths preserved,
 /// destination files are not overwritten), after a dry run that counts the files for the
 /// progress bar.
 /// </summary>

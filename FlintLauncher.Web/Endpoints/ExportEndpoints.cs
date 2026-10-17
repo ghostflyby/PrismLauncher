@@ -105,8 +105,12 @@ public static class ExportEndpoints
                         break;
                     default:
                     {
-                        ModListExportTask.TryParseFormat(request.Format2, out var modlistFormat,
-                            out var modlistExtension);
+                        if (!ModListExportTask.TryParseFormat(request.Format2, out var modlistFormat,
+                            out var modlistExtension))
+                        {
+                            return ApiJson.Error("invalid_body",
+                                "'format2' must be one of: html, markdown, plain, json, csv", 400);
+                        }
                         output = Path.Combine(instanceRoot, baseName + "-mods." + modlistExtension);
                         task = new ModListExportTask(instance, output, modlistFormat,
                             OptionalData.Version | OptionalData.FileName);

@@ -141,7 +141,7 @@ public sealed class TypedJsonFile<T> where T : class
 }
 
 /// <summary>The stateVersion evolution half of the infrastructure (GLOBAL §1; S5/D4 share
-/// it). <see cref="TypedJsonFile{T}.LoadEvolved{U}"/> gates the caller's migration function
+/// it). <see cref="TypedJsonFileVersioning.LoadEvolved{U}"/> gates the caller's migration function
 /// on the on-disk version vs the current default's version — the current default record IS
 /// the schema version, so the caller never states the number twice.</summary>
 public static class TypedJsonFileVersioning

@@ -48,16 +48,14 @@ public sealed class LauncherStateStore
     private LauncherState Load() =>
         _file.LoadEvolved(CurrentDefault, Evolve, MergeOverDefault);
 
-    /// <summary>The fold: every absent half/member takes the current default.</summary>
+    /// <summary>The fold: normalizes the inner scalars of the sub-records (the materializing
+    /// constructor of <see cref="LauncherState"/> has already re-created absent domains).</summary>
     internal static LauncherState MergeOverDefault(LauncherState merged)
     {
-        var fresh = CurrentDefault();
         return merged with
         {
-            LastOfflinePlayerName = merged.LastOfflinePlayerName ?? fresh.LastOfflinePlayerName,
-            Playtime = merged.Playtime ?? fresh.Playtime,
-            Java = merged.Java is null ? fresh.Java : NormalizeJava(merged.Java),
-            Ui = merged.Ui is null ? fresh.Ui : NormalizeUi(merged.Ui),
+            Java = NormalizeJava(merged.Java),
+            Ui = NormalizeUi(merged.Ui),
         };
     }
 

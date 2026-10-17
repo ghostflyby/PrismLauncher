@@ -660,8 +660,8 @@ public class InstanceList
 
     /// <summary>
     /// Commit the staging area given by <paramref name="path"/> — used when creation
-    /// succeeds. <paramref name="shouldOverride"/> (from the task) merges the staging folder
-    /// over an existing instance instead of moving it to a fresh id.
+    /// succeeds. The task's <c>ShouldOverride</c> merges the staging folder over an
+    /// existing instance instead of moving it to a fresh id.
     /// </summary>
     public bool CommitStagedInstance(string path, InstanceTask instanceTask, string groupName)
     {

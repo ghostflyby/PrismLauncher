@@ -168,7 +168,7 @@ public sealed class FlameApi : ResourceApi
         return (netJob, request);
     }
 
-    /// <summary>Port of FlameAPI::getCategories (GET /categories?gameId=432&classId=...).</summary>
+    /// <summary>Port of FlameAPI::getCategories (GET /categories?gameId=432&amp;classId=...).</summary>
     public (NetJob Job, NetRequest Request) GetCategories(ResourceType type)
     {
         return GetCategoriesForClassId(GetClassId(type));

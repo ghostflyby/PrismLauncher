@@ -324,8 +324,8 @@ public sealed class PasteUpload : FlintTask
     }
 
     /// <summary>The paste.gg JSON document, in the key order and Indented (4-space) shape of
-    /// QJsonDocument::toJson(): {"expires": <utc+100d ISO>, "files": [{"name": "log.txt",
-    /// "content": {"format": "text", "value": <log>}}]}</summary>
+    /// QJsonDocument::toJson(): {"expires": &lt;utc+100d ISO&gt;, "files": [{"name": "log.txt",
+    /// "content": {"format": "text", "value": &lt;log&gt;}}]}</summary>
     public static byte[] BuildPasteGgBody(string log)
     {
         var expires = DateTime.UtcNow.AddDays(100).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);

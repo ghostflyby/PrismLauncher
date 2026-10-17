@@ -18,7 +18,7 @@ internal sealed record SseMarker;
 internal sealed record PlainTextMarker;
 
 /// <summary>Marks the multipart/form endpoints whose request bodies Minimal API cannot
-/// infer (they read HttpRequest.Form directly). <paramref name="description"/> names the
+/// infer (they read HttpRequest.Form directly). <paramref name="Description"/> names the
 /// form fields.</summary>
 internal sealed record FormUploadMarker(string Description);
 
@@ -48,7 +48,7 @@ internal static class ApiOpenApi
     {
         options.AddDocumentTransformer((document, context, cancellationToken) =>
         {
-            document.Info ??= new OpenApiInfo
+            document.Info = new OpenApiInfo
             {
                 Title = "Flint API",
                 Version = "v1",

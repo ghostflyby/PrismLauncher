@@ -20,7 +20,7 @@ public sealed class SymlinkTask : FlintTask
         _path = finalPath;
     }
 
-    /// <summary>Port of the free function findBinPath: first <root>/<pattern>, then one level down.</summary>
+    /// <summary>Port of the free function findBinPath: first &lt;root&gt;/&lt;pattern&gt;, then one level down.</summary>
     public static string FindBinPath(string root, string pattern)
     {
         var path = FileSystem.PathCombine(root, pattern);

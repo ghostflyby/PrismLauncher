@@ -88,7 +88,7 @@ public sealed record SettingsPutRequest(
 // ------------------------------------------------------------------ launch / tasks
 
 public sealed record LaunchRequest(
-    string Mode,
+    string? Mode,
     string? OfflineName,
     string? AccountProfileId,
     LaunchJoinServer? Server = null,
@@ -338,7 +338,7 @@ public sealed record ComponentMoveRequest(int Delta);
 /// <summary>POST /instances/{id}/export body (ExportInstanceDialog/ExportPackDialog/
 /// ExportToModListDialog inputs).</summary>
 public sealed record ExportRequest(
-    string Format,
+    string? Format,
     string? Name = null,
     string? VersionId = null,
     string? Summary = null,

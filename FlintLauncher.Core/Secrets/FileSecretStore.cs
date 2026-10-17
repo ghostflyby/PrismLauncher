@@ -6,6 +6,7 @@
 // unix, atomic writes via the TypedJsonFile mechanism. Future backends (Keychain/DPAPI/
 // libsecret) implement the same interface without touching the consumers.
 
+using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 
 namespace FlintLauncher.Core.Secrets;
@@ -29,9 +30,20 @@ public sealed record SecretsFile
 {
     public const int CurrentVersion = 1;
 
-    public int StateVersion { get; init; } = CurrentVersion;
+    // The materializing constructor: the source-generated deserializer does not honor
+    // property initializers for members absent from the payload — without it a partial
+    // secrets.json would surface a null Secrets map.
+    [JsonConstructor]
+    public SecretsFile(int stateVersion = CurrentVersion,
+        Dictionary<string, string>? secrets = null)
+    {
+        StateVersion = stateVersion;
+        Secrets = secrets ?? new Dictionary<string, string>(StringComparer.Ordinal);
+    }
 
-    public Dictionary<string, string> Secrets { get; init; } = new();
+    public int StateVersion { get; init; }
+
+    public Dictionary<string, string> Secrets { get; init; }
 }
 
 /// <summary>The transitional file backend (C4): &lt;data-root&gt;/secrets.json, 0600 on unix,
@@ -79,13 +91,7 @@ public sealed class FileSecretStore : ISecretStore
         return true;
     }
 
-    /// <summary>load-or-default with the record-merge fold: the source-generated deserializer
-    /// does not honor property initializers for absent members, so a payload without the
-    /// secrets map would surface null instead of an empty dictionary.</summary>
-    private SecretsFile Load() =>
-        _file.LoadOrDefault(() => new SecretsFile(),
-            merged => merged with
-            {
-                Secrets = merged.Secrets ?? new Dictionary<string, string>(StringComparer.Ordinal),
-            });
+    /// <summary>load-or-default: the materializing constructor of <see cref="SecretsFile"/>
+    /// re-creates an absent secrets map, so no payload-shape fold is needed here.</summary>
+    private SecretsFile Load() => _file.LoadOrDefault(() => new SecretsFile());
 }

@@ -149,7 +149,7 @@ internal static class WaveSeed
         return instanceRoot;
     }
 
-    /// <summary>Worlds/<World>.h compatible level.dat: Data.LevelName/LastPlayed/GameType.</summary>
+    /// <summary>Worlds/&lt;World&gt;.h compatible level.dat: Data.LevelName/LastPlayed/GameType.</summary>
     public static void World(string worldDir, string name, long lastPlayed = 1700000000000,
         int gameType = 1)
     {

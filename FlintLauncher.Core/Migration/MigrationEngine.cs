@@ -251,7 +251,7 @@ public sealed class FlintLegacyMigrationProfile : IMigrationSourceProfile
 /// the E8 one-time cleanup (a Prism bare <c>metacache</c> ledger in the target directory is
 /// dead weight — the whitelist never carried it, existing stock is deleted). A failed
 /// transfer writes no record: the next startup resumes the idempotent merge. Two entries:
-/// <see cref="ExecuteIfNeeded"/> is the gated startup auto-run; <see cref="Execute"/> is the
+/// <see cref="ExecuteIfNeeded"/> is the gated startup auto-run; <see cref="Execute(FlintPaths, string)"/> is the
 /// record-less transfer the prism import-finished hook runs (the record gates the AUTO-RUN,
 /// never the remount itself).</summary>
 public static class FlintLegacyMigration
@@ -271,7 +271,7 @@ public static class FlintLegacyMigration
     /// gates the AUTO-RUN only — it must never gate the remount itself (an upgraded user
     /// carries the record permanently; a second prism
     /// import lands fresh shared content at the data root afterwards, and that remount is
-    /// the record-less <see cref="Execute"/> entry). A no-op probe (anchors present but
+    /// the record-less <see cref="Execute(FlintPaths, string)"/> entry). A no-op probe (anchors present but
     /// nothing whitelisted to remount) writes NO record: nothing was imported, and the
     /// next startup's probe is a handful of existence checks. A FAILED transfer — exception
     /// OR per-file transfer failure — writes NO record either: the next startup resumes

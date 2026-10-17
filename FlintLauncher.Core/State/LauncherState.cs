@@ -7,6 +7,9 @@
 // <see cref="LauncherStateStore"/> with immediate atomic writes — no layering: everything
 // here is process/machine-level (STATE S6).
 
+using System.Diagnostics.CodeAnalysis;
+using System.Text.Json.Serialization;
+
 namespace FlintLauncher.Core.State;
 
 /// <summary>The single runtime-state file (S5). The record IS the schema version: new
@@ -16,6 +19,23 @@ public sealed record LauncherState : IStateVersioned
 {
     /// <summary>The current schema version (S5 starts at 1).</summary>
     public const int CurrentVersion = 1;
+
+    // The materializing constructor: the source-generated deserializer does not honor
+    // property initializers for members absent from the payload (.NET 10), so the ctor body
+    // re-materializes the sub-records — every deserialized LauncherState has real domain
+    // values, and LauncherStateStore's fold only normalizes inner scalars.
+    [JsonConstructor, SetsRequiredMembers]
+    public LauncherState(int stateVersion = CurrentVersion,
+        bool userAskedAboutAutomaticJavaDownload = false, string lastOfflinePlayerName = "",
+        PlaytimeState? playtime = null, JavaDetectState? java = null, UiState? ui = null)
+    {
+        StateVersion = stateVersion;
+        UserAskedAboutAutomaticJavaDownload = userAskedAboutAutomaticJavaDownload;
+        LastOfflinePlayerName = lastOfflinePlayerName;
+        Playtime = playtime ?? new();
+        Java = java ?? new();
+        Ui = ui ?? new();
+    }
 
     public required int StateVersion { get; init; }
 

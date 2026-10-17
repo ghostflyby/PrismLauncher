@@ -54,14 +54,14 @@ public static class FtbEndpoints
 
         // ---------------------------------------------- modplatform/ftb/packs/{id}
         // the /modpack/{id} description (FtbListModel::packRequestFinished's mapping)
-        api.MapGet("/modplatform/ftb/packs/{id}", async Task<IResult> (int id,
+        api.MapGet("/modplatform/ftb/packs/{id:int}", async Task<IResult> (int id,
                     LauncherRuntime runtime) =>
                 await WithPackAsync(runtime, id, pack => Results.Ok(PackView(pack))))
             .Produces<FtbPackView>();
 
         // -------------------------------------- modplatform/ftb/packs/{id}/versions
         // the description's version list (the FTB App API has no separate version index)
-        api.MapGet("/modplatform/ftb/packs/{id}/versions", async Task<IResult> (int id,
+        api.MapGet("/modplatform/ftb/packs/{id:int}/versions", async Task<IResult> (int id,
                     LauncherRuntime runtime) =>
                 await WithPackAsync(runtime, id, pack => Results.Ok(pack.Versions
                     .Select(version => new FtbPackVersionView(version.Id, version.Name,
