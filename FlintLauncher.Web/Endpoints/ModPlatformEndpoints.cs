@@ -414,7 +414,7 @@ public static class ModPlatformEndpoints
                     filter?.ReleaseTypes is { Count: > 0 } requested
                         ? IndexedVersionType.FromStringList(requested)
                         : IndexedVersionType.FromStringList(JsonUtils.ToStringList(
-                            runtime.Config.Current.ModDownload.ModUpdateReleaseTypes ?? "[]"));
+                            runtime.Config.Current.ModDownload!.ModUpdateReleaseTypes ?? "[]"));
 
                 var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, releaseTypes, runtime.Modrinth, runtime.Flame);
                 var entry = registry.Register("mods-update", task, instanceId: instance.Id());

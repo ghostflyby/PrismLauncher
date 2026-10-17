@@ -152,7 +152,7 @@ public class JsonTests
         var doc = JsonUtils.ParseNodeUntilGarbage("""{"a":1} trailing garbage""", out var garbage);
         Assert.NotNull(doc);
         Assert.Equal(" trailing garbage", garbage);
-        Assert.Equal(1, JsonUtils.RequireInteger(doc!.AsObject()["a"]));
+        Assert.Equal(1, JsonUtils.RequireInteger(doc.AsObject()["a"]));
 
         var strict = JsonUtils.ParseNodeUntilGarbage("""{"a":1}""", out var noGarbage);
         Assert.NotNull(strict);

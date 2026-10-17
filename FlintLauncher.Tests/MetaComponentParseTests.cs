@@ -5,6 +5,7 @@
 // FlintLauncher.Core/Minecraft/Resources (moved there from Minecraft/ in P3-b).
 
 using System.Text.Json.Nodes;
+using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using Xunit;

@@ -16,7 +16,7 @@ public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<J
 
     public JavaVersion(string rhs)
     {
-        _string = rhs ?? "";
+        _string = rhs;
         Parse();
     }
 

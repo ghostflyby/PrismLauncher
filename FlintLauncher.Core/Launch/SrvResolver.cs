@@ -205,7 +205,7 @@ public static class SrvResolver
         return (builder.ToString(), end);
     }
 
-    private static IPEndPoint? ResolveSystemNameserver()
+    private static IPEndPoint ResolveSystemNameserver()
     {
         if (OperatingSystem.IsWindows())
         {

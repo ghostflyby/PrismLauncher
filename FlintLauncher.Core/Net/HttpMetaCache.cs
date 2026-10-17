@@ -67,7 +67,7 @@ public sealed class MetaEntry
 
 public sealed class HttpMetaCache : IDisposable
 {
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
     private readonly Dictionary<string, Dictionary<string, MetaEntry>> _entries =
         new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _basePaths = new(StringComparer.Ordinal);
@@ -90,11 +90,11 @@ public sealed class HttpMetaCache : IDisposable
     {
         lock (_lock)
         {
-            if (_basePaths.ContainsKey(baseId))
+            if (!_basePaths.TryAdd(baseId, basePath))
             {
                 return;
             }
-            _basePaths[baseId] = basePath;
+
             _entries[baseId] = [];
         }
     }

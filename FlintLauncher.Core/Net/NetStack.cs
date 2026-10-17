@@ -64,15 +64,15 @@ public sealed class NetStack
     public void Configure(string userAgent, string proxyType, string addr, int port,
         string user, string pass)
     {
-        var ua = userAgent ?? UserAgent;
+        var ua = userAgent;
         var type = string.IsNullOrWhiteSpace(proxyType) ? "None" : proxyType.Trim();
-        var host = addr ?? "";
+        var host = addr;
         // an HTTP/SOCKS proxy without a host cannot be used — fall back to "no proxy"
         if (type is "HTTP" or "SOCKS5" && host.Length == 0)
         {
             type = "None";
         }
-        var next = (ua, type, host, port, user ?? "", pass ?? "");
+        var next = (ua, type, host, port, user, pass);
         if (this.applied is { } applied && applied.Equals(next))
         {
             return;
@@ -85,7 +85,7 @@ public sealed class NetStack
             }
             this.applied = next;
             UserAgent = ua;
-            proxy = (type, host, port, user ?? "", pass ?? "");
+            proxy = (type, host, port, user, pass);
             client = CreateClient();
         }
     }

@@ -18,7 +18,6 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class ClaimAccount : LaunchStep
 {
-    private MinecraftAccount? account;
     private UseLock? @lock;
 
     public ClaimAccount(LaunchTask parent, AuthSession? session) : base(parent)
@@ -33,11 +32,7 @@ public sealed class ClaimAccount : LaunchStep
     public string? AccountForSession { get; }
 
     /// <summary>The account the controller decided on (see header note).</summary>
-    public MinecraftAccount? Account
-    {
-        get => account;
-        set => account = value;
-    }
+    public MinecraftAccount? Account { get; set; }
 
     /// <summary>Minimal port of the Usable/UseLock pair of launcher/Usable.h.</summary>
     public sealed class UseLock : IDisposable

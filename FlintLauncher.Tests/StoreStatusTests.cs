@@ -91,7 +91,7 @@ public class StoreCompletenessTests : IDisposable
         var report = StoreCompleteness.LibrariesStatus(paths, cache, "1.21.4", Context());
 
         Assert.NotNull(report);
-        Assert.False(report!.Complete);
+        Assert.False(report.Complete);
         Assert.Equal([dfu], report.Missing);
         Assert.Equal(4, report.Bytes); // the brigadier file's content length
     }
@@ -110,7 +110,7 @@ public class StoreCompletenessTests : IDisposable
         var report = StoreCompleteness.LibrariesStatus(paths, cache, "1.21.4", Context());
 
         Assert.NotNull(report);
-        Assert.Equal([brigadier], report!.Missing);
+        Assert.Equal([brigadier], report.Missing);
         Assert.Equal(0, report.Bytes);
     }
 
@@ -126,7 +126,7 @@ public class StoreCompletenessTests : IDisposable
         var report = StoreCompleteness.LibrariesStatus(paths, cache, "1.21.4", Context());
 
         Assert.NotNull(report);
-        Assert.True(report!.Complete);
+        Assert.True(report.Complete);
         Assert.Empty(report.Missing);
         Assert.Equal(0, report.Bytes);
     }
@@ -160,7 +160,7 @@ public class StoreCompletenessTests : IDisposable
         var report = StoreCompleteness.AssetsStatus(paths, "17");
 
         Assert.NotNull(report);
-        Assert.False(report!.Complete);
+        Assert.False(report.Complete);
         Assert.Equal(["minecraft/sounds/missing.ogg"], report.Missing);
         Assert.Equal(3, report.Bytes);
     }
@@ -183,24 +183,24 @@ public class StoreStatusApiTests
             const string brigadier = "com/mojang/brigadier/1.0.18/brigadier-1.0.18.jar";
             const string dfu = "com/mojang/datafixerupper/8.0.16/datafixerupper-8.0.16.jar";
             Directory.CreateDirectory(Path.Combine(paths.MetaDir, "net.minecraft"));
-            File.WriteAllText(Path.Combine(paths.MetaDir, "net.minecraft", "1.21.4.json"), """
-                                                                                           {"formatVersion":1,"uid":"net.minecraft","version":"1.21.4",
-                                                                                            "releaseTime":"2024-12-03T10:15:07+00:00","type":"release",
-                                                                                            "libraries":[{"name":"com.mojang:brigadier:1.0.18"},{"name":"com.mojang:datafixerupper:8.0.16"}]}
-                                                                                           """);
+            await File.WriteAllTextAsync(Path.Combine(paths.MetaDir, "net.minecraft", "1.21.4.json"), """
+                                                                                                      {"formatVersion":1,"uid":"net.minecraft","version":"1.21.4",
+                                                                                                       "releaseTime":"2024-12-03T10:15:07+00:00","type":"release",
+                                                                                                       "libraries":[{"name":"com.mojang:brigadier:1.0.18"},{"name":"com.mojang:datafixerupper:8.0.16"}]}
+                                                                                                      """);
             Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(paths.LibrariesRoot, brigadier))!);
-            File.WriteAllText(Path.Combine(paths.LibrariesRoot, brigadier), "jar!");
+            await File.WriteAllTextAsync(Path.Combine(paths.LibrariesRoot, brigadier), "jar!");
             Directory.CreateDirectory(Path.GetDirectoryName(paths.MetacacheFile)!);
-            File.WriteAllText(paths.MetacacheFile, $$"""
-                {"version":"1","entries":[
-                  {"base":"libraries","path":"{{brigadier}}","md5sum":"","etag":"","last_changed_timestamp":0,"eternal":true}]}
-                """);
+            await File.WriteAllTextAsync(paths.MetacacheFile, $$"""
+                                                                {"version":"1","entries":[
+                                                                  {"base":"libraries","path":"{{brigadier}}","md5sum":"","etag":"","last_changed_timestamp":0,"eternal":true}]}
+                                                                """);
             const string hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
             Directory.CreateDirectory(paths.AssetIndexesDir);
-            File.WriteAllText(Path.Combine(paths.AssetIndexesDir, "17.json"),
+            await File.WriteAllTextAsync(Path.Combine(paths.AssetIndexesDir, "17.json"),
                 "{\"objects\":{\"minecraft/icons/icon_16x16.png\":{\"hash\":\"" + hash + "\",\"size\":3}}}");
             Directory.CreateDirectory(Path.Combine(paths.AssetsRoot, "objects", hash[..2]));
-            File.WriteAllText(Path.Combine(paths.AssetsRoot, "objects", hash[..2], hash), "abc");
+            await File.WriteAllTextAsync(Path.Combine(paths.AssetsRoot, "objects", hash[..2], hash), "abc");
 
             var token = Guid.NewGuid().ToString("N");
             using var app = WebHostBuilder.BuildWebApplication(

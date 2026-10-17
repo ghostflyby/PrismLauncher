@@ -256,7 +256,7 @@ public static class InstanceConfigKeys
 
             // ---- java (OverrideJavaLocation: path + compatibility; OverrideJavaArgs: args)
             E("JavaPath", "OverrideJavaLocation",
-                (u, i) => i.Launch?.Java?.JavaPath ?? u.Java.JavaPath,
+                (u, i) => i.Launch?.Java?.JavaPath ?? u.Java!.JavaPath,
                 i => i.Launch?.Java?.JavaPath is not null,
                 (i, v) => i with
                 {
@@ -266,7 +266,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("IgnoreJavaCompatibility", "OverrideJavaLocation",
-                (u, i) => i.Launch?.Java?.IgnoreJavaCompatibility ?? u.Java.IgnoreJavaCompatibility,
+                (u, i) => i.Launch?.Java?.IgnoreJavaCompatibility ?? u.Java!.IgnoreJavaCompatibility,
                 i => i.Launch?.Java?.IgnoreJavaCompatibility is not null,
                 (i, v) => i with
                 {
@@ -276,7 +276,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("JvmArgs", "OverrideJavaArgs",
-                (u, i) => i.Launch?.Java?.JvmArgs ?? u.Java.JvmArgs,
+                (u, i) => i.Launch?.Java?.JvmArgs ?? u.Java!.JvmArgs,
                 i => i.Launch?.Java?.JvmArgs is not null,
                 (i, v) => i with
                 {
@@ -298,7 +298,7 @@ public static class InstanceConfigKeys
 
             // ---- memory (OverrideMemory)
             E("MinMemAlloc", "OverrideMemory",
-                (u, i) => i.Launch?.Memory?.MinMemAlloc ?? u.Memory.MinMemAlloc,
+                (u, i) => i.Launch?.Memory?.MinMemAlloc ?? u.Memory!.MinMemAlloc,
                 i => i.Launch?.Memory?.MinMemAlloc is not null,
                 (i, v) => i with
                 {
@@ -308,7 +308,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("MaxMemAlloc", "OverrideMemory",
-                (u, i) => i.Launch?.Memory?.MaxMemAlloc ?? u.Memory.MaxMemAlloc,
+                (u, i) => i.Launch?.Memory?.MaxMemAlloc ?? u.Memory!.MaxMemAlloc,
                 i => i.Launch?.Memory?.MaxMemAlloc is not null,
                 (i, v) => i with
                 {
@@ -320,7 +320,7 @@ public static class InstanceConfigKeys
             // PermGen died with the Java <8 support floor (2026-10-05): an imported
             // instance.cfg PermGen key is now an unknown key and drops silently.
             E("LowMemWarning", "OverrideMemory",
-                (u, i) => i.Launch?.Memory?.LowMemWarning ?? u.Memory.LowMemWarning,
+                (u, i) => i.Launch?.Memory?.LowMemWarning ?? u.Memory!.LowMemWarning,
                 i => i.Launch?.Memory?.LowMemWarning is not null,
                 (i, v) => i with
                 {
@@ -332,7 +332,7 @@ public static class InstanceConfigKeys
 
             // ---- window (OverrideWindow)
             E("LaunchMaximized", "OverrideWindow",
-                (u, i) => i.Launch?.Window?.LaunchMaximized ?? u.Window.LaunchMaximized,
+                (u, i) => i.Launch?.Window?.LaunchMaximized ?? u.Window!.LaunchMaximized,
                 i => i.Launch?.Window?.LaunchMaximized is not null,
                 (i, v) => i with
                 {
@@ -342,7 +342,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("MinecraftWinWidth", "OverrideWindow",
-                (u, i) => i.Launch?.Window?.MinecraftWinWidth ?? u.Window.MinecraftWinWidth,
+                (u, i) => i.Launch?.Window?.MinecraftWinWidth ?? u.Window!.MinecraftWinWidth,
                 i => i.Launch?.Window?.MinecraftWinWidth is not null,
                 (i, v) => i with
                 {
@@ -352,7 +352,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("MinecraftWinHeight", "OverrideWindow",
-                (u, i) => i.Launch?.Window?.MinecraftWinHeight ?? u.Window.MinecraftWinHeight,
+                (u, i) => i.Launch?.Window?.MinecraftWinHeight ?? u.Window!.MinecraftWinHeight,
                 i => i.Launch?.Window?.MinecraftWinHeight is not null,
                 (i, v) => i with
                 {
@@ -364,7 +364,7 @@ public static class InstanceConfigKeys
 
             // ---- commands (OverrideCommands, synonym OverrideLaunchCmd)
             E("PreLoadCommand", "OverrideCommands",
-                (u, i) => i.Launch?.Commands?.PreLoadCommand ?? u.Commands.PreLoadCommand,
+                (u, i) => i.Launch?.Commands?.PreLoadCommand ?? u.Commands!.PreLoadCommand,
                 i => i.Launch?.Commands?.PreLoadCommand is not null,
                 (i, v) => i with
                 {
@@ -374,7 +374,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("PreLaunchCommand", "OverrideCommands",
-                (u, i) => i.Launch?.Commands?.PreLaunchCommand ?? u.Commands.PreLaunchCommand,
+                (u, i) => i.Launch?.Commands?.PreLaunchCommand ?? u.Commands!.PreLaunchCommand,
                 i => i.Launch?.Commands?.PreLaunchCommand is not null,
                 (i, v) => i with
                 {
@@ -384,7 +384,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("WrapperCommand", "OverrideCommands",
-                (u, i) => i.Launch?.Commands?.WrapperCommand ?? u.Commands.WrapperCommand,
+                (u, i) => i.Launch?.Commands?.WrapperCommand ?? u.Commands!.WrapperCommand,
                 i => i.Launch?.Commands?.WrapperCommand is not null,
                 (i, v) => i with
                 {
@@ -394,7 +394,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("PostExitCommand", "OverrideCommands",
-                (u, i) => i.Launch?.Commands?.PostExitCommand ?? u.Commands.PostExitCommand,
+                (u, i) => i.Launch?.Commands?.PostExitCommand ?? u.Commands!.PostExitCommand,
                 i => i.Launch?.Commands?.PostExitCommand is not null,
                 (i, v) => i with
                 {
@@ -406,13 +406,13 @@ public static class InstanceConfigKeys
 
             // ---- env (OverrideEnv): the custom environment map's JSON text
             E("Env", "OverrideEnv",
-                (u, i) => i.Launch?.Env ?? u.MinecraftMisc.Env,
+                (u, i) => i.Launch?.Env ?? u.MinecraftMisc!.Env,
                 i => i.Launch?.Env is not null,
                 (i, v) => i with { Launch = (i.Launch ?? new()) with { Env = StringOf(v) } }),
 
             // ---- performance (OverridePerformance)
             E("EnableFeralGamemode", "OverridePerformance",
-                (u, i) => i.Launch?.Performance?.EnableFeralGamemode ?? u.Performance.EnableFeralGamemode,
+                (u, i) => i.Launch?.Performance?.EnableFeralGamemode ?? u.Performance!.EnableFeralGamemode,
                 i => i.Launch?.Performance?.EnableFeralGamemode is not null,
                 (i, v) => i with
                 {
@@ -425,7 +425,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("EnableMangoHud", "OverridePerformance",
-                (u, i) => i.Launch?.Performance?.EnableMangoHud ?? u.Performance.EnableMangoHud,
+                (u, i) => i.Launch?.Performance?.EnableMangoHud ?? u.Performance!.EnableMangoHud,
                 i => i.Launch?.Performance?.EnableMangoHud is not null,
                 (i, v) => i with
                 {
@@ -438,7 +438,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("UseDiscreteGpu", "OverridePerformance",
-                (u, i) => i.Launch?.Performance?.UseDiscreteGpu ?? u.Performance.UseDiscreteGpu,
+                (u, i) => i.Launch?.Performance?.UseDiscreteGpu ?? u.Performance!.UseDiscreteGpu,
                 i => i.Launch?.Performance?.UseDiscreteGpu is not null,
                 (i, v) => i with
                 {
@@ -451,7 +451,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("UseZink", "OverridePerformance",
-                (u, i) => i.Launch?.Performance?.UseZink ?? u.Performance.UseZink,
+                (u, i) => i.Launch?.Performance?.UseZink ?? u.Performance!.UseZink,
                 i => i.Launch?.Performance?.UseZink is not null,
                 (i, v) => i with
                 {
@@ -463,7 +463,7 @@ public static class InstanceConfigKeys
 
             // ---- native library workarounds (OverrideNativeWorkarounds)
             E("UseNativeOpenAL", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.UseNativeOpenAl ?? u.NativeLib.UseNativeOpenAl,
+                (u, i) => i.Launch?.NativeLib?.UseNativeOpenAl ?? u.NativeLib!.UseNativeOpenAl,
                 i => i.Launch?.NativeLib?.UseNativeOpenAl is not null,
                 (i, v) => i with
                 {
@@ -476,7 +476,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("CustomOpenALPath", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.CustomOpenAlPath ?? u.NativeLib.CustomOpenAlPath,
+                (u, i) => i.Launch?.NativeLib?.CustomOpenAlPath ?? u.NativeLib!.CustomOpenAlPath,
                 i => i.Launch?.NativeLib?.CustomOpenAlPath is not null,
                 (i, v) => i with
                 {
@@ -489,7 +489,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("UseNativeGLFW", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.UseNativeGlfw ?? u.NativeLib.UseNativeGlfw,
+                (u, i) => i.Launch?.NativeLib?.UseNativeGlfw ?? u.NativeLib!.UseNativeGlfw,
                 i => i.Launch?.NativeLib?.UseNativeGlfw is not null,
                 (i, v) => i with
                 {
@@ -502,7 +502,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("CustomGLFWPath", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.CustomGlfwPath ?? u.NativeLib.CustomGlfwPath,
+                (u, i) => i.Launch?.NativeLib?.CustomGlfwPath ?? u.NativeLib!.CustomGlfwPath,
                 i => i.Launch?.NativeLib?.CustomGlfwPath is not null,
                 (i, v) => i with
                 {
@@ -515,7 +515,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("UseNativeSDL", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.UseNativeSdl ?? u.NativeLib.UseNativeSdl,
+                (u, i) => i.Launch?.NativeLib?.UseNativeSdl ?? u.NativeLib!.UseNativeSdl,
                 i => i.Launch?.NativeLib?.UseNativeSdl is not null,
                 (i, v) => i with
                 {
@@ -528,7 +528,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("CustomSDLPath", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.CustomSdlPath ?? u.NativeLib.CustomSdlPath,
+                (u, i) => i.Launch?.NativeLib?.CustomSdlPath ?? u.NativeLib!.CustomSdlPath,
                 i => i.Launch?.NativeLib?.CustomSdlPath is not null,
                 (i, v) => i with
                 {
@@ -543,7 +543,7 @@ public static class InstanceConfigKeys
 
             // ---- console (OverrideConsole) — the C7 passthrough pair is NOT here
             E("ShowConsole", "OverrideConsole",
-                (u, i) => i.Misc?.Console?.ShowConsole ?? u.Console.ShowConsole,
+                (u, i) => i.Misc?.Console?.ShowConsole ?? u.Console!.ShowConsole,
                 i => i.Misc?.Console?.ShowConsole is not null,
                 (i, v) => i with
                 {
@@ -553,7 +553,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("AutoCloseConsole", "OverrideConsole",
-                (u, i) => i.Misc?.Console?.AutoCloseConsole ?? u.Console.AutoCloseConsole,
+                (u, i) => i.Misc?.Console?.AutoCloseConsole ?? u.Console!.AutoCloseConsole,
                 i => i.Misc?.Console?.AutoCloseConsole is not null,
                 (i, v) => i with
                 {
@@ -563,7 +563,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("ShowConsoleOnError", "OverrideConsole",
-                (u, i) => i.Misc?.Console?.ShowConsoleOnError ?? u.Console.ShowConsoleOnError,
+                (u, i) => i.Misc?.Console?.ShowConsoleOnError ?? u.Console!.ShowConsoleOnError,
                 i => i.Misc?.Console?.ShowConsoleOnError is not null,
                 (i, v) => i with
                 {
@@ -573,7 +573,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("LogPrePostOutput", "OverrideConsole",
-                (u, i) => i.Misc?.Console?.LogPrePostOutput ?? u.Console.LogPrePostOutput,
+                (u, i) => i.Misc?.Console?.LogPrePostOutput ?? u.Console!.LogPrePostOutput,
                 i => i.Misc?.Console?.LogPrePostOutput is not null,
                 (i, v) => i with
                 {
@@ -585,7 +585,7 @@ public static class InstanceConfigKeys
 
             // ---- game time (OverrideGameTime)
             E("ShowGameTime", "OverrideGameTime",
-                (u, i) => i.Misc?.GameTime?.ShowGameTime ?? u.GameTime.ShowGameTime,
+                (u, i) => i.Misc?.GameTime?.ShowGameTime ?? u.GameTime!.ShowGameTime,
                 i => i.Misc?.GameTime?.ShowGameTime is not null,
                 (i, v) => i with
                 {
@@ -595,7 +595,7 @@ public static class InstanceConfigKeys
                     },
                 }),
             E("RecordGameTime", "OverrideGameTime",
-                (u, i) => i.Misc?.GameTime?.RecordGameTime ?? u.GameTime.RecordGameTime,
+                (u, i) => i.Misc?.GameTime?.RecordGameTime ?? u.GameTime!.RecordGameTime,
                 i => i.Misc?.GameTime?.RecordGameTime is not null,
                 (i, v) => i with
                 {
@@ -608,21 +608,21 @@ public static class InstanceConfigKeys
             // ---- miscellaneous gates (OverrideMiscellaneous / OverrideLegacySettings /
             //      OverrideModDownloadLoaders)
             E("CloseAfterLaunch", "OverrideMiscellaneous",
-                (u, i) => i.Misc?.CloseAfterLaunch ?? u.Launcher.CloseAfterLaunch,
+                (u, i) => i.Misc?.CloseAfterLaunch ?? u.Launcher!.CloseAfterLaunch,
                 i => i.Misc?.CloseAfterLaunch is not null,
                 (i, v) => i with
                 {
                     Misc = (i.Misc ?? new()) with { CloseAfterLaunch = BoolOf(v) },
                 }),
             E("QuitAfterGameStop", "OverrideMiscellaneous",
-                (u, i) => i.Misc?.QuitAfterGameStop ?? u.Launcher.QuitAfterGameStop,
+                (u, i) => i.Misc?.QuitAfterGameStop ?? u.Launcher!.QuitAfterGameStop,
                 i => i.Misc?.QuitAfterGameStop is not null,
                 (i, v) => i with
                 {
                     Misc = (i.Misc ?? new()) with { QuitAfterGameStop = BoolOf(v) },
                 }),
             E("OnlineFixes", "OverrideLegacySettings",
-                (u, i) => i.Misc?.OnlineFixes ?? u.MinecraftMisc.OnlineFixes,
+                (u, i) => i.Misc?.OnlineFixes ?? u.MinecraftMisc!.OnlineFixes,
                 i => i.Misc?.OnlineFixes is not null,
                 (i, v) => i with { Misc = (i.Misc ?? new()) with { OnlineFixes = BoolOf(v) } }),
             E("ModDownloadLoaders", "OverrideModDownloadLoaders",
@@ -800,11 +800,11 @@ public static class InstanceConfigKeys
 
             // ---- the C7 passthrough pair: global-only reads, instance writes dropped
             E("ConsoleMaxLines", null,
-                (u, _) => u.Console.ConsoleMaxLines,
+                (u, _) => u.Console!.ConsoleMaxLines,
                 _ => false,
                 (i, _) => i),
             E("ConsoleOverflowStop", null,
-                (u, _) => u.Console.ConsoleOverflowStop,
+                (u, _) => u.Console!.ConsoleOverflowStop,
                 _ => false,
                 (i, _) => i),
 

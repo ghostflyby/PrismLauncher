@@ -419,13 +419,6 @@ public sealed class ModrinthCreationTask : InstanceTask
         return true;
     }
 
-    /// <summary>obj.value(key).toString() equivalent for the JsonObject-based index.</summary>
-    private static string ObjString(JsonObject obj, string key)
-    {
-        return obj.TryGetPropertyValue(key, out var node) && node is JsonValue value
-            && value.TryGetValue<string>(out var s) ? s : "";
-    }
-
     /// <summary>ObjString over the node read model (ParseManifest works on JsonNode).</summary>
     private static string ObjString(JsonNode? obj, string key)
     {
@@ -438,7 +431,7 @@ public sealed class ModrinthCreationTask : InstanceTask
         var folder = FileSystem.PathCombine(newInstance.ModsRoot(), ".index");
         var ensureMetadataTask = new EnsureMetadataTask(_resources, folder, ResourceProvider.Modrinth, _modrinth);
         // setUpdateLock(true): updates for mods coming from an installed modpack are locked
-        ensureMetadataTask.SetUpdateLock(lockUpdate: true);
+        ensureMetadataTask.LockUpdate = true;
         ensureMetadataTask.MetadataFailed += (_, reason) => EmitStatus(reason);
         EmitStatus("Generating metadata for mods...");
         await ensureMetadataTask.StartAsync(cancellationToken);

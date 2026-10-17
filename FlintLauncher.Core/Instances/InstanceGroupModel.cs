@@ -541,7 +541,7 @@ public sealed class InstanceGroupModel
             // group definitions only
             foreach (var item in list)
             {
-                instanceArr.Add((JsonNode)JsonValue.Create(item)!); // non-generic Add: AOT/trimming clean
+                instanceArr.Add((JsonNode)JsonValue.Create(item)); // non-generic Add: AOT/trimming clean
             }
             groupObj["instances"] = instanceArr;
             groupsArr[name] = groupObj;

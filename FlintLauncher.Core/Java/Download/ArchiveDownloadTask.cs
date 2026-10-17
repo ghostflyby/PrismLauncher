@@ -20,7 +20,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 
-namespace FlintLauncher.Core.Java;
+namespace FlintLauncher.Core.Java.Download;
 
 public sealed class ArchiveDownloadTask : FlintTask
 {

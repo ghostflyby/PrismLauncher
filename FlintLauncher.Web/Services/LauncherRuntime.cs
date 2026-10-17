@@ -168,11 +168,11 @@ public sealed class LauncherRuntime
         // icon pool (assembly step 9, DATA D5): the IconList successor over the IconsDir
         // SETTING (default "icons", data-root-relative — previously three hardcoded
         // Path.Combine(DataDir, "icons") sites ignored the setting)
-        Icons = new IconPool(() => ResolveDataRelativeDir(Config.Current.Dirs.IconsDir, "icons"));
+        Icons = new IconPool(() => ResolveDataRelativeDir(Config.Current.Dirs!.IconsDir, "icons"));
 
         // local skin library (assembly step 9, DATA D6 plan B): the SkinsDir SETTING
         // (default "skins", data-root-relative) finally has a resident model
-        Skins = new SkinsLibrary(() => ResolveDataRelativeDir(Config.Current.Dirs.SkinsDir, "skins"));
+        Skins = new SkinsLibrary(() => ResolveDataRelativeDir(Config.Current.Dirs!.SkinsDir, "skins"));
 
         // accounts: <dataDir>/accounts.json (autosaved on every change)
         Accounts = new AccountList();
@@ -194,11 +194,11 @@ public sealed class LauncherRuntime
     /// (JavaUtils.FindJavaPaths), the JavaInstallList managed-versions probe and the
     /// launch pipeline's AutoInstallJava (through LaunchServices.JavaRoot).</summary>
     public string JavaRoot =>
-        string.IsNullOrWhiteSpace(Config.Current.Dirs.JavaDir)
+        string.IsNullOrWhiteSpace(Config.Current.Dirs!.JavaDir)
             ? Paths.JavaRoot
-            : Path.IsPathRooted(Config.Current.Dirs.JavaDir)
-                ? Config.Current.Dirs.JavaDir
-                : Path.Combine(Paths.StoreRoot, Config.Current.Dirs.JavaDir);
+            : Path.IsPathRooted(Config.Current.Dirs!.JavaDir)
+                ? Config.Current.Dirs!.JavaDir
+                : Path.Combine(Paths.StoreRoot, Config.Current.Dirs!.JavaDir);
 
     /// <summary>A dir-kind setting (IconsDir/SkinsDir — the C++ "relative to the data dir"
     /// convention, CONFIG matrix A): absolute wins as-is, relative joins the data root,

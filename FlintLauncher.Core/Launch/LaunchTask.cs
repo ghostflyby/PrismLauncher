@@ -65,7 +65,6 @@ public class LaunchTask : FlintTask
     private SortedDictionary<string, string> censorFilter = new(StringComparer.Ordinal);
     private int currentStep = -1;
     private LaunchState state = LaunchState.NotStarted;
-    private long pid = -1;
     private LogModel? logModel;
     private TaskCompletionSource? terminalSignal;
 
@@ -105,11 +104,7 @@ public class LaunchTask : FlintTask
     /// injected factory — a disposed host's factory degrades to silence, never throws.</summary>
     private ILogger Log => Diagnostics.Log.For(_services.LoggerFactory, LogCategories.Launch);
 
-    public long Pid
-    {
-        get => pid;
-        set => pid = value;
-    }
+    public long Pid { get; set; } = -1;
 
     /// <summary>Port of LaunchTask::isMultiStep(): a launch chain is multi-step by definition.</summary>
     public override bool IsMultiStep => _steps.Count > 1;
@@ -119,13 +114,12 @@ public class LaunchTask : FlintTask
         if (logModel is null)
         {
             logModel = new LogModel();
-            logModel.SetMaxLines(BaseInstance.GetConsoleMaxLines(_instance.Settings));
-            logModel.SetStopOnOverflow(BaseInstance.ShouldStopOnConsoleOverflow(_instance.Settings));
+            logModel.MaxLines = BaseInstance.GetConsoleMaxLines(_instance.Settings);
+            logModel.StopOnOverflow = BaseInstance.ShouldStopOnConsoleOverflow(_instance.Settings);
             // FIXME: should this really be here?
-            logModel.SetOverflowMessage(
-                $"Stopped watching the game log because the log length surpassed {logModel.GetMaxLines()} lines.\n" +
-                "You may have to fix your mods because the game is still logging to files and" +
-                " likely wasting harddrive space at an alarming rate!");
+            logModel.OverflowMessage = $"Stopped watching the game log because the log length surpassed {logModel.MaxLines} lines.\n" +
+                                       "You may have to fix your mods because the game is still logging to files and" +
+                                       " likely wasting harddrive space at an alarming rate!";
         }
         return logModel;
     }

@@ -217,15 +217,15 @@ public static class FlintConfigImporter
         // staying silent on the pair must NOT leave the typed records' unconditional true
         // standing, or the auto-java machinery overrides the user's JVM on the next launch
         // (AutoInstallJava.cs:52 / BaseInstance.cs:474). An explicit INI key wins for itself.
-        if (!string.IsNullOrEmpty(resolved.Java.JavaPath))
+        if (!string.IsNullOrEmpty(resolved.Java!.JavaPath))
         {
-            if (!sawExplicitAutomaticJavaSwitch && resolved.Java.AutomaticJavaSwitch == true)
+            if (!sawExplicitAutomaticJavaSwitch && resolved.Java!.AutomaticJavaSwitch == true)
             {
-                resolved = resolved with { Java = resolved.Java with { AutomaticJavaSwitch = false } };
+                resolved = resolved with { Java = resolved.Java! with { AutomaticJavaSwitch = false } };
             }
-            if (!sawExplicitAutomaticJavaDownload && resolved.Java.AutomaticJavaDownload == true)
+            if (!sawExplicitAutomaticJavaDownload && resolved.Java!.AutomaticJavaDownload == true)
             {
-                resolved = resolved with { Java = resolved.Java with { AutomaticJavaDownload = false } };
+                resolved = resolved with { Java = resolved.Java! with { AutomaticJavaDownload = false } };
             }
         }
 
@@ -248,7 +248,7 @@ public static class FlintConfigImporter
                     ? lastOfflinePlayerName
                     : current.LastOfflinePlayerName,
                 Java = lastHostname.Length != 0
-                    ? current.Java with { LastHostname = lastHostname }
+                    ? current.Java! with { LastHostname = lastHostname }
                     : current.Java,
             });
         }

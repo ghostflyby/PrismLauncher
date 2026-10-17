@@ -14,10 +14,9 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
-using FlintLauncher.Tests;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class FtbApiEndpointsTests : IDisposable
 {
@@ -166,7 +165,7 @@ public class FtbApiEndpointsTests : IDisposable
         Assert.False(File.Exists(Path.Combine(staging, ".minecraft", "mods", "servermod.jar")));
 
         // components: net.minecraft + the forge modloader target
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         var components = doc.RootElement.GetProperty("components").EnumerateArray().ToList();
         Assert.Contains(components,
             c => c.GetProperty("uid").GetString() == "net.minecraft"

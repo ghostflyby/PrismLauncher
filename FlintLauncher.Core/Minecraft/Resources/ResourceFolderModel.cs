@@ -138,7 +138,7 @@ public class ResourceFolderModel
 
                 FileSystem.UpdateTimestamp(newPath);
 
-                resource.SetFile(new FileInfo(newPath));
+                resource.Fileinfo = new FileInfo(newPath);
 
                 if (!IsWatching)
                 {
@@ -159,7 +159,7 @@ public class ResourceFolderModel
                     return false; // copy of folder (potentially partially) failed
                 }
 
-                resource.SetFile(new FileInfo(newPath));
+                resource.Fileinfo = new FileInfo(newPath);
 
                 if (!IsWatching)
                 {

@@ -9,7 +9,7 @@ using FlintLauncher.Core.Instances.Creation;
 using FlintLauncher.Core.Tasks;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class VanillaCreationTests : IDisposable
 {
@@ -70,14 +70,14 @@ public class VanillaCreationTests : IDisposable
         // instance.json: name/iconKey/uuid written by the typed instance shell (no INI)
         var jsonPath = Path.Combine(dir, "instance.json");
         Assert.True(File.Exists(jsonPath));
-        var json = File.ReadAllText(jsonPath);
+        var json = await File.ReadAllTextAsync(jsonPath);
         Assert.Contains("Test Instance", json);
         Assert.Contains("flint-icon", json);
         Assert.Contains("uuid", json);
         Assert.False(File.Exists(Path.Combine(dir, "instance.cfg")));
 
         // mmc-pack.json: the initial net.minecraft component
-        using (var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "mmc-pack.json"))))
+        using (var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "mmc-pack.json"))))
         {
             var root = doc.RootElement;
             Assert.Equal(1, root.GetProperty("formatVersion").GetInt32());
@@ -100,7 +100,7 @@ public class VanillaCreationTests : IDisposable
         Assert.True(profile.Load());
         var component = profile.GetComponent("net.minecraft");
         Assert.NotNull(component);
-        Assert.Equal("1.20.1", component!.Version);
+        Assert.Equal("1.20.1", component.Version);
         Assert.True(component.Important);
     }
 
@@ -117,7 +117,7 @@ public class VanillaCreationTests : IDisposable
         Assert.True(task.WasSuccessful);
 
         using var doc = JsonDocument.Parse(
-            File.ReadAllText(Path.Combine(_instancesDir, "Fab", "mmc-pack.json")));
+            await File.ReadAllTextAsync(Path.Combine(_instancesDir, "Fab", "mmc-pack.json")));
         var uids = doc.RootElement.GetProperty("components").EnumerateArray()
             .Select(c => c.GetProperty("uid").GetString()!).ToList();
         Assert.Equal(["net.minecraft", "net.fabricmc.fabric-loader"], uids);

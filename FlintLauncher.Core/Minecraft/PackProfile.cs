@@ -25,6 +25,7 @@
 using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Net;

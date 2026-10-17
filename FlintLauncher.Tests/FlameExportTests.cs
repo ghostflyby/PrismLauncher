@@ -14,7 +14,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 [Collection("FlameApi")]
 public class FlameExportTests : IDisposable
@@ -118,7 +118,7 @@ public class FlameExportTests : IDisposable
         Assert.True(export.WasSuccessful, export.FailReason);
         Assert.True(File.Exists(output));
 
-        using var zip = ZipFile.OpenRead(output);
+        using var zip = await ZipFile.OpenReadAsync(output);
         var names = zip.Entries.Select(e => e.FullName).ToHashSet();
 
         // resolved mods are excluded from the overrides zip
@@ -132,7 +132,7 @@ public class FlameExportTests : IDisposable
 
         var manifestEntry = zip.GetEntry("manifest.json")!;
         string manifestJson;
-        using (var reader = new StreamReader(manifestEntry.Open()))
+        using (var reader = new StreamReader(await manifestEntry.OpenAsync()))
         {
             manifestJson = await reader.ReadToEndAsync();
         }
@@ -160,7 +160,7 @@ public class FlameExportTests : IDisposable
 
         var modlistEntry = zip.GetEntry("modlist.html")!;
         string modlist;
-        using (var reader = new StreamReader(modlistEntry.Open()))
+        using (var reader = new StreamReader(await modlistEntry.OpenAsync()))
         {
             modlist = await reader.ReadToEndAsync();
         }
@@ -200,11 +200,11 @@ public class FlameExportTests : IDisposable
         await export.StartAsync();
 
         Assert.True(export.WasSuccessful, export.FailReason);
-        using var zip = ZipFile.OpenRead(output);
+        using var zip = await ZipFile.OpenReadAsync(output);
         Assert.Contains("overrides/mods/unmeta.jar", zip.Entries.Select(e => e.FullName));
 
         var manifestEntry = zip.GetEntry("manifest.json")!;
-        using var reader = new StreamReader(manifestEntry.Open());
+        using var reader = new StreamReader(await manifestEntry.OpenAsync());
         var manifest = JsonNode.Parse(await reader.ReadToEndAsync())!.AsObject();
         var files = manifest["files"]!.AsArray();
         var file = Assert.Single(files)!.AsObject();

@@ -9,7 +9,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 /// <summary>
 /// Routes a local HttpListener as a Modrinth API stub:

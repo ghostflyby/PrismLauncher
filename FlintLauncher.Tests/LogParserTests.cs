@@ -6,7 +6,7 @@
 using FlintLauncher.Core.Launch;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class LogParserTests
 {

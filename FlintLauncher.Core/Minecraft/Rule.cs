@@ -3,6 +3,7 @@
 // condition; the OS check delegates to RuntimeContext::classifierMatches).
 
 using System.Text.Json.Nodes;
+using FlintLauncher.Core.Java;
 
 namespace FlintLauncher.Core.Minecraft;
 

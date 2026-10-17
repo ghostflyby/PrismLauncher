@@ -16,7 +16,7 @@ using FlintLauncher.Core.ModPlatform.Modrinth;
 using Xunit;
 using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 [Collection("ModrinthApi")]
 public class GetModDependenciesTaskTests : IDisposable
@@ -136,7 +136,7 @@ public class GetModDependenciesTaskTests : IDisposable
                 dependencies:
                 [
                     ["projC", "verC1", "required"],
-                ])))!.ToJsonString();
+                ]))).ToJsonString();
         _server.Projects["projB"] = ProjectJson("projB", "b-mod", "B Mod");
         _server.Projects["projD"] = ProjectJson("projD", "d-mod", "D Mod");
 
@@ -224,7 +224,7 @@ public class GetModDependenciesTaskTests : IDisposable
         var (instance, model) = SetupInstance(installC: false);
 
         _server.ProjectVersions["projB"] = new JsonArray(
-            (JsonNode?)JsonNode.Parse(VersionJson("projB", "verB1", "b.jar", "b.bin", "2.0.0", _server.Url)))!.ToJsonString();
+            (JsonNode?)JsonNode.Parse(VersionJson("projB", "verB1", "b.jar", "b.bin", "2.0.0", _server.Url))).ToJsonString();
         _server.Projects["projB"] = ProjectJson("projB", "b-mod", "B Mod");
 
         var packA = new IndexedPack { AddonId = "projA", Slug = "a-mod", Name = "A Mod", Provider = ResourceProvider.Modrinth };

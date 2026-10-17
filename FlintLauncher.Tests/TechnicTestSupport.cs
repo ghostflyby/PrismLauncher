@@ -10,7 +10,7 @@ using System.Text;
 using FlintLauncher.Core.IO;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 /// <summary>
 /// Routes a local HttpListener as a Technic Platform + Solder stub:

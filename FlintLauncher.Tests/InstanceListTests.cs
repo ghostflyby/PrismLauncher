@@ -10,7 +10,7 @@ using FlintLauncher.Core.State;
 using FlintLauncher.Core.Tasks;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class InstanceListTests : IDisposable
 {
@@ -162,7 +162,7 @@ public class InstanceListTests : IDisposable
 
         var inst = list.ResolveInstance("7770001777");
         Assert.NotNull(inst);
-        Assert.Equal("Numeric", inst!.Name());
+        Assert.Equal("Numeric", inst.Name());
     }
 
     // DATA D3: a committed folder whose metadata carries a uuid lands in the group file
@@ -175,12 +175,12 @@ public class InstanceListTests : IDisposable
 
         var staging = list.GetStagedInstancePath("");
         Assert.NotNull(staging);
-        File.WriteAllText(Path.Combine(staging!, "instance.cfg"),
+        File.WriteAllText(Path.Combine(staging, "instance.cfg"),
             "InstanceType=OneSix\nname=Uuid Staged\nuuid=abc123def456\n");
 
         var task = new StubInstanceTask { TargetDir = "", Group = "UuidGroup" };
         task.SetName("Uuid Staged");
-        Assert.True(list.CommitStagedInstance(staging!, task, task.Group));
+        Assert.True(list.CommitStagedInstance(staging, task, task.Group));
 
         using (var doc = JsonDocument.Parse(File.ReadAllText(_groupFile)))
         {
@@ -719,15 +719,15 @@ public class InstanceListTests : IDisposable
         Assert.Contains(".tmp", staging);
         Assert.True(Directory.Exists(staging));
 
-        File.WriteAllText(Path.Combine(staging!, "instance.cfg"), "InstanceType=OneSix\nname=Staged Instance\n");
+        File.WriteAllText(Path.Combine(staging, "instance.cfg"), "InstanceType=OneSix\nname=Staged Instance\n");
 
         var task = new StubInstanceTask { TargetDir = "", Group = "StagedGroup" };
         task.SetName("Staged Instance");
-        Assert.True(list.CommitStagedInstance(staging!, task, task.Group));
+        Assert.True(list.CommitStagedInstance(staging, task, task.Group));
 
         // the staging folder moved into place, named after the task's name
         Assert.True(Directory.Exists(Path.Combine(_instancesDir, "Staged Instance")));
-        Assert.False(Directory.Exists(staging!));
+        Assert.False(Directory.Exists(staging));
 
         list.LoadList();
         Assert.NotNull(list.GetInstanceById("Staged Instance"));
@@ -803,9 +803,9 @@ public class InstanceListTests : IDisposable
 
         var staging = list.GetStagedInstancePath("");
         Assert.NotNull(staging);
-        File.WriteAllText(Path.Combine(staging!, "instance.cfg"), "InstanceType=OneSix\nname=Taken\n");
+        File.WriteAllText(Path.Combine(staging, "instance.cfg"), "InstanceType=OneSix\nname=Taken\n");
 
-        Assert.True(list.CommitStagedInstance(staging!, task, ""));
+        Assert.True(list.CommitStagedInstance(staging, task, ""));
         // FS::DirNameFromString picked the next free folder name
         Assert.True(Directory.Exists(Path.Combine(_instancesDir, "Taken(1)")));
     }

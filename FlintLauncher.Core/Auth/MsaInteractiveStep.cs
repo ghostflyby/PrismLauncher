@@ -340,7 +340,7 @@ public sealed class MsaInteractiveStep : AuthStep
             }
             finally
             {
-                registration.Dispose();
+                await registration.DisposeAsync();
             }
         }
 

@@ -11,7 +11,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Tasks;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class InstanceCopyTests : IDisposable
 {
@@ -148,7 +148,7 @@ public class InstanceCopyTests : IDisposable
         list.LoadList();
         var copy = list.GetInstanceById("Source Copy");
         Assert.NotNull(copy);
-        Assert.Equal("Source Copy", copy!.Name());
+        Assert.Equal("Source Copy", copy.Name());
         Assert.Equal("flint-icon", copy.IconKey());
         Assert.NotEqual(source.Uuid, copy.Uuid);
         Assert.Equal(32, copy.Uuid.Length);
@@ -156,7 +156,7 @@ public class InstanceCopyTests : IDisposable
 
         // keepPlaytime=true: the copied playtime survives (the source's read-only cfg seed
         // was carried into the copy's instance-state.json)
-        var copyState = File.ReadAllText(Path.Combine(copiedDir, "instance-state.json"));
+        var copyState = await File.ReadAllTextAsync(Path.Combine(copiedDir, "instance-state.json"));
         Assert.Contains("1234", copyState);
     }
 
@@ -175,7 +175,7 @@ public class InstanceCopyTests : IDisposable
         var copyDir = Path.Combine(_instancesDir, "Fresh Copy");
         // the copied cfg still carries the source's number (read-compat, never rewritten)…
         Assert.Contains("totalTimePlayed=1234",
-            File.ReadAllText(Path.Combine(copyDir, "instance.cfg")));
+            await File.ReadAllTextAsync(Path.Combine(copyDir, "instance.cfg")));
         // …but the authoritative state file is zeroed
         var copy = new MinecraftInstance(
             new InstanceJsonSettingsObject(copyDir, _global.Environment), copyDir);
@@ -226,7 +226,7 @@ public class InstanceCopyTests : IDisposable
         list.LoadList();
         var copy = list.GetInstanceById("Source(1)");
         Assert.NotNull(copy);
-        Assert.Equal("Source", copy!.Name());
+        Assert.Equal("Source", copy.Name());
         Assert.NotEqual(source.Uuid, copy.Uuid);
     }
 

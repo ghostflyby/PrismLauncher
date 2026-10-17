@@ -442,7 +442,7 @@ public static class MiniToml
             throw new TomlParseException($"Unsupported TOML value: '{atom}'");
         }
 
-        private object? ParseArray()
+        private object ParseArray()
         {
             Expect('[');
             var array = new List<object?>();

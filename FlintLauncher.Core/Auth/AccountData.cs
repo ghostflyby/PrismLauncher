@@ -158,7 +158,7 @@ public sealed class AccountData
     public bool ResumeStateFromV3(JsonObject data)
     {
         var typeV = Get(data, "type");
-        if (typeV is not JsonValue typeVal || !typeVal.TryGetValue(out string? typeS) || typeS is null)
+        if (typeV is not JsonValue typeVal || !typeVal.TryGetValue(out string? typeS))
         {
             // qWarning() << "Failed to parse account data: type is missing.";
             return false;
@@ -182,7 +182,7 @@ public sealed class AccountData
             var clientIdv = Get(data, "msa-client-id");
             if (clientIdv is JsonValue clientIdVal && clientIdVal.TryGetValue(out string? clientId))
             {
-                MsaClientId = clientId ?? "";
+                MsaClientId = clientId;
             } // leave msaClientID empty if it doesn't exist or isn't a string
             MsaToken = TokenFromJsonv3(data, "msa");
             UserToken = TokenFromJsonv3(data, "utoken");
@@ -272,7 +272,7 @@ public sealed class AccountData
 
     internal static string GetString(JsonNode? node)
     {
-        return node is JsonValue value && value.TryGetValue<string>(out var s) && s is not null ? s : "";
+        return node is JsonValue value && value.TryGetValue<string>(out var s) ? s : "";
     }
 
     internal static double GetNumber(JsonNode? node)

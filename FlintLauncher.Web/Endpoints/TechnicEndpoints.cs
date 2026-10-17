@@ -323,7 +323,7 @@ public static class TechnicEndpoints
             listing?.Builds.FirstOrDefault();
         return string.IsNullOrEmpty(build)
             ? (ApiJson.Error("creation_failed", $"the Solder pack '{slug}' has no builds", 500), "")
-            : (null, build!);
+            : (null, build);
     }
 
     /// <summary>The displayName (or raw name) property of a Platform metadata payload, when

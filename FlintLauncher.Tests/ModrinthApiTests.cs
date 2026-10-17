@@ -27,7 +27,7 @@ using Xunit;
 using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
 using ResourceType = FlintLauncher.Core.ModPlatform.ResourceType;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 [Collection("ModrinthApi")]
 public class ModrinthApiTests : IDisposable
@@ -302,14 +302,14 @@ public class ModrinthApiTests : IDisposable
         // the index is kept in mrpack/
         Assert.True(File.Exists(Path.Combine(staging, "mrpack", "modrinth.index.json")));
         // loader component + minecraft component installed via PackProfile
-        using (var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json"))))
+        using (var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json"))))
         {
             var uids = doc.RootElement.GetProperty("components").EnumerateArray()
                 .Select(c => c.GetProperty("uid").GetString()!).ToList();
             Assert.Equal(["net.minecraft", "net.fabricmc.fabric-loader"], uids);
         }
         // D4: the staged instance's identity lives in instance.json (Flint format)
-        Assert.Contains("Imported Pack", File.ReadAllText(Path.Combine(staging, "instance.json")));
+        Assert.Contains("Imported Pack", await File.ReadAllTextAsync(Path.Combine(staging, "instance.json")));
 
         // packwiz-style metadata written per mod
         var indexPath = Path.Combine(staging, "minecraft", "mods", ".index", "test-mod.pw.toml");
@@ -331,7 +331,7 @@ public class ModrinthApiTests : IDisposable
         Assert.NotNull(metadata);
         // (upstream quirk kept: the indexed scan passes the file name, so the slug of the
         //  loaded metadata carries the .pw.toml suffix; the by-slug lookup would not)
-        Assert.StartsWith("test-mod", metadata!.Slug);
+        Assert.StartsWith("test-mod", metadata.Slug);
         Assert.Equal("test.jar", metadata.Filename);
         Assert.Equal("projId1", metadata.ProjectId);
         Assert.Equal("sha512", metadata.HashFormat);
@@ -483,7 +483,7 @@ public class ModrinthApiTests : IDisposable
         Assert.True(export.WasSuccessful, export.FailReason);
         Assert.True(File.Exists(output));
 
-        using var zip = ZipFile.OpenRead(output);
+        using var zip = await ZipFile.OpenReadAsync(output);
         var names = zip.Entries.Select(e => e.FullName).ToHashSet();
 
         // the mod resolved through the API is referenced by URL, not packed
@@ -493,7 +493,7 @@ public class ModrinthApiTests : IDisposable
 
         var indexEntry = zip.GetEntry("modrinth.index.json")!;
         string indexJson;
-        using (var reader = new StreamReader(indexEntry.Open()))
+        using (var reader = new StreamReader(await indexEntry.OpenAsync()))
         {
             indexJson = await reader.ReadToEndAsync();
         }
@@ -636,14 +636,14 @@ public class ModrinthCreationTaskManifestTests : IDisposable
 
         var task = new ModrinthCreationTask(staging, trustedSource: true, _global);
         task.SetName("M");
-        File.WriteAllText(Path.Combine(staging, "modrinth.index.json"),
+        await File.WriteAllTextAsync(Path.Combine(staging, "modrinth.index.json"),
             """{"formatVersion":1,"game":"terraria","files":[],"dependencies":{}}""");
         await task.StartAsync();
         Assert.Equal(TaskState.Failed, task.State);
         Assert.Contains("Unknown game", task.FailReason);
 
         var task2 = new ModrinthCreationTask(staging, trustedSource: true, _global);
-        File.WriteAllText(Path.Combine(staging, "modrinth.index.json"),
+        await File.WriteAllTextAsync(Path.Combine(staging, "modrinth.index.json"),
             """{"formatVersion":42,"game":"minecraft","files":[],"dependencies":{}}""");
         await task2.StartAsync();
         Assert.Equal(TaskState.Failed, task2.State);

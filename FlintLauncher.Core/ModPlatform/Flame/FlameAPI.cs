@@ -130,7 +130,7 @@ public sealed class FlameApi : ResourceApi
     public (NetJob Job, NetRequest Request) GetProject(string addonId)
     {
         var netJob = new NetJob("Flame::GetProject");
-        var request = MakeByteArrayRequest(GetInfoUrl(addonId)!);
+        var request = MakeByteArrayRequest(GetInfoUrl(addonId));
         netJob.AddNetRequest(request);
         return (netJob, request);
     }
@@ -376,7 +376,7 @@ public sealed class FlameApi : ResourceApi
 
     // ------------------------------------------------------------ URL builders
 
-    public override string? GetSearchUrl(SearchArgs args)
+    public override string GetSearchUrl(SearchArgs args)
     {
         var getArguments = new List<string>
         {
@@ -413,7 +413,7 @@ public sealed class FlameApi : ResourceApi
         return BaseUrl + "/mods/search?gameId=432&" + string.Join("&", getArguments);
     }
 
-    public override string? GetVersionsUrl(VersionSearchArgs args)
+    public override string GetVersionsUrl(VersionSearchArgs args)
     {
         var addonId = args.Pack.AddonId;
         var url = $"{BaseUrl}/mods/{addonId}/files?pageSize=10000";
@@ -432,9 +432,9 @@ public sealed class FlameApi : ResourceApi
         return url;
     }
 
-    public override string? GetInfoUrl(string id) => $"{BaseUrl}/mods/{id}";
+    public override string GetInfoUrl(string id) => $"{BaseUrl}/mods/{id}";
 
-    public override string? GetDependencyUrl(DependencySearchArgs args)
+    public override string GetDependencyUrl(DependencySearchArgs args)
     {
         var addonId = args.Dependency.AddonId;
         var url = $"{BaseUrl}/mods/{addonId}/files?pageSize=10000&gameVersion={args.McVersion}";

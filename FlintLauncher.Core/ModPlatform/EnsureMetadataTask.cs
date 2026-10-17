@@ -31,23 +31,16 @@ public sealed class EnsureMetadataTask : FlintTask
     private readonly ModrinthApi _modrinth;
     private readonly FlameApi _flame;
     private readonly Dictionary<string, IndexedVersion> _tempVersions = new(StringComparer.Ordinal);
-    private bool lockUpdate;
+    public bool LockUpdate { get; set; }
 
     public EnsureMetadataTask(Dictionary<string, Resource> resources, string indexDir, ResourceProvider provider,
-                              ModrinthApi? modrinth = null, FlameApi? flame = null)
+        ModrinthApi? modrinth = null, FlameApi? flame = null)
     {
         _resources = resources;
         _indexDir = indexDir;
         _provider = provider;
         _modrinth = modrinth ?? new ModrinthApi();
         _flame = flame ?? new FlameApi();
-    }
-
-    /// <summary>Port of EnsureMetadataTask::setUpdateLock: whether the metadata written by
-    /// this pass locks updates for the resource.</summary>
-    public void SetUpdateLock(bool lockUpdate)
-    {
-        this.lockUpdate = lockUpdate;
     }
 
     /// <summary>Port of the metadataReady(resource) signal, carrying the fresh metadata.</summary>
@@ -75,6 +68,7 @@ public sealed class EnsureMetadataTask : FlintTask
         {
             EmitMetadataFailed(resource, $"No metadata was generated for hash {hash}");
         }
+
         EmitSucceeded();
     }
 
@@ -104,7 +98,6 @@ public sealed class EnsureMetadataTask : FlintTask
         }
 
         {
-
             foreach (var hash in _resources.Keys)
             {
                 var resource = _resources[hash];
@@ -146,6 +139,7 @@ public sealed class EnsureMetadataTask : FlintTask
                 EmitFailed("Could not build the project request");
                 return;
             }
+
             projectJob = job;
             projectRequest = request;
             multiple = false;
@@ -167,7 +161,7 @@ public sealed class EnsureMetadataTask : FlintTask
         try
         {
             projectDoc = JsonNode.Parse(projectRequest.BodyAsString)
-                ?? throw new JsonException("empty response");
+                         ?? throw new JsonException("empty response");
         }
         catch (JsonException e)
         {
@@ -201,6 +195,7 @@ public sealed class EnsureMetadataTask : FlintTask
                     // "Invalid project id from the API response."
                     continue;
                 }
+
                 if (!_resources.TryGetValue(hash, out var resource))
                 {
                     continue;
@@ -254,7 +249,6 @@ public sealed class EnsureMetadataTask : FlintTask
         }
 
         {
-
             var exactMatches = (entriesObj["data"] as JsonObject)?["exactMatches"] as JsonArray;
             if (exactMatches is null || exactMatches.Count == 0)
             {
@@ -367,7 +361,7 @@ public sealed class EnsureMetadataTask : FlintTask
 
                 var id = FlameJson.RequireInteger(entryObj, "id").ToString(CultureInfo.InvariantCulture);
                 if (!addonIds.TryGetValue(id, out var hash) || !_resources.TryGetValue(hash, out var resource)
-                    || !_tempVersions.TryGetValue(hash, out var version))
+                                                            || !_tempVersions.TryGetValue(hash, out var version))
                 {
                     continue;
                 }
@@ -383,6 +377,7 @@ public sealed class EnsureMetadataTask : FlintTask
                     EmitMetadataFailed(resource, "Invalid data returned from the API.");
                     continue;
                 }
+
                 await UpdateMetadata(pack, version, resource, cancellationToken);
             }
         }
@@ -424,7 +419,7 @@ public sealed class EnsureMetadataTask : FlintTask
         var pwMod = MetadataHandler.Create(_indexDir, pack, ver);
         if (pwMod.IsValid)
         {
-            pwMod.LockUpdate = lockUpdate;
+            pwMod.LockUpdate = LockUpdate;
             MetadataHandler.Update(_indexDir, pwMod);
             MetadataReady?.Invoke(resource, pwMod);
         }

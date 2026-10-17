@@ -10,7 +10,7 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Hashing;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 /// <summary>
 /// Routes a local HttpListener as a CurseForge API stub:

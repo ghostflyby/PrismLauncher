@@ -422,15 +422,15 @@ public class PrismImportTaskTests : IDisposable
     {
         // synthetic Prism source
         Directory.CreateDirectory(Path.Combine(_root, "src", "instances", "demo"));
-        File.WriteAllText(Path.Combine(_root, "src", "instances", "demo", "instance.cfg"), "x");
-        File.WriteAllText(Path.Combine(_root, "src", "accounts.json"), "{}");
+        await File.WriteAllTextAsync(Path.Combine(_root, "src", "instances", "demo", "instance.cfg"), "x");
+        await File.WriteAllTextAsync(Path.Combine(_root, "src", "accounts.json"), "{}");
         Directory.CreateDirectory(Path.Combine(_root, "src", "meta"));
-        File.WriteAllText(Path.Combine(_root, "src", "meta", "index.json"), "{}");
-        File.WriteAllText(Path.Combine(_root, "src", "accounts.json"), "{}");
-        File.WriteAllText(Path.Combine(_root, "src", "prismlauncher.cfg"), "k=v");
+        await File.WriteAllTextAsync(Path.Combine(_root, "src", "meta", "index.json"), "{}");
+        await File.WriteAllTextAsync(Path.Combine(_root, "src", "accounts.json"), "{}");
+        await File.WriteAllTextAsync(Path.Combine(_root, "src", "prismlauncher.cfg"), "k=v");
         // pre-existing target content must not be overwritten
         Directory.CreateDirectory(Path.Combine(_root, "dst", "meta"));
-        File.WriteAllText(Path.Combine(_root, "dst", "meta", "index.json"), "existing");
+        await File.WriteAllTextAsync(Path.Combine(_root, "dst", "meta", "index.json"), "existing");
 
         var decisions = new MigrationDecisionStore(Path.Combine(_root, "state", "migration"),
             FlintJsonContext.Default.MigrationDecisionRecord);
@@ -443,15 +443,15 @@ public class PrismImportTaskTests : IDisposable
         if (!task.WasSuccessful)
         {
             // 探针：把失败细节落到文件（MTP 会截断断言消息）
-            File.WriteAllText(Path.Combine(Path.GetTempPath(), "flint-probe-dump.txt"),
+            await File.WriteAllTextAsync(Path.Combine(Path.GetTempPath(), "flint-probe-dump.txt"),
                 "REASON=" + task.FailReason
-                + " | metaExists=" + File.Exists(Path.Combine(_root, "dst", "meta", "index.json"))
-                + " | metaContent=" + (File.Exists(Path.Combine(_root, "dst", "meta", "index.json"))
-                    ? File.ReadAllText(Path.Combine(_root, "dst", "meta", "index.json"))
-                    : "<missing>"));
+                          + " | metaExists=" + File.Exists(Path.Combine(_root, "dst", "meta", "index.json"))
+                          + " | metaContent=" + (File.Exists(Path.Combine(_root, "dst", "meta", "index.json"))
+                              ? await File.ReadAllTextAsync(Path.Combine(_root, "dst", "meta", "index.json"))
+                              : "<missing>"));
             throw new XunitException("see " + Path.Combine(Path.GetTempPath(), "flint-probe-dump.txt"));
         }
-        Assert.Equal("existing", File.ReadAllText(Path.Combine(_root, "dst", "meta", "index.json"))); // idempotent skip
+        Assert.Equal("existing", await File.ReadAllTextAsync(Path.Combine(_root, "dst", "meta", "index.json"))); // idempotent skip
         Assert.True(File.Exists(Path.Combine(_root, "dst", "instances", "demo", "instance.cfg")));
         Assert.True(File.Exists(Path.Combine(_root, "dst", "accounts.json")));
 
@@ -460,7 +460,7 @@ public class PrismImportTaskTests : IDisposable
         Assert.False(File.Exists(Path.Combine(_root, "dst", "polymc_nomigrate.txt")));
         var record = decisions.Read("polymc");
         Assert.NotNull(record);
-        Assert.Equal(MigrationDecisionRecord.Imported, record!.Decision);
+        Assert.Equal(MigrationDecisionRecord.Imported, record.Decision);
         Assert.Equal("cow", record.Mode);
         Assert.NotEqual(MigrationDecisionRecord.UnknownAt, record.At);
         Assert.Equal(1, record.Instances); // the demo instance dir at the source
@@ -473,8 +473,8 @@ public class PrismImportTaskTests : IDisposable
     public async Task ImportTask_OnReflinklessVolume_StillSucceedsThroughTheCopyFallback()
     {
         Directory.CreateDirectory(Path.Combine(_root, "src", "instances", "demo"));
-        File.WriteAllText(Path.Combine(_root, "src", "instances", "demo", "instance.cfg"), "x");
-        File.WriteAllText(Path.Combine(_root, "src", "accounts.json"), "{}");
+        await File.WriteAllTextAsync(Path.Combine(_root, "src", "instances", "demo", "instance.cfg"), "x");
+        await File.WriteAllTextAsync(Path.Combine(_root, "src", "accounts.json"), "{}");
         FileTransfer.CloneAttemptHook = (_, _) => false; // simulate ext4/Windows/cross-volume
 
         var task = new PrismImportTask(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
@@ -506,13 +506,13 @@ public class PrismImportTaskTests : IDisposable
     public async Task ImportTask_PreExistingInstancesDirectory_MergesTheTree_AndSucceeds()
     {
         Directory.CreateDirectory(Path.Combine(_root, "src", "instances", "demo"));
-        File.WriteAllText(Path.Combine(_root, "src", "instances", "demo", "instance.cfg"),
+        await File.WriteAllTextAsync(Path.Combine(_root, "src", "instances", "demo", "instance.cfg"),
             "InstanceType=OneSix\nname=demo\n");
-        File.WriteAllText(Path.Combine(_root, "src", "prismlauncher.cfg"), "k=v");
+        await File.WriteAllTextAsync(Path.Combine(_root, "src", "prismlauncher.cfg"), "k=v");
         Directory.CreateDirectory(Path.Combine(_root, "dst", "instances")); // Flint startup's own creation
         // pre-existing sibling content must survive the merge untouched
         Directory.CreateDirectory(Path.Combine(_root, "dst", "instances", "native"));
-        File.WriteAllText(Path.Combine(_root, "dst", "instances", "native", "instance.cfg"), "native");
+        await File.WriteAllTextAsync(Path.Combine(_root, "dst", "instances", "native", "instance.cfg"), "native");
 
         var decisions = new MigrationDecisionStore(Path.Combine(_root, "state", "migration"),
             FlintJsonContext.Default.MigrationDecisionRecord);
@@ -522,13 +522,13 @@ public class PrismImportTaskTests : IDisposable
 
         Assert.True(task.WasSuccessful, task.FailReason);
         Assert.True(File.Exists(Path.Combine(_root, "dst", "instances", "demo", "instance.cfg")));
-        Assert.Equal("native", File.ReadAllText(
+        Assert.Equal("native", await File.ReadAllTextAsync(
             Path.Combine(_root, "dst", "instances", "native", "instance.cfg"))); // not clobbered
 
         // and the success is honest: the record lands only WITH the tree actually merged
         var record = decisions.Read("prism");
         Assert.NotNull(record);
-        Assert.Equal(MigrationDecisionRecord.Imported, record!.Decision);
+        Assert.Equal(MigrationDecisionRecord.Imported, record.Decision);
         Assert.Equal(1, record.Instances);
     }
 
@@ -539,8 +539,8 @@ public class PrismImportTaskTests : IDisposable
         // count must come from the pre-transfer inventory, not from the emptied source
         Directory.CreateDirectory(Path.Combine(_root, "src", "instances", "demo"));
         Directory.CreateDirectory(Path.Combine(_root, "src", "instances", "second"));
-        File.WriteAllText(Path.Combine(_root, "src", "instances", "demo", "instance.cfg"), "x");
-        File.WriteAllText(Path.Combine(_root, "src", "prismlauncher.cfg"), "k=v");
+        await File.WriteAllTextAsync(Path.Combine(_root, "src", "instances", "demo", "instance.cfg"), "x");
+        await File.WriteAllTextAsync(Path.Combine(_root, "src", "prismlauncher.cfg"), "k=v");
 
         var decisions = new MigrationDecisionStore(Path.Combine(_root, "state-move", "migration"),
             FlintJsonContext.Default.MigrationDecisionRecord);
@@ -552,7 +552,7 @@ public class PrismImportTaskTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(_root, "src", "instances"))); // the wholesale move happened
         var record = decisions.Read("prism");
         Assert.NotNull(record);
-        Assert.Equal("move", record!.Mode);
+        Assert.Equal("move", record.Mode);
         Assert.Equal(2, record.Instances);
     }
 

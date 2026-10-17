@@ -13,7 +13,7 @@ using FlintLauncher.Core.Config;
 using FlintLauncher.Core.State;
 using FlintLauncher.Web;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 internal sealed class TestGlobalSettings
 {

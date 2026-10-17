@@ -7,6 +7,7 @@
 // preserved.
 
 using System.Text.Json.Nodes;
+using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.Minecraft;
@@ -278,7 +279,7 @@ public static class MojangVersionFormat
             var compatibleJavaMajorsOut = new JsonArray();
             foreach (var compatibleJavaMajor in inInfo.CompatibleJavaMajors)
             {
-                compatibleJavaMajorsOut.Add((JsonNode)JsonValue.Create(compatibleJavaMajor)!);
+                compatibleJavaMajorsOut.Add((JsonNode)JsonValue.Create(compatibleJavaMajor));
             }
             outObj["compatibleJavaMajors"] = compatibleJavaMajorsOut;
         }
@@ -387,7 +388,7 @@ public static class MojangVersionFormat
                 var excludes = new JsonArray();
                 foreach (var exclude in library.ExtractExcludes)
                 {
-                    excludes.Add((JsonNode)JsonValue.Create(exclude)!);
+                    excludes.Add((JsonNode)JsonValue.Create(exclude));
                 }
                 libRoot["extract"] = new JsonObject
                 {

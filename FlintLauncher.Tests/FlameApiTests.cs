@@ -19,7 +19,7 @@ using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 [Collection("FlameApi")]
 public class FlameApiTests : IDisposable

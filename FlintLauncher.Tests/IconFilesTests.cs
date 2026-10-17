@@ -4,7 +4,7 @@
 using FlintLauncher.Core.Icons;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class IconFilesTests : IDisposable
 {

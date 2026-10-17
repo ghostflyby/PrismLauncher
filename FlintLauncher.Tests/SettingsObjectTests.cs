@@ -4,7 +4,6 @@
 // pair, persistence through instance.json and the state-trio routing. The former
 // INISettingsObject tests retired with the INI write path (CONFIG C5).
 
-using Flint.Tests;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Web;

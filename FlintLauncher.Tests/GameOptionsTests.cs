@@ -6,7 +6,7 @@
 using FlintLauncher.Core.Minecraft.GameOptions;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class GameOptionsTests : IDisposable
 {

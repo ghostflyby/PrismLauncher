@@ -8,7 +8,7 @@ using System.Net;
 using System.Text;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 internal sealed class PeripheralStubServer : IDisposable
 {

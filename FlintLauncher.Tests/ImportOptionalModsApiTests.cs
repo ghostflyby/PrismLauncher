@@ -11,10 +11,9 @@
 using System.Net;
 using System.Text.Json;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.Tests;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 [Collection("ModrinthApi")]
 public class ImportOptionalModsApiTests : IDisposable

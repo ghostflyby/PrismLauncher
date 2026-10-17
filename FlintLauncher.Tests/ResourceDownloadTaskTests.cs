@@ -13,7 +13,7 @@ using FlintLauncher.Core.Tasks;
 using Xunit;
 using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 [Collection("ModrinthApi")]
 public class ResourceDownloadTaskTests : IDisposable
@@ -122,7 +122,7 @@ public class ResourceDownloadTaskTests : IDisposable
         Assert.NotNull(installed);
         var attached = model.GetMetadata(installed);
         Assert.NotNull(attached);
-        Assert.Equal("verId1", attached!.FileId);
+        Assert.Equal("verId1", attached.FileId);
     }
 
     /// <summary>The folder scan also lists the hidden .index dir (QDir would not); look up by name.</summary>
@@ -159,7 +159,7 @@ public class ResourceDownloadTaskTests : IDisposable
     {
         Directory.CreateDirectory(IndexDir);
         var oldBytes = "old jar bytes"u8.ToArray();
-        File.WriteAllBytes(Path.Combine(ModsDir, "old.jar"), oldBytes);
+        await File.WriteAllBytesAsync(Path.Combine(ModsDir, "old.jar"), oldBytes);
         PackwizModel.UpdateModIndex(IndexDir, new PackwizModel.Mod
         {
             Slug = "test-mod",

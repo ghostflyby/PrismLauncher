@@ -12,7 +12,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 /// <summary>
 /// Routes a local HttpListener as an ATLauncher CDN/API stub:
@@ -24,7 +24,7 @@ namespace Flint.Tests;
 /// </summary>
 internal sealed class StubAtlServer : IDisposable
 {
-    private readonly HttpListener _listener = new();
+    private readonly HttpListener _listener;
 
     public StubAtlServer()
     {

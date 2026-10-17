@@ -13,7 +13,7 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 [Collection("ModrinthApi")]
 public class InstanceImportTaskTests : IDisposable
@@ -91,7 +91,7 @@ public class InstanceImportTaskTests : IDisposable
         Assert.True(File.Exists(Path.Combine(instanceDir, "mrpack", "modrinth.index.json")));
         Assert.True(File.Exists(Path.Combine(instanceDir, "mmc-pack.json")));
         // the net.minecraft component came from the pack's dependencies
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(instanceDir, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(instanceDir, "mmc-pack.json")));
         var components = doc.RootElement.GetProperty("components").EnumerateArray().ToList();
         Assert.Contains(components, c => c.GetProperty("uid").GetString() == "net.minecraft"
                                          && c.GetProperty("version").GetString() == "1.20.1");
@@ -104,9 +104,9 @@ public class InstanceImportTaskTests : IDisposable
         var dir = Path.Combine(_root, "pack-src");
         var packDir = Path.Combine(dir, "MyModpack");
         Directory.CreateDirectory(Path.Combine(packDir, ".minecraft"));
-        File.WriteAllText(Path.Combine(packDir, "instance.cfg"),
+        await File.WriteAllTextAsync(Path.Combine(packDir, "instance.cfg"),
             "InstanceType=OneSix\nname=Original Name\niconKey=default\n");
-        File.WriteAllText(Path.Combine(packDir, ".minecraft", "options.txt"), "keepMe=1\n");
+        await File.WriteAllTextAsync(Path.Combine(packDir, ".minecraft", "options.txt"), "keepMe=1\n");
         Assert.True(MmcZip.CompressDir(zipPath, packDir));
 
         var task = await RunImport(new Uri(zipPath));
@@ -116,7 +116,7 @@ public class InstanceImportTaskTests : IDisposable
         // import fixups run through the typed adapter — instance.json (D4)
         var instanceDir = Path.Combine(_root, "instances", "Imported");
         Assert.True(Directory.Exists(instanceDir));
-        var cfg = File.ReadAllText(Path.Combine(instanceDir, "instance.json"));
+        var cfg = await File.ReadAllTextAsync(Path.Combine(instanceDir, "instance.json"));
         Assert.Contains("Imported", cfg);
         Assert.True(File.Exists(Path.Combine(instanceDir, ".minecraft", "options.txt")));
     }
@@ -129,7 +129,7 @@ public class InstanceImportTaskTests : IDisposable
         var zipPath = Path.Combine(_root, "flame.zip");
         var dir = Path.Combine(_root, "flame-src");
         Directory.CreateDirectory(dir);
-        File.WriteAllText(Path.Combine(dir, "manifest.json"),
+        await File.WriteAllTextAsync(Path.Combine(dir, "manifest.json"),
             """{"manifestType":"minecraftModpack","manifestVersion":1,"minecraft":{"version":"1.20.1"},"files":[],"overrides":"overrides"}""");
         Assert.True(MmcZip.CompressDir(zipPath, dir));
 
@@ -140,7 +140,7 @@ public class InstanceImportTaskTests : IDisposable
         Assert.True(Directory.Exists(instanceDir));
         Assert.True(File.Exists(Path.Combine(instanceDir, "flame", "manifest.json")));
         Assert.True(File.Exists(Path.Combine(instanceDir, "mmc-pack.json")));
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(instanceDir, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(instanceDir, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
             c => c.GetProperty("uid").GetString() == "net.minecraft"
                  && c.GetProperty("version").GetString() == "1.20.1");
@@ -155,9 +155,9 @@ public class InstanceImportTaskTests : IDisposable
         var dir = Path.Combine(_root, "technic-src");
         Directory.CreateDirectory(Path.Combine(dir, "bin"));
         Directory.CreateDirectory(Path.Combine(dir, "modpack"));
-        File.WriteAllText(Path.Combine(dir, "bin", "version.json"),
+        await File.WriteAllTextAsync(Path.Combine(dir, "bin", "version.json"),
             """{"inheritsFrom":"1.20.1","id":"technic-test","libraries":[]}""");
-        File.WriteAllText(Path.Combine(dir, "modpack", "options.txt"), "keepMe=1\n");
+        await File.WriteAllTextAsync(Path.Combine(dir, "modpack", "options.txt"), "keepMe=1\n");
         Assert.True(MmcZip.CompressDir(zipPath, dir));
 
         var task = await RunImport(new Uri(zipPath));
@@ -168,8 +168,8 @@ public class InstanceImportTaskTests : IDisposable
         // the pack contents landed in minecraft/, the version.json flavor set the component,
         // and the identity landed in instance.json (D4)
         Assert.True(File.Exists(Path.Combine(instanceDir, "minecraft", "modpack", "options.txt")));
-        Assert.Contains("Imported", File.ReadAllText(Path.Combine(instanceDir, "instance.json")));
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(instanceDir, "mmc-pack.json")));
+        Assert.Contains("Imported", await File.ReadAllTextAsync(Path.Combine(instanceDir, "instance.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(instanceDir, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
             c => c.GetProperty("uid").GetString() == "net.minecraft"
                  && c.GetProperty("version").GetString() == "1.20.1");
@@ -180,10 +180,10 @@ public class InstanceImportTaskTests : IDisposable
     {
         // a bin/modpack.jar marker that is not a zip fails the pack processor
         var zipPath = Path.Combine(_root, "technic-bad.zip");
-        using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+        using (var zip = await ZipFile.OpenAsync(zipPath, ZipArchiveMode.Create))
         {
             var entry = zip.CreateEntry("bin/modpack.jar");
-            using var writer = entry.Open();
+            using var writer = await entry.OpenAsync();
             var bytes = "jar bytes"u8.ToArray();
             writer.Write(bytes);
         }
@@ -200,7 +200,7 @@ public class InstanceImportTaskTests : IDisposable
         var zipPath = Path.Combine(_root, "unknown.zip");
         var dir = Path.Combine(_root, "unknown-src");
         Directory.CreateDirectory(dir);
-        File.WriteAllText(Path.Combine(dir, "readme.txt"), "nothing in here");
+        await File.WriteAllTextAsync(Path.Combine(dir, "readme.txt"), "nothing in here");
         Assert.True(MmcZip.CompressDir(zipPath, dir));
 
         var task = await RunImport(new Uri(zipPath));

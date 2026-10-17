@@ -9,7 +9,7 @@
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Tasks;
 
-namespace FlintLauncher.Core.Java;
+namespace FlintLauncher.Core.Java.Download;
 
 public sealed class SymlinkTask : FlintTask
 {

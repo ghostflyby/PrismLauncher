@@ -17,7 +17,7 @@ using FlintLauncher.Core.ModPlatform.Packwiz;
 using FlintLauncher.Core.Versioning;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 [Collection("FlameApi")]
 public class ModUpdateTaskTests : IDisposable
@@ -127,7 +127,7 @@ public class ModUpdateTaskTests : IDisposable
         var installed = model.AllMods().First(m => m.Fileinfo.Name == "test.jar");
         var attached = model.GetMetadata(installed);
         Assert.NotNull(attached);
-        Assert.Equal("789", attached!.FileId);
+        Assert.Equal("789", attached.FileId);
     }
 
     [Fact]

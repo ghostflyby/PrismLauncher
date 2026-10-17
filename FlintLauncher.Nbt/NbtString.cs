@@ -7,7 +7,7 @@ namespace FlintLauncher.Nbt;
 
 public sealed class NbtString(string value = "") : NbtTag
 {
-    public string Value { get; } = value ?? "";
+    public string Value { get; } = value;
 
     public override NbtTagType Type => NbtTagType.String;
 

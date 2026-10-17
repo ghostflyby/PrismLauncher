@@ -5,7 +5,7 @@
 using System.Net;
 using System.Net.Sockets;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 /// <summary>
 /// Single allocation source for free TCP ports in tests. <see cref="Reserve"/> binds a

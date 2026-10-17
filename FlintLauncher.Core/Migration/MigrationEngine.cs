@@ -94,7 +94,7 @@ public sealed class PrismFamilyMigrationProfile : IMigrationSourceProfile
         return candidates;
     }
 
-    public IReadOnlyList<PrismImportPlanItem>? Plan(string sourcePath, FlintPaths paths, ImportMode mode) =>
+    public IReadOnlyList<PrismImportPlanItem> Plan(string sourcePath, FlintPaths paths, ImportMode mode) =>
         PrismImportPlanner.Plan(sourcePath, paths.DataRoot, mode);
 }
 

@@ -58,7 +58,7 @@ public class IniFileGoldenTests
             var value = map.GetValueOrDefault(key);
             Assert.True(value is not null, $"key {key} missing from our parse");
 
-            if (value!.ValueKind == IniValue.Kind.Raw)
+            if (value.ValueKind == IniValue.Kind.Raw)
             {
                 continue; // opaque @-type; see above
             }

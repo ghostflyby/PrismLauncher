@@ -43,6 +43,4 @@ public sealed class MinecraftLoadAndCheck : FlintTask
     }
 
     public bool CanAbort() => true;
-
-    public override void Abort() => base.Abort();
 }

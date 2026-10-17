@@ -141,7 +141,7 @@ public class RealLaunchSmokeTests
         }
         var launchTask = instance.CreateLaunchTask(null, null);
         Assert.NotNull(launchTask);
-        Assert.True(launchTask!.IsMultiStep, "real instance launch task should contain the full step chain");
+        Assert.True(launchTask.IsMultiStep, "real instance launch task should contain the full step chain");
     }
 
     private static string WriteFakeJava(string root)

@@ -8,7 +8,7 @@ using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 /// <summary>Instance + mod folder scaffolding for the install/update flow tests.</summary>
 internal sealed class ModInstallTestEnv : IDisposable

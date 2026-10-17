@@ -14,7 +14,7 @@ using FlintLauncher.Core.Versioning;
 using Xunit;
 using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 [Collection("FlameApi")]
 public class FlameCheckUpdateTests : IDisposable

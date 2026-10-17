@@ -141,14 +141,14 @@ public class JavaUtilsTests : IDisposable
         var brokenRoot = TempRoot();
         var home = Path.Combine(root, "jdk-21.0.5");
         Directory.CreateDirectory(Path.Combine(home, "bin"));
-        File.WriteAllText(Path.Combine(home, "bin",
+        await File.WriteAllTextAsync(Path.Combine(home, "bin",
             OperatingSystem.IsWindows() ? "java.exe" : "java"), "");
-        File.WriteAllText(Path.Combine(home, "release"), "JAVA_VERSION=\"21.0.5\"\n");
+        await File.WriteAllTextAsync(Path.Combine(home, "release"), "JAVA_VERSION=\"21.0.5\"\n");
         var brokenHome = Path.Combine(brokenRoot, "jdk-broken");
         Directory.CreateDirectory(Path.Combine(brokenHome, "bin"));
-        File.WriteAllText(Path.Combine(brokenHome, "bin",
+        await File.WriteAllTextAsync(Path.Combine(brokenHome, "bin",
             OperatingSystem.IsWindows() ? "java.exe" : "java"), "");
-        File.WriteAllText(Path.Combine(brokenHome, "release"), "JAVA_VERSION=\"11.0.1\"\n");
+        await File.WriteAllTextAsync(Path.Combine(brokenHome, "release"), "JAVA_VERSION=\"11.0.1\"\n");
 
         IJvmProvider provider = OperatingSystem.IsWindows()
             ? new WindowsProgramFilesJvmProvider([root])
@@ -186,9 +186,9 @@ public class JavaUtilsTests : IDisposable
         var root = TempRoot();
         var home = Path.Combine(root, "Contents", "Home");
         Directory.CreateDirectory(Path.Combine(home, "bin"));
-        File.WriteAllText(Path.Combine(home, "bin",
+        await File.WriteAllTextAsync(Path.Combine(home, "bin",
             OperatingSystem.IsWindows() ? "java.exe" : "java"), "");
-        File.WriteAllText(Path.Combine(home, "release"), "JAVA_VERSION=\"17.0.2\"\nOS_ARCH=\"aarch64\"\n");
+        await File.WriteAllTextAsync(Path.Combine(home, "release"), "JAVA_VERSION=\"17.0.2\"\nOS_ARCH=\"aarch64\"\n");
 
         var candidates = await JavaDetection.DetectAsync(
             providers: [new MacOsJvmProvider([root]), new JavaHomeJvmProvider(root)]);
@@ -208,9 +208,9 @@ public class JavaUtilsTests : IDisposable
         var root = TempRoot();
         var home = Path.Combine(root, "jdk-21.0.5");
         Directory.CreateDirectory(Path.Combine(home, "bin"));
-        File.WriteAllText(Path.Combine(home, "bin",
+        await File.WriteAllTextAsync(Path.Combine(home, "bin",
             OperatingSystem.IsWindows() ? "java.exe" : "java"), "");
-        File.WriteAllText(Path.Combine(home, "release"), "JAVA_VERSION=\"21.0.5\"\nOS_ARCH=\"x86_64\"\n");
+        await File.WriteAllTextAsync(Path.Combine(home, "release"), "JAVA_VERSION=\"21.0.5\"\nOS_ARCH=\"x86_64\"\n");
 
         IJvmProvider provider = OperatingSystem.IsWindows()
             ? new WindowsProgramFilesJvmProvider([root])
@@ -245,9 +245,9 @@ public class JavaUtilsTests : IDisposable
         var prefix = TempRoot();
         var home = Path.Combine(prefix, "opt", "openjdk21", "libexec", "openjdk.jdk", "Contents", "Home");
         Directory.CreateDirectory(Path.Combine(home, "bin"));
-        File.WriteAllText(Path.Combine(home, "bin",
+        await File.WriteAllTextAsync(Path.Combine(home, "bin",
             OperatingSystem.IsWindows() ? "java.exe" : "java"), "");
-        File.WriteAllText(Path.Combine(home, "release"), "JAVA_VERSION=\"21.0.5\"\n");
+        await File.WriteAllTextAsync(Path.Combine(home, "release"), "JAVA_VERSION=\"21.0.5\"\n");
 
         var candidates = await JavaDetection.DetectAsync(providers: [new HomebrewJvmProvider([prefix])]);
 

@@ -13,7 +13,7 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class AuthFlowTests : IDisposable
 {
@@ -407,7 +407,7 @@ public class AuthFlowTests : IDisposable
         account.AccountData.Validity = Validity.Assumed;
 
         var flow = account.Login(useDeviceCode: true, _auth);
-        await flow!.StartAsync();
+        await flow.StartAsync();
 
         Assert.Equal(TaskState.Failed, flow.State);
         Assert.Equal(AccountTaskState.FailedHard, flow.TaskState);

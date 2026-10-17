@@ -14,10 +14,9 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.ModPlatform.Technic;
-using FlintLauncher.Tests;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class TechnicApiEndpointsTests : IDisposable
 {
@@ -222,7 +221,7 @@ public class TechnicApiEndpointsTests : IDisposable
             Assert.Equal("technic=1\n",
                 await File.ReadAllTextAsync(Path.Combine(staging, "minecraft", "modpack", "options.txt")));
             // the version.json libraries became components
-            using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+            using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
             var components = doc.RootElement.GetProperty("components").EnumerateArray()
                 .Select(c => (Uid: c.GetProperty("uid").GetString(),
                     Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
@@ -276,7 +275,7 @@ public class TechnicApiEndpointsTests : IDisposable
         Assert.Equal("solder mod payload",
             await File.ReadAllTextAsync(Path.Combine(staging, "minecraft", "mods", "soldermod.jar")));
         // the processor used the build's minecraft version
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
             c => c.GetProperty("uid").GetString() == "net.minecraft"
                  && c.GetProperty("version").GetString() == "1.20.1");
@@ -312,7 +311,7 @@ public class TechnicApiEndpointsTests : IDisposable
         Assert.Equal("Default Build", id);
 
         using var doc = JsonDocument.Parse(
-            File.ReadAllText(Path.Combine(host.DataDir, "instances", id, "mmc-pack.json")));
+            await File.ReadAllTextAsync(Path.Combine(host.DataDir, "instances", id, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
             c => c.GetProperty("uid").GetString() == "net.minecraft"
                  && c.GetProperty("version").GetString() == "1.16.5");

@@ -14,7 +14,7 @@ using FlintLauncher.Core.ModPlatform.FtbApp;
 using FlintLauncher.Core.Settings;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class FtbAppTests : IDisposable
 {
@@ -267,7 +267,7 @@ public class FtbAppTests : IDisposable
             Variant.AsLong(new MinecraftInstance(
                 new InstanceJsonSettingsObject(staging, _global.Environment),
                 staging).Settings.Get("totalTimePlayed")));
-        var instanceJson = File.ReadAllText(Path.Combine(staging, "instance.json"));
+        var instanceJson = await File.ReadAllTextAsync(Path.Combine(staging, "instance.json"));
         Assert.Contains("jvmArgs", instanceJson); // camelCase wire shape
         Assert.Contains("-Xmx2G -Dtest=1", instanceJson);
 

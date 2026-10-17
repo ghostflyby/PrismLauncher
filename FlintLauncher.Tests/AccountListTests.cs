@@ -7,7 +7,7 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Auth;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class AccountListTests : IDisposable
 {

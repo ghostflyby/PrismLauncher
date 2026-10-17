@@ -826,7 +826,7 @@ public class InstanceList
         return _instanceRootDirMap.GetValueOrDefault(id, PrimaryDir());
     }
 
-    private BaseInstance? LoadInstance(string id)
+    private BaseInstance LoadInstance(string id)
     {
         var environment = Environment ??
             throw new InvalidOperationException(

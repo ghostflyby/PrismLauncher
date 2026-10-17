@@ -94,7 +94,7 @@ public class MigrationApiTests
         {
             Directory.Delete(migrationDir, recursive: true);
         }
-        File.WriteAllText(migrationDir, "a file blocks the migration records directory");
+        await File.WriteAllTextAsync(migrationDir, "a file blocks the migration records directory");
         var source = MakePrismSource(TempRoot());
 
         var response = await host.PostAsync("/api/v1/migration/prism/decline", new { source });
@@ -109,7 +109,7 @@ public class MigrationApiTests
         var backup = Path.Combine(TempRoot(), "prism-backup");
         // even WITH whitelisted content, the directory name is not a known launcher
         Directory.CreateDirectory(backup);
-        File.WriteAllText(Path.Combine(backup, "prismlauncher.cfg"), "k=v");
+        await File.WriteAllTextAsync(Path.Combine(backup, "prismlauncher.cfg"), "k=v");
 
         foreach (var dryRun in new[] { true, false })
         {
@@ -267,23 +267,23 @@ public class MigrationApiTests
         await using var host = await FlintApiHost.StartAsync();
         var source = Path.Combine(TempRoot(), "PrismLauncher");
         Directory.CreateDirectory(Path.Combine(source, "instances", "one"));
-        File.WriteAllText(Path.Combine(source, "instances", "one", "instance.cfg"),
+        await File.WriteAllTextAsync(Path.Combine(source, "instances", "one", "instance.cfg"),
             "InstanceType=OneSix\n");
         Directory.CreateDirectory(Path.Combine(source, "assets", "objects", "aa"));
-        File.WriteAllText(Path.Combine(source, "assets", "objects", "aa", "blob"), "asset");
-        File.WriteAllText(Path.Combine(source, "accounts.json"), OfflineAccountsJson("ImportedOne"));
+        await File.WriteAllTextAsync(Path.Combine(source, "assets", "objects", "aa", "blob"), "asset");
+        await File.WriteAllTextAsync(Path.Combine(source, "accounts.json"), OfflineAccountsJson("ImportedOne"));
         // the recognized INI key set: record domain + secret trio + C9 state keys
-        File.WriteAllText(Path.Combine(source, "prismlauncher.cfg"), """
-            [General]
-            ConfigVersion=1.3
-            ProxyAddr=proxy.corp
-            ProxyPort=3128
-            ProxyPass=hunter2
-            ModrinthToken=mr-token
-            TotalPlayTime=123456
-            TotalPlayTimeMigrated=true
-            LastOfflinePlayerName=OfflineOne
-            """);
+        await File.WriteAllTextAsync(Path.Combine(source, "prismlauncher.cfg"), """
+                                                                                [General]
+                                                                                ConfigVersion=1.3
+                                                                                ProxyAddr=proxy.corp
+                                                                                ProxyPort=3128
+                                                                                ProxyPass=hunter2
+                                                                                ModrinthToken=mr-token
+                                                                                TotalPlayTime=123456
+                                                                                TotalPlayTimeMigrated=true
+                                                                                LastOfflinePlayerName=OfflineOne
+                                                                                """);
 
         var response = await host.PostAsync("/api/v1/migration/prism",
             new { source, mode = "copy", dryRun = false });
@@ -323,12 +323,12 @@ public class MigrationApiTests
             settings.GetProperty("groups").GetProperty("api").GetProperty("ModrinthToken").GetString());
 
         // the import wrote flint.json (the one-shot seal) and the secrets stayed OUT of it
-        var configText = File.ReadAllText(Path.Combine(host.HomeDir, "config", "flint.json"));
+        var configText = await File.ReadAllTextAsync(Path.Combine(host.HomeDir, "config", "flint.json"));
         Assert.DoesNotContain("hunter2", configText);
         Assert.DoesNotContain("mr-token", configText);
 
         // the C9 state keys landed in launcher-state.json
-        var stateText = File.ReadAllText(Path.Combine(host.HomeDir, "state", "launcher-state.json"));
+        var stateText = await File.ReadAllTextAsync(Path.Combine(host.HomeDir, "state", "launcher-state.json"));
         Assert.Contains("OfflineOne", stateText);
         Assert.Contains("123456", stateText);
 
@@ -366,9 +366,9 @@ public class MigrationApiTests
         await using var host = await FlintApiHost.StartAsync();
         var source = Path.Combine(TempRoot(), "PrismLauncher");
         Directory.CreateDirectory(Path.Combine(source, "assets", "objects", "aa"));
-        File.WriteAllText(Path.Combine(source, "assets", "objects", "aa", "blob"), "asset");
+        await File.WriteAllTextAsync(Path.Combine(source, "assets", "objects", "aa", "blob"), "asset");
         Directory.CreateDirectory(Path.Combine(source, "instances", "reloadme"));
-        File.WriteAllText(Path.Combine(source, "instances", "reloadme", "instance.cfg"),
+        await File.WriteAllTextAsync(Path.Combine(source, "instances", "reloadme", "instance.cfg"),
             "InstanceType=OneSix\n");
         // the bulk keeps the per-file transfer walk busy past the abort round-trip
         for (var dir = 0; dir < 200; dir++)
@@ -376,7 +376,7 @@ public class MigrationApiTests
             Directory.CreateDirectory(Path.Combine(source, "libraries", "bulk", $"d{dir}"));
             for (var file = 0; file < 100; file++)
             {
-                File.WriteAllText(Path.Combine(source, "libraries", "bulk", $"d{dir}", $"f{file}"), "x");
+                await File.WriteAllTextAsync(Path.Combine(source, "libraries", "bulk", $"d{dir}", $"f{file}"), "x");
             }
         }
 

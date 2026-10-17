@@ -9,7 +9,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Web;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class RealDataSmokeTests
 {

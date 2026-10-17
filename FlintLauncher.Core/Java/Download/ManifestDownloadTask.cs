@@ -15,11 +15,10 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
-using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 
-namespace FlintLauncher.Core.Java;
+namespace FlintLauncher.Core.Java.Download;
 
 public sealed class ManifestDownloadTask : FlintTask
 {

@@ -167,9 +167,8 @@ public sealed class FileResolvingTask : FlintTask
                             {
                                 var urlValid = Uri.TryCreate(outFile.Version.DownloadUrl, UriKind.Absolute, out _);
                                 if (!urlValid && "sha1" == outFile.Version.HashType
-                                    && outFile.Version.Hash.Length != 0
-                                    && entries[outFile.Version.Hash] is { } entryNode
-                                    && entryNode is not null)
+                                              && outFile.Version.Hash.Length != 0
+                                              && entries[outFile.Version.Hash] is { } entryNode)
                                 {
                                     try
                                     {

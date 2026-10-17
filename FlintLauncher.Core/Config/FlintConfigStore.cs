@@ -18,7 +18,7 @@ namespace FlintLauncher.Core.Config;
 
 public sealed class FlintConfigStore
 {
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
     private readonly TypedJsonFile<FlintConfigFile> _file;
 
     /// <summary>Build (and load) the store for one flint.json. A missing file yields the

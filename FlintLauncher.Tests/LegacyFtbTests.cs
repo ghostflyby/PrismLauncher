@@ -14,7 +14,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.LegacyFtb;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class LegacyFtbTests : IDisposable
 {

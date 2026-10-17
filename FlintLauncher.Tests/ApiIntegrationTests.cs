@@ -18,7 +18,6 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using Flint.Tests;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Launch.Steps;
@@ -437,10 +436,10 @@ public class FlintApiIntegrationTests
 
         // a minimal MultiMC-flavoured zip: one folder with an instance.cfg inside
         var zipPath = Path.Combine(host.DataDir, "pack.zip");
-        using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+        using (var zip = await ZipFile.OpenAsync(zipPath, ZipArchiveMode.Create))
         {
             var entry = zip.CreateEntry("pack/instance.cfg");
-            await using var writer = new StreamWriter(entry.Open());
+            await using var writer = new StreamWriter(await entry.OpenAsync());
             await writer.WriteAsync("name=Pack Inst\n");
         }
 
@@ -727,20 +726,21 @@ public class FlintApiDeviceCodeTests : IDisposable
 {
     private readonly ApiStubServer _server;
     private readonly AuthEndpointsOptions _auth = new();
-    private readonly string _msaDeviceCode;
+
+    private const string MsaDeviceCode = """
+                                          {"device_code":"dev123","user_code":"FLNT-CODE","verification_uri":"https://microsoft.test/link","expires_in":900,"interval":1}
+                                          """;
+
     private string msaToken;
 
     public FlintApiDeviceCodeTests()
     {
         // token endpoint answer is switchable per phase of the test
-        _msaDeviceCode = """
-            {"device_code":"dev123","user_code":"FLNT-CODE","verification_uri":"https://microsoft.test/link","expires_in":900,"interval":1}
-            """;
         msaToken = """{"error":"authorization_pending"}""";
         _server = new ApiStubServer(async ctx =>
         {
             var body = ctx.Request.Url!.AbsolutePath.EndsWith("/devicecode", StringComparison.Ordinal)
-                ? _msaDeviceCode
+                ? MsaDeviceCode
                 : msaToken;
             var bytes = Encoding.UTF8.GetBytes(body);
             ctx.Response.ContentType = "application/json";

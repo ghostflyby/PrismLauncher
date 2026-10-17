@@ -6,7 +6,7 @@
 using FlintLauncher.Core.ModPlatform.Helpers;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class ExportToModListTests
 {

@@ -15,16 +15,63 @@ namespace FlintLauncher.Core.Launch;
 public sealed class LogModel
 {
     private (MessageLevel Level, string Line)[] content;
-    private int maxLines = 1000; // C++ m_maxLines default
+
+    public int MaxLines
+    {
+        get;
+        set
+        {
+            // no-op
+            if (value == field)
+            {
+                return;
+            }
+
+            // if it all still fits in the buffer, just resize it
+            if (firstLine + numLines < field)
+            {
+                field = value;
+                Array.Resize(ref content, value);
+                return;
+            }
+
+            // otherwise, we need to reorganize the data because it crosses the wrap boundary
+            var newContent = new (MessageLevel, string)[value];
+            if (numLines <= value)
+            {
+                // if it all fits in the new buffer, just copy it over
+                for (var i = 0; i < numLines; i++)
+                {
+                    newContent[i] = content[(firstLine + i) % field];
+                }
+            }
+            else
+            {
+                // if it doesn't fit, part of the data needs to be thrown away (the oldest log messages)
+                var lead = numLines - value;
+                for (var i = 0; i < value; i++)
+                {
+                    newContent[i] = content[(firstLine + lead + i) % field];
+                }
+
+                numLines = field;
+            }
+
+            content = newContent;
+            firstLine = 0;
+            field = value;
+        }
+    } = 1000;
+
     private int firstLine;
     private int numLines;
     private bool suspended;
-    private bool stopOnOverflow;
-    private string overflowMessage = "";
+    public bool StopOnOverflow { get; set; }
+    public string OverflowMessage { get;  set; } = "";
 
     public LogModel()
     {
-        content = new (MessageLevel, string)[maxLines];
+        content = new (MessageLevel, string)[MaxLines];
     }
 
     public int RowCount => numLines;
@@ -37,13 +84,14 @@ public sealed class LogModel
             var result = new List<(MessageLevel, string)>(numLines);
             for (var i = 0; i < numLines; i++)
             {
-                result.Add(content[(firstLine + i) % maxLines]);
+                result.Add(content[(firstLine + i) % MaxLines]);
             }
+
             return result;
         }
     }
 
-    public bool IsOverFlow => numLines >= maxLines && stopOnOverflow;
+    public bool IsOverFlow => numLines >= MaxLines && StopOnOverflow;
 
     public void Append(MessageLevel level, string line)
     {
@@ -51,23 +99,26 @@ public sealed class LogModel
         {
             return;
         }
-        var lineNum = (firstLine + numLines) % maxLines;
+
+        var lineNum = (firstLine + numLines) % MaxLines;
         // overflow
-        if (numLines == maxLines)
+        if (numLines == MaxLines)
         {
-            if (stopOnOverflow)
+            if (StopOnOverflow)
             {
                 // nothing more to do, the buffer is full
                 return;
             }
-            firstLine = (firstLine + 1) % maxLines;
+
+            firstLine = (firstLine + 1) % MaxLines;
             numLines--;
         }
-        else if (numLines == maxLines - 1 && stopOnOverflow)
+        else if (numLines == MaxLines - 1 && StopOnOverflow)
         {
             level = MessageLevel.Fatal;
-            line = overflowMessage;
+            line = OverflowMessage;
         }
+
         numLines++;
         content[lineNum] = (level, line);
     }
@@ -89,53 +140,9 @@ public sealed class LogModel
         {
             builder.Append(line).Append('\n');
         }
+
         return builder.ToString();
     }
-
-    public void SetMaxLines(int maxLines)
-    {
-        // no-op
-        if (maxLines == this.maxLines)
-        {
-            return;
-        }
-        // if it all still fits in the buffer, just resize it
-        if (firstLine + numLines < this.maxLines)
-        {
-            this.maxLines = maxLines;
-            Array.Resize(ref content, maxLines);
-            return;
-        }
-        // otherwise, we need to reorganize the data because it crosses the wrap boundary
-        var newContent = new (MessageLevel, string)[maxLines];
-        if (numLines <= maxLines)
-        {
-            // if it all fits in the new buffer, just copy it over
-            for (var i = 0; i < numLines; i++)
-            {
-                newContent[i] = content[(firstLine + i) % this.maxLines];
-            }
-        }
-        else
-        {
-            // if it doesn't fit, part of the data needs to be thrown away (the oldest log messages)
-            var lead = numLines - maxLines;
-            for (var i = 0; i < maxLines; i++)
-            {
-                newContent[i] = content[(firstLine + lead + i) % this.maxLines];
-            }
-            numLines = this.maxLines;
-        }
-        content = newContent;
-        firstLine = 0;
-        this.maxLines = maxLines;
-    }
-
-    public int GetMaxLines() => maxLines;
-
-    public void SetStopOnOverflow(bool stop) => stopOnOverflow = stop;
-
-    public void SetOverflowMessage(string overflowMessage) => this.overflowMessage = overflowMessage;
 
     /// <summary>Port of LogModel::previousLevel: the level of the newest entry (upstream indexes
     /// the content array without the ring wrap — ported as the newest entry).</summary>
@@ -143,8 +150,9 @@ public sealed class LogModel
     {
         if (numLines > 0)
         {
-            return content[(firstLine + numLines - 1) % maxLines].Level;
+            return content[(firstLine + numLines - 1) % MaxLines].Level;
         }
+
         return MessageLevel.Unknown;
     }
 }

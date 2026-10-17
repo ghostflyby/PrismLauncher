@@ -15,7 +15,7 @@ namespace FlintLauncher.Core.State;
 
 public sealed class LauncherStateStore
 {
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
     private readonly TypedJsonFile<LauncherState> _file;
 
     /// <summary>Build (and load) the store for one state file. A missing file yields the

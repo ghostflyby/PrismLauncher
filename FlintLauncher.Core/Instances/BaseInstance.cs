@@ -475,7 +475,7 @@ public abstract class BaseInstance
         _settings.Set("ManagedPackVersionID", versionId);
         _settings.Set("ManagedPackVersionName", version);
 
-        if ((UserLayer.Java.AutomaticJavaSwitch ?? true) &&
+        if ((UserLayer.Java!.AutomaticJavaSwitch ?? true) &&
             Variant.AsBool(_settings.Get("AutomaticJava")) &&
             Variant.AsBool(_settings.Get("OverrideJavaLocation")))
         {

@@ -19,6 +19,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.Minecraft.Resources;

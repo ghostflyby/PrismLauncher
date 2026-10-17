@@ -6,11 +6,10 @@
 
 using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.Tasks;
-using FlintLauncher.Tests;
 using FlintLauncher.Web;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class DataMigrationTests : IDisposable
 {
@@ -115,7 +114,7 @@ public class DataMigrationTests : IDisposable
 
         var record = decisions.Read("PolyMC");
         Assert.NotNull(record);
-        Assert.Equal(MigrationDecisionRecord.Declined, record!.Decision);
+        Assert.Equal(MigrationDecisionRecord.Declined, record.Decision);
         Assert.Equal("PolyMC", record.Source);
         // undecided sources read back as null
         Assert.Null(decisions.Read("prism"));
@@ -188,7 +187,7 @@ public class DataMigrationTests : IDisposable
         Assert.False(File.Exists(DataMigration.NoMigrateMarkerPath(current, "PolyMC")));
         var record = decisions.Read("PolyMC");
         Assert.NotNull(record);
-        Assert.Equal(MigrationDecisionRecord.Declined, record!.Decision);
+        Assert.Equal(MigrationDecisionRecord.Declined, record.Decision);
         Assert.Equal(MigrationDecisionRecord.UnknownAt, record.At);
         Assert.Equal("", record.Mode);
 
@@ -217,7 +216,7 @@ public class DataMigrationTests : IDisposable
         Assert.False(File.Exists(Path.Combine(current, "PolyMC_nomigrate.txt")));
         var record = decisions.Read("polymc");
         Assert.NotNull(record);
-        Assert.Equal(MigrationDecisionRecord.Declined, record!.Decision);
+        Assert.Equal(MigrationDecisionRecord.Declined, record.Decision);
         Assert.Equal(MigrationDecisionRecord.UnknownAt, record.At);
     }
 
@@ -356,9 +355,9 @@ public class DataMigrationTests : IDisposable
         Assert.Equal(TaskState.Succeeded, task.State);
 
         // copied
-        Assert.Equal("content of polymc.cfg", File.ReadAllText(Path.Combine(target, "polymc.cfg")));
-        Assert.Equal("content of flint.cfg", File.ReadAllText(Path.Combine(target, "flint.cfg")));
-        Assert.Equal("content of accounts.json", File.ReadAllText(Path.Combine(target, "accounts.json")));
+        Assert.Equal("content of polymc.cfg", await File.ReadAllTextAsync(Path.Combine(target, "polymc.cfg")));
+        Assert.Equal("content of flint.cfg", await File.ReadAllTextAsync(Path.Combine(target, "flint.cfg")));
+        Assert.Equal("content of accounts.json", await File.ReadAllTextAsync(Path.Combine(target, "accounts.json")));
         Assert.True(File.Exists(Path.Combine(target, "accounts", "steve@gmail.com.json")));
         Assert.True(File.Exists(Path.Combine(target, "assets", "indexes", "6.json")));
         Assert.True(File.Exists(Path.Combine(target, "assets", "objects", "ab", "abcdef")));
@@ -387,7 +386,7 @@ public class DataMigrationTests : IDisposable
     {
         var source = MakeDir("polymc.cfg");
         var target = MakeDir("polymc.cfg");
-        File.WriteAllText(Path.Combine(target, "polymc.cfg"), "target version");
+        await File.WriteAllTextAsync(Path.Combine(target, "polymc.cfg"), "target version");
 
         var task = new DataMigrationTask(source, target, DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
         await task.StartAsync();
@@ -396,7 +395,7 @@ public class DataMigrationTests : IDisposable
         // the task FAILS with this message while the existing target file stays untouched.
         Assert.Equal(TaskState.Failed, task.State);
         Assert.Equal("Some paths could not be copied!", task.FailReason);
-        Assert.Equal("target version", File.ReadAllText(Path.Combine(target, "polymc.cfg")));
+        Assert.Equal("target version", await File.ReadAllTextAsync(Path.Combine(target, "polymc.cfg")));
     }
 
     [Fact]
@@ -425,7 +424,7 @@ public class DataMigrationTests : IDisposable
         var source = Path.Combine(_dir, "src-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(source, "instances", "demo"));
         // the link's target sits OUTSIDE the whitelisted tree — only link.cfg itself matches
-        File.WriteAllText(Path.Combine(source, "marker.txt"), "marker-content");
+        await File.WriteAllTextAsync(Path.Combine(source, "marker.txt"), "marker-content");
         File.CreateSymbolicLink(Path.Combine(source, "instances", "demo", "link.cfg"),
             Path.Combine(source, "marker.txt"));
         var target = Path.Combine(_dir, "target-" + Guid.NewGuid().ToString("N"));
@@ -438,7 +437,7 @@ public class DataMigrationTests : IDisposable
 
         Assert.Equal(TaskState.Succeeded, task.State);
         var landed = Path.Combine(target, "instances", "demo", "link.cfg");
-        Assert.Equal("marker-content", File.ReadAllText(landed));
+        Assert.Equal("marker-content", await File.ReadAllTextAsync(landed));
         Assert.Null(File.ResolveLinkTarget(landed, returnFinalTarget: false)); // content, not a re-link
         Assert.Equal(1, progress.Last().total); // the plan count includes the link too
     }

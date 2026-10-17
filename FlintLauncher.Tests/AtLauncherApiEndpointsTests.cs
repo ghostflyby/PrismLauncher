@@ -12,10 +12,9 @@ using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
-using FlintLauncher.Tests;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class AtLauncherApiEndpointsTests : IDisposable
 {
@@ -180,7 +179,7 @@ public class AtLauncherApiEndpointsTests : IDisposable
             .RootElement.GetProperty("id").GetString()!;
 
         using var doc = JsonDocument.Parse(
-            File.ReadAllText(Path.Combine(host.DataDir, "instances", id, "mmc-pack.json")));
+            await File.ReadAllTextAsync(Path.Combine(host.DataDir, "instances", id, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
             c => c.GetProperty("uid").GetString() == "net.fabricmc.fabric-loader"
                  && c.GetProperty("version").GetString() == "0.14.21");

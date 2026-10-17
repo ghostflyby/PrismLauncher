@@ -13,7 +13,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Flint.Tests;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Web;
 using Microsoft.AspNetCore.Builder;
@@ -215,7 +214,7 @@ public class SkinApiEndpointsTests : IDisposable
         // the core SkinUpload ran: the stub saw the single multipart POST with the token
         var recorded = _server.Request("POST", "/minecraft/profile/skins");
         Assert.NotNull(recorded);
-        Assert.StartsWith("Bearer SKIN_TOKEN_STUB", recorded!.Headers["Authorization"]);
+        Assert.StartsWith("Bearer SKIN_TOKEN_STUB", recorded.Headers["Authorization"]);
         var contentType = recorded.Headers["Content-Type"];
         Assert.StartsWith("multipart/form-data; boundary=", contentType);
         var boundary = contentType["multipart/form-data; boundary=".Length..];
@@ -251,7 +250,7 @@ public class SkinApiEndpointsTests : IDisposable
 
         var recorded = _server.Request("POST", "/minecraft/profile/skins");
         Assert.NotNull(recorded);
-        var boundary = recorded!.Headers["Content-Type"]["multipart/form-data; boundary=".Length..];
+        var boundary = recorded.Headers["Content-Type"]["multipart/form-data; boundary=".Length..];
         Assert.Contains($"name=\"variant\"\r\n\r\nclassic\r\n--{boundary}--", recorded.Body);
     }
 
@@ -319,7 +318,7 @@ public class SkinApiEndpointsTests : IDisposable
 
         var recorded = _server.Request("DELETE", "/minecraft/profile/skins/active");
         Assert.NotNull(recorded);
-        Assert.Equal("Bearer SKIN_TOKEN_STUB", recorded!.Headers["Authorization"]);
+        Assert.Equal("Bearer SKIN_TOKEN_STUB", recorded.Headers["Authorization"]);
     }
 
     // ------------------------------------------------------------------ cape equip
@@ -335,7 +334,7 @@ public class SkinApiEndpointsTests : IDisposable
 
         var recorded = _server.Request("PUT", "/minecraft/profile/capes/active");
         Assert.NotNull(recorded);
-        Assert.Equal("Bearer SKIN_TOKEN_STUB", recorded!.Headers["Authorization"]);
+        Assert.Equal("Bearer SKIN_TOKEN_STUB", recorded.Headers["Authorization"]);
         Assert.Equal("""{"capeId":"1234-abcd"}""", recorded.Body);
     }
 
@@ -371,7 +370,7 @@ public class SkinApiEndpointsTests : IDisposable
 
         var recorded = _server.Request("DELETE", "/minecraft/profile/capes/active");
         Assert.NotNull(recorded);
-        Assert.Equal("Bearer SKIN_TOKEN_STUB", recorded!.Headers["Authorization"]);
+        Assert.Equal("Bearer SKIN_TOKEN_STUB", recorded.Headers["Authorization"]);
         Assert.Null(_server.Request("PUT", "/minecraft/profile/capes/active"));
     }
 

@@ -9,7 +9,7 @@ using FlintLauncher.Core.Skins;
 using FlintLauncher.Core.Tasks;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class SkinApiTests : IDisposable
 {
@@ -51,7 +51,7 @@ public class SkinApiTests : IDisposable
 
         var recorded = _server.Request("POST", "/minecraft/profile/skins");
         Assert.NotNull(recorded);
-        Assert.StartsWith("Bearer SKIN_TOKEN", recorded!.Headers["Authorization"]);
+        Assert.StartsWith("Bearer SKIN_TOKEN", recorded.Headers["Authorization"]);
 
         var contentType = recorded.Headers["Content-Type"];
         Assert.StartsWith("multipart/form-data; boundary=", contentType);
@@ -94,7 +94,7 @@ public class SkinApiTests : IDisposable
         Assert.Equal(TaskState.Succeeded, request.State);
         var recorded = _server.Request("DELETE", "/minecraft/profile/skins/active");
         Assert.NotNull(recorded);
-        Assert.Equal("Bearer SKIN_TOKEN", recorded!.Headers["Authorization"]);
+        Assert.Equal("Bearer SKIN_TOKEN", recorded.Headers["Authorization"]);
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public class SkinApiTests : IDisposable
         Assert.Equal(TaskState.Succeeded, request.State);
         var recorded = _server.Request("PUT", "/minecraft/profile/capes/active");
         Assert.NotNull(recorded);
-        Assert.Equal("Bearer SKIN_TOKEN", recorded!.Headers["Authorization"]);
+        Assert.Equal("Bearer SKIN_TOKEN", recorded.Headers["Authorization"]);
         Assert.Equal("""{"capeId":"1234-abcd"}""", recorded.Body);
     }
 
@@ -119,7 +119,7 @@ public class SkinApiTests : IDisposable
         Assert.Equal(TaskState.Succeeded, request.State);
         var recorded = _server.Request("DELETE", "/minecraft/profile/capes/active");
         Assert.NotNull(recorded);
-        Assert.Equal("Bearer SKIN_TOKEN", recorded!.Headers["Authorization"]);
+        Assert.Equal("Bearer SKIN_TOKEN", recorded.Headers["Authorization"]);
         Assert.Null(_server.Request("PUT", "/minecraft/profile/capes/active"));
     }
 

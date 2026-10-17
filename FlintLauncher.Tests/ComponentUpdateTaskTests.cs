@@ -135,7 +135,7 @@ public class ComponentUpdateTaskTests : IDisposable
         Directory.CreateDirectory(metaDir);
         await File.WriteAllTextAsync(metaFile, json);
         var metaVersion = index.Get(uid, version);
-        metaVersion.SetSha256(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(metaFile))).ToLowerInvariant());
+        metaVersion.SetSha256(Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(metaFile))).ToLowerInvariant());
         await metaVersion.LoadTask(NetMode.Offline).StartAsync();
         Assert.True(metaVersion.IsLoaded(), "seeded meta version should be loaded");
     }
@@ -273,7 +273,7 @@ public class ComponentUpdateTaskTests : IDisposable
             // the injected component is persisted as dependencyOnly on the next save
             profile.SaveNow();
             var pack = JsonNode.Parse(
-                File.ReadAllText(Path.Combine(_root, "mmc-pack.json")))!;
+                await File.ReadAllTextAsync(Path.Combine(_root, "mmc-pack.json")))!;
             var depEntry = pack["components"]!.AsArray()
                 .OfType<JsonObject>()
                 .First(o => o["uid"]!.ToString() == "test.deplib");
@@ -312,7 +312,7 @@ public class ComponentUpdateTaskTests : IDisposable
         Assert.False(File.Exists(depPatchPath));
         profile.SaveNow();
         var pack = JsonNode.Parse(
-            File.ReadAllText(Path.Combine(_root, "mmc-pack.json")))!;
+            await File.ReadAllTextAsync(Path.Combine(_root, "mmc-pack.json")))!;
         Assert.Single(pack["components"]!.AsArray());
     }
 

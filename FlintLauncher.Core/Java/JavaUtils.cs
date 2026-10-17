@@ -248,21 +248,6 @@ public static class JavaUtils
         return candidates;
     }
 
-    /// <summary>
-    /// Port of JavaUtils::FindJavaFromRegistryKey (Windows only). The port's original stub
-    /// (Win32 P/Invoke registry walks were out of scope) is superseded by the JdkFind layer:
-    /// <c>WindowsRegistryJvmProvider</c> walks the JavaSoft / Eclipse Adoptium / Microsoft /
-    /// Azul / Amazon Corretto roots via Microsoft.Win32 (HKLM 64-bit view) and
-    /// <c>WindowsProgramFilesJvmProvider</c> covers the vendor directories under
-    /// %ProgramFiles%. This stub is kept only as the marker of the remaining delta vs the
-    /// C++ walk (AdoptOpenJDK/IBM Semeru roots and the WOW64 32-bit view, both of which
-    /// JdkFind scopes out deliberately) and returns nothing.
-    /// </summary>
-    private static List<JavaInstall> FindJavaFromRegistryKey(uint keyType, string keyName, string keyJavaDir, string subkeySuffix = "")
-    {
-        return [];
-    }
-
     /// <summary>Port of the Linux/FreeBSD/OpenBSD FindJavaPaths branch.</summary>
     private static List<string> FindJavaPathsLinux()
     {

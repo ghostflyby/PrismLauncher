@@ -139,7 +139,7 @@ public class MigrationEngineTests : IDisposable
 
         var plan = engine.Find("prism-family")!.Plan(prismDir, paths, ImportMode.Copy);
         Assert.NotNull(plan);
-        Assert.Contains(plan!, item => item.Name == "instances");
+        Assert.Contains(plan, item => item.Name == "instances");
     }
 
     // A2: the prism-family profile surfaces a MultiMC source under BOTH config names —
@@ -185,7 +185,7 @@ public class MigrationEngineTests : IDisposable
         Assert.Empty(engine.Find("flint-legacy")!.Detect(paths, Decisions()));
 
         // the old flat layout appears (flint.cfg at the root layer)
-        File.WriteAllText(Path.Combine(data, "flint.cfg"), "k=v");
+        await File.WriteAllTextAsync(Path.Combine(data, "flint.cfg"), "k=v");
 
         var decisions = Decisions();
         var candidates = engine.Find("flint-legacy")!.Detect(paths, decisions);
@@ -236,7 +236,7 @@ public class MigrationEngineTests : IDisposable
 
         // the old flat layout: config file, a ledger WITH a real entry, meta content, store
         // content, the old in-data cache area, and the Prism bare ledger (E8 dead stock)
-        File.WriteAllText(Path.Combine(data, "flint.cfg"), "JavaPath=old");
+        await File.WriteAllTextAsync(Path.Combine(data, "flint.cfg"), "JavaPath=old");
         var metaFile = Path.Combine(data, "meta", "net.minecraft", "index.json");
         Directory.CreateDirectory(Path.GetDirectoryName(metaFile)!);
         const string metaBody = "{}";
@@ -251,7 +251,7 @@ public class MigrationEngineTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(data, "assets", "indexes", "5.json"), "{}");
         Directory.CreateDirectory(Path.Combine(data, "cache", "fmllibs"));
         await File.WriteAllTextAsync(Path.Combine(data, "cache", "fmllibs", "lib.jar"), "j");
-        File.WriteAllText(Path.Combine(data, "metacache"), "prism-ledger");
+        await File.WriteAllTextAsync(Path.Combine(data, "metacache"), "prism-ledger");
 
         var result = FlintLegacyMigration.ExecuteIfNeeded(paths, decisions);
 
@@ -269,7 +269,7 @@ public class MigrationEngineTests : IDisposable
         // the pass sealed itself with the S3 record — a second run is a no-op
         var record = decisions.Read(FlintLegacyMigrationProfile.ProfileName);
         Assert.NotNull(record);
-        Assert.Equal(MigrationDecisionRecord.Imported, record!.Decision);
+        Assert.Equal(MigrationDecisionRecord.Imported, record.Decision);
         Assert.Equal("move", record.Mode);
         Assert.Equal(0, record.Instances); // no instances directory in this layout
 
@@ -285,7 +285,7 @@ public class MigrationEngineTests : IDisposable
         ledger.Load();
         var loaded = ledger.GetEntry("meta", "net.minecraft/index.json");
         Assert.NotNull(loaded);
-        Assert.False(loaded!.IsStale);
+        Assert.False(loaded.IsStale);
         var resolved = ledger.ResolveEntry("meta", "net.minecraft/index.json");
         Assert.False(resolved.IsStale);
         Assert.Equal(metaBody, await File.ReadAllTextAsync(resolved.GetFullPath()));
@@ -354,7 +354,7 @@ public class MigrationEngineTests : IDisposable
         // the pass sealed itself with the S3 record — a second run is a no-op
         var record = decisions.Read(FlintLegacyMigrationProfile.ProfileName);
         Assert.NotNull(record);
-        Assert.Equal(MigrationDecisionRecord.Imported, record!.Decision);
+        Assert.Equal(MigrationDecisionRecord.Imported, record.Decision);
         Assert.Equal(1, record.Instances);
         Assert.False(FlintLegacyMigration.ExecuteIfNeeded(paths, decisions).Ran);
     }
@@ -399,7 +399,7 @@ public class MigrationEngineTests : IDisposable
 
         // and it never touches the decision record — the seal is the startup gate's business
         var after = decisions.Read(FlintLegacyMigrationProfile.ProfileName);
-        Assert.Equal(sealedRecord!.At, after!.At);
+        Assert.Equal(sealedRecord.At, after!.At);
         Assert.Equal(sealedRecord.Bytes, after.Bytes);
     }
 
@@ -545,7 +545,7 @@ public class MigrationEngineTests : IDisposable
         }
         // a FILE occupies the migration records path, so the seal write throws
         var blocker = Path.Combine(paths.StateRoot, "migration");
-        File.WriteAllText(blocker, "a file blocks the migration records directory");
+        await File.WriteAllTextAsync(blocker, "a file blocks the migration records directory");
         var decisions = new MigrationDecisionStore(blocker, FlintJsonContext.Default.MigrationDecisionRecord);
         Directory.CreateDirectory(Path.Combine(data, "assets", "indexes"));
         await File.WriteAllTextAsync(Path.Combine(data, "assets", "indexes", "5.json"), "{}");

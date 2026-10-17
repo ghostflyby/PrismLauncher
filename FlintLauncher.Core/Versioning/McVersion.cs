@@ -36,7 +36,7 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
 
     public McVersion(string str)
     {
-        _string = str ?? "";
+        _string = str;
         Parse();
     }
 

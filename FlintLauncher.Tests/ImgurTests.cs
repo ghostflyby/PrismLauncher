@@ -12,7 +12,7 @@ using FlintLauncher.Core.Screenshots;
 using FlintLauncher.Core.Tasks;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class ImgurTests : IDisposable
 {

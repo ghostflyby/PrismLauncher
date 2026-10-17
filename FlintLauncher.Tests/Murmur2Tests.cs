@@ -13,7 +13,7 @@ using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Hashing;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class Murmur2Tests
 {
@@ -126,7 +126,7 @@ public class Murmur2Tests
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, "mod.jar");
         var data = "file content"u8.ToArray();
-        File.WriteAllBytes(path, data);
+        await File.WriteAllBytesAsync(path, data);
 
         Murmur2.FilterFunc cf = c => c is 9 or 10 or 13 or 32;
         Assert.Equal(Murmur2.Hash(data, cf).ToString(), HashUtils.HashFile(path, Algorithm.Murmur2));

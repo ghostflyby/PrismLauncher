@@ -108,7 +108,7 @@ public class CoverageFixCoreTests
         Assert.False(Variant.AsBool(store.Get("LowMemWarning")));
         Assert.True(File.Exists(store.FilePath));
         var reloaded = new FlintConfigStore(store.FilePath, FlintJsonContext.Default.FlintConfigFile);
-        Assert.False(reloaded.Current.Memory.LowMemWarning!.Value);
+        Assert.False(reloaded.Current.Memory!.LowMemWarning!.Value);
     }
 
     [Fact]

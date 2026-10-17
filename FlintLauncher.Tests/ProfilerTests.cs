@@ -8,7 +8,7 @@ using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tools;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class ProfilerTests
 {

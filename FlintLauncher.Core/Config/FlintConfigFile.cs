@@ -26,23 +26,29 @@ public sealed record FlintConfigFile
     /// property initializer (the C++ default) is materialized.</summary>
     public static FlintConfigFile Default() => new();
 
-    public LauncherConfig Launcher { get; init; } = new();
-    public ConsoleConfig Console { get; init; } = new();
-    public GameTimeConfig GameTime { get; init; } = new();
-    public WindowConfig Window { get; init; } = new();
-    public MemoryConfig Memory { get; init; } = new();
-    public PerformanceConfig Performance { get; init; } = new();
-    public NativeLibConfig NativeLib { get; init; } = new();
-    public CommandsConfig Commands { get; init; } = new();
-    public MinecraftMiscConfig MinecraftMisc { get; init; } = new();
-    public ModDownloadConfig ModDownload { get; init; } = new();
-    public JavaConfig Java { get; init; } = new();
-    public DirsConfig Dirs { get; init; } = new();
-    public LanguageConfig Language { get; init; } = new();
-    public MirrorConfig Mirror { get; init; } = new();
-    public ProxyConfig Proxy { get; init; } = new();
-    public ApiConfig Api { get; init; } = new();
-    public ToolsConfig Tools { get; init; } = new();
+    // NOTE: the domain members are NULLABLE even though they carry `= new()` initializers:
+    // the source-generated deserializer does not honor property initializers for members
+    // absent from a payload, so a PARTIAL flint.json payload (a layer above the fold's
+    // base, see FlintConfigFold) genuinely carries null domains. Only Default()/new() and
+    // the fold result are guaranteed materialized. The honest annotation is what keeps
+    // the fold's null fallbacks from being "simplified" away.
+    public LauncherConfig? Launcher { get; init; } = new();
+    public ConsoleConfig? Console { get; init; } = new();
+    public GameTimeConfig? GameTime { get; init; } = new();
+    public WindowConfig? Window { get; init; } = new();
+    public MemoryConfig? Memory { get; init; } = new();
+    public PerformanceConfig? Performance { get; init; } = new();
+    public NativeLibConfig? NativeLib { get; init; } = new();
+    public CommandsConfig? Commands { get; init; } = new();
+    public MinecraftMiscConfig? MinecraftMisc { get; init; } = new();
+    public ModDownloadConfig? ModDownload { get; init; } = new();
+    public JavaConfig? Java { get; init; } = new();
+    public DirsConfig? Dirs { get; init; } = new();
+    public LanguageConfig? Language { get; init; } = new();
+    public MirrorConfig? Mirror { get; init; } = new();
+    public ProxyConfig? Proxy { get; init; } = new();
+    public ApiConfig? Api { get; init; } = new();
+    public ToolsConfig? Tools { get; init; } = new();
 }
 
 /// <summary>Launcher shell + concurrency/network behavior (the C++ "launcher" settings

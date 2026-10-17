@@ -34,14 +34,18 @@ public static class FlintConfigFold
 
     /// <summary>Fold <paramref name="upper"/> over <paramref name="lower"/>: non-null upper
     /// members win, null inherits (C7). BOTH sides may be partial payloads (deserialization
-    /// leaves absent domain objects and members null) — a domain absent from the lower side
-    /// falls back to the record defaults, so the fold result is always fully materialized.
+    /// leaves absent domain objects and members null) — a domain absent from either side
+    /// falls back to the record defaults inside the member-level merges, so the fold result
+    /// is always fully materialized.
     /// NOTE: layers are expected to arrive as PARTIAL PAYLOADS; a hand-materialized
     /// <c>new JavaConfig()</c> has every member non-null (the property initializers ran) and
     /// therefore overrides the lower layer with the defaults — construct test/fixture layers
     /// via JSON payloads, not object initializers, when inheritance matters.</summary>
     public static FlintConfigFile Merge(FlintConfigFile lower, FlintConfigFile upper) => lower with
     {
+        // the domain members are nullable (FlintConfigFile) — a partial payload layer may
+        // carry null domains, which fall back to the record defaults here; the honest
+        // nullable annotation is what keeps these coalescings from reading as redundant
         Launcher = Merge(lower.Launcher ?? new LauncherConfig(), upper.Launcher),
         Console = Merge(lower.Console ?? new ConsoleConfig(), upper.Console),
         GameTime = Merge(lower.GameTime ?? new GameTimeConfig(), upper.GameTime),

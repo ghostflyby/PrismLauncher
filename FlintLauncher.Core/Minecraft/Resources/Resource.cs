@@ -87,64 +87,64 @@ public partial class Resource
 
     public Resource(FileInfo fileInfo)
     {
-        SetFile(fileInfo);
+        Fileinfo = fileInfo;
     }
 
-    public void SetFile(FileInfo fileInfo)
-    {
-        this.fileInfo = fileInfo;
-        ParseFile();
+    public FileInfo Fileinfo { get;
+        set
+        {
+            field = value;
+            ParseFile();
+        }
     }
 
-    public FileInfo Fileinfo => fileInfo;
+    public DateTime DateTimeChanged { get; private set; }
 
-    public DateTime DateTimeChanged => changedDateTime;
+    public string InternalId { get; private set; } = "";
 
-    public string InternalId => internalId;
-
-    public ResourceType Type => type;
+    public ResourceType Type { get; private set; } = ResourceType.Unknown;
 
     public bool Enabled { get; protected set; } = true;
 
-    public string SizeStr => sizeStr;
+    public string SizeStr { get; private set; } = "";
 
-    public long SizeInfo => sizeInfo;
+    public long SizeInfo { get; private set; }
 
     public virtual string Name => name;
 
     public virtual bool Valid => Type != ResourceType.Unknown;
 
-    public ResourceStatus Status => status;
+    public ResourceStatus Status { get; private set; } = ResourceStatus.Unknown;
 
     public void SetStatus(ResourceStatus status)
     {
-        this.status = status;
+        Status = status;
     }
 
     /// <summary>Port of Resource::shouldResolve (the parse-task bookkeeping).</summary>
-    public bool ShouldResolve => !isResolving && !isResolved;
+    public bool ShouldResolve => !IsResolving && !IsResolved;
 
-    public bool IsResolving => isResolving;
+    public bool IsResolving { get; private set; }
 
-    public bool IsResolved => isResolved;
+    public bool IsResolved { get; private set; }
 
-    public int ResolutionTicket => resolutionTicket;
+    public int ResolutionTicket { get; private set; }
 
     public void SetResolving(bool resolving, int resolutionTicket)
     {
-        isResolving = resolving;
-        this.resolutionTicket = resolutionTicket;
+        IsResolving = resolving;
+        ResolutionTicket = resolutionTicket;
     }
 
     /// <summary>Marks the pending parse as concluded (C++ sets m_isResolved in finishResolvingWithDetails).</summary>
     protected void SetResolved()
     {
-        isResolved = true;
+        IsResolved = true;
     }
 
     public string GetOriginalFileName()
     {
-        var fileName = fileInfo.Name;
+        var fileName = Fileinfo.Name;
         if (!Enabled)
         {
             fileName = fileName[..^9]; // chop ".disabled"
@@ -154,19 +154,19 @@ public partial class Resource
 
     public void ParseFile()
     {
-        var fileName = fileInfo.Name;
+        var fileName = Fileinfo.Name;
 
-        type = ResourceType.Unknown;
+        Type = ResourceType.Unknown;
 
-        internalId = fileName;
+        InternalId = fileName;
 
-        (sizeStr, sizeInfo) = CalculateFileSize(fileInfo);
-        if (Directory.Exists(fileInfo.FullName) && !File.Exists(fileInfo.FullName))
+        (SizeStr, SizeInfo) = CalculateFileSize(Fileinfo);
+        if (Directory.Exists(Fileinfo.FullName) && !File.Exists(Fileinfo.FullName))
         {
-            type = ResourceType.Folder;
+            Type = ResourceType.Folder;
             name = fileName;
         }
-        else if (File.Exists(fileInfo.FullName))
+        else if (File.Exists(Fileinfo.FullName))
         {
             if (fileName.EndsWith(".disabled", StringComparison.Ordinal))
             {
@@ -176,28 +176,28 @@ public partial class Resource
 
             if (fileName.EndsWith(".zip", StringComparison.Ordinal) || fileName.EndsWith(".jar", StringComparison.Ordinal))
             {
-                type = ResourceType.ZipFile;
+                Type = ResourceType.ZipFile;
                 fileName = fileName[..^4];
             }
             else if (fileName.EndsWith(".nilmod", StringComparison.Ordinal))
             {
-                type = ResourceType.ZipFile;
+                Type = ResourceType.ZipFile;
                 fileName = fileName[..^7];
             }
             else if (fileName.EndsWith(".litemod", StringComparison.Ordinal))
             {
-                type = ResourceType.LiteMod;
+                Type = ResourceType.LiteMod;
                 fileName = fileName[..^8];
             }
             else
             {
-                type = ResourceType.SingleFile;
+                Type = ResourceType.SingleFile;
             }
 
             name = fileName;
         }
 
-        changedDateTime = LastModified(fileInfo);
+        DateTimeChanged = LastModified(Fileinfo);
     }
 
     /// <summary>Port of Resource::provider: without the metadata layer this is always the fallback.</summary>
@@ -315,7 +315,7 @@ public partial class Resource
             return false;
         }
 
-        var path = fileInfo.FullName;
+        var path = Fileinfo.FullName;
 
         var enable = action switch
         {
@@ -350,7 +350,7 @@ public partial class Resource
 
         try
         {
-            File.Move(fileInfo.FullName, path);
+            File.Move(Fileinfo.FullName, path);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
                                  or NotSupportedException)
@@ -358,7 +358,7 @@ public partial class Resource
             return false;
         }
 
-        SetFile(new FileInfo(path));
+        Fileinfo = new FileInfo(path);
 
         Enabled = enable;
         return true;
@@ -371,12 +371,12 @@ public partial class Resource
     /// </summary>
     public bool Destroy(bool attemptTrash = true)
     {
-        type = ResourceType.Unknown;
+        Type = ResourceType.Unknown;
         _ = attemptTrash; // no portable trash; always delete directly
-        return FileSystem.DeletePath(fileInfo.FullName);
+        return FileSystem.DeletePath(Fileinfo.FullName);
     }
 
-    public bool IsSymLink => (File.GetAttributes(fileInfo.FullName) & FileAttributes.ReparsePoint) != 0;
+    public bool IsSymLink => (File.GetAttributes(Fileinfo.FullName) & FileAttributes.ReparsePoint) != 0;
 
     /// <summary>
     /// Port of Resource::isSymLinkUnder: checks if the file pointed to by the resource is a
@@ -389,8 +389,8 @@ public partial class Resource
             return true;
         }
 
-        var relAbsPath = Path.GetRelativePath(Path.GetFullPath(instPath), fileInfo.FullName);
-        var relCanonPath = Path.GetRelativePath(Path.GetFullPath(instPath), CanonicalFilePath(fileInfo.FullName));
+        var relAbsPath = Path.GetRelativePath(Path.GetFullPath(instPath), Fileinfo.FullName);
+        var relCanonPath = Path.GetRelativePath(Path.GetFullPath(instPath), CanonicalFilePath(Fileinfo.FullName));
 
         return relAbsPath != relCanonPath;
     }
@@ -400,23 +400,13 @@ public partial class Resource
     // ------------------------------------------------------------------ internals
 
     /* The file corresponding to this resource. */
-    private FileInfo fileInfo = new(".");
     /* The cached date when this file was last changed. */
-    private DateTime changedDateTime;
     /* Internal ID for internal purposes. Properties such as human-readability should not be assumed. */
-    private string internalId = "";
     /* Name as reported via the file name. In the absence of a better name, this is shown to the user. */
     private string name = "";
     /* The type of file we're dealing with. */
-    private ResourceType type = ResourceType.Unknown;
     /* Installation status of the resource. */
-    private ResourceStatus status = ResourceStatus.Unknown;
     /* Used to keep track of pending / concluded parse actions on the resource. */
-    private bool isResolving;
-    private bool isResolved;
-    private int resolutionTicket;
-    private string sizeStr = "";
-    private long sizeInfo;
 
     /// <summary>QFileInfo::canonicalFilePath: the path with symlinks resolved (best effort).</summary>
     private static string CanonicalFilePath(string path)

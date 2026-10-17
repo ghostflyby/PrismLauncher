@@ -14,7 +14,6 @@ using System.IO.Compression;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
-using Flint.Tests;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
@@ -235,7 +234,7 @@ public class ExtractNativesTests
     {
         var entry = zip.GetEntry(name);
         Assert.NotNull(entry);
-        using var reader = new StreamReader(entry.Open());
+        using var reader = new StreamReader(await entry.OpenAsync());
         return await reader.ReadToEndAsync();
     }
 

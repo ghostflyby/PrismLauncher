@@ -16,7 +16,7 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class TechnicTests : IDisposable
 {
@@ -206,7 +206,7 @@ public class TechnicTests : IDisposable
             """{"recommended":"1.1.0","latest":"1.2.0","builds":["1.0.0","1.1.0","1.2.0"]}""");
 
         Assert.NotNull(pack);
-        Assert.Equal("1.1.0", pack!.Recommended);
+        Assert.Equal("1.1.0", pack.Recommended);
         Assert.Equal("1.2.0", pack.Latest);
         Assert.Equal(["1.0.0", "1.1.0", "1.2.0"], pack.Builds);
 
@@ -227,10 +227,10 @@ public class TechnicTests : IDisposable
         Assert.Equal("technic=1\n", await File.ReadAllTextAsync(Path.Combine(staging, "minecraft", "modpack", "options.txt")));
         Assert.True(File.Exists(Path.Combine(staging, "minecraft", "bin", "version.json")));
         // instance.json identity (D4)
-        var cfg = File.ReadAllText(Path.Combine(staging, "instance.json"));
+        var cfg = await File.ReadAllTextAsync(Path.Combine(staging, "instance.json"));
         Assert.Contains("Technic Imported", cfg);
         // the forge library name was translated into the component version
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         var components = doc.RootElement.GetProperty("components").EnumerateArray()
             .Select(c => (Uid: c.GetProperty("uid").GetString(), Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
             .ToList();
@@ -250,7 +250,7 @@ public class TechnicTests : IDisposable
         Assert.True(task.WasSuccessful, task.FailReason);
 
         var staging = Path.Combine(_root, "instances", "Technic 1710");
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
             c => c.GetProperty("uid").GetString() == "net.minecraftforge"
                  && c.GetProperty("version").GetString() == "10.13.4.1614");
@@ -266,7 +266,7 @@ public class TechnicTests : IDisposable
         var task = await RunZipInstall(fabricPack, name: "Technic Fabric");
         Assert.True(task.WasSuccessful, task.FailReason);
         var staging = Path.Combine(_root, "instances", "Technic Fabric");
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
             c => c.GetProperty("uid").GetString() == "net.fabricmc.fabric-loader"
                  && c.GetProperty("version").GetString() == "0.14.21");
@@ -278,7 +278,7 @@ public class TechnicTests : IDisposable
         var task2 = await RunZipInstall(quiltPack, name: "Technic Quilt");
         Assert.True(task2.WasSuccessful, task2.FailReason);
         var staging2 = Path.Combine(_root, "instances", "Technic Quilt");
-        using var doc2 = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging2, "mmc-pack.json")));
+        using var doc2 = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging2, "mmc-pack.json")));
         Assert.Contains(doc2.RootElement.GetProperty("components").EnumerateArray(),
             c => c.GetProperty("uid").GetString() == "org.quiltmc.quilt-loader"
                  && c.GetProperty("version").GetString() == "0.19.0");
@@ -302,7 +302,7 @@ public class TechnicTests : IDisposable
         Assert.NotEmpty(Directory.GetFiles(Path.Combine(staging, "jarmods")));
         Assert.Contains(Directory.GetFiles(Path.Combine(staging, "patches")),
             f => Path.GetFileName(f).StartsWith("custom.jarmod."));
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         var components = doc.RootElement.GetProperty("components").EnumerateArray()
             .Select(c => (Uid: c.GetProperty("uid").GetString(), Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
             .ToList();
@@ -331,7 +331,7 @@ public class TechnicTests : IDisposable
         Assert.True(task.WasSuccessful, task.FailReason);
 
         var staging = Path.Combine(_root, "instances", "Technic Embedded");
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         var components = doc.RootElement.GetProperty("components").EnumerateArray()
             .Select(c => (Uid: c.GetProperty("uid").GetString(), Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
             .ToList();
@@ -354,7 +354,7 @@ public class TechnicTests : IDisposable
         Assert.True(task.WasSuccessful, task.FailReason);
 
         var staging = Path.Combine(_root, "instances", "Technic Fml");
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
             c => c.GetProperty("uid").GetString() == "net.minecraft"
                  && c.GetProperty("version").GetString() == "1.6.4");
@@ -383,7 +383,7 @@ public class TechnicTests : IDisposable
         Assert.True(task.WasSuccessful, task.FailReason);
 
         var staging = Path.Combine(_root, "instances", "Technic Vanilla");
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         var components = doc.RootElement.GetProperty("components").EnumerateArray().ToList();
         Assert.Single(components);
         Assert.Equal("net.minecraft", components[0].GetProperty("uid").GetString());
@@ -434,7 +434,7 @@ public class TechnicTests : IDisposable
         Assert.Equal("solder mod payload",
             await File.ReadAllTextAsync(Path.Combine(staging, "minecraft", "mods", "soldermod.jar")));
         // the postProcess used the build's minecraft version (vanilla flavor)
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         var components = doc.RootElement.GetProperty("components").EnumerateArray().ToList();
         Assert.Single(components);
         Assert.Equal("net.minecraft", components[0].GetProperty("uid").GetString());
@@ -501,7 +501,7 @@ public class TechnicTests : IDisposable
 
         Assert.True(task.WasSuccessful, task.FailReason);
         var staging = Path.Combine(_root, "instances", "Solder Vanilla");
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
             c => c.GetProperty("uid").GetString() == "net.minecraft"
                  && c.GetProperty("version").GetString() == "1.16.5");

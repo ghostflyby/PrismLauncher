@@ -5,7 +5,6 @@
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
-using Flint.Tests;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using Xunit;
@@ -412,7 +411,7 @@ public class NetStackTests : IDisposable
 
     private sealed class TestHttpServer : IDisposable
     {
-        private readonly HttpListener _listener = new();
+        private readonly HttpListener _listener;
 
         public TestHttpServer(Action<HttpListenerContext> handler)
         {

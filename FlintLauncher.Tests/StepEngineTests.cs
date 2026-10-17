@@ -49,16 +49,11 @@ public class StepEngineTests
     }
 
     /// <summary>A step that only finishes when released (or aborted).</summary>
-    private sealed class WaitingStep : LaunchStep
+    private sealed class WaitingStep(LaunchTask parent, string name) : LaunchStep(parent)
     {
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public WaitingStep(LaunchTask parent, string name) : base(parent)
-        {
-            Name = name;
-        }
-
-        public string Name { get; }
+        public string Name { get; } = name;
 
         public bool Started { get; private set; }
 

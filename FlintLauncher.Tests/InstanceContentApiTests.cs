@@ -16,7 +16,6 @@ using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
-using Flint.Tests;
 using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Nbt;
 using FlintLauncher.Web;
@@ -316,10 +315,10 @@ public class InstanceCopyApiTests : IAsyncDisposable
 
         var gameRoot = host.GameRootOf(srcId);
         Directory.CreateDirectory(Path.Combine(gameRoot, "mods"));
-        File.WriteAllText(Path.Combine(gameRoot, "mods", "kept.jar"), "mod");
+        await File.WriteAllTextAsync(Path.Combine(gameRoot, "mods", "kept.jar"), "mod");
         Directory.CreateDirectory(Path.Combine(gameRoot, "saves", "World"));
-        File.WriteAllText(Path.Combine(gameRoot, "saves", "World", "level.dat"), "level");
-        File.WriteAllText(Path.Combine(gameRoot, "options.txt"), "difficulty=hard");
+        await File.WriteAllTextAsync(Path.Combine(gameRoot, "saves", "World", "level.dat"), "level");
+        await File.WriteAllTextAsync(Path.Combine(gameRoot, "options.txt"), "difficulty=hard");
 
         // copy without saves/mods, resetting playtime, into its own group
         var copy = await host.PostAsync($"/api/v1/instances/{Uri.EscapeDataString(srcId)}/copy",
@@ -734,10 +733,10 @@ public class ResourceApiTests : IAsyncDisposable
 
         // seed mods (one disabled via the .disabled suffix) + a resource pack
         Directory.CreateDirectory(Path.Combine(gameRoot, "mods"));
-        File.WriteAllText(Path.Combine(gameRoot, "mods", "alpha.jar"), "a");
-        File.WriteAllText(Path.Combine(gameRoot, "mods", "beta.jar.disabled"), "b");
+        await File.WriteAllTextAsync(Path.Combine(gameRoot, "mods", "alpha.jar"), "a");
+        await File.WriteAllTextAsync(Path.Combine(gameRoot, "mods", "beta.jar.disabled"), "b");
         Directory.CreateDirectory(Path.Combine(gameRoot, "resourcepacks"));
-        File.WriteAllText(Path.Combine(gameRoot, "resourcepacks", "pack.zip"), "p");
+        await File.WriteAllTextAsync(Path.Combine(gameRoot, "resourcepacks", "pack.zip"), "p");
         Directory.CreateDirectory(Path.Combine(gameRoot, "datapacks"));
 
         // the merge decision: type=mods on the resources family is rejected in favor of the
@@ -828,7 +827,7 @@ public class ScreenshotApiTests : IAsyncDisposable
         Directory.CreateDirectory(dir);
         File.WriteAllBytes(Path.Combine(dir, "a.png"), [0x89, 0x50, 0x4E, 0x47, 1, 2, 3]);
         File.WriteAllBytes(Path.Combine(dir, "b.png"), [0x89, 0x50, 0x4E, 0x47, 4, 5]);
-        File.WriteAllText(Path.Combine(dir, "notes.txt"), "not an image");
+        await File.WriteAllTextAsync(Path.Combine(dir, "notes.txt"), "not an image");
         return await WaveApiHost.StartAsync(_dataDir);
     }
 

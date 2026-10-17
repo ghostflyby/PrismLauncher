@@ -7,7 +7,7 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Auth;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class OfflineAccountTests
 {
@@ -83,7 +83,7 @@ public class OfflineAccountTests
 
         var reloaded = MinecraftAccount.LoadFromJsonV3(saved);
         Assert.NotNull(reloaded);
-        Assert.Equal(AccountType.Offline, reloaded!.AccountType);
+        Assert.Equal(AccountType.Offline, reloaded.AccountType);
         Assert.Equal("Notch", reloaded.ProfileName());
         Assert.Equal(account.ProfileId(), reloaded.ProfileId());
         Assert.Equal("0", reloaded.AccessToken());

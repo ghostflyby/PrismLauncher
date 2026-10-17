@@ -89,7 +89,6 @@ public static class HardwareInfo
             {
                 return status.ullTotalPhys / 1024 / 1024;
             }
-            return 0;
         }
         return 0;
     }
@@ -110,7 +109,6 @@ public static class HardwareInfo
             {
                 return status.ullAvailPhys / 1024 / 1024;
             }
-            return 0;
         }
         return 0;
     }
@@ -224,16 +222,14 @@ public static class HardwareInfo
     {
         try
         {
-            using var process = new Process
+            using var process = new Process();
+            process.StartInfo = new ProcessStartInfo
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "/bin/sh",
-                    ArgumentList = { "-c", command },
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                },
+                FileName = "/bin/sh",
+                ArgumentList = { "-c", command },
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
             };
             process.Start();
             string output;

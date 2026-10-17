@@ -112,7 +112,7 @@ public sealed class FlameCheckUpdate : FlintTask
         await CollectBlockedMods(cancellationToken);
     }
 
-    private string? GetVersionsUrl(IndexedPack project)
+    private string GetVersionsUrl(IndexedPack project)
     {
         return _flame.GetVersionsUrl(new VersionSearchArgs
         {

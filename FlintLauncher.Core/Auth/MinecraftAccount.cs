@@ -100,7 +100,7 @@ public sealed class MinecraftAccount
     /// <summary>Saves a MinecraftAccount to a JSON object and returns it.</summary>
     public JsonObject SaveToJson() => Data.SaveState();
 
-    public AuthFlow? Login(bool useDeviceCode = false, AuthEndpointsOptions? auth = null)
+    public AuthFlow Login(bool useDeviceCode = false, AuthEndpointsOptions? auth = null)
     {
         return Attach(new AuthFlow(Data, useDeviceCode ? AuthFlowAction.DeviceCode : AuthFlowAction.Login, auth));
     }

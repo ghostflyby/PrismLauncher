@@ -16,7 +16,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class FtbTests : IDisposable
 {
@@ -291,7 +291,7 @@ public class FtbTests : IDisposable
         Assert.DoesNotContain(components, c => c.Uid == "net.fabricmc.fabric-loader");
 
         // managed-pack bookkeeping (D4: instance.json, the "managed" domain)
-        var instJson = File.ReadAllText(Path.Combine(staging, "instance.json"));
+        var instJson = await File.ReadAllTextAsync(Path.Combine(staging, "instance.json"));
         Assert.Contains("managed", instJson);
         Assert.Contains("\"ftb\"", instJson);
     }

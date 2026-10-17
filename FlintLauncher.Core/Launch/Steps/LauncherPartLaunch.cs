@@ -34,8 +34,8 @@ public sealed class LauncherPartLaunch : LaunchStep
     private readonly LoggedProcess _process;
     private readonly bool _closeAfterLaunch;
     private bool closeAfterLaunchTriggered;
-    private AuthSession? session;
-    private MinecraftTarget? targetToJoin;
+    public AuthSession? Session { get; set; }
+    public MinecraftTarget? TargetToJoin { get; set; }
     private string launchScript = "";
     private bool mayProceed;
     private TaskCompletionSource? exitSignal;
@@ -60,10 +60,6 @@ public sealed class LauncherPartLaunch : LaunchStep
         }
         EmitLogLines(lines, level);
     }
-
-    public void SetAuthSession(AuthSession? session) => this.session = session;
-
-    public void SetTargetToJoin(MinecraftTarget? targetToJoin) => this.targetToJoin = targetToJoin;
 
     public void SetWorkingDirectory(string workingDirectory) => _process.SetWorkingDirectory(workingDirectory);
 
@@ -93,7 +89,7 @@ public sealed class LauncherPartLaunch : LaunchStep
             }
         }
 
-        launchScript = instance.CreateLaunchScript(session, targetToJoin, Services);
+        launchScript = instance.CreateLaunchScript(Session, TargetToJoin, Services);
         var args = instance.JavaArguments();
         var allArgs = string.Join(" ", args);
         EmitLogLine("Java arguments:\n  " + Parent.CensorPrivateInfo(allArgs) + "\n", MessageLevel.Launcher);

@@ -421,13 +421,13 @@ public sealed class FlamePackExportTask : FlintTask
             var manifestEntry = zip.CreateEntry("manifest.json", CompressionLevel.Optimal);
             using (var writer = new StreamWriter(manifestEntry.Open(), Encoding.UTF8))
             {
-                writer.Write(GenerateIndex());
+                await writer.WriteAsync(GenerateIndex());
             }
 
             var modlistEntry = zip.CreateEntry("modlist.html", CompressionLevel.Optimal);
             using (var writer = new StreamWriter(modlistEntry.Open(), Encoding.UTF8))
             {
-                writer.Write(GenerateHtml());
+                await writer.WriteAsync(GenerateHtml());
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException

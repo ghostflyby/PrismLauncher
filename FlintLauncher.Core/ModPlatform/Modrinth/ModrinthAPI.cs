@@ -459,7 +459,7 @@ public sealed class ModrinthApi : ResourceApi
         return BaseUrl + "/search?" + string.Join("&", getArguments);
     }
 
-    public override string? GetInfoUrl(string id) => BaseUrl + "/project/" + id;
+    public override string GetInfoUrl(string id) => BaseUrl + "/project/" + id;
 
     /// <summary>Port of ModrinthAPI::getMultipleModInfoURL.</summary>
     public string GetMultipleModInfoUrl(IReadOnlyList<string> ids)
@@ -467,7 +467,7 @@ public sealed class ModrinthApi : ResourceApi
         return BaseUrl + $"/projects?ids=[\"{string.Join("\",\"", ids)}\"]";
     }
 
-    public override string? GetVersionsUrl(VersionSearchArgs args)
+    public override string GetVersionsUrl(VersionSearchArgs args)
     {
         var getArguments = new List<string>();
         if (args.McVersions is { } mcVersions)
@@ -508,7 +508,7 @@ public sealed class ModrinthApi : ResourceApi
                            | ModLoaderType.Ornithe | ModLoaderType.Rift)) != 0;
     }
 
-    public override string? GetDependencyUrl(DependencySearchArgs args)
+    public override string GetDependencyUrl(DependencySearchArgs args)
     {
         return args.Dependency.Version.Length != 0
             ? $"{BaseUrl}/version/{args.Dependency.Version}"

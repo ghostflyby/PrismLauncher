@@ -34,17 +34,10 @@ public sealed class NetResponseInfo
     public Dictionary<string, string> Headers { get; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
-public sealed class ChecksumValidator : Validator
+public sealed class ChecksumValidator(HashAlgorithmName algorithm, byte[]? expected = null) : Validator
 {
-    private readonly HashAlgorithmName _algorithm;
     private IncrementalHash? hash;
-    private byte[] expected;
-
-    public ChecksumValidator(HashAlgorithmName algorithm, byte[]? expected = null)
-    {
-        _algorithm = algorithm;
-        this.expected = expected ?? [];
-    }
+    public byte[] Expected { get; set; } = expected ?? [];
 
     /// <summary>Port of the hex-string overload.</summary>
     public static ChecksumValidator FromHex(HashAlgorithmName algorithm, string expectedHex) => new(
@@ -53,7 +46,7 @@ public sealed class ChecksumValidator : Validator
 
     public override bool Init(NetRequestSpec request)
     {
-        hash = IncrementalHash.CreateHash(_algorithm);
+        hash = IncrementalHash.CreateHash(algorithm);
         return true;
     }
 
@@ -71,7 +64,7 @@ public sealed class ChecksumValidator : Validator
 
     public override bool Validate(NetResponseInfo response)
     {
-        if (expected.Length > 0 && !expected.AsSpan().SequenceEqual(Hash()))
+        if (Expected.Length > 0 && !Expected.AsSpan().SequenceEqual(Hash()))
         {
             return false;
         }
@@ -89,5 +82,4 @@ public sealed class ChecksumValidator : Validator
         return result;
     }
 
-    public void SetExpected(byte[] expected) => this.expected = expected;
 }

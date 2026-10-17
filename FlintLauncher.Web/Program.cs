@@ -7,4 +7,7 @@ using WebHostBuilder = FlintLauncher.Web.WebHostBuilder;
 WebHostBuilder.BuildWebApplication(args).Run();
 
 // Exposed for WebApplicationFactory-based integration tests.
-public partial class Program;
+namespace FlintLauncher.Web
+{
+    public partial class Program;
+}

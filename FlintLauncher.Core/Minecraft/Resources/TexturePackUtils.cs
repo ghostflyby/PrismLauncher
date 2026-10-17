@@ -125,7 +125,7 @@ public static class TexturePackUtils
             foreach (var entry in zip.Entries)
             {
                 var filename = entry.FullName;
-                var stop = false;
+                bool stop;
                 if (!packProcessed && filename == "pack.txt")
                 {
                     packProcessed = true;

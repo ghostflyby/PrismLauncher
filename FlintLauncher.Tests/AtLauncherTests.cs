@@ -15,7 +15,7 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class AtLauncherTests : IDisposable
 {
@@ -170,7 +170,7 @@ public class AtLauncherTests : IDisposable
 
         Assert.Null(error);
         Assert.NotNull(shareCode);
-        Assert.Equal("Test Pack", shareCode!.Pack);
+        Assert.Equal("Test Pack", shareCode.Pack);
         Assert.Equal("1.0.0", shareCode.Version);
         Assert.Equal(2, shareCode.Mods.Count);
         Assert.True(shareCode.Mods[0].Selected);
@@ -227,7 +227,7 @@ public class AtLauncherTests : IDisposable
         Assert.Contains(Directory.GetFiles(patches), f => Path.GetFileName(f).StartsWith("custom.jarmod."));
 
         // instance.json identity + the net.minecraft component from the pack (D4)
-        var cfg = File.ReadAllText(Path.Combine(staging, "instance.json"));
+        var cfg = await File.ReadAllTextAsync(Path.Combine(staging, "instance.json"));
         Assert.Contains("ATL Imported", cfg);
         var components = Components(staging);
         Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.20.1");
@@ -269,7 +269,7 @@ public class AtLauncherTests : IDisposable
 
         Assert.True(task.WasSuccessful, task.FailReason);
         var staging = Path.Combine(_root, "instances", "ATL Forge");
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
             c => c.GetProperty("uid").GetString() == "net.minecraftforge"
                  && c.GetProperty("version").GetString() == "40.1.0");
@@ -416,7 +416,7 @@ public class AtLauncherTests : IDisposable
 
         Assert.True(task.WasSuccessful, task.FailReason);
         var staging = Path.Combine(_root, "instances", "ATL Recommended2");
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
             c => c.GetProperty("uid").GetString() == "net.minecraftforge"
                  && c.GetProperty("version").GetString() == "40.2.0");
@@ -444,7 +444,7 @@ public class AtLauncherTests : IDisposable
 
         Assert.True(task.WasSuccessful, task.FailReason);
         var staging = Path.Combine(_root, "instances", "ATL Choose");
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
             c => c.GetProperty("uid").GetString() == "net.fabricmc.fabric-loader"
                  && c.GetProperty("version").GetString() == "0.14.21");
@@ -473,7 +473,7 @@ public class AtLauncherTests : IDisposable
         var staging = Path.Combine(_root, "instances", "ATL MainClass");
         var patch = Directory.GetFiles(Path.Combine(staging, "patches"))
             .First(f => Path.GetFileName(f).StartsWith("org.multimc.atlauncher."));
-        using var doc = JsonDocument.Parse(File.ReadAllText(patch));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(patch));
         Assert.Equal("net.minecraft.launchwrapper.Launch", doc.RootElement.GetProperty("mainClass").GetString());
         Assert.Equal("Test Pack 1.0.0", doc.RootElement.GetProperty("name").GetString());
     }

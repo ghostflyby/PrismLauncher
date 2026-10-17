@@ -6,9 +6,9 @@
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
-using Flint.Tests;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Java;
+using FlintLauncher.Core.Java.Download;
 using FlintLauncher.Core.Tasks;
 using Xunit;
 
@@ -47,8 +47,8 @@ public class JavaDownloadTests : IDisposable
         // JDK archive whose every path sits under one top-level folder
         var sourceDir = TempPath("jdk-src/jdk-17.0.9");
         Directory.CreateDirectory(Path.Combine(sourceDir, "Contents/Home/bin"));
-        File.WriteAllText(Path.Combine(sourceDir, "Contents/Home/bin/java"), "java-binary");
-        File.WriteAllText(Path.Combine(sourceDir, "release"), "JAVA_VERSION=\"17.0.9\"");
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "Contents/Home/bin/java"), "java-binary");
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "release"), "JAVA_VERSION=\"17.0.9\"");
         Assert.True(MmcZip.CompressDir(zipPath, TempPath("jdk-src")));
 
         using var server = new TestHttpServer(ctx =>
@@ -118,7 +118,7 @@ public class JavaDownloadTests : IDisposable
         // the task runs a listing pass first (C++: collectFiles) to find the strip folder
         var names = TarArchive.ListTarGzFile(tarPath, out var listError);
         Assert.True(names is not null, $"ListTarGzFile failed: {listError}");
-        Assert.Equal("jdk-17.0.9/", names![0]);
+        Assert.Equal("jdk-17.0.9/", names[0]);
         var task = new ArchiveDownloadTask(new Uri($"{server.Url}/jdk-17.0.9.tar.gz"), finalPath);
 
         await task.StartAsync();
@@ -292,9 +292,9 @@ public class JavaDownloadTests : IDisposable
         var home = Path.Combine(target, "Contents", "Home");
         Directory.CreateDirectory(Path.Combine(home, "bin"));
         Directory.CreateDirectory(Path.Combine(home, "lib"));
-        File.WriteAllText(Path.Combine(home, "bin/java"), "java-binary");
-        File.WriteAllText(Path.Combine(home, "lib/native.dylib"), "dylib");
-        File.WriteAllText(Path.Combine(home, "release"), "JAVA_VERSION=17");
+        await File.WriteAllTextAsync(Path.Combine(home, "bin/java"), "java-binary");
+        await File.WriteAllTextAsync(Path.Combine(home, "lib/native.dylib"), "dylib");
+        await File.WriteAllTextAsync(Path.Combine(home, "release"), "JAVA_VERSION=17");
 
         var task = new SymlinkTask(target);
         await task.StartAsync();
@@ -315,7 +315,7 @@ public class JavaDownloadTests : IDisposable
     {
         var target = TempPath("symlink-flat");
         Directory.CreateDirectory(Path.Combine(target, "bin"));
-        File.WriteAllText(Path.Combine(target, "bin/java"), "java-binary");
+        await File.WriteAllTextAsync(Path.Combine(target, "bin/java"), "java-binary");
 
         var alreadyThere = new SymlinkTask(target);
         await alreadyThere.StartAsync();

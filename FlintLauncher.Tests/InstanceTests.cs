@@ -10,7 +10,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Settings;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class InstanceTests : IDisposable
 {

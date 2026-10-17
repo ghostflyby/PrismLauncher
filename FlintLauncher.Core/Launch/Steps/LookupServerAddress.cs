@@ -9,25 +9,13 @@ using FlintLauncher.Core.Instances;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class LookupServerAddress : LaunchStep
+public sealed class LookupServerAddress(LaunchTask parent, MinecraftTarget output) : LaunchStep(parent)
 {
-    private readonly MinecraftTarget _output;
-    private string lookupAddress = "";
-
-    public LookupServerAddress(LaunchTask parent, MinecraftTarget output) : base(parent)
-    {
-        _output = output;
-    }
-
-    /// <summary>Port of setLookupAddress.</summary>
-    public void SetLookupAddress(string lookupAddress)
-    {
-        this.lookupAddress = lookupAddress;
-    }
+    public string LookupAddress { get; set; } = "";
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        var dnsName = $"_minecraft._tcp.{lookupAddress}";
+        var dnsName = $"_minecraft._tcp.{LookupAddress}";
         SrvRecord? record;
         try
         {
@@ -38,7 +26,7 @@ public sealed class LookupServerAddress : LaunchStep
         {
             EmitLogLine($"Failed to resolve server address (this is NOT an error!) {dnsName}: {e.Message}\n",
                 MessageLevel.Launcher);
-            Resolve(lookupAddress, 25565); // Technically the task failed, however, we don't abort the launch
+            Resolve(LookupAddress, 25565); // Technically the task failed, however, we don't abort the launch
             return;                         // and leave it up to minecraft to fail (or maybe not) when connecting
         }
 
@@ -46,7 +34,7 @@ public sealed class LookupServerAddress : LaunchStep
         {
             EmitLogLine($"Failed to resolve server address {dnsName}: the DNS lookup succeeded, but no records were returned.\n",
                 MessageLevel.Warning);
-            Resolve(lookupAddress, 25565);
+            Resolve(LookupAddress, 25565);
             return;
         }
 
@@ -57,8 +45,8 @@ public sealed class LookupServerAddress : LaunchStep
 
     private void Resolve(string address, ushort port)
     {
-        _output.Address = address;
-        _output.Port = port;
+        output.Address = address;
+        output.Port = port;
         EmitSucceeded();
     }
 

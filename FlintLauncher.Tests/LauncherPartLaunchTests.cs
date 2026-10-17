@@ -97,7 +97,7 @@ public class LauncherPartLaunchTests : IDisposable
         var javaPath = WriteFakeJava();
 
         var task = BuildLaunchTask(fixture, instance, javaPath, out var step);
-        step.SetAuthSession(session);
+        step.Session = session;
 
         long pidAtLaunch = -1;
         task.ReadyForLaunch += () =>
@@ -140,7 +140,7 @@ public class LauncherPartLaunchTests : IDisposable
         var javaPath = WriteFakeJava();
 
         var task = BuildLaunchTask(fixture, instance, javaPath, out var step);
-        step.SetAuthSession(fixture.OfflineSession());
+        step.Session = fixture.OfflineSession();
 
         task.ReadyForLaunch += () => task.Abort(); // abort instead of proceeding
 
@@ -172,7 +172,7 @@ public class LauncherPartLaunchTests : IDisposable
         // copies (extracted by EmbeddedJars)
         var task = BuildLaunchTask(fixture, instance, javaPath, out var step,
             installRoot: Path.Combine(_root, "does-not-exist"));
-        step.SetAuthSession(fixture.OfflineSession());
+        step.Session = fixture.OfflineSession();
         task.ReadyForLaunch += () => task.Proceed();
 
         await task.StartAsync();

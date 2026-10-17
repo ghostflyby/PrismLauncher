@@ -19,7 +19,7 @@ public static class Parsers
     public static bool GetDateTime(JsonNode? value, out DateTime outDateTime)
     {
         outDateTime = default;
-        if (value is not JsonValue v || !v.TryGetValue(out string? s) || s is null)
+        if (value is not JsonValue v || !v.TryGetValue(out string? s))
         {
             return false;
         }
@@ -34,7 +34,7 @@ public static class Parsers
     public static bool GetString(JsonNode? value, out string outString)
     {
         outString = "";
-        if (value is not JsonValue v || !v.TryGetValue(out string? s) || s is null)
+        if (value is not JsonValue v || !v.TryGetValue(out string? s))
         {
             return false;
         }
@@ -312,27 +312,27 @@ public static class Parsers
     ref: https://wiki.vg/Mojang_API#UUID_to_Profile_and_Skin.2FCape
 
     {
-        "id": "<profile identifier>",
-        "name": "<player name>",
+        "id": "{profile identifier}",
+        "name": "{player name}",
         "properties": [
             {
                 "name": "textures",
-                "value": "<base64 string>"
+                "value": "{base64 string}"
             }
         ]
     }
 
     decoded base64 "value":
     {
-        "timestamp": <java time in ms>,
-        "profileId": "<profile uuid>",
-        "profileName": "<player name>",
+        "timestamp": {java time in ms},
+        "profileId": "{profile uuid}",
+        "profileName": "{player name}",
         "textures": {
             "SKIN": {
-                "url": "<player skin URL>"
+                "url": "{player skin URL}"
             },
             "CAPE": {
-                "url": "<player cape URL>"
+                "url": "{player cape URL}"
             }
         }
     }

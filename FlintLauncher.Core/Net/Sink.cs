@@ -17,10 +17,7 @@ public abstract class Sink
 
     public void AddValidator(Validator validator)
     {
-        if (validator is not null)
-        {
-            _validators.Add(validator);
-        }
+        _validators.Add(validator);
     }
 
     public abstract bool Init(NetRequestSpec request);

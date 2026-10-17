@@ -11,7 +11,7 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 public class PasteUploadTests : IDisposable
 {

@@ -15,7 +15,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Tasks;
 using Xunit;
 
-namespace Flint.Tests;
+namespace FlintLauncher.Tests;
 
 [Collection("FlameApi")]
 public class FlameImportTests : IDisposable
@@ -106,7 +106,7 @@ public class FlameImportTests : IDisposable
         Assert.True(File.Exists(Path.Combine(staging, "flame", "manifest.json")));
 
         // loader components: minecraft 1.18.2 + forge 40.1.0
-        using (var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json"))))
+        using (var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json"))))
         {
             var components = doc.RootElement.GetProperty("components").EnumerateArray()
                 .Select(c => (Uid: c.GetProperty("uid").GetString(), Version: c.GetProperty("version").GetString()))
@@ -114,7 +114,7 @@ public class FlameImportTests : IDisposable
             Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.18.2");
             Assert.Contains(components, c => c.Uid == "net.minecraftforge" && c.Version == "40.1.0");
         }
-        Assert.Contains("Flame Imported", File.ReadAllText(Path.Combine(staging, "instance.json")));
+        Assert.Contains("Flame Imported", await File.ReadAllTextAsync(Path.Combine(staging, "instance.json")));
 
         // per-mod .pw.toml with the Flame ([update.curseforge]) table
         var metadataToml = await File.ReadAllTextAsync(Path.Combine(staging, "minecraft", "mods", ".index", "test-mod.pw.toml"));
@@ -146,7 +146,7 @@ public class FlameImportTests : IDisposable
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         var components = doc.RootElement.GetProperty("components").EnumerateArray()
             .Select(c => (Uid: c.GetProperty("uid").GetString(), Version: c.GetProperty("version").GetString()))
             .ToList();
@@ -262,7 +262,7 @@ public class FlameImportTests : IDisposable
         RegisterResolvedMod();
         var staging = TempPath("staging-unknown-loader");
         Directory.CreateDirectory(staging);
-        File.WriteAllText(Path.Combine(staging, "manifest.json"), pack.ManifestJson);
+        await File.WriteAllTextAsync(Path.Combine(staging, "manifest.json"), pack.ManifestJson);
 
         var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName("Unknown Loader");
@@ -270,7 +270,7 @@ public class FlameImportTests : IDisposable
 
         Assert.True(task.WasSuccessful, task.FailReason);
         Assert.Contains(task.Warnings, w => w.Contains("Unknown mod loader in manifest"));
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         var components = doc.RootElement.GetProperty("components").EnumerateArray()
             .Select(c => c.GetProperty("uid").GetString()).ToList();
         Assert.Equal(["net.minecraft"], components);
@@ -287,11 +287,11 @@ public class FlameImportTests : IDisposable
         manifestObj["overrides"] = "../outside";
         var staging = TempPath("staging-traversal");
         Directory.CreateDirectory(staging);
-        File.WriteAllText(Path.Combine(staging, "manifest.json"), manifestObj.ToJsonString());
+        await File.WriteAllTextAsync(Path.Combine(staging, "manifest.json"), manifestObj.ToJsonString());
 
         var outsideMarker = TempPath("outside");
         Directory.CreateDirectory(outsideMarker);
-        File.WriteAllText(Path.Combine(outsideMarker, "sentinel.txt"), "must stay");
+        await File.WriteAllTextAsync(Path.Combine(outsideMarker, "sentinel.txt"), "must stay");
 
         var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName("Traversal");
@@ -315,7 +315,7 @@ public class FlameImportTests : IDisposable
         ((JsonObject)((JsonArray)manifestObj["minecraft"]!["modLoaders"]!)[0]!)["id"] = "forge-recommended";
         var staging = TempPath("staging-recommended");
         Directory.CreateDirectory(staging);
-        File.WriteAllText(Path.Combine(staging, "manifest.json"), manifestObj.ToJsonString());
+        await File.WriteAllTextAsync(Path.Combine(staging, "manifest.json"), manifestObj.ToJsonString());
 
         var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName("Recommended");
@@ -327,7 +327,7 @@ public class FlameImportTests : IDisposable
         // with a lookup hook the recommended version resolves (per-task hook, no global reset)
         var staging2 = TempPath("staging-recommended2");
         Directory.CreateDirectory(staging2);
-        File.WriteAllText(Path.Combine(staging2, "manifest.json"), manifestObj.ToJsonString());
+        await File.WriteAllTextAsync(Path.Combine(staging2, "manifest.json"), manifestObj.ToJsonString());
         var task2 = new FlameCreationTask(staging2, trustedSource: true, _global, flame: _flameApi)
         {
             RecommendedVersionLookup = (uid, loaderType, mcVersion) =>
@@ -340,7 +340,7 @@ public class FlameImportTests : IDisposable
         };
         await task2.StartAsync();
         Assert.True(task2.WasSuccessful, task2.FailReason);
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging2, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging2, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
             c => c.GetProperty("uid").GetString() == "net.minecraftforge"
                  && c.GetProperty("version").GetString() == "40.2.0");
@@ -354,7 +354,7 @@ public class FlameImportTests : IDisposable
         // strip the overrides from the zip by writing a manifest-only staging folder
         var staging = TempPath("staging-missing-overrides");
         Directory.CreateDirectory(staging);
-        File.WriteAllText(Path.Combine(staging, "manifest.json"), pack.ManifestJson);
+        await File.WriteAllTextAsync(Path.Combine(staging, "manifest.json"), pack.ManifestJson);
 
         var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName("Missing Overrides");
@@ -369,7 +369,7 @@ public class FlameImportTests : IDisposable
     {
         var staging = TempPath("staging-bad-manifest");
         Directory.CreateDirectory(staging);
-        File.WriteAllText(Path.Combine(staging, "manifest.json"),
+        await File.WriteAllTextAsync(Path.Combine(staging, "manifest.json"),
             """{"manifestType":"minecraftModpack","manifestVersion":9}""");
 
         var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
@@ -392,7 +392,7 @@ public class FlameImportTests : IDisposable
         ((JsonObject)((JsonArray)manifestObj["files"]!)[0]!)["required"] = false;
         var staging = TempPath("staging-optional");
         Directory.CreateDirectory(staging);
-        File.WriteAllText(Path.Combine(staging, "manifest.json"), manifestObj.ToJsonString());
+        await File.WriteAllTextAsync(Path.Combine(staging, "manifest.json"), manifestObj.ToJsonString());
 
         RegisterResolvedMod();
         var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
