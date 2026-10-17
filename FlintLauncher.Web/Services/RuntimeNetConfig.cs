@@ -27,20 +27,20 @@ public static class RuntimeNetConfig
         // the typed user layer (C5/D4 — the SettingsObject adapter view retired)
         var config = runtime.Config.Current;
         var stack = runtime.Net;
-        var userAgent = config.Api!.UserAgentOverride ?? "";
+        var userAgent = config.Api.UserAgentOverride ?? "";
         stack.Configure(
             userAgent.Length > 0 ? userAgent : FlintConfig.Default.UserAgent,
-            config.Proxy!.ProxyType ?? "None",
-            config.Proxy!.ProxyAddr ?? "127.0.0.1",
-            config.Proxy!.ProxyPort ?? 8080,
-            config.Proxy!.ProxyUser ?? "",
+            config.Proxy.ProxyType ?? "None",
+            config.Proxy.ProxyAddr ?? "127.0.0.1",
+            config.Proxy.ProxyPort ?? 8080,
+            config.Proxy.ProxyUser ?? "",
             runtime.Secrets.Get(ProxyPassSecret) ?? "");
 
-        var retries = config.Launcher!.NumberOfManualRetries ?? 1;
+        var retries = config.Launcher.NumberOfManualRetries ?? 1;
         stack.ManualRetries = retries < 0 ? 0 : retries;
 
         // C++ RequestTimeout is in seconds; 0/negative would cancel instantly, so clamp to the default
-        var timeoutSeconds = config.Launcher!.RequestTimeout ?? 60;
+        var timeoutSeconds = config.Launcher.RequestTimeout ?? 60;
         stack.RequestTimeout = TimeSpan.FromSeconds(timeoutSeconds < 1 ? 60 : timeoutSeconds);
 
         ApplyApiCredentials(runtime);
@@ -61,7 +61,7 @@ public static class RuntimeNetConfig
         runtime.Flame.ApiKeyProvider = () =>
             !string.IsNullOrEmpty(flameKey) ? flameKey : FlintConfig.Default.FlameApiKey;
 
-        var msaOverride = runtime.Config.Current.Api!.MsaClientIdOverride ?? "";
+        var msaOverride = runtime.Config.Current.Api.MsaClientIdOverride ?? "";
         runtime.Auth.MsaClientId = msaOverride.Length > 0
             ? msaOverride
             : AuthEndpointsOptions.DefaultMsaClientId;

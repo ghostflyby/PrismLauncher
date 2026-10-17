@@ -44,33 +44,34 @@ public class FlintConfigStoreTests : IDisposable
     // ------------------------------------------------------------------------ fold (C6/C7)
 
     [Fact]
-    public void Fold_Defaults_Come_From_The_Record_Property_Initializers()
+    public void Fold_Defaults_Come_From_The_Default_Table()
     {
-        // an all-null layer stack resolves to exactly the record defaults (single source —
-        // the old double table is gone)
+        // an all-null layer stack resolves to exactly the Default() table (single source —
+        // the old double table is gone; the domain records are blank)
         var resolved = FlintConfigFold.MergeOverDefault(new FlintConfigFile());
-        Assert.Equal(10, resolved.Launcher!.NumberOfConcurrentTasks);
-        Assert.Equal(6, resolved.Launcher!.NumberOfConcurrentDownloads);
-        Assert.Equal("Name", resolved.Launcher!.InstSortMode);
-        Assert.True(resolved.Console!.ShowConsoleOnError);
-        Assert.Equal(100000, resolved.Console!.ConsoleMaxLines);
-        Assert.Equal(512, resolved.Memory!.MinMemAlloc);
-        Assert.Equal(MemoryConfig.DefaultMaxMemAlloc, resolved.Memory!.MaxMemAlloc);
-        Assert.Equal(854, resolved.Window!.MinecraftWinWidth);
-        Assert.Equal("None", resolved.Proxy!.ProxyType);
-        Assert.Equal("127.0.0.1", resolved.Proxy!.ProxyAddr);
-        Assert.Equal(8080, resolved.Proxy!.ProxyPort);
-        Assert.Equal((int)PasteUpload.PasteType.Mclogs, resolved.Api!.PastebinType);
-        Assert.Equal("{}", resolved.MinecraftMisc!.Env);
-        Assert.Equal("[]", resolved.ModDownload!.ModUpdateReleaseTypes);
+        Assert.Equal(10, resolved.Launcher.NumberOfConcurrentTasks);
+        Assert.Equal(6, resolved.Launcher.NumberOfConcurrentDownloads);
+        Assert.Equal("Name", resolved.Launcher.InstSortMode);
+        Assert.True(resolved.Console.ShowConsoleOnError);
+        Assert.Equal(100000, resolved.Console.ConsoleMaxLines);
+        Assert.Equal(512, resolved.Memory.MinMemAlloc);
+        Assert.Equal(MemoryConfig.DefaultMaxMemAlloc, resolved.Memory.MaxMemAlloc);
+        Assert.Equal(854, resolved.Window.MinecraftWinWidth);
+        Assert.Equal("None", resolved.Proxy.ProxyType);
+        Assert.Equal("127.0.0.1", resolved.Proxy.ProxyAddr);
+        Assert.Equal(8080, resolved.Proxy.ProxyPort);
+        Assert.Equal((int)PasteUpload.PasteType.Mclogs, resolved.Api.PastebinType);
+        Assert.Equal("{}", resolved.MinecraftMisc.Env);
+        Assert.Equal("[]", resolved.ModDownload.ModUpdateReleaseTypes);
     }
 
     [Fact]
     public void Fold_Upper_Layer_Wins_Where_NonNull_Null_Inherits()
     {
-        // Layers are partial payloads (the shape deserialization produces — absent members
-        // are null and inherit; hand-materialized `new JavaConfig()` records would override
-        // with their defaults, which is exactly why layers arrive from payloads):
+        // Layers are partial payloads (the shape deserialization produces — absent scalars
+        // are null and inherit; the materializing constructors re-create absent DOMAINS as
+        // blank records, so a domain's presence never masks the layer below — only its set
+        // scalars win):
         // user layer sets memory + java, the instance layer (typed payloads arrive with D4)
         // overrides only MinMemAlloc.
         var user = JsonSerializer.Deserialize(
@@ -81,10 +82,10 @@ public class FlintConfigStoreTests : IDisposable
             FlintJsonContext.Default.FlintConfigFile);
 
         var resolved = FlintConfigFold.MergeOverDefault(FlintConfigFold.Merge(user!, instance!));
-        Assert.Equal(2048, resolved.Memory!.MinMemAlloc);      // instance wins
-        Assert.Equal("/opt/jdk-21", resolved.Java!.JavaPath);  // inherited from user
-        Assert.Equal(MemoryConfig.DefaultMaxMemAlloc, resolved.Memory!.MaxMemAlloc); // default
-        Assert.Equal(FlintConfigFile.Default().Dirs!.IconsDir, resolved.Dirs!.IconsDir);
+        Assert.Equal(2048, resolved.Memory.MinMemAlloc);      // instance wins
+        Assert.Equal("/opt/jdk-21", resolved.Java.JavaPath);  // inherited from user
+        Assert.Equal(MemoryConfig.DefaultMaxMemAlloc, resolved.Memory.MaxMemAlloc); // default
+        Assert.Equal(FlintConfigFile.Default().Dirs.IconsDir, resolved.Dirs.IconsDir);
     }
 
     // ------------------------------------------------------------------------ store (C5)
@@ -94,16 +95,16 @@ public class FlintConfigStoreTests : IDisposable
     {
         Assert.False(File.Exists(ConfigPath));
         var store = NewStore();
-        Assert.Equal(512, store.Current.Memory!.MinMemAlloc);
+        Assert.Equal(512, store.Current.Memory.MinMemAlloc);
         Assert.False(File.Exists(ConfigPath)); // a load without writes creates nothing
 
         store.Set("MinMemAlloc", 3072);
         Assert.True(File.Exists(ConfigPath));
-        Assert.Equal(3072, store.Current.Memory!.MinMemAlloc);
+        Assert.Equal(3072, store.Current.Memory.MinMemAlloc);
 
         // reload from disk: the resolved shape round-trips (Flint-only write side, C5)
         var reloaded = NewStore();
-        Assert.Equal(3072, reloaded.Current.Memory!.MinMemAlloc);
+        Assert.Equal(3072, reloaded.Current.Memory.MinMemAlloc);
     }
 
     [Fact]
@@ -112,11 +113,11 @@ public class FlintConfigStoreTests : IDisposable
         var store = NewStore();
         // INI-era boxed values arrive as strings/longs; the registry's Apply coerces
         store.Set("ProxyPort", "3128");
-        Assert.Equal(3128, store.Current.Proxy!.ProxyPort);
+        Assert.Equal(3128, store.Current.Proxy.ProxyPort);
         store.Set("ProxyPort", 9999L);
-        Assert.Equal(9999, store.Current.Proxy!.ProxyPort);
+        Assert.Equal(9999, store.Current.Proxy.ProxyPort);
         store.Set("LaunchMaximized", "true");
-        Assert.True(store.Current.Window!.LaunchMaximized);
+        Assert.True(store.Current.Window.LaunchMaximized);
     }
 
     [Fact]
@@ -127,9 +128,9 @@ public class FlintConfigStoreTests : IDisposable
         File.WriteAllText(ConfigPath,
             """{"launcher":{"numberOfConcurrentTasks":3},"memory":{"minMemAlloc":768}}""");
         var store = NewStore();
-        Assert.Equal(3, store.Current.Launcher!.NumberOfConcurrentTasks);
-        Assert.Equal(768, store.Current.Memory!.MinMemAlloc);
-        Assert.Equal(6, store.Current.Launcher!.NumberOfConcurrentDownloads);
+        Assert.Equal(3, store.Current.Launcher.NumberOfConcurrentTasks);
+        Assert.Equal(768, store.Current.Memory.MinMemAlloc);
+        Assert.Equal(6, store.Current.Launcher.NumberOfConcurrentDownloads);
     }
 
     [Fact]
@@ -209,14 +210,14 @@ public class FlintConfigStoreTests : IDisposable
         Assert.True(File.Exists(ConfigPath));
 
         // (3) record domains — the recognized keys landed, unknown keys did not
-        Assert.Equal(4, store.Current.Launcher!.NumberOfConcurrentTasks);
-        Assert.Equal(8192, store.Current.Memory!.MaxMemAlloc);
-        Assert.Equal("/opt/jdk", store.Current.Java!.JavaPath);
-        Assert.Equal("HTTP", store.Current.Proxy!.ProxyType);
-        Assert.Equal("proxy.corp", store.Current.Proxy!.ProxyAddr);
-        Assert.Equal(3128, store.Current.Proxy!.ProxyPort);
-        Assert.Equal("corpus", store.Current.Proxy!.ProxyUser);
-        Assert.Equal("zh_CN", store.Current.Language!.Language);
+        Assert.Equal(4, store.Current.Launcher.NumberOfConcurrentTasks);
+        Assert.Equal(8192, store.Current.Memory.MaxMemAlloc);
+        Assert.Equal("/opt/jdk", store.Current.Java.JavaPath);
+        Assert.Equal("HTTP", store.Current.Proxy.ProxyType);
+        Assert.Equal("proxy.corp", store.Current.Proxy.ProxyAddr);
+        Assert.Equal(3128, store.Current.Proxy.ProxyPort);
+        Assert.Equal("corpus", store.Current.Proxy.ProxyUser);
+        Assert.Equal("zh_CN", store.Current.Language.Language);
         // secrets must NOT be config members (C4: the format carries no secret fields)
         Assert.DoesNotContain("hunter2", File.ReadAllText(ConfigPath));
         Assert.DoesNotContain("mr-token", File.ReadAllText(ConfigPath));
@@ -261,7 +262,7 @@ public class FlintConfigStoreTests : IDisposable
         var (secrets, state) = NewSideStores();
         var imported = FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state);
         Assert.EndsWith("flint.cfg", imported.ImportedIni);
-        Assert.Equal("from-flint", store.Current.Language!.Language);
+        Assert.Equal("from-flint", store.Current.Language.Language);
     }
 
     [Fact]
@@ -275,13 +276,13 @@ public class FlintConfigStoreTests : IDisposable
         var (secrets, state) = NewSideStores();
 
         Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
-        Assert.Equal(4096, store.Current.Memory!.MaxMemAlloc);
+        Assert.Equal(4096, store.Current.Memory.MaxMemAlloc);
 
         // a later INI change must not win: flint.json now exists and is authoritative
         File.WriteAllText(Path.Combine(paths.DataRoot, "flint.cfg"),
             "[General]\nMaxMemAlloc=1111\nProxyPass=second\n");
         Assert.Null(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
-        Assert.Equal(4096, store.Current.Memory!.MaxMemAlloc);
+        Assert.Equal(4096, store.Current.Memory.MaxMemAlloc);
         Assert.Equal("first", secrets.Get("ProxyPass"));
     }
 
@@ -304,10 +305,10 @@ public class FlintConfigStoreTests : IDisposable
 
         Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
         // the quintet is state-side and path-keyed now — nothing importable without the path
-        Assert.Empty(state.Current.Java!.Detections);
-        Assert.Equal("", state.Current.Java!.LastHostname);
+        Assert.Empty(state.Current.Java.Detections);
+        Assert.Equal("", state.Current.Java.LastHostname);
         // the ordinary config key still landed and the seal was written
-        Assert.Equal(2, store.Current.Launcher!.NumberOfManualRetries);
+        Assert.Equal(2, store.Current.Launcher.NumberOfManualRetries);
         Assert.True(File.Exists(ConfigPath));
     }
 
@@ -403,17 +404,17 @@ public class FlintConfigStoreTests : IDisposable
 
         Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
 
-        Assert.True(store.Current.Window!.LaunchMaximized);
-        Assert.Equal(1024, store.Current.Window!.MinecraftWinWidth);
-        Assert.Equal(768, store.Current.Window!.MinecraftWinHeight);
-        Assert.Equal("old.corp", store.Current.Proxy!.ProxyAddr);
-        Assert.Equal("olduser", store.Current.Proxy!.ProxyUser);
-        Assert.Equal(2048, store.Current.Memory!.MinMemAlloc);
-        Assert.Equal(4096, store.Current.Memory!.MaxMemAlloc);
-        Assert.Equal("echo preload", store.Current.Commands!.PreLoadCommand);
-        Assert.Equal("echo prelaunch", store.Current.Commands!.PreLaunchCommand);
-        Assert.Equal("echo postexit", store.Current.Commands!.PostExitCommand);
-        Assert.Equal("https://resources.example", store.Current.Mirror!.ResourceUrlOverride);
+        Assert.True(store.Current.Window.LaunchMaximized);
+        Assert.Equal(1024, store.Current.Window.MinecraftWinWidth);
+        Assert.Equal(768, store.Current.Window.MinecraftWinHeight);
+        Assert.Equal("old.corp", store.Current.Proxy.ProxyAddr);
+        Assert.Equal("olduser", store.Current.Proxy.ProxyUser);
+        Assert.Equal(2048, store.Current.Memory.MinMemAlloc);
+        Assert.Equal(4096, store.Current.Memory.MaxMemAlloc);
+        Assert.Equal("echo preload", store.Current.Commands.PreLoadCommand);
+        Assert.Equal("echo prelaunch", store.Current.Commands.PreLaunchCommand);
+        Assert.Equal("echo postexit", store.Current.Commands.PostExitCommand);
+        Assert.Equal("https://resources.example", store.Current.Mirror.ResourceUrlOverride);
 
         // the secret aliases land under the PRIMARY names (C4) — nothing under the aliases
         Assert.Equal("oldpass", secrets.Get("ProxyPass"));
@@ -445,7 +446,7 @@ public class FlintConfigStoreTests : IDisposable
 
         // INISettingsObject::retrieveValue walks configKeys() primary-first: the alias line
         // drops when the primary spelling is present, regardless of file order
-        Assert.Equal(1111, store.Current.Memory!.MinMemAlloc);
+        Assert.Equal(1111, store.Current.Memory.MinMemAlloc);
         Assert.Equal("primary-secret", secrets.Get("ProxyPass"));
     }
 
@@ -473,7 +474,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Equal(654321, state.Current.Playtime.Total);
         Assert.True(state.Current.Playtime.Migrated);
         // the ordinary chain keys landed as usual (the probe rides the same one-shot)
-        Assert.Equal("zh_CN", store.Current.Language!.Language);
+        Assert.Equal("zh_CN", store.Current.Language.Language);
     }
 
     [Fact]
@@ -515,8 +516,8 @@ public class FlintConfigStoreTests : IDisposable
         var (secrets, state) = NewSideStores();
 
         Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
-        Assert.False(store.Current.Java!.AutomaticJavaSwitch);
-        Assert.False(store.Current.Java!.AutomaticJavaDownload);
+        Assert.False(store.Current.Java.AutomaticJavaSwitch);
+        Assert.False(store.Current.Java.AutomaticJavaDownload);
         // the derived pair materialized into flint.json (the one-shot seal), from where the
         // launch path's UserLayer reads it
         var written = JsonDocument.Parse(File.ReadAllText(ConfigPath)).RootElement;
@@ -538,8 +539,8 @@ public class FlintConfigStoreTests : IDisposable
         var (secrets, state) = NewSideStores();
 
         Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
-        Assert.True(store.Current.Java!.AutomaticJavaSwitch);    // explicit — untouched
-        Assert.False(store.Current.Java!.AutomaticJavaDownload); // derived from the pin
+        Assert.True(store.Current.Java.AutomaticJavaSwitch);    // explicit — untouched
+        Assert.False(store.Current.Java.AutomaticJavaDownload); // derived from the pin
     }
 
     [Fact]
@@ -553,8 +554,8 @@ public class FlintConfigStoreTests : IDisposable
         var (secrets, state) = NewSideStores();
 
         Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
-        Assert.True(store.Current.Java!.AutomaticJavaSwitch);
-        Assert.True(store.Current.Java!.AutomaticJavaDownload);
+        Assert.True(store.Current.Java.AutomaticJavaSwitch);
+        Assert.True(store.Current.Java.AutomaticJavaDownload);
     }
 
     [Fact]

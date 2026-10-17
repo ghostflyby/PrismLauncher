@@ -55,7 +55,7 @@ public sealed class AutoInstallJava : LaunchStep
         // store keeps the bare-fixture "feature off" behavior the former unset global double
         // produced
         if (Services.Config is not { } config ||
-            !(config.Current.Java!.AutomaticJavaSwitch ?? false) ||
+            !(config.Current.Java.AutomaticJavaSwitch ?? false) ||
             (Variant.AsBool(settings.Get("OverrideJavaLocation")) &&
              (File.Exists(Variant.AsString(settings.Get("JavaPath"))) || Directory.Exists(Variant.AsString(settings.Get("JavaPath"))))))
         {
@@ -63,7 +63,7 @@ public sealed class AutoInstallJava : LaunchStep
             return;
         }
         var packProfile = _instance.GetPackProfile();
-        if (!(config.Current.Java!.AutomaticJavaDownload ?? false))
+        if (!(config.Current.Java.AutomaticJavaDownload ?? false))
         {
             var javas = Services.JavaInstallListProvider?.Invoke();
             if (javas is not null)

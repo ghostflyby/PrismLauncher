@@ -20,26 +20,40 @@
 //
 // All types are registered into FlintJsonContext (AOT red line: a missing root registration
 // is a runtime failure, not a compile error).
+using System.Text.Json.Serialization;
+
 namespace FlintLauncher.Core.Config;
 
 /// <summary>The instance.json root (D4). One object with a camelCase member per domain;
-/// absent/null members inherit from the user layer or the registered defaults.</summary>
+/// absent scalar members inherit from the user layer or the registered defaults.</summary>
 public sealed record InstanceConfigFile
 {
-    /// <summary>The fresh-instance shape: empty domains, every member unset.</summary>
+    /// <summary>The fresh-instance shape: every scalar unset, every domain constructed.</summary>
     public static InstanceConfigFile Default() => new();
 
-    // NOTE: the domain members are NULLABLE despite the `= new()` initializers — same
-    // finding as FlintConfigFile: the source-generated deserializer does not honor
-    // property initializers for members absent from a payload, and
-    // InstanceConfigStore.Current IS the raw payload ("nulls are the layer", C6/C7).
-    // Only new()/Default() and INI-imported (write-time converted) payloads are
-    // guaranteed materialized; readers therefore null-guard the domains.
-    public InstanceIdentityConfig? Identity { get; init; } = new();
-    public InstanceLaunchConfig? Launch { get; init; } = new();
-    public InstanceManagedConfig? Managed { get; init; } = new();
-    public InstanceExportConfig? Export { get; init; } = new();
-    public InstanceMiscConfig? Misc { get; init; } = new();
+    // The materializing constructor: the source-generated deserializer overwrites init-only
+    // property initializers with null for members absent from the payload (.NET 10), so the
+    // constructor body re-materializes the domains — every in-memory InstanceConfigFile has
+    // real domain values regardless of the on-disk shape. The layer semantics live at the
+    // SCALAR level (null member = inherit from the user layer / registered defaults),
+    // resolved by <see cref="InstanceConfigKeys"/>.
+    [JsonConstructor]
+    public InstanceConfigFile(InstanceIdentityConfig? identity = null,
+        InstanceLaunchConfig? launch = null, InstanceManagedConfig? managed = null,
+        InstanceExportConfig? export = null, InstanceMiscConfig? misc = null)
+    {
+        Identity = identity ?? new InstanceIdentityConfig();
+        Launch = launch ?? new InstanceLaunchConfig();
+        Managed = managed ?? new InstanceManagedConfig();
+        Export = export ?? new InstanceExportConfig();
+        Misc = misc ?? new InstanceMiscConfig();
+    }
+
+    public InstanceIdentityConfig Identity { get; init; }
+    public InstanceLaunchConfig Launch { get; init; }
+    public InstanceManagedConfig Managed { get; init; }
+    public InstanceExportConfig Export { get; init; }
+    public InstanceMiscConfig Misc { get; init; }
 }
 
 /// <summary>Who this instance is (D4: uuid is identity, not state). Name/iconKey/notes
@@ -60,17 +74,35 @@ public sealed record InstanceIdentityConfig
 /// commands / env / performance / nativeLib.</summary>
 public sealed record InstanceLaunchConfig
 {
-    public InstanceJavaConfig Java { get; init; } = new();
-    public InstanceMemoryConfig Memory { get; init; } = new();
-    public InstanceWindowConfig Window { get; init; } = new();
-    public InstanceCommandsConfig Commands { get; init; } = new();
+    // The materializing constructor — same reasoning as the InstanceConfigFile root: a
+    // partial payload like {"launch":{"memory":{"minMemAlloc":…}}} would otherwise
+    // deserialize the absent families as null.
+    [JsonConstructor]
+    public InstanceLaunchConfig(InstanceJavaConfig? java = null, InstanceMemoryConfig? memory = null,
+        InstanceWindowConfig? window = null, InstanceCommandsConfig? commands = null,
+        string? env = null, InstancePerformanceConfig? performance = null,
+        InstanceNativeLibConfig? nativeLib = null)
+    {
+        Java = java ?? new InstanceJavaConfig();
+        Memory = memory ?? new InstanceMemoryConfig();
+        Window = window ?? new InstanceWindowConfig();
+        Commands = commands ?? new InstanceCommandsConfig();
+        Env = env;
+        Performance = performance ?? new InstancePerformanceConfig();
+        NativeLib = nativeLib ?? new InstanceNativeLibConfig();
+    }
+
+    public InstanceJavaConfig Java { get; init; }
+    public InstanceMemoryConfig Memory { get; init; }
+    public InstanceWindowConfig Window { get; init; }
+    public InstanceCommandsConfig Commands { get; init; }
 
     /// <summary>The custom environment map as its JSON object text (same shape as the C++
     /// "Env" value; gated by OverrideEnv on import).</summary>
     public string? Env { get; init; }
 
-    public InstancePerformanceConfig Performance { get; init; } = new();
-    public InstanceNativeLibConfig NativeLib { get; init; } = new();
+    public InstancePerformanceConfig Performance { get; init; }
+    public InstanceNativeLibConfig NativeLib { get; init; }
 }
 
 /// <summary>Java location/arguments (the OverrideJavaLocation family: JavaPath +
@@ -166,10 +198,44 @@ public sealed record InstanceExportConfig
 /// loader list (OverrideModDownloadLoaders) and the instance-only keys.</summary>
 public sealed record InstanceMiscConfig
 {
+    // The materializing constructor — Console/GameTime are re-created when the payload
+    // omits them; the scalar members pass through (null = inherit / unset).
+    [JsonConstructor]
+    public InstanceMiscConfig(InstanceConsoleConfig? console = null,
+        InstanceGameTimeConfig? gameTime = null, bool? closeAfterLaunch = null,
+        bool? quitAfterGameStop = null, bool? onlineFixes = null,
+        string? modDownloadLoaders = null, bool? joinServerOnLaunch = null,
+        string? joinServerOnLaunchAddress = null, string? joinWorldOnLaunch = null,
+        bool? useAccountForInstance = null, string? instanceAccountId = null,
+        bool? countGameTime = null, IReadOnlyList<string>? linkedInstances = null,
+        bool? globalDataPacksEnabled = null, string? globalDataPacksPath = null,
+        bool? useLatestMinecraftVersion = null, string? useLatestMinecraftVersionType = null,
+        string? instanceType = null)
+    {
+        Console = console ?? new InstanceConsoleConfig();
+        GameTime = gameTime ?? new InstanceGameTimeConfig();
+        CloseAfterLaunch = closeAfterLaunch;
+        QuitAfterGameStop = quitAfterGameStop;
+        OnlineFixes = onlineFixes;
+        ModDownloadLoaders = modDownloadLoaders;
+        JoinServerOnLaunch = joinServerOnLaunch;
+        JoinServerOnLaunchAddress = joinServerOnLaunchAddress;
+        JoinWorldOnLaunch = joinWorldOnLaunch;
+        UseAccountForInstance = useAccountForInstance;
+        InstanceAccountId = instanceAccountId;
+        CountGameTime = countGameTime;
+        LinkedInstances = linkedInstances;
+        GlobalDataPacksEnabled = globalDataPacksEnabled;
+        GlobalDataPacksPath = globalDataPacksPath;
+        UseLatestMinecraftVersion = useLatestMinecraftVersion;
+        UseLatestMinecraftVersionType = useLatestMinecraftVersionType;
+        InstanceType = instanceType;
+    }
+
     // ---- layered override families (null member = inherit)
 
-    public InstanceConsoleConfig? Console { get; init; }
-    public InstanceGameTimeConfig? GameTime { get; init; }
+    public InstanceConsoleConfig Console { get; init; }
+    public InstanceGameTimeConfig GameTime { get; init; }
 
     /// <summary>OverrideMiscellaneous family.</summary>
     public bool? CloseAfterLaunch { get; init; }

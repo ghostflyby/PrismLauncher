@@ -284,7 +284,7 @@ public class PasteUploadTests : IDisposable
                  {
                      (PasteUpload.PasteType.Hastebin, "hastebin"),
                      (PasteUpload.PasteType.Mclogs, "mclogs"),
-                     (PasteGG: PasteUpload.PasteType.PasteGg, "pasteGG"),
+                     (PasteUpload.PasteType.PasteGg, "pasteGG"),
                  })
         {
             var upload = new PasteUpload(LogLine, _server.BaseUrl, type);

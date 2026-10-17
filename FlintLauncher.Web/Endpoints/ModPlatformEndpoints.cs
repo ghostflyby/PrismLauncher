@@ -414,7 +414,7 @@ public static class ModPlatformEndpoints
                     filter?.ReleaseTypes is { Count: > 0 } requested
                         ? IndexedVersionType.FromStringList(requested)
                         : IndexedVersionType.FromStringList(JsonUtils.ToStringList(
-                            runtime.Config.Current.ModDownload!.ModUpdateReleaseTypes ?? "[]"));
+                            runtime.Config.Current.ModDownload.ModUpdateReleaseTypes ?? "[]"));
 
                 var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, releaseTypes, runtime.Modrinth, runtime.Flame);
                 var entry = registry.Register("mods-update", task, instanceId: instance.Id());
@@ -741,7 +741,7 @@ public static class ModPlatformEndpoints
     /// instance — the mods surface only exists for real instances, like launch).
     /// D2: every endpoint resolves through the addressing chain (GLOBAL §1).</summary>
     private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string reference) =>
-        runtime.Instances.ResolveInstance(reference) is MinecraftInstance instance ? instance : null;
+        runtime.Instances.ResolveInstance(reference) as MinecraftInstance;
 
     /// <summary>The Flame sorting method by (case-insensitive) name, defaulting to Popularity
     /// (the CurseForge API's default sortField).</summary>

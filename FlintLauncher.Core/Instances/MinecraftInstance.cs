@@ -1167,7 +1167,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         if (Variant.AsBool(_settings.Get("ShowGameTime")))
         {
             // the without-days display flag is global-only (no instance override in C++)
-            var withoutDays = UserLayer.GameTime!.ShowGameTimeWithoutDays ?? false;
+            var withoutDays = UserLayer.GameTime.ShowGameTimeWithoutDays ?? false;
             if (LastTimePlayed() > 0 && LastLaunch() > 0)
             {
                 var lastLaunchTime = DateTimeOffset.FromUnixTimeMilliseconds(LastLaunch()).LocalDateTime;
@@ -1249,7 +1249,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             return null;
         }
-        return LauncherState?.Current.Java!.Detections.GetValueOrDefault(key);
+        return LauncherState?.Current.Java.Detections.GetValueOrDefault(key);
     }
 
     //////  Mod Lists //////
@@ -1258,7 +1258,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         if (loaderModList is null)
         {
-            var isIndexed = !(UserLayer.ModDownload!.ModMetadataDisabled ?? false);
+            var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
             loaderModList = new ModFolderModel(ModsRoot(), isIndexed, createDir: true);
         }
         return loaderModList;
@@ -1268,7 +1268,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         if (coreModList is null)
         {
-            var isIndexed = !(UserLayer.ModDownload!.ModMetadataDisabled ?? false);
+            var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
             coreModList = new ModFolderModel(CoreModsDir(), isIndexed, createDir: true);
         }
         return coreModList;
@@ -1278,7 +1278,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         if (nilModList is null)
         {
-            var isIndexed = !(UserLayer.ModDownload!.ModMetadataDisabled ?? false);
+            var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
             // NOTE: upstream does not create the folder for the nil mod list (4th arg false)
             nilModList = new ModFolderModel(NilModsDir(), isIndexed, createDir: false);
         }

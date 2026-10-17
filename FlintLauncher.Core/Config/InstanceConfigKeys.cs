@@ -27,7 +27,7 @@ namespace FlintLauncher.Core.Config;
 /// <summary>
 ///     One instance settings key: the gate family it belongs to — a derived gate lists
 ///     its own family (the OverrideLaunchCmd synonym lists OverrideCommands); the INI spellings
-///     that set each family live in <see cref="GateIniSpellings" /> (null = instance-only or
+///     that set each family live in <see cref="InstanceConfigKeys.GateIniSpellings" /> (null = instance-only or
 ///     global-only). Plus the resolved getter over (user, instance), the instance-layer set
 ///     probe, and the typed setter applied immutably over the instance payload (null value =
 ///     reset to inherit; gate keys: false/null = clear the family, true = no-op).
@@ -113,126 +113,137 @@ public static class InstanceConfigKeys
     // ------------------------------------------------------------- gate getters / clears
 
     private static bool GateJavaLocation(InstanceConfigFile i) =>
-        Any(i.Launch?.Java?.JavaPath, i.Launch?.Java?.IgnoreJavaCompatibility);
+        Any(i.Launch.Java.JavaPath, i.Launch.Java.IgnoreJavaCompatibility);
 
-    private static bool GateJavaArgs(InstanceConfigFile i) => i.Launch?.Java?.JvmArgs is not null;
+    private static bool GateJavaArgs(InstanceConfigFile i) => i.Launch.Java.JvmArgs is not null;
 
     private static bool GateMemory(InstanceConfigFile i) => Any(
-        i.Launch?.Memory?.MinMemAlloc, i.Launch?.Memory?.MaxMemAlloc,
-        i.Launch?.Memory?.LowMemWarning);
+        i.Launch.Memory.MinMemAlloc, i.Launch.Memory.MaxMemAlloc,
+        i.Launch.Memory.LowMemWarning);
 
     private static bool GateWindow(InstanceConfigFile i) => Any(
-        i.Launch?.Window?.LaunchMaximized, i.Launch?.Window?.MinecraftWinWidth,
-        i.Launch?.Window?.MinecraftWinHeight);
+        i.Launch.Window.LaunchMaximized, i.Launch.Window.MinecraftWinWidth,
+        i.Launch.Window.MinecraftWinHeight);
 
     private static bool GateCommands(InstanceConfigFile i) => Any(
-        i.Launch?.Commands?.PreLoadCommand, i.Launch?.Commands?.PreLaunchCommand,
-        i.Launch?.Commands?.WrapperCommand, i.Launch?.Commands?.PostExitCommand);
+        i.Launch.Commands.PreLoadCommand, i.Launch.Commands.PreLaunchCommand,
+        i.Launch.Commands.WrapperCommand, i.Launch.Commands.PostExitCommand);
 
-    private static bool GateEnv(InstanceConfigFile i) => i.Launch?.Env is not null;
+    private static bool GateEnv(InstanceConfigFile i) => i.Launch.Env is not null;
 
     private static bool GatePerformance(InstanceConfigFile i) => Any(
-        i.Launch?.Performance?.EnableFeralGamemode, i.Launch?.Performance?.EnableMangoHud,
-        i.Launch?.Performance?.UseDiscreteGpu, i.Launch?.Performance?.UseZink);
+        i.Launch.Performance.EnableFeralGamemode, i.Launch.Performance.EnableMangoHud,
+        i.Launch.Performance.UseDiscreteGpu, i.Launch.Performance.UseZink);
 
     private static bool GateNativeLib(InstanceConfigFile i) => Any(
-        i.Launch?.NativeLib?.UseNativeOpenAl, i.Launch?.NativeLib?.CustomOpenAlPath,
-        i.Launch?.NativeLib?.UseNativeGlfw, i.Launch?.NativeLib?.CustomGlfwPath,
-        i.Launch?.NativeLib?.UseNativeSdl, i.Launch?.NativeLib?.CustomSdlPath);
+        i.Launch.NativeLib.UseNativeOpenAl, i.Launch.NativeLib.CustomOpenAlPath,
+        i.Launch.NativeLib.UseNativeGlfw, i.Launch.NativeLib.CustomGlfwPath,
+        i.Launch.NativeLib.UseNativeSdl, i.Launch.NativeLib.CustomSdlPath);
 
     private static bool GateConsole(InstanceConfigFile i) => Any(
-        i.Misc?.Console?.ShowConsole, i.Misc?.Console?.AutoCloseConsole,
-        i.Misc?.Console?.ShowConsoleOnError, i.Misc?.Console?.LogPrePostOutput);
+        i.Misc.Console.ShowConsole, i.Misc.Console.AutoCloseConsole,
+        i.Misc.Console.ShowConsoleOnError, i.Misc.Console.LogPrePostOutput);
 
     private static bool GateGameTime(InstanceConfigFile i) => Any(
-        i.Misc?.GameTime?.ShowGameTime, i.Misc?.GameTime?.RecordGameTime);
+        i.Misc.GameTime.ShowGameTime, i.Misc.GameTime.RecordGameTime);
 
     private static bool GateMiscellaneous(InstanceConfigFile i) => Any(
-        i.Misc?.CloseAfterLaunch, i.Misc?.QuitAfterGameStop);
+        i.Misc.CloseAfterLaunch, i.Misc.QuitAfterGameStop);
 
-    private static bool GateLegacySettings(InstanceConfigFile i) => i.Misc?.OnlineFixes is not null;
+    private static bool GateLegacySettings(InstanceConfigFile i) => i.Misc.OnlineFixes is not null;
 
-    private static bool GateModDownloadLoaders(InstanceConfigFile i) => i.Misc?.ModDownloadLoaders is not null;
+    private static bool GateModDownloadLoaders(InstanceConfigFile i) => i.Misc.ModDownloadLoaders is not null;
 
     /// <summary>
     ///     The gate write: false/null clears the family (C7 — the members fall back to
     ///     inheritance); true is a no-op (the family is derived from its members).
     /// </summary>
     private static InstanceConfigFile GateWrite(InstanceConfigFile i, object? value,
-        Func<InstanceConfigFile, bool> derived, Func<InstanceConfigFile, InstanceConfigFile> clear) =>
+        Func<InstanceConfigFile, InstanceConfigFile> clear) =>
         Variant.AsBool(value) ? i : clear(i);
 
     // ---- explicit family clears (with-expressions only — no reflection, AOT)
 
     private static InstanceConfigFile ClearJavaLocation(InstanceConfigFile i) => i with
     {
-        Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+        Launch = i.Launch with
         {
-            Java = (i.Launch?.Java ?? new InstanceJavaConfig()) with { JavaPath = null, IgnoreJavaCompatibility = null }
+            Java = i.Launch.Java with { JavaPath = null, IgnoreJavaCompatibility = null }
         }
     };
 
     private static InstanceConfigFile ClearJavaArgs(InstanceConfigFile i) => i with
     {
-        Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+        Launch = i.Launch with
         {
-            Java = (i.Launch?.Java ?? new InstanceJavaConfig()) with { JvmArgs = null }
+            Java = i.Launch.Java with { JvmArgs = null }
         }
     };
 
     private static InstanceConfigFile ClearMemory(InstanceConfigFile i) => i with
     {
-        Launch = (i.Launch ?? new InstanceLaunchConfig()) with { Memory = new InstanceMemoryConfig() }
+        Launch = i.Launch with { Memory = new InstanceMemoryConfig() }
     };
 
     private static InstanceConfigFile ClearWindow(InstanceConfigFile i) => i with
     {
-        Launch = (i.Launch ?? new InstanceLaunchConfig()) with { Window = new InstanceWindowConfig() }
+        Launch = i.Launch with { Window = new InstanceWindowConfig() }
     };
 
     private static InstanceConfigFile ClearCommands(InstanceConfigFile i) => i with
     {
-        Launch = (i.Launch ?? new InstanceLaunchConfig()) with { Commands = new InstanceCommandsConfig() }
+        Launch = i.Launch with { Commands = new InstanceCommandsConfig() }
     };
 
     private static InstanceConfigFile ClearEnv(InstanceConfigFile i) => i with
     {
-        Launch = (i.Launch ?? new InstanceLaunchConfig()) with { Env = null }
+        Launch = i.Launch with { Env = null }
     };
 
     private static InstanceConfigFile ClearPerformance(InstanceConfigFile i) => i with
     {
-        Launch = (i.Launch ?? new InstanceLaunchConfig()) with { Performance = new InstancePerformanceConfig() }
+        Launch = i.Launch with { Performance = new InstancePerformanceConfig() }
     };
 
     private static InstanceConfigFile ClearNativeLib(InstanceConfigFile i) => i with
     {
-        Launch = (i.Launch ?? new InstanceLaunchConfig()) with { NativeLib = new InstanceNativeLibConfig() }
+        Launch = i.Launch with { NativeLib = new InstanceNativeLibConfig() }
     };
 
     private static InstanceConfigFile ClearConsole(InstanceConfigFile i) => i with
     {
-        Misc = (i.Misc ?? new InstanceMiscConfig()) with { Console = null }
+        // the domain is materialized — "clear" resets its scalars to null (inherit)
+        Misc = i.Misc with
+        {
+            Console = i.Misc.Console with
+            {
+                ShowConsole = null, AutoCloseConsole = null,
+                ShowConsoleOnError = null, LogPrePostOutput = null,
+            }
+        }
     };
 
     private static InstanceConfigFile ClearGameTime(InstanceConfigFile i) => i with
     {
-        Misc = (i.Misc ?? new InstanceMiscConfig()) with { GameTime = null }
+        Misc = i.Misc with
+        {
+            GameTime = i.Misc.GameTime with { ShowGameTime = null, RecordGameTime = null }
+        }
     };
 
     private static InstanceConfigFile ClearMiscellaneous(InstanceConfigFile i) => i with
     {
-        Misc = (i.Misc ?? new InstanceMiscConfig()) with { CloseAfterLaunch = null, QuitAfterGameStop = null }
+        Misc = i.Misc with { CloseAfterLaunch = null, QuitAfterGameStop = null }
     };
 
     private static InstanceConfigFile ClearLegacySettings(InstanceConfigFile i) => i with
     {
-        Misc = (i.Misc ?? new InstanceMiscConfig()) with { OnlineFixes = null }
+        Misc = i.Misc with { OnlineFixes = null }
     };
 
     private static InstanceConfigFile ClearModDownloadLoaders(InstanceConfigFile i) => i with
     {
-        Misc = (i.Misc ?? new InstanceMiscConfig()) with { ModDownloadLoaders = null }
+        Misc = i.Misc with { ModDownloadLoaders = null }
     };
 
     // ------------------------------------------------------------------------ the registry
@@ -243,307 +254,307 @@ public static class InstanceConfigKeys
         [
             // ---- identity (instance-only; defaults via the Setting registrations)
             E("uuid", null,
-                (_, i) => i.Identity?.Uuid,
-                i => i.Identity?.Uuid is not null,
-                (i, v) => i with { Identity = (i.Identity ?? new InstanceIdentityConfig()) with { Uuid = StringOf(v) } }),
+                (_, i) => i.Identity.Uuid,
+                i => i.Identity.Uuid is not null,
+                (i, v) => i with { Identity = i.Identity with { Uuid = StringOf(v) } }),
             E("name", null,
-                (_, i) => i.Identity?.Name,
-                i => i.Identity?.Name is not null,
-                (i, v) => i with { Identity = (i.Identity ?? new InstanceIdentityConfig()) with { Name = StringOf(v) } }),
+                (_, i) => i.Identity.Name,
+                i => i.Identity.Name is not null,
+                (i, v) => i with { Identity = i.Identity with { Name = StringOf(v) } }),
             E("iconKey", null,
-                (_, i) => i.Identity?.IconKey,
-                i => i.Identity?.IconKey is not null,
-                (i, v) => i with { Identity = (i.Identity ?? new InstanceIdentityConfig()) with { IconKey = StringOf(v) } }),
+                (_, i) => i.Identity.IconKey,
+                i => i.Identity.IconKey is not null,
+                (i, v) => i with { Identity = i.Identity with { IconKey = StringOf(v) } }),
             E("notes", null,
-                (_, i) => i.Identity?.Notes,
-                i => i.Identity?.Notes is not null,
-                (i, v) => i with { Identity = (i.Identity ?? new InstanceIdentityConfig()) with { Notes = StringOf(v) } }),
+                (_, i) => i.Identity.Notes,
+                i => i.Identity.Notes is not null,
+                (i, v) => i with { Identity = i.Identity with { Notes = StringOf(v) } }),
             E("shortcuts", null,
-                (_, i) => i.Identity?.Shortcuts,
-                i => i.Identity?.Shortcuts is not null,
-                (i, v) => i with { Identity = (i.Identity ?? new InstanceIdentityConfig()) with { Shortcuts = StringOf(v) } }),
+                (_, i) => i.Identity.Shortcuts,
+                i => i.Identity.Shortcuts is not null,
+                (i, v) => i with { Identity = i.Identity with { Shortcuts = StringOf(v) } }),
 
             // ---- java (OverrideJavaLocation: path + compatibility; OverrideJavaArgs: args)
             E("JavaPath", "OverrideJavaLocation",
-                (u, i) => i.Launch?.Java?.JavaPath ?? u.Java!.JavaPath,
-                i => i.Launch?.Java?.JavaPath is not null,
+                (u, i) => i.Launch.Java.JavaPath ?? u.Java.JavaPath,
+                i => i.Launch.Java.JavaPath is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Java = (i.Launch?.Java ?? new InstanceJavaConfig()) with { JavaPath = StringOf(v) }
+                        Java = i.Launch.Java with { JavaPath = StringOf(v) }
                     }
                 }),
             E("IgnoreJavaCompatibility", "OverrideJavaLocation",
-                (u, i) => i.Launch?.Java?.IgnoreJavaCompatibility ?? u.Java!.IgnoreJavaCompatibility,
-                i => i.Launch?.Java?.IgnoreJavaCompatibility is not null,
+                (u, i) => i.Launch.Java.IgnoreJavaCompatibility ?? u.Java.IgnoreJavaCompatibility,
+                i => i.Launch.Java.IgnoreJavaCompatibility is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Java = (i.Launch?.Java ?? new InstanceJavaConfig()) with { IgnoreJavaCompatibility = BoolOf(v) }
+                        Java = i.Launch.Java with { IgnoreJavaCompatibility = BoolOf(v) }
                     }
                 }),
             E("JvmArgs", "OverrideJavaArgs",
-                (u, i) => i.Launch?.Java?.JvmArgs ?? u.Java!.JvmArgs,
-                i => i.Launch?.Java?.JvmArgs is not null,
+                (u, i) => i.Launch.Java.JvmArgs ?? u.Java.JvmArgs,
+                i => i.Launch.Java.JvmArgs is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Java = (i.Launch?.Java ?? new InstanceJavaConfig()) with { JvmArgs = StringOf(v) }
+                        Java = i.Launch.Java with { JvmArgs = StringOf(v) }
                     }
                 }),
             E("AutomaticJava", null,
-                (_, i) => i.Launch?.Java?.AutomaticJava,
-                i => i.Launch?.Java?.AutomaticJava is not null,
+                (_, i) => i.Launch.Java.AutomaticJava,
+                i => i.Launch.Java.AutomaticJava is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Java = (i.Launch?.Java ?? new InstanceJavaConfig()) with { AutomaticJava = BoolOf(v) }
+                        Java = i.Launch.Java with { AutomaticJava = BoolOf(v) }
                     }
                 }),
 
             // ---- memory (OverrideMemory)
             E("MinMemAlloc", "OverrideMemory",
-                (u, i) => i.Launch?.Memory?.MinMemAlloc ?? u.Memory!.MinMemAlloc,
-                i => i.Launch?.Memory?.MinMemAlloc is not null,
+                (u, i) => i.Launch.Memory.MinMemAlloc ?? u.Memory.MinMemAlloc,
+                i => i.Launch.Memory.MinMemAlloc is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Memory = (i.Launch?.Memory ?? new InstanceMemoryConfig()) with { MinMemAlloc = IntOf(v) }
+                        Memory = i.Launch.Memory with { MinMemAlloc = IntOf(v) }
                     }
                 }),
             E("MaxMemAlloc", "OverrideMemory",
-                (u, i) => i.Launch?.Memory?.MaxMemAlloc ?? u.Memory!.MaxMemAlloc,
-                i => i.Launch?.Memory?.MaxMemAlloc is not null,
+                (u, i) => i.Launch.Memory.MaxMemAlloc ?? u.Memory.MaxMemAlloc,
+                i => i.Launch.Memory.MaxMemAlloc is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Memory = (i.Launch?.Memory ?? new InstanceMemoryConfig()) with { MaxMemAlloc = IntOf(v) }
+                        Memory = i.Launch.Memory with { MaxMemAlloc = IntOf(v) }
                     }
                 }),
             // PermGen died with the Java <8 support floor (2026-10-05): an imported
             // instance.cfg PermGen key is now an unknown key and drops silently.
             E("LowMemWarning", "OverrideMemory",
-                (u, i) => i.Launch?.Memory?.LowMemWarning ?? u.Memory!.LowMemWarning,
-                i => i.Launch?.Memory?.LowMemWarning is not null,
+                (u, i) => i.Launch.Memory.LowMemWarning ?? u.Memory.LowMemWarning,
+                i => i.Launch.Memory.LowMemWarning is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Memory = (i.Launch?.Memory ?? new InstanceMemoryConfig()) with { LowMemWarning = BoolOf(v) }
+                        Memory = i.Launch.Memory with { LowMemWarning = BoolOf(v) }
                     }
                 }),
 
             // ---- window (OverrideWindow)
             E("LaunchMaximized", "OverrideWindow",
-                (u, i) => i.Launch?.Window?.LaunchMaximized ?? u.Window!.LaunchMaximized,
-                i => i.Launch?.Window?.LaunchMaximized is not null,
+                (u, i) => i.Launch.Window.LaunchMaximized ?? u.Window.LaunchMaximized,
+                i => i.Launch.Window.LaunchMaximized is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Window = (i.Launch?.Window ?? new InstanceWindowConfig()) with { LaunchMaximized = BoolOf(v) }
+                        Window = i.Launch.Window with { LaunchMaximized = BoolOf(v) }
                     }
                 }),
             E("MinecraftWinWidth", "OverrideWindow",
-                (u, i) => i.Launch?.Window?.MinecraftWinWidth ?? u.Window!.MinecraftWinWidth,
-                i => i.Launch?.Window?.MinecraftWinWidth is not null,
+                (u, i) => i.Launch.Window.MinecraftWinWidth ?? u.Window.MinecraftWinWidth,
+                i => i.Launch.Window.MinecraftWinWidth is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Window = (i.Launch?.Window ?? new InstanceWindowConfig()) with { MinecraftWinWidth = IntOf(v) }
+                        Window = i.Launch.Window with { MinecraftWinWidth = IntOf(v) }
                     }
                 }),
             E("MinecraftWinHeight", "OverrideWindow",
-                (u, i) => i.Launch?.Window?.MinecraftWinHeight ?? u.Window!.MinecraftWinHeight,
-                i => i.Launch?.Window?.MinecraftWinHeight is not null,
+                (u, i) => i.Launch.Window.MinecraftWinHeight ?? u.Window.MinecraftWinHeight,
+                i => i.Launch.Window.MinecraftWinHeight is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Window = (i.Launch?.Window ?? new InstanceWindowConfig()) with { MinecraftWinHeight = IntOf(v) }
+                        Window = i.Launch.Window with { MinecraftWinHeight = IntOf(v) }
                     }
                 }),
 
             // ---- commands (OverrideCommands, synonym OverrideLaunchCmd)
             E("PreLoadCommand", "OverrideCommands",
-                (u, i) => i.Launch?.Commands?.PreLoadCommand ?? u.Commands!.PreLoadCommand,
-                i => i.Launch?.Commands?.PreLoadCommand is not null,
+                (u, i) => i.Launch.Commands.PreLoadCommand ?? u.Commands.PreLoadCommand,
+                i => i.Launch.Commands.PreLoadCommand is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Commands = (i.Launch?.Commands ?? new InstanceCommandsConfig()) with { PreLoadCommand = StringOf(v) }
+                        Commands = i.Launch.Commands with { PreLoadCommand = StringOf(v) }
                     }
                 }),
             E("PreLaunchCommand", "OverrideCommands",
-                (u, i) => i.Launch?.Commands?.PreLaunchCommand ?? u.Commands!.PreLaunchCommand,
-                i => i.Launch?.Commands?.PreLaunchCommand is not null,
+                (u, i) => i.Launch.Commands.PreLaunchCommand ?? u.Commands.PreLaunchCommand,
+                i => i.Launch.Commands.PreLaunchCommand is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Commands = (i.Launch?.Commands ?? new InstanceCommandsConfig()) with { PreLaunchCommand = StringOf(v) }
+                        Commands = i.Launch.Commands with { PreLaunchCommand = StringOf(v) }
                     }
                 }),
             E("WrapperCommand", "OverrideCommands",
-                (u, i) => i.Launch?.Commands?.WrapperCommand ?? u.Commands!.WrapperCommand,
-                i => i.Launch?.Commands?.WrapperCommand is not null,
+                (u, i) => i.Launch.Commands.WrapperCommand ?? u.Commands.WrapperCommand,
+                i => i.Launch.Commands.WrapperCommand is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Commands = (i.Launch?.Commands ?? new InstanceCommandsConfig()) with { WrapperCommand = StringOf(v) }
+                        Commands = i.Launch.Commands with { WrapperCommand = StringOf(v) }
                     }
                 }),
             E("PostExitCommand", "OverrideCommands",
-                (u, i) => i.Launch?.Commands?.PostExitCommand ?? u.Commands!.PostExitCommand,
-                i => i.Launch?.Commands?.PostExitCommand is not null,
+                (u, i) => i.Launch.Commands.PostExitCommand ?? u.Commands.PostExitCommand,
+                i => i.Launch.Commands.PostExitCommand is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Commands = (i.Launch?.Commands ?? new InstanceCommandsConfig()) with { PostExitCommand = StringOf(v) }
+                        Commands = i.Launch.Commands with { PostExitCommand = StringOf(v) }
                     }
                 }),
 
             // ---- env (OverrideEnv): the custom environment map's JSON text
             E("Env", "OverrideEnv",
-                (u, i) => i.Launch?.Env ?? u.MinecraftMisc!.Env,
-                i => i.Launch?.Env is not null,
-                (i, v) => i with { Launch = (i.Launch ?? new InstanceLaunchConfig()) with { Env = StringOf(v) } }),
+                (u, i) => i.Launch.Env ?? u.MinecraftMisc.Env,
+                i => i.Launch.Env is not null,
+                (i, v) => i with { Launch = i.Launch with { Env = StringOf(v) } }),
 
             // ---- performance (OverridePerformance)
             E("EnableFeralGamemode", "OverridePerformance",
-                (u, i) => i.Launch?.Performance?.EnableFeralGamemode ?? u.Performance!.EnableFeralGamemode,
-                i => i.Launch?.Performance?.EnableFeralGamemode is not null,
+                (u, i) => i.Launch.Performance.EnableFeralGamemode ?? u.Performance.EnableFeralGamemode,
+                i => i.Launch.Performance.EnableFeralGamemode is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Performance = (i.Launch?.Performance ?? new InstancePerformanceConfig()) with
+                        Performance = i.Launch.Performance with
                         {
                             EnableFeralGamemode = BoolOf(v)
                         }
                     }
                 }),
             E("EnableMangoHud", "OverridePerformance",
-                (u, i) => i.Launch?.Performance?.EnableMangoHud ?? u.Performance!.EnableMangoHud,
-                i => i.Launch?.Performance?.EnableMangoHud is not null,
+                (u, i) => i.Launch.Performance.EnableMangoHud ?? u.Performance.EnableMangoHud,
+                i => i.Launch.Performance.EnableMangoHud is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Performance = (i.Launch?.Performance ?? new InstancePerformanceConfig()) with
+                        Performance = i.Launch.Performance with
                         {
                             EnableMangoHud = BoolOf(v)
                         }
                     }
                 }),
             E("UseDiscreteGpu", "OverridePerformance",
-                (u, i) => i.Launch?.Performance?.UseDiscreteGpu ?? u.Performance!.UseDiscreteGpu,
-                i => i.Launch?.Performance?.UseDiscreteGpu is not null,
+                (u, i) => i.Launch.Performance.UseDiscreteGpu ?? u.Performance.UseDiscreteGpu,
+                i => i.Launch.Performance.UseDiscreteGpu is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Performance = (i.Launch?.Performance ?? new InstancePerformanceConfig()) with
+                        Performance = i.Launch.Performance with
                         {
                             UseDiscreteGpu = BoolOf(v)
                         }
                     }
                 }),
             E("UseZink", "OverridePerformance",
-                (u, i) => i.Launch?.Performance?.UseZink ?? u.Performance!.UseZink,
-                i => i.Launch?.Performance?.UseZink is not null,
+                (u, i) => i.Launch.Performance.UseZink ?? u.Performance.UseZink,
+                i => i.Launch.Performance.UseZink is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        Performance = (i.Launch?.Performance ?? new InstancePerformanceConfig()) with { UseZink = BoolOf(v) }
+                        Performance = i.Launch.Performance with { UseZink = BoolOf(v) }
                     }
                 }),
 
             // ---- native library workarounds (OverrideNativeWorkarounds)
             E("UseNativeOpenAL", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.UseNativeOpenAl ?? u.NativeLib!.UseNativeOpenAl,
-                i => i.Launch?.NativeLib?.UseNativeOpenAl is not null,
+                (u, i) => i.Launch.NativeLib.UseNativeOpenAl ?? u.NativeLib.UseNativeOpenAl,
+                i => i.Launch.NativeLib.UseNativeOpenAl is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        NativeLib = (i.Launch?.NativeLib ?? new InstanceNativeLibConfig()) with
+                        NativeLib = i.Launch.NativeLib with
                         {
                             UseNativeOpenAl = BoolOf(v)
                         }
                     }
                 }),
             E("CustomOpenALPath", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.CustomOpenAlPath ?? u.NativeLib!.CustomOpenAlPath,
-                i => i.Launch?.NativeLib?.CustomOpenAlPath is not null,
+                (u, i) => i.Launch.NativeLib.CustomOpenAlPath ?? u.NativeLib.CustomOpenAlPath,
+                i => i.Launch.NativeLib.CustomOpenAlPath is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        NativeLib = (i.Launch?.NativeLib ?? new InstanceNativeLibConfig()) with
+                        NativeLib = i.Launch.NativeLib with
                         {
                             CustomOpenAlPath = StringOf(v)
                         }
                     }
                 }),
             E("UseNativeGLFW", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.UseNativeGlfw ?? u.NativeLib!.UseNativeGlfw,
-                i => i.Launch?.NativeLib?.UseNativeGlfw is not null,
+                (u, i) => i.Launch.NativeLib.UseNativeGlfw ?? u.NativeLib.UseNativeGlfw,
+                i => i.Launch.NativeLib.UseNativeGlfw is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        NativeLib = (i.Launch?.NativeLib ?? new InstanceNativeLibConfig()) with
+                        NativeLib = i.Launch.NativeLib with
                         {
                             UseNativeGlfw = BoolOf(v)
                         }
                     }
                 }),
             E("CustomGLFWPath", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.CustomGlfwPath ?? u.NativeLib!.CustomGlfwPath,
-                i => i.Launch?.NativeLib?.CustomGlfwPath is not null,
+                (u, i) => i.Launch.NativeLib.CustomGlfwPath ?? u.NativeLib.CustomGlfwPath,
+                i => i.Launch.NativeLib.CustomGlfwPath is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        NativeLib = (i.Launch?.NativeLib ?? new InstanceNativeLibConfig()) with
+                        NativeLib = i.Launch.NativeLib with
                         {
                             CustomGlfwPath = StringOf(v)
                         }
                     }
                 }),
             E("UseNativeSDL", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.UseNativeSdl ?? u.NativeLib!.UseNativeSdl,
-                i => i.Launch?.NativeLib?.UseNativeSdl is not null,
+                (u, i) => i.Launch.NativeLib.UseNativeSdl ?? u.NativeLib.UseNativeSdl,
+                i => i.Launch.NativeLib.UseNativeSdl is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        NativeLib = (i.Launch?.NativeLib ?? new InstanceNativeLibConfig()) with
+                        NativeLib = i.Launch.NativeLib with
                         {
                             UseNativeSdl = BoolOf(v)
                         }
                     }
                 }),
             E("CustomSDLPath", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.CustomSdlPath ?? u.NativeLib!.CustomSdlPath,
-                i => i.Launch?.NativeLib?.CustomSdlPath is not null,
+                (u, i) => i.Launch.NativeLib.CustomSdlPath ?? u.NativeLib.CustomSdlPath,
+                i => i.Launch.NativeLib.CustomSdlPath is not null,
                 (i, v) => i with
                 {
-                    Launch = (i.Launch ?? new InstanceLaunchConfig()) with
+                    Launch = i.Launch with
                     {
-                        NativeLib = (i.Launch?.NativeLib ?? new InstanceNativeLibConfig()) with
+                        NativeLib = i.Launch.NativeLib with
                         {
                             CustomSdlPath = StringOf(v)
                         }
@@ -552,268 +563,268 @@ public static class InstanceConfigKeys
 
             // ---- console (OverrideConsole) — the C7 passthrough pair is NOT here
             E("ShowConsole", "OverrideConsole",
-                (u, i) => i.Misc?.Console?.ShowConsole ?? u.Console!.ShowConsole,
-                i => i.Misc?.Console?.ShowConsole is not null,
+                (u, i) => i.Misc.Console.ShowConsole ?? u.Console.ShowConsole,
+                i => i.Misc.Console.ShowConsole is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with
+                    Misc = i.Misc with
                     {
-                        Console = (i.Misc?.Console ?? new InstanceConsoleConfig()) with { ShowConsole = BoolOf(v) }
+                        Console = i.Misc.Console with { ShowConsole = BoolOf(v) }
                     }
                 }),
             E("AutoCloseConsole", "OverrideConsole",
-                (u, i) => i.Misc?.Console?.AutoCloseConsole ?? u.Console!.AutoCloseConsole,
-                i => i.Misc?.Console?.AutoCloseConsole is not null,
+                (u, i) => i.Misc.Console.AutoCloseConsole ?? u.Console.AutoCloseConsole,
+                i => i.Misc.Console.AutoCloseConsole is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with
+                    Misc = i.Misc with
                     {
-                        Console = (i.Misc?.Console ?? new InstanceConsoleConfig()) with { AutoCloseConsole = BoolOf(v) }
+                        Console = i.Misc.Console with { AutoCloseConsole = BoolOf(v) }
                     }
                 }),
             E("ShowConsoleOnError", "OverrideConsole",
-                (u, i) => i.Misc?.Console?.ShowConsoleOnError ?? u.Console!.ShowConsoleOnError,
-                i => i.Misc?.Console?.ShowConsoleOnError is not null,
+                (u, i) => i.Misc.Console.ShowConsoleOnError ?? u.Console.ShowConsoleOnError,
+                i => i.Misc.Console.ShowConsoleOnError is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with
+                    Misc = i.Misc with
                     {
-                        Console = (i.Misc?.Console ?? new InstanceConsoleConfig()) with { ShowConsoleOnError = BoolOf(v) }
+                        Console = i.Misc.Console with { ShowConsoleOnError = BoolOf(v) }
                     }
                 }),
             E("LogPrePostOutput", "OverrideConsole",
-                (u, i) => i.Misc?.Console?.LogPrePostOutput ?? u.Console!.LogPrePostOutput,
-                i => i.Misc?.Console?.LogPrePostOutput is not null,
+                (u, i) => i.Misc.Console.LogPrePostOutput ?? u.Console.LogPrePostOutput,
+                i => i.Misc.Console.LogPrePostOutput is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with
+                    Misc = i.Misc with
                     {
-                        Console = (i.Misc?.Console ?? new InstanceConsoleConfig()) with { LogPrePostOutput = BoolOf(v) }
+                        Console = i.Misc.Console with { LogPrePostOutput = BoolOf(v) }
                     }
                 }),
 
             // ---- game time (OverrideGameTime)
             E("ShowGameTime", "OverrideGameTime",
-                (u, i) => i.Misc?.GameTime?.ShowGameTime ?? u.GameTime!.ShowGameTime,
-                i => i.Misc?.GameTime?.ShowGameTime is not null,
+                (u, i) => i.Misc.GameTime.ShowGameTime ?? u.GameTime.ShowGameTime,
+                i => i.Misc.GameTime.ShowGameTime is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with
+                    Misc = i.Misc with
                     {
-                        GameTime = (i.Misc?.GameTime ?? new InstanceGameTimeConfig()) with { ShowGameTime = BoolOf(v) }
+                        GameTime = i.Misc.GameTime with { ShowGameTime = BoolOf(v) }
                     }
                 }),
             E("RecordGameTime", "OverrideGameTime",
-                (u, i) => i.Misc?.GameTime?.RecordGameTime ?? u.GameTime!.RecordGameTime,
-                i => i.Misc?.GameTime?.RecordGameTime is not null,
+                (u, i) => i.Misc.GameTime.RecordGameTime ?? u.GameTime.RecordGameTime,
+                i => i.Misc.GameTime.RecordGameTime is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with
+                    Misc = i.Misc with
                     {
-                        GameTime = (i.Misc?.GameTime ?? new InstanceGameTimeConfig()) with { RecordGameTime = BoolOf(v) }
+                        GameTime = i.Misc.GameTime with { RecordGameTime = BoolOf(v) }
                     }
                 }),
 
             // ---- miscellaneous gates (OverrideMiscellaneous / OverrideLegacySettings /
             //      OverrideModDownloadLoaders)
             E("CloseAfterLaunch", "OverrideMiscellaneous",
-                (u, i) => i.Misc?.CloseAfterLaunch ?? u.Launcher!.CloseAfterLaunch,
-                i => i.Misc?.CloseAfterLaunch is not null,
+                (u, i) => i.Misc.CloseAfterLaunch ?? u.Launcher.CloseAfterLaunch,
+                i => i.Misc.CloseAfterLaunch is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with { CloseAfterLaunch = BoolOf(v) }
+                    Misc = i.Misc with { CloseAfterLaunch = BoolOf(v) }
                 }),
             E("QuitAfterGameStop", "OverrideMiscellaneous",
-                (u, i) => i.Misc?.QuitAfterGameStop ?? u.Launcher!.QuitAfterGameStop,
-                i => i.Misc?.QuitAfterGameStop is not null,
+                (u, i) => i.Misc.QuitAfterGameStop ?? u.Launcher.QuitAfterGameStop,
+                i => i.Misc.QuitAfterGameStop is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with { QuitAfterGameStop = BoolOf(v) }
+                    Misc = i.Misc with { QuitAfterGameStop = BoolOf(v) }
                 }),
             E("OnlineFixes", "OverrideLegacySettings",
-                (u, i) => i.Misc?.OnlineFixes ?? u.MinecraftMisc!.OnlineFixes,
-                i => i.Misc?.OnlineFixes is not null,
-                (i, v) => i with { Misc = (i.Misc ?? new InstanceMiscConfig()) with { OnlineFixes = BoolOf(v) } }),
+                (u, i) => i.Misc.OnlineFixes ?? u.MinecraftMisc.OnlineFixes,
+                i => i.Misc.OnlineFixes is not null,
+                (i, v) => i with { Misc = i.Misc with { OnlineFixes = BoolOf(v) } }),
             E("ModDownloadLoaders", "OverrideModDownloadLoaders",
-                (_, i) => i.Misc?.ModDownloadLoaders,
-                i => i.Misc?.ModDownloadLoaders is not null,
+                (_, i) => i.Misc.ModDownloadLoaders,
+                i => i.Misc.ModDownloadLoaders is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with { ModDownloadLoaders = StringOf(v) }
+                    Misc = i.Misc with { ModDownloadLoaders = StringOf(v) }
                 }),
 
             // ---- instance-only misc keys
             E("JoinServerOnLaunch", null,
-                (_, i) => i.Misc?.JoinServerOnLaunch,
-                i => i.Misc?.JoinServerOnLaunch is not null,
+                (_, i) => i.Misc.JoinServerOnLaunch,
+                i => i.Misc.JoinServerOnLaunch is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with { JoinServerOnLaunch = BoolOf(v) }
+                    Misc = i.Misc with { JoinServerOnLaunch = BoolOf(v) }
                 }),
             E("JoinServerOnLaunchAddress", null,
-                (_, i) => i.Misc?.JoinServerOnLaunchAddress,
-                i => i.Misc?.JoinServerOnLaunchAddress is not null,
+                (_, i) => i.Misc.JoinServerOnLaunchAddress,
+                i => i.Misc.JoinServerOnLaunchAddress is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with { JoinServerOnLaunchAddress = StringOf(v) }
+                    Misc = i.Misc with { JoinServerOnLaunchAddress = StringOf(v) }
                 }),
             E("JoinWorldOnLaunch", null,
-                (_, i) => i.Misc?.JoinWorldOnLaunch,
-                i => i.Misc?.JoinWorldOnLaunch is not null,
+                (_, i) => i.Misc.JoinWorldOnLaunch,
+                i => i.Misc.JoinWorldOnLaunch is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with { JoinWorldOnLaunch = StringOf(v) }
+                    Misc = i.Misc with { JoinWorldOnLaunch = StringOf(v) }
                 }),
             E("UseAccountForInstance", null,
-                (_, i) => i.Misc?.UseAccountForInstance,
-                i => i.Misc?.UseAccountForInstance is not null,
+                (_, i) => i.Misc.UseAccountForInstance,
+                i => i.Misc.UseAccountForInstance is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with { UseAccountForInstance = BoolOf(v) }
+                    Misc = i.Misc with { UseAccountForInstance = BoolOf(v) }
                 }),
             E("InstanceAccountId", null,
-                (_, i) => i.Misc?.InstanceAccountId,
-                i => i.Misc?.InstanceAccountId is not null,
+                (_, i) => i.Misc.InstanceAccountId,
+                i => i.Misc.InstanceAccountId is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with { InstanceAccountId = StringOf(v) }
+                    Misc = i.Misc with { InstanceAccountId = StringOf(v) }
                 }),
             E("CountGameTime", null,
-                (_, i) => i.Misc?.CountGameTime,
-                i => i.Misc?.CountGameTime is not null,
+                (_, i) => i.Misc.CountGameTime,
+                i => i.Misc.CountGameTime is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with { CountGameTime = BoolOf(v) }
+                    Misc = i.Misc with { CountGameTime = BoolOf(v) }
                 }),
             E("linkedInstances", null,
-                (_, i) => i.Misc?.LinkedInstances,
-                i => i.Misc?.LinkedInstances is not null,
+                (_, i) => i.Misc.LinkedInstances,
+                i => i.Misc.LinkedInstances is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with { LinkedInstances = ToStringList(v) }
+                    Misc = i.Misc with { LinkedInstances = ToStringList(v) }
                 }),
             E("GlobalDataPacksEnabled", null,
-                (_, i) => i.Misc?.GlobalDataPacksEnabled,
-                i => i.Misc?.GlobalDataPacksEnabled is not null,
+                (_, i) => i.Misc.GlobalDataPacksEnabled,
+                i => i.Misc.GlobalDataPacksEnabled is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with { GlobalDataPacksEnabled = BoolOf(v) }
+                    Misc = i.Misc with { GlobalDataPacksEnabled = BoolOf(v) }
                 }),
             E("GlobalDataPacksPath", null,
-                (_, i) => i.Misc?.GlobalDataPacksPath,
-                i => i.Misc?.GlobalDataPacksPath is not null,
+                (_, i) => i.Misc.GlobalDataPacksPath,
+                i => i.Misc.GlobalDataPacksPath is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with { GlobalDataPacksPath = StringOf(v) }
+                    Misc = i.Misc with { GlobalDataPacksPath = StringOf(v) }
                 }),
             E("UseLatestMinecraftVersion", null,
-                (_, i) => i.Misc?.UseLatestMinecraftVersion,
-                i => i.Misc?.UseLatestMinecraftVersion is not null,
+                (_, i) => i.Misc.UseLatestMinecraftVersion,
+                i => i.Misc.UseLatestMinecraftVersion is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with { UseLatestMinecraftVersion = BoolOf(v) }
+                    Misc = i.Misc with { UseLatestMinecraftVersion = BoolOf(v) }
                 }),
             E("UseLatestMinecraftVersionType", null,
-                (_, i) => i.Misc?.UseLatestMinecraftVersionType,
-                i => i.Misc?.UseLatestMinecraftVersionType is not null,
+                (_, i) => i.Misc.UseLatestMinecraftVersionType,
+                i => i.Misc.UseLatestMinecraftVersionType is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with { UseLatestMinecraftVersionType = StringOf(v) }
+                    Misc = i.Misc with { UseLatestMinecraftVersionType = StringOf(v) }
                 }),
             E("InstanceType", null,
-                (_, i) => i.Misc?.InstanceType,
-                i => i.Misc?.InstanceType is not null,
+                (_, i) => i.Misc.InstanceType,
+                i => i.Misc.InstanceType is not null,
                 (i, v) => i with
                 {
-                    Misc = (i.Misc ?? new InstanceMiscConfig()) with { InstanceType = StringOf(v) }
+                    Misc = i.Misc with { InstanceType = StringOf(v) }
                 }),
 
             // ---- managed pack (the ManagedPack family)
             E("ManagedPack", null,
-                (_, i) => i.Managed?.IsManagedPack,
-                i => i.Managed?.IsManagedPack is not null,
+                (_, i) => i.Managed.IsManagedPack,
+                i => i.Managed.IsManagedPack is not null,
                 (i, v) => i with
                 {
-                    Managed = (i.Managed ?? new InstanceManagedConfig()) with { IsManagedPack = BoolOf(v) }
+                    Managed = i.Managed with { IsManagedPack = BoolOf(v) }
                 }),
             E("ManagedPackType", null,
-                (_, i) => i.Managed?.Type,
-                i => i.Managed?.Type is not null,
-                (i, v) => i with { Managed = (i.Managed ?? new InstanceManagedConfig()) with { Type = StringOf(v) } }),
+                (_, i) => i.Managed.Type,
+                i => i.Managed.Type is not null,
+                (i, v) => i with { Managed = i.Managed with { Type = StringOf(v) } }),
             E("ManagedPackID", null,
-                (_, i) => i.Managed?.Id,
-                i => i.Managed?.Id is not null,
-                (i, v) => i with { Managed = (i.Managed ?? new InstanceManagedConfig()) with { Id = StringOf(v) } }),
+                (_, i) => i.Managed.Id,
+                i => i.Managed.Id is not null,
+                (i, v) => i with { Managed = i.Managed with { Id = StringOf(v) } }),
             E("ManagedPackName", null,
-                (_, i) => i.Managed?.Name,
-                i => i.Managed?.Name is not null,
-                (i, v) => i with { Managed = (i.Managed ?? new InstanceManagedConfig()) with { Name = StringOf(v) } }),
+                (_, i) => i.Managed.Name,
+                i => i.Managed.Name is not null,
+                (i, v) => i with { Managed = i.Managed with { Name = StringOf(v) } }),
             E("ManagedPackVersionID", null,
-                (_, i) => i.Managed?.VersionId,
-                i => i.Managed?.VersionId is not null,
+                (_, i) => i.Managed.VersionId,
+                i => i.Managed.VersionId is not null,
                 (i, v) => i with
                 {
-                    Managed = (i.Managed ?? new InstanceManagedConfig()) with { VersionId = StringOf(v) }
+                    Managed = i.Managed with { VersionId = StringOf(v) }
                 }),
             E("ManagedPackVersionName", null,
-                (_, i) => i.Managed?.VersionName,
-                i => i.Managed?.VersionName is not null,
+                (_, i) => i.Managed.VersionName,
+                i => i.Managed.VersionName is not null,
                 (i, v) => i with
                 {
-                    Managed = (i.Managed ?? new InstanceManagedConfig()) with { VersionName = StringOf(v) }
+                    Managed = i.Managed with { VersionName = StringOf(v) }
                 }),
             E("ManagedPackURL", null,
-                (_, i) => i.Managed?.Url,
-                i => i.Managed?.Url is not null,
-                (i, v) => i with { Managed = (i.Managed ?? new InstanceManagedConfig()) with { Url = StringOf(v) } }),
+                (_, i) => i.Managed.Url,
+                i => i.Managed.Url is not null,
+                (i, v) => i with { Managed = i.Managed with { Url = StringOf(v) } }),
 
             // ---- export family + selected profiler
             E("ExportName", null,
-                (_, i) => i.Export?.Name,
-                i => i.Export?.Name is not null,
-                (i, v) => i with { Export = (i.Export ?? new InstanceExportConfig()) with { Name = StringOf(v) } }),
+                (_, i) => i.Export.Name,
+                i => i.Export.Name is not null,
+                (i, v) => i with { Export = i.Export with { Name = StringOf(v) } }),
             E("ExportVersion", null,
-                (_, i) => i.Export?.Version,
-                i => i.Export?.Version is not null,
-                (i, v) => i with { Export = (i.Export ?? new InstanceExportConfig()) with { Version = StringOf(v) } }),
+                (_, i) => i.Export.Version,
+                i => i.Export.Version is not null,
+                (i, v) => i with { Export = i.Export with { Version = StringOf(v) } }),
             E("ExportSummary", null,
-                (_, i) => i.Export?.Summary,
-                i => i.Export?.Summary is not null,
-                (i, v) => i with { Export = (i.Export ?? new InstanceExportConfig()) with { Summary = StringOf(v) } }),
+                (_, i) => i.Export.Summary,
+                i => i.Export.Summary is not null,
+                (i, v) => i with { Export = i.Export with { Summary = StringOf(v) } }),
             E("ExportAuthor", null,
-                (_, i) => i.Export?.Author,
-                i => i.Export?.Author is not null,
-                (i, v) => i with { Export = (i.Export ?? new InstanceExportConfig()) with { Author = StringOf(v) } }),
+                (_, i) => i.Export.Author,
+                i => i.Export.Author is not null,
+                (i, v) => i with { Export = i.Export with { Author = StringOf(v) } }),
             E("ExportOptionalFiles", null,
-                (_, i) => i.Export?.OptionalFiles,
-                i => i.Export?.OptionalFiles is not null,
+                (_, i) => i.Export.OptionalFiles,
+                i => i.Export.OptionalFiles is not null,
                 (i, v) => i with
                 {
-                    Export = (i.Export ?? new InstanceExportConfig()) with { OptionalFiles = BoolOf(v) }
+                    Export = i.Export with { OptionalFiles = BoolOf(v) }
                 }),
             E("ExportRecommendedRAM", null,
-                (_, i) => i.Export?.RecommendedRam,
-                i => i.Export?.RecommendedRam is not null,
+                (_, i) => i.Export.RecommendedRam,
+                i => i.Export.RecommendedRam is not null,
                 (i, v) => i with
                 {
-                    Export = (i.Export ?? new InstanceExportConfig()) with
+                    Export = i.Export with
                     {
                         // IntOf already preserves null ("not configured", the C++ default)
                         RecommendedRam = IntOf(v)
                     }
                 }),
             E("Profiler", null,
-                (_, i) => i.Export?.Profiler,
-                i => i.Export?.Profiler is not null,
-                (i, v) => i with { Export = (i.Export ?? new InstanceExportConfig()) with { Profiler = StringOf(v) } }),
+                (_, i) => i.Export.Profiler,
+                i => i.Export.Profiler is not null,
+                (i, v) => i with { Export = i.Export with { Profiler = StringOf(v) } }),
 
             // ---- the C7 passthrough pair: global-only reads, instance writes dropped
             E("ConsoleMaxLines", null,
-                (u, _) => u.Console!.ConsoleMaxLines,
+                (u, _) => u.Console.ConsoleMaxLines,
                 _ => false,
                 (i, _) => i),
             E("ConsoleOverflowStop", null,
-                (u, _) => u.Console!.ConsoleOverflowStop,
+                (u, _) => u.Console.ConsoleOverflowStop,
                 _ => false,
                 (i, _) => i),
 
@@ -821,59 +832,59 @@ public static class InstanceConfigKeys
             E("OverrideJavaLocation", "OverrideJavaLocation", // the family this derived gate belongs to (its INI spelling lives in GateIniSpellings)
                 (_, i) => GateJavaLocation(i),
                 _ => false,
-                (i, v) => GateWrite(i, v, GateJavaLocation, ClearJavaLocation)),
+                (i, v) => GateWrite(i, v, ClearJavaLocation)),
             E("OverrideJavaArgs", "OverrideJavaArgs", // the family this derived gate belongs to (its INI spelling lives in GateIniSpellings)
                 (_, i) => GateJavaArgs(i),
                 _ => false,
-                (i, v) => GateWrite(i, v, GateJavaArgs, ClearJavaArgs)),
+                (i, v) => GateWrite(i, v, ClearJavaArgs)),
             E("OverrideMemory", "OverrideMemory", // the family this derived gate belongs to (its INI spelling lives in GateIniSpellings)
                 (_, i) => GateMemory(i),
                 _ => false,
-                (i, v) => GateWrite(i, v, GateMemory, ClearMemory)),
+                (i, v) => GateWrite(i, v, ClearMemory)),
             E("OverrideWindow", "OverrideWindow", // the family this derived gate belongs to (its INI spelling lives in GateIniSpellings)
                 (_, i) => GateWindow(i),
                 _ => false,
-                (i, v) => GateWrite(i, v, GateWindow, ClearWindow)),
+                (i, v) => GateWrite(i, v, ClearWindow)),
             E("OverrideCommands", "OverrideCommands", // the family this derived gate belongs to (its INI spelling lives in GateIniSpellings)
                 (_, i) => GateCommands(i),
                 _ => false,
-                (i, v) => GateWrite(i, v, GateCommands, ClearCommands)),
+                (i, v) => GateWrite(i, v, ClearCommands)),
             E("OverrideLaunchCmd", "OverrideCommands", // the legacy synonym of the commands gate
                 (_, i) => GateCommands(i),
                 _ => false,
-                (i, v) => GateWrite(i, v, GateCommands, ClearCommands)),
+                (i, v) => GateWrite(i, v, ClearCommands)),
             E("OverrideEnv", "OverrideEnv", // the family this derived gate belongs to (its INI spelling lives in GateIniSpellings)
                 (_, i) => GateEnv(i),
                 _ => false,
-                (i, v) => GateWrite(i, v, GateEnv, ClearEnv)),
+                (i, v) => GateWrite(i, v, ClearEnv)),
             E("OverrideConsole", "OverrideConsole", // the family this derived gate belongs to (its INI spelling lives in GateIniSpellings)
                 (_, i) => GateConsole(i),
                 _ => false,
-                (i, v) => GateWrite(i, v, GateConsole, ClearConsole)),
+                (i, v) => GateWrite(i, v, ClearConsole)),
             E("OverrideGameTime", "OverrideGameTime", // the family this derived gate belongs to (its INI spelling lives in GateIniSpellings)
                 (_, i) => GateGameTime(i),
                 _ => false,
-                (i, v) => GateWrite(i, v, GateGameTime, ClearGameTime)),
+                (i, v) => GateWrite(i, v, ClearGameTime)),
             E("OverrideNativeWorkarounds", "OverrideNativeWorkarounds", // the family this derived gate belongs to (its INI spelling lives in GateIniSpellings)
                 (_, i) => GateNativeLib(i),
                 _ => false,
-                (i, v) => GateWrite(i, v, GateNativeLib, ClearNativeLib)),
+                (i, v) => GateWrite(i, v, ClearNativeLib)),
             E("OverridePerformance", "OverridePerformance", // the family this derived gate belongs to (its INI spelling lives in GateIniSpellings)
                 (_, i) => GatePerformance(i),
                 _ => false,
-                (i, v) => GateWrite(i, v, GatePerformance, ClearPerformance)),
+                (i, v) => GateWrite(i, v, ClearPerformance)),
             E("OverrideMiscellaneous", "OverrideMiscellaneous", // the family this derived gate belongs to (its INI spelling lives in GateIniSpellings)
                 (_, i) => GateMiscellaneous(i),
                 _ => false,
-                (i, v) => GateWrite(i, v, GateMiscellaneous, ClearMiscellaneous)),
+                (i, v) => GateWrite(i, v, ClearMiscellaneous)),
             E("OverrideLegacySettings", "OverrideLegacySettings", // the family this derived gate belongs to (its INI spelling lives in GateIniSpellings)
                 (_, i) => GateLegacySettings(i),
                 _ => false,
-                (i, v) => GateWrite(i, v, GateLegacySettings, ClearLegacySettings)),
+                (i, v) => GateWrite(i, v, ClearLegacySettings)),
             E("OverrideModDownloadLoaders", "OverrideModDownloadLoaders", // the family this derived gate belongs to (its INI spelling lives in GateIniSpellings)
                 (_, i) => GateModDownloadLoaders(i),
                 _ => false,
-                (i, v) => GateWrite(i, v, GateModDownloadLoaders, ClearModDownloadLoaders))
+                (i, v) => GateWrite(i, v, ClearModDownloadLoaders))
         ];
 
         var map = new Dictionary<string, InstanceKeyEntry>(StringComparer.Ordinal);

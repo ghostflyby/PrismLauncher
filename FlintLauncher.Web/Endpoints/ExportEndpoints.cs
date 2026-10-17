@@ -179,7 +179,7 @@ public static class ExportEndpoints
     /// <summary>The MinecraftInstance for a {ref} (logs/exports need the game root).
     /// D2: every endpoint resolves through the addressing chain (GLOBAL §1).</summary>
     private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string reference) =>
-        runtime.Instances.ResolveInstance(reference) is MinecraftInstance instance ? instance : null;
+        runtime.Instances.ResolveInstance(reference) as MinecraftInstance;
 
     private static string LogDir(MinecraftInstance instance, string dir) =>
         Path.Combine(instance.GameRoot(), dir);

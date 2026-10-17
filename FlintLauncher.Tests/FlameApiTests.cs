@@ -38,6 +38,7 @@ public class FlameApiTests : IDisposable
 
     public void Dispose()
     {
+        GC.SuppressFinalize(this);
         _server.Dispose();
         try
         {
@@ -101,8 +102,9 @@ public class FlameApiTests : IDisposable
         Assert.Equal(TaskState.Succeeded, job.State);
         Assert.Equal(_baseUrl + "/fingerprints", _server.LastPath);
 
-        var body = JsonNode.Parse(Encoding.UTF8.GetString(_server.LastBody!));
-        var fingerprints = ((JsonArray?)body["fingerprints"])!.Select(f => f!.GetValue<string>()).ToList();
+        var body = Assert.IsType<JsonObject>(JsonNode.Parse(Encoding.UTF8.GetString(_server.LastBody ?? [])));
+        var fingerprints = Assert.IsType<JsonArray>(body["fingerprints"])
+            .Select(f => Assert.IsType<JsonValue>(f, exactMatch: false).GetValue<string>()).ToList();
         // the C++ sends the fingerprints as JSON strings
         Assert.Equal(["123456789", "42"], fingerprints);
         _ = request;
@@ -117,8 +119,9 @@ public class FlameApiTests : IDisposable
         Assert.Equal(TaskState.Succeeded, job.State);
         Assert.Equal(_baseUrl + "/mods/files", _server.LastPath);
 
-        var body = JsonNode.Parse(Encoding.UTF8.GetString(_server.LastBody!));
-        var fileIds = ((JsonArray?)body["fileIds"])!.Select(f => f!.GetValue<string>()).ToList();
+        var body = Assert.IsType<JsonObject>(JsonNode.Parse(Encoding.UTF8.GetString(_server.LastBody ?? [])));
+        var fileIds = Assert.IsType<JsonArray>(body["fileIds"])
+            .Select(f => Assert.IsType<JsonValue>(f, exactMatch: false).GetValue<string>()).ToList();
         Assert.Equal(["456", "789"], fileIds);
     }
 
@@ -131,8 +134,9 @@ public class FlameApiTests : IDisposable
         Assert.Equal(TaskState.Succeeded, job.State);
         Assert.Equal(_baseUrl + "/mods", _server.LastPath);
 
-        var body = JsonNode.Parse(Encoding.UTF8.GetString(_server.LastBody!));
-        var modIds = ((JsonArray?)body["modIds"])!.Select(f => f!.GetValue<string>()).ToList();
+        var body = Assert.IsType<JsonObject>(JsonNode.Parse(Encoding.UTF8.GetString(_server.LastBody ?? [])));
+        var modIds = Assert.IsType<JsonArray>(body["modIds"])
+            .Select(f => Assert.IsType<JsonValue>(f, exactMatch: false).GetValue<string>()).ToList();
         Assert.Equal(["123", "222"], modIds);
     }
 
@@ -242,6 +246,7 @@ public class FlameApiTests : IDisposable
             sha1: "abc123",
             dependencies: """[{"modId": 999, "relationType": 3}]""");
         var obj = JsonNode.Parse(json);
+        Assert.NotNull(obj);
 
         var version = FlameMod.LoadIndexedPackVersion(obj);
 
@@ -268,6 +273,7 @@ public class FlameApiTests : IDisposable
             id: 123, name: "Test Mod", slug: "test-mod"));
 
         var pack = new IndexedPack();
+        Assert.NotNull(obj);
         FlameMod.LoadIndexedPack(pack, obj);
 
         Assert.Equal("123", pack.AddonId);
@@ -290,7 +296,7 @@ public class FlameApiTests : IDisposable
         var arr = JsonNode.Parse($"[{older},{newer}]");
 
         var pack = new IndexedPack { AddonId = "123" };
-        FlameMod.LoadIndexedPackVersions(pack, (JsonArray)arr!);
+        FlameMod.LoadIndexedPackVersions(pack, Assert.IsType<JsonArray>(arr));
 
         Assert.True(pack.VersionsLoaded);
         Assert.Equal(["2", "1"], pack.Versions.Select(v => v.FileId));
@@ -319,7 +325,8 @@ public class FlameApiTests : IDisposable
             Ver("2", "2024-01-01T00:00:00Z"),
         };
         var latest = FlameApi.GetLatestVersion(versions, [], ModLoaderType.None, checkLoaders: false);
-        Assert.Equal("2", latest!.FileId);
+        Assert.NotNull(latest);
+        Assert.Equal("2", latest.FileId);
     }
 
     [Fact]
@@ -331,7 +338,8 @@ public class FlameApiTests : IDisposable
             Ver("fabric1", "2023-06-01T00:00:00Z", ModLoaderType.Fabric),
         };
         var latest = FlameApi.GetLatestVersion(versions, [ModLoaderType.Forge], ModLoaderType.None, checkLoaders: true);
-        Assert.Equal("forge1", latest!.FileId);
+        Assert.NotNull(latest);
+        Assert.Equal("forge1", latest.FileId);
     }
 
     [Fact]
@@ -345,7 +353,8 @@ public class FlameApiTests : IDisposable
             Ver("forge1", "2023-01-01T00:00:00Z", ModLoaderType.Forge),
         };
         var latest = FlameApi.GetLatestVersion(versions, [ModLoaderType.Forge], ModLoaderType.None, checkLoaders: true);
-        Assert.Equal("plain", latest!.FileId);
+        Assert.NotNull(latest);
+        Assert.Equal("plain", latest.FileId);
     }
 
     [Fact]
@@ -359,7 +368,8 @@ public class FlameApiTests : IDisposable
             Ver("forge1", "2023-06-01T00:00:00Z", ModLoaderType.Forge),
         };
         var latest = FlameApi.GetLatestVersion(versions, [ModLoaderType.Forge], ModLoaderType.None, checkLoaders: true);
-        Assert.Equal("forge1", latest!.FileId);
+        Assert.NotNull(latest);
+        Assert.Equal("forge1", latest.FileId);
 
         // ... but a NEWER unspecified file takes precedence
         versions =
@@ -368,7 +378,8 @@ public class FlameApiTests : IDisposable
             Ver("forge1", "2023-06-01T00:00:00Z", ModLoaderType.Forge),
         ];
         latest = FlameApi.GetLatestVersion(versions, [ModLoaderType.Forge], ModLoaderType.None, checkLoaders: true);
-        Assert.Equal("plain", latest!.FileId);
+        Assert.NotNull(latest);
+        Assert.Equal("plain", latest.FileId);
     }
 
     [Fact]
@@ -383,16 +394,19 @@ public class FlameApiTests : IDisposable
 
         // no filter: the newest file (the beta) wins
         var latest = FlameApi.GetLatestVersion(versions, [], ModLoaderType.None, checkLoaders: false);
-        Assert.Equal("beta1", latest!.FileId);
+        Assert.NotNull(latest);
+        Assert.Equal("beta1", latest.FileId);
 
         // release-only: the beta is skipped in both the no-loader and loader-checked passes
         var releases = new List<IndexedVersionType> { new(IndexedVersionTypeValue.Release) };
         latest = FlameApi.GetLatestVersion(versions, [], ModLoaderType.None, checkLoaders: false, releases);
-        Assert.Equal("release1", latest!.FileId);
+        Assert.NotNull(latest);
+        Assert.Equal("release1", latest.FileId);
 
         latest = FlameApi.GetLatestVersion(versions, [ModLoaderType.Forge], ModLoaderType.None,
             checkLoaders: true, releases);
-        Assert.Equal("release1", latest!.FileId);
+        Assert.NotNull(latest);
+        Assert.Equal("release1", latest.FileId);
 
         // alpha-only filter with no alpha files: no version at all
         var alphas = new List<IndexedVersionType> { new(IndexedVersionTypeValue.Alpha) };
@@ -439,8 +453,7 @@ public class FlameApiTests : IDisposable
             ["data"] = new JsonArray(JsonNode.Parse(FlamePayloads.ProjectJson(id: 123))),
         }.ToJsonString();
 
-        var manifest = new FlameManifest();
-        manifest.Files[456] = new FlameFile { ProjectId = 123, FileId = 456 };
+        var manifest = new FlameManifest { Files = { [456] = new FlameFile { ProjectId = 123, FileId = 456 } } };
 
         var task = new FileResolvingTask(manifest, flame: _flameApi);
         await task.StartAsync();
@@ -467,8 +480,7 @@ public class FlameApiTests : IDisposable
             ["data"] = new JsonArray(JsonNode.Parse(FlamePayloads.ProjectJson(id: 123))),
         }.ToJsonString();
 
-        var manifest = new FlameManifest();
-        manifest.Files[456] = new FlameFile { ProjectId = 123, FileId = 456 };
+        var manifest = new FlameManifest { Files = { [456] = new FlameFile { ProjectId = 123, FileId = 456 } } };
 
         var task = new FileResolvingTask(manifest, flame: _flameApi) { FallbackMrBlockedMods = false };
         await task.StartAsync();
@@ -490,8 +502,7 @@ public class FlameApiTests : IDisposable
             ["data"] = new JsonArray(JsonNode.Parse(FlamePayloads.ProjectJson(id: 123, classId: 17))),
         }.ToJsonString();
 
-        var manifest = new FlameManifest();
-        manifest.Files[456] = new FlameFile { ProjectId = 123, FileId = 456 };
+        var manifest = new FlameManifest { Files = { [456] = new FlameFile { ProjectId = 123, FileId = 456 } } };
 
         var task = new FileResolvingTask(manifest, flame: _flameApi);
         await task.StartAsync();

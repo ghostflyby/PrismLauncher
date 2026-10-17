@@ -25,8 +25,9 @@ public class ConcurrentTask : FlintTask
     private protected readonly Queue<FlintTask> Queue = new();
     private protected readonly Dictionary<FlintTask, Task?> Doing = new();
     private protected readonly Dictionary<FlintTask, FlintTask> Done = new();
-    private protected readonly Dictionary<FlintTask, FlintTask> Failed = new();
-    private protected readonly Dictionary<FlintTask, FlintTask> Succeeded = new();
+    // the C++ m_failed/m_succeeded maps — the names hide the FlintTask signal events on purpose
+    private protected new readonly Dictionary<FlintTask, FlintTask> Failed = new();
+    private protected new readonly Dictionary<FlintTask, FlintTask> Succeeded = new();
     private protected readonly Dictionary<Guid, TaskStepProgress> TaskProgress = new();
     private protected int TotalMaxSize;
     private CancellationToken runToken;

@@ -138,7 +138,11 @@ public static class ComponentEndpoints
                         $"the version of '{request.Uid}' could not be installed (its custom patch could not be reverted)");
                 }
                 profile.SaveNow();
-                var component = profile.GetComponent(request.Uid)!;
+                var component = profile.GetComponent(request.Uid);
+                if (component is null)
+                {
+                    return ApiJson.NotFound("component_not_found", $"no component '{request.Uid}'");
+                }
                 return Results.Created(
                     $"/api/v1/instances/{Uri.EscapeDataString(id)}/components/{Uri.EscapeDataString(request.Uid)}",
                     ToView(component));
@@ -286,7 +290,7 @@ public static class ComponentEndpoints
     /// <summary>The MinecraftInstance for a {ref} (the component stack needs the PackProfile).
     /// D2: every endpoint resolves through the addressing chain (GLOBAL §1).</summary>
     private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string reference) =>
-        runtime.Instances.ResolveInstance(reference) is MinecraftInstance instance ? instance : null;
+        runtime.Instances.ResolveInstance(reference) as MinecraftInstance;
 
     private static int IndexOfUid(PackProfile profile, string uid)
     {

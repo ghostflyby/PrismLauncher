@@ -33,36 +33,34 @@ public static class FlintConfigFold
     }
 
     /// <summary>Fold <paramref name="upper"/> over <paramref name="lower"/>: non-null upper
-    /// members win, null inherits (C7). BOTH sides may be partial payloads (deserialization
-    /// leaves absent domain objects and members null) — a domain absent from either side
-    /// falls back to the record defaults inside the member-level merges, so the fold result
-    /// is always fully materialized.
-    /// NOTE: layers are expected to arrive as PARTIAL PAYLOADS; a hand-materialized
-    /// <c>new JavaConfig()</c> has every member non-null (the property initializers ran) and
-    /// therefore overrides the lower layer with the defaults — construct test/fixture layers
-    /// via JSON payloads, not object initializers, when inheritance matters.</summary>
+    /// members win, null inherits (C7). Domains are always materialized (the roots'
+    /// materializing constructors); the layer semantics live at the scalar level — a scalar
+    /// absent from either side is null and inherits, so the fold result is always fully
+    /// resolved.
+    /// NOTE: layers are expected to arrive as PARTIAL PAYLOADS — a payload-absent domain
+    /// re-materializes BLANK via the roots' constructors (every scalar null = inherit), so
+    /// only payload-PRESENT scalars ever win over the lower layer. Hand-materialized domain
+    /// records are blank too (the defaults live in <see cref="FlintConfigFile.Default"/>),
+    /// so fixture layers behave identically whether built from JSON or object initializers.</summary>
     public static FlintConfigFile Merge(FlintConfigFile lower, FlintConfigFile upper) => lower with
     {
-        // the domain members are nullable (FlintConfigFile) — a partial payload layer may
-        // carry null domains, which fall back to the record defaults here; the honest
-        // nullable annotation is what keeps these coalescings from reading as redundant
-        Launcher = Merge(lower.Launcher ?? new LauncherConfig(), upper.Launcher),
-        Console = Merge(lower.Console ?? new ConsoleConfig(), upper.Console),
-        GameTime = Merge(lower.GameTime ?? new GameTimeConfig(), upper.GameTime),
-        Window = Merge(lower.Window ?? new WindowConfig(), upper.Window),
-        Memory = Merge(lower.Memory ?? new MemoryConfig(), upper.Memory),
-        Performance = Merge(lower.Performance ?? new PerformanceConfig(), upper.Performance),
-        NativeLib = Merge(lower.NativeLib ?? new NativeLibConfig(), upper.NativeLib),
-        Commands = Merge(lower.Commands ?? new CommandsConfig(), upper.Commands),
-        MinecraftMisc = Merge(lower.MinecraftMisc ?? new MinecraftMiscConfig(), upper.MinecraftMisc),
-        ModDownload = Merge(lower.ModDownload ?? new ModDownloadConfig(), upper.ModDownload),
-        Java = Merge(lower.Java ?? new JavaConfig(), upper.Java),
-        Dirs = Merge(lower.Dirs ?? new DirsConfig(), upper.Dirs),
-        Language = Merge(lower.Language ?? new LanguageConfig(), upper.Language),
-        Mirror = Merge(lower.Mirror ?? new MirrorConfig(), upper.Mirror),
-        Proxy = Merge(lower.Proxy ?? new ProxyConfig(), upper.Proxy),
-        Api = Merge(lower.Api ?? new ApiConfig(), upper.Api),
-        Tools = Merge(lower.Tools ?? new ToolsConfig(), upper.Tools),
+        Launcher = Merge(lower.Launcher, upper.Launcher),
+        Console = Merge(lower.Console, upper.Console),
+        GameTime = Merge(lower.GameTime, upper.GameTime),
+        Window = Merge(lower.Window, upper.Window),
+        Memory = Merge(lower.Memory, upper.Memory),
+        Performance = Merge(lower.Performance, upper.Performance),
+        NativeLib = Merge(lower.NativeLib, upper.NativeLib),
+        Commands = Merge(lower.Commands, upper.Commands),
+        MinecraftMisc = Merge(lower.MinecraftMisc, upper.MinecraftMisc),
+        ModDownload = Merge(lower.ModDownload, upper.ModDownload),
+        Java = Merge(lower.Java, upper.Java),
+        Dirs = Merge(lower.Dirs, upper.Dirs),
+        Language = Merge(lower.Language, upper.Language),
+        Mirror = Merge(lower.Mirror, upper.Mirror),
+        Proxy = Merge(lower.Proxy, upper.Proxy),
+        Api = Merge(lower.Api, upper.Api),
+        Tools = Merge(lower.Tools, upper.Tools),
     };
 
     /// <summary>Normalize a payload read from disk: absent domain objects and members take
@@ -70,149 +68,149 @@ public static class FlintConfigFold
     public static FlintConfigFile MergeOverDefault(FlintConfigFile payload) =>
         Merge(FlintConfigFile.Default(), payload);
 
-    private static LauncherConfig Merge(LauncherConfig lower, LauncherConfig? upper) => lower with
+    private static LauncherConfig Merge(LauncherConfig lower, LauncherConfig upper) => lower with
     {
-        MenuBarInsteadOfToolBar = upper?.MenuBarInsteadOfToolBar ?? lower.MenuBarInsteadOfToolBar,
-        NumberOfConcurrentTasks = upper?.NumberOfConcurrentTasks ?? lower.NumberOfConcurrentTasks,
-        NumberOfConcurrentDownloads = upper?.NumberOfConcurrentDownloads ?? lower.NumberOfConcurrentDownloads,
-        NumberOfManualRetries = upper?.NumberOfManualRetries ?? lower.NumberOfManualRetries,
-        RequestTimeout = upper?.RequestTimeout ?? lower.RequestTimeout,
-        CloseAfterLaunch = upper?.CloseAfterLaunch ?? lower.CloseAfterLaunch,
-        QuitAfterGameStop = upper?.QuitAfterGameStop ?? lower.QuitAfterGameStop,
-        InstSortMode = upper?.InstSortMode ?? lower.InstSortMode,
-        InstRenamingMode = upper?.InstRenamingMode ?? lower.InstRenamingMode,
+        MenuBarInsteadOfToolBar = upper.MenuBarInsteadOfToolBar ?? lower.MenuBarInsteadOfToolBar,
+        NumberOfConcurrentTasks = upper.NumberOfConcurrentTasks ?? lower.NumberOfConcurrentTasks,
+        NumberOfConcurrentDownloads = upper.NumberOfConcurrentDownloads ?? lower.NumberOfConcurrentDownloads,
+        NumberOfManualRetries = upper.NumberOfManualRetries ?? lower.NumberOfManualRetries,
+        RequestTimeout = upper.RequestTimeout ?? lower.RequestTimeout,
+        CloseAfterLaunch = upper.CloseAfterLaunch ?? lower.CloseAfterLaunch,
+        QuitAfterGameStop = upper.QuitAfterGameStop ?? lower.QuitAfterGameStop,
+        InstSortMode = upper.InstSortMode ?? lower.InstSortMode,
+        InstRenamingMode = upper.InstRenamingMode ?? lower.InstRenamingMode,
     };
 
-    private static ConsoleConfig Merge(ConsoleConfig lower, ConsoleConfig? upper) => lower with
+    private static ConsoleConfig Merge(ConsoleConfig lower, ConsoleConfig upper) => lower with
     {
-        ShowConsole = upper?.ShowConsole ?? lower.ShowConsole,
-        AutoCloseConsole = upper?.AutoCloseConsole ?? lower.AutoCloseConsole,
-        ShowConsoleOnError = upper?.ShowConsoleOnError ?? lower.ShowConsoleOnError,
-        LogPrePostOutput = upper?.LogPrePostOutput ?? lower.LogPrePostOutput,
-        ConsoleMaxLines = upper?.ConsoleMaxLines ?? lower.ConsoleMaxLines,
-        ConsoleOverflowStop = upper?.ConsoleOverflowStop ?? lower.ConsoleOverflowStop,
+        ShowConsole = upper.ShowConsole ?? lower.ShowConsole,
+        AutoCloseConsole = upper.AutoCloseConsole ?? lower.AutoCloseConsole,
+        ShowConsoleOnError = upper.ShowConsoleOnError ?? lower.ShowConsoleOnError,
+        LogPrePostOutput = upper.LogPrePostOutput ?? lower.LogPrePostOutput,
+        ConsoleMaxLines = upper.ConsoleMaxLines ?? lower.ConsoleMaxLines,
+        ConsoleOverflowStop = upper.ConsoleOverflowStop ?? lower.ConsoleOverflowStop,
     };
 
-    private static GameTimeConfig Merge(GameTimeConfig lower, GameTimeConfig? upper) => lower with
+    private static GameTimeConfig Merge(GameTimeConfig lower, GameTimeConfig upper) => lower with
     {
-        ShowGameTime = upper?.ShowGameTime ?? lower.ShowGameTime,
-        ShowGlobalGameTime = upper?.ShowGlobalGameTime ?? lower.ShowGlobalGameTime,
-        ShowGameTimeWithoutDays = upper?.ShowGameTimeWithoutDays ?? lower.ShowGameTimeWithoutDays,
-        RecordGameTime = upper?.RecordGameTime ?? lower.RecordGameTime,
+        ShowGameTime = upper.ShowGameTime ?? lower.ShowGameTime,
+        ShowGlobalGameTime = upper.ShowGlobalGameTime ?? lower.ShowGlobalGameTime,
+        ShowGameTimeWithoutDays = upper.ShowGameTimeWithoutDays ?? lower.ShowGameTimeWithoutDays,
+        RecordGameTime = upper.RecordGameTime ?? lower.RecordGameTime,
     };
 
-    private static WindowConfig Merge(WindowConfig lower, WindowConfig? upper) => lower with
+    private static WindowConfig Merge(WindowConfig lower, WindowConfig upper) => lower with
     {
-        LaunchMaximized = upper?.LaunchMaximized ?? lower.LaunchMaximized,
-        MinecraftWinWidth = upper?.MinecraftWinWidth ?? lower.MinecraftWinWidth,
-        MinecraftWinHeight = upper?.MinecraftWinHeight ?? lower.MinecraftWinHeight,
+        LaunchMaximized = upper.LaunchMaximized ?? lower.LaunchMaximized,
+        MinecraftWinWidth = upper.MinecraftWinWidth ?? lower.MinecraftWinWidth,
+        MinecraftWinHeight = upper.MinecraftWinHeight ?? lower.MinecraftWinHeight,
     };
 
-    private static MemoryConfig Merge(MemoryConfig lower, MemoryConfig? upper) => lower with
+    private static MemoryConfig Merge(MemoryConfig lower, MemoryConfig upper) => lower with
     {
-        MinMemAlloc = upper?.MinMemAlloc ?? lower.MinMemAlloc,
-        MaxMemAlloc = upper?.MaxMemAlloc ?? lower.MaxMemAlloc,
-        LowMemWarning = upper?.LowMemWarning ?? lower.LowMemWarning,
+        MinMemAlloc = upper.MinMemAlloc ?? lower.MinMemAlloc,
+        MaxMemAlloc = upper.MaxMemAlloc ?? lower.MaxMemAlloc,
+        LowMemWarning = upper.LowMemWarning ?? lower.LowMemWarning,
     };
 
-    private static PerformanceConfig Merge(PerformanceConfig lower, PerformanceConfig? upper) => lower with
+    private static PerformanceConfig Merge(PerformanceConfig lower, PerformanceConfig upper) => lower with
     {
-        EnableFeralGamemode = upper?.EnableFeralGamemode ?? lower.EnableFeralGamemode,
-        EnableMangoHud = upper?.EnableMangoHud ?? lower.EnableMangoHud,
-        UseDiscreteGpu = upper?.UseDiscreteGpu ?? lower.UseDiscreteGpu,
-        UseZink = upper?.UseZink ?? lower.UseZink,
+        EnableFeralGamemode = upper.EnableFeralGamemode ?? lower.EnableFeralGamemode,
+        EnableMangoHud = upper.EnableMangoHud ?? lower.EnableMangoHud,
+        UseDiscreteGpu = upper.UseDiscreteGpu ?? lower.UseDiscreteGpu,
+        UseZink = upper.UseZink ?? lower.UseZink,
     };
 
-    private static NativeLibConfig Merge(NativeLibConfig lower, NativeLibConfig? upper) => lower with
+    private static NativeLibConfig Merge(NativeLibConfig lower, NativeLibConfig upper) => lower with
     {
-        UseNativeOpenAl = upper?.UseNativeOpenAl ?? lower.UseNativeOpenAl,
-        CustomOpenAlPath = upper?.CustomOpenAlPath ?? lower.CustomOpenAlPath,
-        UseNativeGlfw = upper?.UseNativeGlfw ?? lower.UseNativeGlfw,
-        CustomGlfwPath = upper?.CustomGlfwPath ?? lower.CustomGlfwPath,
-        UseNativeSdl = upper?.UseNativeSdl ?? lower.UseNativeSdl,
-        CustomSdlPath = upper?.CustomSdlPath ?? lower.CustomSdlPath,
+        UseNativeOpenAl = upper.UseNativeOpenAl ?? lower.UseNativeOpenAl,
+        CustomOpenAlPath = upper.CustomOpenAlPath ?? lower.CustomOpenAlPath,
+        UseNativeGlfw = upper.UseNativeGlfw ?? lower.UseNativeGlfw,
+        CustomGlfwPath = upper.CustomGlfwPath ?? lower.CustomGlfwPath,
+        UseNativeSdl = upper.UseNativeSdl ?? lower.UseNativeSdl,
+        CustomSdlPath = upper.CustomSdlPath ?? lower.CustomSdlPath,
     };
 
-    private static CommandsConfig Merge(CommandsConfig lower, CommandsConfig? upper) => lower with
+    private static CommandsConfig Merge(CommandsConfig lower, CommandsConfig upper) => lower with
     {
-        PreLoadCommand = upper?.PreLoadCommand ?? lower.PreLoadCommand,
-        PreLaunchCommand = upper?.PreLaunchCommand ?? lower.PreLaunchCommand,
-        WrapperCommand = upper?.WrapperCommand ?? lower.WrapperCommand,
-        PostExitCommand = upper?.PostExitCommand ?? lower.PostExitCommand,
+        PreLoadCommand = upper.PreLoadCommand ?? lower.PreLoadCommand,
+        PreLaunchCommand = upper.PreLaunchCommand ?? lower.PreLaunchCommand,
+        WrapperCommand = upper.WrapperCommand ?? lower.WrapperCommand,
+        PostExitCommand = upper.PostExitCommand ?? lower.PostExitCommand,
     };
 
-    private static MinecraftMiscConfig Merge(MinecraftMiscConfig lower, MinecraftMiscConfig? upper) => lower with
+    private static MinecraftMiscConfig Merge(MinecraftMiscConfig lower, MinecraftMiscConfig upper) => lower with
     {
-        OnlineFixes = upper?.OnlineFixes ?? lower.OnlineFixes,
-        Env = upper?.Env ?? lower.Env,
+        OnlineFixes = upper.OnlineFixes ?? lower.OnlineFixes,
+        Env = upper.Env ?? lower.Env,
     };
 
-    private static ModDownloadConfig Merge(ModDownloadConfig lower, ModDownloadConfig? upper) => lower with
+    private static ModDownloadConfig Merge(ModDownloadConfig lower, ModDownloadConfig upper) => lower with
     {
-        ModMetadataDisabled = upper?.ModMetadataDisabled ?? lower.ModMetadataDisabled,
-        ModDependenciesDisabled = upper?.ModDependenciesDisabled ?? lower.ModDependenciesDisabled,
-        SkipModpackUpdatePrompt = upper?.SkipModpackUpdatePrompt ?? lower.SkipModpackUpdatePrompt,
-        ShowModIncompat = upper?.ShowModIncompat ?? lower.ShowModIncompat,
+        ModMetadataDisabled = upper.ModMetadataDisabled ?? lower.ModMetadataDisabled,
+        ModDependenciesDisabled = upper.ModDependenciesDisabled ?? lower.ModDependenciesDisabled,
+        SkipModpackUpdatePrompt = upper.SkipModpackUpdatePrompt ?? lower.SkipModpackUpdatePrompt,
+        ShowModIncompat = upper.ShowModIncompat ?? lower.ShowModIncompat,
         DownloadGameFilesDuringInstanceCreation =
-            upper?.DownloadGameFilesDuringInstanceCreation ?? lower.DownloadGameFilesDuringInstanceCreation,
-        ModUpdateReleaseTypes = upper?.ModUpdateReleaseTypes ?? lower.ModUpdateReleaseTypes,
+            upper.DownloadGameFilesDuringInstanceCreation ?? lower.DownloadGameFilesDuringInstanceCreation,
+        ModUpdateReleaseTypes = upper.ModUpdateReleaseTypes ?? lower.ModUpdateReleaseTypes,
     };
 
-    private static JavaConfig Merge(JavaConfig lower, JavaConfig? upper) => lower with
+    private static JavaConfig Merge(JavaConfig lower, JavaConfig upper) => lower with
     {
-        JavaPath = upper?.JavaPath ?? lower.JavaPath,
-        JvmArgs = upper?.JvmArgs ?? lower.JvmArgs,
-        IgnoreJavaCompatibility = upper?.IgnoreJavaCompatibility ?? lower.IgnoreJavaCompatibility,
-        IgnoreJavaWizard = upper?.IgnoreJavaWizard ?? lower.IgnoreJavaWizard,
-        AutomaticJavaSwitch = upper?.AutomaticJavaSwitch ?? lower.AutomaticJavaSwitch,
-        AutomaticJavaDownload = upper?.AutomaticJavaDownload ?? lower.AutomaticJavaDownload,
-        AutomaticJava = upper?.AutomaticJava ?? lower.AutomaticJava,
+        JavaPath = upper.JavaPath ?? lower.JavaPath,
+        JvmArgs = upper.JvmArgs ?? lower.JvmArgs,
+        IgnoreJavaCompatibility = upper.IgnoreJavaCompatibility ?? lower.IgnoreJavaCompatibility,
+        IgnoreJavaWizard = upper.IgnoreJavaWizard ?? lower.IgnoreJavaWizard,
+        AutomaticJavaSwitch = upper.AutomaticJavaSwitch ?? lower.AutomaticJavaSwitch,
+        AutomaticJavaDownload = upper.AutomaticJavaDownload ?? lower.AutomaticJavaDownload,
+        AutomaticJava = upper.AutomaticJava ?? lower.AutomaticJava,
     };
 
-    private static DirsConfig Merge(DirsConfig lower, DirsConfig? upper) => lower with
+    private static DirsConfig Merge(DirsConfig lower, DirsConfig upper) => lower with
     {
-        IconsDir = upper?.IconsDir ?? lower.IconsDir,
-        SkinsDir = upper?.SkinsDir ?? lower.SkinsDir,
-        JavaDir = upper?.JavaDir ?? lower.JavaDir,
-        DownloadsDir = upper?.DownloadsDir ?? lower.DownloadsDir,
-        DownloadsDirWatchRecursive = upper?.DownloadsDirWatchRecursive ?? lower.DownloadsDirWatchRecursive,
-        MoveModsFromDownloadsDir = upper?.MoveModsFromDownloadsDir ?? lower.MoveModsFromDownloadsDir,
+        IconsDir = upper.IconsDir ?? lower.IconsDir,
+        SkinsDir = upper.SkinsDir ?? lower.SkinsDir,
+        JavaDir = upper.JavaDir ?? lower.JavaDir,
+        DownloadsDir = upper.DownloadsDir ?? lower.DownloadsDir,
+        DownloadsDirWatchRecursive = upper.DownloadsDirWatchRecursive ?? lower.DownloadsDirWatchRecursive,
+        MoveModsFromDownloadsDir = upper.MoveModsFromDownloadsDir ?? lower.MoveModsFromDownloadsDir,
     };
 
-    private static LanguageConfig Merge(LanguageConfig lower, LanguageConfig? upper) => lower with
+    private static LanguageConfig Merge(LanguageConfig lower, LanguageConfig upper) => lower with
     {
-        Language = upper?.Language ?? lower.Language,
-        UseSystemLocale = upper?.UseSystemLocale ?? lower.UseSystemLocale,
+        Language = upper.Language ?? lower.Language,
+        UseSystemLocale = upper.UseSystemLocale ?? lower.UseSystemLocale,
     };
 
-    private static MirrorConfig Merge(MirrorConfig lower, MirrorConfig? upper) => lower with
+    private static MirrorConfig Merge(MirrorConfig lower, MirrorConfig upper) => lower with
     {
-        MetaUrlOverride = upper?.MetaUrlOverride ?? lower.MetaUrlOverride,
-        ResourceUrlOverride = upper?.ResourceUrlOverride ?? lower.ResourceUrlOverride,
-        LegacyFmlLibsUrlOverride = upper?.LegacyFmlLibsUrlOverride ?? lower.LegacyFmlLibsUrlOverride,
+        MetaUrlOverride = upper.MetaUrlOverride ?? lower.MetaUrlOverride,
+        ResourceUrlOverride = upper.ResourceUrlOverride ?? lower.ResourceUrlOverride,
+        LegacyFmlLibsUrlOverride = upper.LegacyFmlLibsUrlOverride ?? lower.LegacyFmlLibsUrlOverride,
     };
 
-    private static ProxyConfig Merge(ProxyConfig lower, ProxyConfig? upper) => lower with
+    private static ProxyConfig Merge(ProxyConfig lower, ProxyConfig upper) => lower with
     {
-        ProxyType = upper?.ProxyType ?? lower.ProxyType,
-        ProxyAddr = upper?.ProxyAddr ?? lower.ProxyAddr,
-        ProxyPort = upper?.ProxyPort ?? lower.ProxyPort,
-        ProxyUser = upper?.ProxyUser ?? lower.ProxyUser,
+        ProxyType = upper.ProxyType ?? lower.ProxyType,
+        ProxyAddr = upper.ProxyAddr ?? lower.ProxyAddr,
+        ProxyPort = upper.ProxyPort ?? lower.ProxyPort,
+        ProxyUser = upper.ProxyUser ?? lower.ProxyUser,
     };
 
-    private static ApiConfig Merge(ApiConfig lower, ApiConfig? upper) => lower with
+    private static ApiConfig Merge(ApiConfig lower, ApiConfig upper) => lower with
     {
-        MsaClientIdOverride = upper?.MsaClientIdOverride ?? lower.MsaClientIdOverride,
-        UserAgentOverride = upper?.UserAgentOverride ?? lower.UserAgentOverride,
-        PastebinCustomApiBase = upper?.PastebinCustomApiBase ?? lower.PastebinCustomApiBase,
-        PastebinType = upper?.PastebinType ?? lower.PastebinType,
+        MsaClientIdOverride = upper.MsaClientIdOverride ?? lower.MsaClientIdOverride,
+        UserAgentOverride = upper.UserAgentOverride ?? lower.UserAgentOverride,
+        PastebinCustomApiBase = upper.PastebinCustomApiBase ?? lower.PastebinCustomApiBase,
+        PastebinType = upper.PastebinType ?? lower.PastebinType,
     };
 
-    private static ToolsConfig Merge(ToolsConfig lower, ToolsConfig? upper) => lower with
+    private static ToolsConfig Merge(ToolsConfig lower, ToolsConfig upper) => lower with
     {
-        JsonEditor = upper?.JsonEditor ?? lower.JsonEditor,
-        JProfilerPath = upper?.JProfilerPath ?? lower.JProfilerPath,
-        JVisualVmPath = upper?.JVisualVmPath ?? lower.JVisualVmPath,
-        McEditPath = upper?.McEditPath ?? lower.McEditPath,
+        JsonEditor = upper.JsonEditor ?? lower.JsonEditor,
+        JProfilerPath = upper.JProfilerPath ?? lower.JProfilerPath,
+        JVisualVmPath = upper.JVisualVmPath ?? lower.JVisualVmPath,
+        McEditPath = upper.McEditPath ?? lower.McEditPath,
     };
 }

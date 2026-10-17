@@ -75,11 +75,11 @@ public static class MiscEndpoints
             }
 
             // the typed user layer (C5/D4 — the SettingsObject view retired)
-            var typeIndex = runtime.Config.Current.Api!.PastebinType ?? (int)PasteUpload.PasteType.Mclogs;
+            var typeIndex = runtime.Config.Current.Api.PastebinType ?? (int)PasteUpload.PasteType.Mclogs;
             var pasteType = typeIndex >= 0 && typeIndex < PasteUpload.PasteTypes.Length
                 ? (PasteUpload.PasteType)typeIndex
                 : PasteUpload.PasteType.Mclogs;
-            var upload = new PasteUpload(content, runtime.Config.Current.Api!.PastebinCustomApiBase ?? "",
+            var upload = new PasteUpload(content, runtime.Config.Current.Api.PastebinCustomApiBase ?? "",
                 pasteType, runtime.Net);
             await upload.StartAsync();
             return upload.WasSuccessful && upload.PasteLink.Length > 0
