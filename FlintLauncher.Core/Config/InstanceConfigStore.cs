@@ -20,7 +20,7 @@ namespace FlintLauncher.Core.Config;
 
 public sealed class InstanceConfigStore
 {
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
     private readonly TypedJsonFile<InstanceConfigFile> _file;
 
     public InstanceConfigStore(string instanceRoot, JsonTypeInfo<InstanceConfigFile> typeInfo)

@@ -300,7 +300,7 @@ public class AccountListTests : IDisposable
         var path = TempPath("autosave.json");
         File.WriteAllText(path, UpstreamAccountsJson);
         var list = new AccountList();
-        list.SetListFilePath(path, autosave: true);
+        list.SetListFilePath(path, enableAutosave: true);
         Assert.True(list.LoadList());
 
         var changed = false;

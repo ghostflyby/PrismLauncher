@@ -42,7 +42,7 @@ public static class FlintConfigFold
     /// only payload-PRESENT scalars ever win over the lower layer. Hand-materialized domain
     /// records are blank too (the defaults live in <see cref="FlintConfigFile.Default"/>),
     /// so fixture layers behave identically whether built from JSON or object initializers.</summary>
-    public static FlintConfigFile Merge(FlintConfigFile lower, FlintConfigFile upper) => lower with
+    public static FlintConfigFile Merge(FlintConfigFile lower, FlintConfigFile upper) => new()
     {
         Launcher = Merge(lower.Launcher, upper.Launcher),
         Console = Merge(lower.Console, upper.Console),

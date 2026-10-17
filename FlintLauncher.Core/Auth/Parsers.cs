@@ -546,7 +546,7 @@ public static class Parsers
         output.IssueInstant = currentTime;
         output.NotAfter = currentTime.AddSeconds(expiresIn);
 
-        if (!GetString(AccountData.Get(obj, "username"), out var username))
+        if (!GetString(AccountData.Get(obj, "username"), out var _))
         {
             // qWarning() << "username is not valid";
             return false;

@@ -316,17 +316,16 @@ public sealed class MsaInteractiveStep : AuthStep
     private sealed class LoopbackListener : IDisposable
     {
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
-        private TaskCompletionSource<Uri?> redirectSource =
+        private readonly TaskCompletionSource<Uri?> redirectSource =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private CancellationTokenSource acceptCts = new();
-        private Task? acceptLoop;
+        private readonly CancellationTokenSource acceptCts = new();
         private bool disposed;
 
         public string Start()
         {
             _listener.Start();
             var port = ((IPEndPoint)_listener.LocalEndpoint).Port;
-            acceptLoop = AcceptLoopAsync(acceptCts.Token);
+_ = AcceptLoopAsync(acceptCts.Token);
             return $"http://127.0.0.1:{port}/";
         }
 

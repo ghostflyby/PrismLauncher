@@ -167,10 +167,10 @@ public sealed class AccountList
         return false;
     }
 
-    public void SetListFilePath(string path, bool autosave = false)
+    public void SetListFilePath(string path, bool enableAutosave = false)
     {
         listFilePath = path;
-        this.autosave = autosave;
+        this.autosave = enableAutosave;
     }
 
     public bool LoadList()

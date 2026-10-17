@@ -121,8 +121,8 @@ public sealed class MinecraftAccount
     {
         currentTask = flow;
         flow.Succeeded += _ => AuthSucceeded();
-        flow.Failed += (_, reason) => AuthFailed(reason);
-        flow.Aborted += _ => AuthFailed("Aborted");
+        flow.Failed += (_, _) => AuthFailed();
+        flow.Aborted += _ => AuthFailed();
         ActivityChanged?.Invoke(true);
         return flow;
     }
@@ -134,7 +134,7 @@ public sealed class MinecraftAccount
         ActivityChanged?.Invoke(false);
     }
 
-    private void AuthFailed(string reason)
+    private void AuthFailed()
     {
         if (currentTask is { } task)
         {

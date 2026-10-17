@@ -176,7 +176,7 @@ public sealed class LauncherRuntime
 
         // accounts: <dataDir>/accounts.json (autosaved on every change)
         Accounts = new AccountList();
-        Accounts.SetListFilePath(paths.AccountsFile, autosave: true);
+        Accounts.SetListFilePath(paths.AccountsFile, enableAutosave: true);
         Accounts.LoadList();
 
         // (CACHE E7: the news checker is gone entirely — the /news endpoint, the feed base
