@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Focused tests for the port of launcher/Commandline.{h,cpp}.
+
 using FlintLauncher.Core.Text;
 using Xunit;
 

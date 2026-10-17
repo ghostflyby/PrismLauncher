@@ -2,9 +2,12 @@
 // Tests for the InstanceList port. Everything synthetic (temp dirs); instance.cfg and
 // instgroups.json are exercised through the real QSettings-compatible INI layer and the
 // Qt-style JSON writer.
+
 using System.Globalization;
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.State;
+using FlintLauncher.Core.Tasks;
 using Xunit;
 
 namespace Flint.Tests;
@@ -472,7 +475,7 @@ public class InstanceListTests : IDisposable
         var state = TestLauncherState.Create();
         state.Update(s => s with
         {
-            Ui = new FlintLauncher.Core.State.UiState { HiddenGroups = ["B"] },
+            Ui = new UiState { HiddenGroups = ["B"] },
         });
         File.WriteAllText(_groupFile,
             """
@@ -761,7 +764,7 @@ public class InstanceListTests : IDisposable
 
         var wrapped = list.WrapInstanceTask(new FailingInstanceTask());
         await wrapped.StartAsync();
-        Assert.Equal(FlintLauncher.Core.Tasks.TaskState.Failed, wrapped.State);
+        Assert.Equal(TaskState.Failed, wrapped.State);
         Assert.Equal("boom", wrapped.FailReason);
 
         // the staging folder was cleaned up: .tmp is empty again

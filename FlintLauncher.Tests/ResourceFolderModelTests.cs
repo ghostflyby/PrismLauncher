@@ -9,6 +9,7 @@
 //    synchronous, so there is no updateFinished signal to await);
 //  - test_addFromWatch's QFileSystemWatcher behavior (startWatching/stopWatching); the
 //    port exercises the same update() folder scan directly.
+
 using FlintLauncher.Core.Minecraft.Resources;
 using Xunit;
 
@@ -191,12 +192,12 @@ public class ResourceFolderModelTests : IDisposable
         var small = new Resource(smallPath);
         var big = new Resource(bigPath);
 
-        Assert.True(small.Compare(big, SortType.Name) < 0); // "the beta" -> "beta" > "alpha"
-        Assert.True(big.Compare(small, SortType.Name) > 0);
+        Assert.True(small.Compare(big) < 0); // "the beta" -> "beta" > "alpha"
+        Assert.True(big.Compare(small) > 0);
         Assert.True(big.Compare(small, SortType.Date) > 0); // modified later
         Assert.True(big.Compare(small, SortType.Size) > 0); // larger
         Assert.True(big.Compare(small, SortType.Filename) > 0); // "the beta.jar" vs "alpha.jar"
-        Assert.Equal(0, small.Compare(small, SortType.Name));
+        Assert.Equal(0, small.Compare(small));
 
         // disabled resources sort after enabled ones
         Assert.True(small.Enable(EnableAction.Toggle));

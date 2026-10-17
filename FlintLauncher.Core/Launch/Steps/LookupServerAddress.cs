@@ -4,6 +4,7 @@
 // game. The QDnsLookup usage is replaced by the minimal SrvResolver; failure semantics match
 // the C++ exactly — a failed lookup is NOT fatal, the launch continues with the original
 // address and the default port and Minecraft itself may still connect (or not).
+
 using FlintLauncher.Core.Instances;
 
 namespace FlintLauncher.Core.Launch.Steps;
@@ -11,7 +12,7 @@ namespace FlintLauncher.Core.Launch.Steps;
 public sealed class LookupServerAddress : LaunchStep
 {
     private readonly MinecraftTarget _output;
-    private string _lookupAddress = "";
+    private string lookupAddress = "";
 
     public LookupServerAddress(LaunchTask parent, MinecraftTarget output) : base(parent)
     {
@@ -21,12 +22,12 @@ public sealed class LookupServerAddress : LaunchStep
     /// <summary>Port of setLookupAddress.</summary>
     public void SetLookupAddress(string lookupAddress)
     {
-        _lookupAddress = lookupAddress;
+        this.lookupAddress = lookupAddress;
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        var dnsName = $"_minecraft._tcp.{_lookupAddress}";
+        var dnsName = $"_minecraft._tcp.{lookupAddress}";
         SrvRecord? record;
         try
         {
@@ -37,7 +38,7 @@ public sealed class LookupServerAddress : LaunchStep
         {
             EmitLogLine($"Failed to resolve server address (this is NOT an error!) {dnsName}: {e.Message}\n",
                 MessageLevel.Launcher);
-            Resolve(_lookupAddress, 25565); // Technically the task failed, however, we don't abort the launch
+            Resolve(lookupAddress, 25565); // Technically the task failed, however, we don't abort the launch
             return;                         // and leave it up to minecraft to fail (or maybe not) when connecting
         }
 
@@ -45,7 +46,7 @@ public sealed class LookupServerAddress : LaunchStep
         {
             EmitLogLine($"Failed to resolve server address {dnsName}: the DNS lookup succeeded, but no records were returned.\n",
                 MessageLevel.Warning);
-            Resolve(_lookupAddress, 25565);
+            Resolve(lookupAddress, 25565);
             return;
         }
 

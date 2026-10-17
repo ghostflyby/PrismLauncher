@@ -8,6 +8,7 @@
 // The JsonTypeInfo comes from the host's source-generated context (FlintJsonContext —
 // GLOBAL §1 keeps the registration list in one place); Core only ever sees the opaque
 // type-info handle, so no reflection ever enters the picture (AOT red line).
+
 using System.Text.Json.Serialization.Metadata;
 
 namespace FlintLauncher.Core.State;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/net/Request.{h,cpp} (HTTP methods, sinks, validators, 429/503 auto-retry)
 // on top of HttpClient instead of QNetworkAccessManager.
+
 using System.Diagnostics;
 using System.Security.Cryptography;
 using FlintLauncher.Core.Tasks;
@@ -14,7 +15,7 @@ public enum RequestOptions
     AcceptLocalFiles = 1,
     MakeEternal = 2,
     AutoRetry = 4,
-    AddAPIHeaders = 8,
+    AddApiHeaders = 8,
 }
 
 public enum HttpMethodValue
@@ -40,8 +41,8 @@ public sealed class NetRequest : FlintTask
     private readonly NetStack _stack;
 
     private readonly List<(string name, string value)> _headers = [];
-    private Sink? _sink;
-    private int _retryCount;
+    private Sink? sink;
+    private int retryCount;
 
     /// <summary>Set for makeCached-style requests: the entry is re-registered after success.</summary>
     internal HttpMetaCache? MetaCache { get; set; }
@@ -70,13 +71,13 @@ public sealed class NetRequest : FlintTask
 
     public Sink? RequestSink
     {
-        get => _sink;
-        set => _sink = value;
+        get => sink;
+        set => sink = value;
     }
 
     public void AddHeader(string name, string value) => _headers.Add((name, value));
 
-    public void AddValidator(Validator validator) => _sink?.AddValidator(validator);
+    public void AddValidator(Validator validator) => sink?.AddValidator(validator);
 
     // ---------------------------------------------------------------- factories
 
@@ -125,9 +126,9 @@ public sealed class NetRequest : FlintTask
     }
 
     /// <summary>Buffer content when constructed via MakeByteArray.</summary>
-    public byte[] Body => (_sink as ByteArraySink)?.Data ?? [];
+    public byte[] Body => (sink as ByteArraySink)?.Data ?? [];
 
-    public string BodyAsString => (_sink as ByteArraySink)?.DataAsString ?? "";
+    public string BodyAsString => (sink as ByteArraySink)?.DataAsString ?? "";
 
     // ---------------------------------------------------------------- execution
 
@@ -180,7 +181,7 @@ public sealed class NetRequest : FlintTask
         try
         {
             HttpResponseMessage response;
-            var effectiveSink = _sink;
+            var effectiveSink = sink;
             while (true)
             {
                 if (effectiveSink is not null && !effectiveSink.Init(spec))
@@ -209,9 +210,9 @@ public sealed class NetRequest : FlintTask
                 var statusCode = (int)response.StatusCode;
                 if (_options.HasFlag(RequestOptions.AutoRetry) &&
                     statusCode is 429 or 503 &&
-                    _retryCount < MaxAutoRetries)
+                    retryCount < MaxAutoRetries)
                 {
-                    _retryCount++;
+                    retryCount++;
                     var delay = TimeSpan.Zero;
                     if (response.Headers.RetryAfter?.Delta is { } delta)
                     {

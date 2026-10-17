@@ -16,7 +16,9 @@
 //    conversion.
 //  - java/, cache/, catpacks/, skins/, translations/ are not imported (Flint manages its
 //    own runtimes; the rest is regenerated or Prism-specific display data).
+
 using System.Globalization;
+using System.Security;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Tasks;
 
@@ -273,7 +275,7 @@ public sealed class PrismImportTask : FlintTask
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
-                                     or System.Security.SecurityException or ArgumentException
+                                     or SecurityException or ArgumentException
                                      or NotSupportedException)
         {
         }
@@ -311,7 +313,7 @@ public sealed class PrismImportTask : FlintTask
             });
         }
         catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException
-                                  or NotSupportedException or System.Security.SecurityException)
+                                  or NotSupportedException or SecurityException)
         {
             // best-effort (the legacy marker write was the same, DataMigration.Decide's
             // upgrade path included): the data has fully landed — a failed decision-record

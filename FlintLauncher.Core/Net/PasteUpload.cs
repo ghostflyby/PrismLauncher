@@ -16,8 +16,10 @@
 //    4-space-indented JSON with raw UTF-8 (UnsafeRelaxedJsonEscaping), byte-compatible with Qt.
 //  - The base URL / client id are constructor parameters (like upstream's url argument); tests
 //    stub them, there is no static endpoint override.
+
 using System.Globalization;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Tasks;
@@ -33,7 +35,7 @@ public sealed class PasteUpload : FlintTask
         // hastebin.com
         Hastebin,
         // paste.gg
-        PasteGG,
+        PasteGg,
         // mclo.gs
         Mclogs,
     }
@@ -66,21 +68,21 @@ public sealed class PasteUpload : FlintTask
         _pasteType = pasteType;
         _net = net ?? NetStack.Default;
 
-        var base_ = PasteTypes[(int)pasteType];
+        var @base = PasteTypes[(int)pasteType];
         if (string.IsNullOrEmpty(_baseUrl))
         {
-            _baseUrl = base_.DefaultBase;
+            _baseUrl = @base.DefaultBase;
         }
 
         // HACK: Paste's docs say the standard API path is at /api/<version> but the official
         // instance paste.gg doesn't follow that??
-        if (pasteType == PasteType.PasteGG && _baseUrl == base_.DefaultBase)
+        if (pasteType == PasteType.PasteGg && _baseUrl == @base.DefaultBase)
         {
             EndpointUrl = "https://api.paste.gg/v1/pastes";
         }
         else
         {
-            EndpointUrl = _baseUrl + base_.EndpointPath;
+            EndpointUrl = _baseUrl + @base.EndpointPath;
         }
     }
 
@@ -184,7 +186,7 @@ public sealed class PasteUpload : FlintTask
                     }
                     break;
                 }
-                case PasteType.PasteGG:
+                case PasteType.PasteGg:
                 {
                     if (!TryParseJson(body, out var obj, "pasteGG"))
                     {
@@ -282,7 +284,7 @@ public sealed class PasteUpload : FlintTask
                 message.Content.Headers.TryAddWithoutValidation("Content-Type", "application/x-www-form-urlencoded");
                 break;
             }
-            case PasteType.PasteGG:
+            case PasteType.PasteGg:
             {
                 message.Content = new ByteArrayContent(BuildPasteGgBody(_log));
                 message.Content.Headers.TryAddWithoutValidation("Content-Type", "application/json");
@@ -318,7 +320,7 @@ public sealed class PasteUpload : FlintTask
         {
             Indented = true,
             IndentSize = 4, // QJsonDocument::Indented
-            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         };
         using (var writer = new Utf8JsonWriter(stream, options))
         {

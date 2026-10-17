@@ -64,7 +64,7 @@ public class FlameApiTests : IDisposable
             CategoryIds = ["adventure"],
         };
 
-        var url = _flameApi.GetSearchURL(args);
+        var url = _flameApi.GetSearchUrl(args);
 
         Assert.NotNull(url);
         Assert.StartsWith(_baseUrl + "/mods/search?gameId=432&", url);
@@ -202,17 +202,17 @@ public class FlameApiTests : IDisposable
     {
         var pack = new IndexedPack { AddonId = "123" };
 
-        var url = _flameApi.GetVersionsURL(new VersionSearchArgs { Pack = pack });
+        var url = _flameApi.GetVersionsUrl(new VersionSearchArgs { Pack = pack });
         Assert.Equal(_baseUrl + "/mods/123/files?pageSize=10000", url);
 
-        url = _flameApi.GetVersionsURL(new VersionSearchArgs
+        url = _flameApi.GetVersionsUrl(new VersionSearchArgs
         {
             Pack = pack,
             McVersions = [new McVersion("1.18.2")],
         });
         Assert.Equal(_baseUrl + "/mods/123/files?pageSize=10000&gameVersion=1.18.2", url);
 
-        url = _flameApi.GetVersionsURL(new VersionSearchArgs
+        url = _flameApi.GetVersionsUrl(new VersionSearchArgs
         {
             Pack = pack,
             McVersions = [new McVersion("1.18.2")],
@@ -221,7 +221,7 @@ public class FlameApiTests : IDisposable
         Assert.Equal(_baseUrl + "/mods/123/files?pageSize=10000&gameVersion=1.18.2&modLoaderType=1", url);
 
         // multiple loaders -> no modLoaderType filter
-        url = _flameApi.GetVersionsURL(new VersionSearchArgs
+        url = _flameApi.GetVersionsUrl(new VersionSearchArgs
         {
             Pack = pack,
             Loaders = ModLoaderType.Forge | ModLoaderType.Fabric,
@@ -258,7 +258,7 @@ public class FlameApiTests : IDisposable
         Assert.Equal(IndexedVersionTypeValue.Release, version.VersionType.Value);
         var dep = Assert.Single(version.Dependencies);
         Assert.Equal("999", dep.AddonId);
-        Assert.Equal(DependencyTypeValue.REQUIRED, dep.Type.Value);
+        Assert.Equal(DependencyTypeValue.Required, dep.Type.Value);
     }
 
     [Fact]
@@ -271,7 +271,7 @@ public class FlameApiTests : IDisposable
         FlameMod.LoadIndexedPack(pack, obj);
 
         Assert.Equal("123", pack.AddonId);
-        Assert.Equal(ResourceProvider.FLAME, pack.Provider);
+        Assert.Equal(ResourceProvider.Flame, pack.Provider);
         Assert.Equal("Test Mod", pack.Name);
         Assert.Equal("test-mod", pack.Slug);
         Assert.Equal("https://www.curseforge.com/projects/test-mod", pack.WebsiteUrl);
@@ -470,7 +470,7 @@ public class FlameApiTests : IDisposable
         var manifest = new FlameManifest();
         manifest.Files[456] = new FlameFile { ProjectId = 123, FileId = 456 };
 
-        var task = new FileResolvingTask(manifest, flame: _flameApi) { FallbackMRBlockedMods = false };
+        var task = new FileResolvingTask(manifest, flame: _flameApi) { FallbackMrBlockedMods = false };
         await task.StartAsync();
 
         // the resolve succeeds; the blocked state is the *missing download URL*

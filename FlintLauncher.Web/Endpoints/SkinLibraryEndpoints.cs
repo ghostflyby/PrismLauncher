@@ -13,8 +13,10 @@
 // no new account surface. The account skin/cape endpoints themselves are untouched (D6).
 // The SkinsDir SETTING decides where the library lives (LauncherRuntime resolves it
 // data-root-relative, the C++ convention).
+
 using FlintLauncher.Core.Skins;
 using FlintLauncher.Web.Models;
+using FlintLauncher.Web.OpenApi;
 using FlintLauncher.Web.Services;
 
 namespace FlintLauncher.Web.Endpoints;
@@ -27,12 +29,12 @@ public static class SkinLibraryEndpoints
         api.MapGet("/skins", (LauncherRuntime runtime) =>
             Results.Ok(runtime.Skins.List()
                 .Select(ToView)
-                .ToArray())).Produces<SkinView[]>(200);
+                .ToArray())).Produces<SkinView[]>();
 
         api.MapGet("/skins/{name}", (string name, LauncherRuntime runtime) =>
             runtime.Skins.Get(name) is { } skin
                 ? Results.Ok(ToView(skin))
-                : ApiJson.NotFound("skin_not_found", $"no stored skin '{name}'")).Produces<SkinView>(200);
+                : ApiJson.NotFound("skin_not_found", $"no stored skin '{name}'")).Produces<SkinView>();
 
         api.MapPost("/skins", async (HttpRequest request, LauncherRuntime runtime) =>
         {
@@ -88,7 +90,7 @@ public static class SkinLibraryEndpoints
                 {
                 }
             }
-        }).WithMetadata(new OpenApi.FormUploadMarker("multipart form: skin image file (png) + optional name/model fields")).Produces<SkinStoredResponse>(201);
+        }).WithMetadata(new FormUploadMarker("multipart form: skin image file (png) + optional name/model fields")).Produces<SkinStoredResponse>(201);
 
         api.MapDelete("/skins/{name}", (string name, LauncherRuntime runtime) =>
             runtime.Skins.Delete(name)
@@ -122,7 +124,7 @@ public static class SkinLibraryEndpoints
                     $"no account with profile id '{request.ProfileId}'", 400);
             }
             var account = runtime.Accounts.At(index);
-            var variant = ParseVariant(request.Model) ?? (skin.Model == SkinModelKind.SLIM ? "slim" : "classic");
+            var variant = ParseVariant(request.Model) ?? (skin.Model == SkinModelKind.Slim ? "slim" : "classic");
             var upload = SkinUpload.Make(account.AccessToken(), texture, variant, runtime.Auth, runtime.Net);
             await upload.StartAsync();
             return upload.WasSuccessful
@@ -136,7 +138,7 @@ public static class SkinLibraryEndpoints
         skin.GetModelString(),
         skin.CapeId,
         skin.Url,
-        File.Exists(skin.Path_));
+        File.Exists(skin.Path));
 
     /// <summary>The form/body model field: "classic"/"slim" (the account upload spelling);
     /// omitted/empty = classic (the SkinManageDialog default).</summary>
@@ -146,15 +148,15 @@ public static class SkinLibraryEndpoints
         switch (value)
         {
             case "" or "classic":
-                kind = SkinModelKind.CLASSIC;
+                kind = SkinModelKind.Classic;
                 error = null;
                 return true;
             case "slim":
-                kind = SkinModelKind.SLIM;
+                kind = SkinModelKind.Slim;
                 error = null;
                 return true;
             default:
-                kind = SkinModelKind.CLASSIC;
+                kind = SkinModelKind.Classic;
                 error = ApiJson.Error("invalid_model", "'model' must be 'classic' or 'slim'", 400);
                 return false;
         }

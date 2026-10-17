@@ -9,9 +9,12 @@
 //  - the QNAM -> the injected NetStack
 // Pure helpers (URL builders, loaders/facets mapping, response shaping) stay static — no
 // configuration behind them.
+
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
+using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Versioning;
 
@@ -137,7 +140,7 @@ public sealed class ModrinthApi : ResourceApi
         var bodyObj = new JsonObject();
         JsonUtils.WriteStringList(bodyObj, "hashes", hashes);
         JsonUtils.WriteString(bodyObj, "algorithm", hashFormat);
-        var bodyRaw = System.Text.Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
+        var bodyRaw = Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
 
         var request = MakeByteArrayRequest($"{BaseUrl}/version_files", bodyRaw);
         netJob.AddNetRequest(request);
@@ -149,7 +152,7 @@ public sealed class ModrinthApi : ResourceApi
     public (NetJob Job, NetRequest Request) LatestVersion(string hash,
                                                            string hashFormat,
                                                            IReadOnlyList<McVersion>? mcVersions,
-                                                           Minecraft.ModLoaderType? loaders,
+                                                           ModLoaderType? loaders,
                                                            IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     {
         var netJob = new NetJob("Modrinth::GetLatestVersion");
@@ -166,7 +169,7 @@ public sealed class ModrinthApi : ResourceApi
         }
         AddVersionTypes(bodyObj, releaseTypes);
 
-        var bodyRaw = System.Text.Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
+        var bodyRaw = Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
 
         var request = MakeByteArrayRequest($"{BaseUrl}/version_file/{hash}/update?algorithm={hashFormat}", bodyRaw);
         netJob.AddNetRequest(request);
@@ -178,7 +181,7 @@ public sealed class ModrinthApi : ResourceApi
     public (NetJob Job, NetRequest Request) LatestVersions(IReadOnlyList<string> hashes,
                                                            string hashFormat,
                                                            IReadOnlyList<McVersion>? mcVersions,
-                                                           Minecraft.ModLoaderType? loaders,
+                                                           ModLoaderType? loaders,
                                                            IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     {
         var netJob = new NetJob("Modrinth::GetLatestVersions");
@@ -197,7 +200,7 @@ public sealed class ModrinthApi : ResourceApi
         }
         AddVersionTypes(bodyObj, releaseTypes);
 
-        var bodyRaw = System.Text.Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
+        var bodyRaw = Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
 
         var request = MakeByteArrayRequest($"{BaseUrl}/version_files/update", bodyRaw);
         netJob.AddNetRequest(request);
@@ -223,7 +226,7 @@ public sealed class ModrinthApi : ResourceApi
     public (NetJob Job, NetRequest Request) GetProjects(IReadOnlyList<string> addonIds)
     {
         var netJob = new NetJob("Modrinth::GetProjects");
-        var searchUrl = GetMultipleModInfoURL(addonIds);
+        var searchUrl = GetMultipleModInfoUrl(addonIds);
         var request = MakeByteArrayRequest(searchUrl);
         netJob.AddNetRequest(request);
         return (netJob, request);
@@ -232,7 +235,7 @@ public sealed class ModrinthApi : ResourceApi
     /// <summary>Port of ModrinthAPI::getProject — the single-project GET (ResourceAPI::getProject).</summary>
     public (NetJob? Job, NetRequest? Request) GetProject(string addonId)
     {
-        var url = GetInfoURL(addonId);
+        var url = GetInfoUrl(addonId);
         if (url is null)
         {
             return (null, null);
@@ -304,17 +307,17 @@ public sealed class ModrinthApi : ResourceApi
 
     // ------------------------------------------------------------------ URL builders
 
-    public static string GetAuthorURL(string name) => "https://modrinth.com/user/" + name;
+    public static string GetAuthorUrl(string name) => "https://modrinth.com/user/" + name;
 
     /// <summary>Port of ModrinthAPI::getModLoaderStrings.</summary>
-    public static List<string> GetModLoaderStrings(Minecraft.ModLoaderType types)
+    public static List<string> GetModLoaderStrings(ModLoaderType types)
     {
-        List<Minecraft.ModLoaderType> all =
+        List<ModLoaderType> all =
         [
-            Minecraft.ModLoaderType.NeoForge, Minecraft.ModLoaderType.Forge, Minecraft.ModLoaderType.Fabric,
-            Minecraft.ModLoaderType.Quilt, Minecraft.ModLoaderType.LiteLoader, Minecraft.ModLoaderType.DataPack,
-            Minecraft.ModLoaderType.Babric, Minecraft.ModLoaderType.BTA, Minecraft.ModLoaderType.LegacyFabric,
-            Minecraft.ModLoaderType.Ornithe, Minecraft.ModLoaderType.Rift,
+            ModLoaderType.NeoForge, ModLoaderType.Forge, ModLoaderType.Fabric,
+            ModLoaderType.Quilt, ModLoaderType.LiteLoader, ModLoaderType.DataPack,
+            ModLoaderType.Babric, ModLoaderType.Bta, ModLoaderType.LegacyFabric,
+            ModLoaderType.Ornithe, ModLoaderType.Rift,
         ];
         var l = new List<string>();
         foreach (var loader in all)
@@ -328,7 +331,7 @@ public sealed class ModrinthApi : ResourceApi
     }
 
     /// <summary>Port of ModrinthAPI::getModLoaderFilters.</summary>
-    public static string GetModLoaderFilters(Minecraft.ModLoaderType types)
+    public static string GetModLoaderFilters(ModLoaderType types)
     {
         var l = GetModLoaderStrings(types).Select(loader => $"\"categories:{loader}\"");
         return string.Join(",", l);
@@ -427,7 +430,7 @@ public sealed class ModrinthApi : ResourceApi
         return $"[{string.Join(",", facetsList)}]";
     }
 
-    public override string? GetSearchURL(SearchArgs args)
+    public override string? GetSearchUrl(SearchArgs args)
     {
         if (args.Loaders is { } loaders && loaders != 0)
         {
@@ -456,15 +459,15 @@ public sealed class ModrinthApi : ResourceApi
         return BaseUrl + "/search?" + string.Join("&", getArguments);
     }
 
-    public override string? GetInfoURL(string id) => BaseUrl + "/project/" + id;
+    public override string? GetInfoUrl(string id) => BaseUrl + "/project/" + id;
 
     /// <summary>Port of ModrinthAPI::getMultipleModInfoURL.</summary>
-    public string GetMultipleModInfoURL(IReadOnlyList<string> ids)
+    public string GetMultipleModInfoUrl(IReadOnlyList<string> ids)
     {
         return BaseUrl + $"/projects?ids=[\"{string.Join("\",\"", ids)}\"]";
     }
 
-    public override string? GetVersionsURL(VersionSearchArgs args)
+    public override string? GetVersionsUrl(VersionSearchArgs args)
     {
         var getArguments = new List<string>();
         if (args.McVersions is { } mcVersions)
@@ -483,7 +486,7 @@ public sealed class ModrinthApi : ResourceApi
     /// <summary>Port of ModrinthAPI::getGameVersionsArray.</summary>
     public static string GetGameVersionsArray(IReadOnlyList<McVersion> mcVersions)
     {
-        var s = new System.Text.StringBuilder();
+        var s = new StringBuilder();
         foreach (var ver in mcVersions)
         {
             s.Append("\"versions:").Append(MapMcVersionToModrinth(ver)).Append("\",");
@@ -497,15 +500,15 @@ public sealed class ModrinthApi : ResourceApi
     }
 
     /// <summary>Port of ModrinthAPI::validateModLoaders.</summary>
-    public static bool ValidateModLoaders(Minecraft.ModLoaderType loaders)
+    public static bool ValidateModLoaders(ModLoaderType loaders)
     {
-        return (loaders & (Minecraft.ModLoaderType.NeoForge | Minecraft.ModLoaderType.Forge | Minecraft.ModLoaderType.Fabric
-                           | Minecraft.ModLoaderType.Quilt | Minecraft.ModLoaderType.LiteLoader | Minecraft.ModLoaderType.DataPack
-                           | Minecraft.ModLoaderType.Babric | Minecraft.ModLoaderType.BTA | Minecraft.ModLoaderType.LegacyFabric
-                           | Minecraft.ModLoaderType.Ornithe | Minecraft.ModLoaderType.Rift)) != 0;
+        return (loaders & (ModLoaderType.NeoForge | ModLoaderType.Forge | ModLoaderType.Fabric
+                           | ModLoaderType.Quilt | ModLoaderType.LiteLoader | ModLoaderType.DataPack
+                           | ModLoaderType.Babric | ModLoaderType.Bta | ModLoaderType.LegacyFabric
+                           | ModLoaderType.Ornithe | ModLoaderType.Rift)) != 0;
     }
 
-    public override string? GetDependencyURL(DependencySearchArgs args)
+    public override string? GetDependencyUrl(DependencySearchArgs args)
     {
         return args.Dependency.Version.Length != 0
             ? $"{BaseUrl}/version/{args.Dependency.Version}"

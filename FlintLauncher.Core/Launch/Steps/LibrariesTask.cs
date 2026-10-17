@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/update/LibrariesTask.{h,cpp}: download the profile's libraries
 // (and jar mods) through a NetJob built from Library.getDownloads.
+
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
-
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Launch.Steps;
@@ -12,7 +12,7 @@ namespace FlintLauncher.Core.Launch.Steps;
 public sealed class LibrariesTask : FlintTask
 {
     private readonly MinecraftInstance _inst;
-    private NetJob? _downloadJob;
+    private NetJob? downloadJob;
 
     public LibrariesTask(MinecraftInstance inst)
     {
@@ -34,7 +34,7 @@ public sealed class LibrariesTask : FlintTask
         }
 
         var job = new NetJob($"Libraries for instance {inst.Name()}");
-        _downloadJob = job;
+        downloadJob = job;
 
         // E6: the stamped runtime cache is the only source — the bare-fixture throwaway is
         // gone; an unstamped instance fails the step naming the missing wire
@@ -55,20 +55,20 @@ public sealed class LibrariesTask : FlintTask
         // starting a NetJob that would be useless after the task already failed)
         if (!ProcessArtifactPool(libArtifactPool, failedLocalLibraries, inst.GetLocalLibraryPath(), metacache, job))
         {
-            _downloadJob = null;
+            downloadJob = null;
             return;
         }
 
         var failedLocalJarMods = new List<string>();
         if (!ProcessArtifactPool(profile.GetJarMods().Cast<Library?>(), failedLocalJarMods, inst.JarModsDir(), metacache, job))
         {
-            _downloadJob = null;
+            downloadJob = null;
             return;
         }
 
         if (failedLocalJarMods.Count != 0 || failedLocalLibraries.Count != 0)
         {
-            _downloadJob = null;
+            downloadJob = null;
             var failedAll = string.Join("\n", failedLocalLibraries.Concat(failedLocalJarMods));
             EmitFailed("Some artifacts marked as 'local' are missing their files:\n" + failedAll +
                        "\n\nYou need to either add the files, or removed the packages that require them." +
@@ -89,14 +89,12 @@ public sealed class LibrariesTask : FlintTask
 
     public override void Abort()
     {
-        if (_downloadJob is not null && _downloadJob.IsRunning)
+        if (downloadJob is not null && downloadJob.IsRunning)
         {
-            _downloadJob.Abort();
+            downloadJob.Abort();
         }
-        else
-        {
-            // Prematurely aborted LibrariesTask
-        }
+
+        // Prematurely aborted LibrariesTask
         base.Abort();
     }
 

@@ -8,6 +8,7 @@
 // per-account scheduled slots) is GUI-era machinery and is NOT ported. The per-launch refresh
 // path (LaunchController.DecideLaunchMode -> MinecraftAccount.Refresh) stays the primary
 // correctness net; this service only pre-warms tokens for long-running hosts.
+
 using FlintLauncher.Core.Auth;
 
 namespace FlintLauncher.Web.Services;
@@ -60,7 +61,7 @@ public sealed class AccountRefreshService(
                 return;
             }
             var account = accounts.At(i);
-            if (account is null || account.AccountType_ == AccountType.Offline || !account.ShouldRefresh())
+            if (account is null || account.AccountType == AccountType.Offline || !account.ShouldRefresh())
             {
                 continue;
             }

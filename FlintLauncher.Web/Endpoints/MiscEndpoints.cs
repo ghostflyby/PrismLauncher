@@ -2,6 +2,7 @@
 // Java discovery, the static /about identity (fix-4), the paste upload (fix-4: GuiUtil's
 // "upload log" flow over the core PasteUpload) and the metadata-cache eviction endpoint.
 // (the launcher news half left with CACHE E7 — GUI-bound, not ported material)
+
 using FlintLauncher.Core;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Net;
@@ -17,12 +18,12 @@ public static class MiscEndpoints
         api.WithTags("Misc");
         // --------------------------------------------------------------- java
         api.MapGet("/java", async (JavaScanService scan) =>
-            Results.Ok((await scan.GetAsync()).ToArray())).Produces<JavaView[]>(200);
+            Results.Ok((await scan.GetAsync()).ToArray())).Produces<JavaView[]>();
 
         // discovery is a fast filesystem scan plus a bounded concurrent `java` probe —
         // synchronous by design (documented decision)
         api.MapPost("/java/scan", async (JavaScanService scan) =>
-            Results.Ok((await scan.ScanAsync()).ToArray())).Produces<JavaView[]>(200);
+            Results.Ok((await scan.ScanAsync()).ToArray())).Produces<JavaView[]>();
 
         // (CACHE E7: the /news endpoint is gone — the news checker was GUI-bound and the
         // user decision retired it whole: checker, feed base, FLINT_NEWS_RSS_URL)
@@ -78,7 +79,7 @@ public static class MiscEndpoints
             var pasteType = typeIndex >= 0 && typeIndex < PasteUpload.PasteTypes.Length
                 ? (PasteUpload.PasteType)typeIndex
                 : PasteUpload.PasteType.Mclogs;
-            var upload = new PasteUpload(content, runtime.Config.Current.Api.PastebinCustomAPIBase ?? "",
+            var upload = new PasteUpload(content, runtime.Config.Current.Api.PastebinCustomApiBase ?? "",
                 pasteType, runtime.Net);
             await upload.StartAsync();
             return upload.WasSuccessful && upload.PasteLink.Length > 0
@@ -109,11 +110,11 @@ public sealed class JavaScanService
 {
     private readonly LauncherRuntime _runtime;
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private volatile IReadOnlyList<JavaView>? _cache;
+    private volatile IReadOnlyList<JavaView>? cache;
 
     public JavaScanService(LauncherRuntime runtime) => _runtime = runtime;
 
-    public async Task<IReadOnlyList<JavaView>> GetAsync() => _cache ??= await ScanAsync();
+    public async Task<IReadOnlyList<JavaView>> GetAsync() => cache ??= await ScanAsync();
 
     public async Task<IReadOnlyList<JavaView>> ScanAsync()
     {
@@ -121,10 +122,10 @@ public sealed class JavaScanService
         try
         {
             var candidates = await JavaDetection.DetectAsync(_runtime.JavaRoot);
-            _cache = candidates
+            cache = candidates
                 .Select(candidate => new JavaView(candidate.Path, candidate.Version, candidate.Architecture))
                 .ToArray();
-            return _cache;
+            return cache;
         }
         finally
         {

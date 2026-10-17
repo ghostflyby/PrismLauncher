@@ -14,7 +14,9 @@
 //    that path and are therefore not ported either. When it lands, it must pass
 //    m_origInstance.Uuid to AddLinkedInstanceId — DATA D3 makes the uuid the persisted
 //    reference form (the C++ passed id(), the dirname; that form is not carried over).
+
 using System.Text.RegularExpressions;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.IO;
 
 namespace FlintLauncher.Core.Instances;
@@ -85,7 +87,7 @@ public class InstanceCopyTask : InstanceTask
         // copyFinished(): the copy's instance layer is rewritten through a generic (null
         // type) instance shell over the typed adapter — the staged folder commits as Flint
         // format (instance.json), whatever format the source was
-        var instanceSettings = new Config.InstanceJsonSettingsObject(
+        var instanceSettings = new InstanceJsonSettingsObject(
             StagingPath, Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution."));
         BaseInstance inst = new NullInstance(instanceSettings, StagingPath);

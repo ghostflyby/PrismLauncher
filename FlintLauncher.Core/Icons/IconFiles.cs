@@ -11,6 +11,7 @@
 //    alias of IconList::getIconIndex.
 //  - installIcon() returned void upstream (failures silently ignored); the port returns
 //    bool. Like QFile::copy, it does not overwrite an existing target.
+
 using FlintLauncher.Core.IO;
 
 namespace FlintLauncher.Core.Icons;

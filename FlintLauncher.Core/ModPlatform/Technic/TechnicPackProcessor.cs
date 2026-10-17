@@ -10,8 +10,11 @@
 // org.quiltmc.quilt-loader detected from version.json's libraries or the jar's properties).
 // The C++ QObject signals become a nullable-string return: null = succeeded, otherwise the
 // failure reason.
+
 using System.IO.Compression;
+using System.Text;
 using System.Text.Json.Nodes;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
@@ -25,7 +28,7 @@ public static class TechnicPackProcessor
     /// the important:true SetComponentVersion calls resolve against the meta index (network),
     /// so the flow awaits instead of blocking a thread (the former .GetAwaiter().GetResult()
     /// sync-over-async is retired).</summary>
-    public static async Task<string?> RunAsync(Config.InstanceEnvironment environment,
+    public static async Task<string?> RunAsync(InstanceEnvironment environment,
         string instName,
         string instIcon,
         string stagingPath,
@@ -37,7 +40,7 @@ public static class TechnicPackProcessor
         var minecraftPath = FileSystem.PathCombine(stagingPath, "minecraft");
         // D4: the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
-            new Config.InstanceJsonSettingsObject(stagingPath, environment), stagingPath);
+            new InstanceJsonSettingsObject(stagingPath, environment), stagingPath);
 
         instance.SetName(instName);
 
@@ -137,7 +140,7 @@ public static class TechnicPackProcessor
         {
             try
             {
-                data = System.Text.Encoding.UTF8.GetString(FileSystem.Read(versionJson));
+                data = Encoding.UTF8.GetString(FileSystem.Read(versionJson));
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
@@ -206,35 +209,34 @@ public static class TechnicPackProcessor
                         }
                         break;
                     }
-                    else if ((libraryName.StartsWith("net.minecraftforge:forge:", StringComparison.Ordinal)
-                              || libraryName.StartsWith("net.minecraftforge:fmlloader:", StringComparison.Ordinal))
-                             && libraryName.Contains('-'))
+
+                    if ((libraryName.StartsWith("net.minecraftforge:forge:", StringComparison.Ordinal)
+                         || libraryName.StartsWith("net.minecraftforge:fmlloader:", StringComparison.Ordinal))
+                        && libraryName.Contains('-'))
                     {
                         var libraryVersion = Section(libraryName, ':', 2);
                         if (!libraryVersion.StartsWith("1.7.10-", StringComparison.Ordinal))
                         {
                             _ = await components.SetComponentVersion("net.minecraftforge", Section(libraryName, '-', 1),
-                                    cancellationToken: cancellationToken);
+                                cancellationToken: cancellationToken);
                         }
                         else
                         {
                             // 1.7.10 versions sometimes look like 1.7.10-10.13.4.1614-1.7.10, this filters out the 10.13.4.1614 part
                             _ = await components.SetComponentVersion("net.minecraftforge", Section(libraryName, '-', 1, 1),
-                                    cancellationToken: cancellationToken);
+                                cancellationToken: cancellationToken);
                         }
                         break;
                     }
-                    else
+
+                    // <Technic library name prefix> -> <our component name>
+                    foreach (var (loaderPrefix, componentUid) in LoaderMap)
                     {
-                        // <Technic library name prefix> -> <our component name>
-                        foreach (var (loaderPrefix, componentUid) in LoaderMap)
+                        if (libraryName.StartsWith(loaderPrefix, StringComparison.Ordinal))
                         {
-                            if (libraryName.StartsWith(loaderPrefix, StringComparison.Ordinal))
-                            {
-                                _ = await components.SetComponentVersion(componentUid, Section(libraryName, ':', 2),
-                                        cancellationToken: cancellationToken);
-                                break;
-                            }
+                            _ = await components.SetComponentVersion(componentUid, Section(libraryName, ':', 2),
+                                cancellationToken: cancellationToken);
+                            break;
                         }
                     }
                 }
@@ -288,7 +290,7 @@ public static class TechnicPackProcessor
             return null;
         }
         using var stream = entry.Open();
-        using var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
+        using var reader = new StreamReader(stream, Encoding.UTF8);
         return reader.ReadToEnd();
     }
 

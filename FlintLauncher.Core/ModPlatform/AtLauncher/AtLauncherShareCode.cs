@@ -2,6 +2,8 @@
 // Port of modplatform/atlauncher/ATLShareCode.{h,cpp}: the {AtlApiBaseUrl}share-codes/{code}
 // response model (the optional-mod selection encoded by the ATLauncher website). Reads go
 // through the JsonNode model (single-DOM, the JsonUtils node-side family).
+
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 
@@ -58,7 +60,7 @@ public static class AtLauncherShareCode
         r.Code = JsonUtils.RequireInteger(obj, "code", "'code'");
 
         if (obj["message"] is JsonValue messageValue
-            && messageValue.GetValueKind() != System.Text.Json.JsonValueKind.Null)
+            && messageValue.GetValueKind() != JsonValueKind.Null)
         {
             r.Message = JsonUtils.RequireString(obj, "message", "'message'");
         }

@@ -8,6 +8,7 @@
 // Defaults come from the record property initializers via the resolved fold — this table
 // never states a value twice. The three C4 secret keys are listed with Secret=true so the
 // wire groups keep accepting them; their storage is the ISecretStore, never the config.
+
 using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Config;
@@ -195,23 +196,23 @@ public static class FlintConfigKeys
 
             // ---- native library workarounds
             Entry("UseNativeOpenAL",
-                f => f.NativeLib.UseNativeOpenAL,
-                (f, v) => f with { NativeLib = f.NativeLib with { UseNativeOpenAL = Variant.AsBool(v) } }),
+                f => f.NativeLib.UseNativeOpenAl,
+                (f, v) => f with { NativeLib = f.NativeLib with { UseNativeOpenAl = Variant.AsBool(v) } }),
             Entry("CustomOpenALPath",
-                f => f.NativeLib.CustomOpenALPath,
-                (f, v) => f with { NativeLib = f.NativeLib with { CustomOpenALPath = Variant.AsString(v) } }),
+                f => f.NativeLib.CustomOpenAlPath,
+                (f, v) => f with { NativeLib = f.NativeLib with { CustomOpenAlPath = Variant.AsString(v) } }),
             Entry("UseNativeGLFW",
-                f => f.NativeLib.UseNativeGLFW,
-                (f, v) => f with { NativeLib = f.NativeLib with { UseNativeGLFW = Variant.AsBool(v) } }),
+                f => f.NativeLib.UseNativeGlfw,
+                (f, v) => f with { NativeLib = f.NativeLib with { UseNativeGlfw = Variant.AsBool(v) } }),
             Entry("CustomGLFWPath",
-                f => f.NativeLib.CustomGLFWPath,
-                (f, v) => f with { NativeLib = f.NativeLib with { CustomGLFWPath = Variant.AsString(v) } }),
+                f => f.NativeLib.CustomGlfwPath,
+                (f, v) => f with { NativeLib = f.NativeLib with { CustomGlfwPath = Variant.AsString(v) } }),
             Entry("UseNativeSDL",
-                f => f.NativeLib.UseNativeSDL,
-                (f, v) => f with { NativeLib = f.NativeLib with { UseNativeSDL = Variant.AsBool(v) } }),
+                f => f.NativeLib.UseNativeSdl,
+                (f, v) => f with { NativeLib = f.NativeLib with { UseNativeSdl = Variant.AsBool(v) } }),
             Entry("CustomSDLPath",
-                f => f.NativeLib.CustomSDLPath,
-                (f, v) => f with { NativeLib = f.NativeLib with { CustomSDLPath = Variant.AsString(v) } }),
+                f => f.NativeLib.CustomSdlPath,
+                (f, v) => f with { NativeLib = f.NativeLib with { CustomSdlPath = Variant.AsString(v) } }),
 
             // ---- commands
             Entry("PreLoadCommand",
@@ -315,14 +316,14 @@ public static class FlintConfigKeys
 
             // ---- mirrors
             Entry("MetaURLOverride",
-                f => f.Mirror.MetaURLOverride,
-                (f, v) => f with { Mirror = f.Mirror with { MetaURLOverride = Variant.AsString(v) } }),
+                f => f.Mirror.MetaUrlOverride,
+                (f, v) => f with { Mirror = f.Mirror with { MetaUrlOverride = Variant.AsString(v) } }),
             Entry("ResourceURLOverride",
-                f => f.Mirror.ResourceURLOverride,
-                (f, v) => f with { Mirror = f.Mirror with { ResourceURLOverride = Variant.AsString(v) } }),
+                f => f.Mirror.ResourceUrlOverride,
+                (f, v) => f with { Mirror = f.Mirror with { ResourceUrlOverride = Variant.AsString(v) } }),
             Entry("LegacyFMLLibsURLOverride",
-                f => f.Mirror.LegacyFMLLibsURLOverride,
-                (f, v) => f with { Mirror = f.Mirror with { LegacyFMLLibsURLOverride = Variant.AsString(v) } }),
+                f => f.Mirror.LegacyFmlLibsUrlOverride,
+                (f, v) => f with { Mirror = f.Mirror with { LegacyFmlLibsUrlOverride = Variant.AsString(v) } }),
 
             // ---- proxy (no Pass member — the password is a secret below)
             Entry("ProxyType",
@@ -350,8 +351,8 @@ public static class FlintConfigKeys
                 f => f.Api.PastebinType,
                 (f, v) => f with { Api = f.Api with { PastebinType = Variant.AsInt(v) } }),
             Entry("PastebinCustomAPIBase",
-                f => f.Api.PastebinCustomAPIBase,
-                (f, v) => f with { Api = f.Api with { PastebinCustomAPIBase = Variant.AsString(v) } }),
+                f => f.Api.PastebinCustomApiBase,
+                (f, v) => f with { Api = f.Api with { PastebinCustomApiBase = Variant.AsString(v) } }),
             SecretEntry("FlameKeyOverride"),
             SecretEntry("ModrinthToken"),
 
@@ -363,11 +364,11 @@ public static class FlintConfigKeys
                 f => f.Tools.JProfilerPath,
                 (f, v) => f with { Tools = f.Tools with { JProfilerPath = Variant.AsString(v) } }),
             Entry("JVisualVMPath",
-                f => f.Tools.JVisualVMPath,
-                (f, v) => f with { Tools = f.Tools with { JVisualVMPath = Variant.AsString(v) } }),
+                f => f.Tools.JVisualVmPath,
+                (f, v) => f with { Tools = f.Tools with { JVisualVmPath = Variant.AsString(v) } }),
             Entry("MCEditPath",
-                f => f.Tools.MCEditPath,
-                (f, v) => f with { Tools = f.Tools with { MCEditPath = Variant.AsString(v) } }),
+                f => f.Tools.McEditPath,
+                (f, v) => f with { Tools = f.Tools with { McEditPath = Variant.AsString(v) } }),
         ];
 
         var map = new Dictionary<string, ConfigKeyEntry>(StringComparer.Ordinal);

@@ -117,12 +117,12 @@ public sealed record InstancePerformanceConfig
 /// <summary>Native library workarounds (OverrideNativeWorkarounds family).</summary>
 public sealed record InstanceNativeLibConfig
 {
-    public bool? UseNativeOpenAL { get; init; }
-    public string? CustomOpenALPath { get; init; }
-    public bool? UseNativeGLFW { get; init; }
-    public string? CustomGLFWPath { get; init; }
-    public bool? UseNativeSDL { get; init; }
-    public string? CustomSDLPath { get; init; }
+    public bool? UseNativeOpenAl { get; init; }
+    public string? CustomOpenAlPath { get; init; }
+    public bool? UseNativeGlfw { get; init; }
+    public string? CustomGlfwPath { get; init; }
+    public bool? UseNativeSdl { get; init; }
+    public string? CustomSdlPath { get; init; }
 }
 
 /// <summary>Managed-pack adoption metadata (the ManagedPack family; written by the pack

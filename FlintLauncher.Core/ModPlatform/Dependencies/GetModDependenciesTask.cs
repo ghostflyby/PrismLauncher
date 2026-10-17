@@ -19,7 +19,9 @@
 //    chain) is preserved.
 //  - instance->resourceLists() (shader/resource-pack/texture-pack metadata sweeps) is not
 //    ported: only the mod folder model exists in this codebase so far.
+
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
@@ -28,7 +30,6 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
-using System.Text.Json.Nodes;
 using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.ModPlatform.Dependencies;
@@ -94,7 +95,7 @@ public class GetModDependenciesTask : SequentialTask
 
     private ResourceApi GetApi(ResourceProvider provider)
     {
-        if (provider == ResourceProvider.FLAME)
+        if (provider == ResourceProvider.Flame)
         {
             return _flame;
         }
@@ -138,7 +139,7 @@ public class GetModDependenciesTask : SequentialTask
         var cDependencies = new List<Dependency>();
         foreach (var verDepSource in version.Dependencies)
         {
-            if (verDepSource.Type.Value != DependencyTypeValue.REQUIRED)
+            if (verDepSource.Type.Value != DependencyTypeValue.Required)
             {
                 continue;
             }
@@ -147,7 +148,7 @@ public class GetModDependenciesTask : SequentialTask
             verDep = GetOverride(verDep, providerName);
 
             // A Modrinth dependency can pin only a version, with an empty project id
-            var isOnlyVersion = providerName == ResourceProvider.MODRINTH && verDep.AddonId.Length == 0;
+            var isOnlyVersion = providerName == ResourceProvider.Modrinth && verDep.AddonId.Length == 0;
 
             if (cDependencies.Exists(i => IsSameDependency(i, verDep, isOnlyVersion)))
             {
@@ -180,7 +181,7 @@ public class GetModDependenciesTask : SequentialTask
     /// <summary>Port of ResourceAPI::getProject for both providers.</summary>
     private (NetJob? Job, NetRequest? Request) GetProject(ResourceProvider provider, string addonId)
     {
-        if (provider == ResourceProvider.FLAME)
+        if (provider == ResourceProvider.Flame)
         {
             var (job, request) = _flame.GetProject(addonId);
             return (job, request);
@@ -191,7 +192,7 @@ public class GetModDependenciesTask : SequentialTask
     /// <summary>Port of the per-provider loadIndexedPack virtual.</summary>
     private static void LoadIndexedPack(ResourceProvider provider, IndexedPack pack, JsonNode obj)
     {
-        if (provider == ResourceProvider.FLAME)
+        if (provider == ResourceProvider.Flame)
         {
             FlameMod.LoadIndexedPack(pack, obj);
         }
@@ -204,7 +205,7 @@ public class GetModDependenciesTask : SequentialTask
     /// <summary>Port of the per-provider loadIndexedPackVersion virtual (Mod resource type).</summary>
     private static IndexedVersion LoadIndexedPackVersion(ResourceProvider provider, JsonNode obj)
     {
-        return provider == ResourceProvider.FLAME
+        return provider == ResourceProvider.Flame
             ? FlameMod.LoadIndexedPackVersion(obj)
             : ModrinthPackIndex.LoadIndexedPackVersion(obj);
     }
@@ -242,7 +243,7 @@ public class GetModDependenciesTask : SequentialTask
                     // Flame nests the project under "data" (the C++
                     // Json::requireObject(Json::requireObject(doc), "data") form; the string
                     // argument is a KEY there, which FlameJson.RequireObject mirrors)
-                    JsonNode obj = provider == ResourceProvider.FLAME
+                    JsonNode obj = provider == ResourceProvider.Flame
                         ? FlameJson.RequireObject(root, "data")
                         : root;
 
@@ -296,7 +297,7 @@ public class GetModDependenciesTask : SequentialTask
         };
 
         var job = new NetJob($"{dep.AddonId}::Dependency");
-        var request = NetRequest.MakeByteArray(new Uri(GetApi(provider).GetDependencyURL(args)!));
+        var request = NetRequest.MakeByteArray(new Uri(GetApi(provider).GetDependencyUrl(args)!));
         job.AddNetRequest(request);
 
         job.Succeeded += _ =>
@@ -461,8 +462,8 @@ public class GetModDependenciesTask : SequentialTask
                     continue;
                 }
                 var deps = smod.Version.Dependencies;
-                var isRequiredByOther = deps.Any(d => d.Type.Value == DependencyTypeValue.REQUIRED &&
-                    (provider == ResourceProvider.MODRINTH && d.AddonId.Length == 0 ? version == d.Version : d.AddonId == addonId));
+                var isRequiredByOther = deps.Any(d => d.Type.Value == DependencyTypeValue.Required &&
+                    (provider == ResourceProvider.Modrinth && d.AddonId.Length == 0 ? version == d.Version : d.AddonId == addonId));
                 if (isRequiredByOther)
                 {
                     reqNames.Add(smod.Pack.Name);

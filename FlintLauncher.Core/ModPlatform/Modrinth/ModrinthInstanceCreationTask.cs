@@ -22,11 +22,14 @@
 //  - Downloads run through a ConcurrentTask of per-file tasks so the fallback-URL retry can
 //    mark the file failed only after every URL was tried (the C++ chains new net actions
 //    from the failed signal).
+
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
+using FlintLauncher.Core.Config;
+using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
-using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
@@ -48,7 +51,7 @@ public sealed class ModrinthCreationTask : InstanceTask
 
     public ModrinthCreationTask(string stagingPath,
                                 bool trustedSource,
-                                Config.InstanceEnvironment environment,
+                                InstanceEnvironment environment,
                                 string id = "",
                                 string versionId = "",
                                 string originalInstanceId = "",
@@ -58,27 +61,27 @@ public sealed class ModrinthCreationTask : InstanceTask
         StagingPath = stagingPath;
         TrustedSource = trustedSource;
         SetParentEnvironment(environment);
-        _managedId = id;
-        _managedVersionId = versionId;
+        managedId = id;
+        managedVersionId = versionId;
         SetOverride(false, originalInstanceId);
     }
 
     public bool TrustedSource { get; }
 
     private readonly ModrinthApi _modrinth;
-    private string _minecraftVersion = "";
-    private string _fabricVersion = "";
-    private string _quiltVersion = "";
-    private string _forgeVersion = "";
-    private string _neoForgeVersion = "";
-    private string _managedId = "";
-    private string _managedVersionId = "";
-    private string _managedName = "";
+    private string minecraftVersion = "";
+    private string fabricVersion = "";
+    private string quiltVersion = "";
+    private string forgeVersion = "";
+    private string neoForgeVersion = "";
+    private string managedId = "";
+    private string managedVersionId = "";
+    private string managedName = "";
 
     private readonly List<File> _files = [];
     private readonly Dictionary<string, Resource> _resources = new(StringComparer.Ordinal);
 
-    private string _rootPath = "minecraft";
+    private string rootPath = "minecraft";
 
     /// <summary>The untrusted files reported when TrustedSource is false (see header note).</summary>
     public IReadOnlyList<string> UntrustedMods { get; private set; } = [];
@@ -115,7 +118,7 @@ public sealed class ModrinthCreationTask : InstanceTask
         FileSystem.EnsureFilePathExists(newIndexPlace);
         FileSystem.Move(indexPath, newIndexPlace);
 
-        var mcPath = FileSystem.PathCombine(StagingPath, _rootPath);
+        var mcPath = FileSystem.PathCombine(StagingPath, rootPath);
 
         var overridePath = FileSystem.PathCombine(StagingPath, "overrides");
         if (System.IO.File.Exists(overridePath) || Directory.Exists(overridePath))
@@ -154,42 +157,42 @@ public sealed class ModrinthCreationTask : InstanceTask
 
         // D4: the staged instance is Flint format from birth (typed instance.json adapter)
         var newInstance = new MinecraftInstance(
-            new Config.InstanceJsonSettingsObject(StagingPath, Environment ??
-                throw new InvalidOperationException(
-                    "InstanceTask requires SetParentEnvironment before execution.")),
+            new InstanceJsonSettingsObject(StagingPath, Environment ??
+                                                        throw new InvalidOperationException(
+                                                            "InstanceTask requires SetParentEnvironment before execution.")),
             StagingPath);
 
         var components = newInstance.GetPackProfile();
         components.BuildingFromScratch();
-        await components.SetComponentVersion("net.minecraft", _minecraftVersion, important: true, cancellationToken);
+        await components.SetComponentVersion("net.minecraft", minecraftVersion, important: true, cancellationToken);
 
         string loader = "";
-        if (_fabricVersion.Length != 0)
+        if (fabricVersion.Length != 0)
         {
-            await components.SetComponentVersion("net.fabricmc.fabric-loader", _fabricVersion, important: false, cancellationToken);
-            loader = ModIndex.GetModLoaderAsString(Minecraft.ModLoaderType.Fabric);
+            await components.SetComponentVersion("net.fabricmc.fabric-loader", fabricVersion, important: false, cancellationToken);
+            loader = ModIndex.GetModLoaderAsString(ModLoaderType.Fabric);
         }
-        if (_quiltVersion.Length != 0)
+        if (quiltVersion.Length != 0)
         {
-            await components.SetComponentVersion("org.quiltmc.quilt-loader", _quiltVersion, important: false, cancellationToken);
-            loader = ModIndex.GetModLoaderAsString(Minecraft.ModLoaderType.Quilt);
+            await components.SetComponentVersion("org.quiltmc.quilt-loader", quiltVersion, important: false, cancellationToken);
+            loader = ModIndex.GetModLoaderAsString(ModLoaderType.Quilt);
         }
-        if (_forgeVersion.Length != 0)
+        if (forgeVersion.Length != 0)
         {
-            await components.SetComponentVersion("net.minecraftforge", _forgeVersion, important: false, cancellationToken);
-            loader = ModIndex.GetModLoaderAsString(Minecraft.ModLoaderType.Forge);
+            await components.SetComponentVersion("net.minecraftforge", forgeVersion, important: false, cancellationToken);
+            loader = ModIndex.GetModLoaderAsString(ModLoaderType.Forge);
         }
-        if (_neoForgeVersion.Length != 0)
+        if (neoForgeVersion.Length != 0)
         {
-            await components.SetComponentVersion("net.neoforged", _neoForgeVersion, important: false, cancellationToken);
-            loader = ModIndex.GetModLoaderAsString(Minecraft.ModLoaderType.NeoForge);
+            await components.SetComponentVersion("net.neoforged", neoForgeVersion, important: false, cancellationToken);
+            loader = ModIndex.GetModLoaderAsString(ModLoaderType.NeoForge);
         }
 
         if (Icon != "default")
         {
             newInstance.SetIconKey(Icon);
         }
-        else if (_managedId.Length != 0)
+        else if (managedId.Length != 0)
         {
             newInstance.SetIconKey("modrinth");
         }
@@ -200,7 +203,7 @@ public sealed class ModrinthCreationTask : InstanceTask
         newInstance.SaveNow();
 
         // ---------------------------------------------------------- download mods
-        var rootModpackPath = FileSystem.PathCombine(StagingPath, _rootPath);
+        var rootModpackPath = FileSystem.PathCombine(StagingPath, rootPath);
 
         var downloadJob = new ConcurrentTask("Mod Download Modrinth");
         var downloadTasks = new List<ModDownloadTask>();
@@ -232,8 +235,8 @@ public sealed class ModrinthCreationTask : InstanceTask
                 return;
             }
 
-            var meta = new ModrinthApi.DownloadMeta(Reason: "modpack", GameVersion: _minecraftVersion, Loader: loader,
-                DependentOn: _managedId.Length != 0 ? _managedVersionId : "");
+            var meta = new ModrinthApi.DownloadMeta(Reason: "modpack", GameVersion: minecraftVersion, Loader: loader,
+                DependentOn: managedId.Length != 0 ? managedVersionId : "");
 
             var downloadTask = new ModDownloadTask(file, filePath, meta, _modrinth);
             downloadTasks.Add(downloadTask);
@@ -280,11 +283,11 @@ public sealed class ModrinthCreationTask : InstanceTask
 
                 if (setInternalData)
                 {
-                    if (_managedVersionId.Length == 0)
+                    if (managedVersionId.Length == 0)
                     {
-                        _managedVersionId = ObjString(obj, "versionId");
+                        managedVersionId = ObjString(obj, "versionId");
                     }
-                    _managedName = ObjString(obj, "name");
+                    managedName = ObjString(obj, "name");
                 }
 
                 var jsonFiles = JsonUtils.RequireArray(obj, "files", "modrinth.index.json");
@@ -377,23 +380,23 @@ public sealed class ModrinthCreationTask : InstanceTask
                     {
                         if (name == "minecraft")
                         {
-                            _minecraftVersion = JsonUtils.RequireString(dependency, "Minecraft version");
+                            minecraftVersion = JsonUtils.RequireString(dependency, "Minecraft version");
                         }
                         else if (name == "fabric-loader")
                         {
-                            _fabricVersion = JsonUtils.RequireString(dependency, "Fabric Loader version");
+                            fabricVersion = JsonUtils.RequireString(dependency, "Fabric Loader version");
                         }
                         else if (name == "quilt-loader")
                         {
-                            _quiltVersion = JsonUtils.RequireString(dependency, "Quilt Loader version");
+                            quiltVersion = JsonUtils.RequireString(dependency, "Quilt Loader version");
                         }
                         else if (name == "forge")
                         {
-                            _forgeVersion = JsonUtils.RequireString(dependency, "Forge version");
+                            forgeVersion = JsonUtils.RequireString(dependency, "Forge version");
                         }
                         else if (name == "neoforge")
                         {
-                            _neoForgeVersion = JsonUtils.RequireString(dependency, "NeoForge version");
+                            neoForgeVersion = JsonUtils.RequireString(dependency, "NeoForge version");
                         }
                         else
                         {
@@ -433,7 +436,7 @@ public sealed class ModrinthCreationTask : InstanceTask
     private async Task EnsureMetaLoop(CancellationToken cancellationToken, MinecraftInstance newInstance)
     {
         var folder = FileSystem.PathCombine(newInstance.ModsRoot(), ".index");
-        var ensureMetadataTask = new EnsureMetadataTask(_resources, folder, ResourceProvider.MODRINTH, _modrinth);
+        var ensureMetadataTask = new EnsureMetadataTask(_resources, folder, ResourceProvider.Modrinth, _modrinth);
         // setUpdateLock(true): updates for mods coming from an installed modpack are locked
         ensureMetadataTask.SetUpdateLock(lockUpdate: true);
         ensureMetadataTask.MetadataFailed += (_, reason) => EmitStatus(reason);
@@ -474,7 +477,7 @@ public sealed class ModrinthCreationTask : InstanceTask
             }
         }
 
-        var mcDir = FileSystem.PathCombine(StagingPath, _rootPath);
+        var mcDir = FileSystem.PathCombine(StagingPath, rootPath);
         var modsPath = FileSystem.PathCombine(mcDir, "mods");
         if (Directory.Exists(modsPath))
         {
@@ -496,9 +499,9 @@ public sealed class ModrinthCreationTask : InstanceTask
     private void SetManagedPack(MinecraftInstance instance)
     {
         // Don't add managed info to packs without an ID (most likely imported from ZIP)
-        if (_managedId.Length != 0)
+        if (managedId.Length != 0)
         {
-            instance.SetManagedPack("modrinth", _managedId, _managedName, _managedVersionId, Version());
+            instance.SetManagedPack("modrinth", managedId, managedName, managedVersionId, Version());
         }
         else
         {

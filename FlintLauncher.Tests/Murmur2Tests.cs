@@ -6,7 +6,9 @@
 // independent reference implementation of that algorithm (empty input = 1540447798,
 // "hello" = 2788266382, ...). The CurseForge fingerprint filter (drops tab/LF/CR/space)
 // is covered by the "hello world" cases: filtered("hello world") == murmur2("helloworld").
+
 using System.Security.Cryptography;
+using System.Text;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Hashing;
 using Xunit;
@@ -33,7 +35,7 @@ public class Murmur2Tests
     [InlineData(504383975u, "The quick brown fox jumps over the lazy dog")]
     public void Murmur2_MatchesCanonicalSeed1Vectors(uint expected, string input)
     {
-        AssertVector(System.Text.Encoding.UTF8.GetBytes(input), expected);
+        AssertVector(Encoding.UTF8.GetBytes(input), expected);
     }
 
     [Fact]
@@ -49,16 +51,16 @@ public class Murmur2Tests
         var cfFilter = (Murmur2.FilterFunc)(c => c is 9 or 10 or 13 or 32);
 
         // the CF fingerprint hashes the stream without tab/LF/CR/space
-        AssertVector(System.Text.Encoding.UTF8.GetBytes("hello world"), 2824650221u, cfFilter);
-        AssertVector(System.Text.Encoding.UTF8.GetBytes("The quick brown fox jumps over the lazy dog"),
+        AssertVector(Encoding.UTF8.GetBytes("hello world"), 2824650221u, cfFilter);
+        AssertVector(Encoding.UTF8.GetBytes("The quick brown fox jumps over the lazy dog"),
             3751777527u, cfFilter);
 
         // whitespace-only input hashes like the empty input
-        AssertVector(System.Text.Encoding.UTF8.GetBytes(" \t\r\n"), 1540447798u, cfFilter);
+        AssertVector(Encoding.UTF8.GetBytes(" \t\r\n"), 1540447798u, cfFilter);
 
         // CRLF/line-ending differences vanish under the filter
-        var lf = System.Text.Encoding.UTF8.GetBytes("line1\nline2");
-        var crlf = System.Text.Encoding.UTF8.GetBytes("line1\r\nline2");
+        var lf = Encoding.UTF8.GetBytes("line1\nline2");
+        var crlf = Encoding.UTF8.GetBytes("line1\r\nline2");
         Assert.Equal(Murmur2.Hash(lf, cfFilter), Murmur2.Hash(crlf, cfFilter));
     }
 
@@ -67,7 +69,7 @@ public class Murmur2Tests
     {
         // FourBytes_MurmurHash2 is exported for incremental use: mixing the stream through
         // the incremental state must reproduce the one-shot hash.
-        var data = System.Text.Encoding.UTF8.GetBytes("The quick brown fox jumps over the lazy dog");
+        var data = Encoding.UTF8.GetBytes("The quick brown fox jumps over the lazy dog");
         var oneShot = Murmur2.Hash(data);
 
         var h = 1u ^ (uint)data.Length;
@@ -135,7 +137,7 @@ public class Murmur2Tests
         Assert.Equal(HashUtils.Hash(data, Algorithm.Sha512), hasher.GetResult());
 
         // the provider-based factory maps FLAME to the CF murmur2 variant
-        var cfHasher = HashUtils.CreateHasher(path, ResourceProvider.FLAME);
+        var cfHasher = HashUtils.CreateHasher(path, ResourceProvider.Flame);
         await cfHasher.StartAsync();
         Assert.Equal(HashUtils.Hash(data, Algorithm.Murmur2), cfHasher.GetResult());
 

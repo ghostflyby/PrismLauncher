@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/net/HttpMetaCache.{h,cpp}: on-disk download cache index. The index file
 // format is kept byte-compatible with PrismLauncher's "metacache" JSON (version "1").
+
+using System.Security;
+using System.Security.Cryptography;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 
@@ -11,12 +14,12 @@ namespace FlintLauncher.Core.Net;
 
 public sealed class MetaEntry
 {
-    private bool _stale = true;
+    private bool stale = true;
 
     /// <summary>The cache whose mount table resolves <see cref="GetFullPath"/> (E4: the
     /// base path is NOT a field on the entry — the storage layer owns the baseId → root
     /// table and the key → path resolution; the disk format never carried it anyway).</summary>
-    private HttpMetaCache? _owner;
+    private HttpMetaCache? owner;
 
     public string BaseId { get; set; } = "";
 
@@ -37,9 +40,9 @@ public sealed class MetaEntry
 
     public bool IsEternal { get; set; }
 
-    public bool IsStale => _stale;
+    public bool IsStale => stale;
 
-    public void SetStale(bool stale) => _stale = stale;
+    public void SetStale(bool stale) => this.stale = stale;
 
     /// <summary>Full path of the cached file: resolved LIVE through the owning cache's
     /// mount table (E4 — remounting a base re-points every entry with it). Fails fast when
@@ -48,7 +51,7 @@ public sealed class MetaEntry
     /// landing) and must not come back through a side door.</summary>
     public string GetFullPath()
     {
-        var owner = _owner ?? throw new InvalidOperationException(
+        var owner = this.owner ?? throw new InvalidOperationException(
             "meta entry has no owning cache — resolve it through HttpMetaCache.ResolveEntry");
         var basePath = owner.GetBasePath(BaseId);
         return basePath.Length != 0
@@ -59,7 +62,7 @@ public sealed class MetaEntry
 
     public bool IsExpired(long offset) => !IsEternal && CurrentAge >= MaxAge - offset;
 
-    internal void SetOwner(HttpMetaCache? owner) => _owner = owner;
+    internal void SetOwner(HttpMetaCache? owner) => this.owner = owner;
 }
 
 public sealed class HttpMetaCache : IDisposable
@@ -69,7 +72,7 @@ public sealed class HttpMetaCache : IDisposable
         new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _basePaths = new(StringComparer.Ordinal);
     private readonly string? _indexFile;
-    private Timer? _saveTimer;
+    private Timer? saveTimer;
 
     public HttpMetaCache(string? path = null)
     {
@@ -78,8 +81,8 @@ public sealed class HttpMetaCache : IDisposable
 
     public void Dispose()
     {
-        _saveTimer?.Dispose();
-        _saveTimer = null;
+        saveTimer?.Dispose();
+        saveTimer = null;
         SaveNow();
     }
 
@@ -146,7 +149,7 @@ public sealed class HttpMetaCache : IDisposable
         {
             using var probe = File.OpenRead(realPath);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or SecurityException)
         {
             Disown(baseId, resourcePath);
             return StaleEntry(baseId, resourcePath);
@@ -166,9 +169,9 @@ public sealed class HttpMetaCache : IDisposable
             try
             {
                 using var stream = File.OpenRead(realPath);
-                md5Sum = Convert.ToHexStringLower(System.Security.Cryptography.MD5.HashData(stream));
+                md5Sum = Convert.ToHexStringLower(MD5.HashData(stream));
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or SecurityException)
             {
                 // no disown here (C++ keeps the entry when the md5 open fails after the
                 // stat succeeded — a TOCTOU race), so a later resolve can still recover.
@@ -298,7 +301,7 @@ public sealed class HttpMetaCache : IDisposable
         {
             return;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or SecurityException)
         {
             // C++ Load() silently skips a ledger that exists but cannot be opened
             // (index.open(ReadOnly) fails -> bare return): the metacache is a true cache
@@ -368,8 +371,8 @@ public sealed class HttpMetaCache : IDisposable
         // reset the save timer (30 seconds, like the C++ batching timer)
         lock (_lock)
         {
-            _saveTimer?.Dispose();
-            _saveTimer = new Timer(_ => SaveNow(), null, 30_000, Timeout.Infinite);
+            saveTimer?.Dispose();
+            saveTimer = new Timer(_ => SaveNow(), null, 30_000, Timeout.Infinite);
         }
     }
 
@@ -437,7 +440,7 @@ public sealed class HttpMetaCache : IDisposable
                 entriesRoot.ToJsonString(new JsonSerializerOptions
                 {
                     WriteIndented = false,
-                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                 }));
         }
         catch (IOException)

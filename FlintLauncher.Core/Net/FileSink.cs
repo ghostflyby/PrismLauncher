@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/net/FileSink.h/.cpp and net/MetaCacheSink.h/.cpp.
+
+using System.Globalization;
+using System.Text.RegularExpressions;
 using FlintLauncher.Core.IO;
 
 namespace FlintLauncher.Core.Net;
@@ -8,10 +11,10 @@ namespace FlintLauncher.Core.Net;
 public class FileSink : Sink
 {
     private readonly string _filename;
-    private bool _wroteAnyData;
+    private bool wroteAnyData;
     /// <summary>Writable by MetaCacheSink (C++: protected member access).</summary>
-    private protected bool WroteAnyData => _wroteAnyData;
-    private string? _tempFile;
+    private protected bool WroteAnyData => wroteAnyData;
+    private string? tempFile;
 
     public FileSink(string filename)
     {
@@ -34,16 +37,16 @@ public class FileSink : Sink
             return false;
         }
 
-        _wroteAnyData = false;
-        _tempFile = _filename + ".flint-tmp";
+        wroteAnyData = false;
+        tempFile = _filename + ".flint-tmp";
         try
         {
-            File.Create(_tempFile).Dispose();
+            File.Create(tempFile).Dispose();
         }
         catch (IOException e)
         {
             FailReason = $"Could not open {_filename} for writing: {e.Message}";
-            _tempFile = null;
+            tempFile = null;
             return false;
         }
 
@@ -57,31 +60,31 @@ public class FileSink : Sink
 
     public override bool Write(byte[] data)
     {
-        if (_tempFile is null)
+        if (tempFile is null)
         {
             FailReason = "Writing into a closed file sink";
             return false;
         }
         try
         {
-            using var stream = File.Open(_tempFile, FileMode.Append, FileAccess.Write);
+            using var stream = File.Open(tempFile, FileMode.Append, FileAccess.Write);
             stream.Write(data);
         }
         catch (IOException e)
         {
             FailReason = $"Failed writing into {_filename}: {e.Message}";
             CancelWriting();
-            _wroteAnyData = false;
+            wroteAnyData = false;
             return false;
         }
         if (!WriteAllValidators(data))
         {
             FailReason = $"Failed writing into {_filename}: validators failed";
             CancelWriting();
-            _wroteAnyData = false;
+            wroteAnyData = false;
             return false;
         }
-        _wroteAnyData = true;
+        wroteAnyData = true;
         return true;
     }
 
@@ -100,7 +103,7 @@ public class FileSink : Sink
 
         // if we wrote any data to the save file, we try to commit the data to the real file.
         // if it actually got a proper file, we write it even if it was empty
-        if (gotFile || _wroteAnyData)
+        if (gotFile || wroteAnyData)
         {
             // ask validators for data consistency: only for actual downloads, not cache hits
             if (!FinalizeAllValidators(response))
@@ -109,11 +112,11 @@ public class FileSink : Sink
                 return false;
             }
 
-            if (_tempFile is not null)
+            if (tempFile is not null)
             {
                 try
                 {
-                    File.Move(_tempFile, _filename, overwrite: true);
+                    File.Move(tempFile, _filename, overwrite: true);
                 }
                 catch (IOException e)
                 {
@@ -121,7 +124,7 @@ public class FileSink : Sink
                     CancelWriting();
                     return false;
                 }
-                _tempFile = null;
+                tempFile = null;
             }
         }
 
@@ -137,18 +140,18 @@ public class FileSink : Sink
 
     private void CancelWriting()
     {
-        if (_tempFile is not null)
+        if (tempFile is not null)
         {
             try
             {
-                File.Delete(_tempFile);
+                File.Delete(tempFile);
             }
             catch (IOException)
             {
             }
-            _tempFile = null;
+            tempFile = null;
         }
-        _wroteAnyData = false;
+        wroteAnyData = false;
     }
 
     protected virtual bool InitCache(NetRequestSpec request) => true;
@@ -170,11 +173,11 @@ public sealed class MetaCacheSink : FileSink
     private readonly ChecksumValidator _md5Node;
     private readonly bool _isEternal;
 
-    public MetaCacheSink(MetaEntry entry, ChecksumValidator md5sum, bool isEternal = false)
+    public MetaCacheSink(MetaEntry entry, ChecksumValidator md5Sum, bool isEternal = false)
         : base(entry.GetFullPath())
     {
         _entry = entry;
-        _md5Node = md5sum;
+        _md5Node = md5Sum;
         _isEternal = isEternal;
     }
 
@@ -233,16 +236,16 @@ public sealed class MetaCacheSink : FileSink
         }
         else if (response.Headers.TryGetValue("Cache-Control", out var cacheControl))
         {
-            var match = System.Text.RegularExpressions.Regex.Match(cacheControl, "max-age=([0-9]+)");
+            var match = Regex.Match(cacheControl, "max-age=([0-9]+)");
             if (match.Success)
             {
-                _entry.MaxAge = long.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                _entry.MaxAge = long.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
             }
         }
         else if (response.Headers.TryGetValue("Expires", out var expiresHeader))
         {
-            if (DateTimeOffset.TryParse(expiresHeader, System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.AssumeUniversal, out var expires))
+            if (DateTimeOffset.TryParse(expiresHeader, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal, out var expires))
             {
                 _entry.MaxAge = expires.ToUnixTimeSeconds() - DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             }

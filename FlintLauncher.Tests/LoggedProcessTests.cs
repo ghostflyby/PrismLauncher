@@ -2,6 +2,8 @@
 // Tests for the LoggedProcess port: line-based stdout/stderr capture (including interleaved
 // output), state transitions, exit codes, kill/abort, stdin writes and working directory
 // handling. Unix-only fixtures (/bin/sh + coreutils); skipped trivially on other hosts.
+
+using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Launch;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -190,7 +192,7 @@ public class LoggedProcessTests
             process.Write("hello diag\n");
             await completion;
 
-            var processCategory = Core.Diagnostics.LogCategories.Process;
+            var processCategory = LogCategories.Process;
             Assert.True(sink.Has(LogLevel.Debug, processCategory, "Starting process /bin/sh"),
                 "spawn command line should be logged");
             Assert.True(sink.Has(LogLevel.Debug, processCategory, "State -> Running"),
@@ -219,7 +221,7 @@ public class LoggedProcessTests
             // world case (child died, broken pipe) throws IOException the same way
             process.Write("never started\n");
 
-            Assert.True(sink.Has(LogLevel.Warning, Core.Diagnostics.LogCategories.Process,
+            Assert.True(sink.Has(LogLevel.Warning, LogCategories.Process,
                 "Stdin write failed"), "a dropped stdin write must be logged as Warning");
         }
         finally

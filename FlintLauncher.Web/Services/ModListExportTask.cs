@@ -8,6 +8,8 @@
 // user picks the format + target file — here the format comes from the request body and the
 // target is always "<name>-mods.<ext>" inside the instance directory, exposed through the
 // task view's OutputPath result).
+
+using System.Security;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.Helpers;
 using FlintLauncher.Core.Tasks;
@@ -19,11 +21,11 @@ public sealed class ModListExportTask : FlintTask
     private static readonly Dictionary<string, (ModListFormat Format, string Extension)> Formats =
         new(StringComparer.Ordinal)
         {
-            ["html"] = (ModListFormat.HTML, "html"),
-            ["markdown"] = (ModListFormat.MARKDOWN, "md"),
-            ["plain"] = (ModListFormat.PLAINTXT, "txt"),
-            ["json"] = (ModListFormat.JSON, "json"),
-            ["csv"] = (ModListFormat.CSV, "csv"),
+            ["html"] = (ModListFormat.Html, "html"),
+            ["markdown"] = (ModListFormat.Markdown, "md"),
+            ["plain"] = (ModListFormat.Plaintxt, "txt"),
+            ["json"] = (ModListFormat.Json, "json"),
+            ["csv"] = (ModListFormat.Csv, "csv"),
         };
 
     private readonly MinecraftInstance _instance;
@@ -54,7 +56,7 @@ public sealed class ModListExportTask : FlintTask
             return true;
         }
         // the C++ dialog default is HTML
-        format = ModListFormat.HTML;
+        format = ModListFormat.Html;
         extension = "html";
         return false;
     }
@@ -92,7 +94,7 @@ public sealed class ModListExportTask : FlintTask
             File.WriteAllText(_outputPath, ExportToModList.ExportModsToString(mods, _format, _extraData));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException
-                                  or System.Security.SecurityException)
+                                  or SecurityException)
         {
             EmitFailed("Could not write the mod list: " + e.Message);
             return Task.CompletedTask;

@@ -2,7 +2,9 @@
 // New tests locking the persistence behavior ported from launcher/minecraft/PackProfile.{h,cpp}:
 // mmc-pack.json round trips, the byte-exact Qt-style save format, patches/*.json handling and
 // the jar mod / custom jar / agent installers.
+
 using System.Text.Json.Nodes;
+using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Minecraft;
 using Xunit;
 
@@ -91,7 +93,7 @@ public class PackProfileTests : IDisposable
         Assert.Equal(3, profile.Components.Count);
 
         var minecraft = profile.Components[0];
-        Assert.Equal("net.minecraft", minecraft.GetID());
+        Assert.Equal("net.minecraft", minecraft.GetId());
         Assert.Equal("1.12.2", minecraft.Version);
         Assert.True(minecraft.Important);
         Assert.False(minecraft.DependencyOnly);
@@ -100,12 +102,12 @@ public class PackProfileTests : IDisposable
         Assert.False(minecraft.IsCustom());
 
         var lwjgl = profile.Components[1];
-        Assert.Equal("org.lwjgl3", lwjgl.GetID());
+        Assert.Equal("org.lwjgl3", lwjgl.GetId());
         // the patch file is on disk and wins over metadata
         Assert.True(lwjgl.IsRemovable());
 
         var hashed = profile.Components[2];
-        Assert.Equal("org.quiltmc.hashed", hashed.GetID());
+        Assert.Equal("org.quiltmc.hashed", hashed.GetId());
         Assert.True(hashed.DependencyOnly);
         Assert.Equal("1.12.2", hashed.Version);
     }
@@ -127,7 +129,7 @@ public class PackProfileTests : IDisposable
             CachedVersion = "0.14.21",
             CachedName = "Fabric Loader",
         };
-        loader.CachedRequires.Add(new Core.Meta.Require { Uid = "net.minecraft", EqualsVersion = "1.20.1" });
+        loader.CachedRequires.Add(new Require { Uid = "net.minecraft", EqualsVersion = "1.20.1" });
         profile.AppendComponent(minecraft);
         profile.AppendComponent(loader);
 
@@ -164,10 +166,10 @@ public class PackProfileTests : IDisposable
         var result = profile.Load();
         Assert.True(result.Ok, result.ErrorMessage);
         Assert.Equal(2, profile.Components.Count);
-        Assert.Equal("net.minecraft", profile.Components[0].GetID());
+        Assert.Equal("net.minecraft", profile.Components[0].GetId());
         Assert.Equal("0.14.21", profile.Components[1].Version);
         Assert.True(profile.Components[1].CachedRequires.Contains(
-            new Core.Meta.Require { Uid = "net.minecraft", EqualsVersion = "1.20.1" }));
+            new Require { Uid = "net.minecraft", EqualsVersion = "1.20.1" }));
     }
 
     [Fact]
@@ -215,10 +217,10 @@ public class PackProfileTests : IDisposable
         profile.AppendComponent(c);
 
         profile.Move(1, PackProfile.MoveDirection.MoveUp); // b moves to the front
-        Assert.Equal(new[] { "test.b", "test.a", "test.c" }, profile.Components.Select(x => x.GetID()).ToArray());
+        Assert.Equal(new[] { "test.b", "test.a", "test.c" }, profile.Components.Select(x => x.GetId()).ToArray());
 
         profile.Move(1, PackProfile.MoveDirection.MoveDown); // a moves behind c
-        Assert.Equal(new[] { "test.b", "test.c", "test.a" }, profile.Components.Select(x => x.GetID()).ToArray());
+        Assert.Equal(new[] { "test.b", "test.c", "test.a" }, profile.Components.Select(x => x.GetId()).ToArray());
     }
 
     [Fact]
@@ -232,17 +234,17 @@ public class PackProfileTests : IDisposable
             profile.BuildingFromScratch();
             Assert.True(profile.InstallJarMods([jarmodSource]));
 
-            var jarmodComponent = profile.Components.Single(c => c.GetID().StartsWith("custom.jarmod."));
-            var jarmodPatch = profile.PatchFilePathForUid(jarmodComponent.GetID());
+            var jarmodComponent = profile.Components.Single(c => c.GetId().StartsWith("custom.jarmod."));
+            var jarmodPatch = profile.PatchFilePathForUid(jarmodComponent.GetId());
             var jarmodFile = Directory.EnumerateFiles(Path.Combine(_root, "jarmods")).Single();
             Assert.True(File.Exists(jarmodPatch));
             Assert.True(File.Exists(jarmodFile));
 
             // removing the jar mod component deletes both the patch record and the copied jar
-            Assert.True(profile.Remove(jarmodComponent.GetID()));
+            Assert.True(profile.Remove(jarmodComponent.GetId()));
             Assert.False(File.Exists(jarmodPatch));
             Assert.False(File.Exists(jarmodFile));
-            Assert.DoesNotContain(profile.Components, c => c.GetID() == jarmodComponent.GetID());
+            Assert.DoesNotContain(profile.Components, c => c.GetId() == jarmodComponent.GetId());
         }
         finally
         {
@@ -264,7 +266,7 @@ public class PackProfileTests : IDisposable
             Assert.True(profile.InstallCustomJar(source));
 
             var component = profile.Components.Single();
-            Assert.Equal("customjar", component.GetID());
+            Assert.Equal("customjar", component.GetId());
             Assert.True(component.IsCustom());
             Assert.EndsWith(" (custom jar)", component.GetName());
 
@@ -297,13 +299,13 @@ public class PackProfileTests : IDisposable
             Assert.True(profile.InstallAgents([source]));
 
             var component = profile.Components.Single();
-            Assert.StartsWith("custom.agent.", component.GetID());
+            Assert.StartsWith("custom.agent.", component.GetId());
             Assert.EndsWith(" (agent)", component.GetName());
 
             // the agent jar is copied into <instance>/libraries/<guid>.jar
             Assert.Single(Directory.EnumerateFiles(Path.Combine(_root, "libraries")));
 
-            var patch = JsonNode.Parse(File.ReadAllText(profile.PatchFilePathForUid(component.GetID())))!.AsObject();
+            var patch = JsonNode.Parse(File.ReadAllText(profile.PatchFilePathForUid(component.GetId())))!.AsObject();
             var agents = patch["+agents"]!.AsArray();
             Assert.Single(agents);
             Assert.StartsWith("custom.agents:", agents[0]!["name"]!.ToString());
@@ -322,7 +324,7 @@ public class PackProfileTests : IDisposable
         Assert.True(profile.InstallEmpty("org.quiltmc.quilt-loader", "Quilt Loader"));
 
         var component = profile.Components.Single();
-        Assert.Equal("org.quiltmc.quilt-loader", component.GetID());
+        Assert.Equal("org.quiltmc.quilt-loader", component.GetId());
         Assert.Equal("Quilt Loader", component.GetName());
         Assert.True(component.IsCustom());
 

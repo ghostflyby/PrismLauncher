@@ -3,6 +3,7 @@
 // core receives its ILoggerFactory by constructor injection, so Attach() hands the built
 // factory to the test (inject it into the object under test) and Detach() must bracket the
 // assertions (the suite runs with collections serialized, see xunit.runner.json).
+
 using Microsoft.Extensions.Logging;
 
 namespace FlintLauncher.Tests;

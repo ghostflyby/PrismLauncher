@@ -5,9 +5,11 @@
 // ReconstructAssets) consumes them. Note: upstream's mapToResources JSON key is
 // "map_to_resources" (LaunchProfile's makeProfileVarMapping consumer reads "mapToResources"
 // through the local getAssetsDir in MinecraftInstance.cs — both spellings exist upstream).
+
+using System.Security.Cryptography;
 using System.Text.Json;
-using FlintLauncher.Core.IO;
 using System.Text.Json.Nodes;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.Launch;
@@ -36,7 +38,7 @@ public sealed class AssetObject
             var objectDl = NetRequest.MakeFile(new Uri(resourceUrl + GetRelPath()), objectFile.FullName);
             if (Hash.Length != 0)
             {
-                objectDl.AddValidator(ChecksumValidator.FromHex(System.Security.Cryptography.HashAlgorithmName.SHA1, Hash));
+                objectDl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, Hash));
             }
             return objectDl;
         }

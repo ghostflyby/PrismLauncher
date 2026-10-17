@@ -7,6 +7,7 @@
 //    therefore never sees isInUse() == true.
 //  - The signal/slot pair changed()/activityChanged(bool) becomes the Changed/ActivityChanged
 //    events; connect() bookkeeping inside AccountList is dropped accordingly.
+
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -33,13 +34,13 @@ public sealed class MinecraftAccount
         return null;
     }
 
-    public static MinecraftAccount CreateBlankMSA()
+    public static MinecraftAccount CreateBlankMsa()
     {
         var account = new MinecraftAccount
         {
             Data =
             {
-                Type = AccountType.MSA,
+                Type = AccountType.Msa,
             },
         };
         return account;
@@ -49,7 +50,7 @@ public sealed class MinecraftAccount
     {
         var account = new MinecraftAccount();
         account.Data.Type = AccountType.Offline;
-        account.Data.YggdrasilToken.Token_ = "0";
+        account.Data.YggdrasilToken.Value = "0";
         account.Data.YggdrasilToken.Validity = Validity.Certain;
         account.Data.YggdrasilToken.IssueInstant = DateTime.UtcNow;
         account.Data.YggdrasilToken.Extra["userName"] = JsonValue.Create(username);
@@ -106,19 +107,19 @@ public sealed class MinecraftAccount
 
     public AuthFlow? Refresh(AuthEndpointsOptions? auth = null)
     {
-        if (_currentTask is not null)
+        if (currentTask is not null)
         {
-            return _currentTask;
+            return currentTask;
         }
 
         return Attach(new AuthFlow(Data, AuthFlowAction.Refresh, auth));
     }
 
-    public AuthFlow? CurrentTask => _currentTask;
+    public AuthFlow? CurrentTask => currentTask;
 
     private AuthFlow Attach(AuthFlow flow)
     {
-        _currentTask = flow;
+        currentTask = flow;
         flow.Succeeded += _ => AuthSucceeded();
         flow.Failed += (_, reason) => AuthFailed(reason);
         flow.Aborted += _ => AuthFailed("Aborted");
@@ -128,16 +129,16 @@ public sealed class MinecraftAccount
 
     private void AuthSucceeded()
     {
-        _currentTask = null;
+        currentTask = null;
         Changed?.Invoke();
         ActivityChanged?.Invoke(false);
     }
 
     private void AuthFailed(string reason)
     {
-        if (_currentTask is { } task)
+        if (currentTask is { } task)
         {
-            switch (task.TaskState_)
+            switch (task.TaskState)
             {
                 case AccountTaskState.Offline:
                 case AccountTaskState.Disabled:
@@ -147,27 +148,27 @@ public sealed class MinecraftAccount
                 case AccountTaskState.FailedSoft:
                     break;
                 case AccountTaskState.FailedHard:
-                    if (AccountType_ == AccountType.MSA)
+                    if (AccountType == AccountType.Msa)
                     {
-                        Data.MsaToken.Token_ = "";
+                        Data.MsaToken.Value = "";
                         Data.MsaToken.RefreshToken = "";
                         Data.MsaToken.Validity = Validity.None;
-                        Data.Validity_ = Validity.None;
+                        Data.Validity = Validity.None;
                     }
                     else
                     {
-                        Data.YggdrasilToken.Token_ = "";
+                        Data.YggdrasilToken.Value = "";
                         Data.YggdrasilToken.Validity = Validity.None;
-                        Data.Validity_ = Validity.None;
+                        Data.Validity = Validity.None;
                     }
                     Changed?.Invoke();
                     break;
                 case AccountTaskState.FailedGone:
-                    Data.Validity_ = Validity.None;
+                    Data.Validity = Validity.None;
                     Changed?.Invoke();
                     break;
                 case AccountTaskState.Working:
-                    Data.AccountState_ = AccountState.Unchecked;
+                    Data.AccountState = AccountState.Unchecked;
                     break;
                 case AccountTaskState.Created:
                 case AccountTaskState.Succeeded:
@@ -175,22 +176,22 @@ public sealed class MinecraftAccount
                     break;
             }
         }
-        _currentTask = null;
+        currentTask = null;
         ActivityChanged?.Invoke(false);
     }
 
     public string DisplayName()
     {
-        if (AccountState_ is not (AccountState.Unchecked or AccountState.Working or AccountState.Offline or AccountState.Online))
+        if (AccountState is not (AccountState.Unchecked or AccountState.Working or AccountState.Offline or AccountState.Online))
         {
             return "⚠ " + ProfileName();
         }
         return ProfileName();
     }
 
-    public bool IsActive => _currentTask is not null;
+    public bool IsActive => currentTask is not null;
 
-    public AccountType AccountType_ => Data.Type;
+    public AccountType AccountType => Data.Type;
 
     public bool OwnsMinecraft() => Data.Type != AccountType.Offline && Data.MinecraftEntitlement.OwnsMinecraft;
 
@@ -198,13 +199,13 @@ public sealed class MinecraftAccount
 
     public string TypeString() => Data.Type switch
     {
-        AccountType.MSA => "msa",
+        AccountType.Msa => "msa",
         AccountType.Offline => "offline",
         _ => "unknown",
     };
 
     /// <summary>Returns the current state of the account.</summary>
-    public AccountState AccountState_ => Data.AccountState_;
+    public AccountState AccountState => Data.AccountState;
 
     public bool ShouldRefresh()
     {
@@ -214,7 +215,7 @@ public sealed class MinecraftAccount
          * Don't refresh broken accounts.
          * Refresh accounts that would expire in the next 12 hours (fresh token validity is 24 hours).
          */
-        switch (Data.Validity_)
+        switch (Data.Validity)
         {
             case Validity.Certain:
                 break;
@@ -282,5 +283,5 @@ public sealed class MinecraftAccount
     public AccountData AccountData => Data;
 
     // current task we are executing here
-    private AuthFlow? _currentTask;
+    private AuthFlow? currentTask;
 }

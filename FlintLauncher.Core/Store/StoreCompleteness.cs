@@ -6,10 +6,11 @@
 // (the ledger does not record ownership, E5; the manifest is the sole "config → file" truth).
 // The Web layer serves this as GET /store/status/libraries/{versionRef} and
 // GET /store/status/assets/{assetsId}.
+
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Launch;
-using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Meta;
+using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.Store;

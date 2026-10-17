@@ -4,7 +4,9 @@
 // launcher-state.json shape (one TypedJsonFile, stateVersion evolution, atomic writes).
 // The C++ kept these inside instance.cfg (mixed into the settings plane); D4 splits them
 // out: they are runtime data, not configuration, and never participate in the layer stack.
+
 using System.Text.Json.Serialization.Metadata;
+using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Config;
 
@@ -48,17 +50,17 @@ public sealed class InstanceStateStore
         // the trio inside instance.cfg, and the D4 split must not lose it on a load that
         // performs no write — the first mutation materializes instance-state.json
         var legacyCfg = Path.Combine(instanceRoot, InstanceIniImporter.LegacyFileName);
-        var ini = new Settings.IniFile();
+        var ini = new IniFile();
         Current = ini.LoadFile(legacyCfg)
             ? new InstanceStateFile
             {
                 StateVersion = InstanceStateFile.CurrentVersion,
-                LastLaunchTime = Settings.Variant.AsLong(Settings.Variant.FromIniValue(
-                    ini.Get("lastLaunchTime") ?? Settings.IniValue.Invalid)),
-                LastTimePlayed = Settings.Variant.AsLong(Settings.Variant.FromIniValue(
-                    ini.Get("lastTimePlayed") ?? Settings.IniValue.Invalid)),
-                TotalTimePlayed = Settings.Variant.AsLong(Settings.Variant.FromIniValue(
-                    ini.Get("totalTimePlayed") ?? Settings.IniValue.Invalid)),
+                LastLaunchTime = Variant.AsLong(Variant.FromIniValue(
+                    ini.Get("lastLaunchTime") ?? IniValue.Invalid)),
+                LastTimePlayed = Variant.AsLong(Variant.FromIniValue(
+                    ini.Get("lastTimePlayed") ?? IniValue.Invalid)),
+                TotalTimePlayed = Variant.AsLong(Variant.FromIniValue(
+                    ini.Get("totalTimePlayed") ?? IniValue.Invalid)),
             }
             : CurrentDefault();
     }

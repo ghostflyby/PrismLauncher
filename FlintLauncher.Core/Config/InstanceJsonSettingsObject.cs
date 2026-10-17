@@ -17,6 +17,7 @@
 //
 // This replaces the IniSettingsObject instance.cfg store (the INI write path is gone — C5)
 // and, together with the typed user stack, retires the S2 FlintConfigSettings adapter.
+
 using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Config;

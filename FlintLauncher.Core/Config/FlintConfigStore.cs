@@ -11,6 +11,7 @@
 // Not thread-safe across instances: the host keeps exactly one; the /settings handlers
 // serialize through the runtime's instance lock for mutations, reads are an atomic
 // reference swap away (the same shape as LauncherStateStore).
+
 using System.Text.Json.Serialization.Metadata;
 
 namespace FlintLauncher.Core.Config;

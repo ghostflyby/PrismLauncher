@@ -12,7 +12,11 @@
 //    with a cancellation token (PingTimeoutMs) and fails with a clear message.
 //  - the online-players extraction of ServerPingTask.cpp (getOnlinePlayers) becomes part of
 //    the parse step; the summary fields are returned to the caller.
+
 using System.Buffers.Binary;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -52,7 +56,7 @@ public static class ServerStatusPing
 
         var ip = await ResolveIpAsync(target.Address, cancellationToken).ConfigureAwait(false);
 
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var stopwatch = Stopwatch.StartNew();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromMilliseconds(PingTimeoutMs));
         var json = await RequestStatusAsync(ip, target.Port, target.Address, timeout.Token)
@@ -90,7 +94,7 @@ public static class ServerStatusPing
             }
             return addresses[0].ToString();
         }
-        catch (Exception e) when (e is SocketException or System.ComponentModel.Win32Exception)
+        catch (Exception e) when (e is SocketException or Win32Exception)
         {
             // "A record lookup failed" — resolution errors surface as the ping failure
             throw new InvalidOperationException($"could not resolve '{host}': {e.Message}", e);
@@ -167,10 +171,10 @@ public static class ServerStatusPing
         if (root?["players"] is JsonObject players)
         {
             online = players["online"] is JsonValue o &&
-                     int.TryParse(o.ToJsonString(), System.Globalization.CultureInfo.InvariantCulture, out var onlineNumber)
+                     int.TryParse(o.ToJsonString(), CultureInfo.InvariantCulture, out var onlineNumber)
                 ? onlineNumber : 0;
             max = players["max"] is JsonValue m &&
-                  int.TryParse(m.ToJsonString(), System.Globalization.CultureInfo.InvariantCulture, out var maxNumber)
+                  int.TryParse(m.ToJsonString(), CultureInfo.InvariantCulture, out var maxNumber)
                 ? maxNumber : 0;
         }
         string? version = null;
@@ -184,7 +188,7 @@ public static class ServerStatusPing
         {
             motd = d is JsonValue dv && dv.TryGetValue<string>(out var motdText)
                 ? motdText
-                : d is JsonObject do_ && do_["text"] is JsonValue dt && dt.TryGetValue<string>(out var text)
+                : d is JsonObject @do && @do["text"] is JsonValue dt && dt.TryGetValue<string>(out var text)
                     ? text
                     : d.ToJsonString();
         }

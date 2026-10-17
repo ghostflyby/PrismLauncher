@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/update/FoldersTask.{h,cpp}: make sure the instance's game folder
 // exists before the update pipeline runs.
-using FlintLauncher.Core.Tasks;
+
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
@@ -31,6 +32,7 @@ public sealed class FoldersTask : FlintTask
                 return Task.CompletedTask;
             }
         }
+
         EmitSucceeded();
         return Task.CompletedTask;
     }

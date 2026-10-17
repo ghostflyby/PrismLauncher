@@ -6,8 +6,11 @@
 // constructed with its CdnBaseUrl pointed at the stub (per-instance, nothing
 // process-global to restore).
 
+using System.Net;
 using System.Text;
+using System.Text.Json;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.LegacyFtb;
 using Xunit;
 
@@ -49,7 +52,7 @@ public class LegacyFtbTests : IDisposable
 
     private static List<(string? Uid, string? Version)> Components(string staging)
     {
-        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
+        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "mmc-pack.json")));
         return doc.RootElement.GetProperty("components").EnumerateArray()
             .Select(c => (Uid: c.GetProperty("uid").GetString(),
                           Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
@@ -206,7 +209,7 @@ public class LegacyFtbTests : IDisposable
         Directory.CreateDirectory(srcDir);
         populate(srcDir);
         var zipPath = path;
-        Assert.True(FlintLauncher.Core.IO.MMCZip.CompressDir(zipPath, srcDir));
+        Assert.True(MmcZip.CompressDir(zipPath, srcDir));
         try
         {
             Directory.Delete(srcDir, recursive: true);
@@ -235,7 +238,7 @@ public class LegacyFtbTests : IDisposable
     public async Task Install_ForgeFromPackJson_CreatesInstance()
     {
         var pack = MakePack();
-        _server.Archives[$"modpacks/TestPack/1_2_3/TestPack-1_2_3.zip"] = BuildArchive(
+        _server.Archives["modpacks/TestPack/1_2_3/TestPack-1_2_3.zip"] = BuildArchive(
             Path.Combine(_root, "forge-pack.zip"), srcDir =>
         {
             Directory.CreateDirectory(Path.Combine(srcDir, "minecraft", "config"));
@@ -352,7 +355,7 @@ public class LegacyFtbTests : IDisposable
 /// </summary>
 internal sealed class StubLegacyFtbServer : IDisposable
 {
-    private readonly System.Net.HttpListener _listener = new();
+    private readonly HttpListener _listener = new();
 
     public StubLegacyFtbServer()
     {
@@ -375,7 +378,7 @@ internal sealed class StubLegacyFtbServer : IDisposable
                         context.Response.Close();
                     }
                 }
-                catch (System.Net.HttpListenerException)
+                catch (HttpListenerException)
                 {
                     break;
                 }
@@ -398,7 +401,7 @@ internal sealed class StubLegacyFtbServer : IDisposable
 
     public string LastArchivePath { get; private set; } = "";
 
-    private void Handle(System.Net.HttpListenerContext ctx)
+    private void Handle(HttpListenerContext ctx)
     {
         var path = ctx.Request.Url!.AbsolutePath.TrimStart('/');
 

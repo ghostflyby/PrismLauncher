@@ -31,9 +31,11 @@
 //    unset kills right away (the C++ default button is Yes).
 //  - reloadSettings() and the console-window plumbing (ShowConsole/ShowConsoleOnError) are
 //    UI-facing and are not ported.
+
+using System.Diagnostics;
 using FlintLauncher.Core.Auth;
-using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Diagnostics;
+using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Settings;
@@ -52,9 +54,9 @@ public enum LaunchDecision
 
 public class LaunchController : FlintTask
 {
-    private AuthSession? _session;
-    private LaunchTask? _launcher;
-    private LaunchMode _actualLaunchMode = LaunchMode.Normal;
+    private AuthSession? session;
+    private LaunchTask? launcher;
+    private LaunchMode actualLaunchMode = LaunchMode.Normal;
 
     /// <summary>The injected launch dependencies: the controller reads/writes the offline
     /// name through <see cref="LaunchServices.LauncherState"/> (launcher-state.json, S5),
@@ -66,10 +68,6 @@ public class LaunchController : FlintTask
     /// <summary>Diagnostics logger (flint.controller category). Resolved per call from the
     /// injected factory; null/unset or disposed factories degrade to silence.</summary>
     private ILogger Log => Diagnostics.Log.For(Services?.LoggerFactory, LogCategories.Controller);
-
-    public LaunchController()
-    {
-    }
 
     public MinecraftInstance? Instance { get; set; }
 
@@ -88,12 +86,12 @@ public class LaunchController : FlintTask
     public MinecraftTarget? TargetToJoin { get; set; }
 
     /// <summary>The launch mode the session ended up with (decideLaunchMode result).</summary>
-    public LaunchMode ActualLaunchMode => _actualLaunchMode;
+    public LaunchMode ActualLaunchMode => actualLaunchMode;
 
     /// <summary>The built launch task once the session was decided (C++ m_launcher).</summary>
-    public LaunchTask? Launcher => _launcher;
+    public LaunchTask? Launcher => launcher;
 
-    public AuthSession? Session => _session;
+    public AuthSession? Session => session;
 
     /// <summary>The C++ askPlayDemo() dialog; returns true to play the demo. Unset = cancel.</summary>
     public Func<bool>? AskPlayDemoHandler { get; set; }
@@ -128,7 +126,7 @@ public class LaunchController : FlintTask
             return;
         }
 
-        if (!JavaCommon.CheckJvmArgs(Variant.AsString(Instance.Settings().Get("JvmArgs"))))
+        if (!JavaCommon.CheckJvmArgs(Variant.AsString(Instance.Settings.Get("JvmArgs"))))
         {
             EmitFailed("Invalid Java arguments specified. Please fix this first.");
             return;
@@ -154,7 +152,7 @@ public class LaunchController : FlintTask
         {
             return;
         }
-        var instanceAccountId = Variant.AsString(Instance!.Settings().Get("InstanceAccountId"));
+        var instanceAccountId = Variant.AsString(Instance!.Settings.Get("InstanceAccountId"));
         var instanceAccountIndex = accounts.FindAccountByProfileId(instanceAccountId);
         if (instanceAccountIndex == -1 || instanceAccountId.Length == 0)
         {
@@ -176,7 +174,7 @@ public class LaunchController : FlintTask
             // Headless extension over C++: the API can request an explicit offline launch
             // (WantedLaunchMode.Offline) without any account; C++ only ever reaches Offline
             // as a *downgrade* and otherwise forces Demo when no account exists.
-            _actualLaunchMode = AccountToUse is null && WantedLaunchMode == LaunchMode.Offline
+            actualLaunchMode = AccountToUse is null && WantedLaunchMode == LaunchMode.Offline
                 ? LaunchMode.Offline
                 : LaunchMode.Demo;
             return LaunchDecision.Continue;
@@ -185,7 +183,7 @@ public class LaunchController : FlintTask
         AccountList? accounts = AccountsProvider?.Invoke();
         MinecraftAccount? accountToCheck;
 
-        if (AccountToUse.AccountType_ != AccountType.Offline)
+        if (AccountToUse.AccountType != AccountType.Offline)
         {
             accountToCheck = AccountToUse.OwnsMinecraft() ? AccountToUse : null;
         }
@@ -211,11 +209,11 @@ public class LaunchController : FlintTask
 
         if (accountToCheck is null)
         {
-            _actualLaunchMode = LaunchMode.Demo;
+            actualLaunchMode = LaunchMode.Demo;
             return LaunchDecision.Continue;
         }
 
-        var state = accountToCheck.AccountState_;
+        var state = accountToCheck.AccountState;
         var needsRefresh = WantedLaunchMode == LaunchMode.Normal &&
                            (state == AccountState.Offline || accountToCheck.ShouldRefresh());
         if (state is AccountState.Unchecked or AccountState.Errored || needsRefresh)
@@ -226,7 +224,7 @@ public class LaunchController : FlintTask
             {
                 await refresh.StartAsync(cancellationToken).ConfigureAwait(false);
             }
-            state = accountToCheck.AccountState_;
+            state = accountToCheck.AccountState;
         }
 
         if (state == AccountState.Working)
@@ -240,7 +238,7 @@ public class LaunchController : FlintTask
                 {
                     return LaunchDecision.Abort;
                 }
-                state = accountToCheck.AccountState_;
+                state = accountToCheck.AccountState;
             }
         }
 
@@ -260,7 +258,7 @@ public class LaunchController : FlintTask
                 reauthReason = $"'{accountToCheck.ProfileName()}' no longer exists on the servers";
                 break;
             default:
-                _actualLaunchMode = state == AccountState.Online && WantedLaunchMode == LaunchMode.Normal
+                actualLaunchMode = state == AccountState.Online && WantedLaunchMode == LaunchMode.Normal
                     ? LaunchMode.Normal
                     : LaunchMode.Offline;
                 return LaunchDecision.Continue; // All good to go
@@ -293,7 +291,7 @@ public class LaunchController : FlintTask
         switch (mode)
         {
             case LaunchMode.Normal:
-                throw new System.Diagnostics.UnreachableException("askOfflineName is never called in Normal mode");
+                throw new UnreachableException("askOfflineName is never called in Normal mode");
             case LaunchMode.Demo:
                 message = "Choose your demo mode player name";
                 break;
@@ -369,15 +367,15 @@ public class LaunchController : FlintTask
             return;
         }
 
-        if (_actualLaunchMode == LaunchMode.Demo)
+        if (actualLaunchMode == LaunchMode.Demo)
         {
             if (WantedLaunchMode == LaunchMode.Demo || AskPlayDemo())
             {
                 var name = AskOfflineName("Player", LaunchMode.Demo);
                 if (name is not null)
                 {
-                    _session = new AuthSession();
-                    _session.MakeDemo(name, MinecraftAccount.UuidFromUsername(name).ToString("D"));
+                    session = new AuthSession();
+                    session.MakeDemo(name, MinecraftAccount.UuidFromUsername(name).ToString("D"));
                     LaunchInstance();
                     return;
                 }
@@ -387,8 +385,8 @@ public class LaunchController : FlintTask
             return;
         }
 
-        _session = new AuthSession();
-        _session.LaunchMode = _actualLaunchMode;
+        session = new AuthSession();
+        session.LaunchMode = actualLaunchMode;
         if (AccountToUse is null)
         {
             // headless extension: an explicit offline launch without any account builds the
@@ -401,16 +399,16 @@ public class LaunchController : FlintTask
                 EmitAborted();
                 return;
             }
-            _session.MakeOffline(name);
+            session.MakeOffline(name);
             LaunchInstance();
             return;
         }
 
-        AccountToUse.FillSession(_session);
+        AccountToUse.FillSession(session);
 
-        if (AccountToUse.AccountType_ != AccountType.Offline)
+        if (AccountToUse.AccountType != AccountType.Offline)
         {
-            if (_actualLaunchMode == LaunchMode.Normal && !AccountToUse.HasProfile())
+            if (actualLaunchMode == LaunchMode.Normal && !AccountToUse.HasProfile())
             {
                 // Now handle setting up a profile name here... (the ProfileSetupDialog is UI;
                 // the headless core cannot invent a profile name — abort like a rejected dialog)
@@ -418,19 +416,19 @@ public class LaunchController : FlintTask
                 return;
             }
 
-            if (_actualLaunchMode == LaunchMode.Offline)
+            if (actualLaunchMode == LaunchMode.Offline)
             {
                 var name = OfflineName;
                 if (name.Length == 0)
                 {
-                    name = AskOfflineName(_session.PlayerName, LaunchMode.Offline) ?? "";
+                    name = AskOfflineName(session.PlayerName, LaunchMode.Offline) ?? "";
                     if (name.Length == 0)
                     {
                         EmitAborted();
                         return;
                     }
                 }
-                _session.MakeOffline(name);
+                session.MakeOffline(name);
             }
         }
 
@@ -442,49 +440,49 @@ public class LaunchController : FlintTask
     /// <summary>Port of launchInstance(): build the LaunchTask, prepend the banner steps, run.</summary>
     private void LaunchInstance()
     {
-        _launcher = Instance!.CreateLaunchTask(_session, TargetToJoin, Services);
-        if (_launcher is null)
+        launcher = Instance!.CreateLaunchTask(session, TargetToJoin, Services);
+        if (launcher is null)
         {
             EmitFailed("Couldn't instantiate a launcher.");
             return;
         }
         Log.LaunchStarted(
             Instance.Id(),
-            _actualLaunchMode.ToString(),
-            _session?.PlayerName ?? "(none)",
+            actualLaunchMode.ToString(),
+            session?.PlayerName ?? "(none)",
             TargetToJoin?.ToString() ?? "(instance default)");
 
-        _launcher.ReadyForLaunch += ReadyForLaunch;
-        _launcher.Succeeded += OnLauncherSucceeded;
-        _launcher.Failed += OnLauncherFailed;
-        _launcher.RequestProgress += OnProgressRequested;
+        launcher.ReadyForLaunch += ReadyForLaunch;
+        launcher.Succeeded += OnLauncherSucceeded;
+        launcher.Failed += OnLauncherFailed;
+        launcher.RequestProgress += OnProgressRequested;
 
         // Prepend Online and Auth Status
         string onlineMode;
-        if (_actualLaunchMode == LaunchMode.Normal)
+        if (actualLaunchMode == LaunchMode.Normal)
         {
             onlineMode = "online";
 
             // Prepend Server Status
             string[] servers = ["login.microsoftonline.com", "session.minecraft.net", "textures.minecraft.net", "api.mojang.com"];
 
-            _launcher.PrependStep(new PrintServers(_launcher, servers));
+            launcher.PrependStep(new PrintServers(launcher, servers));
         }
         else
         {
-            onlineMode = _actualLaunchMode == LaunchMode.Demo ? "demo" : "offline";
+            onlineMode = actualLaunchMode == LaunchMode.Demo ? "demo" : "offline";
         }
 
-        _launcher.PrependStep(new TextPrint(_launcher, "Launched instance in " + onlineMode + " mode\n",
+        launcher.PrependStep(new TextPrint(launcher, "Launched instance in " + onlineMode + " mode\n",
             MessageLevel.Launcher));
 
         // Prepend Version
         {
             var versionString =
                 $"{FlintConfig.Default.LauncherDisplayName} version: {FlintConfig.DefaultVersionString} ({FlintConfig.Default.BuildPlatform})";
-            _launcher.PrependStep(new TextPrint(_launcher, versionString + "\n", MessageLevel.Launcher));
+            launcher.PrependStep(new TextPrint(launcher, versionString + "\n", MessageLevel.Launcher));
         }
-        _ = _launcher.StartAsync();
+        _ = launcher.StartAsync();
     }
 
     /// <summary>Port of readyForLaunch(): the profiler plumbing is UI, so the default is an
@@ -493,7 +491,7 @@ public class LaunchController : FlintTask
     {
         if (AutoProceed)
         {
-            _launcher?.Proceed();
+            launcher?.Proceed();
         }
     }
 
@@ -510,25 +508,25 @@ public class LaunchController : FlintTask
     }
 
     /// <summary>Port of onProgressRequested(): the progress dialog collapses into a proceed().</summary>
-    private void OnProgressRequested(FlintTask task) => _launcher?.Proceed();
+    private void OnProgressRequested(FlintTask task) => launcher?.Proceed();
 
     // -------------------------------------------------------------------------------- abort
 
     public override void Abort()
     {
-        if (_launcher is null)
+        if (launcher is null)
         {
             // C++ abort(): nothing to kill before the launcher exists
             base.Abort();
             return;
         }
-        if (!_launcher.CanAbort())
+        if (!launcher.CanAbort())
         {
             return;
         }
         if (ConfirmKillHandler is null || ConfirmKillHandler())
         {
-            _launcher.Abort();
+            launcher.Abort();
         }
     }
 }

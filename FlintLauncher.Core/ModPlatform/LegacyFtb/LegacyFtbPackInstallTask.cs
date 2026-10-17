@@ -11,7 +11,9 @@
 //    the C++), otherwise a plain download into a temporary folder
 //  - downloadFiles() (the P5 update pipeline) is not ported; creation succeeds without
 //    fetching game files, like the other creation tasks.
+
 using System.Text.Json;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
@@ -29,7 +31,7 @@ public sealed class LegacyFtbPackInstallTask : InstanceTask
 
     private readonly LegacyFtbModpack _pack;
     private readonly string _version;
-    private string _archivePath = "";
+    private string archivePath = "";
 
     /// <summary>APPLICATION->metacache() hook ("FTBPacks" base); null = plain downloads.</summary>
     public HttpMetaCache? MetaCache { get; set; }
@@ -65,13 +67,13 @@ public sealed class LegacyFtbPackInstallTask : InstanceTask
         {
             var entry = MetaCache.ResolveEntry("FTBPacks", path);
             entry.SetStale(true);
-            _archivePath = entry.GetFullPath();
+            archivePath = entry.GetFullPath();
             request = NetRequest.MakeCached(MetaCache, new Uri(url), entry);
         }
         else
         {
-            _archivePath = TempCachePath(path);
-            request = NetRequest.MakeFile(new Uri(url), _archivePath);
+            archivePath = TempCachePath(path);
+            request = NetRequest.MakeFile(new Uri(url), archivePath);
         }
 
         var job = new NetJob("Download FTB Pack");
@@ -100,7 +102,7 @@ public sealed class LegacyFtbPackInstallTask : InstanceTask
         SetProgress(2, 4);
 
         var extractDir = FileSystem.PathCombine(StagingPath, "unzip");
-        if (MMCZip.ExtractDir(_archivePath, "", extractDir) is null)
+        if (MmcZip.ExtractDir(archivePath, "", extractDir) is null)
         {
             EmitFailed("Failed to extract modpack");
             return;
@@ -127,7 +129,7 @@ public sealed class LegacyFtbPackInstallTask : InstanceTask
 
         // D4: the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
-            new Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
+            new InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution.")),
             StagingPath);
         {

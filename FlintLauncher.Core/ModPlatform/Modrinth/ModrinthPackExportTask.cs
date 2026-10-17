@@ -11,6 +11,7 @@
 //  - The ExportToZipTask becomes direct ZipArchive writing with the same layout
 //    ("overrides/" prefix, modrinth.index.json as an extra entry, resolved files excluded).
 //  - The progress/step plumbing of the Qt signals is reduced to status/progress updates.
+
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
@@ -18,7 +19,9 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
+using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
+using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
@@ -35,7 +38,7 @@ public sealed class ModrinthPackExportTask : FlintTask
     private readonly MinecraftInstance _instance;
     private readonly string _gameRoot;
     private readonly string _output;
-    private readonly MMCZip.FilterFunction? _filter;
+    private readonly MmcZip.FilterFunction? _filter;
 
     private readonly List<string> _files = [];
     private readonly Dictionary<string, string> _pendingHashes = new(StringComparer.Ordinal);
@@ -48,7 +51,7 @@ public sealed class ModrinthPackExportTask : FlintTask
                                   bool optionalFiles,
                                   MinecraftInstance instance,
                                   string output,
-                                  MMCZip.FilterFunction? filter = null,
+                                  MmcZip.FilterFunction? filter = null,
                                   ModrinthApi? modrinth = null)
     {
         _modrinth = modrinth ?? new ModrinthApi();
@@ -79,7 +82,7 @@ public sealed class ModrinthPackExportTask : FlintTask
     private bool CollectFiles()
     {
         _files.Clear();
-        if (!MMCZip.CollectFileListRecursively(_instance.GameRoot(), null, _files,
+        if (!MmcZip.CollectFileListRecursively(_instance.GameRoot(), null, _files,
                 _filter != null ? (Func<FileSystemInfo, bool>)(f => _filter(GetRelativePath(f.FullName))) : null))
         {
             EmitFailed("Could not search for files");
@@ -123,7 +126,7 @@ public sealed class ModrinthPackExportTask : FlintTask
                 // "Could not open {file} for hashing"
                 continue;
             }
-            var sha512 = Hashing.HashUtils.Hash(data, Hashing.Algorithm.Sha512);
+            var sha512 = HashUtils.Hash(data, Algorithm.Sha512);
 
             var mod = modList.AllMods().Find(m => string.Equals(m.Fileinfo.FullName, file, StringComparison.Ordinal));
             if (mod is not null)
@@ -136,7 +139,7 @@ public sealed class ModrinthPackExportTask : FlintTask
                     if (Uri.TryCreate(url, UriKind.Absolute, out var parsedUrl)
                         && ModrinthApi.MrpackHosts.Contains(parsedUrl.Host))
                     {
-                        var sha1 = Hashing.HashUtils.Hash(data, Hashing.Algorithm.Sha1);
+                        var sha1 = HashUtils.Hash(data, Algorithm.Sha1);
 
                         _resolvedFiles[relative] = new ResolvedFile(sha1, sha512, url,
                             new FileInfo(file).Length, metadata.Side);
@@ -273,11 +276,11 @@ public sealed class ModrinthPackExportTask : FlintTask
         // collect all supported components
         var profile = _instance.GetPackProfile();
         profile.Load(); // (MinecraftInstance loads its profile lazily in the C++; make it explicit here)
-        Minecraft.Component? minecraft = profile.GetComponent("net.minecraft");
-        Minecraft.Component? quilt = profile.GetComponent("org.quiltmc.quilt-loader");
-        Minecraft.Component? fabric = profile.GetComponent("net.fabricmc.fabric-loader");
-        Minecraft.Component? forge = profile.GetComponent("net.minecraftforge");
-        Minecraft.Component? neoForge = profile.GetComponent("net.neoforged");
+        Component? minecraft = profile.GetComponent("net.minecraft");
+        Component? quilt = profile.GetComponent("org.quiltmc.quilt-loader");
+        Component? fabric = profile.GetComponent("net.fabricmc.fabric-loader");
+        Component? forge = profile.GetComponent("net.minecraftforge");
+        Component? neoForge = profile.GetComponent("net.neoforged");
 
         // convert all available components to mrpack dependencies (the C++ reads the raw
         // m_version of each component)
@@ -337,7 +340,7 @@ public sealed class ModrinthPackExportTask : FlintTask
 
             fileOut["env"] = env;
             fileOut["path"] = path;
-            fileOut["downloads"] = new JsonArray((JsonNode?)JsonValue.Create(value.Url));
+            fileOut["downloads"] = new JsonArray(JsonValue.Create(value.Url));
 
             var hashes = new JsonObject
             {

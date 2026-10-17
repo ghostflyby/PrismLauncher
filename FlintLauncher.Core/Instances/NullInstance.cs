@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/NullInstance.h: the placeholder instance used when an instance folder
 // exists but its type cannot be instantiated.
+
+using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tasks;
 
@@ -24,7 +26,7 @@ public class NullInstance : BaseInstance
 
     public override string InstanceConfigFolder() => InstanceRoot();
 
-    public override Launch.LaunchTask? CreateLaunchTask(AuthSession? account, MinecraftTarget? targetToJoin) => null;
+    public override LaunchTask? CreateLaunchTask(AuthSession? account, MinecraftTarget? targetToJoin) => null;
 
     public override List<FlintTask> CreateUpdateTask() => [];
 

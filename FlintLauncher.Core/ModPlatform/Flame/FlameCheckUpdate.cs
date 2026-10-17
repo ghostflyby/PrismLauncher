@@ -11,18 +11,18 @@
 //  - The ResourceDownloadTask / GetModDependenciesTask wiring of the C++ Update struct is
 //    not ported yet (P6-c); the update record carries the resolved IndexedVersion instead.
 //  - checkFailed carries the recoverUrl as a third event argument ("" when none).
+
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
+using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
-
-using Minecraft;
 
 public sealed class FlameCheckUpdate : FlintTask
 {
@@ -114,7 +114,7 @@ public sealed class FlameCheckUpdate : FlintTask
 
     private string? GetVersionsUrl(IndexedPack project)
     {
-        return _flame.GetVersionsURL(new VersionSearchArgs
+        return _flame.GetVersionsUrl(new VersionSearchArgs
         {
             Pack = project,
             McVersions = _gameVersions.ToList(),
@@ -142,7 +142,7 @@ public sealed class FlameCheckUpdate : FlintTask
             Name = resource.Name,
             Slug = metadata.Slug,
             AddonId = metadata.ProjectId,
-            Provider = ResourceProvider.FLAME,
+            Provider = ResourceProvider.Flame,
         };
         {
             try
@@ -200,7 +200,7 @@ public sealed class FlameCheckUpdate : FlintTask
                 NewVersion = latestVer.Version,
                 NewVersionType = latestVer.VersionType,
                 Changelog = changelog,
-                Provider = ResourceProvider.FLAME,
+                Provider = ResourceProvider.Flame,
                 Version = latestVer,
                 Enabled = resource.Enabled,
             });

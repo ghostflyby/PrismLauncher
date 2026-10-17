@@ -12,8 +12,9 @@
 //    metadata comes from the release file + runtime probe instead of the checker output.
 //  - The APPLICATION->settings()->get("NumberOfConcurrentTasks") lookup died with the
 //    JavaCheck fan-out: the JdkFind pipeline manages its own parallelism.
-using JdkFind;
+
 using FlintLauncher.Core.Tasks;
+using JdkFind;
 
 namespace FlintLauncher.Core.Java;
 
@@ -28,9 +29,9 @@ public sealed class JavaInstallList
 
     private readonly bool _onlyManagedVersions;
     private readonly string? _javaRoot;
-    private Status _status = Status.NotDone;
-    private JavaListLoadTask? _loadTask;
-    private List<JavaInstall> _vlist = [];
+    private Status status = Status.NotDone;
+    private JavaListLoadTask? loadTask;
+    private List<JavaInstall> vlist = [];
 
     /// <summary><paramref name="javaRoot"/> is the launcher-managed java dir (the JavaDir
     /// setting under E2 store semantics — the host passes the resolved root; the default
@@ -50,35 +51,35 @@ public sealed class JavaInstallList
 
     private FlintTask? GetCurrentTask()
     {
-        return _status == Status.InProgress ? _loadTask : null;
+        return status == Status.InProgress ? loadTask : null;
     }
 
     private void Load()
     {
-        if (_status != Status.InProgress)
+        if (status != Status.InProgress)
         {
-            _status = Status.InProgress;
-            _loadTask = new JavaListLoadTask(this, _onlyManagedVersions, _javaRoot);
+            status = Status.InProgress;
+            loadTask = new JavaListLoadTask(this, _onlyManagedVersions, _javaRoot);
             // C++ starts the task immediately; the returned Task tracks the in-flight run.
-            _ = _loadTask.StartAsync();
+            _ = loadTask.StartAsync();
         }
     }
 
-    public bool IsLoaded() => _status == Status.Done;
+    public bool IsLoaded() => status == Status.Done;
 
-    public JavaInstall At(int i) => _vlist[i];
+    public JavaInstall At(int i) => vlist[i];
 
-    public int Count => _vlist.Count;
+    public int Count => vlist.Count;
 
-    public IReadOnlyList<JavaInstall> Versions() => _vlist;
+    public IReadOnlyList<JavaInstall> Versions() => vlist;
 
     /// <summary>Port of JavaInstallList::updateListData().</summary>
     public void UpdateListData(IReadOnlyList<JavaInstall> versions)
     {
-        _vlist = [.. versions];
+        vlist = [.. versions];
         SortVersions();
-        _status = Status.Done;
-        _loadTask = null;
+        status = Status.Done;
+        loadTask = null;
     }
 
     /// <summary>
@@ -88,7 +89,7 @@ public sealed class JavaInstallList
     /// </summary>
     public void SortVersions()
     {
-        _vlist.Sort((left, right) => right.GreaterThan(left) ? -1 : left.GreaterThan(right) ? 1 : 0);
+        vlist.Sort((left, right) => right.GreaterThan(left) ? -1 : left.GreaterThan(right) ? 1 : 0);
     }
 }
 

@@ -12,9 +12,13 @@
 //    the install listing them (the C++ dialog defaults to rejecting -> abort).
 //  - downloadFiles() (the P5 update pipeline) is not ported; creation succeeds without
 //    fetching game files, like the other creation tasks.
+
+using System.Security.Cryptography;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Json;
+using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.ModPlatform.Ftb;
@@ -85,7 +89,7 @@ public sealed class FtbPackInstallTask : InstanceTask
             var loaded = FtbApi.LoadVersion(response);
             CopyInto(_version, loaded);
         }
-        catch (Json.JsonParseException e)
+        catch (JsonParseException e)
         {
             EmitFailed("Could not understand pack manifest:\n" + e.Message);
             return;
@@ -223,7 +227,7 @@ public sealed class FtbPackInstallTask : InstanceTask
         EmitStatus("Creating the instance...");
         // D4: the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
-            new Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
+            new InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution.")),
             StagingPath);
         var components = instance.GetPackProfile();
@@ -302,7 +306,7 @@ public sealed class FtbPackInstallTask : InstanceTask
             var dl = NetRequest.MakeFile(new Uri(file.Url), path);
             if (file.Sha1.Length != 0)
             {
-                dl.AddValidator(ChecksumValidator.FromHex(System.Security.Cryptography.HashAlgorithmName.SHA1, file.Sha1));
+                dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, file.Sha1));
             }
 
             jobPtr.AddNetRequest(dl);

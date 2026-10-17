@@ -4,6 +4,7 @@
 // QDateTime is represented by DateTimeOffset? here: null mirrors the null/invalid QDateTime
 // (QDateTime::isNull()), and the offset mirrors Qt::OffsetFromUTC. Callers guard with HasValue
 // where the C++ code checks isNull().
+
 using System.Globalization;
 
 namespace FlintLauncher.Core.Minecraft;

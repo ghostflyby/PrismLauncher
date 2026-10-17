@@ -9,6 +9,9 @@
 // InstanceIniImporter for instance.cfg) — INI files are never deleted, never rewritten by
 // Flint (flint.json / instance.json are the only config write targets, TypedJsonFile).
 // The former Encode/SaveFile writer half retired with the instance.cfg write path (D4).
+
+using System.Text;
+
 namespace FlintLauncher.Core.Settings;
 
 internal static class QSettingsIniCodec
@@ -153,7 +156,7 @@ internal static class QSettingsIniCodec
                     return result;
                 }
 
-            var current = new System.Text.StringBuilder();
+            var current = new StringBuilder();
             var anyQuoted = false;
             var hadContent = false;
             // an element is a mix of quoted and unquoted parts ("ab" cd "ef" ->abcdef)
@@ -241,7 +244,7 @@ internal static class QSettingsIniCodec
     }
 
     /// <summary>Reads one escape sequence starting after the backslash; returns the new index.</summary>
-    private static int ReadEscape(string s, int i, System.Text.StringBuilder sb)
+    private static int ReadEscape(string s, int i, StringBuilder sb)
     {
         if (i >= s.Length)
         {
@@ -300,7 +303,7 @@ internal static class QSettingsIniCodec
         {
             return s;
         }
-        var sb = new System.Text.StringBuilder(s.Length);
+        var sb = new StringBuilder(s.Length);
         var i = 0;
         while (i < s.Length)
         {
@@ -324,7 +327,7 @@ internal static class QSettingsIniCodec
         // Qt's iniUnescapedKey decodes each %XX to one QChar (per-code-unit escaping,
         // qsettings.cpp iniEscapedKey/iniUnescapedKey) — multi-escape runs mean
         // Latin-1-range characters, never UTF-8 sequences.
-        var sb = new System.Text.StringBuilder();
+        var sb = new StringBuilder();
         var i = 0;
         while (i < key.Length)
         {

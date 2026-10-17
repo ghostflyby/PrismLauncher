@@ -10,6 +10,8 @@
 //  - saveJsonFile() writes through the atomic FileSystem.Write (QSaveFile equivalent).
 //  - writeOverrideOrders() is declared in the C++ header but has no definition anywhere in
 //    this checkout; it is not ported (dead declaration upstream).
+
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
@@ -131,7 +133,7 @@ public static class ProfileUtils
         try
         {
             // QJsonDocument::toJson() always appends a trailing newline
-            FileSystem.Write(filename, System.Text.Encoding.UTF8.GetBytes(QtJson.ToIndentedString(doc) + "\n"));
+            FileSystem.Write(filename, Encoding.UTF8.GetBytes(QtJson.ToIndentedString(doc) + "\n"));
             return true;
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of tests/GZip_test.cpp (test_Through) plus focused round-trip cases.
+
 using FlintLauncher.Core.IO;
 using Xunit;
 

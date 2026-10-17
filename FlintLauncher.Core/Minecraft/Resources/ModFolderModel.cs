@@ -19,6 +19,7 @@
 // still ShouldResolve (the freshly scanned / changed / added ones, exactly the set the C++
 // resolve pass targets). The parse is best-effort: a failing jar keeps filename-only
 // details, like an upstream parse task that finishes with an empty result.
+
 using FlintLauncher.Core.ModPlatform;
 
 namespace FlintLauncher.Core.Minecraft.Resources;

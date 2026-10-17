@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of the platform-neutral cases of tests/FileSystem_test.cpp
 // (QTemporaryDir is replaced by a per-test temp directory).
+
+using System.Text;
 using FlintLauncher.Core.IO;
 using Xunit;
 
@@ -189,10 +191,10 @@ public class FileSystemTests
         var path = Path.Combine(tempDirScope.Path, "log.txt");
         FileSystem.Append(path, "a"u8.ToArray());
         FileSystem.Append(path, "b"u8.ToArray());
-        Assert.Equal("ab", System.Text.Encoding.UTF8.GetString(FileSystem.Read(path)));
+        Assert.Equal("ab", Encoding.UTF8.GetString(FileSystem.Read(path)));
 
         FileSystem.AppendSafe(path, "c"u8.ToArray());
-        Assert.Equal("abc", System.Text.Encoding.UTF8.GetString(FileSystem.Read(path)));
+        Assert.Equal("abc", Encoding.UTF8.GetString(FileSystem.Read(path)));
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/launch/ReconstructAssets.{h,cpp}: rebuild the virtual assets
 // folder for the profile's asset index (see Launch/AssetsUtils.cs).
+
 using FlintLauncher.Core.IO;
 
 namespace FlintLauncher.Core.Launch.Steps;

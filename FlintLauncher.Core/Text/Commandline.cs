@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only AND Apache-2.0
 // Port of launcher/Commandline.{h,cpp}: shell-like argv splitting and $VAR/${VAR}
 // expansion (originally by Orochimarufan, MultiMC contributors).
+
 using System.Text;
 
 namespace FlintLauncher.Core.Text;
@@ -81,40 +82,40 @@ public static class Commandline
     {
         var result = new StringBuilder(input);
 
-        const int Base = 0;
-        const int MaybeBrace = 1;
-        const int Variable = 2;
-        const int Brace = 3;
-        var state = Base;
+        const int @base = 0;
+        const int maybeBrace = 1;
+        const int variable = 2;
+        const int brace = 3;
+        var state = @base;
         var startIdx = -1;
         for (var i = 0; i < result.Length;)
         {
             var c = result[i++];
             switch (state)
             {
-                case Base:
+                case @base:
                     if (c == '$')
                     {
-                        state = MaybeBrace;
+                        state = maybeBrace;
                     }
                     break;
-                case MaybeBrace:
+                case maybeBrace:
                     if (c == '{')
                     {
-                        state = Brace;
+                        state = brace;
                         startIdx = i;
                     }
                     else if (char.IsLetterOrDigit(c) || c == '_')
                     {
-                        state = Variable;
+                        state = variable;
                         startIdx = i - 1;
                     }
                     else
                     {
-                        state = Base;
+                        state = @base;
                     }
                     break;
-                case Brace:
+                case brace:
                     if (c == '}')
                     {
                         var res = Lookup(dict, result.ToString(startIdx, i - 1 - startIdx));
@@ -123,10 +124,10 @@ public static class Commandline
                             Replace(result, startIdx - 2, i - startIdx + 2, res);
                             i = startIdx - 2 + res.Length;
                         }
-                        state = Base;
+                        state = @base;
                     }
                     break;
-                case Variable:
+                case variable:
                     if (!char.IsLetterOrDigit(c) && c != '_')
                     {
                         var res = Lookup(dict, result.ToString(startIdx, i - startIdx - 1));
@@ -135,12 +136,12 @@ public static class Commandline
                             Replace(result, startIdx - 1, i - startIdx, res);
                             i = startIdx - 1 + res.Length;
                         }
-                        state = Base;
+                        state = @base;
                     }
                     break;
             }
         }
-        if (state == Variable)
+        if (state == variable)
         {
             var res = Lookup(dict, result.ToString(startIdx, result.Length - startIdx));
             if (res.Length != 0)

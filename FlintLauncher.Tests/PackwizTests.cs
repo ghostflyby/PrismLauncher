@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of tests/Packwiz_test.cpp (fixtures: tests/testdata/Packwiz -> TestData/Packwiz),
 // plus coverage for the create/update/delete/by-id paths and the MiniToml subset parser.
+
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Packwiz;
@@ -42,7 +43,7 @@ public class PackwizTests
         Assert.Equal("c8fe6e15ddea32668822dddb26e1851e5f03834be4bcb2eff9c0da7fdc086a9b6cead78e31a44d3bc66335cba11144ee0337c6d5346f1ba6362306449" +
                      "9b3188d", metadata.Hash);
 
-        Assert.Equal(ResourceProvider.MODRINTH, metadata.Provider);
+        Assert.Equal(ResourceProvider.Modrinth, metadata.Provider);
         Assert.Equal("ug2qKTPR", metadata.Version());
         Assert.Equal("kYq5qkSL", metadata.ModId());
     }
@@ -69,7 +70,7 @@ public class PackwizTests
         Assert.Equal("murmur2", metadata.HashFormat);
         Assert.Equal("1781245820", metadata.Hash);
 
-        Assert.Equal(ResourceProvider.FLAME, metadata.Provider);
+        Assert.Equal(ResourceProvider.Flame, metadata.Provider);
         Assert.Equal("3509043", metadata.FileId);
         Assert.Equal("327154", metadata.ProjectId);
     }
@@ -81,7 +82,7 @@ public class PackwizTests
         var pack = new IndexedPack
         {
             AddonId = "kYq5qkSL",
-            Provider = ResourceProvider.MODRINTH,
+            Provider = ResourceProvider.Modrinth,
             Name = "Borderless Mining",
             Slug = "borderless-mining",
         };
@@ -114,7 +115,7 @@ public class PackwizTests
         Assert.Equal("url", mod.Mode);
         Assert.Equal(version.DownloadUrl, mod.Url);
         Assert.Equal("sha512", mod.HashFormat);
-        Assert.Equal(ResourceProvider.MODRINTH, mod.Provider);
+        Assert.Equal(ResourceProvider.Modrinth, mod.Provider);
         Assert.Equal("kYq5qkSL", mod.ModId());
         Assert.Equal("ug2qKTPR", mod.Version());
         Assert.Equal("1.1.1+1.18", mod.VersionNumber);
@@ -129,7 +130,7 @@ public class PackwizTests
         var pack = new IndexedPack
         {
             AddonId = "327154",
-            Provider = ResourceProvider.FLAME,
+            Provider = ResourceProvider.Flame,
             Name = "Screenshot to Clipboard",
             Slug = "screenshot-to-clipboard",
         };
@@ -181,7 +182,7 @@ public class PackwizTests
         Assert.Equal(new IndexedVersionType(IndexedVersionTypeValue.Release), loaded.ReleaseType);
         var dep = Assert.Single(loaded.Dependencies);
         Assert.Equal("P7dR8mSH", dep.AddonId);
-        Assert.Equal(new DependencyType(DependencyTypeValue.REQUIRED), dep.Type);
+        Assert.Equal(new DependencyType(DependencyTypeValue.Required), dep.Type);
         // the update lock defaults to false and round-trips (x-prismlauncher-lock-update)
         Assert.False(loaded.LockUpdate);
     }
@@ -223,7 +224,7 @@ public class PackwizTests
             Slug = "screenshot-to-clipboard-fabric",
             Name = "Screenshot to Clipboard (Fabric)",
             Filename = "screenshot-to-clipboard-1.0.7-fabric.jar",
-            Provider = ResourceProvider.FLAME,
+            Provider = ResourceProvider.Flame,
             FileId = "3509043",
             ProjectId = "327154",
             HashFormat = "murmur2",
@@ -235,7 +236,7 @@ public class PackwizTests
 
         var loaded = Packwiz.GetIndexForMod(dir, "screenshot-to-clipboard-fabric");
         Assert.True(loaded.IsValid);
-        Assert.Equal(ResourceProvider.FLAME, loaded.Provider);
+        Assert.Equal(ResourceProvider.Flame, loaded.Provider);
         Assert.Equal("3509043", loaded.FileId);
         Assert.Equal("327154", loaded.ProjectId);
     }

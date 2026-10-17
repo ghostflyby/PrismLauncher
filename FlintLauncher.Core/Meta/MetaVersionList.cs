@@ -3,6 +3,8 @@
 // machinery (data()/roles/roleNames/waitToLoad/QEventLoop), the BaseVersionList interface and
 // the change signals are UI-layer plumbing and are not ported; everything metadata-related is.
 
+using System.Text.Json.Nodes;
+
 namespace FlintLauncher.Core.Meta;
 
 public sealed class VersionList : MetaEntity
@@ -11,9 +13,9 @@ public sealed class VersionList : MetaEntity
     private readonly List<string> _externalRecommendsVersions = [];
     private readonly Dictionary<string, MetaVersion> _lookup = new(StringComparer.Ordinal);
     private readonly string _uid;
-    private string _name = "";
+    private string name = "";
 
-    private MetaVersion? _recommended;
+    private MetaVersion? recommended;
 
     public VersionList(string uid)
     {
@@ -25,13 +27,13 @@ public sealed class VersionList : MetaEntity
     /// <summary>The display name; a settable property for the parsers (setName upstream).</summary>
     public string Name
     {
-        get => _name;
-        set => _name = value;
+        get => name;
+        set => name = value;
     }
 
     public override string LocalFilename() => _uid + "/index.json";
 
-    public string HumanReadable() => _name.Length == 0 ? _uid : _name;
+    public string HumanReadable() => name.Length == 0 ? _uid : name;
 
     public IReadOnlyList<MetaVersion> Versions() => _versions;
 
@@ -64,7 +66,7 @@ public sealed class VersionList : MetaEntity
         _versions.Sort((a, b) => string.CompareOrdinal(a.Name(), b.Name()));
     }
 
-    public override void Parse(System.Text.Json.Nodes.JsonObject obj)
+    public override void Parse(JsonObject obj)
     {
         MetaJsonFormat.ParseVersionList(obj, this);
     }
@@ -93,14 +95,14 @@ public sealed class VersionList : MetaEntity
         }
 
         // FIXME upstream: this is dumb, we have 'recommended' as part of the metadata already...
-        _recommended = _versions.Find(ptr => ptr.Type() == "release");
+        recommended = _versions.Find(ptr => ptr.Type() == "release");
     }
 
     public void MergeFromIndex(VersionList other)
     {
-        if (_name != other._name)
+        if (name != other.name)
         {
-            Name = other._name;
+            Name = other.name;
         }
         if (other.Sha256.Length != 0)
         {
@@ -110,9 +112,9 @@ public sealed class VersionList : MetaEntity
 
     public void Merge(VersionList other)
     {
-        if (_name != other._name)
+        if (name != other.name)
         {
-            Name = other._name;
+            Name = other.name;
         }
         if (other.Sha256.Length != 0)
         {
@@ -142,7 +144,7 @@ public sealed class VersionList : MetaEntity
                 _versions.Add(otherVersion);
                 version = otherVersion;
             }
-            _recommended = GetBetterVersion(_recommended, version);
+            recommended = GetBetterVersion(recommended, version);
         }
     }
 
@@ -166,7 +168,7 @@ public sealed class VersionList : MetaEntity
         return a.Type() == "release" ? a : b;
     }
 
-    public MetaVersion? GetRecommended() => _recommended;
+    public MetaVersion? GetRecommended() => recommended;
 
     public MetaVersion? GetRecommendedForParent(string uid, string version)
     {

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Skin API tests: the multipart PUT shape of SkinUpload (boundary, parts, ordering), the
 // DELETE of the active skin and the cape equip/remove endpoints against the local stub server.
+
 using System.Text;
+using System.Text.Json.Nodes;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Skins;
 using FlintLauncher.Core.Tasks;
@@ -144,16 +146,16 @@ public class SkinApiTests : IDisposable
         {
             new()
             {
-                Path_ = Path.Combine(_dir, "myskin.png"),
+                Path = Path.Combine(_dir, "myskin.png"),
                 CapeId = "cape-id",
-                Model = SkinModelKind.SLIM,
+                Model = SkinModelKind.Slim,
                 Url = "https://textures.minecraft.net/texture/abc",
             },
         };
         SkinListStore.Save(_dir, skins);
 
         // {"skins": [{"name": ..., "capeId": ..., "url": ..., "model": ...}]}
-        var root = System.Text.Json.Nodes.JsonNode.Parse(
+        var root = JsonNode.Parse(
             File.ReadAllText(Path.Combine(_dir, "index.json")))!.AsObject();
         Assert.Equal(new HashSet<string> { "skins" }, new HashSet<string>(root.Select(p => p.Key)));
         var entry = root["skins"]![0]!.AsObject();
@@ -166,9 +168,9 @@ public class SkinApiTests : IDisposable
         var skin = Assert.Single(loaded);
         Assert.Equal("myskin", skin.Name());
         Assert.Equal("cape-id", skin.CapeId);
-        Assert.Equal(SkinModelKind.SLIM, skin.Model);
+        Assert.Equal(SkinModelKind.Slim, skin.Model);
         Assert.Equal("https://textures.minecraft.net/texture/abc", skin.Url);
-        Assert.Equal(Path.Combine(_dir, "myskin.png"), skin.Path_);
+        Assert.Equal(Path.Combine(_dir, "myskin.png"), skin.Path);
     }
 
     [Fact]

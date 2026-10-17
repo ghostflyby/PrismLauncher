@@ -5,6 +5,7 @@
 // (JsonNode.Parse with the C++ Json::requireDocument "{what}: Error parsing JSON: ..."
 // wrapping) and the QJsonValue object cast ("Value is not an object") the array-entry
 // and root-document paths share.
+
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;

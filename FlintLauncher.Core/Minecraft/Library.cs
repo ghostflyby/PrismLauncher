@@ -12,6 +12,9 @@
 //  - The qDebug()/qWarning() log lines are dropped.
 //  - This checkout has no ".pack.xz" handling in Library::getDownloads (older MultiMC branches
 //    rewrote forge URLs to .pack.xz); nothing to port there.
+
+using System.Security.Cryptography;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.Minecraft;
@@ -212,12 +215,12 @@ public class Library
 
         string ActualPath(string relPath)
         {
-            relPath = IO.FileSystem.RemoveInvalidPathChars(relPath);
-            var outPath = IO.FileSystem.PathCombine(StoragePrefix(), relPath);
+            relPath = FileSystem.RemoveInvalidPathChars(relPath);
+            var outPath = FileSystem.PathCombine(StoragePrefix(), relPath);
             if (local && overridePath.Length != 0)
             {
                 var fileName = Path.GetFileName(outPath);
-                return Path.GetFullPath(IO.FileSystem.PathCombine(overridePath, fileName));
+                return Path.GetFullPath(FileSystem.PathCombine(overridePath, fileName));
             }
             // the default prefix is the C++-era relative "libraries/", which anchored on
             // the C++ process CWD (the application chdir'd into its data dir at startup);
@@ -225,7 +228,7 @@ public class Library
             // storage base (the store root, E2) — never on the process CWD
             if (!Path.IsPathRooted(outPath) && storageBase.Length != 0)
             {
-                outPath = IO.FileSystem.PathCombine(storageBase, outPath);
+                outPath = FileSystem.PathCombine(storageBase, outPath);
             }
             return Path.GetFullPath(outPath);
         }
@@ -269,7 +272,7 @@ public class Library
         bool CheckLocalFile(string storage)
         {
             var fileName = Path.GetFileName(storage);
-            var fullPath = IO.FileSystem.PathCombine(overridePath, fileName);
+            var fullPath = FileSystem.PathCombine(overridePath, fileName);
             if (!File.Exists(fullPath))
             {
                 failedLocalFiles.Add(fullPath);
@@ -304,12 +307,12 @@ public class Library
             options |= RequestOptions.MakeEternal;
 
             // Net::ApiRequest::makeCached == makeCached + AddAPIHeaders
-            options |= RequestOptions.AddAPIHeaders;
+            options |= RequestOptions.AddApiHeaders;
 
             var dl = NetRequest.MakeCached(cache, new Uri(url), entry, options);
             if (sha1.Length != 0)
             {
-                dl.AddValidator(ChecksumValidator.FromHex(System.Security.Cryptography.HashAlgorithmName.SHA1, sha1));
+                dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, sha1));
             }
             result.Add(dl);
         }
@@ -326,17 +329,17 @@ public class Library
                     {
                         var nat32Classifier = nativeClassifier.Replace("${arch}", "32");
                         var nat64Classifier = nativeClassifier.Replace("${arch}", "64");
-                        var nat32info = MojangDownloads.GetDownloadInfo(nat32Classifier);
-                        if (nat32info is not null)
+                        var nat32Info = MojangDownloads.GetDownloadInfo(nat32Classifier);
+                        if (nat32Info is not null)
                         {
                             var cookedStorage = rawStorage.Replace("${arch}", "32");
-                            AddDownload(cookedStorage, nat32info.Url, nat32info.Sha1);
+                            AddDownload(cookedStorage, nat32Info.Url, nat32Info.Sha1);
                         }
-                        var nat64info = MojangDownloads.GetDownloadInfo(nat64Classifier);
-                        if (nat64info is not null)
+                        var nat64Info = MojangDownloads.GetDownloadInfo(nat64Classifier);
+                        if (nat64Info is not null)
                         {
                             var cookedStorage = rawStorage.Replace("${arch}", "64");
-                            AddDownload(cookedStorage, nat64info.Url, nat64info.Sha1);
+                            AddDownload(cookedStorage, nat64Info.Url, nat64Info.Sha1);
                         }
                     }
                     else

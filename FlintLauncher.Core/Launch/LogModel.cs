@@ -7,81 +7,84 @@
 //    the port keeps the data semantics: a ring buffer of (level, line) entries with max-lines
 //    overflow handling, suspend/clear/previousLevel and the plain-text dump.
 //  - setLineWrap/setColorLines are pure view options and are not ported.
+
+using System.Text;
+
 namespace FlintLauncher.Core.Launch;
 
 public sealed class LogModel
 {
-    private (MessageLevel Level, string Line)[] _content;
-    private int _maxLines = 1000; // C++ m_maxLines default
-    private int _firstLine;
-    private int _numLines;
-    private bool _suspended;
-    private bool _stopOnOverflow;
-    private string _overflowMessage = "";
+    private (MessageLevel Level, string Line)[] content;
+    private int maxLines = 1000; // C++ m_maxLines default
+    private int firstLine;
+    private int numLines;
+    private bool suspended;
+    private bool stopOnOverflow;
+    private string overflowMessage = "";
 
     public LogModel()
     {
-        _content = new (MessageLevel, string)[_maxLines];
+        content = new (MessageLevel, string)[maxLines];
     }
 
-    public int RowCount => _numLines;
+    public int RowCount => numLines;
 
     /// <summary>The (level, line) entries in chronological order.</summary>
     public IReadOnlyList<(MessageLevel Level, string Line)> Entries
     {
         get
         {
-            var result = new List<(MessageLevel, string)>(_numLines);
-            for (var i = 0; i < _numLines; i++)
+            var result = new List<(MessageLevel, string)>(numLines);
+            for (var i = 0; i < numLines; i++)
             {
-                result.Add(_content[(_firstLine + i) % _maxLines]);
+                result.Add(content[(firstLine + i) % maxLines]);
             }
             return result;
         }
     }
 
-    public bool IsOverFlow => _numLines >= _maxLines && _stopOnOverflow;
+    public bool IsOverFlow => numLines >= maxLines && stopOnOverflow;
 
     public void Append(MessageLevel level, string line)
     {
-        if (_suspended)
+        if (suspended)
         {
             return;
         }
-        var lineNum = (_firstLine + _numLines) % _maxLines;
+        var lineNum = (firstLine + numLines) % maxLines;
         // overflow
-        if (_numLines == _maxLines)
+        if (numLines == maxLines)
         {
-            if (_stopOnOverflow)
+            if (stopOnOverflow)
             {
                 // nothing more to do, the buffer is full
                 return;
             }
-            _firstLine = (_firstLine + 1) % _maxLines;
-            _numLines--;
+            firstLine = (firstLine + 1) % maxLines;
+            numLines--;
         }
-        else if (_numLines == _maxLines - 1 && _stopOnOverflow)
+        else if (numLines == maxLines - 1 && stopOnOverflow)
         {
             level = MessageLevel.Fatal;
-            line = _overflowMessage;
+            line = overflowMessage;
         }
-        _numLines++;
-        _content[lineNum] = (level, line);
+        numLines++;
+        content[lineNum] = (level, line);
     }
 
-    public void Suspend(bool suspend) => _suspended = suspend;
+    public void Suspend(bool suspend) => suspended = suspend;
 
-    public bool Suspended => _suspended;
+    public bool Suspended => suspended;
 
     public void Clear()
     {
-        _firstLine = 0;
-        _numLines = 0;
+        firstLine = 0;
+        numLines = 0;
     }
 
     public string ToPlainText()
     {
-        var builder = new System.Text.StringBuilder();
+        var builder = new StringBuilder();
         foreach (var (_, line) in Entries)
         {
             builder.Append(line).Append('\n');
@@ -92,55 +95,55 @@ public sealed class LogModel
     public void SetMaxLines(int maxLines)
     {
         // no-op
-        if (maxLines == _maxLines)
+        if (maxLines == this.maxLines)
         {
             return;
         }
         // if it all still fits in the buffer, just resize it
-        if (_firstLine + _numLines < _maxLines)
+        if (firstLine + numLines < this.maxLines)
         {
-            _maxLines = maxLines;
-            Array.Resize(ref _content, maxLines);
+            this.maxLines = maxLines;
+            Array.Resize(ref content, maxLines);
             return;
         }
         // otherwise, we need to reorganize the data because it crosses the wrap boundary
         var newContent = new (MessageLevel, string)[maxLines];
-        if (_numLines <= maxLines)
+        if (numLines <= maxLines)
         {
             // if it all fits in the new buffer, just copy it over
-            for (var i = 0; i < _numLines; i++)
+            for (var i = 0; i < numLines; i++)
             {
-                newContent[i] = _content[(_firstLine + i) % _maxLines];
+                newContent[i] = content[(firstLine + i) % this.maxLines];
             }
         }
         else
         {
             // if it doesn't fit, part of the data needs to be thrown away (the oldest log messages)
-            var lead = _numLines - maxLines;
+            var lead = numLines - maxLines;
             for (var i = 0; i < maxLines; i++)
             {
-                newContent[i] = _content[(_firstLine + lead + i) % _maxLines];
+                newContent[i] = content[(firstLine + lead + i) % this.maxLines];
             }
-            _numLines = _maxLines;
+            numLines = this.maxLines;
         }
-        _content = newContent;
-        _firstLine = 0;
-        _maxLines = maxLines;
+        content = newContent;
+        firstLine = 0;
+        this.maxLines = maxLines;
     }
 
-    public int GetMaxLines() => _maxLines;
+    public int GetMaxLines() => maxLines;
 
-    public void SetStopOnOverflow(bool stop) => _stopOnOverflow = stop;
+    public void SetStopOnOverflow(bool stop) => stopOnOverflow = stop;
 
-    public void SetOverflowMessage(string overflowMessage) => _overflowMessage = overflowMessage;
+    public void SetOverflowMessage(string overflowMessage) => this.overflowMessage = overflowMessage;
 
     /// <summary>Port of LogModel::previousLevel: the level of the newest entry (upstream indexes
     /// the content array without the ring wrap — ported as the newest entry).</summary>
     public MessageLevel PreviousLevel()
     {
-        if (_numLines > 0)
+        if (numLines > 0)
         {
-            return _content[(_firstLine + _numLines - 1) % _maxLines].Level;
+            return content[(firstLine + numLines - 1) % maxLines].Level;
         }
         return MessageLevel.Unknown;
     }

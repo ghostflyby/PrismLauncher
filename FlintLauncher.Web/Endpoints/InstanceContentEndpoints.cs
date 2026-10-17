@@ -4,6 +4,7 @@
 // the external-resource pages (resources/{type}), ScreenshotsPage (listing + imgur upload)
 // and GameOptionsPage (options.txt). Long-running flows (imgur upload) run as registered
 // tasks (202) like import/mods-install; everything else is synchronous local file work.
+
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft.GameOptions;
 using FlintLauncher.Core.Minecraft.Resources;
@@ -11,6 +12,7 @@ using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Core.Screenshots;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
+using FlintLauncher.Web.OpenApi;
 using FlintLauncher.Web.Services;
 
 namespace FlintLauncher.Web.Endpoints;
@@ -51,7 +53,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).Produces<WorldView[]>(200);
+        }).Produces<WorldView[]>();
 
         api.MapDelete("/instances/{id}/worlds/{folderName}", async (string id, string folderName,
             LauncherRuntime runtime) =>
@@ -116,7 +118,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).Produces<WorldDetailView>(200);
+        }).Produces<WorldDetailView>();
 
         // world copy (WorldPage's "copy" action -> CopyWorldTask): the copy lands in the same
         // saves folder under the given name (folder rename + level.dat LevelName rewrite)
@@ -274,7 +276,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).WithMetadata(new OpenApi.FormUploadMarker("multipart form: world archive file (zip)")).Produces<WorldView>(201);
+        }).WithMetadata(new FormUploadMarker("multipart form: world archive file (zip)")).Produces<WorldView>(201);
     }
 
     // ----------------------------------------------------------------------- servers
@@ -298,7 +300,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).Produces<ServerEntryView[]>(200);
+        }).Produces<ServerEntryView[]>();
 
         api.MapPost("/instances/{id}/servers", async (string id, ServerAddRequest request,
             LauncherRuntime runtime) =>
@@ -388,7 +390,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).Produces<ServerPingView>(200);
+        }).Produces<ServerPingView>();
     }
 
     // --------------------------------------------------------------------- resources
@@ -424,7 +426,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).Produces<ResourceView[]>(200);
+        }).Produces<ResourceView[]>();
 
         api.MapPost("/instances/{id}/resources/{type}/{name}/enable", async (string id, string type,
             string name, LauncherRuntime runtime) =>
@@ -600,7 +602,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).Produces<ScreenshotView[]>(200);
+        }).Produces<ScreenshotView[]>();
 
         // ScreenshotsPage's imgur upload: each named file uploads as an image; more than one
         // also creates an album (the C++ SequentialTask shape)
@@ -711,7 +713,7 @@ public static class InstanceContentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).Produces<GameOptionView[]>(200);
+        }).Produces<GameOptionView[]>();
 
         api.MapPut("/instances/{id}/gameoptions", async (string id, GameOptionsPutRequest? request,
             LauncherRuntime runtime) =>

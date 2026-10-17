@@ -2,8 +2,11 @@
 // P5-c smoke: launch a real assembled step chain through the LaunchController (the headless
 // entry point) with a fake java that speaks the EntryPoint stdin protocol — no network, no
 // real Minecraft. Also assembles the launch task of a real Prism instance (read-only).
+
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using Xunit;
 
@@ -35,7 +38,7 @@ public class RealLaunchSmokeTests
         // JavaPath is the instance-layer override: writing the member IS the override (the
         // derived OverrideJavaLocation gate reads true — C7; real Prism instance.cfg files
         // carry the same override as a gated value).
-        instance.Settings().Set("JavaPath", javaPath);
+        instance.Settings.Set("JavaPath", javaPath);
         fixture.SeedJavaDetection(javaPath, javaUnixTime, vendor: "smoke");
 
         // Resolve the REAL NewLaunch.jar built by the BuildJavaJars MSBuild target (the fake
@@ -128,10 +131,10 @@ public class RealLaunchSmokeTests
         // D4: the real Prism instance loads read-only through the typed layer stack (the
         // instance.cfg imports in memory; nothing materializes)
         var instance = new MinecraftInstance(
-            new Core.Config.InstanceJsonSettingsObject(instanceDir, global.Environment),
+            new InstanceJsonSettingsObject(instanceDir, global.Environment),
             instanceDir);
-        _ = instance.Settings();
-        var reload = await instance.GetPackProfile().ReloadAsync(Core.Net.NetMode.Offline);
+        _ = instance.Settings;
+        var reload = await instance.GetPackProfile().ReloadAsync(NetMode.Offline);
         if (!reload.Ok)
         {
             return; // meta cache unavailable in this test layout; covered by fixture-based tests

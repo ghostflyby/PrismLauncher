@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/skins/SkinDelete.{h,cpp}: DELETE minecraft/profile/skins/active.
+
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Net;
 

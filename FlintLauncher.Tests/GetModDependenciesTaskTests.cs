@@ -4,16 +4,17 @@
 // only B is resolved), the optional-dependency skip, the version-pinned (Modrinth
 // version-only) dependency that resolves its project through a second lookup, and the
 // Flame file-id based variant.
+
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Minecraft;
+using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Dependencies;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.Core.Minecraft;
-using FlintLauncher.Core.Minecraft.Resources;
-using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
 using Xunit;
+using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
 
 namespace Flint.Tests;
 
@@ -55,7 +56,7 @@ public class GetModDependenciesTaskTests : IDisposable
                 Slug = "c-mod",
                 Name = "C Mod",
                 Filename = "c.jar",
-                Provider = ResourceProvider.MODRINTH,
+                Provider = ResourceProvider.Modrinth,
                 ProjectId = "projC",
                 FileId = "verC1",
                 VersionNumber = "3.0.0",
@@ -94,7 +95,7 @@ public class GetModDependenciesTaskTests : IDisposable
             ["version_number"] = versionNumber,
             ["version_type"] = "release",
             ["files"] = new JsonArray(
-                (JsonNode?)new JsonObject
+                new JsonObject
                 {
                     ["url"] = $"{baseUrl}/{downloadName}",
                     ["filename"] = fileName,
@@ -139,7 +140,7 @@ public class GetModDependenciesTaskTests : IDisposable
         _server.Projects["projB"] = ProjectJson("projB", "b-mod", "B Mod");
         _server.Projects["projD"] = ProjectJson("projD", "d-mod", "D Mod");
 
-        var packA = new IndexedPack { AddonId = "projA", Slug = "a-mod", Name = "A Mod", Provider = ResourceProvider.MODRINTH };
+        var packA = new IndexedPack { AddonId = "projA", Slug = "a-mod", Name = "A Mod", Provider = ResourceProvider.Modrinth };
         var verA = new IndexedVersion
         {
             AddonId = "projA",
@@ -149,8 +150,8 @@ public class GetModDependenciesTaskTests : IDisposable
             Loaders = ModLoaderType.Fabric,
             Dependencies =
             [
-                new Dependency { AddonId = "projB", Type = new DependencyType(DependencyTypeValue.REQUIRED) },
-                new Dependency { AddonId = "projD", Type = new DependencyType(DependencyTypeValue.OPTIONAL) },
+                new Dependency { AddonId = "projB", Type = new DependencyType(DependencyTypeValue.Required) },
+                new Dependency { AddonId = "projD", Type = new DependencyType(DependencyTypeValue.Optional) },
             ],
         };
 
@@ -171,8 +172,8 @@ public class GetModDependenciesTaskTests : IDisposable
         Assert.Equal("2.0.0", dep.Version.VersionNumber);
         Assert.True(dep.Version.IsCurrentlySelected);
         Assert.True(dep.Pack.VersionsLoaded);
-        Assert.Equal(ResourceProvider.MODRINTH, dep.Pack.Provider);
-        Assert.Equal(DependencyTypeValue.REQUIRED, dep.Dependency!.Type.Value);
+        Assert.Equal(ResourceProvider.Modrinth, dep.Pack.Provider);
+        Assert.Equal(DependencyTypeValue.Required, dep.Dependency!.Type.Value);
 
         // the walk consulted B's version list but never touched C's (installed) or D's (optional)
         Assert.Contains(_server.Requests, r => r.Contains("/project/projB/version"));
@@ -189,7 +190,7 @@ public class GetModDependenciesTaskTests : IDisposable
         _server.VersionsById["verX1"] = VersionJson("projX", "verX1", "x.jar", "x.bin", "7.5.0", _server.Url);
         _server.Projects["projX"] = ProjectJson("projX", "x-mod", "X Mod");
 
-        var packA = new IndexedPack { AddonId = "projA", Slug = "a-mod", Name = "A Mod", Provider = ResourceProvider.MODRINTH };
+        var packA = new IndexedPack { AddonId = "projA", Slug = "a-mod", Name = "A Mod", Provider = ResourceProvider.Modrinth };
         var verA = new IndexedVersion
         {
             AddonId = "projA",
@@ -198,7 +199,7 @@ public class GetModDependenciesTaskTests : IDisposable
             Loaders = ModLoaderType.Fabric,
             Dependencies =
             [
-                new Dependency { AddonId = "", Version = "verX1", Type = new DependencyType(DependencyTypeValue.REQUIRED) },
+                new Dependency { AddonId = "", Version = "verX1", Type = new DependencyType(DependencyTypeValue.Required) },
             ],
         };
 
@@ -226,7 +227,7 @@ public class GetModDependenciesTaskTests : IDisposable
             (JsonNode?)JsonNode.Parse(VersionJson("projB", "verB1", "b.jar", "b.bin", "2.0.0", _server.Url)))!.ToJsonString();
         _server.Projects["projB"] = ProjectJson("projB", "b-mod", "B Mod");
 
-        var packA = new IndexedPack { AddonId = "projA", Slug = "a-mod", Name = "A Mod", Provider = ResourceProvider.MODRINTH };
+        var packA = new IndexedPack { AddonId = "projA", Slug = "a-mod", Name = "A Mod", Provider = ResourceProvider.Modrinth };
         var verA = new IndexedVersion
         {
             AddonId = "projA",
@@ -235,7 +236,7 @@ public class GetModDependenciesTaskTests : IDisposable
             Loaders = ModLoaderType.Fabric,
             Dependencies =
             [
-                new Dependency { AddonId = "projB", Type = new DependencyType(DependencyTypeValue.REQUIRED) },
+                new Dependency { AddonId = "projB", Type = new DependencyType(DependencyTypeValue.Required) },
             ],
         };
 
@@ -293,7 +294,7 @@ public class GetModDependenciesFlameTests : IDisposable
                 displayName: "B Mod 1.0", fileName: "b.jar", fileDate: "2024-02-01T00:00:00Z"))),
         }.ToJsonString();
 
-        var packA = new IndexedPack { AddonId = "123", Slug = "a-mod", Name = "A Mod", Provider = ResourceProvider.FLAME };
+        var packA = new IndexedPack { AddonId = "123", Slug = "a-mod", Name = "A Mod", Provider = ResourceProvider.Flame };
         var verA = new IndexedVersion
         {
             AddonId = "123",
@@ -302,7 +303,7 @@ public class GetModDependenciesFlameTests : IDisposable
             Loaders = ModLoaderType.Forge,
             Dependencies =
             [
-                new Dependency { AddonId = "789", Type = new DependencyType(DependencyTypeValue.REQUIRED) },
+                new Dependency { AddonId = "789", Type = new DependencyType(DependencyTypeValue.Required) },
             ],
         };
 
@@ -317,7 +318,7 @@ public class GetModDependenciesFlameTests : IDisposable
         Assert.Equal("B Mod", dep.Pack.Name);
         Assert.Equal("999", dep.Version.FileId);
         Assert.Equal("b.jar", dep.Version.FileName);
-        Assert.Equal(ResourceProvider.FLAME, dep.Pack.Provider);
+        Assert.Equal(ResourceProvider.Flame, dep.Pack.Provider);
 
         // the Flame dependency lookup went through the file-list endpoint
         Assert.Contains(_server.Requests, r => r.Contains("/mods/789/files"));

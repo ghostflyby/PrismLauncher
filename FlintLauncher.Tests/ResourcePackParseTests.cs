@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of tests/ResourcePackParse_test.cpp (fixtures: TestData/ResourcePackParse, copied
 // from tests/testdata/Resources — the upstream QFINDTESTDATA("testdata/Resources") dir).
+
 using FlintLauncher.Core.Minecraft.Resources;
 using Xunit;
 

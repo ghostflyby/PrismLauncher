@@ -5,13 +5,15 @@
 // with the MultiMC dual-name rider, the C4 secret trio → the store, the C9 state keys →
 // launcher-state.json, the rest → the record domains) and the G4 wire rerouting (PUT/GET of
 // the secret trio through secrets.json, never flint.json).
+
 using System.Net;
 using System.Text.Json;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Config;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Secrets;
-using FlintLauncher.Core.State;
 using FlintLauncher.Core.Settings;
+using FlintLauncher.Core.State;
 using FlintLauncher.Web;
 using Xunit;
 
@@ -58,7 +60,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Equal("None", resolved.Proxy.ProxyType);
         Assert.Equal("127.0.0.1", resolved.Proxy.ProxyAddr);
         Assert.Equal(8080, resolved.Proxy.ProxyPort);
-        Assert.Equal((int)Core.Net.PasteUpload.PasteType.Mclogs, resolved.Api.PastebinType);
+        Assert.Equal((int)PasteUpload.PasteType.Mclogs, resolved.Api.PastebinType);
         Assert.Equal("{}", resolved.MinecraftMisc.Env);
         Assert.Equal("[]", resolved.ModDownload.ModUpdateReleaseTypes);
     }
@@ -411,7 +413,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Equal("echo preload", store.Current.Commands.PreLoadCommand);
         Assert.Equal("echo prelaunch", store.Current.Commands.PreLaunchCommand);
         Assert.Equal("echo postexit", store.Current.Commands.PostExitCommand);
-        Assert.Equal("https://resources.example", store.Current.Mirror.ResourceURLOverride);
+        Assert.Equal("https://resources.example", store.Current.Mirror.ResourceUrlOverride);
 
         // the secret aliases land under the PRIMARY names (C4) — nothing under the aliases
         Assert.Equal("oldpass", secrets.Get("ProxyPass"));

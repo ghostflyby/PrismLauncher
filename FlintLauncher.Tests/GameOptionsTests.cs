@@ -2,6 +2,7 @@
 // Tests for the GameOptions port (launcher/minecraft/gameoptions/GameOptions.{h,cpp}): the
 // key:value parsing (first ':' separator, untrimmed raw values, "version" line extraction),
 // the whole-file rewrite through a save file and the edit helpers.
+
 using FlintLauncher.Core.Minecraft.GameOptions;
 using Xunit;
 

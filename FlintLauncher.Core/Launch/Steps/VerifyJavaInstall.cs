@@ -3,6 +3,7 @@
 // major version is compatible with the instance profile. The probed version/architecture
 // come from the state-side probe cache (S5) via the instance, not from settings (C9).
 
+using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Launch.Steps;
@@ -17,7 +18,7 @@ public sealed class VerifyJavaInstall : LaunchStep
     {
         var instance = Parent.Instance;
         var packProfile = instance.GetPackProfile();
-        var settings = instance.Settings();
+        var settings = instance.Settings;
         var storedVersion = instance.GetJavaVersion().ToString();
         var ignoreCompatibility = Variant.AsBool(settings.Get("IgnoreJavaCompatibility"));
         var javaArchitecture = instance.JavaDetection()?.Architecture ?? "";
@@ -38,7 +39,7 @@ public sealed class VerifyJavaInstall : LaunchStep
         }
         var compatibleMajors = profile.GetCompatibleJavaMajors();
 
-        var javaVersion = new Java.JavaVersion(storedVersion);
+        var javaVersion = new JavaVersion(storedVersion);
 
         if (compatibleMajors.Count == 0 || compatibleMajors.Contains(javaVersion.Major))
         {

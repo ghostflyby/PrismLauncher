@@ -12,8 +12,13 @@
 //    port returns the C++ "GPU discovery failed" message with a documented reason instead.
 //  - availableRamMiB() on macOS returns 0 in the C++ as well (EnsureAvailableMemory then
 //    skips the check).
+
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Security;
 using System.Text;
+using Microsoft.Win32;
 
 namespace FlintLauncher.Core.Launch;
 
@@ -51,11 +56,11 @@ public static class HardwareInfo
         {
             try
             {
-                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                using var key = Registry.LocalMachine.OpenSubKey(
                     @"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
                 return key?.GetValue("ProcessorNameString") as string ?? "";
             }
-            catch (Exception e) when (e is System.Security.SecurityException or IOException)
+            catch (Exception e) when (e is SecurityException or IOException)
             {
                 return "";
             }
@@ -219,9 +224,9 @@ public static class HardwareInfo
     {
         try
         {
-            using var process = new System.Diagnostics.Process
+            using var process = new Process
             {
-                StartInfo = new System.Diagnostics.ProcessStartInfo
+                StartInfo = new ProcessStartInfo
                 {
                     FileName = "/bin/sh",
                     ArgumentList = { "-c", command },
@@ -252,7 +257,7 @@ public static class HardwareInfo
             }
             return true;
         }
-        catch (Exception e) when (e is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+        catch (Exception e) when (e is Win32Exception or IOException or InvalidOperationException)
         {
             return false;
         }
@@ -309,7 +314,7 @@ public static class HardwareInfo
     private static extern int sysctlbyname(byte[] name, out ulong oldValue, ref uint oldSize, nint newValue, nuint newValueSize);
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct MEMORYSTATUSEX
+    private struct Memorystatusex
     {
         public uint dwLength;
         public uint dwMemoryLoad;
@@ -323,16 +328,16 @@ public static class HardwareInfo
     }
 
     [DllImport("kernel32", SetLastError = true)]
-    private static extern bool GlobalMemoryStatusEx(out MEMORYSTATUSEX buffer);
+    private static extern bool GlobalMemoryStatusEx(out Memorystatusex buffer);
 
-    private static bool TryGetMemoryStatus(out MEMORYSTATUSEX status)
+    private static bool TryGetMemoryStatus(out Memorystatusex status)
     {
         status = default;
         if (!OperatingSystem.IsWindows())
         {
             return false;
         }
-        status.dwLength = (uint)Marshal.SizeOf<MEMORYSTATUSEX>();
+        status.dwLength = (uint)Marshal.SizeOf<Memorystatusex>();
         return GlobalMemoryStatusEx(out status);
     }
 }

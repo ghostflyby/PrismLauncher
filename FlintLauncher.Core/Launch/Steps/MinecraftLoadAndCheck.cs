@@ -10,9 +10,9 @@
 //    map 1:1).
 //  - updateLatestMinecraft() (the "UseLatestMinecraftVersion" branch) was deferred in P3 and
 //    is not ported, so the whole branch is skipped (documented P5-c follow-up).
+
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Net;
-
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Launch.Steps;

@@ -5,7 +5,10 @@
 // D4: the source here is Prism format (instance.cfg, read-only); the copy's metadata fixups
 // run through the typed adapter, so the staged folder commits as Flint format (instance.json
 // + instance-state.json) while the copied cfg stays untouched on disk.
+
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Tasks;
 using Xunit;
 
 namespace Flint.Tests;
@@ -54,7 +57,7 @@ public class InstanceCopyTests : IDisposable
     }
 
     private MinecraftInstance CreateSource() =>
-        new(new FlintLauncher.Core.Config.InstanceJsonSettingsObject(_sourceDir, _global.Environment),
+        new(new InstanceJsonSettingsObject(_sourceDir, _global.Environment),
             _sourceDir);
 
     private InstanceList CreateList() =>
@@ -175,7 +178,7 @@ public class InstanceCopyTests : IDisposable
             File.ReadAllText(Path.Combine(copyDir, "instance.cfg")));
         // …but the authoritative state file is zeroed
         var copy = new MinecraftInstance(
-            new FlintLauncher.Core.Config.InstanceJsonSettingsObject(copyDir, _global.Environment), copyDir);
+            new InstanceJsonSettingsObject(copyDir, _global.Environment), copyDir);
         Assert.Equal(0, copy.TotalTimePlayed());
         Assert.Equal(0, copy.LastTimePlayed());
     }
@@ -235,12 +238,12 @@ public class InstanceCopyTests : IDisposable
         var symlinks = new InstanceCopyTask(source, new InstanceCopyPrefs { UseSymLinks = true });
         symlinks.SetParentEnvironment(_global.Environment);
         await symlinks.StartAsync();
-        Assert.Equal(FlintLauncher.Core.Tasks.TaskState.Failed, symlinks.State);
+        Assert.Equal(TaskState.Failed, symlinks.State);
 
         var clone = new InstanceCopyTask(source, new InstanceCopyPrefs { UseClone = true });
         clone.SetParentEnvironment(_global.Environment);
         await clone.StartAsync();
-        Assert.Equal(FlintLauncher.Core.Tasks.TaskState.Failed, clone.State);
+        Assert.Equal(TaskState.Failed, clone.State);
 
         // nothing was copied (only the source instance itself is there)
         Assert.Equal(["Source"], Directory.GetFileSystemEntries(_instancesDir)

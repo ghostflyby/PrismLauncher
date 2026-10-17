@@ -6,10 +6,12 @@
 // all against the stub ATL server. Each test drives its own AtLauncherApi client pointed
 // at the stub (the former process-global DownloadServerUrl/ApiBaseUrl hooks are
 // per-instance state now).
+
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using Xunit;
 
@@ -91,7 +93,7 @@ public class AtLauncherTests : IDisposable
     public async Task PackIndex_ParsesPacksnew()
     {
         _server.PacksNewJson = new JsonArray(
-            (JsonNode?)new JsonObject
+            new JsonObject
             {
                 ["id"] = 1,
                 ["position"] = 10,
@@ -100,10 +102,10 @@ public class AtLauncherTests : IDisposable
                 ["system"] = false,
                 ["description"] = "A public pack",
                 ["versions"] = new JsonArray(
-                    (JsonNode?)new JsonObject { ["version"] = "1.0.0", ["minecraft"] = "1.20.1" },
-                    (JsonNode?)new JsonObject { ["version"] = "1.1.0", ["minecraft"] = "1.20.4" }),
+                    new JsonObject { ["version"] = "1.0.0", ["minecraft"] = "1.20.1" },
+                    new JsonObject { ["version"] = "1.1.0", ["minecraft"] = "1.20.4" }),
             },
-            (JsonNode?)new JsonObject
+            new JsonObject
             {
                 ["id"] = 2,
                 ["position"] = 5,
@@ -153,8 +155,8 @@ public class AtLauncherTests : IDisposable
                 ["mods"] = new JsonObject
                 {
                     ["optional"] = new JsonArray(
-                        (JsonNode?)new JsonObject { ["selected"] = true, ["name"] = "Optifine" },
-                        (JsonNode?)new JsonObject { ["selected"] = false, ["name"] = "JourneyMap" }),
+                        new JsonObject { ["selected"] = true, ["name"] = "Optifine" },
+                        new JsonObject { ["selected"] = false, ["name"] = "JourneyMap" }),
                 },
             },
         }.ToJsonString();
@@ -340,7 +342,7 @@ public class AtLauncherTests : IDisposable
         fixture.Register(_server);
 
         var cacheDir = Path.Combine(_root, "cache");
-        var cache = new FlintLauncher.Core.Net.HttpMetaCache(Path.Combine(_root, "metacache"));
+        var cache = new HttpMetaCache(Path.Combine(_root, "metacache"));
         cache.AddBase("ATLauncherPacks", cacheDir);
 
         var list = CreateList();

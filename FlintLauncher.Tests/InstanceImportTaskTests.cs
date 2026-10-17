@@ -3,9 +3,11 @@
 // (modrinth.index.json -> Modrinth, manifest.json -> Flame (FlameCreationTask, P6-b),
 // bin/modpack.jar -> Technic (TechnicPackProcessor, P6-b), instance.cfg -> plain folder
 // import, unknown -> error), plus the download-from-URL path through the meta cache.
+
 using System.IO.Compression;
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
@@ -105,7 +107,7 @@ public class InstanceImportTaskTests : IDisposable
         File.WriteAllText(Path.Combine(packDir, "instance.cfg"),
             "InstanceType=OneSix\nname=Original Name\niconKey=default\n");
         File.WriteAllText(Path.Combine(packDir, ".minecraft", "options.txt"), "keepMe=1\n");
-        Assert.True(FlintLauncher.Core.IO.MMCZip.CompressDir(zipPath, packDir));
+        Assert.True(MmcZip.CompressDir(zipPath, packDir));
 
         var task = await RunImport(new Uri(zipPath));
 
@@ -129,7 +131,7 @@ public class InstanceImportTaskTests : IDisposable
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "manifest.json"),
             """{"manifestType":"minecraftModpack","manifestVersion":1,"minecraft":{"version":"1.20.1"},"files":[],"overrides":"overrides"}""");
-        Assert.True(FlintLauncher.Core.IO.MMCZip.CompressDir(zipPath, dir));
+        Assert.True(MmcZip.CompressDir(zipPath, dir));
 
         var task = await RunImport(new Uri(zipPath));
 
@@ -156,7 +158,7 @@ public class InstanceImportTaskTests : IDisposable
         File.WriteAllText(Path.Combine(dir, "bin", "version.json"),
             """{"inheritsFrom":"1.20.1","id":"technic-test","libraries":[]}""");
         File.WriteAllText(Path.Combine(dir, "modpack", "options.txt"), "keepMe=1\n");
-        Assert.True(FlintLauncher.Core.IO.MMCZip.CompressDir(zipPath, dir));
+        Assert.True(MmcZip.CompressDir(zipPath, dir));
 
         var task = await RunImport(new Uri(zipPath));
 
@@ -199,7 +201,7 @@ public class InstanceImportTaskTests : IDisposable
         var dir = Path.Combine(_root, "unknown-src");
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "readme.txt"), "nothing in here");
-        Assert.True(FlintLauncher.Core.IO.MMCZip.CompressDir(zipPath, dir));
+        Assert.True(MmcZip.CompressDir(zipPath, dir));
 
         var task = await RunImport(new Uri(zipPath));
 

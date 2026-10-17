@@ -5,6 +5,7 @@
 // transitional backend is <see cref="FileSecretStore"/>: <data-root>/secrets.json, 0600 on
 // unix, atomic writes via the TypedJsonFile mechanism. Future backends (Keychain/DPAPI/
 // libsecret) implement the same interface without touching the consumers.
+
 using System.Text.Json.Serialization.Metadata;
 
 namespace FlintLauncher.Core.Secrets;

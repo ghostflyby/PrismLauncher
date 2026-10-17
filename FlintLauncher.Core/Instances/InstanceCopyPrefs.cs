@@ -88,10 +88,10 @@ public sealed class InstanceCopyPrefs
         // If we have any filters to add, join them as a single regex string to return:
         if (filters.Count != 0)
         {
-            const string McRoot = "[.]?minecraft/";
+            const string mcRoot = "[.]?minecraft/";
             // Ensure the first filter starts with the root, then join the others with an OR
             // regex before the root (ex: ".minecraft/saves|.minecraft/mods"):
-            return McRoot + string.Join("|" + McRoot, filters);
+            return mcRoot + string.Join("|" + mcRoot, filters);
         }
 
         return "";

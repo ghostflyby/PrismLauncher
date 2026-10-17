@@ -10,16 +10,17 @@
 //  - getModFileChangelog/getModDescription return Tasks instead of blocking a QEventLoop.
 //  - searchFilter goes through Uri.EscapeDataString (the C++ relies on QUrl's TolerantMode
 //    to encode it when the request is built).
+
 using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
+using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
-
-using Minecraft;
 
 public sealed class FlameApi : ResourceApi
 {
@@ -59,7 +60,7 @@ public sealed class FlameApi : ResourceApi
         }
         bodyObj["fingerprints"] = fingerprintsArr;
 
-        var bodyRaw = System.Text.Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
+        var bodyRaw = Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
         var request = MakeByteArrayRequest($"{BaseUrl}/fingerprints", bodyRaw);
         netJob.AddNetRequest(request);
         return (netJob, request);
@@ -118,7 +119,7 @@ public sealed class FlameApi : ResourceApi
         }
         bodyObj["modIds"] = addonsArr;
 
-        var bodyRaw = System.Text.Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
+        var bodyRaw = Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
         var request = MakeByteArrayRequest($"{BaseUrl}/mods", bodyRaw);
         netJob.AddNetRequest(request);
         return (netJob, request);
@@ -129,7 +130,7 @@ public sealed class FlameApi : ResourceApi
     public (NetJob Job, NetRequest Request) GetProject(string addonId)
     {
         var netJob = new NetJob("Flame::GetProject");
-        var request = MakeByteArrayRequest(GetInfoURL(addonId)!);
+        var request = MakeByteArrayRequest(GetInfoUrl(addonId)!);
         netJob.AddNetRequest(request);
         return (netJob, request);
     }
@@ -147,7 +148,7 @@ public sealed class FlameApi : ResourceApi
         }
         bodyObj["fileIds"] = filesArr;
 
-        var bodyRaw = System.Text.Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
+        var bodyRaw = Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
         var request = MakeByteArrayRequest($"{BaseUrl}/mods/files", bodyRaw);
         netJob.AddNetRequest(request);
         return (netJob, request);
@@ -375,7 +376,7 @@ public sealed class FlameApi : ResourceApi
 
     // ------------------------------------------------------------ URL builders
 
-    public override string? GetSearchURL(SearchArgs args)
+    public override string? GetSearchUrl(SearchArgs args)
     {
         var getArguments = new List<string>
         {
@@ -412,7 +413,7 @@ public sealed class FlameApi : ResourceApi
         return BaseUrl + "/mods/search?gameId=432&" + string.Join("&", getArguments);
     }
 
-    public override string? GetVersionsURL(VersionSearchArgs args)
+    public override string? GetVersionsUrl(VersionSearchArgs args)
     {
         var addonId = args.Pack.AddonId;
         var url = $"{BaseUrl}/mods/{addonId}/files?pageSize=10000";
@@ -431,9 +432,9 @@ public sealed class FlameApi : ResourceApi
         return url;
     }
 
-    public override string? GetInfoURL(string id) => $"{BaseUrl}/mods/{id}";
+    public override string? GetInfoUrl(string id) => $"{BaseUrl}/mods/{id}";
 
-    public override string? GetDependencyURL(DependencySearchArgs args)
+    public override string? GetDependencyUrl(DependencySearchArgs args)
     {
         var addonId = args.Dependency.AddonId;
         var url = $"{BaseUrl}/mods/{addonId}/files?pageSize=10000&gameVersion={args.McVersion}";

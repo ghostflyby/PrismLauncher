@@ -3,6 +3,9 @@
 // for interacting with mod-platform APIs (search args/sorting models and the shared
 // version-string mapping helpers). The Qt slot/callback machinery (searchProjects and the
 // Callback<T> plumbing) is not ported — callers drive the returned NetRequest directly.
+
+using System.Text;
+using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.ModPlatform;
@@ -28,7 +31,7 @@ public sealed class SearchArgs
 
     public string? Search { get; set; }
     public SortingMethod? Sorting { get; set; }
-    public Minecraft.ModLoaderType? Loaders { get; set; }
+    public ModLoaderType? Loaders { get; set; }
     public List<McVersion>? Versions { get; set; }
     public SideType? Side { get; set; }
     public List<string>? CategoryIds { get; set; }
@@ -42,7 +45,7 @@ public sealed class VersionSearchArgs
     public required IndexedPack Pack { get; set; }
 
     public List<McVersion>? McVersions { get; set; }
-    public Minecraft.ModLoaderType? Loaders { get; set; }
+    public ModLoaderType? Loaders { get; set; }
     public ResourceType ResourceType { get; set; } = ResourceType.Unknown;
     public bool IncludeChangelog { get; set; }
 }
@@ -58,7 +61,7 @@ public sealed class DependencySearchArgs
 {
     public required Dependency Dependency { get; init; }
     public required McVersion McVersion { get; init; }
-    public Minecraft.ModLoaderType Loader { get; init; } = Minecraft.ModLoaderType.None;
+    public ModLoaderType Loader { get; init; } = ModLoaderType.None;
     public bool IncludeChangelog { get; init; }
 }
 
@@ -71,13 +74,13 @@ public abstract class ResourceApi
     /// <summary>Gets a list of available sorting methods for this API.</summary>
     public abstract List<SortingMethod> GetSortingMethods();
 
-    public abstract string? GetSearchURL(SearchArgs args);
+    public abstract string? GetSearchUrl(SearchArgs args);
 
-    public abstract string? GetInfoURL(string id);
+    public abstract string? GetInfoUrl(string id);
 
-    public abstract string? GetVersionsURL(VersionSearchArgs args);
+    public abstract string? GetVersionsUrl(VersionSearchArgs args);
 
-    public abstract string? GetDependencyURL(DependencySearchArgs args);
+    public abstract string? GetDependencyUrl(DependencySearchArgs args);
 
     // ------------------------------------------------------------------ helpers
 
@@ -98,7 +101,7 @@ public abstract class ResourceApi
     /// <summary>Port of ResourceAPI::getGameVersionsString.</summary>
     public static string GetGameVersionsString(IReadOnlyList<McVersion> mcVersions)
     {
-        var s = new System.Text.StringBuilder();
+        var s = new StringBuilder();
         foreach (var ver in mcVersions)
         {
             s.Append('"').Append(MapMcVersionToModrinth(ver)).Append("\",");

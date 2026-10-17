@@ -121,12 +121,12 @@ public static class FlintConfigFold
 
     private static NativeLibConfig Merge(NativeLibConfig lower, NativeLibConfig? upper) => lower with
     {
-        UseNativeOpenAL = upper?.UseNativeOpenAL ?? lower.UseNativeOpenAL,
-        CustomOpenALPath = upper?.CustomOpenALPath ?? lower.CustomOpenALPath,
-        UseNativeGLFW = upper?.UseNativeGLFW ?? lower.UseNativeGLFW,
-        CustomGLFWPath = upper?.CustomGLFWPath ?? lower.CustomGLFWPath,
-        UseNativeSDL = upper?.UseNativeSDL ?? lower.UseNativeSDL,
-        CustomSDLPath = upper?.CustomSDLPath ?? lower.CustomSDLPath,
+        UseNativeOpenAl = upper?.UseNativeOpenAl ?? lower.UseNativeOpenAl,
+        CustomOpenAlPath = upper?.CustomOpenAlPath ?? lower.CustomOpenAlPath,
+        UseNativeGlfw = upper?.UseNativeGlfw ?? lower.UseNativeGlfw,
+        CustomGlfwPath = upper?.CustomGlfwPath ?? lower.CustomGlfwPath,
+        UseNativeSdl = upper?.UseNativeSdl ?? lower.UseNativeSdl,
+        CustomSdlPath = upper?.CustomSdlPath ?? lower.CustomSdlPath,
     };
 
     private static CommandsConfig Merge(CommandsConfig lower, CommandsConfig? upper) => lower with
@@ -183,9 +183,9 @@ public static class FlintConfigFold
 
     private static MirrorConfig Merge(MirrorConfig lower, MirrorConfig? upper) => lower with
     {
-        MetaURLOverride = upper?.MetaURLOverride ?? lower.MetaURLOverride,
-        ResourceURLOverride = upper?.ResourceURLOverride ?? lower.ResourceURLOverride,
-        LegacyFMLLibsURLOverride = upper?.LegacyFMLLibsURLOverride ?? lower.LegacyFMLLibsURLOverride,
+        MetaUrlOverride = upper?.MetaUrlOverride ?? lower.MetaUrlOverride,
+        ResourceUrlOverride = upper?.ResourceUrlOverride ?? lower.ResourceUrlOverride,
+        LegacyFmlLibsUrlOverride = upper?.LegacyFmlLibsUrlOverride ?? lower.LegacyFmlLibsUrlOverride,
     };
 
     private static ProxyConfig Merge(ProxyConfig lower, ProxyConfig? upper) => lower with
@@ -200,7 +200,7 @@ public static class FlintConfigFold
     {
         MsaClientIdOverride = upper?.MsaClientIdOverride ?? lower.MsaClientIdOverride,
         UserAgentOverride = upper?.UserAgentOverride ?? lower.UserAgentOverride,
-        PastebinCustomAPIBase = upper?.PastebinCustomAPIBase ?? lower.PastebinCustomAPIBase,
+        PastebinCustomApiBase = upper?.PastebinCustomApiBase ?? lower.PastebinCustomApiBase,
         PastebinType = upper?.PastebinType ?? lower.PastebinType,
     };
 
@@ -208,7 +208,7 @@ public static class FlintConfigFold
     {
         JsonEditor = upper?.JsonEditor ?? lower.JsonEditor,
         JProfilerPath = upper?.JProfilerPath ?? lower.JProfilerPath,
-        JVisualVMPath = upper?.JVisualVMPath ?? lower.JVisualVMPath,
-        MCEditPath = upper?.MCEditPath ?? lower.MCEditPath,
+        JVisualVmPath = upper?.JVisualVmPath ?? lower.JVisualVmPath,
+        McEditPath = upper?.McEditPath ?? lower.McEditPath,
     };
 }

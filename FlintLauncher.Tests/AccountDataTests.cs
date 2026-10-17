@@ -2,6 +2,8 @@
 // Tests for the AccountData port: v3 JSON resume/save round-trips on the exact upstream key
 // layout, the legacy "offline" ygg token migration, the entitlement fallback from profile
 // validity, the http->https textures rewrite and unknown-type rejection.
+
+using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Auth;
 using Xunit;
@@ -86,10 +88,10 @@ public class AccountDataTests
     {
         var data = ResumedMsaAccount();
 
-        Assert.Equal(AccountType.MSA, data.Type);
-        Assert.Equal("c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb", data.MsaClientID);
+        Assert.Equal(AccountType.Msa, data.Type);
+        Assert.Equal("c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb", data.MsaClientId);
 
-        Assert.Equal("MSA_TOKEN", data.MsaToken.Token_);
+        Assert.Equal("MSA_TOKEN", data.MsaToken.Value);
         Assert.Equal("MSA_REFRESH", data.MsaToken.RefreshToken);
         Assert.Equal(Validity.Assumed, data.MsaToken.Validity);
         Assert.Equal(1638904328, new DateTimeOffset(data.MsaToken.IssueInstant!.Value).ToUnixTimeSeconds());
@@ -98,9 +100,9 @@ public class AccountDataTests
         Assert.True(data.MsaToken.Extra.TryGetValue("expires_in", out var expiresIn));
         Assert.Equal("86400", expiresIn!.ToJsonString());
 
-        Assert.Equal("USER_TOKEN", data.UserToken.Token_);
+        Assert.Equal("USER_TOKEN", data.UserToken.Value);
         Assert.Equal("UHS123", AccountData.GetString(data.UserToken.Extra["uhs"]));
-        Assert.Equal("XSTS_TOKEN", data.MojangServicesToken.Token_);
+        Assert.Equal("XSTS_TOKEN", data.MojangServicesToken.Value);
 
         Assert.Equal("YGG_TOKEN", data.AccessToken());
         Assert.Equal(Validity.Assumed, data.YggdrasilToken.Validity);
@@ -111,7 +113,7 @@ public class AccountDataTests
         Assert.Equal(Validity.Assumed, data.MinecraftEntitlement.Validity);
         Assert.True(data.MinecraftEntitlement.OwnsMinecraft);
         Assert.True(data.MinecraftEntitlement.CanPlayMinecraft);
-        Assert.Equal(Validity.Assumed, data.Validity_);
+        Assert.Equal(Validity.Assumed, data.Validity);
     }
 
     [Fact]
@@ -151,7 +153,7 @@ public class AccountDataTests
         Assert.Equal("https://textures.minecraft.net/texture/skinhash", data.MinecraftProfile.SkinField.Url);
         Assert.Equal("https://textures.minecraft.net/texture/capehash", data.MinecraftProfile.Capes["cape-id"].Url);
         // base64 skin data survives
-        Assert.Equal("hello skin", System.Text.Encoding.UTF8.GetString(data.MinecraftProfile.SkinField.Data));
+        Assert.Equal("hello skin", Encoding.UTF8.GetString(data.MinecraftProfile.SkinField.Data));
         // currentCape only sticks when the cape exists in the cape map
         Assert.Equal("cape-id", data.MinecraftProfile.CurrentCape);
     }

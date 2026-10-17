@@ -13,6 +13,7 @@
 //  - QNetworkReply::errorString() texts are replaced by plain "HTTP status <code> for <url>" /
 //    exception messages; the user-visible step messages embed them only in generic failures.
 
+using System.Text;
 using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.Auth;
@@ -86,7 +87,7 @@ public sealed class AuthStepResponse
 
     public byte[] Body { get; init; } = [];
 
-    public string BodyText => System.Text.Encoding.UTF8.GetString(Body);
+    public string BodyText => Encoding.UTF8.GetString(Body);
 
     public bool Success => Error == (int)QtNetworkError.NoError;
 }
@@ -105,7 +106,7 @@ public static class AuthStepHttp
                 request.Body is null ? HttpMethod.Get : HttpMethod.Post, request.Url);
             if (request.Body is not null)
             {
-                message.Content = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(request.Body));
+                message.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(request.Body));
             }
             foreach (var (name, value) in request.Headers)
             {

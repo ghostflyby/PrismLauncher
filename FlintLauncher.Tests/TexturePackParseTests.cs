@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of tests/TexturePackParse_test.cpp (fixtures: TestData/TexturePackParse, copied
 // from tests/testdata/TexturePackParse).
+
 using FlintLauncher.Core.Minecraft.Resources;
 using Xunit;
 

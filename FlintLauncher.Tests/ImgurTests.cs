@@ -4,8 +4,10 @@
 // headers, the JSON response parsing into the ScreenShot metadata, and every failure path.
 // The factories are instance methods (the client rides an injected NetStack); each suite
 // builds its own ImgurApi.
+
 using System.Text;
 using System.Text.Json;
+using FlintLauncher.Core;
 using FlintLauncher.Core.Screenshots;
 using FlintLauncher.Core.Tasks;
 using Xunit;
@@ -63,8 +65,8 @@ public class ImgurTests : IDisposable
         var shot = new ScreenShot(TempPng([1, 2, 3]));
         var upload = _imgur.MakeUpload(shot);
         Assert.Equal("https://api.imgur.com/3/image", upload.EndpointUrl);
-        Assert.Equal(FlintLauncher.Core.FlintConfig.Default.ImgurBaseUrl + "image", upload.EndpointUrl);
-        Assert.Equal(FlintLauncher.Core.FlintConfig.Default.ImgurBaseUrl + "image", ImgurApi.UploadUrl());
+        Assert.Equal(FlintConfig.Default.ImgurBaseUrl + "image", upload.EndpointUrl);
+        Assert.Equal(FlintConfig.Default.ImgurBaseUrl + "image", ImgurApi.UploadUrl());
     }
 
     [Fact]
@@ -198,7 +200,7 @@ public class ImgurTests : IDisposable
         var result = new ImgurApi.AlbumResult();
         var album = _imgur.MakeAlbum(result, [ShotWithHash("h1")]);
         Assert.Equal("https://api.imgur.com/3/album", album.EndpointUrl);
-        Assert.Equal(FlintLauncher.Core.FlintConfig.Default.ImgurBaseUrl + "album", ImgurApi.AlbumUrl());
+        Assert.Equal(FlintConfig.Default.ImgurBaseUrl + "album", ImgurApi.AlbumUrl());
     }
 
     [Fact]

@@ -4,15 +4,17 @@
 // chain, InstanceIniImporter for instance.cfg). Flint never writes an INI; the write sides
 // are flint.json and instance.json (TypedJsonFile). Reads legacy formats (no ConfigVersion,
 // 1.1, 1.2), staying byte-compatible with PrismLauncher.
+
 using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace FlintLauncher.Core.Settings;
 
 public sealed class IniFile
 {
     private readonly Dictionary<string, IniValue> _map = new(StringComparer.Ordinal);
-
-    public IniFile() { }
 
     // ------------------------------------------------------------------ access
 
@@ -247,15 +249,15 @@ public sealed class IniFile
             };
             if (items is not null)
             {
-                var array = new System.Text.Json.Nodes.JsonArray();
+                var array = new JsonArray();
                 foreach (var item in items)
                 {
-                    array.Add((System.Text.Json.Nodes.JsonNode?)System.Text.Json.Nodes.JsonValue.Create(item));
+                    array.Add((JsonNode?)JsonValue.Create(item));
                 }
-                return IniValue.From(array.ToJsonString(new System.Text.Json.JsonSerializerOptions
+                return IniValue.From(array.ToJsonString(new JsonSerializerOptions
                 {
                     WriteIndented = false,
-                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                 }));
             }
             return value;

@@ -7,22 +7,22 @@
 // the instance-stamped LaunchServices (Services.LegacyFmllibsUrlOverride) and the metacache
 // from the instance ("fmllibs" base — registered once at the composition root, E6; an
 // unstamped instance fails the step instead of silently re-downloading).
-using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Net;
 
+using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Minecraft;
+using FlintLauncher.Core.Net;
+using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class LegacyFMLLibrariesTask : FlintTask
+public sealed class LegacyFmlLibrariesTask : FlintTask
 {
     private readonly MinecraftInstance _inst;
     private readonly List<FmlLib> _fmlLibsToProcess = [];
-    private NetJob? _downloadJob;
+    private NetJob? downloadJob;
 
-    public LegacyFMLLibrariesTask(MinecraftInstance inst)
+    public LegacyFmlLibrariesTask(MinecraftInstance inst)
     {
         _inst = inst;
     }
@@ -86,7 +86,7 @@ public sealed class LegacyFMLLibrariesTask : FlintTask
         var metacache = _inst.MetaCache ?? throw new InvalidOperationException(
             $"no meta cache stamped on instance '{_inst.Name()}' — the composition root must inject it");
         var dlJob = new NetJob("FML libraries");
-        _downloadJob = dlJob;
+        downloadJob = dlJob;
         foreach (var lib in _fmlLibsToProcess)
         {
             var entry = metacache.ResolveEntry("fmllibs", lib.Filename);
@@ -114,7 +114,7 @@ public sealed class LegacyFMLLibrariesTask : FlintTask
 
     private void FmllibsFinished()
     {
-        _downloadJob = null;
+        downloadJob = null;
         if (_fmlLibsToProcess.Count != 0)
         {
             EmitStatus("Copying FML libraries into the instance...");
@@ -156,14 +156,12 @@ public sealed class LegacyFMLLibrariesTask : FlintTask
 
     public override void Abort()
     {
-        if (_downloadJob is not null && _downloadJob.IsRunning)
+        if (downloadJob is not null && downloadJob.IsRunning)
         {
-            _downloadJob.Abort();
+            downloadJob.Abort();
         }
-        else
-        {
-            // Prematurely aborted LegacyFMLLibrariesTask
-        }
+
+        // Prematurely aborted LegacyFMLLibrariesTask
         base.Abort();
     }
 }

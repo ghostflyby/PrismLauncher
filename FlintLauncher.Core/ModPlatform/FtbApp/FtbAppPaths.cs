@@ -7,6 +7,7 @@
 // Deviation: the launcher-wide "FTBAppInstancesPath" setting and the QProcessEnvironment
 // lookups of the original are UI concerns, so RootPath is injected per instance (tests
 // construct an FtbAppPaths pointed at their tree); DefaultRoot stays a pure static helper.
+
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;

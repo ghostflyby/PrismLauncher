@@ -13,6 +13,7 @@
 //
 // Immediate atomic write on every mutation (the C++ INI settings object saved per Set; the
 // instance settings surface relies on that).
+
 using System.Text.Json.Serialization.Metadata;
 
 namespace FlintLauncher.Core.Config;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/launch/CreateGameFolders.{h,cpp}: create the main .minecraft
 // folder for the instance and any other necessary folders.
+
 using FlintLauncher.Core.IO;
 
 namespace FlintLauncher.Core.Launch.Steps;

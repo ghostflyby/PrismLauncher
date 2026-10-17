@@ -32,17 +32,17 @@ public abstract class ProblemProvider
 public class ProblemContainer : ProblemProvider
 {
     private readonly List<PatchProblem> _problems = [];
-    private ProblemSeverity _problemSeverity = ProblemSeverity.None;
+    private ProblemSeverity problemSeverity = ProblemSeverity.None;
 
     public override IReadOnlyList<PatchProblem> GetProblems() => _problems;
 
-    public override ProblemSeverity GetProblemSeverity() => _problemSeverity;
+    public override ProblemSeverity GetProblemSeverity() => problemSeverity;
 
     public void AddProblem(ProblemSeverity severity, string description)
     {
-        if (severity > _problemSeverity)
+        if (severity > problemSeverity)
         {
-            _problemSeverity = severity;
+            problemSeverity = severity;
         }
         _problems.Add(new PatchProblem(severity, description));
     }

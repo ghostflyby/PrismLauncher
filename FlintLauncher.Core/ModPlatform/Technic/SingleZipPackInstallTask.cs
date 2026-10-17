@@ -9,6 +9,7 @@
 //    (InstanceImportTask.DownloadFromUrl's fallback).
 //  - the "fixing permissions" walk after extraction is not ported (no unix permission
 //    model on the .NET zip layer; MMCZip writes plain files).
+
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
@@ -19,7 +20,7 @@ public sealed class SingleZipPackInstallTask : InstanceTask
 {
     private readonly Uri _sourceUrl;
     private readonly string _minecraftVersion;
-    private string _archivePath = "";
+    private string archivePath = "";
 
     /// <summary>APPLICATION->metacache() hook ("general" base); null = plain download.</summary>
     public HttpMetaCache? MetaCache { get; set; }
@@ -43,7 +44,7 @@ public sealed class SingleZipPackInstallTask : InstanceTask
             var filesNetJob = new NetJob("Modpack download");
             var request = NetRequest.MakeCached(MetaCache, _sourceUrl, entry);
             filesNetJob.AddNetRequest(request);
-            _archivePath = entry.GetFullPath();
+            archivePath = entry.GetFullPath();
             await filesNetJob.StartAsync(cancellationToken);
             if (!filesNetJob.WasSuccessful)
             {
@@ -55,10 +56,10 @@ public sealed class SingleZipPackInstallTask : InstanceTask
         {
             // (the C++ downloads through the global cache — outside the instance folder; the
             //  headless fallback mirrors that with a temporary file)
-            _archivePath = Path.Combine(Path.GetTempPath(), "flint-technic-" + Guid.NewGuid().ToString("N") +
+            archivePath = Path.Combine(Path.GetTempPath(), "flint-technic-" + Guid.NewGuid().ToString("N") +
                                         Path.GetFileName(_sourceUrl.AbsolutePath));
-            FileSystem.EnsureFilePathExists(_archivePath);
-            var request = NetRequest.MakeFile(_sourceUrl, _archivePath);
+            FileSystem.EnsureFilePathExists(archivePath);
+            var request = NetRequest.MakeFile(_sourceUrl, archivePath);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
             {
@@ -76,7 +77,7 @@ public sealed class SingleZipPackInstallTask : InstanceTask
         var extractDir = FileSystem.PathCombine(StagingPath, "minecraft");
         FileSystem.EnsureFolderPathExists(extractDir);
 
-        var extracted = MMCZip.ExtractDir(_archivePath, "", extractDir);
+        var extracted = MmcZip.ExtractDir(archivePath, "", extractDir);
         if (extracted is null)
         {
             EmitFailed("Failed to extract modpack");

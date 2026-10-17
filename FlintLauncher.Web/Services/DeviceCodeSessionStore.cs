@@ -12,7 +12,9 @@
 //   done     - the flow succeeded; the finished account is added to the AccountList
 //   expired  - the flow failed (expired device code, denied user, transport failure...)
 // deviceId is an internal correlation id (never sent to Microsoft).
+
 using FlintLauncher.Core.Auth;
+using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
 
 namespace FlintLauncher.Web.Services;
@@ -41,7 +43,7 @@ public sealed class DeviceCodeSessionStore
     /// </summary>
     public Session Start(AuthEndpointsOptions? auth = null)
     {
-        var account = MinecraftAccount.CreateBlankMSA();
+        var account = MinecraftAccount.CreateBlankMsa();
         var flow = account.Login(useDeviceCode: true, auth)
                    ?? throw new InvalidOperationException("could not create the device-code auth flow");
 
@@ -97,7 +99,7 @@ public sealed class DeviceCodeSessionStore
         var flow = session.Flow;
         if (flow.IsFinished)
         {
-            if (flow.State == Core.Tasks.TaskState.Succeeded)
+            if (flow.State == TaskState.Succeeded)
             {
                 if (accounts.FindAccountByProfileId(session.Account.ProfileId()) == -1)
                 {

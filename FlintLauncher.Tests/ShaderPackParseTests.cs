@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of tests/ShaderPackParse_test.cpp (fixtures: TestData/ShaderPackParse, copied
 // from tests/testdata/ShaderPackParse).
+
 using FlintLauncher.Core.Minecraft.Resources;
 using Xunit;
 
@@ -43,6 +44,6 @@ public class ShaderPackParseTests
         var valid = ShaderPackUtils.Process(pack);
 
         Assert.Equal(ShaderPackFormat.Invalid, pack.PackFormat);
-        Assert.True(valid == false);
+        Assert.True(!valid);
     }
 }

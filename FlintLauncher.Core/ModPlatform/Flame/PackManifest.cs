@@ -2,6 +2,7 @@
 // Port of modplatform/flame/PackManifest.{h,cpp}: the CurseForge modpack manifest.json
 // model (manifestType "minecraftModpack", manifestVersion 1) and its loader. The C++
 // QMap<int, File> (key-sorted) becomes a SortedDictionary keyed by file id.
+
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 

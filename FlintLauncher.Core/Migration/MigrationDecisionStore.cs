@@ -6,6 +6,7 @@
 // can show ("可审计、API 可展示上次迁移结果"). Legacy markers found on disk are upgraded in
 // place on first sight (read → declined@unknown record → marker deleted), see
 // <see cref="DataMigration.Decide"/>.
+
 using System.Text.Json.Serialization.Metadata;
 
 namespace FlintLauncher.Core.Migration;

@@ -12,6 +12,7 @@
 //    though LogModel itself is a ring buffer that drops old lines. The buffer is capped
 //    (oldest lines dropped, indexes preserved).
 
+using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
@@ -27,7 +28,7 @@ public sealed class FlintTaskRegistry
     {
         // the host's factory (DI) — the former FlintLog static facade read the same factory
         // handed over at startup; task lifecycle events land in the same sinks
-        _log = loggerFactory.CreateLogger(Core.Diagnostics.LogCategories.Tasks);
+        _log = loggerFactory.CreateLogger(LogCategories.Tasks);
     }
 
     public sealed class Entry
@@ -56,7 +57,7 @@ public sealed class FlintTaskRegistry
 
     private readonly object _lock = new();
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.Ordinal);
-    private int _sequence;
+    private int sequence;
 
     /// <summary>Log lines kept per task (absolute indexes preserved beyond the cap).</summary>
     public const int MaxBufferedLines = 5000;
@@ -122,7 +123,7 @@ public sealed class FlintTaskRegistry
     {
         lock (_lock)
         {
-            return $"t{++_sequence}-{Guid.NewGuid().ToString("N")[..8]}";
+            return $"t{++sequence}-{Guid.NewGuid().ToString("N")[..8]}";
         }
     }
 

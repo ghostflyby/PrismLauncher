@@ -7,6 +7,7 @@
 // Threaded from the composition root through InstanceList to every discovered instance, and
 // through the InstanceStaging wrapper to the creation/copy/import tasks that build instances
 // inside a staging folder.
+
 using System.Text.Json.Serialization.Metadata;
 
 namespace FlintLauncher.Core.Config;

@@ -10,18 +10,19 @@
 // canAbort()/abort() port note: the C++ forwards to the wrapped task's canAbort()/abort()
 // (C++ Task::canAbort defaults to a false flag). The C# FlintTask always accepts abort
 // requests, so "can abort" here means the wrapped task has not finished yet.
+
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Launch;
 
 public sealed class TaskStepWrapper : LaunchStep
 {
-    private FlintTask? _task;
-    private TaskCompletionSource? _proceedSignal;
+    private FlintTask? task;
+    private TaskCompletionSource? proceedSignal;
 
     public TaskStepWrapper(LaunchTask parent, FlintTask task) : base(parent)
     {
-        _task = task;
+        this.task = task;
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -34,11 +35,11 @@ public sealed class TaskStepWrapper : LaunchStep
 
         // progressReportingRequest + the proceed() gate: the wrapped task starts once the
         // controller confirms (headless: auto-proceed).
-        _proceedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        proceedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         EmitProgressReportingRequest();
-        await _proceedSignal.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        await proceedSignal.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
 
-        var task = _task;
+        var task = this.task;
         if (task is null)
         {
             EmitSucceeded();
@@ -48,27 +49,27 @@ public sealed class TaskStepWrapper : LaunchStep
 
         if (task.WasSuccessful)
         {
-            _task = null;
+            this.task = null;
             EmitSucceeded();
         }
         else
         {
             var reason = $"Instance update failed because: {task.FailReason}\n\n";
-            _task = null;
+            this.task = null;
             EmitLogLine(reason, MessageLevel.Fatal);
             EmitFailed(reason);
         }
     }
 
-    public override void Proceed() => _proceedSignal?.TrySetResult();
+    public override void Proceed() => proceedSignal?.TrySetResult();
 
-    public override bool CanAbort() => _task is null || !_task.IsFinished;
+    public override bool CanAbort() => task is null || !task.IsFinished;
 
     public override bool AbortStep()
     {
-        if (_task is not null && !_task.IsFinished)
+        if (task is not null && !task.IsFinished)
         {
-            _task.Abort();
+            task.Abort();
             return true;
         }
         return base.AbortStep();

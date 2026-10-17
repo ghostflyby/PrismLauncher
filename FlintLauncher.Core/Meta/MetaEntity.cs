@@ -14,7 +14,9 @@
 //    follow the current upstream implementation: local-cache-first with sha256 verification,
 //    checksummed re-download, and a ParsingValidator so unparseable bodies are never
 //    committed to the cache (the entry goes stale on failure).
+
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
@@ -32,9 +34,9 @@ public enum LoadStatus
 
 public abstract class MetaEntity
 {
-    private LoadStatus _loadStatus = LoadStatus.NotLoaded;
+    private LoadStatus loadStatus = LoadStatus.NotLoaded;
 
-    private FlintTask? _task;
+    private FlintTask? task;
 
     /// <summary>The cache this entity downloads through and resolves its local file under
     /// (base "meta"; C++: APPLICATION->metacache()). E6: the static CWD-anchored fallback is
@@ -74,11 +76,11 @@ public abstract class MetaEntity
         // consider it loaded only if the main hash is either empty and was remote loaded or the
         // hashes match and was loaded
         return Sha256.Length == 0
-            ? _loadStatus == LoadStatus.Remote
-            : _loadStatus != LoadStatus.NotLoaded && Sha256 == FileSha256;
+            ? loadStatus == LoadStatus.Remote
+            : loadStatus != LoadStatus.NotLoaded && Sha256 == FileSha256;
     }
 
-    public LoadStatus Status() => _loadStatus;
+    public LoadStatus Status() => loadStatus;
 
     /// <summary>for parsers</summary>
     public void SetSha256(string sha256) => Sha256 = sha256;
@@ -88,12 +90,12 @@ public abstract class MetaEntity
     /// <summary>Port of BaseEntity::loadTask().</summary>
     public FlintTask LoadTask(NetMode loadType = NetMode.Online, bool forceReload = false)
     {
-        if (_task is not null && _task.IsRunning)
+        if (task is not null && task.IsRunning)
         {
-            return _task;
+            return task;
         }
-        _task = new MetaEntityLoadTask(this, loadType, forceReload);
-        return _task;
+        task = new MetaEntityLoadTask(this, loadType, forceReload);
+        return task;
     }
 
     /// <summary>
@@ -134,7 +136,7 @@ public abstract class MetaEntity
             try
             {
                 var obj = JsonUtils.RequireObject(
-                    JsonUtils.RequireNode(System.Text.Encoding.UTF8.GetString([.. _data]), fname), fname);
+                    JsonUtils.RequireNode(Encoding.UTF8.GetString([.. _data]), fname), fname);
                 _entity.Parse(obj);
                 return true;
             }
@@ -171,7 +173,7 @@ public abstract class MetaEntity
                 try
                 {
                     // read local file if nothing is loaded yet
-                    if (_entity._loadStatus == LoadStatus.NotLoaded || _entity.FileSha256.Length == 0)
+                    if (_entity.loadStatus == LoadStatus.NotLoaded || _entity.FileSha256.Length == 0)
                     {
                         EmitStatus("Loading local file");
                         fileData = FileSystem.Read(fname);
@@ -189,12 +191,12 @@ public abstract class MetaEntity
                     }
 
                     // load local file
-                    if (_entity._loadStatus == LoadStatus.NotLoaded)
+                    if (_entity.loadStatus == LoadStatus.NotLoaded)
                     {
                         var obj = JsonUtils.RequireObject(
-                            JsonUtils.RequireNode(System.Text.Encoding.UTF8.GetString(fileData), fname), fname);
+                            JsonUtils.RequireNode(Encoding.UTF8.GetString(fileData), fname), fname);
                         _entity.Parse(obj);
-                        _entity._loadStatus = LoadStatus.Local;
+                        _entity.loadStatus = LoadStatus.Local;
                     }
                 }
                 catch (Exception)
@@ -204,15 +206,15 @@ public abstract class MetaEntity
                     // qCritical() << "Unable to parse file ...";
                     // just make sure it's gone and we never consider it again.
                     FileSystem.DeletePath(fname);
-                    _entity._loadStatus = LoadStatus.NotLoaded;
+                    _entity.loadStatus = LoadStatus.NotLoaded;
                 }
             }
             // if we need remote update, run the update task
-            var wasLoadedOffline = _entity._loadStatus != LoadStatus.NotLoaded && _mode == NetMode.Offline;
+            var wasLoadedOffline = _entity.loadStatus != LoadStatus.NotLoaded && _mode == NetMode.Offline;
             // if hash is not present always fetch from remote (e.g. the main index file), else
             // only fetch if the hash doesn't match
             var wasLoadedRemote = _entity.Sha256.Length == 0
-                ? _entity._loadStatus == LoadStatus.Remote
+                ? _entity.loadStatus == LoadStatus.Remote
                 : hashMatches;
             if (wasLoadedOffline || (wasLoadedRemote && !_forceReload))
             {
@@ -230,7 +232,7 @@ public abstract class MetaEntity
             }
             entry.SetStale(true);
             // Net::ApiRequest::makeCached == makeCached + AddAPIHeaders
-            var dl = NetRequest.MakeCached(cache, _entity.Url(), entry, RequestOptions.AddAPIHeaders);
+            var dl = NetRequest.MakeCached(cache, _entity.Url(), entry, RequestOptions.AddApiHeaders);
             /*
              * The validator parses the file and loads it into the object.
              * If that fails, the file is not written to storage.
@@ -244,7 +246,7 @@ public abstract class MetaEntity
             await dl.StartAsync(cancellationToken).ConfigureAwait(false);
             if (dl.State == TaskState.Succeeded)
             {
-                _entity._loadStatus = LoadStatus.Remote;
+                _entity.loadStatus = LoadStatus.Remote;
                 _entity.FileSha256 = _entity.Sha256;
                 EmitSucceeded();
             }

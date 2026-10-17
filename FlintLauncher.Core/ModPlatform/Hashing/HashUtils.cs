@@ -3,6 +3,7 @@
 // (sha1/sha256/sha512/md5/md5 via the crypto stack, and the CurseForge murmur2 variant
 // with its tab/LF/CR/space filter). The QtConcurrent Hasher task becomes the awaitable
 // Hasher FlintTask.
+
 using System.Globalization;
 using System.Security.Cryptography;
 using FlintLauncher.Core.Tasks;
@@ -53,8 +54,8 @@ public static class HashUtils
     /// </summary>
     public static Hasher CreateHasher(string filePath, ResourceProvider provider) => provider switch
     {
-        ResourceProvider.MODRINTH => new Hasher(filePath, ProviderCapabilities.HashType(ResourceProvider.MODRINTH)[0]),
-        ResourceProvider.FLAME => new Hasher(filePath, Algorithm.Murmur2),
+        ResourceProvider.Modrinth => new Hasher(filePath, ProviderCapabilities.HashType(ResourceProvider.Modrinth)[0]),
+        ResourceProvider.Flame => new Hasher(filePath, Algorithm.Murmur2),
         _ => throw new ArgumentException("[Hashing] Unrecognized mod platform!", nameof(provider)),
     };
 
@@ -102,7 +103,7 @@ public static class HashUtils
 /// <summary>Port of Hashing::Hasher: a Task that computes a file hash off the caller's flow.</summary>
 public sealed class Hasher : FlintTask
 {
-    private string _result = "";
+    private string result = "";
 
     public Hasher(string filePath, Algorithm alg)
     {
@@ -119,7 +120,7 @@ public sealed class Hasher : FlintTask
 
     public Algorithm Alg { get; }
 
-    public string GetResult() => _result;
+    public string GetResult() => result;
 
     public string GetPath() => Path;
 
@@ -128,13 +129,13 @@ public sealed class Hasher : FlintTask
 
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        _result = HashUtils.HashFile(Path, Alg);
-        if (_result.Length == 0)
+        result = HashUtils.HashFile(Path, Alg);
+        if (result.Length == 0)
         {
             EmitFailed("Empty hash!");
             return Task.CompletedTask;
         }
-        ResultsReady?.Invoke(_result);
+        ResultsReady?.Invoke(result);
         EmitSucceeded();
         return Task.CompletedTask;
     }

@@ -28,6 +28,7 @@
 //  - The metadata (.pw.toml index) system is not ported, so the indexed scan pass
 //    (getFromMetadata), the orphan-metadata cleanup and the NotInstalled status never
 //    trigger; m_isIndexed/firstFolderLoad are kept for structure.
+
 using FlintLauncher.Core.IO;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
@@ -41,7 +42,7 @@ public class ResourceFolderModel
 {
     private readonly string _dir;
     private readonly bool _isIndexed;
-    private bool _firstFolderLoad = true;
+    private bool firstFolderLoad = true;
 
     private readonly List<Resource> _resources = [];
     // Represents the relationship between a resource's internal ID and its row position on the model.
@@ -167,8 +168,6 @@ public class ResourceFolderModel
 
                 return true;
             }
-            default:
-                break;
         }
         return false;
     }
@@ -207,7 +206,7 @@ public class ResourceFolderModel
     public virtual bool Update()
     {
         var newResources = RunLoadTask();
-        _firstFolderLoad = false;
+        firstFolderLoad = false;
 
         var currentSet = new HashSet<string>(_resourcesIndex.Keys);
         var newSet = new HashSet<string>(newResources.Keys);
@@ -293,7 +292,7 @@ public class ResourceFolderModel
             }
         }
 
-        if (_firstFolderLoad)
+        if (firstFolderLoad)
         {
             // Remove orphan metadata to prevent issues (PolyMC issue 996). The metadata
             // layer is not ported, so there are no NotInstalled-only entries to clean.

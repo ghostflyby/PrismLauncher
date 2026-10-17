@@ -4,6 +4,8 @@
 // (/modpack/{id}) in sequence, dropping the "dud" packs without versions. The Qt
 // QAbstractListModel/logos machinery is not ported — this is the plain data layer.
 
+using FlintLauncher.Core.Json;
+
 namespace FlintLauncher.Core.ModPlatform.Ftb;
 
 public sealed class FtbPackModel
@@ -54,7 +56,7 @@ public sealed class FtbPackModel
         {
             remainingPacks = FtbApi.LoadModpackIndex(indexRequest.BodyAsString);
         }
-        catch (Json.JsonParseException)
+        catch (JsonParseException)
         {
             // (the C++ only warns and leaves the model empty)
             return;
@@ -84,7 +86,7 @@ public sealed class FtbPackModel
                 }
                 _modpacks.Add(pack);
             }
-            catch (Json.JsonParseException)
+            catch (JsonParseException)
             {
                 // (the C++ only logs "Error while reading pack manifest from FTB")
             }

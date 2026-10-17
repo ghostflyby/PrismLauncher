@@ -4,6 +4,7 @@
 // its env), the --data-dir semantics narrowing, the G1 fail-fast probe, and the S4 logs
 // anchor with the macOS exception. Env-dependent cases snapshot and restore the process
 // environment (the suite runs with parallelMode none).
+
 using FlintLauncher.Core;
 using FlintLauncher.Web;
 using Xunit;

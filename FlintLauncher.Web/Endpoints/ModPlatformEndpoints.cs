@@ -5,6 +5,8 @@
 // enable/disable/uninstall renames). The install/update flows run as registered tasks
 // (202 + taskId) like launch/import; the update task additionally publishes its found
 // updates through the task view's optional result payload.
+
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
@@ -14,6 +16,7 @@ using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
+using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
@@ -66,10 +69,10 @@ public static class ModPlatformEndpoints
             {
                 return ApiJson.Error("invalid_type", unsupportedReason, 400);
             }
-            return parsedProvider == ResourceProvider.FLAME
+            return parsedProvider == ResourceProvider.Flame
                 ? await FlameSearchAsync(resourceType, query, version, loader, index, offset, runtime)
                 : await ModrinthSearchAsync(resourceType, query, version, loader, index, offset, runtime);
-        }).Produces<FlameSearchResult[]>(200).Produces<ModrinthSearchResult[]>(200);
+        }).Produces<FlameSearchResult[]>().Produces<ModrinthSearchResult[]>();
 
         // ----------------------------------------------------- modplatform/{provider}/categories
         // GET /categories?gameId=432&classId=... (Flame) or GET /tag/category filtered by
@@ -83,7 +86,7 @@ public static class ModPlatformEndpoints
                 return ApiJson.Error("unknown_provider", "provider must be 'modrinth' or 'flame'", 400);
             }
 
-            if (parsedProvider == ResourceProvider.FLAME)
+            if (parsedProvider == ResourceProvider.Flame)
             {
                 int effectiveClassId;
                 if (!string.IsNullOrWhiteSpace(classId))
@@ -110,7 +113,7 @@ public static class ModPlatformEndpoints
                 var (_, flameRequest) = runtime.Flame.GetCategoriesForClassId(effectiveClassId);
                 runtime.Flame.AddApiKeyHeader(flameRequest);
                 await flameRequest.StartAsync();
-                if (flameRequest.State != Core.Tasks.TaskState.Succeeded)
+                if (flameRequest.State != TaskState.Succeeded)
                 {
                     return ApiJson.Error("flame_unavailable",
                         $"curseforge categories failed: {flameRequest.FailReason}", 502);
@@ -131,14 +134,14 @@ public static class ModPlatformEndpoints
 
             var (_, modrinthRequest) = runtime.Modrinth.GetModCategories();
             await modrinthRequest.StartAsync();
-            if (modrinthRequest.State != Core.Tasks.TaskState.Succeeded)
+            if (modrinthRequest.State != TaskState.Succeeded)
             {
                 return ApiJson.Error("modrinth_unavailable",
                     $"modrinth categories failed: {modrinthRequest.FailReason}", 502);
             }
 
             return Results.Ok(ParseModrinthCategories(modrinthRequest.BodyAsString, projectType).ToArray());
-        }).Produces<ProviderCategoryView[]>(200);
+        }).Produces<ProviderCategoryView[]>();
 
         // --------------------------------------------------- modplatform/{provider}/mods/{projectId}/description
         api.MapGet("/modplatform/{provider}/mods/{projectId}/description",
@@ -150,7 +153,7 @@ public static class ModPlatformEndpoints
             }
 
             string body;
-            if (parsedProvider == ResourceProvider.FLAME)
+            if (parsedProvider == ResourceProvider.Flame)
             {
                 if (!int.TryParse(projectId, out var modId))
                 {
@@ -164,7 +167,7 @@ public static class ModPlatformEndpoints
                 body = await runtime.Modrinth.GetProjectDescription(projectId);
             }
             return Results.Ok(new ProviderBodyView(body));
-        }).Produces<ProviderBodyView>(200);
+        }).Produces<ProviderBodyView>();
 
         // ------------------------------------------------ modplatform/{provider}/mods/{projectId}/changelog
         api.MapGet("/modplatform/{provider}/mods/{projectId}/changelog",
@@ -175,7 +178,7 @@ public static class ModPlatformEndpoints
             {
                 return ApiJson.Error("unknown_provider", "provider must be 'modrinth' or 'flame'", 400);
             }
-            if (parsedProvider != ResourceProvider.FLAME)
+            if (parsedProvider != ResourceProvider.Flame)
             {
                 // Modrinth has no per-file changelog endpoint (changelogs ride on versions)
                 return ApiJson.Error("invalid_request",
@@ -192,7 +195,7 @@ public static class ModPlatformEndpoints
 
             var body = await runtime.Flame.GetModFileChangelog(modId, fileIdNum);
             return Results.Ok(new ProviderBodyView(body));
-        }).Produces<ProviderBodyView>(200);
+        }).Produces<ProviderBodyView>();
 
         // ------------------------------------------------ modplatform/{provider}/versions
         api.MapGet("/modplatform/{provider}/versions", async Task<IResult> (
@@ -208,14 +211,14 @@ public static class ModPlatformEndpoints
                 return ApiJson.Error("unknown_provider", "provider must be 'modrinth' or 'flame'", 400);
             }
 
-            var url = parsedProvider == ResourceProvider.FLAME
-                ? runtime.Flame.GetVersionsURL(new VersionSearchArgs
+            var url = parsedProvider == ResourceProvider.Flame
+                ? runtime.Flame.GetVersionsUrl(new VersionSearchArgs
                 {
-                    Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.FLAME },
+                    Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.Flame },
                 })
-                : runtime.Modrinth.GetVersionsURL(new VersionSearchArgs
+                : runtime.Modrinth.GetVersionsUrl(new VersionSearchArgs
                 {
-                    Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.MODRINTH },
+                    Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.Modrinth },
                 });
             if (url is null)
             {
@@ -225,7 +228,7 @@ public static class ModPlatformEndpoints
             var request = NetRequest.MakeByteArray(new Uri(url));
             // the provider header hooks (Flame x-api-key / Modrinth PAT) mirror the request
             // builders the core API methods use
-            if (parsedProvider == ResourceProvider.FLAME)
+            if (parsedProvider == ResourceProvider.Flame)
             {
                 runtime.Flame.AddApiKeyHeader(request);
             }
@@ -234,7 +237,7 @@ public static class ModPlatformEndpoints
                 runtime.Modrinth.AddApiHeaders(request);
             }
             await request.StartAsync();
-            if (request.State != Core.Tasks.TaskState.Succeeded)
+            if (request.State != TaskState.Succeeded)
             {
                 return ApiJson.Error($"{parsedProvider.ToString().ToLowerInvariant()}_unavailable",
                     $"{provider} version list failed: {request.FailReason}", 502);
@@ -255,7 +258,7 @@ public static class ModPlatformEndpoints
                 var pack = new IndexedPack { AddonId = projectId, Provider = parsedProvider };
                 try
                 {
-                    if (parsedProvider == ResourceProvider.FLAME)
+                    if (parsedProvider == ResourceProvider.Flame)
                     {
                         if (bodyRoot is JsonObject flameRoot &&
                             flameRoot["data"] is JsonArray data)
@@ -295,7 +298,7 @@ public static class ModPlatformEndpoints
 
                 return Results.Ok(pack.Versions.Select(VersionView).ToArray());
             }
-        }).Produces<ProviderVersionView[]>(200);
+        }).Produces<ProviderVersionView[]>();
 
         // ------------------------------------------------------ instances/{id}/mods
         api.MapGet("/instances/{id}/mods", async (string id, LauncherRuntime runtime) =>
@@ -333,7 +336,7 @@ public static class ModPlatformEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).Produces<InstalledModView[]>(200);
+        }).Produces<InstalledModView[]>();
 
         api.MapPost("/instances/{id}/mods/install", async (string id, List<ModInstallSelection>? selections,
             LauncherRuntime runtime, FlintTaskRegistry registry) =>
@@ -476,7 +479,7 @@ public static class ModPlatformEndpoints
         {
             return ResourceType.ResourcePack;
         }
-        if (provider == ResourceProvider.MODRINTH && type == ResourceType.World)
+        if (provider == ResourceProvider.Modrinth && type == ResourceType.World)
         {
             error = "type 'worlds' is not supported by modrinth";
         }
@@ -534,8 +537,8 @@ public static class ModPlatformEndpoints
                 var id = entryObj["id"] is JsonValue idValue &&
                          idValue.ToJsonString() is var idRaw &&
                          idRaw.Length != 0 && idRaw[0] != '"' && // numbers only (GetInt64 upstream)
-                         long.TryParse(idRaw, System.Globalization.CultureInfo.InvariantCulture, out var idNumber)
-                    ? idNumber.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                         long.TryParse(idRaw, CultureInfo.InvariantCulture, out var idNumber)
+                    ? idNumber.ToString(CultureInfo.InvariantCulture)
                     : "";
                 result.Add(new ProviderCategoryView(id, Str(entryObj, "name"), Str(entryObj, "icon")));
             }
@@ -598,7 +601,7 @@ public static class ModPlatformEndpoints
             Sorting = FlameSorting(index, runtime),
         };
 
-        var url = runtime.Flame.GetSearchURL(args);
+        var url = runtime.Flame.GetSearchUrl(args);
         if (url is null)
         {
             return ApiJson.Error("invalid_loader", $"loader '{loader}' is not supported by CurseForge", 400);
@@ -607,7 +610,7 @@ public static class ModPlatformEndpoints
         var request = NetRequest.MakeByteArray(new Uri(url));
         runtime.Flame.AddApiKeyHeader(request);
         await request.StartAsync();
-        if (request.State != Core.Tasks.TaskState.Succeeded)
+        if (request.State != TaskState.Succeeded)
         {
             return ApiJson.Error("flame_unavailable",
                 $"curseforge search failed: {request.FailReason}", 502);
@@ -678,7 +681,7 @@ public static class ModPlatformEndpoints
             },
         };
 
-        var url = runtime.Modrinth.GetSearchURL(args);
+        var url = runtime.Modrinth.GetSearchUrl(args);
         if (url is null)
         {
             return ApiJson.Error("invalid_loader", $"loader '{loader}' is not supported by Modrinth", 400);
@@ -686,7 +689,7 @@ public static class ModPlatformEndpoints
 
         var request = NetRequest.MakeByteArray(new Uri(url));
         await request.StartAsync();
-        if (request.State != Core.Tasks.TaskState.Succeeded)
+        if (request.State != TaskState.Succeeded)
         {
             return ApiJson.Error("modrinth_unavailable",
                 $"modrinth search failed: {request.FailReason}", 502);
@@ -721,7 +724,7 @@ public static class ModPlatformEndpoints
                         hitObj["downloads"] is JsonValue downloads &&
                         downloads.ToJsonString() is var dlRaw &&
                         dlRaw.Length != 0 && dlRaw[0] != '"' && // numbers only (GetInt64 upstream)
-                        long.TryParse(dlRaw, System.Globalization.CultureInfo.InvariantCulture, out var downloadCount)
+                        long.TryParse(dlRaw, CultureInfo.InvariantCulture, out var downloadCount)
                             ? downloadCount
                             : 0));
                 }
@@ -768,7 +771,7 @@ public static class ModPlatformEndpoints
             if (hit[key] is JsonValue value &&
                 value.ToJsonString() is var raw &&
                 raw.Length != 0 && raw[0] != '"' &&
-                long.TryParse(raw, System.Globalization.CultureInfo.InvariantCulture, out var number))
+                long.TryParse(raw, CultureInfo.InvariantCulture, out var number))
             {
                 return number;
             }

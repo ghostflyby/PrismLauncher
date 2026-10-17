@@ -3,6 +3,8 @@
 // like /api/v1/info), coverage of the /api/v1 route table (every operation carries a 2xx
 // response and, except the discovery endpoint, the 401 the auth filter produces), and the
 // security scheme wiring.
+
+using System.Net;
 using System.Text.Json;
 using Xunit;
 
@@ -58,7 +60,7 @@ public class OpenApiTests
     {
         await using var host = await FlintApiHost.StartAsync();
         var client = host.CreateUnauthorizedClient();
-        Assert.Equal(System.Net.HttpStatusCode.OK, (await client.GetAsync("/healthz")).StatusCode);
-        Assert.Equal(System.Net.HttpStatusCode.OK, (await client.GetAsync("/api/v1/info")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/healthz")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/info")).StatusCode);
     }
 }

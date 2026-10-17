@@ -4,6 +4,7 @@
 // accessors (descriptor/name/typeString) are inlined here and the BaseVersion overloads of the
 // comparison operators collapse onto the typed ones (the only polymorphic sibling in the java
 // layer is Java::Metadata, which is ordered independently).
+
 using FlintLauncher.Core.Text;
 
 namespace FlintLauncher.Core.Java;

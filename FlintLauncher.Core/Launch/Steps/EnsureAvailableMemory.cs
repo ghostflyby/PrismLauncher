@@ -4,6 +4,7 @@
 // checks the kernel memory-pressure level; the other platforms compare the maximum allocation
 // against the available RAM (70% rule). The C++ QMessageBox prompts become the
 // Services.Ui.ConfirmLaunch hook (headless: launch anyway).
+
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Settings;
 
@@ -44,7 +45,7 @@ public sealed class EnsureAvailableMemory : LaunchStep
             }
 
             var shouldAbort = false;
-            if (Variant.AsBool(_instance.Settings().Get("LowMemWarning")))
+            if (Variant.AsBool(_instance.Settings.Get("LowMemWarning")))
             {
                 shouldAbort = Services.Ui.ConfirmLaunch?.Invoke(text) == false;
             }
@@ -70,15 +71,15 @@ public sealed class EnsureAvailableMemory : LaunchStep
             return Task.CompletedTask;
         }
 
-        var settingMin = (ulong)Variant.AsLong(_instance.Settings().Get("MinMemAlloc"));
-        var settingMax = (ulong)Variant.AsLong(_instance.Settings().Get("MaxMemAlloc"));
+        var settingMin = (ulong)Variant.AsLong(_instance.Settings.Get("MinMemAlloc"));
+        var settingMax = (ulong)Variant.AsLong(_instance.Settings.Get("MaxMemAlloc"));
         var max = Math.Max(settingMin, settingMax);
 
         if (max * 0.7 > available)
         {
             var shouldAbort = false;
 
-            if (Variant.AsBool(_instance.Settings().Get("LowMemWarning")))
+            if (Variant.AsBool(_instance.Settings.Get("LowMemWarning")))
             {
                 var dialogText =
                     "There might not be enough free RAM to launch this instance with the current memory settings.\n\n" +

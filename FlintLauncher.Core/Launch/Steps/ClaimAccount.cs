@@ -10,6 +10,7 @@
 //    MinecraftAccount explicitly did not port the Usable use-counting, so the lock here
 //    tracks only its own lifetime (a real counter can hook in at the same spot once the
 //    auth layer ports Usable — P5-c follow-up).
+
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Instances;
 
@@ -17,8 +18,8 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class ClaimAccount : LaunchStep
 {
-    private MinecraftAccount? _account;
-    private UseLock? _lock;
+    private MinecraftAccount? account;
+    private UseLock? @lock;
 
     public ClaimAccount(LaunchTask parent, AuthSession? session) : base(parent)
     {
@@ -34,8 +35,8 @@ public sealed class ClaimAccount : LaunchStep
     /// <summary>The account the controller decided on (see header note).</summary>
     public MinecraftAccount? Account
     {
-        get => _account;
-        set => _account = value;
+        get => account;
+        set => account = value;
     }
 
     /// <summary>Minimal port of the Usable/UseLock pair of launcher/Usable.h.</summary>
@@ -57,13 +58,13 @@ public sealed class ClaimAccount : LaunchStep
     {
         if (Account is not null)
         {
-            _lock = new UseLock(Account);
+            @lock = new UseLock(Account);
         }
         EmitSucceeded();
         return Task.CompletedTask;
     }
 
-    public override void FinalizeStep() => _lock?.Dispose();
+    public override void FinalizeStep() => @lock?.Dispose();
 
     public override bool CanAbort() => false;
 }

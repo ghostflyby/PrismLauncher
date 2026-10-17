@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/net/Validator.h and net/ChecksumValidator.h.
+
 using System.Security.Cryptography;
 
 namespace FlintLauncher.Core.Net;
@@ -36,13 +37,13 @@ public sealed class NetResponseInfo
 public sealed class ChecksumValidator : Validator
 {
     private readonly HashAlgorithmName _algorithm;
-    private IncrementalHash? _hash;
-    private byte[] _expected;
+    private IncrementalHash? hash;
+    private byte[] expected;
 
     public ChecksumValidator(HashAlgorithmName algorithm, byte[]? expected = null)
     {
         _algorithm = algorithm;
-        _expected = expected ?? [];
+        this.expected = expected ?? [];
     }
 
     /// <summary>Port of the hex-string overload.</summary>
@@ -52,25 +53,25 @@ public sealed class ChecksumValidator : Validator
 
     public override bool Init(NetRequestSpec request)
     {
-        _hash = IncrementalHash.CreateHash(_algorithm);
+        hash = IncrementalHash.CreateHash(_algorithm);
         return true;
     }
 
     public override bool Write(byte[] data)
     {
-        _hash?.AppendData(data);
+        hash?.AppendData(data);
         return true;
     }
 
     public override bool Abort()
     {
-        _hash = null;
+        hash = null;
         return true;
     }
 
     public override bool Validate(NetResponseInfo response)
     {
-        if (_expected.Length > 0 && !_expected.AsSpan().SequenceEqual(Hash()))
+        if (expected.Length > 0 && !expected.AsSpan().SequenceEqual(Hash()))
         {
             return false;
         }
@@ -79,14 +80,14 @@ public sealed class ChecksumValidator : Validator
 
     public byte[] Hash()
     {
-        if (_hash is null)
+        if (hash is null)
         {
             return [];
         }
-        var result = _hash.GetHashAndReset();
-        _hash = null;
+        var result = hash.GetHashAndReset();
+        hash = null;
         return result;
     }
 
-    public void SetExpected(byte[] expected) => _expected = expected;
+    public void SetExpected(byte[] expected) => this.expected = expected;
 }

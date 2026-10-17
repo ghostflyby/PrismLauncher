@@ -2,6 +2,7 @@
 // Tests for JavaCommon's JVM args sanity check (the only surviving half of the C++
 // JavaCommon after the JavaCheck.jar retirement — the TestCheck flow had no production
 // consumer in the headless core).
+
 using FlintLauncher.Core.Java;
 using Xunit;
 

@@ -3,6 +3,7 @@
 // responses every endpoint can produce through ApiJson, and small endpoint markers for the
 // handful of shapes Minimal API cannot infer (SSE streams, plain-text bodies, multipart
 // form uploads).
+
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 

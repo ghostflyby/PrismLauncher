@@ -21,6 +21,7 @@
 //  - setComponentVersion() is async for the same reason (important changes trigger a resolve).
 //  - Not ported: setOldConfigVersion() and writeOverrideOrders() (declared-but-undefined
 //    upstream), updateLatestMinecraft() (instance update flow, P3) and the model roles.
+
 using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
@@ -100,16 +101,16 @@ public sealed class PackProfile : IDisposable
     private readonly IPackProfileEnv _env;
 
     /// <summary>the launch profile (volatile, temporary thing created on demand)</summary>
-    private LaunchProfile? _profile;
+    private LaunchProfile? profile;
 
     private readonly List<Component> _components = [];
     private readonly Dictionary<string, Component> _componentIndex = new(StringComparer.Ordinal);
 
-    private bool _dirty;
+    private bool dirty;
 
-    private ComponentUpdateTask? _updateTask;
+    private ComponentUpdateTask? updateTask;
 
-    private bool _loaded;
+    private bool loaded;
 
     public PackProfile(IPackProfileEnv env, Index? metadataIndex = null)
     {
@@ -184,25 +185,25 @@ public sealed class PackProfile : IDisposable
         }
     }
 
-    public bool SaveIsScheduled() => _dirty;
+    public bool SaveIsScheduled() => dirty;
 
     /// <summary>call this to explicitly mark the component list as loaded - used to build a new component list from scratch.</summary>
     public void BuildingFromScratch()
     {
-        _loaded = true;
-        _dirty = true;
+        loaded = true;
+        dirty = true;
     }
 
     private void ScheduleSave()
     {
-        if (!_loaded)
+        if (!loaded)
         {
             // "Component list should never save if it didn't successfully load"
             return;
         }
         // NOTE deviation: the C++ starts a 5s single-shot QTimer here; saving happens through
         // SaveNow()/Dispose() instead (no event loop at this layer)
-        _dirty = true;
+        dirty = true;
     }
 
     private bool SaveInternal()
@@ -210,7 +211,7 @@ public sealed class PackProfile : IDisposable
         var filename = ComponentsFilePath();
         if (SavePackProfile(filename, _components))
         {
-            _dirty = false;
+            dirty = false;
             return true;
         }
         return false;
@@ -242,7 +243,7 @@ public sealed class PackProfile : IDisposable
             _components.Add(component);
             _componentIndex[component.Uid] = component;
         }
-        _loaded = true;
+        loaded = true;
         return Result.Success();
     }
 
@@ -254,17 +255,17 @@ public sealed class PackProfile : IDisposable
     public async Task<Result> ReloadAsync(NetMode netmode, CancellationToken cancellationToken = default)
     {
         // Do not reload when the update/resolve task is running. It is in control.
-        if (_updateTask is not null)
+        if (updateTask is not null)
         {
-            if (_updateTask.GetNetMode() == netmode)
+            if (updateTask.GetNetMode() == netmode)
             {
                 return Result.Success();
             }
 
             // https://github.com/PrismLauncher/PrismLauncher/issues/5209
             // FIXME upstream: HACK HACK HACK
-            _updateTask.Abort();
-            _updateTask = null;
+            updateTask.Abort();
+            updateTask = null;
         }
 
         // flush any scheduled saves to not lose state
@@ -283,7 +284,7 @@ public sealed class PackProfile : IDisposable
     }
 
     /// <summary>get current running task...</summary>
-    public ComponentUpdateTask? GetCurrentTask() => _updateTask;
+    public ComponentUpdateTask? GetCurrentTask() => updateTask;
 
     /// <summary>
     /// resolve all components (starts a ComponentUpdateTask). The returned Task completes when
@@ -292,7 +293,7 @@ public sealed class PackProfile : IDisposable
     public Task Resolve(NetMode netmode, CancellationToken cancellationToken = default)
     {
         var updateTask = new ComponentUpdateTask(ComponentUpdateTask.Mode.Resolution, netmode, this);
-        _updateTask = updateTask;
+        this.updateTask = updateTask;
         updateTask.Succeeded += _ => UpdateSucceeded();
         updateTask.Failed += (_, error) => UpdateFailed(error);
         updateTask.Aborted += _ => UpdateFailed("Aborted");
@@ -301,13 +302,13 @@ public sealed class PackProfile : IDisposable
 
     private void UpdateSucceeded()
     {
-        _updateTask = null;
+        updateTask = null;
         InvalidateLaunchProfile();
     }
 
     private void UpdateFailed(string error)
     {
-        _updateTask = null;
+        updateTask = null;
         InvalidateLaunchProfile();
     }
 
@@ -468,7 +469,7 @@ public sealed class PackProfile : IDisposable
     /// <summary>insert component so that its index is ideally the specified one</summary>
     public void InsertComponent(int index, Component component)
     {
-        var id = component.GetID();
+        var id = component.GetId();
         if (id.Length == 0)
         {
             return;
@@ -487,7 +488,7 @@ public sealed class PackProfile : IDisposable
 
     private void OnComponentDataChanged(Component component)
     {
-        if (component.GetID() == "net.minecraft")
+        if (component.GetId() == "net.minecraft")
         {
             MinecraftChanged?.Invoke(this);
         }
@@ -511,7 +512,7 @@ public sealed class PackProfile : IDisposable
         }
 
         _components.RemoveAt(index);
-        _componentIndex.Remove(patch.GetID());
+        _componentIndex.Remove(patch.GetId());
         InvalidateLaunchProfile();
         ScheduleSave();
         return true;
@@ -522,7 +523,7 @@ public sealed class PackProfile : IDisposable
     {
         for (var i = 0; i < _components.Count; i++)
         {
-            if (_components[i].GetID() == id)
+            if (_components[i].GetId() == id)
             {
                 return Remove(i);
             }
@@ -617,7 +618,7 @@ public sealed class PackProfile : IDisposable
 
     public void InvalidateLaunchProfile()
     {
-        _profile = null;
+        profile = null;
     }
 
     // ---------------------------------------------------------------- installers
@@ -922,7 +923,7 @@ public sealed class PackProfile : IDisposable
     /// <summary>apply the component patches. Catches all the errors and returns null for failure.</summary>
     public LaunchProfile? GetProfile()
     {
-        if (_profile is null)
+        if (profile is null)
         {
             try
             {
@@ -931,14 +932,14 @@ public sealed class PackProfile : IDisposable
                 {
                     file.ApplyTo(profile);
                 }
-                _profile = profile;
+                this.profile = profile;
             }
             catch (Exception e) when (e is JsonParseException or MetaParseException or FileSystemException)
             {
                 return null;
             }
         }
-        return _profile;
+        return profile;
     }
 
     // ---------------------------------------------------------------- versions
@@ -966,17 +967,15 @@ public sealed class PackProfile : IDisposable
             }
             return false;
         }
-        else
+
+        // add new
+        var newComponent = new Component(this, uid)
         {
-            // add new
-            var newComponent = new Component(this, uid)
-            {
-                Version = version,
-                Important = important,
-            };
-            AppendComponent(newComponent);
-            return true;
-        }
+            Version = version,
+            Important = important,
+        };
+        AppendComponent(newComponent);
+        return true;
     }
 
     public string GetComponentVersion(string uid)
@@ -1033,7 +1032,7 @@ public sealed class PackProfile : IDisposable
         var result = new List<ModLoaderType>();
         foreach (var c in _components)
         {
-            if (c.IsEnabled() && Component.KnownModloaders.TryGetValue(c.GetID(), out var entry))
+            if (c.IsEnabled() && Component.KnownModloaders.TryGetValue(c.GetId(), out var entry))
             {
                 result.Add(entry.Type);
             }

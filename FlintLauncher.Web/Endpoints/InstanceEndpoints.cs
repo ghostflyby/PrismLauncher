@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Instance endpoints: list/get/create-vanilla/import/delete/patch + instance settings.
+
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Instances.Creation;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
@@ -41,7 +43,7 @@ public static class InstanceEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).Produces<InstanceSummary[]>(200);
+        }).Produces<InstanceSummary[]>();
 
         // the group index of the instance list (MainWindow's group view)
         api.MapGet("/instances/groups", async (LauncherRuntime runtime) =>
@@ -72,7 +74,7 @@ public static class InstanceEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).Produces<InstanceGroupView[]>(200);
+        }).Produces<InstanceGroupView[]>();
 
         // {ref} resolves through the D2 chain (inode → uuid → dirname); direct
         // GetInstanceById is banned at the API boundary (GLOBAL §1 review rule)
@@ -90,7 +92,7 @@ public static class InstanceEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).Produces<InstanceDetail>(200);
+        }).Produces<InstanceDetail>();
 
         api.MapPost("/instances/vanilla", async (VanillaCreateRequest request, LauncherRuntime runtime) =>
         {
@@ -330,15 +332,15 @@ public static class InstanceEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
                 }
-                var settings = inst.Settings();
+                var settings = inst.Settings;
                 var node = new JsonObject();
-                if (settings is Core.Config.InstanceJsonSettingsObject typed)
+                if (settings is InstanceJsonSettingsObject typed)
                 {
                     // the instance's own layer (D4): the derived gate states, every
                     // instance-layer member that is set (with its EFFECTIVE value — the C7
                     // fold over flint.json) and the runtime time trio (instance-state.json).
                     // Keys the instance layer never set are absent — they inherit.
-                    foreach (var entry in Core.Config.InstanceConfigKeys.All
+                    foreach (var entry in InstanceConfigKeys.All
                                  .OrderBy(e => e.Key, StringComparer.Ordinal))
                     {
                         var derivedGate = entry.Key.StartsWith("Override", StringComparison.Ordinal);
@@ -369,7 +371,7 @@ public static class InstanceEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).Produces<Dictionary<string, JsonElement>>(200);
+        }).Produces<Dictionary<string, JsonElement>>();
 
         api.MapPut("/instances/{ref}/settings", async (string @ref, SettingsPutRequest request,
                                                       LauncherRuntime runtime) =>
@@ -387,7 +389,7 @@ public static class InstanceEndpoints
                 {
                     return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
                 }
-                var settings = inst.Settings();
+                var settings = inst.Settings;
 
                 foreach (var property in request.Overrides.EnumerateObject())
                 {
@@ -412,7 +414,7 @@ public static class InstanceEndpoints
 
     public static InstanceSummary Summary(BaseInstance inst, LauncherRuntime runtime)
     {
-        _ = inst.Settings(); // ensure the type-specific settings (and InstanceType) are loaded
+        _ = inst.Settings; // ensure the type-specific settings (and InstanceType) are loaded
         var list = runtime.Instances;
         return new InstanceSummary(
             inst.Id(),
@@ -430,7 +432,7 @@ public static class InstanceEndpoints
 
     public static InstanceDetail Detail(BaseInstance inst, LauncherRuntime runtime)
     {
-        _ = inst.Settings();
+        _ = inst.Settings;
         var list = runtime.Instances;
         return new InstanceDetail(
             inst.Id(),

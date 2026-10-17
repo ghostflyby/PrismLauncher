@@ -3,9 +3,11 @@
 // HttpListener pattern, see StubModrinthServer) plus synthetic CurseForge manifest.zip
 // payload builders (manifest.json + overrides) and the file/project/fingerprint JSON
 // templates shared by the tests.
+
 using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Hashing;
 
 namespace Flint.Tests;
@@ -324,13 +326,13 @@ internal sealed class FlamePackBuilder
             ["minecraft"] = new JsonObject
             {
                 ["version"] = mcVersion,
-                ["modLoaders"] = new JsonArray((JsonNode?)new JsonObject
+                ["modLoaders"] = new JsonArray(new JsonObject
                 {
                     ["id"] = loader,
                     ["primary"] = true,
                 }),
             },
-            ["files"] = new JsonArray((JsonNode?)new JsonObject
+            ["files"] = new JsonArray(new JsonObject
             {
                 ["projectID"] = projectId,
                 ["fileID"] = fileId,
@@ -354,7 +356,7 @@ internal sealed class FlamePackBuilder
             File.WriteAllText(Path.Combine(dir, "overrides", "options.txt"), OptionsTxt);
             File.WriteAllText(Path.Combine(dir, "overrides", "config", "settings.txt"), ConfigTxt);
             File.WriteAllBytes(Path.Combine(dir, "overrides", "mods", "override.jar"), ModBytes);
-            return FlintLauncher.Core.IO.MMCZip.CompressDir(path, dir);
+            return MmcZip.CompressDir(path, dir);
         }
         finally
         {

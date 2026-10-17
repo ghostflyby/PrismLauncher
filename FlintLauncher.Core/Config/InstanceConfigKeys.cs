@@ -18,6 +18,8 @@
 //
 // The C7 passthrough pair (ConsoleMaxLines/ConsoleOverflowStop) is deliberately global-only:
 // reads come from the user layer, instance-side writes are dropped (non-layered per C7).
+
+using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Config;
@@ -127,9 +129,9 @@ public static class InstanceConfigKeys
         i.Launch?.Performance?.UseDiscreteGpu, i.Launch?.Performance?.UseZink);
 
     private static bool GateNativeLib(InstanceConfigFile i) => Any(
-        i.Launch?.NativeLib?.UseNativeOpenAL, i.Launch?.NativeLib?.CustomOpenALPath,
-        i.Launch?.NativeLib?.UseNativeGLFW, i.Launch?.NativeLib?.CustomGLFWPath,
-        i.Launch?.NativeLib?.UseNativeSDL, i.Launch?.NativeLib?.CustomSDLPath);
+        i.Launch?.NativeLib?.UseNativeOpenAl, i.Launch?.NativeLib?.CustomOpenAlPath,
+        i.Launch?.NativeLib?.UseNativeGlfw, i.Launch?.NativeLib?.CustomGlfwPath,
+        i.Launch?.NativeLib?.UseNativeSdl, i.Launch?.NativeLib?.CustomSdlPath);
 
     private static bool GateConsole(InstanceConfigFile i) => Any(
         i.Misc?.Console?.ShowConsole, i.Misc?.Console?.AutoCloseConsole,
@@ -461,80 +463,80 @@ public static class InstanceConfigKeys
 
             // ---- native library workarounds (OverrideNativeWorkarounds)
             E("UseNativeOpenAL", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.UseNativeOpenAL ?? u.NativeLib.UseNativeOpenAL,
-                i => i.Launch?.NativeLib?.UseNativeOpenAL is not null,
+                (u, i) => i.Launch?.NativeLib?.UseNativeOpenAl ?? u.NativeLib.UseNativeOpenAl,
+                i => i.Launch?.NativeLib?.UseNativeOpenAl is not null,
                 (i, v) => i with
                 {
                     Launch = (i.Launch ?? new()) with
                     {
                         NativeLib = (i.Launch?.NativeLib ?? new()) with
                         {
-                            UseNativeOpenAL = BoolOf(v),
+                            UseNativeOpenAl = BoolOf(v),
                         },
                     },
                 }),
             E("CustomOpenALPath", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.CustomOpenALPath ?? u.NativeLib.CustomOpenALPath,
-                i => i.Launch?.NativeLib?.CustomOpenALPath is not null,
+                (u, i) => i.Launch?.NativeLib?.CustomOpenAlPath ?? u.NativeLib.CustomOpenAlPath,
+                i => i.Launch?.NativeLib?.CustomOpenAlPath is not null,
                 (i, v) => i with
                 {
                     Launch = (i.Launch ?? new()) with
                     {
                         NativeLib = (i.Launch?.NativeLib ?? new()) with
                         {
-                            CustomOpenALPath = StringOf(v),
+                            CustomOpenAlPath = StringOf(v),
                         },
                     },
                 }),
             E("UseNativeGLFW", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.UseNativeGLFW ?? u.NativeLib.UseNativeGLFW,
-                i => i.Launch?.NativeLib?.UseNativeGLFW is not null,
+                (u, i) => i.Launch?.NativeLib?.UseNativeGlfw ?? u.NativeLib.UseNativeGlfw,
+                i => i.Launch?.NativeLib?.UseNativeGlfw is not null,
                 (i, v) => i with
                 {
                     Launch = (i.Launch ?? new()) with
                     {
                         NativeLib = (i.Launch?.NativeLib ?? new()) with
                         {
-                            UseNativeGLFW = BoolOf(v),
+                            UseNativeGlfw = BoolOf(v),
                         },
                     },
                 }),
             E("CustomGLFWPath", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.CustomGLFWPath ?? u.NativeLib.CustomGLFWPath,
-                i => i.Launch?.NativeLib?.CustomGLFWPath is not null,
+                (u, i) => i.Launch?.NativeLib?.CustomGlfwPath ?? u.NativeLib.CustomGlfwPath,
+                i => i.Launch?.NativeLib?.CustomGlfwPath is not null,
                 (i, v) => i with
                 {
                     Launch = (i.Launch ?? new()) with
                     {
                         NativeLib = (i.Launch?.NativeLib ?? new()) with
                         {
-                            CustomGLFWPath = StringOf(v),
+                            CustomGlfwPath = StringOf(v),
                         },
                     },
                 }),
             E("UseNativeSDL", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.UseNativeSDL ?? u.NativeLib.UseNativeSDL,
-                i => i.Launch?.NativeLib?.UseNativeSDL is not null,
+                (u, i) => i.Launch?.NativeLib?.UseNativeSdl ?? u.NativeLib.UseNativeSdl,
+                i => i.Launch?.NativeLib?.UseNativeSdl is not null,
                 (i, v) => i with
                 {
                     Launch = (i.Launch ?? new()) with
                     {
                         NativeLib = (i.Launch?.NativeLib ?? new()) with
                         {
-                            UseNativeSDL = BoolOf(v),
+                            UseNativeSdl = BoolOf(v),
                         },
                     },
                 }),
             E("CustomSDLPath", "OverrideNativeWorkarounds",
-                (u, i) => i.Launch?.NativeLib?.CustomSDLPath ?? u.NativeLib.CustomSDLPath,
-                i => i.Launch?.NativeLib?.CustomSDLPath is not null,
+                (u, i) => i.Launch?.NativeLib?.CustomSdlPath ?? u.NativeLib.CustomSdlPath,
+                i => i.Launch?.NativeLib?.CustomSdlPath is not null,
                 (i, v) => i with
                 {
                     Launch = (i.Launch ?? new()) with
                     {
                         NativeLib = (i.Launch?.NativeLib ?? new()) with
                         {
-                            CustomSDLPath = StringOf(v),
+                            CustomSdlPath = StringOf(v),
                         },
                     },
                 }),
@@ -882,7 +884,7 @@ public static class InstanceConfigKeys
         null => null,
         IReadOnlyList<string> list => list,
         IEnumerable<string> en => en.ToList(),
-        string text => Json.JsonUtils.ToStringList(text),
+        string text => JsonUtils.ToStringList(text),
         _ => null,
     };
 }

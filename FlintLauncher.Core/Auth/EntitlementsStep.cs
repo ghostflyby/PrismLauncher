@@ -30,7 +30,7 @@ public sealed class EntitlementsStep : AuthStep
         var url = _auth.MinecraftServices.TrimEnd('/') + "/entitlements/license?requestId=" + entitlementsRequestId;
         var headers = new List<KeyValuePair<string, string>>(Headers)
         {
-            new("Authorization", $"Bearer {Data.YggdrasilToken.Token_}"),
+            new("Authorization", $"Bearer {Data.YggdrasilToken.Value}"),
         };
 
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest

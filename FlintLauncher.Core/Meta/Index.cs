@@ -2,6 +2,8 @@
 // Port of launcher/meta/Index.{h,cpp} (the non-Qt subset). The QAbstractListModel roles
 // (data()/rowCount()/headerData()), the Qt dataChanged wiring of connectVersionList() and the
 // blocking getLoadedVersion() QEventLoop are UI plumbing and are not ported.
+
+using System.Text.Json.Nodes;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 
@@ -90,7 +92,7 @@ public sealed class Index : MetaEntity
         }
     }
 
-    public override void Parse(System.Text.Json.Nodes.JsonObject obj)
+    public override void Parse(JsonObject obj)
     {
         MetaJsonFormat.ParseIndex(obj, this);
     }

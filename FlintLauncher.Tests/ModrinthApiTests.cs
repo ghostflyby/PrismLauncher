@@ -6,22 +6,26 @@
 //
 // The Modrinth base URL is a static override hook (like AuthEndpoints), so the whole class
 // is serialized through the "ModrinthApi" collection and restores the defaults in Dispose.
+
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
-using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
-using ResourceType = FlintLauncher.Core.ModPlatform.ResourceType;
 using Xunit;
+using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
+using ResourceType = FlintLauncher.Core.ModPlatform.ResourceType;
 
 namespace Flint.Tests;
 
@@ -64,7 +68,7 @@ public class ModrinthApiTests : IDisposable
     /// </summary>
     private static void UnpackInto(string mrpackPath, string staging)
     {
-        Assert.NotNull(FlintLauncher.Core.IO.MMCZip.ExtractDir(mrpackPath, "", staging));
+        Assert.NotNull(MmcZip.ExtractDir(mrpackPath, "", staging));
         // the downloaded mods and overrides must land in place
         Directory.CreateDirectory(Path.Combine(staging, "minecraft", "mods"));
     }
@@ -86,7 +90,7 @@ public class ModrinthApiTests : IDisposable
             OpenSource = true,
         };
 
-        var url = _api.GetSearchURL(args);
+        var url = _api.GetSearchUrl(args);
 
         Assert.NotNull(url);
         Assert.StartsWith(_baseUrl + "/search?", url);
@@ -121,7 +125,7 @@ public class ModrinthApiTests : IDisposable
             CategoryIds = ["adventure", "technology", "utility"],
         };
 
-        var url = _api.GetSearchURL(args);
+        var url = _api.GetSearchUrl(args);
         Assert.NotNull(url);
 
         var urlText = Uri.UnescapeDataString(url);
@@ -141,14 +145,14 @@ public class ModrinthApiTests : IDisposable
     {
         var args = new SearchArgs { Type = ResourceType.Mod };
         args.Loaders = (ModLoaderType)0x8000; // no Modrinth support for unknown loaders
-        Assert.Null(_api.GetSearchURL(args));
+        Assert.Null(_api.GetSearchUrl(args));
     }
 
     [Fact]
     public async Task Search_SendsFacetsQueryParam()
     {
         var args = new SearchArgs { Type = ResourceType.Mod, Offset = 0, Search = "jei" };
-        var url = _api.GetSearchURL(args)!;
+        var url = _api.GetSearchUrl(args)!;
 
         var request = NetRequest.MakeByteArray(new Uri(url));
         await request.StartAsync();
@@ -257,7 +261,7 @@ public class ModrinthApiTests : IDisposable
     [Fact]
     public void VersionFileHelpers_MapUrlsAndLoaders()
     {
-        Assert.Equal("https://modrinth.com/user/flowln", ModrinthApi.GetAuthorURL("flowln"));
+        Assert.Equal("https://modrinth.com/user/flowln", ModrinthApi.GetAuthorUrl("flowln"));
         Assert.Equal(["fabric", "quilt"], ModrinthApi.GetModLoaderStrings(ModLoaderType.Fabric | ModLoaderType.Quilt));
         Assert.Equal("\"categories:fabric\",\"categories:quilt\"",
             ModrinthApi.GetModLoaderFilters(ModLoaderType.Fabric | ModLoaderType.Quilt));
@@ -470,7 +474,7 @@ public class ModrinthApiTests : IDisposable
 
         // ... then export the instance again (the staged instance is Flint format, D4)
         var instance = new MinecraftInstance(
-            new FlintLauncher.Core.Config.InstanceJsonSettingsObject(staging, _global.Environment), staging);
+            new InstanceJsonSettingsObject(staging, _global.Environment), staging);
         var output = TempPath("exported.mrpack");
         var export = new ModrinthPackExportTask("Round Trip Pack", "1.0.0", "round trip", optionalFiles: true,
             instance, output, modrinth: _api);
@@ -479,7 +483,7 @@ public class ModrinthApiTests : IDisposable
         Assert.True(export.WasSuccessful, export.FailReason);
         Assert.True(File.Exists(output));
 
-        using var zip = System.IO.Compression.ZipFile.OpenRead(output);
+        using var zip = ZipFile.OpenRead(output);
         var names = zip.Entries.Select(e => e.FullName).ToHashSet();
 
         // the mod resolved through the API is referenced by URL, not packed
@@ -530,7 +534,7 @@ public class ModrinthApiTests : IDisposable
             Slug = "test-mod",
             Name = "Test Mod",
             Filename = "test.jar",
-            Provider = ResourceProvider.MODRINTH,
+            Provider = ResourceProvider.Modrinth,
             ProjectId = "projId1",
             FileId = "oldVersion",
             VersionNumber = "1.0.0",
@@ -556,7 +560,7 @@ public class ModrinthApiTests : IDisposable
         Assert.Equal("Test Mod", update.Name);
         Assert.Equal("1.0.0", update.OldVersion);
         Assert.Equal("2.0.0", update.NewVersion);
-        Assert.Equal(ResourceProvider.MODRINTH, update.Provider);
+        Assert.Equal(ResourceProvider.Modrinth, update.Provider);
     }
 
     [Fact]
@@ -573,7 +577,7 @@ public class ModrinthApiTests : IDisposable
             Slug = "test-mod",
             Name = "Test Mod",
             Filename = "test.jar",
-            Provider = ResourceProvider.MODRINTH,
+            Provider = ResourceProvider.Modrinth,
             ProjectId = "projId1",
             FileId = "verId1",
             VersionNumber = "1.0.0",
@@ -599,7 +603,7 @@ public class ModrinthApiTests : IDisposable
     public void HashUtils_Port_ProvidesModrinthHashType()
     {
         // the Modrinth hasher uses the first declared hash type (sha512)
-        Assert.Equal("sha512", ProviderCapabilities.HashType(ResourceProvider.MODRINTH)[0]);
+        Assert.Equal("sha512", ProviderCapabilities.HashType(ResourceProvider.Modrinth)[0]);
         var data = "payload"u8.ToArray();
         Assert.Equal(HashUtils.Hash(data, Algorithm.Sha512), HashUtils.Hash(data, "sha512"));
     }

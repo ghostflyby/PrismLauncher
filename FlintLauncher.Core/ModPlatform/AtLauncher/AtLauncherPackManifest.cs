@@ -3,6 +3,7 @@
 // model (loader, libraries, mods incl. optional flags, configs checksum, keeps/deletes,
 // mainClass/extraArguments) with the exact fields the C++ loadVersion() reads. Reads go
 // through the JsonNode model (single-DOM, the JsonUtils node-side family).
+
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 
@@ -27,7 +28,7 @@ public enum ModType : byte
     Ic2Lib,
     DenLib,
     Coremods,
-    MCPC,
+    Mcpc,
     Plugins,
     Extract,
     Decomp,
@@ -200,7 +201,7 @@ public static class AtLauncherPackManifest
         "ic2lib" => ModType.Ic2Lib,
         "denlib" => ModType.DenLib,
         "coremods" => ModType.Coremods,
-        "mcpc" => ModType.MCPC,
+        "mcpc" => ModType.Mcpc,
         "plugins" => ModType.Plugins,
         "extract" => ModType.Extract,
         "decomp" => ModType.Decomp,

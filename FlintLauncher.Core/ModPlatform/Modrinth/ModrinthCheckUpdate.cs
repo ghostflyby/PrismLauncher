@@ -10,9 +10,12 @@
 //  - The ResourceDownloadTask / GetModDependenciesTask wiring of the C++ Update struct is
 //    not ported yet (P6-c); the update record carries the resolved IndexedVersion instead.
 //  - The dependency list (m_deps) is not ported.
+
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
+using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 
@@ -39,21 +42,21 @@ public sealed class ModrinthCheckUpdate : FlintTask
 
     private readonly IReadOnlyList<Resource> _resources;
     private readonly IReadOnlyList<McVersion> _gameVersions;
-    private readonly List<Minecraft.ModLoaderType> _loadersList;
+    private readonly List<ModLoaderType> _loadersList;
     private readonly Func<Resource, MetadataHandler.ModStruct?> _metadataLookup;
     private readonly IReadOnlyList<IndexedVersionType> _releaseTypes;
     private readonly ModrinthApi _modrinth;
 
-    private readonly string _hashType = ProviderCapabilities.HashType(ResourceProvider.MODRINTH)[0];
+    private readonly string _hashType = ProviderCapabilities.HashType(ResourceProvider.Modrinth)[0];
     private readonly Dictionary<string, Resource> _mappings = new(StringComparer.Ordinal); // hash -> resource
 
     private readonly List<Update> _updates = [];
-    private int _loaderIdx;
-    private int _initialSize;
+    private int loaderIdx;
+    private int initialSize;
 
     public ModrinthCheckUpdate(IReadOnlyList<Resource> resources,
                                IReadOnlyList<McVersion> mcVersions,
-                               IReadOnlyList<Minecraft.ModLoaderType> loadersList,
+                               IReadOnlyList<ModLoaderType> loadersList,
                                Func<Resource, MetadataHandler.ModStruct?> metadataLookup,
                                IReadOnlyList<IndexedVersionType>? releaseTypes = null,
                                ModrinthApi? modrinth = null)
@@ -67,11 +70,11 @@ public sealed class ModrinthCheckUpdate : FlintTask
 
         if (_loadersList.Count != 0)
         { // this is for mods so append all the other posible loaders to the initial list
-            _initialSize = _loadersList.Count;
-            Minecraft.ModLoaderType modLoaders = Minecraft.ModLoaderType.None;
+            initialSize = _loadersList.Count;
+            ModLoaderType modLoaders = ModLoaderType.None;
             foreach (var m in resources)
             {
-                modLoaders |= _metadataLookup(m)?.Loaders ?? Minecraft.ModLoaderType.None;
+                modLoaders |= _metadataLookup(m)?.Loaders ?? ModLoaderType.None;
             }
             foreach (var l in _loadersList)
             {
@@ -101,7 +104,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
 
             if (metadata.HashFormat != _hashType)
             {
-                var hashTask = Hashing.HashUtils.CreateHasher(resource.Fileinfo.FullName, ResourceProvider.MODRINTH);
+                var hashTask = HashUtils.CreateHasher(resource.Fileinfo.FullName, ResourceProvider.Modrinth);
                 await hashTask.StartAsync(cancellationToken);
                 if (!hashTask.WasSuccessful)
                 {
@@ -116,10 +119,10 @@ public sealed class ModrinthCheckUpdate : FlintTask
         await CheckNextLoader(cancellationToken);
     }
 
-    private async Task GetUpdateModsForLoader(Minecraft.ModLoaderType? loader, bool forceModLoaderCheck,
+    private async Task GetUpdateModsForLoader(ModLoaderType? loader, bool forceModLoaderCheck,
         CancellationToken cancellationToken)
     {
-        _loaderIdx++;
+        loaderIdx++;
 
         EmitStatus("Waiting for the API response from Modrinth...");
 
@@ -151,7 +154,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
         await CheckVersionsResponse(request.BodyAsString, loader, cancellationToken);
     }
 
-    private async Task CheckVersionsResponse(string response, Minecraft.ModLoaderType? loader,
+    private async Task CheckVersionsResponse(string response, ModLoaderType? loader,
         CancellationToken cancellationToken)
     {
         EmitStatus("Parsing the API response from Modrinth...");
@@ -225,7 +228,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
                         NewVersion = projectVer.VersionNumber,
                         NewVersionType = projectVer.VersionType,
                         Changelog = projectVer.Changelog,
-                        Provider = ResourceProvider.MODRINTH,
+                        Provider = ResourceProvider.Modrinth,
                         Version = projectVer,
                         Enabled = resource.Enabled,
                     });
@@ -248,12 +251,12 @@ public sealed class ModrinthCheckUpdate : FlintTask
             EmitSucceeded();
             return;
         }
-        if (_loaderIdx < _loadersList.Count)
+        if (loaderIdx < _loadersList.Count)
         { // this are mods so check with loaders
-            await GetUpdateModsForLoader(_loadersList[_loaderIdx], _loaderIdx > _initialSize, cancellationToken);
+            await GetUpdateModsForLoader(_loadersList[loaderIdx], loaderIdx > initialSize, cancellationToken);
             return;
         }
-        if (_loadersList.Count == 0 && _loaderIdx == 0)
+        if (_loadersList.Count == 0 && loaderIdx == 0)
         { // this are other resources no need to check more than once with empty loader
             await GetUpdateModsForLoader(null, forceModLoaderCheck: false, cancellationToken);
             return;

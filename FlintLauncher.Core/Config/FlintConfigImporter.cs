@@ -26,6 +26,7 @@
 // non-empty imported JavaPath and no explicit AutomaticJavaSwitch/Download key, the pair
 // lands false in flint.json (Application.cpp computes the default from the INI-loaded
 // JavaPath before registering the keys; the typed records default them true unconditionally).
+
 using FlintLauncher.Core.Secrets;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.State;

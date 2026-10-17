@@ -8,6 +8,7 @@
 //    ported C++ tests' expectations hold on every platform; Qt uses the native
 //    separator for toNativeSeparators-based helpers such as pathDepth/pathTruncate).
 //  - QFileInfo::path() is reimplemented as FileInfoPath.
+
 using System.Globalization;
 using System.Text;
 
@@ -208,7 +209,6 @@ public static class FileSystem
                 {
                     failed = true;
                     failedPaths?.Add(dstPath);
-                    return;
                 }
             }
         }
@@ -494,7 +494,7 @@ public static class FileSystem
     public static string DirNameFromString(string str, IReadOnlyList<string> inDirs)
     {
         var num = 0;
-        var baseName = RemoveInvalidFilenameChars(str, '-');
+        var baseName = RemoveInvalidFilenameChars(str);
         string dirName;
         do
         {

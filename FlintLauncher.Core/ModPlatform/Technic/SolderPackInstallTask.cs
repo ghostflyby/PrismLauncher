@@ -6,6 +6,8 @@
 //
 // Deviation (headless port): the C++ downloads into a QTemporaryDir; the port uses a
 // temporary folder under the system temp path that is removed afterwards.
+
+using System.Security.Cryptography;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
@@ -18,14 +20,14 @@ public sealed class SolderPackInstallTask : InstanceTask
     private readonly Uri _solderUrl;
     private readonly string _pack;
     private readonly string _version;
-    private string _minecraftVersion;
+    private string minecraftVersion;
 
     public SolderPackInstallTask(Uri solderUrl, string pack, string version, string minecraftVersion)
     {
         _solderUrl = solderUrl;
         _pack = pack;
         _version = version;
-        _minecraftVersion = minecraftVersion;
+        this.minecraftVersion = minecraftVersion;
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -65,7 +67,7 @@ public sealed class SolderPackInstallTask : InstanceTask
 
         if (build.Minecraft.Length != 0)
         {
-            _minecraftVersion = build.Minecraft;
+            minecraftVersion = build.Minecraft;
         }
 
         var outputDir = Path.Combine(Path.GetTempPath(), $"flint-solder-{Guid.NewGuid():N}");
@@ -82,7 +84,7 @@ public sealed class SolderPackInstallTask : InstanceTask
                 var dl = NetRequest.MakeFile(new Uri(mod.Url), path);
                 if (mod.Md5.Length != 0)
                 {
-                    dl.AddValidator(ChecksumValidator.FromHex(System.Security.Cryptography.HashAlgorithmName.MD5, mod.Md5));
+                    dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.MD5, mod.Md5));
                 }
                 filesJob.AddNetRequest(dl);
 
@@ -120,7 +122,7 @@ public sealed class SolderPackInstallTask : InstanceTask
         while (modCount > i)
         {
             var path = Path.Combine(outputDir, i.ToString());
-            if (MMCZip.ExtractDir(path, "", extractDir) is null)
+            if (MmcZip.ExtractDir(path, "", extractDir) is null)
             {
                 EmitFailed("Failed to extract modpack");
                 return;
@@ -133,7 +135,7 @@ public sealed class SolderPackInstallTask : InstanceTask
         var failure = await TechnicPackProcessor.RunAsync(
             Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution."),
-            Name(), Icon, StagingPath, _minecraftVersion, isSolder: true,
+            Name(), Icon, StagingPath, minecraftVersion, isSolder: true,
             cancellationToken: cancellationToken);
         if (failure is not null)
         {

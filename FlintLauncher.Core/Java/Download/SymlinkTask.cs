@@ -5,6 +5,7 @@
 // FS::create_link becomes System.IO.File.CreateSymbolicLink (available since .NET 6, AOT-safe);
 // existing destinations are skipped (the C++ std::filesystem call would throw on them, but the
 // task re-runs only when the wanted bin path is missing anyway).
+
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Tasks;
 

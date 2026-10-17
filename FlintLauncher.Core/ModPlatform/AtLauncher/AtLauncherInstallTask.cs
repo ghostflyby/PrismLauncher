@@ -27,12 +27,16 @@
 //    a plain download into a temporary folder (the C++ always goes through the cache).
 //  - downloadFiles() (the P5 update pipeline) is not ported; creation succeeds without
 //    fetching game files, like the other creation tasks.
+
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
+using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
@@ -86,10 +90,10 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
 
     /// <summary>BlockedModsDialog stand-in: given a blocked mod, return a matching local file
     /// path (null when the user has none).</summary>
-    public Func<Flame.BlockedMod, string?>? BlockedModLocalFileResolver { get; set; }
+    public Func<BlockedMod, string?>? BlockedModLocalFileResolver { get; set; }
 
     /// <summary>The blocked (browser-download) files reported when the resolver ran.</summary>
-    public IReadOnlyList<Flame.BlockedMod> BlockedMods { get; private set; } = [];
+    public IReadOnlyList<BlockedMod> BlockedMods { get; private set; } = [];
 
     // ------------------------------------------------------------- meta layer hooks
 
@@ -106,9 +110,9 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
     // -------------------------------------------------------------------- state
 
     private readonly PackVersion _version = new();
-    private string _archivePath = "";
+    private string archivePath = "";
     private readonly List<string> _jarMods = [];
-    private VersionFile? _minecraftVersionData;
+    private VersionFile? minecraftVersionData;
     private readonly Dictionary<string, string> _componentsToInstall = new();
     private readonly Dictionary<string, VersionMod> _modsToExtract = new();
     private readonly Dictionary<string, VersionMod> _modsToDecomp = new();
@@ -174,7 +178,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
 
         // (the C++ fails the install when net.minecraft is not in the local metadata index;
         //  see the header note for the best-effort deviation)
-        _minecraftVersionData = MetaVersionDataLookup?.Invoke("net.minecraft", _version.Minecraft);
+        minecraftVersionData = MetaVersionDataLookup?.Invoke("net.minecraft", _version.Minecraft);
 
         if (resetDirectory)
         {
@@ -309,7 +313,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
             case ModType.Decomp:
             case ModType.TexturePackExtract:
             case ModType.ResourcePackExtract:
-            case ModType.MCPC:
+            case ModType.Mcpc:
                 return null;
             case ModType.Forge:
             // Forge detection happens later on, if it cannot be detected it will
@@ -446,9 +450,9 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
             }
         }
 
-        if (_minecraftVersionData is not null)
+        if (minecraftVersionData is not null)
         {
-            foreach (var library in _minecraftVersionData.Libraries)
+            foreach (var library in minecraftVersionData.Libraries)
             {
                 exempt.Add(library.RawName());
             }
@@ -637,7 +641,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
     private static void WritePatchFile(string patchFileName, VersionFile f)
     {
         FileSystem.Write(patchFileName,
-            System.Text.Encoding.UTF8.GetBytes(QtJson.ToIndentedString(OneSixVersionFormat.VersionFileToJson(f)) + "\n"));
+            Encoding.UTF8.GetBytes(QtJson.ToIndentedString(OneSixVersionFormat.VersionFileToJson(f)) + "\n"));
     }
 
     private async Task InstallConfigs(CancellationToken cancellationToken)
@@ -653,12 +657,12 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
             var entry = MetaCache.ResolveEntry("ATLauncherPacks", path);
             entry.SetStale(true);
             dl = NetRequest.MakeCached(MetaCache, new Uri(url), entry, stack: _api.Net);
-            _archivePath = entry.GetFullPath();
+            archivePath = entry.GetFullPath();
         }
         else
         {
-            _archivePath = TempCachePath(path);
-            dl = NetRequest.MakeFile(new Uri(url), _archivePath, stack: _api.Net);
+            archivePath = TempCachePath(path);
+            dl = NetRequest.MakeFile(new Uri(url), archivePath, stack: _api.Net);
         }
 
         if (_version.Configs.Sha1.Length != 0)
@@ -682,7 +686,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
 
         var extractDir = FileSystem.PathCombine(StagingPath, "minecraft");
         // (the C++ does not check the extraction result here — it proceeds to the mods)
-        _ = MMCZip.ExtractDir(_archivePath, "", extractDir);
+        _ = MmcZip.ExtractDir(archivePath, "", extractDir);
 
         await DownloadMods(cancellationToken);
     }
@@ -719,7 +723,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
         _jarMods.Clear();
         var modJob = new NetJob("Mod download");
         var downloadRequests = new List<NetRequest>();
-        var blockedMods = new List<(VersionMod Mod, Flame.BlockedMod Blocked)>();
+        var blockedMods = new List<(VersionMod Mod, BlockedMod Blocked)>();
 
         foreach (var mod in _version.Mods)
         {
@@ -743,7 +747,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
                     break;
                 case DownloadType.Browser:
                     {
-                        blockedMods.Add((mod, new Flame.BlockedMod
+                        blockedMods.Add((mod, new BlockedMod
                         {
                             Name = mod.File,
                             WebsiteUrl = mod.Url,
@@ -988,7 +992,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
                 }
             }
 
-            if (MMCZip.ExtractDir(modPath, folderToExtract, extractToPath) is null)
+            if (MmcZip.ExtractDir(modPath, folderToExtract, extractToPath) is null)
             {
                 // assume error
                 return false;
@@ -1010,7 +1014,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
                 return false;
             }
 
-            if (!MMCZip.ExtractFile(modPath, mod.DecompFile, extractToPath))
+            if (!MmcZip.ExtractFile(modPath, mod.DecompFile, extractToPath))
             {
                 return false;
             }
@@ -1041,7 +1045,7 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
 
         // D4: the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
-            new Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
+            new InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution.")),
             StagingPath);
         {

@@ -12,12 +12,14 @@
 // BuildConfig.TECHNIC_API_BASE_URL constant). The optional `serverUrl` (query param on the
 // GETs, body field on the install) selects a per-request derived client instead of mutating
 // the shared one, so an override can never leak into other requests (and needs no restore).
+
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
+using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 
@@ -35,13 +37,13 @@ public static class TechnicEndpoints
         api.MapGet("/modplatform/technic/search", async Task<IResult> (string? query, string? serverUrl,
             LauncherRuntime runtime) =>
             await SearchAsync(string.IsNullOrWhiteSpace(query) ? "" : query.Trim(), serverUrl, runtime))
-            .Produces<TechnicSearchResultView[]>(200);
+            .Produces<TechnicSearchResultView[]>();
 
         // ----------------------------------------------- modplatform/technic/trending
         api.MapGet("/modplatform/technic/trending", async Task<IResult> (string? serverUrl,
             LauncherRuntime runtime) =>
             await SearchAsync("", serverUrl, runtime))
-            .Produces<TechnicSearchResultView[]>(200);
+            .Produces<TechnicSearchResultView[]>();
 
         // --------------------------------------------- modplatform/technic/modpack/{slug}
         // TechnicPage::suggestCurrent's metadata step (+ metadataLoaded's Solder build
@@ -119,7 +121,7 @@ public static class TechnicEndpoints
                 versions,
                 recommended,
                 latest));
-        }).Produces<TechnicPackView>(200);
+        }).Produces<TechnicPackView>();
 
         // ------------------------------------------------- modplatform/technic/install
         api.MapPost("/modplatform/technic/install", async Task<IResult> (
@@ -275,7 +277,7 @@ public static class TechnicEndpoints
         var (url, mode) = api.SearchUrl(term);
         var request = NetRequest.MakeByteArray(new Uri(url), stack: api.Net);
         await request.StartAsync();
-        if (request.State != Core.Tasks.TaskState.Succeeded)
+        if (request.State != TaskState.Succeeded)
         {
             return ApiJson.Error("technic_unavailable",
                 $"technic search failed: {request.FailReason}", 502);
@@ -298,7 +300,7 @@ public static class TechnicEndpoints
     {
         var request = NetRequest.MakeByteArray(new Uri(url), stack: net);
         await request.StartAsync();
-        return request.State != Core.Tasks.TaskState.Succeeded
+        return request.State != TaskState.Succeeded
             ? (ApiJson.Error("technic_unavailable",
                 $"technic request failed: {request.FailReason}", 502), request.FailReason, "")
             : (null, "", request.BodyAsString);

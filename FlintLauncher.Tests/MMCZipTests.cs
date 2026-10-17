@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Focused round-trip tests for the port of launcher/MMCZip.{h,cpp}.
+
 using System.IO.Compression;
 using FlintLauncher.Core.IO;
 using Xunit;
 
 namespace FlintLauncher.Tests;
 
-public class MMCZipTests : IDisposable
+public class MmcZipTests : IDisposable
 {
     private readonly string _tempDir = Path.Combine(Path.GetTempPath(), "flint-zip-" + Guid.NewGuid().ToString("N"));
 
-    public MMCZipTests()
+    public MmcZipTests()
     {
         Directory.CreateDirectory(_tempDir);
     }
@@ -46,11 +47,11 @@ public class MMCZipTests : IDisposable
     {
         var src = MakeSourceDir();
         var zipPath = Path.Combine(_tempDir, "out.zip");
-        Assert.True(MMCZip.CompressDir(zipPath, src));
+        Assert.True(MmcZip.CompressDir(zipPath, src));
         Assert.True(File.Exists(zipPath));
 
         var dst = Path.Combine(_tempDir, "dst");
-        var extracted = MMCZip.ExtractDir(zipPath, dst);
+        var extracted = MmcZip.ExtractDir(zipPath, dst);
         Assert.NotNull(extracted);
         Assert.Contains(Path.Combine(dst, "a.txt"), extracted);
         Assert.Equal("alpha", File.ReadAllText(Path.Combine(dst, "a.txt")));
@@ -64,10 +65,10 @@ public class MMCZipTests : IDisposable
     {
         var src = MakeSourceDir();
         var zipPath = Path.Combine(_tempDir, "out.zip");
-        Assert.True(MMCZip.CompressDir(zipPath, src));
+        Assert.True(MmcZip.CompressDir(zipPath, src));
 
         var dst = Path.Combine(_tempDir, "dst-sub");
-        var extracted = MMCZip.ExtractDir(zipPath, "sub/", dst);
+        var extracted = MmcZip.ExtractDir(zipPath, "sub/", dst);
         Assert.NotNull(extracted);
         Assert.False(File.Exists(Path.Combine(dst, "a.txt")));
         Assert.Equal("beta", File.ReadAllText(Path.Combine(dst, "b.txt")));
@@ -78,12 +79,12 @@ public class MMCZipTests : IDisposable
     {
         var src = MakeSourceDir();
         var zipPath = Path.Combine(_tempDir, "out.zip");
-        Assert.True(MMCZip.CompressDir(zipPath, src));
+        Assert.True(MmcZip.CompressDir(zipPath, src));
 
         var target = Path.Combine(_tempDir, "only-a.txt");
-        Assert.True(MMCZip.ExtractFile(zipPath, "a.txt", target));
+        Assert.True(MmcZip.ExtractFile(zipPath, "a.txt", target));
         Assert.Equal("alpha", File.ReadAllText(target));
-        Assert.False(MMCZip.ExtractFile(zipPath, "missing.txt", target));
+        Assert.False(MmcZip.ExtractFile(zipPath, "missing.txt", target));
     }
 
     [Fact]
@@ -117,8 +118,8 @@ public class MMCZipTests : IDisposable
         using (var into = new ZipArchive(s, ZipArchiveMode.Create))
         {
             var contained = new HashSet<string>();
-            Assert.True(MMCZip.MergeZipFiles(into, zip2, contained, filter: key => !key.Contains("META-INF")));
-            Assert.True(MMCZip.MergeZipFiles(into, zip1, contained));
+            Assert.True(MmcZip.MergeZipFiles(into, zip2, contained, filter: key => !key.Contains("META-INF")));
+            Assert.True(MmcZip.MergeZipFiles(into, zip1, contained));
         }
 
         using var merged = ZipFile.OpenRead(mergedPath);
@@ -144,7 +145,7 @@ public class MMCZipTests : IDisposable
         }
 
         var dst = Path.Combine(_tempDir, "dst-slip");
-        var extracted = MMCZip.ExtractDir(zipPath, dst);
+        var extracted = MmcZip.ExtractDir(zipPath, dst);
         Assert.Null(extracted);
         Assert.False(File.Exists(Path.Combine(_tempDir, "evil.txt")));
     }
@@ -159,7 +160,7 @@ public class MMCZipTests : IDisposable
             // zero entries; the resulting EOCD-only file is 22 bytes
         }
         Assert.Equal(22, new FileInfo(zipPath).Length);
-        var extracted = MMCZip.ExtractDir(zipPath, Path.Combine(_tempDir, "dst-empty"));
+        var extracted = MmcZip.ExtractDir(zipPath, Path.Combine(_tempDir, "dst-empty"));
         Assert.NotNull(extracted);
         Assert.Empty(extracted);
     }

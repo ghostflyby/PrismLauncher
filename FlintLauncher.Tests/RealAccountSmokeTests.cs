@@ -2,6 +2,7 @@
 // Read-only smoke test against the real PrismLauncher accounts.json (same pattern as
 // RealDataSmokeTests): loads the account list through the port, then re-saves to a temp file and
 // compares the JSON structure (key sets, never bytes). Never writes to the real file.
+
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Auth;
 using Xunit;
@@ -43,10 +44,10 @@ public class RealAccountSmokeTests : IDisposable
             var account = list.At(i);
             // every account gets a runtime Id128 internal id
             Assert.Matches("^[0-9a-f]{32}$", account.InternalId);
-            Assert.True(Enum.IsDefined(account.AccountType_));
-            if (account.AccountType_ == AccountType.MSA)
+            Assert.True(Enum.IsDefined(account.AccountType));
+            if (account.AccountType == AccountType.Msa)
             {
-                Assert.False(string.IsNullOrEmpty(account.AccountData.MsaClientID));
+                Assert.False(string.IsNullOrEmpty(account.AccountData.MsaClientId));
             }
             if (account.HasProfile())
             {

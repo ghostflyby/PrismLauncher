@@ -2,9 +2,11 @@
 // Tests for the VanillaCreationTask port: folder layout, the instance.json identity keys and
 // the initial mmc-pack.json, verified through the real PackProfile loader. D4: a fresh
 // instance is Flint format from birth — no instance.cfg is written.
+
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Instances.Creation;
+using FlintLauncher.Core.Tasks;
 using Xunit;
 
 namespace Flint.Tests;
@@ -155,7 +157,7 @@ public class VanillaCreationTests : IDisposable
         Directory.CreateDirectory(task.StagingPath);
 
         await task.StartAsync();
-        Assert.Equal(FlintLauncher.Core.Tasks.TaskState.Failed, task.State);
+        Assert.Equal(TaskState.Failed, task.State);
     }
 
     [Fact]

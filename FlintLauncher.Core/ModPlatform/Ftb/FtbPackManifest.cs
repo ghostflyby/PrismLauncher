@@ -7,6 +7,7 @@
 // Deviations: the Json::require* calls throw JsonParseException (the C++ JSONValidationError);
 // optional fields keep the QJsonValue coercion defaults (toInt() of a missing value -> 0,
 // toString() -> ""); Modpack.safeName is a computed property instead of a parsed field.
+
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Json;

@@ -19,9 +19,11 @@
 //    error(QString, QString, uri) -> STATE_FAILED_HARD with the description;
 //    requestFailed(Error) -> STATE_OFFLINE for network errors on a granted/silent session,
 //    otherwise STATE_FAILED_SOFT ("Failed to refresh token." when silent).
+
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace FlintLauncher.Core.Auth;
@@ -30,8 +32,8 @@ public sealed class MsaInteractiveStep : AuthStep
 {
     private readonly bool _silent;
     private readonly AuthEndpointsOptions _auth;
-    private string _clientId = "";
-    private LoopbackListener? _listener;
+    private string clientId = "";
+    private LoopbackListener? listener;
 
     /// <summary>Port of the authorizeWithBrowser(const QUrl&amp;) signal.</summary>
     public event Action<string>? AuthorizeWithBrowser;
@@ -46,16 +48,16 @@ public sealed class MsaInteractiveStep : AuthStep
 
     public override void Abort()
     {
-        _listener?.Dispose();
-        _listener = null;
+        listener?.Dispose();
+        listener = null;
     }
 
     public override async Task PerformAsync(CancellationToken cancellationToken)
     {
-        _clientId = _auth.MsaClientId;
+        clientId = _auth.MsaClientId;
         if (_silent)
         {
-            if (Data.MsaClientID != _clientId)
+            if (Data.MsaClientId != clientId)
             {
                 EmitFinished(AccountTaskState.Disabled,
                     "Microsoft user authentication failed - client identification has changed.");
@@ -72,18 +74,18 @@ public sealed class MsaInteractiveStep : AuthStep
         }
 
         // *m_data = AccountData(); m_data->msaClientID = m_clientId;
-        Data.Type = AccountType.MSA;
-        Data.MsaClientID = _clientId;
+        Data.Type = AccountType.Msa;
+        Data.MsaClientId = clientId;
         Data.MsaToken = new Token();
         Data.UserToken = new Token();
         Data.MojangServicesToken = new Token();
         Data.YggdrasilToken = new Token();
         Data.MinecraftProfile = new MinecraftProfile();
         Data.MinecraftEntitlement = new MinecraftEntitlement();
-        Data.Validity_ = Validity.None;
+        Data.Validity = Validity.None;
         Data.ErrorString = "";
         Data.NetworkError = 0;
-        Data.AccountState_ = AccountState.Unchecked;
+        Data.AccountState = AccountState.Unchecked;
 
         await GrantAsync(cancellationToken).ConfigureAwait(false);
     }
@@ -94,7 +96,7 @@ public sealed class MsaInteractiveStep : AuthStep
     {
         var payload = FormEncode(
             ("grant_type", "refresh_token"),
-            ("client_id", _clientId),
+            ("client_id", clientId),
             ("refresh_token", Data.MsaToken.RefreshToken));
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
         {
@@ -129,13 +131,13 @@ public sealed class MsaInteractiveStep : AuthStep
 
     private async Task GrantAsync(CancellationToken cancellationToken)
     {
-        _listener = new LoopbackListener();
-        var redirectUri = _listener.Start();
+        listener = new LoopbackListener();
+        var redirectUri = listener.Start();
 
         // QOAuth2AuthorizationCodeFlow::buildAuthenticateUrl() + modifyParametersFunction(prompt)
         var authorizeUrl = _auth.MsaAuthorize +
             "?response_type=code" +
-            "&client_id=" + Uri.EscapeDataString(_clientId) +
+            "&client_id=" + Uri.EscapeDataString(clientId) +
             "&scope=" + Uri.EscapeDataString("XboxLive.SignIn XboxLive.offline_access") +
             "&redirect_uri=" + Uri.EscapeDataString(redirectUri) +
             "&prompt=select_account";
@@ -146,7 +148,7 @@ public sealed class MsaInteractiveStep : AuthStep
         string? oauthError = null;
         try
         {
-            var redirect = await _listener.WaitForRedirectAsync(cancellationToken).ConfigureAwait(false);
+            var redirect = await listener.WaitForRedirectAsync(cancellationToken).ConfigureAwait(false);
             if (redirect is not null)
             {
                 var query = ParseQuery(redirect.Query);
@@ -164,8 +166,8 @@ public sealed class MsaInteractiveStep : AuthStep
         }
         finally
         {
-            _listener.Dispose();
-            _listener = null;
+            listener.Dispose();
+            listener = null;
         }
 
         if (oauthError is not null)
@@ -182,7 +184,7 @@ public sealed class MsaInteractiveStep : AuthStep
 
         var payload = FormEncode(
             ("grant_type", "authorization_code"),
-            ("client_id", _clientId),
+            ("client_id", clientId),
             ("code", code),
             ("redirect_uri", redirectUri));
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
@@ -216,7 +218,7 @@ public sealed class MsaInteractiveStep : AuthStep
     /// </summary>
     public bool CompleteWithRedirectUri(string uri)
     {
-        if (_listener is not { } listener)
+        if (this.listener is not { } listener)
         {
             return false;
         }
@@ -228,12 +230,12 @@ public sealed class MsaInteractiveStep : AuthStep
 
     private void ApplyGrantedTokens(TokenResponse rsp)
     {
-        Data.MsaClientID = _clientId;
+        Data.MsaClientId = clientId;
         Data.MsaToken.IssueInstant = DateTime.UtcNow;
         Data.MsaToken.NotAfter = DateTime.UtcNow.AddSeconds(rsp.ExpiresIn);
         Data.MsaToken.Extra = rsp.Extra;
         Data.MsaToken.RefreshToken = rsp.RefreshToken;
-        Data.MsaToken.Token_ = rsp.AccessToken;
+        Data.MsaToken.Value = rsp.AccessToken;
     }
 
     private static readonly KeyValuePair<string, string>[] FormHeaders =
@@ -271,7 +273,7 @@ public sealed class MsaInteractiveStep : AuthStep
         {
             obj = JsonNode.Parse(data) as JsonObject;
         }
-        catch (Exception e) when (e is System.Text.Json.JsonException or ArgumentException)
+        catch (Exception e) when (e is JsonException or ArgumentException)
         {
             obj = null;
         }
@@ -314,27 +316,27 @@ public sealed class MsaInteractiveStep : AuthStep
     private sealed class LoopbackListener : IDisposable
     {
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
-        private TaskCompletionSource<Uri?> _redirectSource =
+        private TaskCompletionSource<Uri?> redirectSource =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private CancellationTokenSource _acceptCts = new();
-        private Task? _acceptLoop;
-        private bool _disposed;
+        private CancellationTokenSource acceptCts = new();
+        private Task? acceptLoop;
+        private bool disposed;
 
         public string Start()
         {
             _listener.Start();
             var port = ((IPEndPoint)_listener.LocalEndpoint).Port;
-            _acceptLoop = AcceptLoopAsync(_acceptCts.Token);
+            acceptLoop = AcceptLoopAsync(acceptCts.Token);
             return $"http://127.0.0.1:{port}/";
         }
 
         public async Task<Uri?> WaitForRedirectAsync(CancellationToken cancellationToken)
         {
             var registration = cancellationToken.Register(() =>
-                _redirectSource.TrySetCanceled(cancellationToken));
+                redirectSource.TrySetCanceled(cancellationToken));
             try
             {
-                return await _redirectSource.Task.ConfigureAwait(false);
+                return await redirectSource.Task.ConfigureAwait(false);
             }
             finally
             {
@@ -345,7 +347,7 @@ public sealed class MsaInteractiveStep : AuthStep
         /// <summary>Feeds a callback URI from outside (custom-scheme handler).</summary>
         public void CompleteExternally(Uri uri)
         {
-            _redirectSource.TrySetResult(uri);
+            redirectSource.TrySetResult(uri);
         }
 
         private async Task AcceptLoopAsync(CancellationToken cancellationToken)
@@ -414,7 +416,7 @@ public sealed class MsaInteractiveStep : AuthStep
 
                 if (requestUri is not null)
                 {
-                    _redirectSource.TrySetResult(requestUri);
+                    redirectSource.TrySetResult(requestUri);
                 }
             }
             catch (Exception)
@@ -425,12 +427,12 @@ public sealed class MsaInteractiveStep : AuthStep
 
         public void Dispose()
         {
-            if (_disposed)
+            if (disposed)
             {
                 return;
             }
-            _disposed = true;
-            _acceptCts.Cancel();
+            disposed = true;
+            acceptCts.Cancel();
             try
             {
                 _listener.Stop();
@@ -438,7 +440,7 @@ public sealed class MsaInteractiveStep : AuthStep
             catch (Exception)
             {
             }
-            _redirectSource.TrySetResult(null);
+            redirectSource.TrySetResult(null);
         }
     }
 }

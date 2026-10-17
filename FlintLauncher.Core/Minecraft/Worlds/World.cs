@@ -83,7 +83,7 @@ public enum GameTypeKind
 /// <summary>Port of the World class (launcher/minecraft/World.h).</summary>
 public sealed class World
 {
-    private bool _metadataLoaded;
+    private bool metadataLoaded;
 
     public World(string containerPath)
     {
@@ -119,9 +119,9 @@ public sealed class World
 
     public bool IsValid { get; private set; }
 
-    public bool IsMetadataLoaded => _metadataLoaded;
+    public bool IsMetadataLoaded => metadataLoaded;
 
-    public bool IsOnFS => Directory.Exists(ContainerPath);
+    public bool IsOnFs => Directory.Exists(ContainerPath);
 
     /// <summary>Port of World::repath: change the world's filesystem path.</summary>
     public void Repath(string file)
@@ -130,7 +130,7 @@ public sealed class World
         ContainerPath = full;
         FolderName = Path.GetFileName(full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         ContainerOffsetPath = "";
-        _metadataLoaded = false;
+        metadataLoaded = false;
         IconFile = "";
         if (File.Exists(full) && Path.GetExtension(full) == ".zip")
         {
@@ -155,7 +155,7 @@ public sealed class World
     /// <summary>Port of World::loadMetadata: parse level.dat (from folder or zip) once.</summary>
     public void LoadMetadata()
     {
-        if (_metadataLoaded)
+        if (metadataLoaded)
         {
             return;
         }
@@ -165,9 +165,9 @@ public sealed class World
         }
         else if (Directory.Exists(ContainerPath))
         {
-            ReadFromFS(ContainerPath);
+            ReadFromFs(ContainerPath);
         }
-        _metadataLoaded = true;
+        metadataLoaded = true;
     }
 
     /// <summary>Port of World::resetIcon: remove the icon file, if any.</summary>
@@ -268,7 +268,7 @@ public sealed class World
         // The C++ installed from unloaded World objects, deriving the target folder from
         // an empty name (FS::DirNameFromString("") -> "(1)"); loading the metadata here
         // gives the intended folder name instead.
-        if (!_metadataLoaded)
+        if (!metadataLoaded)
         {
             LoadMetadata();
         }
@@ -283,7 +283,7 @@ public sealed class World
             // NOTE: upstream World.cpp writes `ok = !MMCZip::extractSubDir(...)`, which
             // inverts the result; this port uses the intended semantics.
             using var zip = ZipFile.OpenRead(ContainerPath);
-            ok = MMCZip.ExtractSubDir(zip, ContainerOffsetPath, finalPath) != null;
+            ok = MmcZip.ExtractSubDir(zip, ContainerOffsetPath, finalPath) != null;
         }
         else if (Directory.Exists(ContainerPath))
         {
@@ -353,9 +353,9 @@ public sealed class World
     // ------------------------------------------------------------------ internals
 
     /// <summary>Port of World::readFromFS.</summary>
-    private void ReadFromFS(string dir)
+    private void ReadFromFs(string dir)
     {
-        var bytes = GetDatDataFromFS(dir, "level.dat");
+        var bytes = GetDatDataFromFs(dir, "level.dat");
         if (bytes is null || bytes.Length == 0)
         {
             IsValid = false;
@@ -363,7 +363,7 @@ public sealed class World
         }
         try
         {
-            LevelDatTime = (DateTimeOffset)Directory.GetLastWriteTimeUtc(dir);
+            LevelDatTime = Directory.GetLastWriteTimeUtc(dir);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
@@ -372,7 +372,7 @@ public sealed class World
         LoadFromLevelDat(bytes);
         if (Seed == 0)
         {
-            var worldGen = GetDatDataFromFS(dir, "data/minecraft/world_gen_settings.dat");
+            var worldGen = GetDatDataFromFs(dir, "data/minecraft/world_gen_settings.dat");
             if (worldGen is { Length: > 0 })
             {
                 Seed = LoadSeed(worldGen);
@@ -491,7 +491,7 @@ public sealed class World
     }
 
     /// <summary>Port of getDatDataFromFS: the contents of <paramref name="file"/> inside the world dir, or null.</summary>
-    private static byte[]? GetDatDataFromFS(string root, string file)
+    private static byte[]? GetDatDataFromFs(string root, string file)
     {
         var fullFilePath = FileSystem.PathCombine(root, file);
         if (!File.Exists(fullFilePath))

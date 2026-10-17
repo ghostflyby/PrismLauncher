@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/launch/PrintInstanceInfo.{h,cpp}: print system + instance info
 // into the launch log. The FreeBSD sysctl/pciconf branches are not ported (Q_OS_FREEBSD only).
+
+using System.Runtime.InteropServices;
 using FlintLauncher.Core.Instances;
 
 namespace FlintLauncher.Core.Launch.Steps;
@@ -56,7 +58,7 @@ public sealed class PrintInstanceInfo : LaunchStep
         {
             return $"Windows {os.Version}";
         }
-        return System.Runtime.InteropServices.RuntimeInformation.OSDescription.Trim();
+        return RuntimeInformation.OSDescription.Trim();
     }
 
     /// <summary>Port of QSysInfo::kernelType.</summary>

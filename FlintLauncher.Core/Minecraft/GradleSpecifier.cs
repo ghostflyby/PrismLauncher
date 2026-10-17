@@ -5,6 +5,7 @@
 // Ported as a readonly struct so C++ value-copy semantics (e.g. `GradleSpecifier
 // nativeSpec = m_name; nativeSpec.setClassifier(...)`) are preserved; classification
 // changes go through WithClassifier() which returns the modified copy.
+
 using System.Text.RegularExpressions;
 
 namespace FlintLauncher.Core.Minecraft;

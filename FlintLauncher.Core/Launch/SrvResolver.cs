@@ -12,6 +12,7 @@
 // NetworkInterface properties — if that fails, callers treat the lookup as failed exactly
 // like a QDnsLookup error. The queried server can be overridden per launch through the
 // injected LaunchServices.SrvServerEndpoint (tests point it at a local UDP stub).
+
 using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;

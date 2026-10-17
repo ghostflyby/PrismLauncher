@@ -5,10 +5,11 @@
 // APPLICATION->metacache() reaches the task through the instance (MinecraftInstance.MetaCache,
 // stamped by the composition root); the ResourceURLOverride setting comes from the
 // instance-stamped LaunchServices (Services.ResourceUrlOverride).
-using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Net;
 
+using System.Security.Cryptography;
+using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Launch.Steps;
@@ -16,7 +17,7 @@ namespace FlintLauncher.Core.Launch.Steps;
 public sealed class AssetUpdateTask : FlintTask
 {
     private readonly MinecraftInstance _inst;
-    private NetJob? _downloadJob;
+    private NetJob? downloadJob;
 
     public AssetUpdateTask(MinecraftInstance inst)
     {
@@ -49,11 +50,11 @@ public sealed class AssetUpdateTask : FlintTask
         var dl = NetRequest.MakeCached(metacache, new Uri(indexUrl), entry);
         if (assets.Sha1.Length != 0)
         {
-            dl.AddValidator(ChecksumValidator.FromHex(System.Security.Cryptography.HashAlgorithmName.SHA1, assets.Sha1));
+            dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, assets.Sha1));
         }
         job.AddNetRequest(dl);
 
-        _downloadJob = job;
+        downloadJob = job;
         await job.StartAsync(cancellationToken).ConfigureAwait(false);
         if (!job.WasSuccessful)
         {
@@ -100,7 +101,7 @@ public sealed class AssetUpdateTask : FlintTask
                 source = new Uri(resourceUrl).Host;
             }
             EmitStatus($"Getting the asset files from {source}...");
-            _downloadJob = job;
+            downloadJob = job;
             await job.StartAsync(cancellationToken).ConfigureAwait(false);
             if (!job.WasSuccessful)
             {
@@ -126,14 +127,12 @@ public sealed class AssetUpdateTask : FlintTask
 
     public override void Abort()
     {
-        if (_downloadJob is not null && _downloadJob.IsRunning)
+        if (downloadJob is not null && downloadJob.IsRunning)
         {
-            _downloadJob.Abort();
+            downloadJob.Abort();
         }
-        else
-        {
-            // Prematurely aborted AssetUpdateTask
-        }
+
+        // Prematurely aborted AssetUpdateTask
         base.Abort();
     }
 }

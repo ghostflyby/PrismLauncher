@@ -6,11 +6,13 @@
 // processor's component writing — all against the stub Technic/Solder server. Each test
 // drives its own TechnicApi client pointed at the stub (the former process-global
 // BaseUrl/ApiBuild hooks are per-instance state now).
+
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.Technic;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using Xunit;
 
@@ -102,8 +104,8 @@ public class TechnicTests : IDisposable
             ]}
             """;
         var (url, mode) = _api.SearchUrl("");
-        var request = FlintLauncher.Core.Net.NetRequest.MakeByteArray(new Uri(url));
-        var job = new FlintLauncher.Core.Net.NetJob("search");
+        var request = NetRequest.MakeByteArray(new Uri(url));
+        var job = new NetJob("search");
         job.AddNetRequest(request);
         await job.StartAsync();
         Assert.True(job.WasSuccessful, job.FailReason);
@@ -409,7 +411,7 @@ public class TechnicTests : IDisposable
         {
             ["minecraft"] = "1.20.1",
             ["mods"] = new JsonArray(
-                (JsonNode?)new JsonObject
+                new JsonObject
                 {
                     ["name"] = "Solder Mod",
                     ["version"] = "1.0",
@@ -447,7 +449,7 @@ public class TechnicTests : IDisposable
         {
             ["minecraft"] = "1.20.1",
             ["mods"] = new JsonArray(
-                (JsonNode?)new JsonObject
+                new JsonObject
                 {
                     ["name"] = "Solder Mod",
                     ["md5"] = new string('0', 32),

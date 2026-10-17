@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Tests for the Net stack: sinks/validators offline, HttpMetaCache persistence (Prism-compatible
 // JSON index), and live requests against a local HTTP server (304 revalidation, checksums, retry).
+
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -328,7 +329,7 @@ public class NetStackTests : IDisposable
         Assert.Equal("\"v1\"", entry.Etag);
 
         // second fetch: server answers 304, local data is used (no rewrite)
-        var entry2 = cache.ResolveEntry("general", "thing.txt", "");
+        var entry2 = cache.ResolveEntry("general", "thing.txt");
         Assert.False(entry2.IsStale);
         var second = NetRequest.MakeCached(cache, new Uri(server.Url + "/thing.txt"), entry2);
         await second.StartAsync();

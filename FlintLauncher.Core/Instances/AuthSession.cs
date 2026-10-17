@@ -6,6 +6,7 @@
 // P4 reconciliation: upstream has no status enum on AuthSession (the launch pipeline tracks
 // state itself), so the draft's data surface was already complete; MinecraftAccount::fillSession
 // lives on FlintLauncher.Core.Auth.MinecraftAccount.FillSession (P4).
+
 using System.Text.Json.Nodes;
 
 namespace FlintLauncher.Core.Instances;

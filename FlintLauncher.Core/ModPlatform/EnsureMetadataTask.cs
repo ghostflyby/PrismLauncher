@@ -9,18 +9,19 @@
 //  - Resource::setMetadata does not exist yet (the P3b Mod port has no metadata field),
 //    so the freshly created ModStruct is handed to callers through the MetadataReady
 //    event (ModFolderModel re-reads it from disk through its hook).
+
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft.Resources;
+using FlintLauncher.Core.ModPlatform.Flame;
+using FlintLauncher.Core.ModPlatform.Modrinth;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform;
-
-using Flame;
-using Modrinth;
 
 public sealed class EnsureMetadataTask : FlintTask
 {
@@ -30,7 +31,7 @@ public sealed class EnsureMetadataTask : FlintTask
     private readonly ModrinthApi _modrinth;
     private readonly FlameApi _flame;
     private readonly Dictionary<string, IndexedVersion> _tempVersions = new(StringComparer.Ordinal);
-    private bool _lockUpdate;
+    private bool lockUpdate;
 
     public EnsureMetadataTask(Dictionary<string, Resource> resources, string indexDir, ResourceProvider provider,
                               ModrinthApi? modrinth = null, FlameApi? flame = null)
@@ -46,7 +47,7 @@ public sealed class EnsureMetadataTask : FlintTask
     /// this pass locks updates for the resource.</summary>
     public void SetUpdateLock(bool lockUpdate)
     {
-        _lockUpdate = lockUpdate;
+        this.lockUpdate = lockUpdate;
     }
 
     /// <summary>Port of the metadataReady(resource) signal, carrying the fresh metadata.</summary>
@@ -61,10 +62,10 @@ public sealed class EnsureMetadataTask : FlintTask
 
         switch (_provider)
         {
-            case ResourceProvider.MODRINTH:
+            case ResourceProvider.Modrinth:
                 await ModrinthFlow(cancellationToken);
                 break;
-            case ResourceProvider.FLAME:
+            case ResourceProvider.Flame:
                 await FlameFlow(cancellationToken);
                 break;
         }
@@ -79,7 +80,7 @@ public sealed class EnsureMetadataTask : FlintTask
 
     private async Task ModrinthFlow(CancellationToken cancellationToken)
     {
-        var hashType = ProviderCapabilities.HashType(ResourceProvider.MODRINTH)[0];
+        var hashType = ProviderCapabilities.HashType(ResourceProvider.Modrinth)[0];
 
         // ---------------------------------------------------------- versions task
         var (versionJob, versionRequest) = _modrinth.CurrentVersions(_resources.Keys.ToList(), hashType);
@@ -134,8 +135,8 @@ public sealed class EnsureMetadataTask : FlintTask
             return;
         }
 
-        Net.NetJob projectJob;
-        Net.NetRequest projectRequest;
+        NetJob projectJob;
+        NetRequest projectRequest;
         bool multiple;
         if (addonIds.Count == 1)
         {
@@ -305,8 +306,8 @@ public sealed class EnsureMetadataTask : FlintTask
             return;
         }
 
-        Net.NetJob projectJob;
-        Net.NetRequest projectRequest;
+        NetJob projectJob;
+        NetRequest projectRequest;
         bool multiple;
         if (addonIds.Count == 1)
         {
@@ -423,7 +424,7 @@ public sealed class EnsureMetadataTask : FlintTask
         var pwMod = MetadataHandler.Create(_indexDir, pack, ver);
         if (pwMod.IsValid)
         {
-            pwMod.LockUpdate = _lockUpdate;
+            pwMod.LockUpdate = lockUpdate;
             MetadataHandler.Update(_indexDir, pwMod);
             MetadataReady?.Invoke(resource, pwMod);
         }

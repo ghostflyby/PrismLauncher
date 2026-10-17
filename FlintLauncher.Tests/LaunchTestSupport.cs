@@ -5,8 +5,12 @@
 // LaunchProfile offline (no network, no real Mojang metadata).
 
 using FlintLauncher.Core.Auth;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
+using FlintLauncher.Core.Launch.Steps;
+using FlintLauncher.Core.Net;
+using FlintLauncher.Core.State;
 using FlintLauncher.Web;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -21,7 +25,7 @@ namespace FlintLauncher.Tests;
 public class GlobalLaunchSettingsStub
 {
     /// <summary>The fixture's typed user-layer store (flint.json under the fixture config root).</summary>
-    public Core.Config.FlintConfigStore Store { get; }
+    public FlintConfigStore Store { get; }
 
     private readonly string _configDir;
 
@@ -29,7 +33,7 @@ public class GlobalLaunchSettingsStub
     {
         _configDir = Path.Combine(Path.GetTempPath(), $"flint-user-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_configDir);
-        Store = new Core.Config.FlintConfigStore(
+        Store = new FlintConfigStore(
             Path.Combine(_configDir, "flint.json"), FlintJsonContext.Default.FlintConfigFile);
 
         StubSet("ShowGameTime", true);
@@ -79,10 +83,10 @@ public class GlobalLaunchSettingsStub
     public void StubSet(string id, object? value) => Store.Set(id, value);
 
     /// <summary>The typed instance environment over this store (the D4 instance.json stack).</summary>
-    public Core.Config.InstanceEnvironment Environment =>
+    public InstanceEnvironment Environment =>
         new(Store, FlintJsonContext.Default.InstanceConfigFile, FlintJsonContext.Default.InstanceStateFile);
 
-    public static implicit operator Core.Config.InstanceEnvironment(
+    public static implicit operator InstanceEnvironment(
         GlobalLaunchSettingsStub stub) => stub.Environment;
 }
 
@@ -103,20 +107,20 @@ public sealed class LaunchFixture : IDisposable
     /// composition root owns, "meta" base under the fixture's cache root — the CWD-anchored
     /// static fallback is gone). Instances created here carry it, which also stamps their
     /// pack profiles' metadata index.</summary>
-    public Core.Net.HttpMetaCache MetaCache { get; }
+    public HttpMetaCache MetaCache { get; }
 
     /// <summary>The launcher runtime state store (S5) over the fixture's state root — launch
     /// fixtures seed the java probe cache / offline name through <see cref="SeedJavaDetection"/>
     /// or <see cref="State"/> directly.</summary>
-    public Core.State.LauncherStateStore State { get; }
+    public LauncherStateStore State { get; }
 
     public LaunchFixture()
     {
         Directory.CreateDirectory(Root);
-        State = new Core.State.LauncherStateStore(
+        State = new LauncherStateStore(
             Path.Combine(_paths.Paths.StateRoot, "launcher-state.json"),
             FlintJsonContext.Default.LauncherState);
-        MetaCache = new Core.Net.HttpMetaCache(
+        MetaCache = new HttpMetaCache(
             Path.Combine(_paths.Paths.CacheRoot, "metacache.json"));
         MetaCache.AddBase("meta", _paths.Paths.MetaDir);
         MetaCache.AddBase("libraries", _paths.Paths.LibrariesRoot);
@@ -134,11 +138,11 @@ public sealed class LaunchFixture : IDisposable
         {
             Java = state.Java with
             {
-                Detections = new Dictionary<string, Core.State.JavaDetectEntry>(
+                Detections = new Dictionary<string, JavaDetectEntry>(
                     state.Java.Detections, StringComparer.Ordinal)
                 {
                     [key] = new(
-                        Core.Launch.Steps.CheckJava.ComputeJavaSignature(javaUnixTime, key),
+                        CheckJava.ComputeJavaSignature(javaUnixTime, key),
                         architecture, realArchitecture, version, vendor),
                 },
             },
@@ -199,8 +203,8 @@ public sealed class LaunchFixture : IDisposable
         // the typed instance layer (D4): the adapter over the fixture root folds the
         // fixture's user-layer store (Global) with the instance's own instance.json
         var instance = new MinecraftInstance(
-            new Core.Config.InstanceJsonSettingsObject(
-                instanceRoot, new Core.Config.InstanceEnvironment(
+            new InstanceJsonSettingsObject(
+                instanceRoot, new InstanceEnvironment(
                     Global.Store, FlintJsonContext.Default.InstanceConfigFile,
                     FlintJsonContext.Default.InstanceStateFile)),
             instanceRoot)
@@ -215,7 +219,7 @@ public sealed class LaunchFixture : IDisposable
         };
         instance.GetPackProfile().Load();
         // the patch files are read by the component update task (PackProfile::reload)
-        var result = await instance.GetPackProfile().ReloadAsync(Core.Net.NetMode.Offline);
+        var result = await instance.GetPackProfile().ReloadAsync(NetMode.Offline);
         Assert.True(result.Ok, result.ErrorMessage);
         return instance;
     }

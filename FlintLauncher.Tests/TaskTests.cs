@@ -4,6 +4,7 @@
 // options runs, the 4096-subtask stack safety check) and adds coverage for the ConcurrentTask
 // concurrency limit, the MultipleOptionsTask fallback order, composite failure semantics and
 // abort.
+
 using System.Diagnostics;
 using FlintLauncher.Core.Tasks;
 using Xunit;
@@ -14,9 +15,9 @@ public class TaskTests
 {
     // Counters for the concurrency-limit test. xUnit creates a fresh test class instance per
     // test, so plain fields are safe. (Locals captured by lambdas cannot be used with Interlocked.)
-    private int _runningChildren;
-    private int _maxObservedChildren;
-    private int _startedCount;
+    private int runningChildren;
+    private int maxObservedChildren;
+    private int startedCount;
 
     // ---- test doubles (the C++ test file defines BasicTask / BasicTask_MultiStep locally) ----
 
@@ -280,11 +281,11 @@ public class TaskTests
         {
             children.Add(new CallbackTestTask(async (task, cancellationToken) =>
             {
-                var running = Interlocked.Increment(ref _runningChildren);
-                var currentMax = Volatile.Read(ref _maxObservedChildren);
+                var running = Interlocked.Increment(ref runningChildren);
+                var currentMax = Volatile.Read(ref maxObservedChildren);
                 while (running > currentMax)
                 {
-                    var prev = Interlocked.CompareExchange(ref _maxObservedChildren, running, currentMax);
+                    var prev = Interlocked.CompareExchange(ref maxObservedChildren, running, currentMax);
                     if (prev == currentMax)
                     {
                         break;
@@ -294,7 +295,7 @@ public class TaskTests
 
                 await allReleased.Task.WaitAsync(cancellationToken);
 
-                Interlocked.Decrement(ref _runningChildren);
+                Interlocked.Decrement(ref runningChildren);
                 task.Succeed();
             }));
         }
@@ -308,7 +309,7 @@ public class TaskTests
         var run = t.StartAsync();
 
         // The limit is actually reached (subtasks do run in parallel up to the cap).
-        await WaitForAsync(() => Volatile.Read(ref _runningChildren) == maxConcurrent);
+        await WaitForAsync(() => Volatile.Read(ref runningChildren) == maxConcurrent);
 
         allReleased.SetResult();
         await run;
@@ -316,7 +317,7 @@ public class TaskTests
         Assert.True(t.WasSuccessful);
         Assert.All(children, child => Assert.True(child.WasSuccessful));
         // ... and never exceeded.
-        Assert.Equal(maxConcurrent, Volatile.Read(ref _maxObservedChildren));
+        Assert.Equal(maxConcurrent, Volatile.Read(ref maxObservedChildren));
     }
 
     [Fact]
@@ -493,7 +494,7 @@ public class TaskTests
         var release = new TaskCompletionSource();
         var t = new CallbackTestTask(async (task, _) =>
         {
-            Interlocked.Increment(ref _startedCount);
+            Interlocked.Increment(ref startedCount);
             await release.Task;
             task.Succeed();
         });
@@ -501,12 +502,12 @@ public class TaskTests
         var first = t.StartAsync();
         var second = t.StartAsync(); // C++ start() does nothing while the task is running
 
-        await WaitForAsync(() => Volatile.Read(ref _startedCount) == 1);
+        await WaitForAsync(() => Volatile.Read(ref startedCount) == 1);
 
         release.SetResult();
         await Task.WhenAll(first, second);
 
-        Assert.Equal(1, Volatile.Read(ref _startedCount));
+        Assert.Equal(1, Volatile.Read(ref startedCount));
         Assert.True(t.WasSuccessful);
     }
 

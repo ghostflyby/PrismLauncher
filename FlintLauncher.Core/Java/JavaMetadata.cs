@@ -10,6 +10,7 @@
 // shim used across the Minecraft format layer since P2a) keeps its original
 // FlintLauncher.Core.Minecraft namespace so its many consumers keep compiling; that is also
 // why this file uses classic block-scoped namespaces instead of the file-scoped form.
+
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
@@ -30,12 +31,12 @@ namespace FlintLauncher.Core.Java
         public string Descriptor() => Version.ToString();
 
         /// <summary>Port of BaseVersion::name().</summary>
-        public string Name() => _name;
+        public string Name() => name;
 
         /// <summary>Port of BaseVersion::typeString().</summary>
         public string TypeString() => Vendor;
 
-        private string _name = "";
+        private string name = "";
 
         public string Vendor { get; set; } = "";
 
@@ -79,7 +80,7 @@ namespace FlintLauncher.Core.Java
         {
             var meta = new JavaMetadata();
 
-            meta._name = obj.StringOr("name");
+            meta.name = obj.StringOr("name");
             meta.Vendor = obj.StringOr("vendor");
             meta.Url = obj.StringOr("url");
             meta.ReleaseTime = ParseUtils.TimeFromS3Time(obj.StringOr("releaseTime"));
@@ -145,7 +146,7 @@ namespace FlintLauncher.Core.Java
                     return false;
                 }
             }
-            return StringUtils.NaturalCompare(_name, rhs._name, ignoreCase: true) < 0;
+            return StringUtils.NaturalCompare(name, rhs.name, ignoreCase: true) < 0;
         }
 
         /// <summary>Port of Metadata::operator==.</summary>
@@ -155,7 +156,7 @@ namespace FlintLauncher.Core.Java
             {
                 return false;
             }
-            return Version == other.Version && _name == other._name;
+            return Version == other.Version && name == other.name;
         }
 
         /// <summary>Port of Metadata::operator&gt;.</summary>
@@ -180,7 +181,7 @@ namespace FlintLauncher.Core.Java
 
         public override bool Equals(object? obj) => Equals(obj as JavaMetadata);
 
-        public override int GetHashCode() => HashCode.Combine(Version, _name);
+        public override int GetHashCode() => HashCode.Combine(Version, name);
 
         public static bool operator <(JavaMetadata left, JavaMetadata right)
         {

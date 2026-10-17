@@ -12,6 +12,8 @@
 // stub-pointed AuthEndpointsOptions handed to its own host.
 // Environment.CurrentDirectory is process-global too: every host sets it (core paths are
 // CWD-relative) and restores it on dispose.
+
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
@@ -25,6 +27,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.ModPlatform.Technic;
+using FlintLauncher.Core.State;
 using FlintLauncher.Web;
 using FlintLauncher.Web.Services;
 using Microsoft.AspNetCore.Builder;
@@ -161,7 +164,7 @@ internal sealed class ApiStubServer : IDisposable
 {
     private readonly HttpListener _listener = new();
     private readonly Task _loop;
-    private bool _disposed;
+    private bool disposed;
 
     public ApiStubServer(Func<HttpListenerContext, Task> handler)
     {
@@ -179,14 +182,14 @@ internal sealed class ApiStubServer : IDisposable
 
     private async Task ListenLoop()
     {
-        while (!_disposed)
+        while (!disposed)
         {
             HttpListenerContext context;
             try
             {
                 context = await _listener.GetContextAsync();
             }
-            catch (Exception) when (_disposed)
+            catch (Exception) when (disposed)
             {
                 return;
             }
@@ -206,11 +209,11 @@ internal sealed class ApiStubServer : IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
+        if (disposed)
         {
             return;
         }
-        _disposed = true;
+        disposed = true;
         try
         {
             _listener.Stop();
@@ -434,7 +437,7 @@ public class FlintApiIntegrationTests
 
         // a minimal MultiMC-flavoured zip: one folder with an instance.cfg inside
         var zipPath = Path.Combine(host.DataDir, "pack.zip");
-        using (var zip = System.IO.Compression.ZipFile.Open(zipPath, System.IO.Compression.ZipArchiveMode.Create))
+        using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
         {
             var entry = zip.CreateEntry("pack/instance.cfg");
             await using var writer = new StreamWriter(entry.Open());
@@ -563,7 +566,7 @@ public class FlintApiIntegrationTests
             {
                 Java = state.Java with
                 {
-                    Detections = new Dictionary<string, Core.State.JavaDetectEntry>(
+                    Detections = new Dictionary<string, JavaDetectEntry>(
                         state.Java.Detections, StringComparer.Ordinal)
                     {
                         [javaPath] = new(CheckJava.ComputeJavaSignature(javaUnixTime, javaPath),
@@ -725,7 +728,7 @@ public class FlintApiDeviceCodeTests : IDisposable
     private readonly ApiStubServer _server;
     private readonly AuthEndpointsOptions _auth = new();
     private readonly string _msaDeviceCode;
-    private string _msaToken;
+    private string msaToken;
 
     public FlintApiDeviceCodeTests()
     {
@@ -733,12 +736,12 @@ public class FlintApiDeviceCodeTests : IDisposable
         _msaDeviceCode = """
             {"device_code":"dev123","user_code":"FLNT-CODE","verification_uri":"https://microsoft.test/link","expires_in":900,"interval":1}
             """;
-        _msaToken = """{"error":"authorization_pending"}""";
+        msaToken = """{"error":"authorization_pending"}""";
         _server = new ApiStubServer(async ctx =>
         {
             var body = ctx.Request.Url!.AbsolutePath.EndsWith("/devicecode", StringComparison.Ordinal)
                 ? _msaDeviceCode
-                : _msaToken;
+                : msaToken;
             var bytes = Encoding.UTF8.GetBytes(body);
             ctx.Response.ContentType = "application/json";
             await ctx.Response.OutputStream.WriteAsync(bytes);
@@ -781,7 +784,7 @@ public class FlintApiDeviceCodeTests : IDisposable
         Assert.True(poll.GetProperty("account").ValueKind is JsonValueKind.Null);
 
         // deny the code server-side: the flow fails -> "expired"
-        _msaToken = """{"error":"authorization_expired"}""";
+        msaToken = """{"error":"authorization_expired"}""";
         var deadline = DateTime.UtcNow.AddSeconds(20);
         var state = "pending";
         while (state == "pending" && DateTime.UtcNow < deadline)

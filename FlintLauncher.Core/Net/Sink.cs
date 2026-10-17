@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/net/Sink.h and net/ByteArraySink.h.
+
+using System.Text;
+
 namespace FlintLauncher.Core.Net;
 
 /// <summary>
@@ -91,7 +94,7 @@ public sealed class ByteArraySink : Sink
 
     public byte[] Data => _stream.ToArray();
 
-    public string DataAsString => System.Text.Encoding.UTF8.GetString(_stream.ToArray());
+    public string DataAsString => Encoding.UTF8.GetString(_stream.ToArray());
 
     public override bool Init(NetRequestSpec request)
     {

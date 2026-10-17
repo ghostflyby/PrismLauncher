@@ -12,6 +12,7 @@
 //    equivalent, so the port uses a "flint-<32 hex>" one.
 //  - The endpoint base goes through the injected AuthEndpointsOptions.MinecraftServices
 //    (defaults byte-identical to the hardcoded upstream URL) so tests can stub it.
+
 using System.Text;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Net;

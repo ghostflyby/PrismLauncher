@@ -14,6 +14,8 @@
 //    NetRequest cannot express multipart Content-Type headers.
 //  - The imgur base URL / client id come from FlintConfig (BuildConfig.IMGUR_BASE_URL /
 //    IMGUR_CLIENT_ID) by default but are factory-injectable so tests can stub them.
+
+using System.Security;
 using System.Text;
 using System.Text.Json;
 using FlintLauncher.Core.Net;
@@ -87,7 +89,7 @@ public sealed class ImgurUpload : FlintTask
             fileData = await File.ReadAllBytesAsync(_shot.FilePath, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException
-                                  or ArgumentException or System.Security.SecurityException)
+                                  or ArgumentException or SecurityException)
         {
             EmitFailed($"Could not open file {_shot.FilePath} for reading: {e.Message}");
             return;

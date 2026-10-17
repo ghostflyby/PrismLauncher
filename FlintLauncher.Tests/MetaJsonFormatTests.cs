@@ -2,11 +2,12 @@
 // Read-side behavior pins for the Meta metadata parsers (launcher/meta/JsonFormat port) on the
 // JsonNode model: format-version number semantics (no TryGetValue<T>), Require/Ensure message
 // parity, require-set round trips and the requireIsArrayOf<QJsonObject> quirks.
+
 using System.Text.Json.Nodes;
-using FluentIndex = FlintLauncher.Core.Meta.Index;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Meta;
 using Xunit;
+using FluentIndex = FlintLauncher.Core.Meta.Index;
 
 namespace FlintLauncher.Tests;
 

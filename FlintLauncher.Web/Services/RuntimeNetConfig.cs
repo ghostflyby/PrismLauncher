@@ -10,7 +10,9 @@
 // secret-consuming API client options re-derive from the store here: the Modrinth PAT, the
 // Flame (CurseForge) key provider and — from the config side (C4 keeps it public) — the MSA
 // client-id override for the auth options.
+
 using FlintLauncher.Core;
+using FlintLauncher.Core.Auth;
 
 namespace FlintLauncher.Web.Services;
 
@@ -62,6 +64,6 @@ public static class RuntimeNetConfig
         var msaOverride = runtime.Config.Current.Api.MsaClientIdOverride ?? "";
         runtime.Auth.MsaClientId = msaOverride.Length > 0
             ? msaOverride
-            : Core.Auth.AuthEndpointsOptions.DefaultMsaClientId;
+            : AuthEndpointsOptions.DefaultMsaClientId;
     }
 }

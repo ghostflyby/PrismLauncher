@@ -9,6 +9,9 @@
 //  - fromQtMsgType() has no Qt logging layer to map from and is not ported.
 //  - guessLevel() is the port of LogParser::guessLevel (the launcher log has no XML parser of
 //    its own; the full log4j XML event parser of LogParser is not ported — see LaunchTask).
+
+using System.Text.RegularExpressions;
+
 namespace FlintLauncher.Core.Launch;
 
 /// <summary>Port of MessageLevelValue/MessageLevel: what level a log message is.</summary>
@@ -111,8 +114,8 @@ public static class MessageLevelExtensions
     /// </summary>
     public static MessageLevel GuessLevel(this MessageLevel _, string line, MessageLevel previous)
     {
-        const string LineWithLevel = "^\\[[^\\]]+\\] \\[[^/]+/(?<level>[^\\]]+)\\]";
-        var match = System.Text.RegularExpressions.Regex.Match(line, LineWithLevel);
+        const string lineWithLevel = "^\\[[^\\]]+\\] \\[[^/]+/(?<level>[^\\]]+)\\]";
+        var match = Regex.Match(line, lineWithLevel);
         if (match.Success)
         {
             // New style logs from log4j

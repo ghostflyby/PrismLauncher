@@ -13,6 +13,7 @@
 //    mutate them directly (friend access upstream).
 //  - The blocking waitToLoad()/waitLoadMeta() calls get async counterparts; the synchronous
 //    wait is only available through WaitLoadMetaAsync.
+
 using System.Text;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Meta;
@@ -56,7 +57,7 @@ public class Component : ProblemProvider
         };
 
     private readonly List<PatchProblem> _componentProblems = [];
-    private ProblemSeverity _componentProblemSeverity = ProblemSeverity.None;
+    private ProblemSeverity componentProblemSeverity = ProblemSeverity.None;
 
     private UpdateAction UpdateActionValue { get; set; } = new UpdateAction.None();
 
@@ -183,7 +184,7 @@ public class Component : ProblemProvider
         Order = order;
     }
 
-    public string GetID() => Uid;
+    public string GetId() => Uid;
 
     public string GetName()
     {
@@ -297,7 +298,7 @@ public class Component : ProblemProvider
         if (file is not null)
         {
             var severity = file.GetProblemSeverity();
-            return _componentProblemSeverity > severity ? _componentProblemSeverity : severity;
+            return componentProblemSeverity > severity ? componentProblemSeverity : severity;
         }
         return ProblemSeverity.Error;
     }
@@ -316,9 +317,9 @@ public class Component : ProblemProvider
 
     public void AddComponentProblem(ProblemSeverity severity, string description)
     {
-        if (severity > _componentProblemSeverity)
+        if (severity > componentProblemSeverity)
         {
-            _componentProblemSeverity = severity;
+            componentProblemSeverity = severity;
         }
         _componentProblems.Add(new PatchProblem(severity, description));
         EmitDataChanged();
@@ -327,7 +328,7 @@ public class Component : ProblemProvider
     public void ResetComponentProblems()
     {
         _componentProblems.Clear();
-        _componentProblemSeverity = ProblemSeverity.None;
+        componentProblemSeverity = ProblemSeverity.None;
         EmitDataChanged();
     }
 
@@ -367,10 +368,8 @@ public class Component : ProblemProvider
                 UpdateCachedData();
             }
         }
-        else
-        {
-            // not loaded... assume it will be sorted out later by the update task
-        }
+
+        // not loaded... assume it will be sorted out later by the update task
         EmitDataChanged();
     }
 

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Account endpoints: list, offline add, remove, default-selection and the MSA device-code
 // login (start + poll; see DeviceCodeSessionStore for the flow wiring).
+
+using FlintLauncher.Core.Auth;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 
@@ -20,7 +22,7 @@ public static class AccountEndpoints
             Results.Ok(Enumerable.Range(0, runtime.Accounts.Count)
                 .Select(i => View(runtime.Accounts.At(i), runtime.Accounts))
                 .ToArray()))
-            .Produces<AccountView[]>(200);
+            .Produces<AccountView[]>();
 
         api.MapPost("/accounts/offline", (OfflineAccountRequest request, LauncherRuntime runtime) =>
         {
@@ -28,7 +30,7 @@ public static class AccountEndpoints
             {
                 return ApiJson.Error("invalid_body", "'name' is required", 400);
             }
-            var account = Core.Auth.MinecraftAccount.CreateOffline(request.Name);
+            var account = MinecraftAccount.CreateOffline(request.Name);
             runtime.Accounts.AddAccount(account);
             return Results.Created($"/api/v1/accounts/{account.ProfileId()}",
                 View(account, runtime.Accounts));
@@ -85,11 +87,11 @@ public static class AccountEndpoints
             return session is null
                 ? ApiJson.NotFound("device_not_found", $"no device-code session '{deviceId}'")
                 : Results.Ok(store.Poll(session, runtime.Accounts));
-        }).Produces<DeviceCodePollResponse>(200);
+        }).Produces<DeviceCodePollResponse>();
     }
 
-    public static AccountView View(Core.Auth.MinecraftAccount account,
-                                   Core.Auth.AccountList list) => new(
+    public static AccountView View(MinecraftAccount account,
+                                   AccountList list) => new(
         account.ProfileId(),
         account.ProfileName(),
         account.TypeString(),

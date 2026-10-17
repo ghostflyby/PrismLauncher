@@ -21,18 +21,18 @@ public enum ShaderPackFormat
 /// <summary>Port of the ShaderPack class.</summary>
 public class ShaderPack : Resource
 {
-    private ShaderPackFormat _packFormat = ShaderPackFormat.Invalid;
+    private ShaderPackFormat packFormat = ShaderPackFormat.Invalid;
 
     public ShaderPack(string filePath) : this(new FileInfo(filePath)) { }
 
     public ShaderPack(FileInfo fileInfo) : base(fileInfo) { }
 
-    public ShaderPackFormat PackFormat => _packFormat;
+    public ShaderPackFormat PackFormat => packFormat;
 
     public void SetPackFormat(ShaderPackFormat newFormat)
     {
-        _packFormat = newFormat;
+        packFormat = newFormat;
     }
 
-    public override bool Valid => _packFormat != ShaderPackFormat.Invalid;
+    public override bool Valid => packFormat != ShaderPackFormat.Invalid;
 }

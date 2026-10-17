@@ -4,6 +4,9 @@
 // records under the state root). The prism-family endpoints are strictly user-triggered —
 // prism-family never auto-runs (G2); the flint-legacy profile is the one startup eager pass
 // (LauncherRuntime assembly step 5) and is not served here.
+
+using System.Security;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Migration;
 using FlintLauncher.Web.Models;
@@ -36,7 +39,7 @@ public static class MigrationEndpoints
         group.MapGet("/candidates", (LauncherRuntime runtime) =>
             Results.Ok(PrismSourceDetector.Detect(runtime.Paths.DataDir, runtime.MigrationDecisions,
                 runtime.Paths.ConfigFile).ToArray()))
-            .Produces<PrismSourceDetector.PrismSourceCandidate[]>(200);
+            .Produces<PrismSourceDetector.PrismSourceCandidate[]>();
 
         group.MapGet("/plan", (LauncherRuntime runtime, string source, string? mode) =>
         {
@@ -53,7 +56,7 @@ public static class MigrationEndpoints
             var totalBytes = plan.Sum(item => item.Bytes);
             return Results.Ok(new PrismImportPlanResponse(source, importMode.ToString(), totalFiles, totalBytes,
                 plan.ToArray()));
-        }).Produces<PrismImportPlanResponse>(200);
+        }).Produces<PrismImportPlanResponse>();
 
         group.MapPost("/", async (LauncherRuntime runtime, FlintTaskRegistry registry, PrismImportRequest request) =>
         {
@@ -110,7 +113,7 @@ public static class MigrationEndpoints
             var entry = registry.Register("prism-import", task, onFinished: null);
             _ = task.StartAsync();
             return Results.Accepted($"/api/v1/tasks/{entry.Id}", new TaskAcceptedResponse(entry.Id));
-        }).Produces<PrismImportDryRunResponse>(200).Produces<TaskAcceptedResponse>(202);
+        }).Produces<PrismImportDryRunResponse>().Produces<TaskAcceptedResponse>(202);
 
         group.MapPost("/decline", (LauncherRuntime runtime, PrismDeclineRequest request) =>
         {
@@ -136,7 +139,7 @@ public static class MigrationEndpoints
                 });
             }
             catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException
-                                     or NotSupportedException or System.Security.SecurityException)
+                                     or NotSupportedException or SecurityException)
             {
             }
             return Results.NoContent();
@@ -185,7 +188,7 @@ public static class MigrationEndpoints
             // flint.json already present → Idle (the one-shot never re-fires, even when a
             // setting was written mid-import), no chain file at any root → Idle (this
             // import carried no INI — nothing to sort).
-            Core.Config.FlintConfigImporter.ImportIfNeeded(runtime.Paths, runtime.Config,
+            FlintConfigImporter.ImportIfNeeded(runtime.Paths, runtime.Config,
                 runtime.Secrets, runtime.State);
         }
         catch

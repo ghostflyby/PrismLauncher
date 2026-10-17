@@ -3,9 +3,14 @@
 // instance back to a CF zip and assert manifest.json (files from the local .pw.toml Flame
 // metadata and from the fingerprint API), modlist.html and the overrides/ zip layout
 // (resolved files excluded).
+
+using System.Globalization;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text.Json.Nodes;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using Xunit;
 
@@ -44,7 +49,7 @@ public class FlameExportTests : IDisposable
     /// path of the created instance folder.</summary>
     private async Task<string> ImportInstance(string name)
     {
-        var downloadSha1 = Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(_downloadBytes))
+        var downloadSha1 = Convert.ToHexString(SHA1.HashData(_downloadBytes))
             .ToLowerInvariant();
         var fileJson = FlamePayloads.FileJson(_server.Url, fileId: 456, sha1: downloadSha1);
         _server.FilesJson = new JsonObject { ["data"] = new JsonArray(JsonNode.Parse(fileJson)) }.ToJsonString();
@@ -59,7 +64,7 @@ public class FlameExportTests : IDisposable
         Assert.True(pack.WriteZip(zipPath));
         var staging = TempPath($"staging-{name}");
         Directory.CreateDirectory(staging);
-        Assert.NotNull(FlintLauncher.Core.IO.MMCZip.ExtractDir(zipPath, "", staging));
+        Assert.NotNull(MmcZip.ExtractDir(zipPath, "", staging));
 
         var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName(name);
@@ -80,7 +85,7 @@ public class FlameExportTests : IDisposable
         var unmetaFingerprint = FlamePayloads.Murmur(unmetaBytes);
         var unmetaFileJson = FlamePayloads.FileJson(_server.Url, modId: 222, fileId: 999,
             fileName: "unmeta.jar", downloadUrlPath: null,
-            fileFingerprint: long.Parse(unmetaFingerprint, System.Globalization.CultureInfo.InvariantCulture),
+            fileFingerprint: long.Parse(unmetaFingerprint, CultureInfo.InvariantCulture),
             isAvailable: true);
         _server.FingerprintJson = FlamePayloads.FingerprintJson(new Dictionary<string, string>
         {
@@ -96,7 +101,7 @@ public class FlameExportTests : IDisposable
         // the export reads the instance through the typed settings stack (D4) — the staged
         // instance is Flint format (instance.json), written by the import task itself
         var instance = new MinecraftInstance(
-            new FlintLauncher.Core.Config.InstanceJsonSettingsObject(staging, _global.Environment), staging);
+            new InstanceJsonSettingsObject(staging, _global.Environment), staging);
         var output = TempPath("exported.zip");
         var export = new FlamePackExportTask(new FlamePackExportTask.Options
         {
@@ -180,7 +185,7 @@ public class FlameExportTests : IDisposable
         _server.FingerprintJson = """{"data":{"exactMatches":[]}}""";
 
         var instance = new MinecraftInstance(
-            new FlintLauncher.Core.Config.InstanceJsonSettingsObject(staging, _global.Environment), staging);
+            new InstanceJsonSettingsObject(staging, _global.Environment), staging);
         var output = TempPath("exported-unresolved.zip");
         var export = new FlamePackExportTask(new FlamePackExportTask.Options
         {

@@ -6,10 +6,12 @@
 // file flow) — the Flame stub backs the CurseForge file resolver. Each test suite builds
 // its own FtbApi/FlameApi clients pointed at the stubs (per-instance BaseUrl, nothing
 // process-global to restore).
+
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Json;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using Xunit;
@@ -189,22 +191,22 @@ public class FtbTests : IDisposable
     public void Manifest_ErrorMessages_KeepTheCppShapes()
     {
         // parse errors keep the "{what}: Error parsing JSON: ..." wrapper
-        var parseError = Assert.Throws<FlintLauncher.Core.Json.JsonParseException>(
+        var parseError = Assert.Throws<JsonParseException>(
             () => FtbApi.LoadModpack("not json"));
         Assert.StartsWith("JSON response from FTB: Error parsing JSON: ", parseError.Message);
 
         // a non-object root document fails like the old Json::requireObject(doc)
-        var kindError = Assert.Throws<FlintLauncher.Core.Json.JsonParseException>(
+        var kindError = Assert.Throws<JsonParseException>(
             () => FtbApi.LoadModpack("[1,2]"));
         Assert.Equal("Document is not an object", kindError.Message);
 
         // a missing required key keeps the "'key's parent does not contain 'key'" message
-        var missing = Assert.Throws<FlintLauncher.Core.Json.JsonParseException>(
+        var missing = Assert.Throws<JsonParseException>(
             () => FtbApi.LoadModpack("""{"id":1}"""));
         Assert.Equal("'name's parent does not contain 'name'", missing.Message);
 
         // a non-integer for a required int keeps the fmod check
-        var notInt = Assert.Throws<FlintLauncher.Core.Json.JsonParseException>(
+        var notInt = Assert.Throws<JsonParseException>(
             () => FtbApi.LoadVersion("""
                 {"id":1.5,"parent":0,"name":"n","type":"t",
                  "installs":0,"plays":0,"updated":0,"specs":{"id":1,"minimum":1,"recommended":1}}

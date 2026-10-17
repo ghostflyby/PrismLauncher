@@ -6,6 +6,7 @@
 // existing-data protection, Application.cpp:2029/2055 "Migration was skipped, due to
 // existing data" — post-reform keyed on the config root's flint.json; the dry-run preview
 // stays open above the protection).
+
 using System.Net;
 using System.Text.Json;
 using Xunit;
@@ -69,7 +70,7 @@ public class MigrationApiTests
     public async Task Decline_Known_Source_Still_Writes_The_Record()
     {
         await using var host = await FlintApiHost.StartAsync();
-        var source = MakePrismSource(TempRoot(), "PrismLauncher");
+        var source = MakePrismSource(TempRoot());
 
         var response = await host.PostAsync("/api/v1/migration/prism/decline", new { source });
 

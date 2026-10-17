@@ -10,6 +10,7 @@
 // Known deviations from cmark: no reference links, no strikethrough/tables (extensions),
 // simplified emphasis delimiter matching (same-char runs must balance one nesting level),
 // simplified list indentation handling, and HTML blocks end at the first blank line.
+
 using System.Text;
 using System.Text.RegularExpressions;
 

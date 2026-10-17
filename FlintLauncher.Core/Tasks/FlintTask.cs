@@ -31,11 +31,11 @@ public enum TaskState
 /// </summary>
 public abstract class FlintTask
 {
-    private CancellationTokenSource? _cts;
-    private Task? _runTask;
-    private long _progress;
-    private long _progressTotal = 100;
-    private string _details = "";
+    private CancellationTokenSource? cts;
+    private Task? runTask;
+    private long progress;
+    private long progressTotal = 100;
+    private string details = "";
 
     protected FlintTask()
     {
@@ -70,13 +70,13 @@ public abstract class FlintTask
     public virtual bool IsMultiStep => false;
 
     /// <summary>Port of Task::getProgress().</summary>
-    public long CurrentProgress => _progress;
+    public long CurrentProgress => progress;
 
     /// <summary>Port of Task::getTotalProgress().</summary>
-    public long TotalProgress => _progressTotal;
+    public long TotalProgress => progressTotal;
 
     /// <summary>Port of Task::getDetails(). (A Details property would clash with the event.)</summary>
-    public string GetDetails() => _details;
+    public string GetDetails() => details;
 
     /// <summary>Port of the succeeded() signal.</summary>
     public event Action<FlintTask>? Succeeded;
@@ -108,18 +108,18 @@ public abstract class FlintTask
         {
             // Task::start() refuses to start a task that is already running; await the in-flight
             // run so the returned Task still completes at the terminal state.
-            await (_runTask ?? Task.CompletedTask).ConfigureAwait(false);
+            await (this.runTask ?? Task.CompletedTask).ConfigureAwait(false);
             return;
         }
 
         // NOTE: only fall through to here in end states (C++ restarts from any end state).
         State = TaskState.Running;
-        var previousCts = _cts;
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var previousCts = cts;
+        cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         previousCts?.Dispose();
 
-        var runTask = RunAsync(_cts.Token);
-        _runTask = runTask;
+        var runTask = RunAsync(cts.Token);
+        this.runTask = runTask;
         await runTask.ConfigureAwait(false);
     }
 
@@ -132,7 +132,7 @@ public abstract class FlintTask
     {
         if (State == TaskState.Running)
         {
-            _cts?.Cancel();
+            cts?.Cancel();
         }
     }
 
@@ -217,11 +217,11 @@ public abstract class FlintTask
     /// <summary>Port of Task::setDetails(); only emits on change, like the C++ original.</summary>
     protected void EmitDetails(string details)
     {
-        if (_details == details)
+        if (this.details == details)
         {
             return;
         }
-        _details = details;
+        this.details = details;
         Details?.Invoke(this, details);
     }
 
@@ -234,18 +234,18 @@ public abstract class FlintTask
     /// <summary>Port of Task::setProgress(current, total); only emits on change.</summary>
     protected void SetProgress(long current, long total)
     {
-        if (_progress == current && _progressTotal == total)
+        if (progress == current && progressTotal == total)
         {
             return;
         }
-        _progress = current;
-        _progressTotal = total;
+        progress = current;
+        progressTotal = total;
         EmitProgress(new TaskStepProgress(Uid)
         {
             Current = current,
             Total = total,
             Status = Status,
-            Details = _details,
+            Details = details,
             State = TaskStepState.Running,
         });
     }
@@ -253,7 +253,7 @@ public abstract class FlintTask
     /// <summary>Used by ConcurrentTask::clear() to reset the overall progress (C++: m_progress = 0).</summary>
     protected void ResetProgress()
     {
-        _progress = 0;
+        progress = 0;
     }
 
     /// <summary>
@@ -263,10 +263,10 @@ public abstract class FlintTask
     /// </summary>
     public virtual TaskStepProgress GetProgress() => new(Uid)
     {
-        Current = _progress,
-        Total = _progressTotal,
+        Current = progress,
+        Total = progressTotal,
         Status = Status,
-        Details = _details,
+        Details = details,
         State = ToStepState(State),
     };
 

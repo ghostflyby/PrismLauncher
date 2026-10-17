@@ -10,6 +10,7 @@
 //    stringifies as text instead of the "System.Byte[]" type name.
 //  - The @@ double-prefix for plain @-prefixed values and the verbatim Raw @-types are
 //    untouched behavior, pinned here against regressions.
+
 using FlintLauncher.Core.Settings;
 using Xunit;
 

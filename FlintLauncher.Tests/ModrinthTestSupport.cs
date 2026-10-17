@@ -2,6 +2,7 @@
 // Test doubles for the Modrinth layer tests: a stub Modrinth API/download server (free-port
 // HttpListener pattern, see NetStackTests) and a synthetic .mrpack builder (index +
 // overrides + mods with real hashes) written through MMCZip.
+
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -248,7 +249,7 @@ internal sealed class MrPackBuilder
                 ["client"] = "required",
                 ["server"] = "required",
             },
-            ["downloads"] = new JsonArray((JsonNode?)JsonValue.Create($"{baseUrl}/mod.bin")),
+            ["downloads"] = new JsonArray(JsonValue.Create($"{baseUrl}/mod.bin")),
             ["fileSize"] = pack.ModBytes.Length,
         };
         files.Add((JsonNode?)mainFile);
@@ -269,7 +270,7 @@ internal sealed class MrPackBuilder
                     ["client"] = "optional",
                     ["server"] = "unsupported",
                 },
-                ["downloads"] = new JsonArray((JsonNode?)JsonValue.Create($"{baseUrl}/optional.bin")),
+                ["downloads"] = new JsonArray(JsonValue.Create($"{baseUrl}/optional.bin")),
                 ["fileSize"] = pack.OptionalBytes.Length,
             });
         }
@@ -303,7 +304,7 @@ internal sealed class MrPackBuilder
             ["version_number"] = versionNumber,
             ["version_type"] = "release",
             ["files"] = new JsonArray(
-                (JsonNode?)new JsonObject
+                new JsonObject
                 {
                     ["url"] = $"{baseUrl}/mod.bin",
                     ["filename"] = "test.jar",
@@ -350,7 +351,7 @@ internal sealed class MrPackBuilder
             {
                 File.WriteAllBytes(Path.Combine(dir, "mods", "optional.jar"), optionalBytes);
             }
-            return MMCZip.CompressDir(path, dir);
+            return MmcZip.CompressDir(path, dir);
         }
         finally
         {

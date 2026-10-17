@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of tests/Library_test.cpp (testdata in TestData/Libraries).
+
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
@@ -344,7 +345,7 @@ public class LibraryTests
 
         Assert.True(test.ApplyRules);
         Assert.Single(test.Rules);
-        Assert.True(test.IsActive(DummyContext("linux")));
+        Assert.True(test.IsActive(DummyContext()));
         Assert.False(test.IsActive(DummyContext("osx")));
     }
 }

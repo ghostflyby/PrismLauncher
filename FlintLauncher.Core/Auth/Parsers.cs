@@ -6,7 +6,9 @@
 // the "Failed to parse response from <service> as JSON" qWarnings are dropped (the bool return
 // carries the outcome, as upstream). QDateTime::fromString(Qt::ISODate) maps to an invariant
 // round-trip DateTime.Parse (the Xbox timestamps carry 7-digit fractions).
+
 using System.Globalization;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace FlintLauncher.Core.Auth;
@@ -128,7 +130,7 @@ public static class Parsers
             // qWarning() << "User Token is not a string";
             return false;
         }
-        output.Token_ = token;
+        output.Value = token;
         var arrayVal = (AccountData.Get(obj, "DisplayClaims") as JsonObject) is { } displayClaims
             ? AccountData.Get(displayClaims, "xui")
             : null;
@@ -137,7 +139,7 @@ public static class Parsers
             // qWarning() << "Missing xui claims array";
             return false;
         }
-        var foundUHS = false;
+        var foundUhs = false;
         foreach (var item in array)
         {
             if (item is not JsonObject claimObj)
@@ -146,7 +148,7 @@ public static class Parsers
             }
             if (claimObj.ContainsKey("uhs"))
             {
-                foundUHS = true;
+                foundUhs = true;
             }
             else
             {
@@ -165,7 +167,7 @@ public static class Parsers
 
             break;
         }
-        if (!foundUHS)
+        if (!foundUhs)
         {
             // qWarning() << "Missing uhs";
             return false;
@@ -274,9 +276,9 @@ public static class Parsers
 
     // these skin URLs are for the MHF_Steve and MHF_Alex accounts (made by a Mojang employee)
     // they are needed because the session server doesn't return skin urls for default skins
-    private const string SKIN_URL_STEVE =
+    private const string SkinUrlSteve =
         "https://textures.minecraft.net/texture/1a4af718455d4aab528e7a61f86fa25e6a369d1768dcb13f7df319a713eb810b";
-    private const string SKIN_URL_ALEX =
+    private const string SkinUrlAlex =
         "https://textures.minecraft.net/texture/83cee5ca6afcdb171285aa00e8049c297b2dbeba0efb8ff970a5677a1b644032";
 
     private static bool IsDefaultModelSteve(string uuid)
@@ -410,7 +412,7 @@ public static class Parsers
         // fill in default skin info ourselves, as this endpoint doesn't provide it
         var steve = IsDefaultModelSteve(output.Id);
         skinOut.Variant = steve ? "CLASSIC" : "SLIM";
-        skinOut.Url = steve ? SKIN_URL_STEVE : SKIN_URL_ALEX;
+        skinOut.Url = steve ? SkinUrlSteve : SkinUrlAlex;
         // sadly we can't figure this out, but I don't think it really matters...
         skinOut.Id = "00000000-0000-0000-0000-000000000000";
         var capeOut = new Cape();
@@ -556,7 +558,7 @@ public static class Parsers
             // qWarning() << "access_token is not valid";
             return false;
         }
-        output.Token_ = accessToken;
+        output.Value = accessToken;
         output.Validity = Validity.Certain;
         return true;
     }
@@ -568,7 +570,7 @@ public static class Parsers
         {
             return JsonNode.Parse(data) as JsonObject;
         }
-        catch (System.Text.Json.JsonException)
+        catch (JsonException)
         {
             return null;
         }

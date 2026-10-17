@@ -8,6 +8,7 @@
 // for its serverUrl override — see FtbEndpoints); the client rides the injected NetStack
 // (LauncherRuntime.Ftb — see the Modrinth/Flame de-singletoning for the same story). The
 // parsers are pure helpers and stay static; reads go through the JsonNode model.
+
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;

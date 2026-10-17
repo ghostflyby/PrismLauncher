@@ -3,12 +3,15 @@
 // existing instance's mods folder): jar lands in mods/, the .pw.toml metadata is written,
 // a checksum mismatch fails cleanly without leaving payload behind, and the previously
 // installed file is only removed after the new download succeeded.
+
 using System.Security.Cryptography;
+using FlintLauncher.Core.Minecraft;
+using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.Core.Minecraft.Resources;
-using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
+using FlintLauncher.Core.Tasks;
 using Xunit;
+using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
 
 namespace Flint.Tests;
 
@@ -61,7 +64,7 @@ public class ResourceDownloadTaskTests : IDisposable
             AddonId = "projId1",
             Slug = "test-mod",
             Name = "Test Mod",
-            Provider = ResourceProvider.MODRINTH,
+            Provider = ResourceProvider.Modrinth,
         };
         var version = new IndexedVersion
         {
@@ -74,7 +77,7 @@ public class ResourceDownloadTaskTests : IDisposable
             HashType = "sha1",
             Hash = sha1,
             McVersion = ["1.20.1"],
-            Loaders = FlintLauncher.Core.Minecraft.ModLoaderType.Fabric,
+            Loaders = ModLoaderType.Fabric,
         };
         return (pack, version);
     }
@@ -90,8 +93,8 @@ public class ResourceDownloadTaskTests : IDisposable
 
         Assert.True(task.WasSuccessful, task.FailReason);
         Assert.Equal(Path.Combine(ModsDir, "test.jar"), Path.Combine(ModsDir, task.GetFilename()));
-        Assert.Equal("verId1", task.GetVersionID());
-        Assert.Equal(ResourceProvider.MODRINTH, task.GetProvider());
+        Assert.Equal("verId1", task.GetVersionId());
+        Assert.Equal(ResourceProvider.Modrinth, task.GetProvider());
         Assert.Equal("Test Mod", task.GetName());
         Assert.Same(pack, task.GetPack());
 
@@ -104,7 +107,7 @@ public class ResourceDownloadTaskTests : IDisposable
         Assert.True(metadata.IsValid);
         Assert.Equal("test-mod", metadata.Slug);
         Assert.Equal("test.jar", metadata.Filename);
-        Assert.Equal(ResourceProvider.MODRINTH, metadata.Provider);
+        Assert.Equal(ResourceProvider.Modrinth, metadata.Provider);
         Assert.Equal("projId1", metadata.ProjectId);
         Assert.Equal("verId1", metadata.FileId);
         Assert.Equal("1.0.0", metadata.VersionNumber);
@@ -138,7 +141,7 @@ public class ResourceDownloadTaskTests : IDisposable
             AddonId = "projId1",
             Slug = "test-mod",
             Name = "Test Mod",
-            Provider = ResourceProvider.MODRINTH,
+            Provider = ResourceProvider.Modrinth,
         }, version, model, modrinth: _modrinth);
         await task.StartAsync();
 
@@ -162,7 +165,7 @@ public class ResourceDownloadTaskTests : IDisposable
             Slug = "test-mod",
             Name = "Test Mod",
             Filename = "old.jar",
-            Provider = ResourceProvider.MODRINTH,
+            Provider = ResourceProvider.Modrinth,
             ProjectId = "projId1",
             FileId = "verOld",
             VersionNumber = "0.9.0",
@@ -200,6 +203,6 @@ public class ResourceDownloadTaskTests : IDisposable
         await task.StartAsync();
 
         Assert.False(task.WasSuccessful);
-        Assert.Equal(FlintLauncher.Core.Tasks.TaskState.Failed, task.State);
+        Assert.Equal(TaskState.Failed, task.State);
     }
 }

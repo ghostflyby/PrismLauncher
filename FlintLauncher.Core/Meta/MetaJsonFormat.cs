@@ -2,6 +2,8 @@
 // Port of launcher/meta/JsonFormat.{h,cpp}: the shared metadata format version handling and
 // the Require/RequireSet types, plus the index/version/version-list parsers. Reads go through
 // the JsonNode model (single-DOM); the Parse(JsonObject) entity entry points keep JsonObject.
+
+using System.Collections;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
@@ -74,7 +76,7 @@ public sealed class RequireSet : IEnumerable<Require>
 
     public IEnumerator<Require> GetEnumerator() => _set.GetEnumerator();
 
-    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
 public static class MetaJsonFormat
@@ -138,7 +140,7 @@ public static class MetaJsonFormat
         version.SetVolatile(Bool(obj, "volatile"));
         var reqs = new RequireSet();
         var conflicts = new RequireSet();
-        ParseRequires(obj, reqs, "requires");
+        ParseRequires(obj, reqs);
         ParseRequires(obj, conflicts, "conflicts");
         version.SetRequires(reqs, conflicts);
         var sha256 = Str(obj, "sha256");

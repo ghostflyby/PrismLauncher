@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // API DTOs. Explicit records (no dictionaries of object) so the whole surface stays
 // source-generation/AOT clean; every type here is registered in FlintJsonContext.
+
 using System.Text.Json;
 using System.Text.Json.Serialization;
 

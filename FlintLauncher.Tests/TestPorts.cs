@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Flint test infrastructure (no upstream counterpart): the PortAllocator/PortLease pair —
 // the single allocation source for test TCP ports (16 call sites converged here).
+
 using System.Net;
 using System.Net.Sockets;
 
@@ -55,13 +56,13 @@ internal static class PortAllocator
     /// <summary>A held reservation of a free loopback port.</summary>
     internal sealed class PortLease : IDisposable
     {
-        private TcpListener? _listener;
+        private TcpListener? listener;
 
         public PortLease()
         {
-            _listener = new TcpListener(IPAddress.Loopback, 0);
-            _listener.Start();
-            Port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+            listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            Port = ((IPEndPoint)listener.LocalEndpoint).Port;
         }
 
         /// <summary>The reserved port, still held by the lease.</summary>
@@ -75,16 +76,16 @@ internal static class PortAllocator
         /// </summary>
         public TcpListener TakeListener()
         {
-            ObjectDisposedException.ThrowIf(_listener is null, this);
-            var listener = _listener;
-            _listener = null;
+            ObjectDisposedException.ThrowIf(this.listener is null, this);
+            var listener = this.listener;
+            this.listener = null;
             return listener;
         }
 
         public void Dispose()
         {
-            _listener?.Stop();
-            _listener = null;
+            listener?.Stop();
+            listener = null;
         }
     }
 }

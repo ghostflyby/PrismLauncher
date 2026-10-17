@@ -3,9 +3,11 @@
 // data/secrets.json, 0600, named get/set/delete) and the G2 migration engine (profiles +
 // auto-run candidates + the flint-legacy eager remount pass with its E8 bare-ledger cleanup).
 
+using System.Security.Cryptography;
 using FlintLauncher.Core;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Migration;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Secrets;
 using FlintLauncher.Web;
 using Xunit;
@@ -239,7 +241,7 @@ public class MigrationEngineTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(metaFile)!);
         const string metaBody = "{}";
         await File.WriteAllTextAsync(metaFile, metaBody);
-        var md5 = Convert.ToHexString(System.Security.Cryptography.MD5.HashData("{}"u8.ToArray()))
+        var md5 = Convert.ToHexString(MD5.HashData("{}"u8.ToArray()))
             .ToLowerInvariant();
         var ledgerJson = """
             {"version":"1","entries":[{"base":"meta","path":"net.minecraft/index.json","md5sum":"MD5","etag":"","last_changed_timestamp":0,"eternal":true}]}
@@ -278,7 +280,7 @@ public class MigrationEngineTests : IDisposable
         // resolves against the moved content file (ResolveEntry verifies existence + md5 —
         // this pins the assembly-order guarantee: the eager pass runs before the runtime's
         // MetaCache.Load(), so the first ledger read sees the remounted file)
-        using var ledger = new Core.Net.HttpMetaCache(paths.MetacacheFile);
+        using var ledger = new HttpMetaCache(paths.MetacacheFile);
         ledger.AddBase("meta", paths.MetaDir);
         ledger.Load();
         var loaded = ledger.GetEntry("meta", "net.minecraft/index.json");

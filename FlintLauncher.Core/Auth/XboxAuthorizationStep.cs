@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/auth/steps/XboxAuthorizationStep.{h,cpp} (XSTS authorize), including
 // the full XErr error-code ladder of processSTSError().
+
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace FlintLauncher.Core.Auth;
@@ -45,7 +47,7 @@ public sealed class XboxAuthorizationStep : AuthStep
                 "TokenType": "JWT"
             }
             """ + "\n";
-        var xboxAuthData = xboxAuthTemplate.Replace("%1", Data.UserToken.Token_).Replace("%2", _relyingParty);
+        var xboxAuthData = xboxAuthTemplate.Replace("%1", Data.UserToken.Value).Replace("%2", _relyingParty);
 
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
         {
@@ -59,7 +61,7 @@ public sealed class XboxAuthorizationStep : AuthStep
         {
             if (AuthNetUtils.IsApplicationError(response.Error) && !AuthNetUtils.IsServerError(response.Error))
             {
-                if (ProcessSTSError(response))
+                if (ProcessStsError(response))
                 {
                     return;
                 }
@@ -101,7 +103,7 @@ public sealed class XboxAuthorizationStep : AuthStep
     }
 
     /// <summary>Port of processSTSError: true when the XSTS error object was handled.</summary>
-    private bool ProcessSTSError(AuthStepResponse response)
+    private bool ProcessStsError(AuthStepResponse response)
     {
         if (response.Error != (int)QtNetworkError.AuthenticationRequiredError)
         {
@@ -112,7 +114,7 @@ public sealed class XboxAuthorizationStep : AuthStep
         {
             obj = JsonNode.Parse(response.Body) as JsonObject;
         }
-        catch (Exception e) when (e is System.Text.Json.JsonException or ArgumentException)
+        catch (Exception e) when (e is JsonException or ArgumentException)
         {
             obj = null;
         }

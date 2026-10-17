@@ -9,17 +9,19 @@
 // tests redirect that root with a directory symlink instead of mutating the cwd (a global
 // cwd swap would race the other test classes); all such tests live in this one class, which
 // xUnit keeps sequential.
+
 using System.IO.Compression;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using Flint.Tests;
-using FlintLauncher.Core.Instances;
 using FlintLauncher.Core;
+using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -334,7 +336,7 @@ public class ExtractNativesTests
         instance.LaunchServices = new LaunchServices
         {
             Paths = instance.Paths,
-            LoggerFactory = Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
+            LoggerFactory = NullLoggerFactory.Instance,
             ResourceUrlOverride = server.Url + "/objects/",
         };
         try

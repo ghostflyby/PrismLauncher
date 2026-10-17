@@ -8,7 +8,9 @@
 //    (whose false return makes parse() fail) is mirrored with a plain entry iteration.
 //  - pack.png validation reads the PNG header (PngImage.cs) where the C++ decodes any
 //    QImage-supported format.
+
 using System.IO.Compression;
+using System.Text;
 using FlintLauncher.Core.IO;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
@@ -55,7 +57,7 @@ public static class TexturePackUtils
                 return false; // can't open pack.txt
             }
 
-            var packTxtResult = ProcessPackTXT(pack, data);
+            var packTxtResult = ProcessPackTxt(pack, data);
             if (!packTxtResult)
             {
                 return false;
@@ -85,7 +87,7 @@ public static class TexturePackUtils
                 return false; // can't open pack.png file
             }
 
-            var packPngResult = ProcessPackPNG(pack, data);
+            var packPngResult = ProcessPackPng(pack, data);
             if (!packPngResult)
             {
                 return false;
@@ -129,7 +131,7 @@ public static class TexturePackUtils
                     packProcessed = true;
                     var data = ReadEntry(entry);
                     stop = packProcessed && (iconProcessed || level == TexturePackProcessingLevel.BasicInfoOnly);
-                    var result = ProcessPackTXT(pack, System.Text.Encoding.UTF8.GetString(data));
+                    var result = ProcessPackTxt(pack, Encoding.UTF8.GetString(data));
                     if (!result)
                     {
                         return false;
@@ -145,7 +147,7 @@ public static class TexturePackUtils
                     iconProcessed = true;
                     var data = ReadEntry(entry);
                     stop = packProcessed && iconProcessed;
-                    var result = ProcessPackPNG(pack, data);
+                    var result = ProcessPackPng(pack, data);
                     if (!result)
                     {
                         return false;
@@ -154,7 +156,6 @@ public static class TexturePackUtils
                     {
                         break;
                     }
-                    continue;
                 }
                 // else: file->skip()
             }
@@ -163,14 +164,14 @@ public static class TexturePackUtils
     }
 
     /// <summary>Port of TexturePackUtils::processPackTXT: the description is the raw file content.</summary>
-    public static bool ProcessPackTXT(TexturePack pack, string rawData)
+    public static bool ProcessPackTxt(TexturePack pack, string rawData)
     {
         pack.SetDescription(rawData);
         return true;
     }
 
     /// <summary>Port of TexturePackUtils::processPackPNG(pack, data).</summary>
-    public static bool ProcessPackPNG(TexturePack pack, byte[] rawData)
+    public static bool ProcessPackPng(TexturePack pack, byte[] rawData)
     {
         if (PngImageReader.TryReadPng(rawData, out var img))
         {
@@ -189,7 +190,7 @@ public static class TexturePackUtils
     /// this always returns false (the ZIP branch even reports "could not set pack.mcmeta
     /// as current file." after success); the only caller ignores the result.
     /// </summary>
-    public static bool ProcessPackPNG(TexturePack pack)
+    public static bool ProcessPackPng(TexturePack pack)
     {
         switch (pack.Type)
         {
@@ -209,7 +210,7 @@ public static class TexturePackUtils
                         return false; // can't open pack.png file
                     }
 
-                    if (!ProcessPackPNG(pack, data))
+                    if (!ProcessPackPng(pack, data))
                     {
                         return false; // pack.png invalid
                     }
@@ -228,7 +229,7 @@ public static class TexturePackUtils
                     var entry = zip.GetEntry("pack.png");
                     if (entry != null)
                     {
-                        if (!ProcessPackPNG(pack, ReadEntry(entry)))
+                        if (!ProcessPackPng(pack, ReadEntry(entry)))
                         {
                             return false; // pack.png invalid
                         }

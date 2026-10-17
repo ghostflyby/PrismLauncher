@@ -30,24 +30,25 @@
 //  - logWarning() becomes a Warnings entry + a status line (no warningLogged signal).
 
 using System.Text.RegularExpressions;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Launch;
-using FlintLauncher.Core.Net;
+using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Core.ModPlatform.Modrinth;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
-using Minecraft.Worlds;
 using ResourceType = ResourceType;
 
 public sealed partial class FlameCreationTask : InstanceTask
 {
     public FlameCreationTask(string stagingPath,
                              bool trustedSource,
-                             Config.InstanceEnvironment environment,
+                             InstanceEnvironment environment,
                              string id = "",
                              string versionId = "",
                              ModrinthApi? modrinth = null,
@@ -75,7 +76,7 @@ public sealed partial class FlameCreationTask : InstanceTask
     private readonly List<(string FileName, string TargetFolder)> _otherResources = [];
     private readonly List<string> _selectedOptionalMods = [];
 
-    private MinecraftInstance? _newInstance;
+    private MinecraftInstance? newInstance;
 
     /// <summary>logWarning() output (no warningLogged signal in this port).</summary>
     public IReadOnlyList<string> Warnings => _warnings;
@@ -233,10 +234,10 @@ public sealed partial class FlameCreationTask : InstanceTask
         }
 
         // D4: the staged instance is Flint format from birth (typed instance.json adapter)
-        _newInstance = new MinecraftInstance(
-            new Config.InstanceJsonSettingsObject(StagingPath, Environment ??
-                throw new InvalidOperationException(
-                    "InstanceTask requires SetParentEnvironment before execution.")),
+        newInstance = new MinecraftInstance(
+            new InstanceJsonSettingsObject(StagingPath, Environment ??
+                                                        throw new InvalidOperationException(
+                                                            "InstanceTask requires SetParentEnvironment before execution.")),
             StagingPath);
         var mcVersion = _pack.Minecraft.Version;
 
@@ -247,7 +248,7 @@ public sealed partial class FlameCreationTask : InstanceTask
             LogWarning("Mysterious trailing dots removed from Minecraft version while importing pack.");
         }
 
-        var components = _newInstance.GetPackProfile();
+        var components = newInstance.GetPackProfile();
         components.BuildingFromScratch();
         await components.SetComponentVersion("net.minecraft", mcVersion, important: true, cancellationToken);
         if (loaderType.Length != 0)
@@ -263,22 +264,22 @@ public sealed partial class FlameCreationTask : InstanceTask
 
         if (Icon != "default")
         {
-            _newInstance.SetIconKey(Icon);
+            newInstance.SetIconKey(Icon);
         }
         else
         {
             if (_pack.Name.Contains("Direwolf20", StringComparison.Ordinal))
             {
-                _newInstance.SetIconKey("steve");
+                newInstance.SetIconKey("steve");
             }
             else if (_pack.Name.Contains("FTB", StringComparison.Ordinal)
                      || _pack.Name.Contains("Feed The Beast", StringComparison.Ordinal))
             {
-                _newInstance.SetIconKey("ftb_logo");
+                newInstance.SetIconKey("ftb_logo");
             }
             else
             {
-                _newInstance.SetIconKey("flame");
+                newInstance.SetIconKey("flame");
             }
         }
 
@@ -299,7 +300,7 @@ public sealed partial class FlameCreationTask : InstanceTask
 
             // C7: writing MaxMemAlloc sets the instance-layer member, which IS the override
             // (the derived OverrideMemory gate reads true; no separate gate write exists)
-            _newInstance.Settings().Set("MaxMemAlloc", recommendedRam);
+            newInstance.Settings.Set("MaxMemAlloc", recommendedRam);
         }
 
         var jarmodsPath = FileSystem.PathCombine(StagingPath, "minecraft", "jarmods");
@@ -307,15 +308,15 @@ public sealed partial class FlameCreationTask : InstanceTask
         {
             // install all the jar mods
             var jarMods = Directory.EnumerateFiles(jarmodsPath).ToList();
-            _ = _newInstance.GetPackProfile().InstallJarMods(jarMods);
+            _ = newInstance.GetPackProfile().InstallJarMods(jarMods);
             // nuke the original files
             FileSystem.DeletePath(jarmodsPath);
         }
 
-        SetManagedPack(_newInstance);
+        SetManagedPack(newInstance);
 
-        _newInstance.SetName(Name());
-        _newInstance.SaveNow();
+        newInstance.SetName(Name());
+        newInstance.SaveNow();
 
         // ---------------------------------------------------------- resolve + download
         var modIdResolver = new FileResolvingTask(_pack, _modrinth, _flame);
@@ -630,8 +631,6 @@ public sealed partial class FlameCreationTask : InstanceTask
                 case ResourceType.World:
                     worldPath = ValidatePath(fileName, targetFolder, "saves");
                     InstallWorld(worldPath);
-                    break;
-                default:
                     break;
             }
         }

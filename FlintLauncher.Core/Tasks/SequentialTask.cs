@@ -34,11 +34,11 @@ public class SequentialTask : ConcurrentTask
         // interleaved completion bookkeeping can never leave a stale status behind.
         long stamp;
         int doing, done, totalSize;
-        lock (_gate)
+        lock (Gate)
         {
             stamp = BeginStateUpdateLocked();
-            doing = _doing.Count;
-            done = _done.Count;
+            doing = Doing.Count;
+            done = Done.Count;
             totalSize = TotalSizeLocked();
         }
 

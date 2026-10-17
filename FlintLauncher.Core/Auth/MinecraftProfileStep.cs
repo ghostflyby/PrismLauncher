@@ -24,7 +24,7 @@ public sealed class MinecraftProfileStep : AuthStep
         var url = _auth.MinecraftServices.TrimEnd('/') + "/minecraft/profile";
         var headers = new List<KeyValuePair<string, string>>(Headers)
         {
-            new("Authorization", $"Bearer {Data.YggdrasilToken.Token_}"),
+            new("Authorization", $"Bearer {Data.YggdrasilToken.Value}"),
         };
 
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest

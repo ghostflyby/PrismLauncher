@@ -14,6 +14,7 @@
 //    with the failing download's reason.
 //  - The review-dialog UX (candidate list, per-resource check state) is the host
 //    application's job; this task takes the already-selected download tasks.
+
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Tasks;
 

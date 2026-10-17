@@ -9,6 +9,7 @@
 //  - The icon QPixmapCache/Mutex plumbing (Qt GUI) is dropped; only the icon path is
 //    kept on ModDetails. LocalModParseTask (the Task wrapper) is not ported — callers
 //    can fill ModDetails directly (see finishResolvingWithDetails).
+
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Versioning;
 
@@ -17,22 +18,22 @@ namespace FlintLauncher.Core.Minecraft.Resources;
 /// <summary>Port of the Mod class: a Resource with lazily resolved ModDetails.</summary>
 public class Mod : Resource
 {
-    private ModDetails _localDetails = new();
-    private int _requiredByCount;
-    private int _requiresCount;
+    private ModDetails localDetails = new();
+    private int requiredByCount;
+    private int requiresCount;
 
     public Mod(string filePath) : this(new FileInfo(filePath)) { }
 
     public Mod(FileInfo file) : base(file)
     {
-        _enabled = file.Extension != ".disabled";
+        Enabled = file.Extension != ".disabled";
     }
 
-    public ModDetails Details => _localDetails;
+    public ModDetails Details => localDetails;
 
     public void SetDetails(ModDetails details)
     {
-        _localDetails = details;
+        localDetails = details;
     }
 
     public override int Compare(Resource other, SortType type = SortType.Name)
@@ -221,24 +222,24 @@ public class Mod : Resource
     public string ReleaseType() => "Unknown";
 
     /// <summary>Internal path to the mod's icon file.</summary>
-    public string IconPath => _localDetails.IconFile;
+    public string IconPath => localDetails.IconFile;
 
-    public override bool Valid => _localDetails.ModId.Length != 0;
+    public override bool Valid => localDetails.ModId.Length != 0;
 
     public List<string> Dependencies() => Details.Dependencies;
 
-    public int RequiredByCount => _requiredByCount;
+    public int RequiredByCount => requiredByCount;
 
-    public int RequiresCount => _requiresCount;
+    public int RequiresCount => requiresCount;
 
     public void SetRequiredByCount(int value)
     {
-        _requiredByCount = value;
+        requiredByCount = value;
     }
 
     public void SetRequiresCount(int value)
     {
-        _requiresCount = value;
+        requiresCount = value;
     }
 
     /// <summary>Port of Mod::finishResolvingWithDetails (minus the pixmap-cache bookkeeping).</summary>
@@ -246,6 +247,6 @@ public class Mod : Resource
     {
         SetResolving(false, ResolutionTicket);
         SetResolved();
-        _localDetails = details;
+        localDetails = details;
     }
 }

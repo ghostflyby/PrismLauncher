@@ -2,6 +2,7 @@
 // Port of launcher/Version.{h,cpp} — FlexVer ordering (https://git.sleeping.town/exa/FlexVer)
 // with Prism's custom handling of spaces ("1.20 Pre-Release 1").
 // Renamed from `Version` to `McVersion` to avoid ambiguity with System.Version.
+
 using System.Text;
 
 namespace FlintLauncher.Core.Versioning;
@@ -29,7 +30,7 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
     }
 
     private readonly string _string;
-    private Section[] _sections = [];
+    private Section[] sections = [];
 
     public McVersion() : this("") { }
 
@@ -95,7 +96,7 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
                 sections.Add(new Section(type, s));
             }
         }
-        _sections = sections.ToArray();
+        this.sections = sections.ToArray();
     }
 
     private static int CompareSections(Section a, Section b)
@@ -136,11 +137,11 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
         {
             return 1;
         }
-        var size = Math.Max(_sections.Length, other._sections.Length);
+        var size = Math.Max(sections.Length, other.sections.Length);
         for (var i = 0; i < size; i++)
         {
-            var sec1 = i < _sections.Length ? _sections[i] : default;
-            var sec2 = i < other._sections.Length ? other._sections[i] : default;
+            var sec1 = i < sections.Length ? sections[i] : default;
+            var sec2 = i < other.sections.Length ? other.sections[i] : default;
             var cmp = CompareSections(sec1, sec2);
             if (cmp != 0)
             {
@@ -157,7 +158,7 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
     public override int GetHashCode()
     {
         var hash = new HashCode();
-        foreach (var section in _sections)
+        foreach (var section in sections)
         {
             hash.Add((int)section.Type);
             hash.Add(section.Value, StringComparer.Ordinal);

@@ -66,8 +66,6 @@ public sealed class LaunchCommand : LaunchStep
                 }
                 break;
             }
-            default:
-                break;
         }
     }
 

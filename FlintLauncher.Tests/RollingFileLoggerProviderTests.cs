@@ -2,6 +2,7 @@
 // Tests for the rolling log file sink (Application.cpp:513-528 port): generations shift down
 // at startup, a fresh Flint-0.log receives the lines, and an unwritable location degrades to
 // a no-op instead of taking the launcher down.
+
 using FlintLauncher.Web.Logging;
 using Microsoft.Extensions.Logging;
 using Xunit;

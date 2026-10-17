@@ -13,6 +13,7 @@
 //    TarArchive.cs (no new packages), selected by gzip magic bytes like libarchive does.
 //  - Unix permission bits and symlinks stored in zip entries are not restored (the MMCZip
 //    port's known limitation; the tar.gz path preserves the execute bits and symlinks).
+
 using System.IO.Compression;
 using System.Security.Cryptography;
 using FlintLauncher.Core.IO;
@@ -134,7 +135,7 @@ public sealed class ArchiveDownloadTask : FlintTask
             try
             {
                 using var zip = ZipFile.OpenRead(input);
-                extracted = MMCZip.ExtractSubDir(zip, firstFolder, _finalPath);
+                extracted = MmcZip.ExtractSubDir(zip, firstFolder, _finalPath);
             }
             catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
                                      or ArgumentException or NotSupportedException)

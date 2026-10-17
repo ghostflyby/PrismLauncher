@@ -4,12 +4,25 @@
 // BEFORE any core service is built, wires the core singletons and maps the /api/v1
 // endpoints. Program.cs is a one-line wrapper around this factory so integration tests can
 // host the exact same app in-process.
+
 using System.Diagnostics;
+using System.Text.Json;
 using FlintLauncher.Core;
+using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Diagnostics;
+using FlintLauncher.Core.Java;
+using FlintLauncher.Core.Launch;
+using FlintLauncher.Core.ModPlatform.AtLauncher;
+using FlintLauncher.Core.ModPlatform.Flame;
+using FlintLauncher.Core.ModPlatform.Ftb;
+using FlintLauncher.Core.ModPlatform.Modrinth;
+using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Web.Endpoints;
 using FlintLauncher.Web.Logging;
+using FlintLauncher.Web.Models;
+using FlintLauncher.Web.OpenApi;
 using FlintLauncher.Web.Services;
+
 // extension-method log events (HttpLog.Request/Probe) live in the Core Diagnostics namespace
 
 namespace FlintLauncher.Web;
@@ -17,12 +30,12 @@ namespace FlintLauncher.Web;
 public static class WebHostBuilder
 {
     public static WebApplication BuildWebApplication(string[] args,
-        Core.ModPlatform.Modrinth.ModrinthApi? modrinth = null,
-        Core.ModPlatform.Flame.FlameApi? flame = null,
-        Core.ModPlatform.Technic.TechnicApi? technic = null,
-        Core.ModPlatform.AtLauncher.AtLauncherApi? atlauncher = null,
-        Core.ModPlatform.Ftb.FtbApi? ftb = null,
-        Core.Auth.AuthEndpointsOptions? auth = null,
+        ModrinthApi? modrinth = null,
+        FlameApi? flame = null,
+        TechnicApi? technic = null,
+        AtLauncherApi? atlauncher = null,
+        FtbApi? ftb = null,
+        AuthEndpointsOptions? auth = null,
         FlintPaths? paths = null)
     {
         // the five-root layout (G1); tests override to point InstallRoot (the jars/ lookup)
@@ -62,7 +75,7 @@ public static class WebHostBuilder
 
         // machine-readable API surface (G3): source-generated under Native AOT, served
         // unauthenticated next to /healthz as a discovery-plane artifact
-        builder.Services.AddOpenApi("v1", OpenApi.ApiOpenApi.Configure);
+        builder.Services.AddOpenApi("v1", ApiOpenApi.Configure);
 
         LauncherRuntime runtime;
         try
@@ -105,7 +118,7 @@ public static class WebHostBuilder
         // logger factory from the app services, paths from the FlintPaths layout, meta cache,
         // global settings and runtime state from the runtime. The launch endpoints hand it to
         // the controller and the instance list stamps it onto (re)discovered instances.
-        runtime.LaunchServices = new Core.Launch.LaunchServices
+        runtime.LaunchServices = new LaunchServices
         {
             Paths = paths,
             LoggerFactory = loggerFactory,
@@ -117,7 +130,7 @@ public static class WebHostBuilder
             // semantics, and the managed-versions javalist scans it (the C++
             // APPLICATION->javalist() the AutoInstallJava "no download" branch reads)
             JavaRootProvider = () => runtime.JavaRoot,
-            JavaInstallListProvider = () => new Core.Java.JavaInstallList(javaRoot: runtime.JavaRoot),
+            JavaInstallListProvider = () => new JavaInstallList(javaRoot: runtime.JavaRoot),
             // the C++ LaunchTask always parses log4j XML events out of the game output
             // (LaunchTask::parseXmlLogs); the port keeps it behind an opt-in gate for
             // pure-core consumers and this host turns it on (fix-3)
@@ -195,8 +208,8 @@ public static class WebHostBuilder
                     context.Response.StatusCode = 500;
                     context.Response.ContentType = "application/json";
                     await context.Response.WriteAsync(
-                        System.Text.Json.JsonSerializer.Serialize(
-                            new Models.ApiErrorEnvelope(new Models.ErrorResponse("internal_error", ex.Message)),
+                        JsonSerializer.Serialize(
+                            new ApiErrorEnvelope(new ErrorResponse("internal_error", ex.Message)),
                             FlintJsonContext.Default.ApiErrorEnvelope));
                 }
             }
@@ -204,13 +217,13 @@ public static class WebHostBuilder
 
         app.MapOpenApi();
 
-        app.MapGet("/healthz", () => Results.Ok(new Models.HealthResponse("ok")))
+        app.MapGet("/healthz", () => Results.Ok(new HealthResponse("ok")))
             .WithTags("Meta")
-            .Produces<Models.HealthResponse>();
+            .Produces<HealthResponse>();
 
         var api = app.MapGroup("/api/v1");
         api.AddApiAuth(apiAuth);
-        api.MapGet("/info", (FlintConfig config) => new Models.InfoResponse(
+        api.MapGet("/info", (FlintConfig config) => new InfoResponse(
             config.LauncherDisplayName,
             config.PrintableVersionString(),
             config.UserAgent,

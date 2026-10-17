@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Tests for the IconFiles port (IconUtils + the file-level IconList operations).
+
 using FlintLauncher.Core.Icons;
 using Xunit;
 

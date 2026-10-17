@@ -5,6 +5,7 @@
 // shell-script "java" plays the EntryPoint: it echoes every stdin line back (so the script
 // delivery is observable through the log) and honours the launch/abort command vocabulary,
 // without any real Minecraft download.
+
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Launch.Steps;
@@ -92,7 +93,7 @@ public class LauncherPartLaunchTests : IDisposable
         using var fixture = new LaunchFixture();
         fixture.SeedJavaDetection("java", 0, version: "17.0.2"); // C9: probe cache, not settings
         var instance = await fixture.CreateInstance();
-        var session = fixture.OfflineSession("Steve");
+        var session = fixture.OfflineSession();
         var javaPath = WriteFakeJava();
 
         var task = BuildLaunchTask(fixture, instance, javaPath, out var step);
@@ -139,7 +140,7 @@ public class LauncherPartLaunchTests : IDisposable
         var javaPath = WriteFakeJava();
 
         var task = BuildLaunchTask(fixture, instance, javaPath, out var step);
-        step.SetAuthSession(fixture.OfflineSession("Steve"));
+        step.SetAuthSession(fixture.OfflineSession());
 
         task.ReadyForLaunch += () => task.Abort(); // abort instead of proceeding
 
@@ -171,7 +172,7 @@ public class LauncherPartLaunchTests : IDisposable
         // copies (extracted by EmbeddedJars)
         var task = BuildLaunchTask(fixture, instance, javaPath, out var step,
             installRoot: Path.Combine(_root, "does-not-exist"));
-        step.SetAuthSession(fixture.OfflineSession("Steve"));
+        step.SetAuthSession(fixture.OfflineSession());
         task.ReadyForLaunch += () => task.Proceed();
 
         await task.StartAsync();

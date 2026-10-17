@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of tests/DataPackParse_test.cpp (fixtures: TestData/DataPackParse, copied from
 // tests/testdata/DataPackParse).
+
 using FlintLauncher.Core.Minecraft.Resources;
 using Xunit;
 

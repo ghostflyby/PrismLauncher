@@ -5,7 +5,9 @@
 // JsonTypeInfo<T> from FlintJsonContext — reflection-based serialization never enters the
 // picture (Native AOT red line: a missing root registration is a runtime failure, not a
 // compile error).
+
 using System.Diagnostics.CodeAnalysis;
+using System.Security;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 
@@ -107,7 +109,7 @@ public sealed class TypedJsonFile<T> where T : class
             json = File.ReadAllText(FilePath);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
-                                  or System.Security.SecurityException or NotSupportedException)
+                                  or SecurityException or NotSupportedException)
         {
             return false;
         }
@@ -123,7 +125,7 @@ public sealed class TypedJsonFile<T> where T : class
                 File.Copy(FilePath, FilePath + ".corrupt", overwrite: true);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException
-                                      or System.Security.SecurityException or NotSupportedException)
+                                      or SecurityException or NotSupportedException)
             {
                 // the backup is best-effort; the default still applies
             }
@@ -146,9 +148,9 @@ public static class TypedJsonFileVersioning
     /// given, folds EVERY loaded payload over the current defaults BEFORE the gate (the
     /// C6/C7 fold shape: members absent from an older/partial payload take their property
     /// defaults) — this is the single stateVersion gate; do not fork a second one.</summary>
-    public static U LoadEvolved<U>(this TypedJsonFile<U> file, Func<U> currentDefault,
-        Func<int, U, U> evolve, Func<U, U>? mergeWithDefault = null)
-        where U : class, IStateVersioned
+    public static TU LoadEvolved<TU>(this TypedJsonFile<TU> file, Func<TU> currentDefault,
+        Func<int, TU, TU> evolve, Func<TU, TU>? mergeWithDefault = null)
+        where TU : class, IStateVersioned
     {
         var latest = currentDefault();
         var loaded = file.LoadOrDefault(() => latest, mergeWithDefault);

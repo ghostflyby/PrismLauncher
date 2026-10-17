@@ -13,6 +13,7 @@
 //  - loadV3() clears the list before loading (upstream only ever calls it on a fresh model).
 //  - The JSON is written sorted-by-key with Qt's 4-space indentation (QJsonDocument::Indented),
 //    matching the QtJson helper used by the other persisted formats.
+
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -26,11 +27,7 @@ public sealed class AccountList
 {
     private enum AccountListVersion
     {
-        MojangMSA = 3,
-    }
-
-    public AccountList()
-    {
+        MojangMsa = 3,
     }
 
     public int Count => _accounts.Count;
@@ -94,9 +91,9 @@ public sealed class AccountList
             {
                 var existingAccountPtr = _accounts[existingAccount];
                 _accounts[existingAccount] = account;
-                if (ReferenceEquals(_defaultAccount, existingAccountPtr))
+                if (ReferenceEquals(defaultAccount, existingAccountPtr))
                 {
-                    _defaultAccount = account;
+                    defaultAccount = account;
                 }
                 OnListChanged();
                 return;
@@ -113,9 +110,9 @@ public sealed class AccountList
         if (row >= 0 && row < _accounts.Count)
         {
             var account = _accounts[row];
-            if (ReferenceEquals(account, _defaultAccount))
+            if (ReferenceEquals(account, defaultAccount))
             {
-                _defaultAccount = null;
+                defaultAccount = null;
                 OnDefaultAccountChanged();
             }
             _accounts.RemoveAt(row);
@@ -135,24 +132,24 @@ public sealed class AccountList
         }
     }
 
-    public MinecraftAccount? DefaultAccount => _defaultAccount;
+    public MinecraftAccount? DefaultAccount => defaultAccount;
 
     public void SetDefaultAccount(MinecraftAccount? newAccount)
     {
-        if (newAccount is null && _defaultAccount is not null)
+        if (newAccount is null && defaultAccount is not null)
         {
-            _defaultAccount = null;
+            defaultAccount = null;
             OnDefaultAccountChanged();
         }
         else
         {
             // upstream only accepts accounts that are actually on the list
             var onList = _accounts.FirstOrDefault(a => ReferenceEquals(a, newAccount));
-            if (onList is null || ReferenceEquals(_defaultAccount, onList))
+            if (onList is null || ReferenceEquals(defaultAccount, onList))
             {
                 return;
             }
-            _defaultAccount = onList;
+            defaultAccount = onList;
             OnDefaultAccountChanged();
         }
     }
@@ -172,13 +169,13 @@ public sealed class AccountList
 
     public void SetListFilePath(string path, bool autosave = false)
     {
-        _listFilePath = path;
-        _autosave = autosave;
+        listFilePath = path;
+        this.autosave = autosave;
     }
 
     public bool LoadList()
     {
-        if (string.IsNullOrEmpty(_listFilePath))
+        if (string.IsNullOrEmpty(listFilePath))
         {
             return false;
         }
@@ -186,7 +183,7 @@ public sealed class AccountList
         byte[] jsonData;
         try
         {
-            jsonData = FileSystem.Read(_listFilePath);
+            jsonData = FileSystem.Read(listFilePath);
         }
         catch (Exception)
         {
@@ -211,7 +208,7 @@ public sealed class AccountList
 
         // Make sure the format version matches.
         var listVersion = EnsureIntegerLike(root["formatVersion"]);
-        if (listVersion == (int)AccountListVersion.MojangMSA)
+        if (listVersion == (int)AccountListVersion.MojangMsa)
         {
             return LoadV3(root);
         }
@@ -226,7 +223,7 @@ public sealed class AccountList
         // Attempt to rename the old version.
         try
         {
-            File.Move(_listFilePath, Path.Combine(Path.GetDirectoryName(_listFilePath) ?? "", newName));
+            File.Move(listFilePath, Path.Combine(Path.GetDirectoryName(listFilePath) ?? "", newName));
         }
         catch (Exception)
         {
@@ -237,7 +234,7 @@ public sealed class AccountList
     public bool LoadV3(JsonObject root)
     {
         _accounts.Clear();
-        _defaultAccount = null;
+        defaultAccount = null;
         if (root["accounts"] is not JsonArray accounts)
         {
             return true;
@@ -262,36 +259,33 @@ public sealed class AccountList
                 _accounts.Add(account);
                 if (AccountData.EnsureBool(accountObj["active"]))
                 {
-                    _defaultAccount = account;
+                    defaultAccount = account;
                 }
             }
-            else
-            {
-                // qWarning() << "Failed to load an account.";
-            }
+            // qWarning() << "Failed to load an account.";
         }
         return true;
     }
 
     public bool SaveList()
     {
-        if (string.IsNullOrEmpty(_listFilePath))
+        if (string.IsNullOrEmpty(listFilePath))
         {
             return false;
         }
 
         // make sure the parent folder exists
-        if (!FileSystem.EnsureFilePathExists(_listFilePath))
+        if (!FileSystem.EnsureFilePathExists(listFilePath))
         {
             return false;
         }
 
         // make sure the file wasn't overwritten with a folder before (fixes a bug)
-        if (Directory.Exists(_listFilePath))
+        if (Directory.Exists(listFilePath))
         {
             try
             {
-                Directory.Delete(_listFilePath, recursive: true);
+                Directory.Delete(listFilePath, recursive: true);
             }
             catch (Exception)
             {
@@ -302,7 +296,7 @@ public sealed class AccountList
         // Build the JSON document to write to the list file.
         JsonObject root = new()
         {
-            ["formatVersion"] = (int)AccountListVersion.MojangMSA,
+            ["formatVersion"] = (int)AccountListVersion.MojangMsa,
         };
 
         // Build a list of accounts.
@@ -310,7 +304,7 @@ public sealed class AccountList
         foreach (var account in _accounts)
         {
             var accountObj = account.SaveToJson();
-            if (ReferenceEquals(_defaultAccount, account))
+            if (ReferenceEquals(defaultAccount, account))
             {
                 accountObj["active"] = true;
             }
@@ -323,7 +317,7 @@ public sealed class AccountList
         try
         {
             // QSaveFile: write to a temporary file and atomically rename over the target
-            var tmpPath = _listFilePath + ".tmp";
+            var tmpPath = listFilePath + ".tmp";
             using (var stream = new FileStream(tmpPath, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 stream.Write(bytes);
@@ -332,7 +326,7 @@ public sealed class AccountList
             {
                 File.SetUnixFileMode(tmpPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
             }
-            File.Move(tmpPath, _listFilePath, overwrite: true);
+            File.Move(tmpPath, listFilePath, overwrite: true);
         }
         catch (Exception)
         {
@@ -351,7 +345,7 @@ public sealed class AccountList
 
     private void OnListChanged()
     {
-        if (_autosave)
+        if (autosave)
         {
             // TODO: Alert the user if this fails.
             SaveList();
@@ -361,7 +355,7 @@ public sealed class AccountList
 
     private void OnDefaultAccountChanged()
     {
-        if (_autosave)
+        if (autosave)
         {
             SaveList();
         }
@@ -369,9 +363,9 @@ public sealed class AccountList
     }
 
     private readonly List<MinecraftAccount> _accounts = [];
-    private MinecraftAccount? _defaultAccount;
-    private string _listFilePath = "";
-    private bool _autosave;
+    private MinecraftAccount? defaultAccount;
+    private string listFilePath = "";
+    private bool autosave;
 
     /// <summary>QVariant::toInt over the formatVersion value (numbers and digit strings).</summary>
     private static int EnsureIntegerLike(JsonNode? node)

@@ -4,6 +4,7 @@
 // and truncation/corruption errors. No real user level.dat data is used.
 
 using System.Buffers.Binary;
+using System.Text;
 using FlintLauncher.Nbt;
 using Xunit;
 
@@ -132,7 +133,7 @@ public class NbtTests
 
         Assert.Equal(new[] { "first", "second" }, root.Entries.Select(e => e.Key).ToArray());
         Assert.Equal("uno", ((NbtString)root["first"]).Value);
-        Assert.True(root.Insert("second", new NbtString("nope")) == false); // insert never replaces
+        Assert.True(!root.Insert("second", new NbtString("nope"))); // insert never replaces
     }
 
     [Fact]
@@ -206,7 +207,7 @@ public class NbtTests
     {
         // U+10000: .NET UTF-8 emits F0 90 80 80 (4 bytes);
         // modified UTF-8 emits ED A0 80 ED B0 80 (surrogate pair D800 DC00, 3 bytes each)
-        var netUtf8 = System.Text.Encoding.UTF8.GetBytes("\U00010000");
+        var netUtf8 = Encoding.UTF8.GetBytes("\U00010000");
         Assert.Equal(new byte[] { 0xF0, 0x90, 0x80, 0x80 }, netUtf8);
 
         var modified = ModifiedUtf8.Encode("\U00010000");

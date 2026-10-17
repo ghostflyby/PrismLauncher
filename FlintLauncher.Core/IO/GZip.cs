@@ -3,6 +3,7 @@
 // NOTE: the C++ GZip module has no maxDecompressedSize guard and no "DecompressMaybe"
 // variant in this revision of PrismLauncher — the module only provides unzip/zip and
 // readGzFileByBlocks, which are ported here 1:1.
+
 using System.IO.Compression;
 
 namespace FlintLauncher.Core.IO;

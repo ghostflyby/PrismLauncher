@@ -6,13 +6,16 @@
 //
 // All classes join "LauncherJars": the hosts chdir (process-global) and the Http proxy/
 // retry hooks are process-global statics that must not race the other API suites.
+
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using FlintLauncher.Core;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Net;
+using FlintLauncher.Core.State;
 using FlintLauncher.Nbt;
 using FlintLauncher.Web;
 using FlintLauncher.Web.Services;
@@ -46,7 +49,7 @@ public class CoverageFixSettingsApiTests
         var minecraft = groups.GetProperty("minecraft");
         // RAM-derived (SysInfo::defaultMaxJvmMem port); the record property default is the
         // single source (CONFIG C6 — GlobalSettingsRegistration retired)
-        Assert.Equal(Core.Config.MemoryConfig.DefaultMaxMemAlloc,
+        Assert.Equal(MemoryConfig.DefaultMaxMemAlloc,
             minecraft.GetProperty("MaxMemAlloc").GetInt32());
         Assert.True(minecraft.GetProperty("LowMemWarning").GetBoolean());
         Assert.True(minecraft.GetProperty("ShowGlobalGameTime").GetBoolean());
@@ -243,7 +246,7 @@ public class CoverageFixSettingsApiTests
 public class CoverageFixWorldsApiTests : IAsyncDisposable
 {
     private readonly string _dataDir = Path.Combine(Path.GetTempPath(), $"flint-fix4-{Guid.NewGuid():N}");
-    private WaveApiHost? _host;
+    private WaveApiHost? host;
 
     private static void SeededWorld(string worldDir, string name, long seed)
     {
@@ -264,9 +267,9 @@ public class CoverageFixWorldsApiTests : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (_host is not null)
+        if (host is not null)
         {
-            await _host.DisposeAsync();
+            await host.DisposeAsync();
         }
         try
         {
@@ -282,9 +285,9 @@ public class CoverageFixWorldsApiTests : IAsyncDisposable
     {
         WaveSeed.Instance(_dataDir, "w-four", "Worlds Four");
         SeededWorld(Path.Combine(SavesDir, "world_one"), "World One", 42);
-        _host = await WaveApiHost.StartAsync(_dataDir);
+        host = await WaveApiHost.StartAsync(_dataDir);
 
-        var copy = await _host.PostAsync("/api/v1/instances/w-four/worlds/world_one/copy",
+        var copy = await host.PostAsync("/api/v1/instances/w-four/worlds/world_one/copy",
             new { name = "World One Copy" });
         Assert.Equal(HttpStatusCode.Created, copy.StatusCode);
         var view = JsonDocument.Parse(await copy.Content.ReadAsStringAsync()).RootElement;
@@ -297,14 +300,14 @@ public class CoverageFixWorldsApiTests : IAsyncDisposable
         Assert.True(File.Exists(Path.Combine(copiedDir, "level.dat")));
 
         // the listing shows both worlds
-        var worlds = JsonDocument.Parse(await _host.Client.GetStringAsync(
+        var worlds = JsonDocument.Parse(await host.Client.GetStringAsync(
             "/api/v1/instances/w-four/worlds")).RootElement;
         Assert.Equal(2, worlds.GetArrayLength());
 
         // errors: missing body name, unknown world
-        Assert.Equal(HttpStatusCode.BadRequest, (await _host.PostAsync(
+        Assert.Equal(HttpStatusCode.BadRequest, (await host.PostAsync(
             "/api/v1/instances/w-four/worlds/world_one/copy", new { name = "" })).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await _host.PostAsync(
+        Assert.Equal(HttpStatusCode.NotFound, (await host.PostAsync(
             "/api/v1/instances/w-four/worlds/ghost/copy", new { name = "X" })).StatusCode);
     }
 
@@ -314,9 +317,9 @@ public class CoverageFixWorldsApiTests : IAsyncDisposable
         WaveSeed.Instance(_dataDir, "w-four", "Worlds Four");
         SeededWorld(Path.Combine(SavesDir, "world_one"), "World One", 123456789);
         File.WriteAllBytes(Path.Combine(SavesDir, "world_one", "icon.png"), [1, 2, 3]);
-        _host = await WaveApiHost.StartAsync(_dataDir);
+        host = await WaveApiHost.StartAsync(_dataDir);
 
-        var response = await _host.Client.GetAsync("/api/v1/instances/w-four/worlds/world_one");
+        var response = await host.Client.GetAsync("/api/v1/instances/w-four/worlds/world_one");
         response.EnsureSuccessStatusCode();
         var detail = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
         Assert.Equal("World One", detail.GetProperty("name").GetString());
@@ -331,13 +334,13 @@ public class CoverageFixWorldsApiTests : IAsyncDisposable
 
         // a world without an icon reports an empty path
         SeededWorld(Path.Combine(SavesDir, "no_icon"), "No Icon", 7);
-        detail = JsonDocument.Parse(await _host.Client.GetStringAsync(
+        detail = JsonDocument.Parse(await host.Client.GetStringAsync(
             "/api/v1/instances/w-four/worlds/no_icon")).RootElement;
         Assert.Equal("", detail.GetProperty("iconPath").GetString());
         Assert.Equal(7, detail.GetProperty("seed").GetInt64());
 
         Assert.Equal(HttpStatusCode.NotFound,
-            (await _host.Client.GetAsync("/api/v1/instances/w-four/worlds/ghost")).StatusCode);
+            (await host.Client.GetAsync("/api/v1/instances/w-four/worlds/ghost")).StatusCode);
     }
 }
 
@@ -515,7 +518,7 @@ public class CoverageFixLaunchJoinApiTests
             {
                 Java = state.Java with
                 {
-                    Detections = new Dictionary<string, Core.State.JavaDetectEntry>(
+                    Detections = new Dictionary<string, JavaDetectEntry>(
                         state.Java.Detections, StringComparer.Ordinal)
                     {
                         [javaPath] = new(CheckJava.ComputeJavaSignature(javaUnixTime, javaPath),

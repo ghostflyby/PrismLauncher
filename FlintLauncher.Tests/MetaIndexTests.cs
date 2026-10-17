@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of tests/Index_test.cpp.
-using FluentIndex = FlintLauncher.Core.Meta.Index;
+
 using FlintLauncher.Core.Meta;
 using Xunit;
+using FluentIndex = FlintLauncher.Core.Meta.Index;
 
 namespace FlintLauncher.Tests;
 

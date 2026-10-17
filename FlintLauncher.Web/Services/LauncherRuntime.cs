@@ -2,18 +2,25 @@
 // The host's core-object wiring: the singletons a C++ Application object would own, built
 // once by WebHostBuilder against the resolved data dir. All paths come from the injected
 // FlintPaths — the process working directory is not load-bearing.
+
 using System.Text.Json.Nodes;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
+using FlintLauncher.Core.Config;
+using FlintLauncher.Core.Icons;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
-using FlintLauncher.Core.Net;
+using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.ModPlatform.Flame;
+using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.ModPlatform.Technic;
-using FlintLauncher.Core.ModPlatform.Ftb;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Screenshots;
+using FlintLauncher.Core.Secrets;
+using FlintLauncher.Core.Skins;
+using FlintLauncher.Core.State;
 using FlintLauncher.Web.Models;
 
 namespace FlintLauncher.Web.Services;
@@ -46,33 +53,33 @@ public sealed class LauncherRuntime
     /// resolved fold through it). The instance layer folds it as the user layer of its own
     /// instance.json stack (D4) — the former SettingsObject adapter view retired with the D4
     /// batch.</summary>
-    public Core.Config.FlintConfigStore Config { get; }
+    public FlintConfigStore Config { get; }
     /// <summary>The launcher runtime state (launcher-state.json, S5 — assembly step 4:
     /// loaded BEFORE the config so the C5 importer can strip state keys into it later).</summary>
-    public Core.State.LauncherStateStore State { get; }
+    public LauncherStateStore State { get; }
     /// <summary>The transitional secret store (CONFIG C4, assembly step 3:
     /// &lt;data-root&gt;/secrets.json, 0600).</summary>
-    public Core.Secrets.ISecretStore Secrets { get; }
+    public ISecretStore Secrets { get; }
     /// <summary>The per-source migration decision records (STATE S3:
     /// &lt;state-root&gt;/migration/&lt;source&gt;.json).</summary>
-    public Core.Migration.MigrationDecisionStore MigrationDecisions { get; }
+    public MigrationDecisionStore MigrationDecisions { get; }
     public InstanceList Instances { get; }
     /// <summary>The global icon library (DATA D5: the IconList port — key→path index,
     /// scan, install/delete — over the IconsDir setting).</summary>
-    public Core.Icons.IconPool Icons { get; }
+    public IconPool Icons { get; }
     /// <summary>The local skin library (DATA D6 plan B) over the SkinsDir setting.</summary>
-    public Core.Skins.SkinsLibrary Skins { get; }
+    public SkinsLibrary Skins { get; }
     public AccountList Accounts { get; }
     public HttpMetaCache MetaCache { get; }
     /// <summary>The flint-legacy eager pass outcome (assembly step 5, GLOBAL G2): what the
     /// startup remount did, so the host can log it and tests can assert it.</summary>
-    public Core.Migration.FlintLegacyMigration.Result LegacyMigration { get; }
+    public FlintLegacyMigration.Result LegacyMigration { get; }
 
     /// <summary>The C5 INI import outcome (assembly step 6): what the one-shot importer did,
     /// including an unreadable chain INI — the ctor runs before any logger exists, so the
     /// host surfaces this after Build (the flint-legacy result pattern).</summary>
-    public Core.Config.FlintConfigImporter.ImportResult ConfigImport { get; } =
-        Core.Config.FlintConfigImporter.ImportResult.Idle;
+    public FlintConfigImporter.ImportResult ConfigImport { get; } =
+        FlintConfigImporter.ImportResult.Idle;
 
     /// <summary>The launch-pipeline dependencies (paths, logger factory, global settings,
     /// meta cache, install root). Built by the composition root (WebHostBuilder) once the
@@ -98,29 +105,29 @@ public sealed class LauncherRuntime
         // secrets init (assembly step 3): <dataDir>/secrets.json (0600) — the C4 transitional
         // backend; the secret trio (ProxyPass/ModrinthToken/FlameKeyOverride) reads and
         // writes here (G4: PUT /settings reroutes, RuntimeNetConfig/API clients read the store)
-        Secrets = new Core.Secrets.FileSecretStore(paths.SecretsFile, FlintJsonContext.Default.SecretsFile);
+        Secrets = new FileSecretStore(paths.SecretsFile, FlintJsonContext.Default.SecretsFile);
 
         // state load (assembly step 4): launcher-state.json BEFORE the config import — the
         // importer will strip the C9 state keys into it (GLOBAL §2 ordering)
-        State = new Core.State.LauncherStateStore(paths.LauncherStateFile, FlintJsonContext.Default.LauncherState);
+        State = new LauncherStateStore(paths.LauncherStateFile, FlintJsonContext.Default.LauncherState);
 
         // per-source migration decision records (S3): <stateDir>/migration/<source>.json
-        MigrationDecisions = new Core.Migration.MigrationDecisionStore(
+        MigrationDecisions = new MigrationDecisionStore(
             paths.MigrationDir, FlintJsonContext.Default.MigrationDecisionRecord);
 
         // flint-legacy migration probe/execute (assembly step 5, GLOBAL G2): the pre-reform
         // flat layout remounts onto the five roots ONCE (eager, no lazy dual-read) — before
         // the config import so the moved flint.cfg is found on the config side, and before
         // the cache ledger is built so its Load() reads the remounted metacache.json
-        LegacyMigration = Core.Migration.FlintLegacyMigration.ExecuteIfNeeded(paths, MigrationDecisions);
+        LegacyMigration = FlintLegacyMigration.ExecuteIfNeeded(paths, MigrationDecisions);
 
         // global config (assembly step 6): flint.json is the authoritative user layer (C5);
         // when it is missing, the one-shot importer reads the INI chain
         // (flint.cfg ← prismlauncher.cfg/polymc.cfg/multimc.cfg|mmc.cfg) and sorts it in a
         // single pass — secret trio → the store (C4, loaded above), C9 state keys → the
         // state store (loaded above), the rest → the record domains. Flint never writes INI.
-        Config = new Core.Config.FlintConfigStore(paths.ConfigFile, FlintJsonContext.Default.FlintConfigFile);
-        ConfigImport = Core.Config.FlintConfigImporter.ImportIfNeeded(paths, Config, Secrets, State);
+        Config = new FlintConfigStore(paths.ConfigFile, FlintJsonContext.Default.FlintConfigFile);
+        ConfigImport = FlintConfigImporter.ImportIfNeeded(paths, Config, Secrets, State);
 
         // meta cache (assembly step 8, CACHE E6 — the C++ Application.cpp:1036-1051 startup
         // shape: ONE registration of every base, then the ledger Load()). The mounts follow
@@ -150,7 +157,7 @@ public sealed class LauncherRuntime
         // discovered instances also carry the layout, cache and state store
         Instances = new InstanceList([paths.InstancesDir])
         {
-            Environment = new Core.Config.InstanceEnvironment(
+            Environment = new InstanceEnvironment(
                 Config, FlintJsonContext.Default.InstanceConfigFile, FlintJsonContext.Default.InstanceStateFile),
             LauncherState = State,
             Paths = paths,
@@ -161,11 +168,11 @@ public sealed class LauncherRuntime
         // icon pool (assembly step 9, DATA D5): the IconList successor over the IconsDir
         // SETTING (default "icons", data-root-relative — previously three hardcoded
         // Path.Combine(DataDir, "icons") sites ignored the setting)
-        Icons = new Core.Icons.IconPool(() => ResolveDataRelativeDir(Config.Current.Dirs.IconsDir, "icons"));
+        Icons = new IconPool(() => ResolveDataRelativeDir(Config.Current.Dirs.IconsDir, "icons"));
 
         // local skin library (assembly step 9, DATA D6 plan B): the SkinsDir SETTING
         // (default "skins", data-root-relative) finally has a resident model
-        Skins = new Core.Skins.SkinsLibrary(() => ResolveDataRelativeDir(Config.Current.Dirs.SkinsDir, "skins"));
+        Skins = new SkinsLibrary(() => ResolveDataRelativeDir(Config.Current.Dirs.SkinsDir, "skins"));
 
         // accounts: <dataDir>/accounts.json (autosaved on every change)
         Accounts = new AccountList();

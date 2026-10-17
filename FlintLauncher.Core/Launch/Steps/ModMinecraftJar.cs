@@ -2,6 +2,7 @@
 // Port of launcher/minecraft/launch/ModMinecraftJar.{h,cpp} plus the MMCZip::createModdedJar
 // helper it is the only consumer of (launcher/MMCZip.cpp). createModdedJar lives here instead
 // of IO/MMCZip.cs because it depends on the minecraft/mod Mod model.
+
 using System.IO.Compression;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft.Resources;
@@ -114,7 +115,7 @@ public sealed class ModMinecraftJar : LaunchStep
                 }
                 if (mod.Type == ResourceType.ZipFile)
                 {
-                    if (!MMCZip.MergeZipFiles(zipOut, mod.Fileinfo.FullName, addedFiles))
+                    if (!MmcZip.MergeZipFiles(zipOut, mod.Fileinfo.FullName, addedFiles))
                     {
                         zipOut.Dispose();
                         FileSystem.DeletePath(targetJarPath);
@@ -136,11 +137,11 @@ public sealed class ModMinecraftJar : LaunchStep
                     var whatToZip = filename.FullName;
                     var parentDir = Path.GetDirectoryName(Path.GetFullPath(whatToZip)) ?? "";
                     var files = new List<string>();
-                    MMCZip.CollectFileListRecursively(whatToZip, null, files, null);
+                    MmcZip.CollectFileListRecursively(whatToZip, null, files);
 
                     files.RemoveAll(file => addedFiles.Contains(file));
 
-                    if (!MMCZip.CompressDirFiles(zipOut, parentDir, files))
+                    if (!MmcZip.CompressDirFiles(zipOut, parentDir, files))
                     {
                         zipOut.Dispose();
                         FileSystem.DeletePath(targetJarPath);
@@ -158,7 +159,7 @@ public sealed class ModMinecraftJar : LaunchStep
 
             // finally add the minecraft.jar contents (everything except META-INF, so the jar
             // keeps the mod-added manifest entries)
-            if (!MMCZip.MergeZipFiles(zipOut, sourceJarPath, addedFiles,
+            if (!MmcZip.MergeZipFiles(zipOut, sourceJarPath, addedFiles,
                     key => !key.Contains("META-INF", StringComparison.Ordinal)))
             {
                 zipOut.Dispose();

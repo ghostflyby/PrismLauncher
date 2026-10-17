@@ -6,6 +6,9 @@
 // continues the chain, every other state is terminal through changeState(). abort() cancels the
 // in-flight step (the cancellation surfaces as OperationCanceledException and maps to the
 // FlintTask aborted state, matching the C++ emitAborted() + tr("Aborted") path).
+
+using FlintLauncher.Core.Tasks;
+
 namespace FlintLauncher.Core.Auth;
 
 public enum AuthFlowAction
@@ -15,22 +18,22 @@ public enum AuthFlowAction
     DeviceCode,
 }
 
-public sealed class AuthFlow : Tasks.FlintTask
+public sealed class AuthFlow : FlintTask
 {
-    private AccountTaskState _taskState = AccountTaskState.Created;
+    private AccountTaskState taskState = AccountTaskState.Created;
     private readonly List<AuthStep> _steps = [];
-    private AuthStep? _currentStep;
+    private AuthStep? currentStep;
 
     public AuthFlow(AccountData data, AuthFlowAction action = AuthFlowAction.Refresh,
         AuthEndpointsOptions? auth = null)
     {
         Data = data;
         var endpoints = auth ?? new AuthEndpointsOptions();
-        if (data.Type == AccountType.MSA)
+        if (data.Type == AccountType.Msa)
         {
             if (action == AuthFlowAction.DeviceCode)
             {
-                var oauthStep = new MSADeviceCodeStep(data, endpoints);
+                var oauthStep = new MsaDeviceCodeStep(data, endpoints);
                 oauthStep.AuthorizeWithBrowser += (url, code, expiresIn) =>
                     AuthorizeWithBrowserWithExtra?.Invoke(url, code, expiresIn);
                 _steps.Add(oauthStep);
@@ -56,7 +59,7 @@ public sealed class AuthFlow : Tasks.FlintTask
     public AccountData Data { get; }
 
     /// <summary>Port of AuthFlow::taskState().</summary>
-    public AccountTaskState TaskState_ => _taskState;
+    public AccountTaskState TaskState => taskState;
 
     /// <summary>Port of the authorizeWithBrowser(QUrl) signal (interactive login).</summary>
     public event Action<string>? AuthorizeWithBrowser;
@@ -72,23 +75,23 @@ public sealed class AuthFlow : Tasks.FlintTask
             if (_steps.Count == 0)
             {
                 // we got to the end without an incident... assume this is all.
-                _currentStep = null;
+                currentStep = null;
                 Succeed();
                 return;
             }
-            _currentStep = _steps[0];
+            currentStep = _steps[0];
             _steps.RemoveAt(0);
-            EmitStatus(_currentStep.Describe());
+            EmitStatus(currentStep.Describe());
             var stepReported = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             void Handler(AccountTaskState resultingState, string message)
             {
                 // NOTE: true -> non-terminal state, false -> terminal state
                 stepReported.TrySetResult(ChangeState(resultingState, message));
             }
-            _currentStep.Finished += Handler;
+            currentStep.Finished += Handler;
             try
             {
-                await _currentStep.PerformAsync(cancellationToken).ConfigureAwait(false);
+                await currentStep.PerformAsync(cancellationToken).ConfigureAwait(false);
                 // WaitAsync: a step whose loop exits through its abort flag without reporting
                 // (upstream MSADeviceCodeStep expiry quirk) must not wedge the flow when the
                 // task is cancelled — the cancellation surfaces as the aborted state.
@@ -100,26 +103,26 @@ public sealed class AuthFlow : Tasks.FlintTask
             }
             finally
             {
-                _currentStep.Finished -= Handler;
+                currentStep.Finished -= Handler;
             }
         }
     }
 
     public override void Abort()
     {
-        _currentStep?.Abort();
+        currentStep?.Abort();
         base.Abort();
     }
 
     private void Succeed()
     {
-        Data.Validity_ = Validity.Certain;
+        Data.Validity = Validity.Certain;
         ChangeState(AccountTaskState.Succeeded, "Finished all authentication steps");
     }
 
     private bool ChangeState(AccountTaskState newState, string reason = "")
     {
-        _taskState = newState;
+        taskState = newState;
         EmitDetails(reason);
         switch (newState)
         {
@@ -128,51 +131,51 @@ public sealed class AuthFlow : Tasks.FlintTask
                 Data.ErrorString = "";
                 return true;
             case AccountTaskState.Working:
-                if (_currentStep is null)
+                if (currentStep is null)
                 {
                     EmitStatus("Preparing to log in...");
                 }
-                Data.AccountState_ = AccountState.Working;
+                Data.AccountState = AccountState.Working;
                 return true;
             case AccountTaskState.Succeeded:
                 EmitStatus("Authentication task succeeded.");
-                Data.AccountState_ = AccountState.Online;
+                Data.AccountState = AccountState.Online;
                 EmitSucceeded();
                 return false;
             case AccountTaskState.Offline:
                 EmitStatus("Failed to contact the authentication server.");
                 Data.ErrorString = reason;
-                Data.AccountState_ = AccountState.Offline;
+                Data.AccountState = AccountState.Offline;
                 EmitFailed(reason);
                 return false;
             case AccountTaskState.Disabled:
                 EmitStatus("Client ID has changed. New session needs to be created.");
                 Data.ErrorString = reason;
-                Data.AccountState_ = AccountState.Disabled;
+                Data.AccountState = AccountState.Disabled;
                 EmitFailed(reason);
                 return false;
             case AccountTaskState.FailedSoft:
                 EmitStatus("Encountered an error during authentication.");
                 Data.ErrorString = reason;
-                Data.AccountState_ = AccountState.Errored;
+                Data.AccountState = AccountState.Errored;
                 EmitFailed(reason);
                 return false;
             case AccountTaskState.FailedHard:
                 EmitStatus("Failed to authenticate. The session has expired.");
                 Data.ErrorString = reason;
-                Data.AccountState_ = AccountState.Expired;
+                Data.AccountState = AccountState.Expired;
                 EmitFailed(reason);
                 return false;
             case AccountTaskState.FailedGone:
                 EmitStatus("Failed to authenticate. The account no longer exists.");
                 Data.ErrorString = reason;
-                Data.AccountState_ = AccountState.Gone;
+                Data.AccountState = AccountState.Gone;
                 EmitFailed(reason);
                 return false;
             default:
                 EmitStatus("...");
                 var error = $"Unknown account task state: {(int)newState}";
-                Data.AccountState_ = AccountState.Errored;
+                Data.AccountState = AccountState.Errored;
                 EmitFailed(error);
                 return false;
         }

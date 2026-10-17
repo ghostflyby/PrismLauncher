@@ -6,7 +6,11 @@
 // the token to its clients) → a freshly generated temporary token held in-process (the
 // startup logs it once at Information). Disable entirely with --no-auth / FLINT_NO_AUTH=1
 // (e.g. for a loopback-only deployment where another layer owns auth).
+
+using System.Security;
 using System.Security.Cryptography;
+using System.Text.Json;
+using FlintLauncher.Web.Models;
 
 namespace FlintLauncher.Web.Services;
 
@@ -86,7 +90,7 @@ public sealed class ApiAuthService
             File.Delete(Path.Combine(dataDir, LegacyTokenFileName));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
-                                 or System.Security.SecurityException)
+                                 or SecurityException)
         {
             // the leftover stays; it is inert (nothing reads it anymore)
         }
@@ -99,7 +103,7 @@ public static class ApiAuthMiddleware
 {
     public static RouteGroupBuilder AddApiAuth(this RouteGroupBuilder api, ApiAuthService auth)
     {
-        api.AddEndpointFilter(async (EndpointFilterInvocationContext context, EndpointFilterDelegate next) =>
+        api.AddEndpointFilter(async (context, next) =>
         {
             var request = context.HttpContext.Request;
             // /api/v1/info and the OpenAPI document stay open for client discovery (like
@@ -120,9 +124,9 @@ public static class ApiAuthMiddleware
                     response.StatusCode = 401;
                     response.ContentType = "application/json";
                     await response.WriteAsync(
-                        System.Text.Json.JsonSerializer.Serialize(
-                            new Models.ApiErrorEnvelope(
-                                new Models.ErrorResponse("unauthorized",
+                        JsonSerializer.Serialize(
+                            new ApiErrorEnvelope(
+                                new ErrorResponse("unauthorized",
                                     "provide the API token as 'Authorization: Bearer <token>' or 'X-Api-Token'")),
                             FlintJsonContext.Default.ApiErrorEnvelope));
                     return Results.Empty;

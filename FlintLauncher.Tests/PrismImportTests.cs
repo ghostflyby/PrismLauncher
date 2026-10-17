@@ -5,7 +5,9 @@
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.Tasks;
+using FlintLauncher.Web;
 using Xunit;
+using Xunit.Sdk;
 
 namespace FlintLauncher.Tests;
 
@@ -431,7 +433,7 @@ public class PrismImportTaskTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "dst", "meta", "index.json"), "existing");
 
         var decisions = new MigrationDecisionStore(Path.Combine(_root, "state", "migration"),
-            Web.FlintJsonContext.Default.MigrationDecisionRecord);
+            FlintJsonContext.Default.MigrationDecisionRecord);
         // S7: the task files under the ACTUAL source name — a polymc source must not be
         // recorded as "prism" (the old hardcode)
         var task = new PrismImportTask(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
@@ -447,7 +449,7 @@ public class PrismImportTaskTests : IDisposable
                 + " | metaContent=" + (File.Exists(Path.Combine(_root, "dst", "meta", "index.json"))
                     ? File.ReadAllText(Path.Combine(_root, "dst", "meta", "index.json"))
                     : "<missing>"));
-            throw new Xunit.Sdk.XunitException("see " + Path.Combine(Path.GetTempPath(), "flint-probe-dump.txt"));
+            throw new XunitException("see " + Path.Combine(Path.GetTempPath(), "flint-probe-dump.txt"));
         }
         Assert.Equal("existing", File.ReadAllText(Path.Combine(_root, "dst", "meta", "index.json"))); // idempotent skip
         Assert.True(File.Exists(Path.Combine(_root, "dst", "instances", "demo", "instance.cfg")));
@@ -513,7 +515,7 @@ public class PrismImportTaskTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "dst", "instances", "native", "instance.cfg"), "native");
 
         var decisions = new MigrationDecisionStore(Path.Combine(_root, "state", "migration"),
-            Web.FlintJsonContext.Default.MigrationDecisionRecord);
+            FlintJsonContext.Default.MigrationDecisionRecord);
         var task = new PrismImportTask(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
             ImportMode.CopyOnWrite, "prism", decisions);
         await task.StartAsync();
@@ -541,7 +543,7 @@ public class PrismImportTaskTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "src", "prismlauncher.cfg"), "k=v");
 
         var decisions = new MigrationDecisionStore(Path.Combine(_root, "state-move", "migration"),
-            Web.FlintJsonContext.Default.MigrationDecisionRecord);
+            FlintJsonContext.Default.MigrationDecisionRecord);
         var task = new PrismImportTask(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
             ImportMode.Move, "prism", decisions);
         await task.StartAsync();

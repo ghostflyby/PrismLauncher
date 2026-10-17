@@ -2,6 +2,8 @@
 // Port of launcher/meta/Version.{h,cpp}: a metadata version record wrapping a VersionFile.
 // The QObject signals (typeChanged/timeChanged/requiresChanged) are model plumbing for the Qt
 // views and are not ported; MergeFromList assigns directly like upstream.
+
+using System.Text.Json.Nodes;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Versioning;
 
@@ -9,9 +11,9 @@ namespace FlintLauncher.Core.Meta;
 
 public sealed class MetaVersion : MetaEntity
 {
-    private bool _providesRecommendations;
+    private bool providesRecommendations;
 
-    private bool _recommended;
+    private bool recommended;
 
     // NOTE: the C++ m_name member is dead there as well (never written); dropped to keep
     // the port warning-clean
@@ -19,17 +21,17 @@ public sealed class MetaVersion : MetaEntity
 
     private readonly string _version;
 
-    private string _type = "";
+    private string type = "";
 
-    private long _time;
+    private long time;
 
-    private RequireSet _requires = new();
+    private RequireSet requires = new();
 
-    private RequireSet _conflicts = new();
+    private RequireSet conflicts = new();
 
-    private bool _volatile;
+    private bool @volatile;
 
-    private VersionFile? _data;
+    private VersionFile? data;
 
     public MetaVersion(string uid, string version)
     {
@@ -43,73 +45,73 @@ public sealed class MetaVersion : MetaEntity
     /// <summary>Port of BaseVersion::name().</summary>
     public string Name()
     {
-        if (_data is not null)
+        if (data is not null)
         {
-            return _data.Name;
+            return data.Name;
         }
         return _uid;
     }
 
     /// <summary>Port of BaseVersion::typeString().</summary>
-    public string TypeString() => _type;
+    public string TypeString() => type;
 
     public string Uid() => _uid;
 
     public string Version() => _version;
 
-    public string Type() => _type;
+    public string Type() => type;
 
     /// <summary>QDateTime::fromMSecsSinceEpoch(m_time * 1000, Qt::UTC).</summary>
-    public DateTimeOffset Time() => DateTimeOffset.FromUnixTimeMilliseconds(_time * 1000);
+    public DateTimeOffset Time() => DateTimeOffset.FromUnixTimeMilliseconds(time * 1000);
 
-    public long RawTime() => _time;
+    public long RawTime() => time;
 
-    public RequireSet RequiredSet() => _requires;
+    public RequireSet RequiredSet() => requires;
 
-    public VersionFile? Data() => _data;
+    public VersionFile? Data() => data;
 
-    public bool IsRecommended() => _recommended;
+    public bool IsRecommended() => recommended;
 
     /// <summary>Hides BaseEntity::isLoaded() like the C++ shadowing declaration.</summary>
-    public new bool IsLoaded() => _data is not null && base.IsLoaded();
+    public new bool IsLoaded() => data is not null && base.IsLoaded();
 
     public void Merge(MetaVersion other)
     {
         MergeFromList(other);
-        if (other._data is not null)
+        if (other.data is not null)
         {
-            SetData(other._data);
+            SetData(other.data);
         }
     }
 
     public void MergeFromList(MetaVersion other)
     {
-        if (other._providesRecommendations)
+        if (other.providesRecommendations)
         {
-            if (_recommended != other._recommended)
+            if (recommended != other.recommended)
             {
-                SetRecommended(other._recommended);
+                SetRecommended(other.recommended);
             }
         }
-        if (_type != other._type)
+        if (type != other.type)
         {
-            SetType(other._type);
+            SetType(other.type);
         }
-        if (_time != other._time)
+        if (time != other.time)
         {
-            SetTime(other._time);
+            SetTime(other.time);
         }
-        if (!_requires.SetEquals(other._requires))
+        if (!requires.SetEquals(other.requires))
         {
-            _requires = other._requires.Clone();
+            requires = other.requires.Clone();
         }
-        if (!_conflicts.SetEquals(other._conflicts))
+        if (!conflicts.SetEquals(other.conflicts))
         {
-            _conflicts = other._conflicts.Clone();
+            conflicts = other.conflicts.Clone();
         }
-        if (_volatile != other._volatile)
+        if (@volatile != other.@volatile)
         {
-            SetVolatile(other._volatile);
+            SetVolatile(other.@volatile);
         }
         if (other.Sha256.Length != 0)
         {
@@ -117,7 +119,7 @@ public sealed class MetaVersion : MetaEntity
         }
     }
 
-    public override void Parse(System.Text.Json.Nodes.JsonObject obj)
+    public override void Parse(JsonObject obj)
     {
         MetaJsonFormat.ParseVersion(obj, this);
     }
@@ -132,21 +134,21 @@ public sealed class MetaVersion : MetaEntity
 
     // ------------------------------------------------- for usage by format parsers only
 
-    public void SetType(string type) => _type = type;
+    public void SetType(string type) => this.type = type;
 
-    public void SetTime(long time) => _time = time;
+    public void SetTime(long time) => this.time = time;
 
     public void SetRequires(RequireSet reqs, RequireSet conflicts)
     {
-        _requires = reqs;
-        _conflicts = conflicts;
+        requires = reqs;
+        this.conflicts = conflicts;
     }
 
-    public void SetVolatile(bool volatileValue) => _volatile = volatileValue;
+    public void SetVolatile(bool volatileValue) => @volatile = volatileValue;
 
-    public void SetRecommended(bool recommended) => _recommended = recommended;
+    public void SetRecommended(bool recommended) => this.recommended = recommended;
 
-    public void SetProvidesRecommendations() => _providesRecommendations = true;
+    public void SetProvidesRecommendations() => providesRecommendations = true;
 
-    public void SetData(VersionFile data) => _data = data;
+    public void SetData(VersionFile data) => this.data = data;
 }

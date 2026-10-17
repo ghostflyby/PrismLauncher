@@ -69,7 +69,7 @@ public class WorldTests : IDisposable
         var world = new World(dir);
         world.LoadMetadata();
         Assert.True(world.IsValid);
-        Assert.True(world.IsOnFS);
+        Assert.True(world.IsOnFs);
         Assert.Equal("TestWorld", world.FolderName);
         Assert.Equal("Test World", world.Name);
         Assert.Equal(GameTypeKind.Creative, world.GameType.Kind);
@@ -100,7 +100,7 @@ public class WorldTests : IDisposable
         Directory.CreateDirectory(dir);
         var world = new World(dir);
         Assert.False(world.IsValid);
-        Assert.True(world.IsOnFS); // the (invalid) world folder still exists
+        Assert.True(world.IsOnFs); // the (invalid) world folder still exists
         world.LoadMetadata(); // must be a no-op-ish and not throw
         Assert.False(world.IsValid);
     }

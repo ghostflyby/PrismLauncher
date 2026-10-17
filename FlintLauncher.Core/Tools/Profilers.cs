@@ -11,6 +11,8 @@
 //  - JVisualVMFactory's default path uses QStandardPaths::findExecutable; the port searches the
 //    PATH environment variable (with .exe appended on Windows) for "jvisualvm", falling back to
 //    "visualvm", empty when not found (the C++ default is null in that case).
+
+using System.Globalization;
 using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Tools;
@@ -104,7 +106,7 @@ public sealed class JProfilerFactory : ProfilerFactory
 }
 
 /// <summary>Port of JVisualVMFactory / JVisualVM::beginProfilingImpl.</summary>
-public sealed class JVisualVMFactory : ProfilerFactory
+public sealed class JVisualVmFactory : ProfilerFactory
 {
     public const string PathKey = "JVisualVMPath";
 
@@ -233,7 +235,7 @@ public static class Profilers
     private static readonly Dictionary<string, ProfilerFactory> AllFactories = new()
     {
         ["jprofiler"] = new JProfilerFactory(),
-        ["jvisualvm"] = new JVisualVMFactory(),
+        ["jvisualvm"] = new JVisualVmFactory(),
         ["generic"] = new GenericProfilerFactory(),
     };
 
@@ -258,13 +260,13 @@ internal static class ProfilerStringExtensions
 {
     public static bool IsEmpty(this string s) => s.Length == 0;
 
-    public static string ToStringInvariant(this int value) => value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    public static string ToStringInvariant(this int value) => value.ToString(CultureInfo.InvariantCulture);
 
     public static int AsIntSetting(this object? value, int fallback)
     {
         try
         {
-            return Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
+            return Convert.ToInt32(value, CultureInfo.InvariantCulture);
         }
         catch (Exception e) when (e is FormatException or InvalidCastException or OverflowException)
         {

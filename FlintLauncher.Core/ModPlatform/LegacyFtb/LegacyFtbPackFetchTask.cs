@@ -9,6 +9,7 @@
 // failed fetch keeps the successfully parsed lists and fails with the C++ "Failed to
 // download some pack lists" message (the C++ emits failed while still handing out the
 // parsed lists through the same signal arguments).
+
 using System.Xml;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;

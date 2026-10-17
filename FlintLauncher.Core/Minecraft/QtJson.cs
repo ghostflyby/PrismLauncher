@@ -3,7 +3,10 @@
 // QJsonDocument/QJsonObject behaviors the C++ version-format code relies on for round-trip
 // serialization — QJsonObject iterates its members sorted by key, and
 // QJsonDocument::toJson(QJsonDocument::Indented) writes 4-space indentation.
+
 using System.Globalization;
+using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -16,7 +19,7 @@ public static class QtJson
         Indented = true,
         IndentCharacter = ' ',
         IndentSize = 4,
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
     /// <summary>
@@ -31,7 +34,7 @@ public static class QtJson
         {
             SortObjectKeys(node).WriteTo(writer);
         }
-        return System.Text.Encoding.UTF8.GetString(stream.ToArray());
+        return Encoding.UTF8.GetString(stream.ToArray());
     }
 
     /// <summary>Returns a copy of the tree with all object members sorted by key (QString order = ordinal).</summary>

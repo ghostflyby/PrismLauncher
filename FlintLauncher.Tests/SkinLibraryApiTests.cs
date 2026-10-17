@@ -4,9 +4,11 @@
 // and the apply endpoint's guard rails (unknown account / missing skin / missing texture).
 // The happy-path apply is covered by the SkinApiEndpointsTests stub machinery shape — here
 // the local CRUD and the composable guards are exercised without a Minecraft-services stub.
+
 using System.Net;
-using System.Net.Http.Json;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using FlintLauncher.Web;
 using Microsoft.AspNetCore.Builder;
@@ -17,8 +19,8 @@ namespace FlintLauncher.Tests;
 public class SkinLibraryApiTests : IAsyncDisposable
 {
     private readonly string _homeDir = Path.Combine(Path.GetTempPath(), $"flint-skinlib-{Guid.NewGuid():N}");
-    private WebApplication? _app;
-    private HttpClient? _client;
+    private WebApplication? app;
+    private HttpClient? client;
 
     private string DataDir => Path.Combine(_homeDir, "data");
     private string SkinsDir => Path.Combine(DataDir, "skins");
@@ -28,26 +30,26 @@ public class SkinLibraryApiTests : IAsyncDisposable
         Directory.CreateDirectory(_homeDir);
         Directory.CreateDirectory(DataDir);
         var token = Guid.NewGuid().ToString("N");
-        _app = WebHostBuilder.BuildWebApplication(
+        app = WebHostBuilder.BuildWebApplication(
         [
             "--home-dir", _homeDir,
             "--api-token", token,
             "--urls", "http://127.0.0.1:0",
         ]);
-        await _app.StartAsync();
-        _client = new HttpClient { BaseAddress = new Uri(_app.Urls.First()) };
-        _client.DefaultRequestHeaders.Add("X-Api-Token", token);
-        return _client;
+        await app.StartAsync();
+        client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
+        client.DefaultRequestHeaders.Add("X-Api-Token", token);
+        return client;
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_app is not null)
+        if (app is not null)
         {
-            await _app.StopAsync();
-            _app.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            await app.StopAsync();
+            app.DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
-        _client?.Dispose();
+        client?.Dispose();
         try
         {
             Directory.Delete(_homeDir, recursive: true);
@@ -157,7 +159,7 @@ public class SkinLibraryApiTests : IAsyncDisposable
 
         // missing body
         var noBody = await client.PostAsync("/api/v1/skins/Real/apply",
-            new StringContent("null", System.Text.Encoding.UTF8, "application/json"));
+            new StringContent("null", Encoding.UTF8, "application/json"));
         Assert.Equal(HttpStatusCode.BadRequest, noBody.StatusCode);
     }
 }

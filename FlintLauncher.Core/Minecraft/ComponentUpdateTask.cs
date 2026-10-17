@@ -19,6 +19,7 @@
 //    performUpdateActions become awaits of the same load tasks.
 //  - The `#if 0` Launch-vs-Resolution load branching of loadComponents() is compiled out
 //    upstream as well; both modes load component versions.
+
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
@@ -84,9 +85,9 @@ public sealed class ComponentUpdateTask : FlintTask
 
     private readonly List<RemoteLoadStatus> _remoteLoadStatusList = [];
 
-    private bool _remoteLoadSuccessful = true;
+    private bool remoteLoadSuccessful = true;
 
-    private int _remoteTasksInProgress;
+    private int remoteTasksInProgress;
 
     public ComponentUpdateTask(Mode mode, NetMode netmode, PackProfile list)
     {
@@ -189,7 +190,7 @@ public sealed class ComponentUpdateTask : FlintTask
         var result = LoadResult.LoadedLocal;
         var taskIndex = 0;
         var componentIndex = 0;
-        _remoteLoadSuccessful = true;
+        remoteLoadSuccessful = true;
 
         var waitTasks = new List<Task>();
 
@@ -221,7 +222,7 @@ public sealed class ComponentUpdateTask : FlintTask
             }
             componentIndex++;
         }
-        _remoteTasksInProgress = taskIndex;
+        remoteTasksInProgress = taskIndex;
         SetProgress(0, taskIndex);
         switch (result)
         {
@@ -286,11 +287,11 @@ public sealed class ComponentUpdateTask : FlintTask
         }
         else
         {
-            _remoteLoadSuccessful = false;
+            remoteLoadSuccessful = false;
             status.Succeeded = false;
         }
         status.Finished = true;
-        _remoteTasksInProgress--;
+        remoteTasksInProgress--;
 
         // update the cached data of the component from the downloaded version file.
         if (loadSucceeded && status.Type == RemoteLoadType.Version)
@@ -307,12 +308,12 @@ public sealed class ComponentUpdateTask : FlintTask
     private async Task CheckIfAllFinishedAsync(CancellationToken cancellationToken)
     {
         SetProgress(CurrentProgress + 1, TotalProgress);
-        if (_remoteTasksInProgress != 0)
+        if (remoteTasksInProgress != 0)
         {
             // not yet...
             return;
         }
-        if (_remoteLoadSuccessful)
+        if (remoteLoadSuccessful)
         {
             // nothing bad happened... clear the temp load status and proceed with looking at dependencies
             _remoteLoadStatusList.Clear();
@@ -627,7 +628,7 @@ public sealed class ComponentUpdateTask : FlintTask
                         }
                         else if (add.Uid == "net.fabricmc.intermediary" || add.Uid == "org.quiltmc.hashed")
                         {
-                            var minecraft = _profile.Components.FirstOrDefault(cmp => cmp.GetID() == "net.minecraft");
+                            var minecraft = _profile.Components.FirstOrDefault(cmp => cmp.GetId() == "net.minecraft");
                             if (minecraft is not null)
                             {
                                 component.Version = minecraft.GetVersion();
@@ -699,7 +700,7 @@ public sealed class ComponentUpdateTask : FlintTask
                     {
                         // (the C++ "no version list in metadata index" branch is unreachable:
                         // Index::get() creates the list entry)
-                        var versionList = _profile.MetadataIndex.Get(component.GetID());
+                        var versionList = _profile.MetadataIndex.Get(component.GetId());
                         // port of the blocking VersionList::waitToLoad()
                         if (!versionList.IsLoaded())
                         {
@@ -719,15 +720,15 @@ public sealed class ComponentUpdateTask : FlintTask
                     }
                     case UpdateAction.Remove:
                     {
-                        toRemove.Add(component.GetID());
+                        toRemove.Add(component.GetId());
                         break;
                     }
                     case UpdateAction.ImportantChanged ic:
                     {
                         // port of the blocking Index::getLoadedVersion()
-                        await _profile.MetadataIndex.LoadVersion(component.GetID(), ic.OldVersion, _netmode)
+                        await _profile.MetadataIndex.LoadVersion(component.GetId(), ic.OldVersion, _netmode)
                             .StartAsync(cancellationToken);
-                        var oldVersion = _profile.MetadataIndex.Get(component.GetID(), ic.OldVersion);
+                        var oldVersion = _profile.MetadataIndex.Get(component.GetId(), ic.OldVersion);
                         foreach (var oldReq in oldVersion.RequiredSet())
                         {
                             if (!component.CachedRequires.Contains(oldReq)
@@ -737,14 +738,14 @@ public sealed class ComponentUpdateTask : FlintTask
                                 addedActions = true;
                             }
                         }
-                        var linked = CollectTreeLinked(component.GetID());
+                        var linked = CollectTreeLinked(component.GetId());
                         foreach (var comp in linked)
                         {
                             if (comp.IsCustom())
                             {
                                 continue;
                             }
-                            var compUid = comp.GetID();
+                            var compUid = comp.GetId();
                             var parentReq = component.CachedRequires.FirstOrDefault(req => req.Uid == compUid);
                             if (parentReq is not null)
                             {
@@ -758,13 +759,13 @@ public sealed class ComponentUpdateTask : FlintTask
                                 else
                                 {
                                     comp.SetUpdateAction(new UpdateAction.LatestRecommendedCompatible(
-                                        component.GetID(), component.GetName(), component.GetVersion()));
+                                        component.GetId(), component.GetName(), component.GetVersion()));
                                 }
                             }
                             else
                             {
                                 comp.SetUpdateAction(new UpdateAction.LatestRecommendedCompatible(
-                                    component.GetID(), component.GetName(), component.GetVersion()));
+                                    component.GetId(), component.GetName(), component.GetVersion()));
                             }
                             addedActions = true;
                         }

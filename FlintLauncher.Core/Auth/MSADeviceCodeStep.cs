@@ -8,17 +8,19 @@
 // authorization restarts. Upstream quirk kept: the local expiry abort (step abort with no
 // Finished report) leaves the flow hanging, exactly like the C++ MSADeviceCodeStep::abort() —
 // in practice the server's expired_token error is what surfaces to the user.
+
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace FlintLauncher.Core.Auth;
 
-public sealed class MSADeviceCodeStep : AuthStep
+public sealed class MsaDeviceCodeStep : AuthStep
 {
     private readonly AuthEndpointsOptions _auth;
 
     // https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-device-code
-    public MSADeviceCodeStep(AccountData data, AuthEndpointsOptions? auth = null) : base(data)
+    public MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? auth = null) : base(data)
     {
         _auth = auth ?? new AuthEndpointsOptions();
     }
@@ -28,33 +30,33 @@ public sealed class MSADeviceCodeStep : AuthStep
     /// <summary>Port of the authorizeWithBrowser(QString url, QString code, int expiresIn) signal.</summary>
     public event Action<string, string, int>? AuthorizeWithBrowser;
 
-    private string _clientId = "";
-    private string _deviceCode = "";
-    private bool _isAborted;
-    private int _interval = 5;
-    private DateTime? _expirationUtc; // stands in for m_expiration_timer
+    private string clientId = "";
+    private string deviceCode = "";
+    private bool isAborted;
+    private int interval = 5;
+    private DateTime? expirationUtc; // stands in for m_expiration_timer
 
     public override void Abort()
     {
-        _expirationUtc = null; // m_expiration_timer.stop(); m_pool_timer.stop();
-        _isAborted = true;
+        expirationUtc = null; // m_expiration_timer.stop(); m_pool_timer.stop();
+        isAborted = true;
     }
 
     public override async Task PerformAsync(CancellationToken cancellationToken)
     {
-        _clientId = _auth.MsaClientId;
+        clientId = _auth.MsaClientId;
         await RequestDeviceAuthorization(cancellationToken).ConfigureAwait(false);
-        while (!_isAborted && _expirationUtc is { } expiration)
+        while (!isAborted && expirationUtc is { } expiration)
         {
             var remaining = expiration - DateTime.UtcNow;
-            if (remaining < TimeSpan.FromSeconds(_interval))
+            if (remaining < TimeSpan.FromSeconds(interval))
             {
                 // the device code is about to expire: start the flow over with a fresh code
                 // (upstream startPoolTimer() -> perform())
                 await RequestDeviceAuthorization(cancellationToken).ConfigureAwait(false);
                 continue;
             }
-            await Task.Delay(TimeSpan.FromSeconds(_interval), cancellationToken).ConfigureAwait(false);
+            await Task.Delay(TimeSpan.FromSeconds(interval), cancellationToken).ConfigureAwait(false);
             if (await PollForToken(cancellationToken).ConfigureAwait(false))
             {
                 return;
@@ -64,7 +66,7 @@ public sealed class MSADeviceCodeStep : AuthStep
 
     private async Task RequestDeviceAuthorization(CancellationToken cancellationToken)
     {
-        var payload = FormEncode(("client_id", _clientId), ("scope", "XboxLive.SignIn XboxLive.offline_access"));
+        var payload = FormEncode(("client_id", clientId), ("scope", "XboxLive.SignIn XboxLive.offline_access"));
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
         {
             Url = new Uri(_auth.MsaDeviceCode),
@@ -93,19 +95,19 @@ public sealed class MSADeviceCodeStep : AuthStep
         }
         if (rsp.Interval != 0)
         {
-            _interval = rsp.Interval;
+            interval = rsp.Interval;
         }
-        _deviceCode = rsp.DeviceCode;
+        deviceCode = rsp.DeviceCode;
         AuthorizeWithBrowser?.Invoke(rsp.VerificationUri, rsp.UserCode, rsp.ExpiresIn);
-        _expirationUtc = DateTime.UtcNow.AddSeconds(rsp.ExpiresIn);
+        expirationUtc = DateTime.UtcNow.AddSeconds(rsp.ExpiresIn);
     }
 
     private async Task<bool> PollForToken(CancellationToken cancellationToken)
     {
         var payload = FormEncode(
-            ("client_id", _clientId),
+            ("client_id", clientId),
             ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
-            ("device_code", _deviceCode));
+            ("device_code", deviceCode));
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
         {
             Url = new Uri(_auth.MsaToken),
@@ -120,7 +122,7 @@ public sealed class MSADeviceCodeStep : AuthStep
             // reduce their polling frequency before retrying.  The use of an
             // exponential backoff algorithm to achieve this, such as doubling the
             // polling interval on each such connection timeout, is RECOMMENDED."
-            _interval *= 2;
+            interval *= 2;
             return false;
         }
         var rsp = ParseAuthenticationResponse(response.Body);
@@ -130,7 +132,7 @@ public sealed class MSADeviceCodeStep : AuthStep
             // "A variant of 'authorization_pending', the authorization request is
             // still pending and polling should continue, but the interval MUST
             // be increased by 5 seconds for this and all subsequent requests."
-            _interval += 5;
+            interval += 5;
             return false;
         }
         if (rsp.Error == "authorization_pending")
@@ -149,8 +151,8 @@ public sealed class MSADeviceCodeStep : AuthStep
             return false; // it failed so just try again without increasing the interval
         }
 
-        _expirationUtc = null;
-        Data.MsaClientID = _clientId;
+        expirationUtc = null;
+        Data.MsaClientId = clientId;
         Data.MsaToken.IssueInstant = DateTime.UtcNow;
         // upstream writes QDateTime::currentDateTime() (local time) here, but the consumers
         // (MinecraftAccount refresh check, MsaInteractiveStep) compare against UtcNow — a
@@ -158,7 +160,7 @@ public sealed class MSADeviceCodeStep : AuthStep
         Data.MsaToken.NotAfter = DateTime.UtcNow.AddSeconds(rsp.ExpiresIn);
         Data.MsaToken.Extra = rsp.Extra;
         Data.MsaToken.RefreshToken = rsp.RefreshToken;
-        Data.MsaToken.Token_ = rsp.AccessToken;
+        Data.MsaToken.Value = rsp.AccessToken;
         EmitFinished(AccountTaskState.Working, "Got MSA token");
         return true;
     }
@@ -248,7 +250,7 @@ public sealed class MSADeviceCodeStep : AuthStep
         {
             return JsonNode.Parse(data) as JsonObject;
         }
-        catch (Exception e) when (e is System.Text.Json.JsonException or ArgumentException)
+        catch (Exception e) when (e is JsonException or ArgumentException)
         {
             return null;
         }

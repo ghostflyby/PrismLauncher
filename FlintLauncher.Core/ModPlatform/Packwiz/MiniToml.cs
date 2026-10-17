@@ -14,6 +14,10 @@
 //   - inline tables { key = value, key = value }
 // Everything else (floats, datetimes, multiline strings, nested brackets in keys, ...)
 // is rejected with a parse error, like the C++ callers would see from toml++'s parse_error.
+
+using System.Globalization;
+using System.Text;
+
 namespace FlintLauncher.Core.ModPlatform.Packwiz;
 
 /// <summary>Port of toml++'s parse_error for the subset parser.</summary>
@@ -129,7 +133,7 @@ public sealed class TomlTable
 public static class MiniToml
 {
     /// <summary>toml::parse_file equivalent: parse the file content into its root table.</summary>
-    public static TomlTable ParseFile(string path) => Parse(System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(path)));
+    public static TomlTable ParseFile(string path) => Parse(Encoding.UTF8.GetString(File.ReadAllBytes(path)));
 
     /// <summary>toml::parse equivalent for the documented subset.</summary>
     public static TomlTable Parse(string text)
@@ -139,8 +143,8 @@ public static class MiniToml
 
     private sealed class Parser(string text)
     {
-        private int _pos;
-        private TomlTable _current = new();
+        private int pos;
+        private TomlTable current = new();
         private readonly TomlTable _root = new();
 
         // tables explicitly opened via [header]; tables created implicitly by dotted keys
@@ -149,7 +153,7 @@ public static class MiniToml
 
         internal TomlTable ParseDocument()
         {
-            _current = _root;
+            current = _root;
             while (true)
             {
                 SkipWhitespaceAndComments();
@@ -171,23 +175,23 @@ public static class MiniToml
                 }
                 else
                 {
-                    ParseKeyValue(_current);
+                    ParseKeyValue(current);
                 }
             }
         }
 
         private char Peek(int offset = 0)
         {
-            var index = _pos + offset;
+            var index = pos + offset;
             return index < text.Length ? text[index] : '\0';
         }
 
-        private bool AtEnd => _pos >= text.Length;
+        private bool AtEnd => pos >= text.Length;
 
         private char Advance()
         {
-            var c = text[_pos];
-            _pos++;
+            var c = text[pos];
+            pos++;
             return c;
         }
 
@@ -225,7 +229,7 @@ public static class MiniToml
         private void ParseTableHeader()
         {
             Expect('[');
-            _current = _root;
+            current = _root;
             var path = new List<string>();
             while (true)
             {
@@ -261,7 +265,7 @@ public static class MiniToml
             {
                 throw new TomlParseException($"Duplicate table definition: [{header}]");
             }
-            _current = table;
+            current = table;
         }
 
         /// <summary>
@@ -325,7 +329,7 @@ public static class MiniToml
 
             var element = new TomlTable();
             array.Add(element);
-            _current = element;
+            current = element;
         }
 
         private void ParseKeyValue(TomlTable table, bool inline = false)
@@ -387,16 +391,16 @@ public static class MiniToml
             {
                 return ParseLiteralString();
             }
-            var start = _pos;
+            var start = pos;
             while (!AtEnd && (char.IsAsciiLetterOrDigit(Peek()) || Peek() is '_' or '-'))
             {
                 Advance();
             }
-            if (_pos == start)
+            if (pos == start)
             {
                 throw new TomlParseException($"Invalid key character '{Peek()}'");
             }
-            return text[start.._pos];
+            return text[start..pos];
         }
 
         private object? ParseValue()
@@ -417,12 +421,12 @@ public static class MiniToml
 
         private object ParseAtom()
         {
-            var start = _pos;
+            var start = pos;
             while (!AtEnd && Peek() is not (',' or ']' or '}' or '\n' or '\r' or '#'))
             {
                 Advance();
             }
-            var atom = text[start.._pos].TrimEnd(' ', '\t');
+            var atom = text[start..pos].TrimEnd(' ', '\t');
             if (atom == "true")
             {
                 return true;
@@ -431,7 +435,7 @@ public static class MiniToml
             {
                 return false;
             }
-            if (long.TryParse(atom, System.Globalization.NumberStyles.AllowLeadingSign, System.Globalization.CultureInfo.InvariantCulture, out var number))
+            if (long.TryParse(atom, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var number))
             {
                 return number;
             }
@@ -511,7 +515,7 @@ public static class MiniToml
         {
             Expect('"');
             // tolerate the (invalid but harmless) empty "" appearing from writers
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
             while (true)
             {
                 if (AtEnd)
@@ -551,13 +555,13 @@ public static class MiniToml
 
         private string ParseUnicodeEscape(int length)
         {
-            if (_pos + length > text.Length)
+            if (pos + length > text.Length)
             {
                 throw new TomlParseException("Invalid unicode escape");
             }
-            var hex = text.Substring(_pos, length);
-            _pos += length;
-            if (!int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var code))
+            var hex = text.Substring(pos, length);
+            pos += length;
+            if (!int.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var code))
             {
                 throw new TomlParseException($"Invalid unicode escape '\\u{hex}'");
             }
@@ -574,13 +578,13 @@ public static class MiniToml
         private string ParseLiteralString()
         {
             Expect('\'');
-            var start = _pos;
+            var start = pos;
             while (!AtEnd)
             {
                 var c = Advance();
                 if (c == '\'')
                 {
-                    return text[start..(_pos - 1)];
+                    return text[start..(pos - 1)];
                 }
             }
             throw new TomlParseException("Unterminated literal string");

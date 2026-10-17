@@ -4,19 +4,23 @@
 // checker died in the migration) and store the probed properties in the launcher runtime
 // state's path-keyed probe cache (launcher-state.json, S5 — the C++ stored them as settings
 // keys, moved out of the config world by CONFIG C9).
+
+using System.Globalization;
 using System.Security.Cryptography;
-using JdkFind;
+using System.Text;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Java;
+using FlintLauncher.Core.Settings;
+using FlintLauncher.Core.State;
+using JdkFind;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class CheckJava : LaunchStep
 {
-    private string _javaPath = "";
-    private string _javaSignature = "";
-    private string _detectKey = "";
+    private string javaPath = "";
+    private string javaSignature = "";
+    private string detectKey = "";
 
     public CheckJava(LaunchTask parent) : base(parent)
     {
@@ -25,17 +29,17 @@ public sealed class CheckJava : LaunchStep
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         var instance = Parent.Instance;
-        var settings = instance.Settings();
+        var settings = instance.Settings;
 
         var javaPathSetting = Variant.AsString(settings.Get("JavaPath"));
-        _javaPath = LauncherJars.ResolveExecutable(javaPathSetting);
+        javaPath = LauncherJars.ResolveExecutable(javaPathSetting);
 
         // C7: the override gate is derived — "a java location member is set at the instance
         // layer" (the legacy "OverrideJava" spelling was never a registered key and stays a
         // harmless unknown read, like upstream's leftover)
         var perInstance = Variant.AsBool(settings.Get("OverrideJava")) || Variant.AsBool(settings.Get("OverrideJavaLocation"));
 
-        var realJavaPath = LauncherJars.FindExecutable(_javaPath);
+        var realJavaPath = LauncherJars.FindExecutable(javaPath);
         if (realJavaPath.Length == 0)
         {
             if (perInstance)
@@ -52,23 +56,23 @@ public sealed class CheckJava : LaunchStep
             return;
         }
 
-        EmitLogLine("Java path is:\n  " + _javaPath, MessageLevel.Launcher);
+        EmitLogLine("Java path is:\n  " + javaPath, MessageLevel.Launcher);
 
         var javaInfo = new FileInfo(realJavaPath);
         var javaUnixTime = new DateTimeOffset(javaInfo.LastWriteTimeUtc).ToUnixTimeMilliseconds();
 
-        _javaSignature = ComputeJavaSignature(javaUnixTime, _javaPath);
+        javaSignature = ComputeJavaSignature(javaUnixTime, javaPath);
 
         // S5: the probe cache is launcher-state.json's path-keyed map (keyed through
         // MinecraftInstance.JavaDetectKey — the same resolution the signature covers),
         // replacing the five global settings keys that overwrote each other across JVMs
         // (CONFIG C9)
         var detectKey = MinecraftInstance.JavaDetectKey(javaPathSetting);
-        _detectKey = detectKey;
+        this.detectKey = detectKey;
         var stored = Services.LauncherState?.Current.Java.Detections.GetValueOrDefault(detectKey);
 
         // if timestamps are not the same, or something is missing, check!
-        if (stored is null || stored.Signature != _javaSignature || stored.Version.Length == 0 ||
+        if (stored is null || stored.Signature != javaSignature || stored.Version.Length == 0 ||
             stored.Architecture.Length == 0 || stored.RealArchitecture.Length == 0 || stored.Vendor.Length == 0)
         {
             await ProbeJavaAsync(realJavaPath, cancellationToken).ConfigureAwait(false);
@@ -121,14 +125,14 @@ public sealed class CheckJava : LaunchStep
         PrintJavaInfo(version, mojangPlatform, osArch, vendor);
         // write the probe result into the path-keyed state cache (S5), then
         // refresh the runtime context from it — settings are out of the loop (C9)
-        var signature = _javaSignature;
-        var detectKey = _detectKey;
+        var signature = javaSignature;
+        var detectKey = this.detectKey;
         Services.LauncherState?.Update(state =>
         {
-            var detections = new Dictionary<string, State.JavaDetectEntry>(
+            var detections = new Dictionary<string, JavaDetectEntry>(
                 state.Java.Detections, StringComparer.Ordinal)
             {
-                [detectKey] = new State.JavaDetectEntry(
+                [detectKey] = new JavaDetectEntry(
                     signature,
                     mojangPlatform,
                     osArch,
@@ -150,8 +154,8 @@ public sealed class CheckJava : LaunchStep
     /// <summary>Port of the QCryptographicHash::Sha1 over QByteArray::number(unixtime) + path.</summary>
     internal static string ComputeJavaSignature(long javaUnixTime, string javaPath)
     {
-        var timestampBytes = System.Text.Encoding.ASCII.GetBytes(javaUnixTime.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        var pathBytes = System.Text.Encoding.UTF8.GetBytes(javaPath);
+        var timestampBytes = Encoding.ASCII.GetBytes(javaUnixTime.ToString(CultureInfo.InvariantCulture));
+        var pathBytes = Encoding.UTF8.GetBytes(javaPath);
         var hash = SHA1.HashData([.. timestampBytes, .. pathBytes]);
         return Convert.ToHexStringLower(hash);
     }

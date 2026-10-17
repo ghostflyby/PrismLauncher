@@ -14,6 +14,7 @@
 //    is not ported, and this task only ever runs against the mods folder for now.
 //  - The NetJob status line is raised on this task (the C# NetJob has no public status
 //    setter); progress propagates through the SequentialTask subtask plumbing.
+
 using System.Security.Cryptography;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
@@ -33,11 +34,11 @@ public class ResourceDownloadTask : SequentialTask
     private readonly ResourceFolderModel _packModel;
     private readonly ModrinthApi _modrinth;
 
-    private NetJob? _filesNetJob;
-    private LocalResourceUpdateTask? _updateTask;
+    private NetJob? filesNetJob;
+    private LocalResourceUpdateTask? updateTask;
 
     // Port of the to_delete tuple: (old metadata name, old file name)
-    private (string Name, string Filename) _toDelete = ("", "");
+    private (string Name, string Filename) toDelete = ("", "");
 
     public ResourceDownloadTask(IndexedPack pack,
                                 IndexedVersion version,
@@ -55,13 +56,13 @@ public class ResourceDownloadTask : SequentialTask
 
         if (isIndexed)
         {
-            _updateTask = new LocalResourceUpdateTask(_packModel.IndexDir, _pack, _packVersion);
-            _updateTask.HasOldResource += HasOldResource;
+            updateTask = new LocalResourceUpdateTask(_packModel.IndexDir, _pack, _packVersion);
+            updateTask.HasOldResource += HasOldResource;
 
-            AddTask(_updateTask);
+            AddTask(updateTask);
         }
 
-        _filesNetJob = new NetJob("Resource download");
+        filesNetJob = new NetJob("Resource download");
         EmitStatus($"Downloading resource:\n{_packVersion.DownloadUrl}");
 
         var action = _modrinth.MakeFileRequest(_packVersion.DownloadUrl,
@@ -75,17 +76,17 @@ public class ResourceDownloadTask : SequentialTask
                 action.AddValidator(validator);
             }
         }
-        _filesNetJob.AddNetRequest(action);
-        _filesNetJob.Succeeded += DownloadSucceeded;
-        _filesNetJob.Failed += DownloadFailed;
-        _filesNetJob.Progress += DownloadProgressChanged;
+        filesNetJob.AddNetRequest(action);
+        filesNetJob.Succeeded += DownloadSucceeded;
+        filesNetJob.Failed += DownloadFailed;
+        filesNetJob.Progress += DownloadProgressChanged;
 
-        AddTask(_filesNetJob);
+        AddTask(filesNetJob);
     }
 
     public string GetFilename() => _packVersion.FileName;
 
-    public string GetVersionID() => _packVersion.FileId;
+    public string GetVersionId() => _packVersion.FileId;
 
     public IndexedVersion GetVersion() => _packVersion;
 
@@ -141,14 +142,14 @@ public class ResourceDownloadTask : SequentialTask
     // downloaded successfully!
     private void HasOldResource(string name, string filename)
     {
-        _toDelete = (name, filename);
+        toDelete = (name, filename);
     }
 
     private void DownloadSucceeded(FlintTask task)
     {
-        _filesNetJob = null;
-        var oldName = _toDelete.Name;
-        var oldFilename = _toDelete.Filename;
+        filesNetJob = null;
+        var oldName = toDelete.Name;
+        var oldFilename = toDelete.Filename;
 
         if (oldName.Length == 0 || oldFilename == _packVersion.FileName)
         {
@@ -163,7 +164,7 @@ public class ResourceDownloadTask : SequentialTask
 
     private void DownloadFailed(FlintTask task, string reason)
     {
-        _filesNetJob = null;
+        filesNetJob = null;
         EmitFailed(reason);
     }
 

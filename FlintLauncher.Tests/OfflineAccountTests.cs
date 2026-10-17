@@ -2,6 +2,7 @@
 // Tests for MinecraftAccount offline creation: the deterministic offline UUID
 // (Java UUID#nameUUIDFromBytes over "OfflinePlayer:<name>", ported via MD5 + QUuid byte order),
 // the format of the random pieces and the saved JSON.
+
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Auth;
 using Xunit;
@@ -63,7 +64,7 @@ public class OfflineAccountTests
     {
         var account = MinecraftAccount.CreateOffline("Notch");
 
-        Assert.Equal(AccountType.Offline, account.AccountType_);
+        Assert.Equal(AccountType.Offline, account.AccountType);
         Assert.Equal("0", account.AccessToken());
         Assert.Equal(Validity.Certain, account.AccountData.YggdrasilToken.Validity);
         Assert.NotNull(account.AccountData.YggdrasilToken.IssueInstant);
@@ -82,7 +83,7 @@ public class OfflineAccountTests
 
         var reloaded = MinecraftAccount.LoadFromJsonV3(saved);
         Assert.NotNull(reloaded);
-        Assert.Equal(AccountType.Offline, reloaded!.AccountType_);
+        Assert.Equal(AccountType.Offline, reloaded!.AccountType);
         Assert.Equal("Notch", reloaded.ProfileName());
         Assert.Equal(account.ProfileId(), reloaded.ProfileId());
         Assert.Equal("0", reloaded.AccessToken());

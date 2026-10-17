@@ -17,10 +17,12 @@
 // Port lineage: this is the group half of InstanceList (C++ InstanceList::groupByGroup /
 // m_instanceGroupIndex / on_GroupStateChanged), extracted once the C8/S5 split made the two
 // halves heterogeneous (config syncs, state does not).
+
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.State;
 
 namespace FlintLauncher.Core.Instances;
@@ -49,7 +51,7 @@ public sealed class InstanceGroupModel
     /// side; owned by launcher-state.json since C8/S5.</summary>
     private readonly HashSet<string> _collapsed = new(StringComparer.Ordinal);
 
-    private bool _loaded;
+    private bool loaded;
 
     /// <summary><paramref name="canPersist"/> is the upstream "group saving prevented
     /// because we don't know the full list of instances yet" gate (true = writes allowed);
@@ -269,7 +271,7 @@ public sealed class InstanceGroupModel
     /// imports carry dirnames); a reference that resolves to nothing is kept verbatim.</summary>
     public bool Load(Func<string, string?> uuidResolver)
     {
-        if (_loaded)
+        if (loaded)
         {
             return true;
         }
@@ -439,7 +441,7 @@ public sealed class InstanceGroupModel
                     stateSeededHidden = true;
                 }
             }
-            _loaded = true;
+            loaded = true;
         }
 
         if (stateSeededHidden)
@@ -548,7 +550,7 @@ public sealed class InstanceGroupModel
         try
         {
             FileSystem.Write(groupFileName,
-                Encoding.UTF8.GetBytes(Minecraft.QtJson.ToIndentedString(toplevel) + "\n"));
+                Encoding.UTF8.GetBytes(QtJson.ToIndentedString(toplevel) + "\n"));
             return true;
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
@@ -587,7 +589,7 @@ public sealed class InstanceGroupModel
                 }
             }
             FileSystem.Write(groupFileName,
-                Encoding.UTF8.GetBytes(Minecraft.QtJson.ToIndentedString(topLevel) + "\n"));
+                Encoding.UTF8.GetBytes(QtJson.ToIndentedString(topLevel) + "\n"));
         }
         catch (Exception e) when (e is JsonException or FileSystemException or IOException
                                   or UnauthorizedAccessException or NotSupportedException)

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/skins/CapeChange.{h,cpp}: PUT minecraft/profile/capes/active with
 // {"capeId":"<id>"}; an empty cape id becomes a DELETE (cape removal).
+
 using System.Text;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Net;

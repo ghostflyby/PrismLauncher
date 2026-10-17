@@ -2,7 +2,9 @@
 // Port of launcher/minecraft/VersionFile.{h,cpp}: the OneSix/Mojang version JSON model plus
 // its application to a LaunchProfile. As in Library.cs, the C++ friend-accessed data members
 // become public properties.
+
 using FlintLauncher.Core.Java;
+using FlintLauncher.Core.Meta;
 
 namespace FlintLauncher.Core.Minecraft;
 
@@ -87,13 +89,13 @@ public class VersionFile : ProblemContainer
      * Prism Launcher: set of packages this depends on
      * NOTE: this is shared with the meta format!!!
      */
-    public Meta.RequireSet Requires { get; set; } = new();
+    public RequireSet Requires { get; set; } = new();
 
     /**
      * Prism Launcher: set of packages this conflicts with
      * NOTE: this is shared with the meta format!!!
      */
-    public Meta.RequireSet Conflicts { get; set; } = new();
+    public RequireSet Conflicts { get; set; } = new();
 
     /// is volatile -- may be removed as soon as it is no longer needed by something else
     public bool Volatile { get; set; }

@@ -4,6 +4,7 @@
 // What remains is the response-body entry point: JsonNode.Parse throws the raw JsonException,
 // so the "{what}: Error parsing JSON: ..." wrapping of the C++ Json::requireDocument is kept
 // here for the surfaced "Could not understand ..." failure messages.
+
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;

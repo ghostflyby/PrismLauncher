@@ -9,6 +9,7 @@
 // Deviations (headless port):
 //  - QIcon becomes the FtbAppIcon data record (path/kind/image type); no decoding.
 //  - getFTBRoot()/getDynamicPath() move to FtbAppPaths with an injected RootPath.
+
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;

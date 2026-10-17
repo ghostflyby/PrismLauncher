@@ -115,7 +115,7 @@ public sealed class NbtWriter(Stream output)
 
     private void WriteList(NbtList list)
     {
-        if ((long)list.Count > MaxArrayLength)
+        if (list.Count > MaxArrayLength)
         {
             throw new ArgumentOutOfRangeException(nameof(list), list.Count, "List is too large for NBT");
         }
@@ -134,7 +134,7 @@ public sealed class NbtWriter(Stream output)
 
     private void WriteByteArray(byte[] value)
     {
-        if ((long)value.Length > MaxArrayLength)
+        if (value.Length > MaxArrayLength)
         {
             throw new ArgumentOutOfRangeException(nameof(value), value.Length, "Byte array is too large for NBT");
         }
@@ -144,7 +144,7 @@ public sealed class NbtWriter(Stream output)
 
     private void WriteArray<T>(T[] value, int elementSize, SpanAction<T> write) where T : struct
     {
-        if ((long)value.Length > MaxArrayLength)
+        if (value.Length > MaxArrayLength)
         {
             throw new ArgumentOutOfRangeException(nameof(value), value.Length, "Array is too large for NBT");
         }

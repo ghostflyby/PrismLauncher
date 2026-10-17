@@ -11,7 +11,9 @@
 // Secret members are deliberately absent (C4): ProxyPass / ModrinthToken / FlameKeyOverride
 // live in the secret store (FlintLauncher.Core.Secrets) and code reads them by name through
 // ISecretStore — the config format carries no secret fields.
+
 using FlintLauncher.Core.Launch;
+using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.Config;
 
@@ -128,12 +130,12 @@ public sealed record PerformanceConfig
 /// <summary>Native library workarounds (system OpenAL/GLFW/SDL vs the bundled copies).</summary>
 public sealed record NativeLibConfig
 {
-    public bool? UseNativeOpenAL { get; init; } = false;
-    public string? CustomOpenALPath { get; init; } = "";
-    public bool? UseNativeGLFW { get; init; } = false;
-    public string? CustomGLFWPath { get; init; } = "";
-    public bool? UseNativeSDL { get; init; } = false;
-    public string? CustomSDLPath { get; init; } = "";
+    public bool? UseNativeOpenAl { get; init; } = false;
+    public string? CustomOpenAlPath { get; init; } = "";
+    public bool? UseNativeGlfw { get; init; } = false;
+    public string? CustomGlfwPath { get; init; } = "";
+    public bool? UseNativeSdl { get; init; } = false;
+    public string? CustomSdlPath { get; init; } = "";
 }
 
 /// <summary>Custom commands around the game process (BaseInstance override-gated).</summary>
@@ -218,9 +220,9 @@ public sealed record LanguageConfig
 /// stores the raw string).</summary>
 public sealed record MirrorConfig
 {
-    public string? MetaURLOverride { get; init; } = "";
-    public string? ResourceURLOverride { get; init; } = "";
-    public string? LegacyFMLLibsURLOverride { get; init; } = "";
+    public string? MetaUrlOverride { get; init; } = "";
+    public string? ResourceUrlOverride { get; init; } = "";
+    public string? LegacyFmlLibsUrlOverride { get; init; } = "";
 }
 
 /// <summary>Proxy coordinates. NO Pass member (C4): the proxy password is a secret, read by
@@ -239,10 +241,10 @@ public sealed record ApiConfig
 {
     public string? MsaClientIdOverride { get; init; } = "";
     public string? UserAgentOverride { get; init; } = "";
-    public string? PastebinCustomAPIBase { get; init; } = "";
+    public string? PastebinCustomApiBase { get; init; } = "";
 
     /// <summary>The PasteUpload.PasteType index (the C++ stores the enum's int).</summary>
-    public int? PastebinType { get; init; } = (int)Net.PasteUpload.PasteType.Mclogs;
+    public int? PastebinType { get; init; } = (int)PasteUpload.PasteType.Mclogs;
 }
 
 /// <summary>External tool paths (the C++ ExternalToolsPage tools; the profiler launchers
@@ -251,6 +253,6 @@ public sealed record ToolsConfig
 {
     public string? JsonEditor { get; init; } = "";
     public string? JProfilerPath { get; init; } = "";
-    public string? JVisualVMPath { get; init; } = "";
-    public string? MCEditPath { get; init; } = "";
+    public string? JVisualVmPath { get; init; } = "";
+    public string? McEditPath { get; init; } = "";
 }

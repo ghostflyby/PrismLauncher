@@ -3,6 +3,7 @@
 // HttpListener pattern, see AtlTestSupport) serving /modpack/all, /modpack/{id} and
 // /modpack/{id}/{version} plus file downloads, and a synthetic pack/version fixture with
 // real sha1 checksums.
+
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -170,7 +171,7 @@ internal sealed class FtbPackFixture
             ["updated"] = 1600000000,
             ["refreshed"] = 1600000001,
             ["art"] = new JsonArray(
-                (JsonNode?)new JsonObject
+                new JsonObject
                 {
                     ["id"] = 1,
                     ["url"] = "https://example.invalid/logo.png",
@@ -183,7 +184,7 @@ internal sealed class FtbPackFixture
                     ["updated"] = 1600000000,
                 }),
             ["authors"] = new JsonArray(
-                (JsonNode?)new JsonObject
+                new JsonObject
                 {
                     ["id"] = 7,
                     ["name"] = "tester",
@@ -192,7 +193,7 @@ internal sealed class FtbPackFixture
                     ["updated"] = 1600000000,
                 }),
             ["versions"] = new JsonArray(
-                (JsonNode?)new JsonObject
+                new JsonObject
                 {
                     ["id"] = VersionId,
                     ["name"] = fixture.VersionName,
@@ -205,7 +206,7 @@ internal sealed class FtbPackFixture
                         ["recommended"] = 4096,
                     },
                 },
-                (JsonNode?)new JsonObject
+                new JsonObject
                 {
                     ["id"] = VersionId + 1,
                     ["name"] = "1.1.0",
@@ -219,7 +220,7 @@ internal sealed class FtbPackFixture
                     },
                 }),
             ["tags"] = new JsonArray(
-                (JsonNode?)new JsonObject { ["id"] = 3, ["name"] = "magic" }),
+                new JsonObject { ["id"] = 3, ["name"] = "magic" }),
         }.ToJsonString();
         return fixture;
     }
@@ -245,7 +246,7 @@ internal sealed class FtbPackFixture
                 ["recommended"] = 4096,
             },
             ["targets"] = new JsonArray(
-                (JsonNode?)new JsonObject
+                new JsonObject
                 {
                     ["id"] = 1,
                     ["type"] = "game",
@@ -253,7 +254,7 @@ internal sealed class FtbPackFixture
                     ["version"] = Minecraft,
                     ["updated"] = 1600000000,
                 },
-                (JsonNode?)new JsonObject
+                new JsonObject
                 {
                     ["id"] = 2,
                     ["type"] = "modloader",
@@ -262,7 +263,7 @@ internal sealed class FtbPackFixture
                     ["updated"] = 1600000000,
                 }),
             ["files"] = new JsonArray(
-                (JsonNode?)new JsonObject
+                new JsonObject
                 {
                     ["id"] = 1001,
                     ["type"] = "mod",
@@ -277,7 +278,7 @@ internal sealed class FtbPackFixture
                     ["optional"] = false,
                     ["updated"] = 1600000000,
                 },
-                (JsonNode?)new JsonObject
+                new JsonObject
                 {
                     ["id"] = 1002,
                     ["type"] = "config",
@@ -293,7 +294,7 @@ internal sealed class FtbPackFixture
                     ["updated"] = 1600000000,
                 },
                 // no url + a CurseForge pair: resolved through the Flame layer
-                (JsonNode?)new JsonObject
+                new JsonObject
                 {
                     ["id"] = 1003,
                     ["type"] = "mod",
@@ -313,7 +314,7 @@ internal sealed class FtbPackFixture
                     },
                 },
                 // server-only files are skipped entirely
-                (JsonNode?)new JsonObject
+                new JsonObject
                 {
                     ["id"] = 1004,
                     ["type"] = "mod",

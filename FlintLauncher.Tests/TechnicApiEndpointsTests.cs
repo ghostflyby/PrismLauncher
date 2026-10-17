@@ -8,7 +8,9 @@
 //
 // Every host gets its own TechnicApi client pointed at the stub (BaseUrl/ApiBuild are
 // per-instance state now, so no [Collection] serialization is needed anymore).
+
 using System.Net;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.ModPlatform.Technic;
@@ -248,11 +250,11 @@ public class TechnicApiEndpointsTests : IDisposable
         {
             ["minecraft"] = "1.20.1",
             ["mods"] = new JsonArray(
-                (JsonNode?)new JsonObject
+                new JsonObject
                 {
                     ["name"] = "Solder Mod",
                     ["version"] = "1.0",
-                    ["md5"] = Convert.ToHexString(System.Security.Cryptography.MD5.HashData(modBytes))
+                    ["md5"] = Convert.ToHexString(MD5.HashData(modBytes))
                         .ToLowerInvariant(),
                     ["url"] = $"{_server.Url}/files/soldermod.zip",
                 }),

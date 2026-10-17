@@ -3,9 +3,11 @@
 // cleaner. Discovery runs on the JdkFind facilities (LocateAsync primary + FromExecutable
 // fallback) and both layers are tested here with synthetic homes; real-machine assertions are
 // guarded like RealDataSmokeTests.
+
+using FlintLauncher.Core;
+using FlintLauncher.Core.Java;
 using JdkFind;
 using JdkFind.Providers;
-using FlintLauncher.Core.Java;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -109,7 +111,7 @@ public class JavaUtilsTests : IDisposable
     public void FindJavaPaths_PicksUpEnvProvidedPaths()
     {
         var extra = "/opt/flint-test-jdk/bin/java";
-        SetEnv($"{Core.FlintConfig.Default.LauncherAppBinaryEnvName}_JAVA_PATHS", extra);
+        SetEnv($"{FlintConfig.Default.LauncherAppBinaryEnvName}_JAVA_PATHS", extra);
 
         var candidates = JavaUtils.FindJavaPaths();
 
@@ -124,7 +126,7 @@ public class JavaUtilsTests : IDisposable
         Assert.Equal("java", java.Id.ToString());
         Assert.Equal("unknown", java.Arch);
         Assert.Equal(OperatingSystem.IsWindows() ? "javaw" : "java", java.Path);
-        Assert.Equal(java.Path, JavaUtils.MakeJavaPtr(java.Path, "java", "unknown").Path);
+        Assert.Equal(java.Path, JavaUtils.MakeJavaPtr(java.Path, "java").Path);
     }
 
     [Fact]
@@ -155,7 +157,7 @@ public class JavaUtilsTests : IDisposable
                 : new UnixJvmProvider(root);
         var executable = Path.Combine(home, "bin", JavaUtils.JavaExecutable);
         var broken = Path.Combine(brokenHome, "bin", JavaUtils.JavaExecutable);
-        SetEnv($"{Core.FlintConfig.Default.LauncherAppBinaryEnvName}_JAVA_PATHS",
+        SetEnv($"{FlintConfig.Default.LauncherAppBinaryEnvName}_JAVA_PATHS",
             string.Join(Path.PathSeparator, executable, broken, Path.Combine(root, "nonexistent", "java")));
 
         var candidates = await JavaDetection.DetectAsync(providers: [provider]);

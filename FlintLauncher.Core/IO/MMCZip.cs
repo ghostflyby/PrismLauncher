@@ -9,11 +9,12 @@
 //    only adds file entries); this matches what jars/Modrinth packs expect.
 //  - createModdedJar is not ported: it depends on the minecraft/mod Mod model.
 //  - findFiles does not exist in the current C++ MMCZip; nothing to port.
+
 using System.IO.Compression;
 
 namespace FlintLauncher.Core.IO;
 
-public static class MMCZip
+public static class MmcZip
 {
     /// <summary>FilterFileFunction/FilterFunction equivalent: return true to exclude (collect) or to allow (merge).</summary>
     public delegate bool FilterFunction(string relativeName);

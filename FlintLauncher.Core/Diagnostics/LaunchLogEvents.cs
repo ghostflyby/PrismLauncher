@@ -5,6 +5,7 @@
 // what a launch investigation needs: the full java command line (upstream logs it via
 // qDebug in LauncherPartLaunch.cpp:131), what was written to the child's stdin and when,
 // gate arm/consume edges and per-step outcomes.
+
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 

@@ -14,6 +14,7 @@
 //    surrounding "{what}: Error parsing JSON: ..." wrapper is kept.
 //  - QJsonValue stores every number as a double; the node reads parse the raw token text,
 //    which agrees for every JSON number literal Qt could round-trip.
+
 using System.Globalization;
 using System.Text;
 using System.Text.Json;

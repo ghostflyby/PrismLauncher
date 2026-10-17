@@ -4,6 +4,7 @@
 // endpoint behaviour is driven by the knobs, so the whole MSA flow can be exercised without
 // touching the real services. Used by AuthFlowTests and SkinApiTests, which point their own
 // AuthEndpointsOptions instances at it.
+
 using System.Net;
 using System.Text;
 

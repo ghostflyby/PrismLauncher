@@ -9,8 +9,11 @@
 //    no-ops except where they change control flow (they only log upstream).
 //  - QVariant ids are strings ("" = null); the Flame write path parses them back to
 //    integers exactly like the C++ toInt() checks.
+
+using System.Globalization;
 using System.Text;
 using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.ModPlatform.Packwiz;
@@ -24,7 +27,7 @@ public static class Packwiz
         public string Name { get; set; } = "";
         public string Filename { get; set; } = "";
         public SideType Side { get; set; } = new(SideTypeValue.UniversalSide);
-        public Minecraft.ModLoaderType Loaders { get; set; } = Minecraft.ModLoaderType.None;
+        public ModLoaderType Loaders { get; set; } = ModLoaderType.None;
         public List<string> McVersions { get; } = [];
         public IndexedVersionType ReleaseType { get; set; } = IndexedVersionType.Invalid;
 
@@ -68,7 +71,7 @@ public static class Packwiz
             Filename = modVersion.FileName,
         };
 
-        if (modPack.Provider == ResourceProvider.FLAME)
+        if (modPack.Provider == ResourceProvider.Flame)
         {
             mod.Mode = "metadata:curseforge";
         }
@@ -139,7 +142,7 @@ public static class Packwiz
         string update;
         switch (mod.Provider)
         {
-            case ResourceProvider.FLAME:
+            case ResourceProvider.Flame:
                 if (long.TryParse(mod.FileId, out var fileId) && long.TryParse(mod.ProjectId, out var projectId))
                 {
                     if (fileId == 0 || projectId == 0)
@@ -155,7 +158,7 @@ public static class Packwiz
                 }
                 update = $"file-id = {mod.FileId}\nproject-id = {mod.ProjectId}";
                 break;
-            case ResourceProvider.MODRINTH:
+            case ResourceProvider.Modrinth:
                 if (mod.ModId().Length == 0 || mod.Version().Length == 0)
                 {
                     // "Did not write file {name} because missing information!"
@@ -308,19 +311,19 @@ public static class Packwiz
                 return new Mod();
             }
 
-            var flameTable = updateTable.GetTable(ProviderCapabilities.Name(ResourceProvider.FLAME));
+            var flameTable = updateTable.GetTable(ProviderCapabilities.Name(ResourceProvider.Flame));
             if (flameTable is not null)
             {
-                mod.Provider = ResourceProvider.FLAME;
-                mod.FileId = flameTable.GetInteger("file-id").ToString(System.Globalization.CultureInfo.InvariantCulture);
-                mod.ProjectId = flameTable.GetInteger("project-id").ToString(System.Globalization.CultureInfo.InvariantCulture);
+                mod.Provider = ResourceProvider.Flame;
+                mod.FileId = flameTable.GetInteger("file-id").ToString(CultureInfo.InvariantCulture);
+                mod.ProjectId = flameTable.GetInteger("project-id").ToString(CultureInfo.InvariantCulture);
             }
             else
             {
-                var modrinthTable = updateTable.GetTable(ProviderCapabilities.Name(ResourceProvider.MODRINTH));
+                var modrinthTable = updateTable.GetTable(ProviderCapabilities.Name(ResourceProvider.Modrinth));
                 if (modrinthTable is not null)
                 {
-                    mod.Provider = ResourceProvider.MODRINTH;
+                    mod.Provider = ResourceProvider.Modrinth;
                     mod.ProjectId = modrinthTable.GetString("mod-id");
                     mod.FileId = modrinthTable.GetString("version");
                 }

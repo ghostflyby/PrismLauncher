@@ -12,6 +12,7 @@
 //    attribute dance; here both the folder check and everything else run in ExecuteAsync
 //    (the attribute call has no portable equivalent and only hides the folder on Windows).
 //  - abort() -> the base Abort() cancellation (the C++ just emits aborted()).
+
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Tasks;
 

@@ -7,6 +7,7 @@
 // [Collection("ModrinthApi")] matches InstanceImportTaskTests: ModrinthApi.BaseUrl /
 // DownloadHost are process-global statics and the API host runs the very same
 // InstanceImportTask the core tests drive directly.
+
 using System.Net;
 using System.Text.Json;
 using FlintLauncher.Core.ModPlatform.Modrinth;

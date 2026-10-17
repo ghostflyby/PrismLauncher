@@ -2,6 +2,10 @@
 // Port of the QVariant-ish conversions Prism performs on values coming out of INI files
 // (the Qt6 INI reader returns strings for scalars, so typed accessors parse them the way
 // QVariant::toBool/toInt would).
+
+using System.Globalization;
+using System.Text;
+
 namespace FlintLauncher.Core.Settings;
 
 public static class Variant
@@ -11,9 +15,9 @@ public static class Variant
         null => "",
         string s => s,
         bool b => b ? "true" : "false",
-        int i => i.ToString(System.Globalization.CultureInfo.InvariantCulture),
-        long l => l.ToString(System.Globalization.CultureInfo.InvariantCulture),
-        double d => d.ToString("R", System.Globalization.CultureInfo.InvariantCulture),
+        int i => i.ToString(CultureInfo.InvariantCulture),
+        long l => l.ToString(CultureInfo.InvariantCulture),
+        double d => d.ToString("R", CultureInfo.InvariantCulture),
         IReadOnlyList<string> list => string.Join(", ", list),
         byte[] bytes => BytesAsText(bytes),
         _ => value.ToString() ?? "",
@@ -41,9 +45,9 @@ public static class Variant
         {
             return StrictUtf8.GetString(bytes);
         }
-        catch (System.Text.DecoderFallbackException)
+        catch (DecoderFallbackException)
         {
-            var sb = new System.Text.StringBuilder(bytes.Length);
+            var sb = new StringBuilder(bytes.Length);
             foreach (var b in bytes)
             {
                 sb.Append((char)b);
@@ -52,7 +56,7 @@ public static class Variant
         }
     }
 
-    private static readonly System.Text.UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     public static int AsInt(object? value) => value switch
     {
@@ -60,7 +64,7 @@ public static class Variant
         int i => i,
         long l => checked((int)l),
         bool b => b ? 1 : 0,
-        string s => int.TryParse(s, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var i) ? i : 0,
+        string s => int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i) ? i : 0,
         double d => (int)d,
         _ => 0,
     };
@@ -71,7 +75,7 @@ public static class Variant
         long l => l,
         int i => i,
         bool b => b ? 1 : 0,
-        string s => long.TryParse(s, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var l) ? l : 0,
+        string s => long.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var l) ? l : 0,
         double d => (long)d,
         _ => 0,
     };
@@ -83,7 +87,7 @@ public static class Variant
         int i => i,
         long l => l,
         bool b => b ? 1 : 0,
-        string s => double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : 0,
+        string s => double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0,
         _ => 0,
     };
 
@@ -113,9 +117,9 @@ public static class Variant
         IniValue iv => iv,
         string s => IniValue.From(s),
         bool b => IniValue.From(b ? "true" : "false"),
-        int i => IniValue.From(i.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-        long l => IniValue.From(l.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-        double d => IniValue.From(d.ToString("R", System.Globalization.CultureInfo.InvariantCulture)),
+        int i => IniValue.From(i.ToString(CultureInfo.InvariantCulture)),
+        long l => IniValue.From(l.ToString(CultureInfo.InvariantCulture)),
+        double d => IniValue.From(d.ToString("R", CultureInfo.InvariantCulture)),
         IReadOnlyList<string> list => list.Count == 0 ? IniValue.Invalid : IniValue.From(list.ToList()),
         IEnumerable<string> en => ToIniValue(en.ToList()),
         byte[] bytes => IniValue.From(bytes),

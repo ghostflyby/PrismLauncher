@@ -3,6 +3,7 @@
 // (free-port HttpListener pattern, see ModrinthTestSupport) serving search/trending
 // results, pack metadata, Solder pack/build listings and file downloads, plus synthetic
 // Technic zip pack builders (bin/version.json / bin/modpack.jar / vanilla flavors).
+
 using System.IO.Compression;
 using System.Net;
 using System.Text;
@@ -203,7 +204,7 @@ internal sealed class TechnicZipPackBuilder
                 File.WriteAllText(Path.Combine(dir, "bin", "version.json"), VersionJson);
             }
 
-            return MMCZip.CompressDir(path, dir);
+            return MmcZip.CompressDir(path, dir);
         }
         finally
         {
@@ -257,7 +258,7 @@ internal sealed class TechnicZipPackBuilder
             Directory.CreateDirectory(Path.GetDirectoryName(inner)!);
             File.WriteAllBytes(inner, content);
             var zipPath = Path.Combine(dir, "mod.zip");
-            Assert.True(MMCZip.CompressDir(zipPath, dir));
+            Assert.True(MmcZip.CompressDir(zipPath, dir));
             return File.ReadAllBytes(zipPath);
         }
         finally

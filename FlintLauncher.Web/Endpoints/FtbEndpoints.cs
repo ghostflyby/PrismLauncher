@@ -10,6 +10,7 @@
 // BuildConfig.FTB_API_BASE_URL constant). The install's `serverUrl` body field selects a
 // per-request derived client instead of mutating the shared one, so an override can never
 // leak into other requests (and needs no restore).
+
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.ModPlatform.Ftb;
@@ -48,14 +49,14 @@ public static class FtbEndpoints
             }
             return Results.Ok(new FtbPackIndexResponse(
                 ids.Select(id => new FtbPackIndexEntry(id)).ToArray()));
-        }).Produces<FtbPackIndexResponse>(200);
+        }).Produces<FtbPackIndexResponse>();
 
         // ---------------------------------------------- modplatform/ftb/packs/{id}
         // the /modpack/{id} description (FtbListModel::packRequestFinished's mapping)
         api.MapGet("/modplatform/ftb/packs/{id}", async Task<IResult> (int id,
             LauncherRuntime runtime) =>
             await WithPackAsync(runtime, id, pack => Results.Ok(PackView(pack))))
-            .Produces<FtbPackView>(200);
+            .Produces<FtbPackView>();
 
         // -------------------------------------- modplatform/ftb/packs/{id}/versions
         // the description's version list (the FTB App API has no separate version index)
@@ -65,7 +66,7 @@ public static class FtbEndpoints
                 .Select(version => new FtbPackVersionView(version.Id, version.Name,
                     version.Type, version.Updated))
                 .ToArray())))
-            .Produces<FtbPackVersionView[]>(200);
+            .Produces<FtbPackVersionView[]>();
 
         // -------------------------------------------------- modplatform/ftb/install
         api.MapPost("/modplatform/ftb/install", async Task<IResult> (

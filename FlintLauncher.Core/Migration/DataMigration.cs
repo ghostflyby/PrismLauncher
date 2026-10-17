@@ -15,6 +15,9 @@
 //  - The migration inventory is the exact filter list from Application::handleDataMigration;
 //    the launcher's own config file name comes from FlintConfig ("flint.cfg", Prism's
 //    "prismlauncher.cfg").
+
+using System.Security;
+using System.Text.RegularExpressions;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Tasks;
 
@@ -50,7 +53,7 @@ public static class Filters
 
     public static Func<string, bool> StartsWith(string pattern) => src => src.StartsWith(pattern, StringComparison.Ordinal);
 
-    public static Func<string, bool> Regexp(System.Text.RegularExpressions.Regex pattern) =>
+    public static Func<string, bool> Regexp(Regex pattern) =>
         src => pattern.IsMatch(src);
 }
 
@@ -301,7 +304,7 @@ public static class DataMigration
                 File.Delete(legacyMarker);
             }
             catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException
-                                     or NotSupportedException or System.Security.SecurityException)
+                                     or NotSupportedException or SecurityException)
             {
             }
         }

@@ -20,20 +20,22 @@
 //    hang); the port awaits both load tasks inline, so the proceed() gate is not needed here.
 //  - Task/Task::Ptr plumbing (connect succeeded/failed/progress chains) collapses into
 //    await + state inspection.
+
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Java;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Java;
+using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tasks;
+using Index = FlintLauncher.Core.Meta.Index;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class AutoInstallJava : LaunchStep
 {
     private readonly MinecraftInstance _instance;
-    private FlintTask? _currentTask;
-    private int _majorJavaVersionIndex;
+    private FlintTask? currentTask;
+    private int majorJavaVersionIndex;
     private readonly string _supportedArch;
 
     public AutoInstallJava(LaunchTask parent) : base(parent)
@@ -44,7 +46,7 @@ public sealed class AutoInstallJava : LaunchStep
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        var settings = _instance.Settings();
+        var settings = _instance.Settings;
         // the typed user layer (D4): the C++ default of this switch derives from the
         // INI-loaded JavaPath being empty (Application.cpp:768-770) and the one-shot import
         // materializes exactly that into flint.json (E3) — so a present store carries the
@@ -67,8 +69,8 @@ public sealed class AutoInstallJava : LaunchStep
             {
                 // (upstream connects finished + emits progressReportingRequest without starting
                 //  the task; the port awaits the load instead — see header note)
-                _currentTask = javas.GetLoadTask();
-                await _currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
+                currentTask = javas.GetLoadTask();
+                await currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
                 var compatibleMajors = packProfile.GetProfile()?.GetCompatibleJavaMajors() ?? [];
                 for (var i = 0; i < javas.Count; i++)
                 {
@@ -114,17 +116,17 @@ public sealed class AutoInstallJava : LaunchStep
 
         // load the "net.minecraft.java" version list, then walk the compatible majors
         var versionList = MetadataIndex().Get("net.minecraft.java");
-        _currentTask = versionList.LoadTask(NetMode.Online);
-        await _currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
-        if (!_currentTask.WasSuccessful && State == TaskState.Running)
+        currentTask = versionList.LoadTask();
+        await currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
+        if (!currentTask.WasSuccessful && State == TaskState.Running)
         {
-            EmitFailed(_currentTask.FailReason);
+            EmitFailed(currentTask.FailReason);
             return;
         }
         await TryNextMajorJava(cancellationToken).ConfigureAwait(false);
     }
 
-    private Meta.Index MetadataIndex() =>
+    private Index MetadataIndex() =>
         Services.MetadataIndexProvider?.Invoke(_instance) ?? _instance.GetPackProfile().MetadataIndex;
 
     private IReadOnlyList<int> MajorJavaVersions() =>
@@ -132,7 +134,7 @@ public sealed class AutoInstallJava : LaunchStep
 
     private void SetJavaPath(string path)
     {
-        var settings = _instance.Settings();
+        var settings = _instance.Settings;
         // C7: there is no gate boolean anymore — writing JavaPath sets the instance-layer
         // member, which IS the override (the derived OverrideJavaLocation reads true)
         settings.Set("JavaPath", path);
@@ -163,7 +165,7 @@ public sealed class AutoInstallJava : LaunchStep
         }
     }
 
-    private async Task DownloadJava(Meta.MetaVersion version, string javaName, CancellationToken cancellationToken)
+    private async Task DownloadJava(MetaVersion version, string javaName, CancellationToken cancellationToken)
     {
         var runtimes = version.Data()?.Runtimes ?? [];
         foreach (var java in runtimes)
@@ -175,10 +177,10 @@ public sealed class AutoInstallJava : LaunchStep
                 switch (java.DownloadType)
                 {
                     case JavaDownloadType.Manifest:
-                        _currentTask = new ManifestDownloadTask(new Uri(java.Url), finalPath, java.ChecksumType, java.ChecksumHash);
+                        currentTask = new ManifestDownloadTask(new Uri(java.Url), finalPath, java.ChecksumType, java.ChecksumHash);
                         break;
                     case JavaDownloadType.Archive:
-                        _currentTask = new ArchiveDownloadTask(new Uri(java.Url), finalPath, java.ChecksumType, java.ChecksumHash);
+                        currentTask = new ArchiveDownloadTask(new Uri(java.Url), finalPath, java.ChecksumType, java.ChecksumHash);
                         break;
                     case JavaDownloadType.Unknown:
                     default:
@@ -198,12 +200,12 @@ public sealed class AutoInstallJava : LaunchStep
                 if (OperatingSystem.IsMacOS())
                 {
                     var seq = new SequentialTask("Install Java");
-                    seq.AddTask(_currentTask);
+                    seq.AddTask(currentTask);
                     seq.AddTask(new SymlinkTask(finalPath));
-                    _currentTask = seq;
+                    currentTask = seq;
                 }
-                await _currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
-                if (_currentTask.WasSuccessful)
+                await currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
+                if (currentTask.WasSuccessful)
                 {
                     SetJavaPathFromPartial();
                 }
@@ -227,7 +229,7 @@ public sealed class AutoInstallJava : LaunchStep
         var packProfile = _instance.GetPackProfile();
         var wantedJavaName = packProfile.GetProfile()?.GetCompatibleJavaName() ?? "";
         var majorJavaVersions = MajorJavaVersions();
-        if (_majorJavaVersionIndex >= majorJavaVersions.Count)
+        if (majorJavaVersionIndex >= majorJavaVersions.Count)
         {
             EmitLogLine($"No versions of Java were found for your operating system: {SysInfo.CurrentSystem()}-{SysInfo.UseQtForArch()}",
                 MessageLevel.Warning);
@@ -235,8 +237,8 @@ public sealed class AutoInstallJava : LaunchStep
             EmitSucceeded();
             return;
         }
-        var majorJavaVersion = majorJavaVersions[_majorJavaVersionIndex];
-        _majorJavaVersionIndex++;
+        var majorJavaVersion = majorJavaVersions[majorJavaVersionIndex];
+        majorJavaVersionIndex++;
 
         var versionList = MetadataIndex().Get("net.minecraft.java");
         var javaMajor = versionList.GetVersion($"java{majorJavaVersion}");
@@ -247,9 +249,9 @@ public sealed class AutoInstallJava : LaunchStep
         }
         else
         {
-            _currentTask = MetadataIndex().LoadVersion("net.minecraft.java", javaMajor.Version(), NetMode.Online);
-            await _currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
-            if (_currentTask.WasSuccessful)
+            currentTask = MetadataIndex().LoadVersion("net.minecraft.java", javaMajor.Version());
+            await currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
+            if (currentTask.WasSuccessful)
             {
                 await DownloadJava(javaMajor, wantedJavaName, cancellationToken).ConfigureAwait(false);
             }
@@ -260,13 +262,13 @@ public sealed class AutoInstallJava : LaunchStep
         }
     }
 
-    public override bool CanAbort() => _currentTask is not null && _currentTask.IsRunning;
+    public override bool CanAbort() => currentTask is not null && currentTask.IsRunning;
 
     public override bool AbortStep()
     {
-        if (_currentTask is not null && _currentTask.IsRunning)
+        if (currentTask is not null && currentTask.IsRunning)
         {
-            _currentTask.Abort();
+            currentTask.Abort();
             EmitAborted();
             return true;
         }

@@ -15,7 +15,9 @@
 // Deviations: the QAbstractListModel surface (rowCount/columnCount/data/headerData) is not
 // ported; the item list is exposed directly plus small additive helpers (Find/Set/Remove) that
 // operate on the same in-memory list save() writes.
+
 using System.Globalization;
+using System.Security;
 using System.Text;
 
 namespace FlintLauncher.Core.Minecraft.GameOptions;
@@ -101,7 +103,7 @@ public sealed class GameOptions
             content = File.ReadAllText(path);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                 or NotSupportedException or System.Security.SecurityException)
+                                 or NotSupportedException or SecurityException)
         {
             return false;
         }
@@ -146,26 +148,26 @@ public sealed class GameOptions
         var tempPath = path + ".flint-tmp";
         try
         {
-            using (var out_ = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            using (var @out = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 if (version != 0)
                 {
                     var versionLine = $"version:{version.ToString(CultureInfo.InvariantCulture)}\n";
-                    out_.Write(Encoding.UTF8.GetBytes(versionLine));
+                    @out.Write(Encoding.UTF8.GetBytes(versionLine));
                 }
                 foreach (var item in mapping)
                 {
-                    out_.Write(Encoding.UTF8.GetBytes(item.Key));
-                    out_.Write(":"u8);
-                    out_.Write(Encoding.UTF8.GetBytes(item.Value));
-                    out_.Write("\n"u8);
+                    @out.Write(Encoding.UTF8.GetBytes(item.Key));
+                    @out.Write(":"u8);
+                    @out.Write(Encoding.UTF8.GetBytes(item.Value));
+                    @out.Write("\n"u8);
                 }
             }
             File.Move(tempPath, path, overwrite: true);
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                 or NotSupportedException or System.Security.SecurityException)
+                                 or NotSupportedException or SecurityException)
         {
             try
             {

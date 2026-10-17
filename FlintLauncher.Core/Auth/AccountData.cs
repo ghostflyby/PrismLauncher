@@ -14,6 +14,7 @@
 //    (the launcher core is not localized).
 //  - qWarning()/qDebug() diagnostics are dropped (comment markers where they carried meaning).
 
+using System.Text;
 using System.Text.Json.Nodes;
 
 namespace FlintLauncher.Core.Auth;
@@ -34,8 +35,9 @@ public sealed class Token
     /// <summary>QDateTime notAfter ("exp" when saved, epoch seconds).</summary>
     public DateTime? NotAfter;
 
-    /// <summary>C++ member token (suffixed: a member named Token cannot live in class Token).</summary>
-    public string Token_ = "";
+    /// <summary>C++ member token (named Value: NO member — field or property — may carry
+    /// the name of its enclosing type Token, CS0542).</summary>
+    public string Value { get; set; } = "";
 
     /// <summary>C++ member refresh_token.</summary>
     public string RefreshToken = "";
@@ -53,7 +55,7 @@ public sealed class Token
         {
             IssueInstant = IssueInstant,
             NotAfter = NotAfter,
-            Token_ = Token_,
+            Value = Value,
             RefreshToken = RefreshToken,
             Validity = Validity,
             Persistent = Persistent,
@@ -109,7 +111,7 @@ public sealed class MinecraftProfile
 
 public enum AccountType
 {
-    MSA,
+    Msa,
     Offline,
 }
 
@@ -133,22 +135,22 @@ public sealed class AccountData
     public JsonObject SaveState()
     {
         var output = new JsonObject();
-        if (Type == AccountType.MSA)
+        if (Type == AccountType.Msa)
         {
             output["type"] = "MSA";
-            output["msa-client-id"] = JsonValue.Create(MsaClientID);
-            TokenToJSONV3(output, MsaToken, "msa");
-            TokenToJSONV3(output, UserToken, "utoken");
-            TokenToJSONV3(output, MojangServicesToken, "xrp-mc");
+            output["msa-client-id"] = JsonValue.Create(MsaClientId);
+            TokenToJsonv3(output, MsaToken, "msa");
+            TokenToJsonv3(output, UserToken, "utoken");
+            TokenToJsonv3(output, MojangServicesToken, "xrp-mc");
         }
         else if (Type == AccountType.Offline)
         {
             output["type"] = "Offline";
         }
 
-        TokenToJSONV3(output, YggdrasilToken, "ygg");
-        ProfileToJSONV3(output, MinecraftProfile, "profile");
-        EntitlementToJSONV3(output, MinecraftEntitlement);
+        TokenToJsonv3(output, YggdrasilToken, "ygg");
+        ProfileToJsonv3(output, MinecraftProfile, "profile");
+        EntitlementToJsonv3(output, MinecraftEntitlement);
         return output;
     }
 
@@ -163,7 +165,7 @@ public sealed class AccountData
         }
         if (typeS == "MSA")
         {
-            Type = AccountType.MSA;
+            Type = AccountType.Msa;
         }
         else if (typeS == "Offline")
         {
@@ -175,27 +177,27 @@ public sealed class AccountData
             return false;
         }
 
-        if (Type == AccountType.MSA)
+        if (Type == AccountType.Msa)
         {
-            var clientIDV = Get(data, "msa-client-id");
-            if (clientIDV is JsonValue clientIdVal && clientIdVal.TryGetValue(out string? clientId))
+            var clientIdv = Get(data, "msa-client-id");
+            if (clientIdv is JsonValue clientIdVal && clientIdVal.TryGetValue(out string? clientId))
             {
-                MsaClientID = clientId ?? "";
+                MsaClientId = clientId ?? "";
             } // leave msaClientID empty if it doesn't exist or isn't a string
-            MsaToken = TokenFromJSONV3(data, "msa");
-            UserToken = TokenFromJSONV3(data, "utoken");
-            MojangServicesToken = TokenFromJSONV3(data, "xrp-mc");
+            MsaToken = TokenFromJsonv3(data, "msa");
+            UserToken = TokenFromJsonv3(data, "utoken");
+            MojangServicesToken = TokenFromJsonv3(data, "xrp-mc");
         }
 
-        YggdrasilToken = TokenFromJSONV3(data, "ygg");
+        YggdrasilToken = TokenFromJsonv3(data, "ygg");
         // versions before 7.2 used "offline" as the offline token
-        if (YggdrasilToken.Token_ == "offline")
+        if (YggdrasilToken.Value == "offline")
         {
-            YggdrasilToken.Token_ = "0";
+            YggdrasilToken.Value = "0";
         }
 
-        MinecraftProfile = ProfileFromJSONV3(data, "profile");
-        if (!EntitlementFromJSONV3(data, MinecraftEntitlement))
+        MinecraftProfile = ProfileFromJsonv3(data, "profile");
+        if (!EntitlementFromJsonv3(data, MinecraftEntitlement))
         {
             if (MinecraftProfile.Validity != Validity.None)
             {
@@ -205,12 +207,12 @@ public sealed class AccountData
             }
         }
 
-        Validity_ = MinecraftProfile.Validity;
+        Validity = MinecraftProfile.Validity;
         return true;
     }
 
     /// <summary>Yggdrasil access token, as passed to the game.</summary>
-    public string AccessToken() => YggdrasilToken.Token_;
+    public string AccessToken() => YggdrasilToken.Value;
 
     public string ProfileId() => MinecraftProfile.Id;
 
@@ -218,9 +220,9 @@ public sealed class AccountData
 
     public string LastError() => ErrorString;
 
-    public AccountType Type = AccountType.MSA;
+    public AccountType Type = AccountType.Msa;
 
-    public string MsaClientID = "";
+    public string MsaClientId = "";
     public Token MsaToken = new();
     public Token UserToken = new();
     public Token MojangServicesToken = new();
@@ -228,7 +230,7 @@ public sealed class AccountData
     public Token YggdrasilToken = new();
     public MinecraftProfile MinecraftProfile = new();
     public MinecraftEntitlement MinecraftEntitlement = new();
-    public Validity Validity_ = Validity.None;
+    public Validity Validity = Validity.None;
 
     // runtime only information (not saved with the account)
     public string InternalId = "";
@@ -237,7 +239,7 @@ public sealed class AccountData
     /// <summary>QNetworkReply::NetworkError storage; see AuthNetUtils for the code meanings.</summary>
     public int NetworkError;
 
-    public AccountState AccountState_ = AccountState.Unchecked;
+    public AccountState AccountState = AccountState.Unchecked;
 
     // ------------------------------------------------------------------ helpers
 
@@ -315,7 +317,7 @@ public sealed class AccountData
 
     // ------------------------------------------------------------- (de)serialization
 
-    internal static void TokenToJSONV3(JsonObject parent, Token t, string tokenName)
+    internal static void TokenToJsonv3(JsonObject parent, Token t, string tokenName)
     {
         if (!t.Persistent)
         {
@@ -333,9 +335,9 @@ public sealed class AccountData
         }
 
         var save = false;
-        if (t.Token_.Length != 0)
+        if (t.Value.Length != 0)
         {
-            outObj["token"] = t.Token_;
+            outObj["token"] = t.Value;
             save = true;
         }
         if (t.RefreshToken.Length != 0)
@@ -360,7 +362,7 @@ public sealed class AccountData
         }
     }
 
-    internal static Token TokenFromJSONV3(JsonObject parent, string tokenName)
+    internal static Token TokenFromJsonv3(JsonObject parent, string tokenName)
     {
         var outToken = new Token();
         var tokenObject = Get(parent, tokenName) as JsonObject;
@@ -383,7 +385,7 @@ public sealed class AccountData
         var token = Get(tokenObject, "token");
         if (IsString(token))
         {
-            outToken.Token_ = GetString(token);
+            outToken.Value = GetString(token);
             outToken.Validity = Validity.Assumed;
         }
 
@@ -407,7 +409,7 @@ public sealed class AccountData
         return outToken;
     }
 
-    internal static void ProfileToJSONV3(JsonObject parent, MinecraftProfile p, string tokenName)
+    internal static void ProfileToJsonv3(JsonObject parent, MinecraftProfile p, string tokenName)
     {
         if (p.Id.Length == 0)
         {
@@ -462,7 +464,7 @@ public sealed class AccountData
         return url.Replace("http://textures.minecraft.net", "https://textures.minecraft.net");
     }
 
-    internal static MinecraftProfile ProfileFromJSONV3(JsonObject parent, string tokenName)
+    internal static MinecraftProfile ProfileFromJsonv3(JsonObject parent, string tokenName)
     {
         var outProfile = new MinecraftProfile();
         var tokenObject = Get(parent, tokenName) as JsonObject;
@@ -578,7 +580,7 @@ public sealed class AccountData
     /// <summary>QByteArray::fromBase64 (default lenient mode: whitespace/invalid chars skipped).</summary>
     internal static byte[] FromBase64(string str)
     {
-        var sb = new System.Text.StringBuilder(str.Length);
+        var sb = new StringBuilder(str.Length);
         foreach (var c in str)
         {
             if (c is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9' or '+' or '/' or '=')
@@ -589,7 +591,7 @@ public sealed class AccountData
         return Convert.FromBase64String(sb.ToString());
     }
 
-    internal static void EntitlementToJSONV3(JsonObject parent, MinecraftEntitlement p)
+    internal static void EntitlementToJsonv3(JsonObject parent, MinecraftEntitlement p)
     {
         if (p.Validity == Validity.None)
         {
@@ -603,7 +605,7 @@ public sealed class AccountData
         parent["entitlement"] = outObj;
     }
 
-    internal static bool EntitlementFromJSONV3(JsonObject parent, MinecraftEntitlement outEntitlement)
+    internal static bool EntitlementFromJsonv3(JsonObject parent, MinecraftEntitlement outEntitlement)
     {
         if (Get(parent, "entitlement") is not JsonObject entitlementObject || entitlementObject.Count == 0)
         {

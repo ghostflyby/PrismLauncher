@@ -4,9 +4,11 @@
 // offline no-op flow, the interactive loopback listener exchange and the silent refresh flow.
 // All endpoint URLs are redirected through a stub-pointed AuthEndpointsOptions passed into the
 // flow, so no real network is involved.
+
 using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Auth;
+using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using Xunit;
@@ -37,7 +39,7 @@ public class AuthFlowTests : IDisposable
     [Fact]
     public async Task Device_Code_MSA_Flow_Succeeds_End_To_End()
     {
-        var account = MinecraftAccount.CreateBlankMSA();
+        var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
         var browserEvents = new List<(string url, string code, int expiresIn)>();
         flow.AuthorizeWithBrowserWithExtra += (url, code, expiresIn) => browserEvents.Add((url, code, expiresIn));
@@ -45,22 +47,22 @@ public class AuthFlowTests : IDisposable
         await flow.StartAsync();
 
         Assert.True(flow.State == TaskState.Succeeded,
-            "state=" + flow.State + " taskState=" + flow.TaskState_ + " reason=" + flow.FailReason + " status=" + flow.Status);
-        Assert.Equal(AccountTaskState.Succeeded, flow.TaskState_);
+            "state=" + flow.State + " taskState=" + flow.TaskState + " reason=" + flow.FailReason + " status=" + flow.Status);
+        Assert.Equal(AccountTaskState.Succeeded, flow.TaskState);
 
         var data = account.AccountData;
         // MSA token step (after two simulated authorization_pending polls)
-        Assert.Equal("MSA_ACCESS", data.MsaToken.Token_);
+        Assert.Equal("MSA_ACCESS", data.MsaToken.Value);
         Assert.Equal("MSA_REFRESH", data.MsaToken.RefreshToken);
-        Assert.Equal("c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb", data.MsaClientID);
+        Assert.Equal("c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb", data.MsaClientId);
         Assert.NotNull(data.MsaToken.IssueInstant);
         Assert.NotNull(data.MsaToken.NotAfter);
         // Xbox user token step
-        Assert.Equal("USER_TOKEN_STUB", data.UserToken.Token_);
+        Assert.Equal("USER_TOKEN_STUB", data.UserToken.Value);
         Assert.Equal(Validity.Certain, data.UserToken.Validity);
         Assert.Equal("UHS_STUB", AccountData.GetString(data.UserToken.Extra["uhs"]));
         // XSTS step (rp://api.minecraftservices.com/)
-        Assert.Equal("XSTS_TOKEN_STUB", data.MojangServicesToken.Token_);
+        Assert.Equal("XSTS_TOKEN_STUB", data.MojangServicesToken.Value);
         // launcher login step -> yggdrasil token
         Assert.Equal("MC_ACCESS_TOKEN_STUB", data.AccessToken());
         Assert.Equal(Validity.Certain, data.YggdrasilToken.Validity);
@@ -77,8 +79,8 @@ public class AuthFlowTests : IDisposable
         // skin step downloaded the (rewritten) skin url
         Assert.Equal("fake-png-bytes-for-testing", Encoding.UTF8.GetString(data.MinecraftProfile.SkinField.Data));
         // overall account state
-        Assert.Equal(AccountState.Online, data.AccountState_);
-        Assert.Equal(Validity.Certain, data.Validity_);
+        Assert.Equal(AccountState.Online, data.AccountState);
+        Assert.Equal(Validity.Certain, data.Validity);
         Assert.True(account.HasProfile());
 
         // the browser event carries the stub verification uri/user code
@@ -139,17 +141,17 @@ public class AuthFlowTests : IDisposable
     {
         _server.XErr = 2148916238;
 
-        var account = MinecraftAccount.CreateBlankMSA();
+        var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
         await flow.StartAsync();
 
         Assert.Equal(TaskState.Failed, flow.State);
-        Assert.Equal(AccountTaskState.FailedSoft, flow.TaskState_);
+        Assert.Equal(AccountTaskState.FailedSoft, flow.TaskState);
         // 2148916238: underaged account not linked to a family (upstream message, verbatim)
         Assert.Equal("This Microsoft account is underaged and is not linked to a family.\n\n" +
             "Please set up your account according to <a href=\"https://help.minecraft.net/hc/en-us/articles/4408968616077\">help.minecraft.net</a>.",
             flow.FailReason);
-        Assert.Equal(AccountState.Errored, account.AccountData.AccountState_);
+        Assert.Equal(AccountState.Errored, account.AccountData.AccountState);
         Assert.Contains("underaged", account.AccountData.LastError());
     }
 
@@ -158,7 +160,7 @@ public class AuthFlowTests : IDisposable
     {
         _server.XErr = 2148916233;
 
-        var account = MinecraftAccount.CreateBlankMSA();
+        var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
         await flow.StartAsync();
 
@@ -173,7 +175,7 @@ public class AuthFlowTests : IDisposable
     {
         _server.XErr = 2148916999;
 
-        var account = MinecraftAccount.CreateBlankMSA();
+        var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
         await flow.StartAsync();
 
@@ -186,7 +188,7 @@ public class AuthFlowTests : IDisposable
     {
         _server.ProfileStatus = 404;
 
-        var account = MinecraftAccount.CreateBlankMSA();
+        var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
         await flow.StartAsync();
 
@@ -194,7 +196,7 @@ public class AuthFlowTests : IDisposable
         Assert.Equal(TaskState.Succeeded, flow.State);
         Assert.Equal("", account.AccountData.ProfileId());
         Assert.Equal("No Minecraft profile", account.AccountData.ProfileName());
-        Assert.Equal(AccountState.Online, account.AccountData.AccountState_);
+        Assert.Equal(AccountState.Online, account.AccountData.AccountState);
         // entitlements were still fetched
         Assert.True(account.AccountData.MinecraftEntitlement.CanPlayMinecraft);
     }
@@ -204,14 +206,14 @@ public class AuthFlowTests : IDisposable
     {
         _server.ProfileStatus = 500;
 
-        var account = MinecraftAccount.CreateBlankMSA();
+        var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
         await flow.StartAsync();
 
         Assert.Equal(TaskState.Failed, flow.State);
-        Assert.Equal(AccountTaskState.Offline, flow.TaskState_);
+        Assert.Equal(AccountTaskState.Offline, flow.TaskState);
         Assert.Contains("Minecraft Java profile acquisition failed", flow.FailReason);
-        Assert.Equal(AccountState.Offline, account.AccountData.AccountState_);
+        Assert.Equal(AccountState.Offline, account.AccountData.AccountState);
     }
 
     [Fact]
@@ -219,15 +221,15 @@ public class AuthFlowTests : IDisposable
     {
         _server.TokenMode = AuthStubServer.DeviceCodeTokenMode.AlwaysExpired;
 
-        var account = MinecraftAccount.CreateBlankMSA();
+        var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
         await flow.StartAsync();
 
         Assert.Equal(TaskState.Failed, flow.State);
-        Assert.Equal(AccountTaskState.FailedHard, flow.TaskState_);
+        Assert.Equal(AccountTaskState.FailedHard, flow.TaskState);
         Assert.Equal("Device Access failed: Device token has expired.", flow.FailReason);
         // the token stored on the account stays untouched (empty on a fresh MSA account)
-        Assert.Equal("", account.AccountData.MsaToken.Token_);
+        Assert.Equal("", account.AccountData.MsaToken.Value);
         // hard failure clears the MSA token via MinecraftAccount::authFailed semantics — but the
         // flow itself only reports; the account layer reacts through events (see OfflineAccountTests).
     }
@@ -237,7 +239,7 @@ public class AuthFlowTests : IDisposable
     {
         _server.PendingTokenResponses = 10; // keep the flow polling
 
-        var account = MinecraftAccount.CreateBlankMSA();
+        var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
         var runTask = flow.StartAsync();
 
@@ -259,12 +261,12 @@ public class AuthFlowTests : IDisposable
     public async Task Offline_Account_Flow_Succeeds_Without_Steps()
     {
         var account = MinecraftAccount.CreateOffline("Notch");
-        var flow = new AuthFlow(account.AccountData, AuthFlowAction.Refresh);
+        var flow = new AuthFlow(account.AccountData);
         await flow.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, flow.State);
-        Assert.Equal(Validity.Certain, account.AccountData.Validity_);
-        Assert.Equal(AccountState.Online, account.AccountData.AccountState_);
+        Assert.Equal(Validity.Certain, account.AccountData.Validity);
+        Assert.Equal(AccountState.Online, account.AccountData.AccountState);
         Assert.Empty(_server.Requests);
     }
 
@@ -273,7 +275,7 @@ public class AuthFlowTests : IDisposable
     {
         _server.PendingTokenResponses = 0;
 
-        var account = MinecraftAccount.CreateBlankMSA();
+        var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.Login, _auth);
         var authorizeUrl = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         flow.AuthorizeWithBrowser += url => authorizeUrl.TrySetResult(url);
@@ -302,8 +304,8 @@ public class AuthFlowTests : IDisposable
         await runTask;
 
         Assert.Equal(TaskState.Succeeded, flow.State);
-        Assert.Equal("MSA_ACCESS", account.AccountData.MsaToken.Token_);
-        Assert.Equal("c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb", account.AccountData.MsaClientID);
+        Assert.Equal("MSA_ACCESS", account.AccountData.MsaToken.Value);
+        Assert.Equal("c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb", account.AccountData.MsaClientId);
 
         // the code was exchanged at the token endpoint
         var tokenReq = _server.Request("POST", "/token")!;
@@ -317,7 +319,7 @@ public class AuthFlowTests : IDisposable
     {
         _server.PendingTokenResponses = 0;
 
-        var account = MinecraftAccount.CreateBlankMSA();
+        var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.Login, _auth);
         var authorizeUrl = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         flow.AuthorizeWithBrowser += url => authorizeUrl.TrySetResult(url);
@@ -342,10 +344,10 @@ public class AuthFlowTests : IDisposable
     {
         _server.PendingTokenResponses = 0;
 
-        var account = MinecraftAccount.CreateBlankMSA();
-        account.AccountData.MsaClientID = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
+        var account = MinecraftAccount.CreateBlankMsa();
+        account.AccountData.MsaClientId = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
         account.AccountData.MsaToken.RefreshToken = "EXISTING_REFRESH";
-        account.AccountData.YggdrasilToken.Token_ = "STALE_YGG";
+        account.AccountData.YggdrasilToken.Value = "STALE_YGG";
 
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.Refresh, _auth);
         await flow.StartAsync();
@@ -354,7 +356,7 @@ public class AuthFlowTests : IDisposable
         var tokenReq = _server.Request("POST", "/token")!;
         Assert.Contains("grant_type=refresh_token", tokenReq.Body);
         Assert.Contains("refresh_token=EXISTING_REFRESH", tokenReq.Body);
-        Assert.Equal("MSA_ACCESS", account.AccountData.MsaToken.Token_);
+        Assert.Equal("MSA_ACCESS", account.AccountData.MsaToken.Value);
         Assert.Equal("MSA_REFRESH", account.AccountData.MsaToken.RefreshToken);
 
         // the full chain ran after the refresh
@@ -365,17 +367,17 @@ public class AuthFlowTests : IDisposable
     public async Task Silent_Refresh_With_Changed_Client_Id_Is_Disabled()
     {
 
-        var account = MinecraftAccount.CreateBlankMSA();
-        account.AccountData.MsaClientID = "another-client-id";
+        var account = MinecraftAccount.CreateBlankMsa();
+        account.AccountData.MsaClientId = "another-client-id";
         account.AccountData.MsaToken.RefreshToken = "EXISTING_REFRESH";
 
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.Refresh, _auth);
         await flow.StartAsync();
 
         Assert.Equal(TaskState.Failed, flow.State);
-        Assert.Equal(AccountTaskState.Disabled, flow.TaskState_);
+        Assert.Equal(AccountTaskState.Disabled, flow.TaskState);
         Assert.Equal("Microsoft user authentication failed - client identification has changed.", flow.FailReason);
-        Assert.Equal(AccountState.Disabled, account.AccountData.AccountState_);
+        Assert.Equal(AccountState.Disabled, account.AccountData.AccountState);
         Assert.Empty(_server.Requests);
     }
 
@@ -383,8 +385,8 @@ public class AuthFlowTests : IDisposable
     public async Task Silent_Refresh_With_Empty_Refresh_Token_Is_Disabled()
     {
 
-        var account = MinecraftAccount.CreateBlankMSA();
-        account.AccountData.MsaClientID = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
+        var account = MinecraftAccount.CreateBlankMsa();
+        account.AccountData.MsaClientId = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
 
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.Refresh, _auth);
         await flow.StartAsync();
@@ -399,20 +401,20 @@ public class AuthFlowTests : IDisposable
     {
         _server.TokenMode = AuthStubServer.DeviceCodeTokenMode.AlwaysExpired;
 
-        var account = MinecraftAccount.CreateBlankMSA();
-        account.AccountData.MsaToken.Token_ = "OLD_TOKEN";
+        var account = MinecraftAccount.CreateBlankMsa();
+        account.AccountData.MsaToken.Value = "OLD_TOKEN";
         account.AccountData.MsaToken.RefreshToken = "OLD_REFRESH";
-        account.AccountData.Validity_ = Validity.Assumed;
+        account.AccountData.Validity = Validity.Assumed;
 
         var flow = account.Login(useDeviceCode: true, _auth);
         await flow!.StartAsync();
 
         Assert.Equal(TaskState.Failed, flow.State);
-        Assert.Equal(AccountTaskState.FailedHard, flow.TaskState_);
+        Assert.Equal(AccountTaskState.FailedHard, flow.TaskState);
         // MinecraftAccount::authFailed(STATE_FAILED_HARD): MSA tokens cleared
-        Assert.Equal("", account.AccountData.MsaToken.Token_);
+        Assert.Equal("", account.AccountData.MsaToken.Value);
         Assert.Equal("", account.AccountData.MsaToken.RefreshToken);
-        Assert.Equal(Validity.None, account.AccountData.Validity_);
+        Assert.Equal(Validity.None, account.AccountData.Validity);
     }
 
     [Fact]
@@ -428,7 +430,7 @@ public class AuthFlowTests : IDisposable
         Assert.False(account.IsActive);
 
         // fillSession (port of MinecraftAccount::fillSession)
-        var session = new FlintLauncher.Core.Instances.AuthSession();
+        var session = new AuthSession();
         account.FillSession(session);
         Assert.Equal("0", session.AccessToken);
         Assert.Equal("Notch", session.PlayerName);

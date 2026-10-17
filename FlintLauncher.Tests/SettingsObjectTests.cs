@@ -3,6 +3,8 @@
 // flint.json -> instance.json): C7 fold resolution, the derived gates, the C7 passthrough
 // pair, persistence through instance.json and the state-trio routing. The former
 // INISettingsObject tests retired with the INI write path (CONFIG C5).
+
+using Flint.Tests;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Web;
@@ -39,7 +41,7 @@ public class SettingsObjectTests : IDisposable
     /// <summary>A user layer with one non-default member (the fold's lower layer).</summary>
     private FlintConfigStore UserWith(string key, object? value)
     {
-        var user = Flint.Tests.TestGlobalSettings.CreateStore();
+        var user = TestGlobalSettings.CreateStore();
         user.Set(key, value);
         return user;
     }

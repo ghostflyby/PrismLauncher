@@ -18,6 +18,7 @@
 //  - The toml++ read of ReadMCModTOML goes through MiniToml (extended with [[array of
 //    tables]] for [[mods]] / [[dependencies.<modId>]]); a parse failure yields empty details
 //    like the caught toml++ parse_error.
+
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
@@ -191,7 +192,6 @@ public static class ModUtils
                     {
                         break; // stop
                     }
-                    continue;
                 }
                 // file->skip()
             }
@@ -753,7 +753,7 @@ public static class ModUtils
                         }
                         if (largest > 0)
                         {
-                            var key = largest.ToString() + "x" + largest.ToString();
+                            var key = largest + "x" + largest;
                             details.IconFile = iconObj.Contains(key) ? StringOr(iconObj[key]) : "";
                         }
                         else

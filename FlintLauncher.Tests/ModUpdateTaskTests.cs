@@ -5,14 +5,15 @@
 // apply pass replacing the jar and refreshing its metadata; plus the failure semantics (a
 // failing download does not abort its siblings, the model still refreshes, and the task
 // fails with the download's reason).
+
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Minecraft;
+using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Packwiz;
-using FlintLauncher.Core.Minecraft;
-using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Versioning;
 using Xunit;
 
@@ -55,7 +56,7 @@ public class ModUpdateTaskTests : IDisposable
             Slug = "test-mod",
             Name = "Test Mod",
             Filename = "test.jar",
-            Provider = ResourceProvider.FLAME,
+            Provider = ResourceProvider.Flame,
             ProjectId = "123",
             FileId = "456",
             VersionNumber = "1.0.0",
@@ -104,7 +105,7 @@ public class ModUpdateTaskTests : IDisposable
             AddonId = metadata.ProjectId,
             Slug = metadata.Slug,
             Name = update.Name,
-            Provider = ResourceProvider.FLAME,
+            Provider = ResourceProvider.Flame,
         };
         var download = new ResourceDownloadTask(pack, update.Version, model,
             isIndexed: true, downloadReason: "update", instance: instance);
@@ -137,7 +138,7 @@ public class ModUpdateTaskTests : IDisposable
         // a good download for a second mod...
         var goodBytes = "good jar bytes"u8.ToArray();
         _server.Downloads["good.bin"] = goodBytes;
-        var goodPack = new IndexedPack { AddonId = "124", Slug = "good-mod", Name = "Good Mod", Provider = ResourceProvider.FLAME };
+        var goodPack = new IndexedPack { AddonId = "124", Slug = "good-mod", Name = "Good Mod", Provider = ResourceProvider.Flame };
         var goodVersion = new IndexedVersion
         {
             AddonId = "124",
@@ -152,7 +153,7 @@ public class ModUpdateTaskTests : IDisposable
             instance: instance);
 
         // ...and one whose checksum cannot match
-        var badPack = new IndexedPack { AddonId = "125", Slug = "bad-mod", Name = "Bad Mod", Provider = ResourceProvider.FLAME };
+        var badPack = new IndexedPack { AddonId = "125", Slug = "bad-mod", Name = "Bad Mod", Provider = ResourceProvider.Flame };
         var badVersion = new IndexedVersion
         {
             AddonId = "125",

@@ -17,6 +17,8 @@
 //    instead of opening a dialog when it is NotAsked (NotAsked and No both skip scheduling
 //    "saves/" paths, Yes schedules them like the dialog's answer).
 //  - the copy executes synchronously inside StartAsync (no QtConcurrent thread hop).
+
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Tasks;
 
@@ -49,19 +51,19 @@ public abstract class InstanceTask : FlintTask
 {
     private readonly List<string> _filesToRemove = [];
 
-    private string _originalName = "";
-    private string _originalVersion = "";
-    private string _modifiedName = "";
+    private string originalName = "";
+    private string originalVersion = "";
+    private string modifiedName = "";
 
-    private bool _overrideExisting;
-    private bool _confirmUpdate = true;
-    private string _originalInstanceId = "";
+    private bool overrideExisting;
+    private bool confirmUpdate = true;
+    private string originalInstanceId = "";
 
     /// <summary>The typed instance-layer environment (D4): user flint.json store + the
     /// instance.json/instance-state.json type infos. Set through
     /// <see cref="SetParentEnvironment"/> (the InstanceStaging wrapper does it before the
     /// task runs); the creation tasks build their staged instances with it.</summary>
-    protected Config.InstanceEnvironment? Environment { get; private set; }
+    protected InstanceEnvironment? Environment { get; private set; }
 
     /// <summary>C++ m_instIcon + setIcon().</summary>
     public string Icon { get; set; } = "";
@@ -82,7 +84,7 @@ public abstract class InstanceTask : FlintTask
     /// <summary>C++ m_filesToRemove (consumed by the import/update flows).</summary>
     protected IReadOnlyList<string> FilesToRemove => _filesToRemove;
 
-    public void SetParentEnvironment(Config.InstanceEnvironment environment) => Environment = environment;
+    public void SetParentEnvironment(InstanceEnvironment environment) => Environment = environment;
 
     /// <summary>C++ setIcon().</summary>
     public void SetIcon(string icon) => Icon = icon;
@@ -90,50 +92,50 @@ public abstract class InstanceTask : FlintTask
     /// <summary>C++ setGroup().</summary>
     public void SetGroup(string group) => Group = group;
 
-    public bool ShouldConfirmUpdate() => _confirmUpdate;
+    public bool ShouldConfirmUpdate() => confirmUpdate;
 
-    public void SetConfirmUpdate(bool confirm) => _confirmUpdate = confirm;
+    public void SetConfirmUpdate(bool confirm) => confirmUpdate = confirm;
 
-    public bool ShouldOverride => _overrideExisting;
+    public bool ShouldOverride => overrideExisting;
 
     /// <summary>C++ originalInstanceID().</summary>
-    public string OriginalInstanceID => _originalInstanceId;
+    public string OriginalInstanceId => originalInstanceId;
 
-    public string OriginalName() => _originalName;
+    public string OriginalName() => originalName;
 
-    public string ModifiedName() => _modifiedName.Length != 0 ? _modifiedName : _originalName;
+    public string ModifiedName() => modifiedName.Length != 0 ? modifiedName : originalName;
 
     /// <summary>C++ name(): the display name the created instance will get.</summary>
     public string Name()
     {
-        if (_modifiedName.Length != 0)
+        if (modifiedName.Length != 0)
         {
             return ModifiedName();
         }
-        if (_originalVersion.Length != 0)
+        if (originalVersion.Length != 0)
         {
-            return _originalName + " " + _originalVersion;
+            return originalName + " " + originalVersion;
         }
-        return _originalName;
+        return originalName;
     }
 
     /// <summary>C++ version().</summary>
-    public string Version() => _originalVersion;
+    public string Version() => originalVersion;
 
-    public void SetName(string name) => _modifiedName = name;
+    public void SetName(string name) => modifiedName = name;
 
     public void SetOriginalName(string name, string version)
     {
-        _originalName = name;
-        _originalVersion = version;
+        originalName = name;
+        originalVersion = version;
     }
 
     public void SetOverride(bool overrideExisting, string instanceIdToOverride = "")
     {
-        _overrideExisting = overrideExisting;
+        this.overrideExisting = overrideExisting;
         if (instanceIdToOverride.Length != 0)
         {
-            _originalInstanceId = instanceIdToOverride;
+            originalInstanceId = instanceIdToOverride;
         }
     }
 

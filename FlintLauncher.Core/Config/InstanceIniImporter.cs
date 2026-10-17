@@ -21,6 +21,7 @@
 // The passthrough pair (ConsoleMaxLines/ConsoleOverflowStop) and the java probe quintet are
 // non-layered (C7/C9): instance values are dropped — the console pair stays global-only and
 // the probe cache is launcher-state.json's path-keyed map.
+
 using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Config;

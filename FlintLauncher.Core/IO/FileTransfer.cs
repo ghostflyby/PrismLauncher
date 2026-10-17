@@ -14,7 +14,9 @@
 // P/Invoke notes: path arguments travel as NUL-terminated UTF-8 byte arrays — blittable, so
 // no marshaler engine, no unsafe, and the declarations stay AOT-clean (LibraryImport would
 // force AllowUnsafeBlocks project-wide).
+
 using System.Runtime.InteropServices;
+using System.Security;
 using System.Text;
 
 namespace FlintLauncher.Core.IO;
@@ -359,7 +361,7 @@ public static class FileTransfer
             File.SetUnixFileMode(dst, File.GetUnixFileMode(src));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
-                                 or System.Security.SecurityException or NotSupportedException)
+                                 or SecurityException or NotSupportedException)
         {
         }
     }

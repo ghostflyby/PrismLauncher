@@ -11,6 +11,7 @@
 // distributions never use them). Like the C++ flow (collectFiles + parse), consumers make two
 // passes over the archive: a listing pass to find the first top-level folder and the
 // extraction pass.
+
 using System.IO.Compression;
 using System.Text;
 using FlintLauncher.Core.IO;

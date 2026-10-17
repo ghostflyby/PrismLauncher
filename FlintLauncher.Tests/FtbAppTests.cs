@@ -5,8 +5,11 @@
 // copy, InstanceType/totalTimePlayed/JvmArgs settings, net.minecraft + loader components)
 // through an FtbAppPaths instance whose RootPath points at the synthetic tree (per-instance,
 // nothing process-global to restore).
+
 using System.Text.Json;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform.FtbApp;
 using FlintLauncher.Core.Settings;
 using Xunit;
@@ -17,7 +20,7 @@ public class FtbAppTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-ftbapp-{Guid.NewGuid():N}");
     private readonly TestGlobalSettings _global = new();
-    private string _instancesPath = "";
+    private string instancesPath = "";
 
     public FtbAppTests()
     {
@@ -53,24 +56,24 @@ public class FtbAppTests : IDisposable
 
     /// <summary>A synthetic FTB App root: storage/settings.json pointing at an instances
     /// folder that holds one modpack folder (built by <paramref name="populate"/>). The
-    /// matching <see cref="FtbAppPaths"/> instance lands in <see cref="_paths"/>.</summary>
+    /// matching <see cref="FtbAppPaths"/> instance lands in <see cref="paths"/>.</summary>
     private string BuildFtbAppTree(Action<string> populate)
     {
         var ftbRoot = Path.Combine(_root, ".ftba");
-        _instancesPath = Path.Combine(_root, "ftb-instances");
+        instancesPath = Path.Combine(_root, "ftb-instances");
         Directory.CreateDirectory(Path.Combine(ftbRoot, "storage"));
-        Directory.CreateDirectory(_instancesPath);
+        Directory.CreateDirectory(instancesPath);
         File.WriteAllText(Path.Combine(ftbRoot, "storage", "settings.json"),
-            $$"""{"instanceLocation": "{{_instancesPath.Replace("\\", "\\\\")}}"}""");
+            $$"""{"instanceLocation": "{{instancesPath.Replace("\\", "\\\\")}}"}""");
 
-        var packPath = Path.Combine(_instancesPath, "my-ftb-pack");
+        var packPath = Path.Combine(instancesPath, "my-ftb-pack");
         Directory.CreateDirectory(packPath);
         populate(packPath);
-        _paths = new FtbAppPaths(ftbRoot);
+        paths = new FtbAppPaths(ftbRoot);
         return packPath;
     }
 
-    private FtbAppPaths _paths = new();
+    private FtbAppPaths paths = new();
 
     private static void WriteInstanceJson(string packPath, string modLoader)
     {
@@ -97,7 +100,7 @@ public class FtbAppTests : IDisposable
     {
         var packPath = BuildFtbAppTree(_ => { });
 
-        Assert.Equal(Directory.GetParent(packPath)!.FullName, _paths.GetDynamicInstancesPath());
+        Assert.Equal(Directory.GetParent(packPath)!.FullName, paths.GetDynamicInstancesPath());
     }
 
     [Fact]
@@ -147,7 +150,7 @@ public class FtbAppTests : IDisposable
         Assert.Equal("1.18.2", modpack.McVersion);
         Assert.Equal(95514000, modpack.TotalPlayTime);
         Assert.Equal("-Xmx2G -Dtest=1", modpack.JvmArgs);
-        Assert.Equal(FlintLauncher.Core.Minecraft.ModLoaderType.Forge, modpack.LoaderType);
+        Assert.Equal(ModLoaderType.Forge, modpack.LoaderType);
         Assert.Equal("14.23.5.2860", modpack.LoaderVersion);
         // folder.jpg does not exist -> the .ftbapp logo with its jpg type byte
         Assert.Equal(FtbAppIcon.Kind.Logo, modpack.Icon.IconKind);
@@ -178,7 +181,7 @@ public class FtbAppTests : IDisposable
 
         var modpack = FtbAppPackParse.ParseDirectory(packPath);
 
-        Assert.Equal(FlintLauncher.Core.Minecraft.ModLoaderType.Fabric, modpack.LoaderType);
+        Assert.Equal(ModLoaderType.Fabric, modpack.LoaderType);
         Assert.Equal("0.14.21", modpack.LoaderVersion);
     }
 
@@ -215,13 +218,13 @@ public class FtbAppTests : IDisposable
     {
         BuildFtbAppTree(pack => WriteInstanceJson(pack, "forge-14.23.5.2860"));
         // a sibling folder without an instance.json is ignored
-        Directory.CreateDirectory(Path.Combine(_instancesPath, "not-a-pack"));
+        Directory.CreateDirectory(Path.Combine(instancesPath, "not-a-pack"));
 
-        var modpacks = FtbAppPackParse.ParseInstancesDirectory(_instancesPath);
+        var modpacks = FtbAppPackParse.ParseInstancesDirectory(instancesPath);
 
         var pack = Assert.Single(modpacks);
         Assert.Equal("My FTB Pack", pack.Name);
-        Assert.Equal(Path.Combine(_instancesPath, "my-ftb-pack"), pack.Path);
+        Assert.Equal(Path.Combine(instancesPath, "my-ftb-pack"), pack.Path);
 
         Assert.Empty(FtbAppPackParse.ParseInstancesDirectory(Path.Combine(_root, "missing")));
     }
@@ -262,8 +265,8 @@ public class FtbAppTests : IDisposable
         // OverrideJavaArgs gate reads true because JvmArgs is set)
         Assert.Equal(95514, // ms -> s
             Variant.AsLong(new MinecraftInstance(
-                new FlintLauncher.Core.Config.InstanceJsonSettingsObject(staging, _global.Environment),
-                staging).Settings().Get("totalTimePlayed")));
+                new InstanceJsonSettingsObject(staging, _global.Environment),
+                staging).Settings.Get("totalTimePlayed")));
         var instanceJson = File.ReadAllText(Path.Combine(staging, "instance.json"));
         Assert.Contains("jvmArgs", instanceJson); // camelCase wire shape
         Assert.Contains("-Xmx2G -Dtest=1", instanceJson);

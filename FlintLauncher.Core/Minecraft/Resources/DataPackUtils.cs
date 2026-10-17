@@ -14,6 +14,7 @@
 //    QImage-supported format.
 //  - QJsonValue::isDouble()/QString::number(double) formats numbers like Qt's 'g' with 6
 //    significant digits (lowercase exponent); QtJson.NumberToString mirrors that.
+
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -73,7 +74,7 @@ public static class DataPackUtils
                 return McmetaInvalid(); // can't open mcmeta file
             }
 
-            var mcmetaResult = ProcessMCMeta(pack, data);
+            var mcmetaResult = ProcessMcMeta(pack, data);
             if (!mcmetaResult)
             {
                 return McmetaInvalid(); // mcmeta invalid
@@ -109,7 +110,7 @@ public static class DataPackUtils
                 return PngInvalid(); // can't open pack.png file
             }
 
-            var packPngResult = ProcessPackPNG(pack, data);
+            var packPngResult = ProcessPackPng(pack, data);
             if (!packPngResult)
             {
                 return PngInvalid(); // pack.png invalid
@@ -152,7 +153,7 @@ public static class DataPackUtils
                     metaParsed = true;
                     var data = ReadEntry(entry);
 
-                    mcmetaResult = ProcessMCMeta(pack, Encoding.UTF8.GetString(data));
+                    mcmetaResult = ProcessMcMeta(pack, Encoding.UTF8.GetString(data));
 
                     if (!mcmetaResult)
                     {
@@ -164,7 +165,7 @@ public static class DataPackUtils
                     iconParsed = true;
                     var data = ReadEntry(entry);
 
-                    packPngResult = ProcessPackPNG(pack, data);
+                    packPngResult = ProcessPackPng(pack, data);
                     if (!packPngResult)
                     {
                         return true; // pack.png invalid (breakControl)
@@ -222,7 +223,7 @@ public static class DataPackUtils
     // https://minecraft.wiki/w/Data_pack#pack.mcmeta
     // https://minecraft.wiki/w/Raw_JSON_text_format
     // https://minecraft.wiki/w/Tutorials/Creating_a_resource_pack#Formatting_pack.mcmeta
-    public static bool ProcessMCMeta(DataPack pack, string rawData)
+    public static bool ProcessMcMeta(DataPack pack, string rawData)
     {
         var jsonRoot = JsonUtils.ParseNodeUntilGarbage(rawData, out _);
         if (jsonRoot is null)
@@ -355,7 +356,7 @@ public static class DataPackUtils
     }
 
     /// <summary>Port of DataPackUtils::processPackPNG(pack, data).</summary>
-    public static bool ProcessPackPNG(DataPack pack, byte[] rawData)
+    public static bool ProcessPackPng(DataPack pack, byte[] rawData)
     {
         if (PngImageReader.TryReadPng(rawData, out var img))
         {
@@ -375,7 +376,7 @@ public static class DataPackUtils
     /// https://github.com/PrismLauncher/PrismLauncher/issues/1740); the only caller
     /// (DataPack::image) ignores the result.
     /// </summary>
-    public static bool ProcessPackPNG(DataPack pack)
+    public static bool ProcessPackPng(DataPack pack)
     {
         switch (pack.Type)
         {
@@ -395,7 +396,7 @@ public static class DataPackUtils
                         return false; // can't open pack.png file
                     }
 
-                    if (!ProcessPackPNG(pack, data))
+                    if (!ProcessPackPng(pack, data))
                     {
                         return false; // pack.png invalid
                     }
@@ -416,7 +417,7 @@ public static class DataPackUtils
                     {
                         return false; // png_invalid
                     }
-                    if (!ProcessPackPNG(pack, ReadEntry(entry)))
+                    if (!ProcessPackPng(pack, ReadEntry(entry)))
                     {
                         return false; // pack.png invalid
                     }

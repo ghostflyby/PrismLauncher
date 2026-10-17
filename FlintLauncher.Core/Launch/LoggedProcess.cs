@@ -29,6 +29,8 @@
 //    additionally traces spawn command line, stdin writes, every state change and the exit
 //    through the injected "flint.process" logger — these were the exact blind spots of the
 //    first real-launch investigation.
+
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 using FlintLauncher.Core.Diagnostics;
@@ -53,21 +55,21 @@ public sealed class LoggedProcess : IDisposable
 {
     private readonly Process _process = new();
     private readonly object _lock = new();
-    private Decoder? _errDecoder;
-    private Decoder? _outDecoder;
-    private string _leftoverLine = "";
-    private string _errLeftoverLine = "";
-    private bool _isAborting;
-    private bool _isDetachable;
+    private Decoder? errDecoder;
+    private Decoder? outDecoder;
+    private string leftoverLine = "";
+    private string errLeftoverLine = "";
+    private bool isAborting;
+    private bool isDetachable;
     // volatile: terminal states are applied on a continuation thread and read by waiters
     // that observed the StateChanged/TCS edge; keep the field reads fresh
-    private volatile LoggedProcessState _state = LoggedProcessState.NotRunning;
-    private volatile int _exitCode;
-    private bool _started;
-    private bool _disposed;
+    private volatile LoggedProcessState state = LoggedProcessState.NotRunning;
+    private volatile int exitCode;
+    private bool started;
+    private bool disposed;
     /// <summary>Signalled by OnTerminated AFTER the terminal state is applied, so waiters never
     /// observe a stale Running state (Process.WaitForExitAsync races the exit continuation).</summary>
-    private TaskCompletionSource<LoggedProcessState>? _terminatedTcs;
+    private TaskCompletionSource<LoggedProcessState>? terminatedTcs;
 
     /// <summary>The injected diagnostics factory (the launch pipeline passes the host's
     /// LaunchServices.LoggerFactory); null keeps the silent-by-default library behavior.</summary>
@@ -82,8 +84,8 @@ public sealed class LoggedProcess : IDisposable
     {
         _loggerFactory = loggerFactory;
         var encoding = outputEncoding ?? Encoding.UTF8;
-        _outDecoder = encoding.GetDecoder();
-        _errDecoder = encoding.GetDecoder();
+        outDecoder = encoding.GetDecoder();
+        errDecoder = encoding.GetDecoder();
 
         _process.StartInfo.UseShellExecute = false;
         _process.StartInfo.RedirectStandardOutput = true;
@@ -99,12 +101,12 @@ public sealed class LoggedProcess : IDisposable
     /// <summary>Port of the stateChanged(LoggedProcess::State) signal.</summary>
     public event Action<LoggedProcessState>? StateChanged;
 
-    public LoggedProcessState State => _state;
+    public LoggedProcessState State => state;
 
     /// <summary>Port of QProcess::errorString() for the FailedToStart log line.</summary>
     public string ErrorString { get; private set; } = "";
 
-    public int ExitCode => _exitCode;
+    public int ExitCode => exitCode;
 
     /// <summary>Port of QProcess::processId(); 0 when not running.</summary>
     public int ProcessId
@@ -113,9 +115,9 @@ public sealed class LoggedProcess : IDisposable
         {
             try
             {
-                return _started && !_process.HasExited ? _process.Id : 0;
+                return started && !_process.HasExited ? _process.Id : 0;
             }
-            catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception)
+            catch (Exception e) when (e is InvalidOperationException or Win32Exception)
             {
                 return 0;
             }
@@ -139,7 +141,7 @@ public sealed class LoggedProcess : IDisposable
         }
     }
 
-    public void SetDetachable(bool detachable) => _isDetachable = detachable;
+    public void SetDetachable(bool detachable) => isDetachable = detachable;
 
     /// <summary>Port of QProcess::start(program, args). Returns false when the process failed
     /// to start (the FailedToStart log line and state change are emitted like the C++
@@ -160,11 +162,11 @@ public sealed class LoggedProcess : IDisposable
 
         lock (_lock)
         {
-            _started = false;
-            _isAborting = false;
-            _exitCode = 0;
-            _leftoverLine = "";
-            _errLeftoverLine = "";
+            started = false;
+            isAborting = false;
+            exitCode = 0;
+            leftoverLine = "";
+            errLeftoverLine = "";
         }
 
         ChangeState(LoggedProcessState.Starting);
@@ -172,7 +174,7 @@ public sealed class LoggedProcess : IDisposable
         {
             _process.Start();
         }
-        catch (Exception e) when (e is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+        catch (Exception e) when (e is Win32Exception or IOException or InvalidOperationException)
         {
             ErrorString = e.Message;
             log.FailedToStart(ErrorString);
@@ -180,8 +182,8 @@ public sealed class LoggedProcess : IDisposable
             ChangeState(LoggedProcessState.FailedToStart);
             return false;
         }
-        _started = true;
-        _terminatedTcs = new TaskCompletionSource<LoggedProcessState>(TaskCreationOptions.RunContinuationsAsynchronously);
+        started = true;
+        terminatedTcs = new TaskCompletionSource<LoggedProcessState>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         // Declare Running BEFORE arming the exit continuation: a process that exits instantly
         // would otherwise have OnTerminated apply Finished and the late Running transition
@@ -237,12 +239,12 @@ public sealed class LoggedProcess : IDisposable
     /// <summary>Port of the kill() slot: equivalent to kill -9.</summary>
     public void Kill()
     {
-        _isAborting = true;
+        isAborting = true;
         try
         {
             _process.Kill(entireProcessTree: true);
         }
-        catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
+        catch (Exception e) when (e is InvalidOperationException or Win32Exception or NotSupportedException)
         {
             // already dead
         }
@@ -251,9 +253,9 @@ public sealed class LoggedProcess : IDisposable
     /// <summary>Waits for the process to exit; completes with the final LoggedProcessState.</summary>
     public async Task<LoggedProcessState> WaitForExitAsync(CancellationToken cancellationToken = default)
     {
-        if (!_started)
+        if (!started)
         {
-            return _state;
+            return state;
         }
         try
         {
@@ -263,26 +265,26 @@ public sealed class LoggedProcess : IDisposable
         {
             throw;
         }
-        catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (Exception e) when (e is InvalidOperationException or Win32Exception)
         {
         }
         // the process is gone, but OnTerminated applies the terminal state on its own
         // continuation — wait for it so callers always see Finished/Aborted here
-        if (_terminatedTcs is { } terminated)
+        if (terminatedTcs is { } terminated)
         {
             return await terminated.Task.ConfigureAwait(false);
         }
-        return _state;
+        return state;
     }
 
     public void Dispose()
     {
-        if (_disposed)
+        if (disposed)
         {
             return;
         }
-        _disposed = true;
-        if (_isDetachable)
+        disposed = true;
+        if (isDetachable)
         {
             // LoggedProcess::~LoggedProcess: pretend the process is gone so nothing reaps it
             ChangeState(LoggedProcessState.NotRunning);
@@ -312,24 +314,24 @@ public sealed class LoggedProcess : IDisposable
                 break;
             }
 
-            var decoder = isStdErr ? _errDecoder : _outDecoder;
+            var decoder = isStdErr ? errDecoder : outDecoder;
             var chars = new char[decoder!.GetCharCount(buffer, 0, read)];
             decoder.GetChars(buffer, 0, read, chars, 0);
             var str = new string(chars);
 
             lock (_lock)
             {
-                var existing = isStdErr ? _errLeftoverLine : _leftoverLine;
+                var existing = isStdErr ? errLeftoverLine : this.leftoverLine;
                 if (existing.Length != 0)
                 {
                     str = existing + str;
                     if (isStdErr)
                     {
-                        _errLeftoverLine = "";
+                        errLeftoverLine = "";
                     }
                     else
                     {
-                        _leftoverLine = "";
+                        this.leftoverLine = "";
                     }
                 }
 
@@ -339,11 +341,11 @@ public sealed class LoggedProcess : IDisposable
                 var leftoverLine = lines[^1];
                 if (isStdErr)
                 {
-                    _errLeftoverLine = leftoverLine;
+                    errLeftoverLine = leftoverLine;
                 }
                 else
                 {
-                    _leftoverLine = leftoverLine;
+                    this.leftoverLine = leftoverLine;
                 }
 
                 var complete = lines[..^1];
@@ -359,14 +361,14 @@ public sealed class LoggedProcess : IDisposable
         string finalLine;
         lock (_lock)
         {
-            finalLine = isStdErr ? _errLeftoverLine : _leftoverLine;
+            finalLine = isStdErr ? errLeftoverLine : leftoverLine;
             if (isStdErr)
             {
-                _errLeftoverLine = "";
+                errLeftoverLine = "";
             }
             else
             {
-                _leftoverLine = "";
+                leftoverLine = "";
             }
         }
         if (finalLine.Length != 0)
@@ -377,7 +379,7 @@ public sealed class LoggedProcess : IDisposable
 
     private void OnTerminated()
     {
-        if (!_started)
+        if (!started)
         {
             return;
         }
@@ -386,20 +388,20 @@ public sealed class LoggedProcess : IDisposable
         {
             exitCode = _process.ExitCode;
         }
-        catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (Exception e) when (e is InvalidOperationException or Win32Exception)
         {
             return;
         }
         lock (_lock)
         {
-            if (_exitCode == 0)
+            if (this.exitCode == 0)
             {
-                _exitCode = exitCode;
+                this.exitCode = exitCode;
             }
         }
 
         // based on state, send signals
-        if (!_isAborting)
+        if (!isAborting)
         {
             DiagLog.Exited(exitCode);
             Log?.Invoke([$"Process exited with code {exitCode}."], MessageLevel.Launcher);
@@ -411,16 +413,16 @@ public sealed class LoggedProcess : IDisposable
             Log?.Invoke(["Process was killed by user."], MessageLevel.Error);
             ChangeState(LoggedProcessState.Aborted);
         }
-        _terminatedTcs?.TrySetResult(_state);
+        terminatedTcs?.TrySetResult(state);
     }
 
     private void ChangeState(LoggedProcessState state)
     {
-        if (state == _state)
+        if (state == this.state)
         {
             return;
         }
-        _state = state;
+        this.state = state;
         DiagLog.StateChanged(state.ToString());
         StateChanged?.Invoke(state);
     }

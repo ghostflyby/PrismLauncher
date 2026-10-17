@@ -3,6 +3,7 @@
 // failure propagation, abort semantics, the proceed gate, substituteVariables and the
 // LaunchCommand step (real /bin/echo sub-process, LogPrePostOutput of a real command).
 
+using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Tasks;
@@ -205,7 +206,7 @@ public class StepEngineTests
             // into an explicit 409 instead of a silent no-op)
             Assert.False(task.IsWaitingForProceed);
             // and both gate edges are visible in the diagnostics channel
-            var launchCategory = Core.Diagnostics.LogCategories.Launch;
+            var launchCategory = LogCategories.Launch;
             Assert.True(sink.Has(LogLevel.Information, launchCategory, "ReadyForLaunch gate open"),
                 "gate opening should be logged");
             Assert.True(sink.Has(LogLevel.Information, launchCategory, "Proceed routed to step GatedStep"),

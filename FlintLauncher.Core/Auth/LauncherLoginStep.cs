@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/auth/steps/LauncherLoginStep.{h,cpp}.
+
+using System.Text.Json.Nodes;
+
 namespace FlintLauncher.Core.Auth;
 
 public sealed class LauncherLoginStep : AuthStep
@@ -23,7 +26,7 @@ public sealed class LauncherLoginStep : AuthStep
     {
         var url = _auth.MinecraftServices.TrimEnd('/') + "/launcher/login";
         var uhs = AccountData.GetString(ExtraValue("uhs"));
-        var xToken = Data.MojangServicesToken.Token_;
+        var xToken = Data.MojangServicesToken.Value;
 
         var mcAuthTemplate = "\n" + """
             {
@@ -63,7 +66,7 @@ public sealed class LauncherLoginStep : AuthStep
         EmitFinished(AccountTaskState.Working, "Got Minecraft access token");
     }
 
-    private System.Text.Json.Nodes.JsonNode? ExtraValue(string key)
+    private JsonNode? ExtraValue(string key)
     {
         return Data.MojangServicesToken.Extra.TryGetValue(key, out var value) ? value : null;
     }

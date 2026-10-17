@@ -4,6 +4,7 @@
 // rolling file provider opens its writer in its own constructor, BEFORE the runtime
 // assembly, so the WebHostBuilder catch can write the failure into Flint-0.log before
 // rethrowing (fail-fast preserved, but the last words are on disk).
+
 using FlintLauncher.Web;
 using Xunit;
 

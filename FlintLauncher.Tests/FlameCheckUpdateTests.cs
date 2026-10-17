@@ -3,14 +3,16 @@
 // (murmur2 hash + project/file ids), the stub returning a newer file -> update candidate
 // mapped (with the changelog fetched), and the blocked-update path (no download URL)
 // surfacing through checkFailed with the manual-download recover URL.
+
+using System.Security.Cryptography;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.ModPlatform;
-using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
+using FlintLauncher.Core.ModPlatform;
+using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Versioning;
-using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
 using Xunit;
+using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
 
 namespace Flint.Tests;
 
@@ -50,14 +52,14 @@ public class FlameCheckUpdateTests : IDisposable
 
         // installed metadata: the sha1 the CurseForge API reported when the file was
         // installed (the Flame branch of the metadata flow stores the API file hash)
-        var oldSha1 = Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(jarBytes))
+        var oldSha1 = Convert.ToHexString(SHA1.HashData(jarBytes))
             .ToLowerInvariant();
         var metadata = new PackwizModel.Mod
         {
             Slug = "test-mod",
             Name = "Test Mod",
             Filename = "test.jar",
-            Provider = ResourceProvider.FLAME,
+            Provider = ResourceProvider.Flame,
             ProjectId = "123",
             FileId = "456",
             VersionNumber = "1.0.0",
@@ -101,7 +103,7 @@ public class FlameCheckUpdateTests : IDisposable
         Assert.Equal("1.0.0", update.OldVersion);
         Assert.Equal("Test Mod 2.0", update.NewVersion);
         Assert.Equal(IndexedVersionTypeValue.Release, update.NewVersionType.Value);
-        Assert.Equal(ResourceProvider.FLAME, update.Provider);
+        Assert.Equal(ResourceProvider.Flame, update.Provider);
         Assert.Equal("789", update.Version.FileId);
         // the changelog was fetched from the API for the update record
         Assert.Equal("changelog text", update.Changelog);

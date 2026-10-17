@@ -9,7 +9,9 @@
 //    silently skipped like upstream's QFile::link returning false without surfacing an error).
 //  - Relative manifest file URLs are rejected (upstream hands them to QUrl/QNetworkAccessManager
 //    which would fail the request later); the meta server only issues absolute URLs.
+
 using System.Security.Cryptography;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
@@ -56,7 +58,7 @@ public sealed class ManifestDownloadTask : FlintTask
             doc = JsonNode.Parse(download.BodyAsString) as JsonObject
                 ?? throw new JsonParseException("Manifest root is not a JSON object");
         }
-        catch (Exception e) when (e is JsonParseException or System.Text.Json.JsonException)
+        catch (Exception e) when (e is JsonParseException or JsonException)
         {
             // qWarning() << "Error while parsing JSON response ..."
             EmitFailed(e.Message);

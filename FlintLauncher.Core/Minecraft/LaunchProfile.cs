@@ -2,19 +2,21 @@
 // Port of launcher/minecraft/LaunchProfile.{h,cpp}: the merged profile a set of version
 // patches is applied to. The Qt model/ProblemProvider plumbing is kept; only the UI-facing
 // getProblems() FIXME (always empty upstream as well) stays as-is.
+
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.Minecraft;
 
 public class LaunchProfile : ProblemProvider
 {
-    private string _minecraftVersion = "";
+    private string minecraftVersion = "";
 
     /// Release type - "release" or "snapshot"
-    private string _minecraftVersionType = "";
+    private string minecraftVersionType = "";
 
     /// Assets type - "legacy" or a version ID
-    private MojangAssetIndexInfo? _minecraftAssets;
+    private MojangAssetIndexInfo? minecraftAssets;
 
     /**
      * arguments that should be used for launching minecraft
@@ -22,7 +24,7 @@ public class LaunchProfile : ProblemProvider
      * ex: "--username ${auth_player_name} --session ${auth_session}
      *      --version ${version_name} --gameDir ${game_directory} --assetsDir ${game_assets}"
      */
-    private string _minecraftArguments = "";
+    private string minecraftArguments = "";
 
     /**
      * Additional arguments to pass to the JVM in addition to those the user has configured,
@@ -31,13 +33,13 @@ public class LaunchProfile : ProblemProvider
     private readonly List<string> _addnJvmArguments = [];
 
     /// A list of all tweaker classes
-    private List<string> _tweakers = [];
+    private List<string> tweakers = [];
 
     /// The main class to load first
-    private string _mainClass = "";
+    private string mainClass = "";
 
     /// The applet class, for some very old minecraft releases
-    private string _appletClass = "";
+    private string appletClass = "";
 
     /// the list of libraries
     private readonly List<Library> _libraries = [];
@@ -49,7 +51,7 @@ public class LaunchProfile : ProblemProvider
     private readonly List<Agent> _agents = [];
 
     /// the main jar
-    private Library? _mainJar;
+    private Library? mainJar;
 
     /// the list of native libraries
     private readonly List<Library> _nativeLibraries = [];
@@ -66,21 +68,21 @@ public class LaunchProfile : ProblemProvider
     /// compatible java major versions
     private readonly List<int> _compatibleJavaMajors = [];
 
-    private string _compatibleJavaName = "";
+    private string compatibleJavaName = "";
 
-    private ProblemSeverity _problemSeverity = ProblemSeverity.None;
+    private ProblemSeverity problemSeverity = ProblemSeverity.None;
 
     /// <summary>clear the profile</summary>
     public void Clear()
     {
-        _minecraftVersion = "";
-        _minecraftVersionType = "";
-        _minecraftAssets = null;
-        _minecraftArguments = "";
+        minecraftVersion = "";
+        minecraftVersionType = "";
+        minecraftAssets = null;
+        minecraftArguments = "";
         _addnJvmArguments.Clear();
-        _tweakers.Clear();
-        _mainClass = "";
-        _appletClass = "";
+        tweakers.Clear();
+        mainClass = "";
+        appletClass = "";
         _libraries.Clear();
         _mavenFiles.Clear();
         _agents.Clear();
@@ -88,8 +90,8 @@ public class LaunchProfile : ProblemProvider
         _jarMods.Clear();
         // NOTE upstream: clear() does not reset m_mods, m_nativeLibraries, m_compatibleJavaMajors
         // or m_compatibleJavaName — kept as-is
-        _mainJar = null;
-        _problemSeverity = ProblemSeverity.None;
+        mainJar = null;
+        problemSeverity = ProblemSeverity.None;
     }
 
     private static void ApplyString(string from, ref string to)
@@ -103,23 +105,23 @@ public class LaunchProfile : ProblemProvider
 
     // ------------------------------------------------------------- application of patches
 
-    public void ApplyMinecraftVersion(string id) => ApplyString(id, ref _minecraftVersion);
+    public void ApplyMinecraftVersion(string id) => ApplyString(id, ref minecraftVersion);
 
-    public void ApplyAppletClass(string appletClass) => ApplyString(appletClass, ref _appletClass);
+    public void ApplyAppletClass(string appletClass) => ApplyString(appletClass, ref this.appletClass);
 
-    public void ApplyMainClass(string mainClass) => ApplyString(mainClass, ref _mainClass);
+    public void ApplyMainClass(string mainClass) => ApplyString(mainClass, ref this.mainClass);
 
-    public void ApplyMinecraftArguments(string minecraftArguments) => ApplyString(minecraftArguments, ref _minecraftArguments);
+    public void ApplyMinecraftArguments(string minecraftArguments) => ApplyString(minecraftArguments, ref this.minecraftArguments);
 
     public void ApplyAddnJvmArguments(IReadOnlyList<string> addnJvmArguments) => _addnJvmArguments.AddRange(addnJvmArguments);
 
-    public void ApplyMinecraftVersionType(string type) => ApplyString(type, ref _minecraftVersionType);
+    public void ApplyMinecraftVersionType(string type) => ApplyString(type, ref minecraftVersionType);
 
     public void ApplyMinecraftAssets(MojangAssetIndexInfo? assets)
     {
         if (assets is not null)
         {
-            _minecraftAssets = assets;
+            minecraftAssets = assets;
         }
     }
 
@@ -132,7 +134,7 @@ public class LaunchProfile : ProblemProvider
     {
         // if the applied tweakers override an existing one, skip it. this effectively moves it later in the sequence
         var newTweakers = new List<string>();
-        foreach (var tweaker in _tweakers)
+        foreach (var tweaker in this.tweakers)
         {
             if (tweakers.Contains(tweaker))
             {
@@ -142,7 +144,7 @@ public class LaunchProfile : ProblemProvider
         }
         // then just append the new tweakers (or moved original ones)
         newTweakers.AddRange(tweakers);
-        _tweakers = newTweakers;
+        this.tweakers = newTweakers;
     }
 
     public void ApplyJarMods(IReadOnlyList<Library> jarMods) => _jarMods.AddRange(jarMods);
@@ -195,7 +197,7 @@ public class LaunchProfile : ProblemProvider
     {
         if (javaName.Length != 0)
         {
-            _compatibleJavaName = javaName;
+            compatibleJavaName = javaName;
         }
     }
 
@@ -263,44 +265,44 @@ public class LaunchProfile : ProblemProvider
     {
         if (jar is not null)
         {
-            _mainJar = jar;
+            mainJar = jar;
         }
     }
 
     public void ApplyProblemSeverity(ProblemSeverity severity)
     {
-        if (_problemSeverity < severity)
+        if (problemSeverity < severity)
         {
-            _problemSeverity = severity;
+            problemSeverity = severity;
         }
     }
 
     // ---------------------------------------------------------------- getters
 
-    public string GetMinecraftVersion() => _minecraftVersion;
+    public string GetMinecraftVersion() => minecraftVersion;
 
-    public string GetMainClass() => _mainClass;
+    public string GetMainClass() => mainClass;
 
-    public string GetAppletClass() => _appletClass;
+    public string GetAppletClass() => appletClass;
 
-    public string GetMinecraftVersionType() => _minecraftVersionType;
+    public string GetMinecraftVersionType() => minecraftVersionType;
 
     public MojangAssetIndexInfo GetMinecraftAssets()
     {
-        if (_minecraftAssets is null)
+        if (minecraftAssets is null)
         {
             return new MojangAssetIndexInfo("legacy");
         }
-        return _minecraftAssets;
+        return minecraftAssets;
     }
 
-    public string GetMinecraftArguments() => _minecraftArguments;
+    public string GetMinecraftArguments() => minecraftArguments;
 
     public IReadOnlyList<string> GetAddnJvmArguments() => _addnJvmArguments;
 
     public IReadOnlySet<string> GetTraits() => _traits;
 
-    public IReadOnlyList<string> GetTweakers() => _tweakers;
+    public IReadOnlyList<string> GetTweakers() => tweakers;
 
     public IReadOnlyList<Library> GetJarMods() => _jarMods;
 
@@ -314,9 +316,9 @@ public class LaunchProfile : ProblemProvider
 
     public IReadOnlyList<int> GetCompatibleJavaMajors() => _compatibleJavaMajors;
 
-    public string GetCompatibleJavaName() => _compatibleJavaName;
+    public string GetCompatibleJavaName() => compatibleJavaName;
 
-    public Library? GetMainJar() => _mainJar;
+    public Library? GetMainJar() => mainJar;
 
     public bool HasTrait(string trait) => _traits.Contains(trait);
 
@@ -338,16 +340,16 @@ public class LaunchProfile : ProblemProvider
             lib.GetApplicableFiles(runtimeContext, jars, nativeJars, native32, native64, overridePath, storageBase);
         }
         // NOTE: order is important here, add main jar last to the lists
-        if (_mainJar is not null)
+        if (mainJar is not null)
         {
             // FIXME: HACK!! jar modding is weird and unsystematic!
             if (_jarMods.Count != 0 && addJarMods)
             {
-                jars.Add(Path.GetFullPath(IO.FileSystem.PathCombine(tempPath, "minecraft.jar")));
+                jars.Add(Path.GetFullPath(FileSystem.PathCombine(tempPath, "minecraft.jar")));
             }
             else
             {
-                _mainJar.GetApplicableFiles(runtimeContext, jars, nativeJars, native32, native64, overridePath, storageBase);
+                mainJar.GetApplicableFiles(runtimeContext, jars, nativeJars, native32, native64, overridePath, storageBase);
             }
         }
         foreach (var lib in GetNativeLibraries())
@@ -364,7 +366,7 @@ public class LaunchProfile : ProblemProvider
         }
     }
 
-    public override ProblemSeverity GetProblemSeverity() => _problemSeverity;
+    public override ProblemSeverity GetProblemSeverity() => problemSeverity;
 
     public override IReadOnlyList<PatchProblem> GetProblems()
     {

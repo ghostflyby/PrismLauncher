@@ -2,6 +2,7 @@
 // Port of launcher/JavaCommon.{h,cpp} (the pure logic; the Qt dialogs are UI-layer and left for
 // the UI phase). CheckJvmArgs is the "JVM args sanity" check. The TestCheck two-pass flow died
 // with the JavaCheck.jar retirement: it had no production consumer in the headless core.
+
 using System.Text.RegularExpressions;
 
 namespace FlintLauncher.Core.Java;

@@ -3,6 +3,8 @@
 // the BuildJavaJars MSBuild target (javac/jar via Exec) and embedded into this assembly).
 // Extracted to the per-user temp cache so LauncherJars finds them without any external
 // installation layout.
+
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Launch;
 
 namespace FlintLauncher.Core.Java;
@@ -11,7 +13,7 @@ public static class EmbeddedJars
 {
     /// <summary>Extraction target: &lt;temp&gt;/Flint/jars/&lt;name&gt;.jar.</summary>
     public static string CacheDir { get; } =
-        IO.FileSystem.PathCombine(Path.GetTempPath(), "Flint", "jars");
+        FileSystem.PathCombine(Path.GetTempPath(), "Flint", "jars");
 
     private static readonly string[] JarNames =
     [
@@ -40,7 +42,7 @@ public static class EmbeddedJars
         }
 
         // 2) already extracted to the cache and still present
-        var cached = IO.FileSystem.PathCombine(CacheDir, jarFileName);
+        var cached = FileSystem.PathCombine(CacheDir, jarFileName);
         if (File.Exists(cached))
         {
             return cached;
@@ -54,7 +56,7 @@ public static class EmbeddedJars
         {
             return "";
         }
-        IO.FileSystem.EnsureFilePathExists(cached);
+        FileSystem.EnsureFilePathExists(cached);
         using (var target = File.Create(cached))
         {
             stream.CopyTo(target);
@@ -68,14 +70,14 @@ public static class EmbeddedJars
         var candidates = new List<string>();
         if (OperatingSystem.IsLinux() || OperatingSystem.IsFreeBSD())
         {
-            candidates.Add(IO.FileSystem.PathCombine(root, "share",
+            candidates.Add(FileSystem.PathCombine(root, "share",
                 FlintConfig.Default.LauncherName));
         }
-        candidates.Add(IO.FileSystem.PathCombine(root, "jars"));
-        candidates.Add(IO.FileSystem.PathCombine(AppContext.BaseDirectory, "jars"));
+        candidates.Add(FileSystem.PathCombine(root, "jars"));
+        candidates.Add(FileSystem.PathCombine(AppContext.BaseDirectory, "jars"));
         foreach (var dir in candidates)
         {
-            var path = IO.FileSystem.PathCombine(dir, jarFileName);
+            var path = FileSystem.PathCombine(dir, jarFileName);
             if (File.Exists(path))
             {
                 return path;

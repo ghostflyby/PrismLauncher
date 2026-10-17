@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of tests/JavaVersion_test.cpp.
+
 using FlintLauncher.Core.Java;
 using Xunit;
 

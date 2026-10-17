@@ -3,6 +3,8 @@
 // GetModDependenciesTask / ModUpdateTask): the typed user layer (a real FlintConfigStore,
 // seeded with the same values the former in-memory stub registered) and a builder that
 // stamps a mc version + mod loader onto the instance's pack profile.
+
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft;
 
@@ -24,8 +26,8 @@ internal sealed class ModInstallTestEnv : IDisposable
     {
         // D4: the typed instance adapter over the env root (instance.json)
         var instance = new MinecraftInstance(
-            new FlintLauncher.Core.Config.InstanceJsonSettingsObject(_root, _global.Environment), _root);
-        _ = instance.Settings(); // force the specific-settings load, like the C++ first touch
+            new InstanceJsonSettingsObject(_root, _global.Environment), _root);
+        _ = instance.Settings; // force the specific-settings load, like the C++ first touch
         var profile = instance.GetPackProfile();
         profile.AppendComponent(new Component(profile, "net.minecraft") { CachedVersion = mcVersion });
         profile.AppendComponent(new Component(profile, LoaderUid(loader)) { CachedVersion = loaderVersion });

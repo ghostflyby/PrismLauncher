@@ -2,6 +2,7 @@
 // Tests for the mod-list export: the exact templates of the C++ ExportToModList for the
 // HTML/Markdown/plain-text/JSON/CSV formats (with every OptionalData flag) and the custom
 // line-template format, including the metadata-version fallback and the escaping rules.
+
 using FlintLauncher.Core.ModPlatform.Helpers;
 using Xunit;
 
@@ -154,12 +155,12 @@ public class ExportToModListTests
     [Fact]
     public void ExportDispatchesToEachFormat()
     {
-        Assert.Equal(ExportToModList.ToHtml(Mods, All), ExportToModList.ExportModsToString(Mods, ModListFormat.HTML, All));
-        Assert.Equal(ExportToModList.ToMarkdown(Mods, All), ExportToModList.ExportModsToString(Mods, ModListFormat.MARKDOWN, All));
-        Assert.Equal(ExportToModList.ToPlainTxt(Mods, All), ExportToModList.ExportModsToString(Mods, ModListFormat.PLAINTXT, All));
-        Assert.Equal(ExportToModList.ToJson(Mods, All), ExportToModList.ExportModsToString(Mods, ModListFormat.JSON, All));
-        Assert.Equal(ExportToModList.ToCsv(Mods, All), ExportToModList.ExportModsToString(Mods, ModListFormat.CSV, All));
-        Assert.Equal("unknown format:5", ExportToModList.ExportModsToString(Mods, ModListFormat.CUSTOM, All));
+        Assert.Equal(ExportToModList.ToHtml(Mods, All), ExportToModList.ExportModsToString(Mods, ModListFormat.Html, All));
+        Assert.Equal(ExportToModList.ToMarkdown(Mods, All), ExportToModList.ExportModsToString(Mods, ModListFormat.Markdown, All));
+        Assert.Equal(ExportToModList.ToPlainTxt(Mods, All), ExportToModList.ExportModsToString(Mods, ModListFormat.Plaintxt, All));
+        Assert.Equal(ExportToModList.ToJson(Mods, All), ExportToModList.ExportModsToString(Mods, ModListFormat.Json, All));
+        Assert.Equal(ExportToModList.ToCsv(Mods, All), ExportToModList.ExportModsToString(Mods, ModListFormat.Csv, All));
+        Assert.Equal("unknown format:5", ExportToModList.ExportModsToString(Mods, ModListFormat.Custom, All));
     }
 
     [Fact]

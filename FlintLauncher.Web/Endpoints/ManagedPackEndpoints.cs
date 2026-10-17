@@ -8,6 +8,7 @@
 // recorded ManagedPackVersionID — the same resolution the mod install flow uses, lifted one
 // level. atlauncher/ftb (and unmanaged instances) return 400 not_supported: the port has no
 // pack-level update path for them (their C++ flows re-download the pack instance).
+
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform;
@@ -35,16 +36,16 @@ public static class ManagedPackEndpoints
                 return Results.Ok(new ManagedPackView(
                     instance.IsManagedPack(),
                     instance.GetManagedPackType(),
-                    instance.GetManagedPackID(),
+                    instance.GetManagedPackId(),
                     instance.GetManagedPackName(),
-                    instance.GetManagedPackVersionID(),
+                    instance.GetManagedPackVersionId(),
                     instance.GetManagedPackVersionName()));
             }
             finally
             {
                 runtime.InstanceLock.Release();
             }
-        }).Produces<ManagedPackView>(200);
+        }).Produces<ManagedPackView>();
 
         api.MapPost("/instances/{ref}/managedpack/update-check", async (string @ref,
             HttpContext httpContext, LauncherRuntime runtime) =>
@@ -78,8 +79,8 @@ public static class ManagedPackEndpoints
                 }
 
                 var provider = type == ModPlatformTasks.FlameKey
-                    ? ResourceProvider.FLAME
-                    : ResourceProvider.MODRINTH;
+                    ? ResourceProvider.Flame
+                    : ResourceProvider.Modrinth;
                 var loadersList = profile.GetModLoadersList();
                 var resolver = new ModSelectionResolver(new McVersion(mcVersion),
                     profile.GetModLoaders() ?? ModLoaderType.None, loadersList, runtime.Modrinth, runtime.Flame);
@@ -88,7 +89,7 @@ public static class ManagedPackEndpoints
                 {
                     // the pack-level analogue of the provider CheckUpdate pass: resolve the
                     // pack project's latest matching version (empty versionId = latest)
-                    (_, latest) = await resolver.ResolveAsync(provider, instance.GetManagedPackID(),
+                    (_, latest) = await resolver.ResolveAsync(provider, instance.GetManagedPackId(),
                         "", httpContext.RequestAborted);
                 }
                 catch (ModResolveException e)
@@ -96,7 +97,7 @@ public static class ManagedPackEndpoints
                     return ApiJson.Error("update_check_failed", e.Message, 502);
                 }
 
-                var currentVersion = instance.GetManagedPackVersionID();
+                var currentVersion = instance.GetManagedPackVersionId();
                 var latestVersion = latest.FileId;
                 return Results.Ok(new ManagedPackUpdateResponse(
                     currentVersion,
@@ -107,6 +108,6 @@ public static class ManagedPackEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).Produces<ManagedPackUpdateResponse>(200);
+        }).Produces<ManagedPackUpdateResponse>();
     }
 }

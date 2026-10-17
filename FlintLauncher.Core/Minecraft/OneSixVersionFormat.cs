@@ -4,6 +4,7 @@
 // The QJsonDocument wrapper of versionFileFromJson is replaced by a JsonObject parameter (the
 // "document is empty or null" branch cannot trigger for an object); the upstream bug where
 // versionFileToJson serializes jarMods into the "mods" array is preserved and marked.
+
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Java;
@@ -80,11 +81,8 @@ public static partial class OneSixVersionFormat
             {
                 outInfo.Order = JsonUtils.RequireInteger(root, "order", "Value");
             }
-            else
-            {
-                // FIXME upstream: evaluate if we don't want to throw exceptions here instead
-                // qCritical() << filename << "doesn't contain an order field";
-            }
+            // FIXME upstream: evaluate if we don't want to throw exceptions here instead
+            // qCritical() << filename << "doesn't contain an order field";
         }
 
         outInfo.Name = root.StringOr("name");
@@ -383,7 +381,7 @@ public static partial class OneSixVersionFormat
         }
         if (!patch.Requires.IsEmpty)
         {
-            MetaJsonFormat.SerializeRequires(root, patch.Requires, "requires");
+            MetaJsonFormat.SerializeRequires(root, patch.Requires);
         }
         if (!patch.Conflicts.IsEmpty)
         {

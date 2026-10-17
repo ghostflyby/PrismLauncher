@@ -10,12 +10,13 @@
 // ISecretStore (C4 — flint.json carries no secret fields); GET serves the stored values so
 // the wire contract is unchanged for the host.
 
+using System.Text.Json;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Icons;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Settings;
-using System.Text.Json;
 using FlintLauncher.Web.Models;
+using FlintLauncher.Web.OpenApi;
 using FlintLauncher.Web.Services;
 
 namespace FlintLauncher.Web.Endpoints;
@@ -176,7 +177,7 @@ public static class SettingsAndIconsEndpoints
                 groups[group] = values;
             }
             return Results.Ok(new SettingsGroupsResponse(groups));
-        }).Produces<SettingsGroupsResponse>(200);
+        }).Produces<SettingsGroupsResponse>();
 
         api.MapPut("/settings", (LauncherRuntime runtime, GlobalSettingsPutRequest? body) =>
         {
@@ -194,7 +195,7 @@ public static class SettingsAndIconsEndpoints
                         $"key '{prop.Name}' is not part of group '{body.Group}'", 400);
                 }
                 var value = TypedValue(
-                    prop.Value.ValueKind == JsonValueKind.Null ? "" : (object?)prop.Value.Clone(),
+                    prop.Value.ValueKind == JsonValueKind.Null ? "" : prop.Value.Clone(),
                     FlintConfigKeys.Default(prop.Name));
                 if (FlintConfigKeys.IsSecret(prop.Name))
                 {
@@ -232,7 +233,7 @@ public static class SettingsAndIconsEndpoints
             return Results.Ok(icons.Entries()
                 .Select(entry => new IconView(entry.Key, entry.DisplayName))
                 .ToArray());
-        }).Produces<IconView[]>(200);
+        }).Produces<IconView[]>();
 
         api.MapPost("/icons", async (HttpRequest request, IconPool icons) =>
         {
@@ -262,7 +263,7 @@ public static class SettingsAndIconsEndpoints
                 installed.Add(name);
             }
             return Results.Ok(new IconInstalledResponse(installed[0]));
-        }).WithMetadata(new OpenApi.FormUploadMarker("multipart form: icon file (png/jpg/svg)")).Produces<IconInstalledResponse>(200);
+        }).WithMetadata(new FormUploadMarker("multipart form: icon file (png/jpg/svg)")).Produces<IconInstalledResponse>();
 
         api.MapDelete("/icons/{key}", (string key, IconPool icons) =>
             icons.Delete(key)
@@ -304,7 +305,7 @@ public static class SettingsAndIconsEndpoints
             instance.SetIconKey(key);
             instance.SaveNow();
             return Results.NoContent();
-        }).WithMetadata(new OpenApi.FormUploadMarker("multipart form: icon file, or form field iconKey referencing an installed icon")).Produces(204);
+        }).WithMetadata(new FormUploadMarker("multipart form: icon file, or form field iconKey referencing an installed icon")).Produces(204);
     }
 
     /// <summary>Coerce the incoming JSON value to the declared default's kind, like the

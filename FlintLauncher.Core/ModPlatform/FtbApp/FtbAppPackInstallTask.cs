@@ -6,6 +6,8 @@
 //
 // Deviation: downloadFiles() (the P5 update pipeline) is not ported; creation succeeds
 // without fetching game files, like the other creation tasks.
+
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
@@ -43,17 +45,17 @@ public sealed class FtbAppPackInstallTask : InstanceTask
 
         // D4: the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
-            new Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
+            new InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution.")),
             StagingPath);
 
-        instance.Settings().Set("totalTimePlayed", _pack.TotalPlayTime / 1000);
+        instance.Settings.Set("totalTimePlayed", _pack.TotalPlayTime / 1000);
 
         if (_pack.JvmArgs.Length != 0)
         {
             // C7: writing JvmArgs sets the instance-layer member, which IS the override (the
             // derived OverrideJavaArgs gate reads true; no separate gate write exists)
-            instance.Settings().Set("JvmArgs", _pack.JvmArgs);
+            instance.Settings.Set("JvmArgs", _pack.JvmArgs);
         }
 
         var components = instance.GetPackProfile();
@@ -76,8 +78,6 @@ public sealed class FtbAppPackInstallTask : InstanceTask
                     break;
                 case ModLoaderType.Quilt:
                     await components.SetComponentVersion("org.quiltmc.quilt-loader", _pack.LoaderVersion, important: true, cancellationToken);
-                    break;
-                default:
                     break;
             }
         }

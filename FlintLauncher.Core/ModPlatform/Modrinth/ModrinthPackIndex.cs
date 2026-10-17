@@ -2,9 +2,11 @@
 // Port of modplatform/modrinth/ModrinthPackIndex.{h,cpp}: load Modrinth project/version
 // JSON documents into the provider-neutral ModIndex models. The .mrpack (modrinth.index.json)
 // parsing lives in ModrinthInstanceCreationTask.ParseManifest, like upstream.
+
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
+using FlintLauncher.Core.Minecraft;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
@@ -22,7 +24,7 @@ public static class ModrinthPackIndex
             pack.AddonId = obj.RequireString("id");
         }
 
-        pack.Provider = ResourceProvider.MODRINTH;
+        pack.Provider = ResourceProvider.Modrinth;
         pack.Name = obj.RequireString("title");
         pack.ResourceType = ModrinthApi.GetResourceType(obj.GetPropertySafe("project_type").AsString() ?? "");
         if ((obj.TryGetArrayContains("loaders", "datapack")) ||
@@ -44,7 +46,7 @@ public static class ModrinthPackIndex
             var modAuthor = new ModpackAuthor
             {
                 Name = author.AsString() ?? "",
-                Url = ModrinthApi.GetAuthorURL(author.AsString() ?? ""),
+                Url = ModrinthApi.GetAuthorUrl(author.AsString() ?? ""),
             };
             pack.Authors = [modAuthor];
         }
@@ -125,12 +127,12 @@ public static class ModrinthPackIndex
         {
             switch (loader.AsString())
             {
-                case "neoforge": file.Loaders |= Minecraft.ModLoaderType.NeoForge; break;
-                case "forge": file.Loaders |= Minecraft.ModLoaderType.Forge; break;
-                case "cauldron": file.Loaders |= Minecraft.ModLoaderType.Cauldron; break;
-                case "liteloader": file.Loaders |= Minecraft.ModLoaderType.LiteLoader; break;
-                case "fabric": file.Loaders |= Minecraft.ModLoaderType.Fabric; break;
-                case "quilt": file.Loaders |= Minecraft.ModLoaderType.Quilt; break;
+                case "neoforge": file.Loaders |= ModLoaderType.NeoForge; break;
+                case "forge": file.Loaders |= ModLoaderType.Forge; break;
+                case "cauldron": file.Loaders |= ModLoaderType.Cauldron; break;
+                case "liteloader": file.Loaders |= ModLoaderType.LiteLoader; break;
+                case "fabric": file.Loaders |= ModLoaderType.Fabric; break;
+                case "quilt": file.Loaders |= ModLoaderType.Quilt; break;
             }
         }
         file.Version = obj.RequireString("name");
@@ -156,11 +158,11 @@ public static class ModrinthPackIndex
 
                 dependency.Type = depType switch
                 {
-                    "required" => new DependencyType(DependencyTypeValue.REQUIRED),
-                    "optional" => new DependencyType(DependencyTypeValue.OPTIONAL),
-                    "incompatible" => new DependencyType(DependencyTypeValue.INCOMPATIBLE),
-                    "embedded" => new DependencyType(DependencyTypeValue.EMBEDDED),
-                    _ => new DependencyType(DependencyTypeValue.UNKNOWN),
+                    "required" => new DependencyType(DependencyTypeValue.Required),
+                    "optional" => new DependencyType(DependencyTypeValue.Optional),
+                    "incompatible" => new DependencyType(DependencyTypeValue.Incompatible),
+                    "embedded" => new DependencyType(DependencyTypeValue.Embedded),
+                    _ => new DependencyType(DependencyTypeValue.Unknown),
                 };
 
                 file.Dependencies.Add(dependency);
@@ -215,7 +217,7 @@ public static class ModrinthPackIndex
             }
             else
             {
-                var hashTypes = ProviderCapabilities.HashType(ResourceProvider.MODRINTH);
+                var hashTypes = ProviderCapabilities.HashType(ResourceProvider.Modrinth);
                 foreach (var hashType in hashTypes)
                 {
                     if (hashList.GetPropertySafe(hashType) is { } hash)

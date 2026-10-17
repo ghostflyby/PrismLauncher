@@ -5,7 +5,9 @@
 // <Generations> kept. Every line is flushed (the C++ flushes per message too). An
 // unwritable directory must not take the launcher down: the C++ shows a fatal dialog, the
 // port degrades to console-only logging.
+
 using System.Globalization;
+using System.Security;
 
 namespace FlintLauncher.Web.Logging;
 
@@ -37,7 +39,7 @@ public sealed class RollingFileLoggerProvider : ILoggerProvider
             };
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                  or System.Security.SecurityException or NotSupportedException)
+                                  or SecurityException or NotSupportedException)
         {
             _writer = null;
         }

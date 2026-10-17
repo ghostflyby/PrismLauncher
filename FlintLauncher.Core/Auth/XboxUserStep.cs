@@ -37,7 +37,7 @@ public sealed class XboxUserStep : AuthStep
                 "TokenType": "JWT"
             }
             """ + "\n";
-        var xboxAuthData = xboxAuthTemplate.Replace("%1", Data.MsaToken.Token_);
+        var xboxAuthData = xboxAuthTemplate.Replace("%1", Data.MsaToken.Value);
 
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
         {

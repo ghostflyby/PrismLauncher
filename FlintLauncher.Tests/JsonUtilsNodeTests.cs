@@ -2,9 +2,11 @@
 // Number/kind semantics of the JsonNode Require*/Ensure* family (the single read model since
 // the element dual track retired) — especially around numbers (int truncation, double
 // rejection in RequireInteger, string numbers NOT coerced).
+
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 using Xunit;
+using Xunit.Sdk;
 
 namespace FlintLauncher.Tests;
 
@@ -13,7 +15,7 @@ public class JsonUtilsNodeTests
     private static JsonNode? Parse(string json) => JsonNode.Parse(json);
 
     private static JsonNode Object(string json) =>
-        Parse(json) ?? throw new Xunit.Sdk.XunitException("not an object");
+        Parse(json) ?? throw new XunitException("not an object");
 
     [Theory]
     [InlineData("""{"n":42}""", 42)]
@@ -91,9 +93,9 @@ public class JsonUtilsNodeTests
         Assert.Throws<JsonParseException>(() => JsonUtils.RequireBoolean(obj["n"], "n"));
         Assert.Throws<JsonParseException>(() => JsonUtils.RequireDouble(obj["s"], "s"));
         Assert.Throws<JsonParseException>(() => JsonUtils.RequireBoolean(obj["z"], "z"));
-        Assert.Throws<JsonParseException>(() => JsonUtils.RequireDouble(missing(obj), "nope"));
+        Assert.Throws<JsonParseException>(() => JsonUtils.RequireDouble(Missing(obj), "nope"));
 
-        static JsonNode? missing(JsonNode o) => o["nope"];
+        static JsonNode? Missing(JsonNode o) => o["nope"];
     }
 
     [Fact]
@@ -129,5 +131,5 @@ public class JsonUtilsNodeTests
         Assert.Equal("index is not a double", nullValue.Message);
     }
 
-    private static JsonNode? missing(JsonNode o) => o["nope"];
+    private static JsonNode? Missing(JsonNode o) => o["nope"];
 }

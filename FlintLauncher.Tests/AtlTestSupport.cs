@@ -3,6 +3,7 @@
 // HttpListener pattern, see ModrinthTestSupport) serving packsnew.json, share-codes,
 // per-version Configs.json/Configs.zip and mod downloads, plus a synthetic pack fixture
 // (Configs.json + Configs.zip + mod payloads with real md5/sha1 checksums).
+
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -195,7 +196,7 @@ internal sealed class AtlPackFixture
             Directory.CreateDirectory(Path.Combine(srcDir, "config"));
             File.WriteAllText(Path.Combine(srcDir, "config", "test.cfg"), fixture.ConfigTxt);
             var zipPath = Path.Combine(srcDir, "Configs.zip");
-            Assert.True(MMCZip.CompressDir(zipPath, srcDir));
+            Assert.True(MmcZip.CompressDir(zipPath, srcDir));
             fixture.ConfigsZipBytes = File.ReadAllBytes(zipPath);
         }
         finally
@@ -211,7 +212,7 @@ internal sealed class AtlPackFixture
         fixture.ConfigsSha1 = Convert.ToHexString(SHA1.HashData(fixture.ConfigsZipBytes)).ToLowerInvariant();
 
         var mods = new JsonArray(
-            (JsonNode?)new JsonObject
+            new JsonObject
             {
                 ["name"] = "Required Mod",
                 ["version"] = "1.0",
@@ -224,7 +225,7 @@ internal sealed class AtlPackFixture
                 ["optional"] = false,
                 ["description"] = "A required mod",
             },
-            (JsonNode?)new JsonObject
+            new JsonObject
             {
                 ["name"] = "Optional Selected",
                 ["version"] = "1.0",
@@ -238,7 +239,7 @@ internal sealed class AtlPackFixture
                 ["selected"] = false,
                 ["description"] = "An optional mod the user picks",
             },
-            (JsonNode?)new JsonObject
+            new JsonObject
             {
                 ["name"] = "Optional Unselected",
                 ["version"] = "1.0",
@@ -251,7 +252,7 @@ internal sealed class AtlPackFixture
                 ["optional"] = true,
                 ["selected"] = false,
             },
-            (JsonNode?)new JsonObject
+            new JsonObject
             {
                 ["name"] = "Legacy Jar Mod",
                 ["version"] = "1.0",

@@ -11,6 +11,9 @@
 //                    of the Prism bare metacache ledger.
 // The profiles share the S3 decision records (state/migration/<source>.json), so both are
 // one-shot decisions a host can display.
+
+using System.Globalization;
+using System.Security;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.IO;
 
@@ -323,7 +326,7 @@ public static class FlintLegacyMigration
                 {
                     Source = FlintLegacyMigrationProfile.ProfileName,
                     Decision = MigrationDecisionRecord.Imported,
-                    At = DateTimeOffset.Now.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+                    At = DateTimeOffset.Now.ToString("o", CultureInfo.InvariantCulture),
                     Mode = "move",
                     Instances = Directory.Exists(Path.Combine(paths.DataRoot, "instances"))
                         ? Directory.EnumerateDirectories(Path.Combine(paths.DataRoot, "instances")).Count()
@@ -332,7 +335,7 @@ public static class FlintLegacyMigration
                 });
             }
             catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException
-                                     or NotSupportedException or System.Security.SecurityException)
+                                     or NotSupportedException or SecurityException)
             {
             }
         }
@@ -442,7 +445,7 @@ public static class FlintLegacyMigration
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                      or ArgumentException or NotSupportedException
-                                     or System.Security.SecurityException)
+                                     or SecurityException)
         {
             // no record — the next startup resumes the idempotent merge (destination
             // exists → skip), which is the honest outcome of a half-done remount

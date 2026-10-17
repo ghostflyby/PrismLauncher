@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
+
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FlintLauncher.Core.Config;
+using FlintLauncher.Core.Migration;
+using FlintLauncher.Core.Secrets;
+using FlintLauncher.Core.State;
+using FlintLauncher.Core.Store;
+using FlintLauncher.Web.Endpoints;
 using FlintLauncher.Web.Models;
 
 namespace FlintLauncher.Web;
@@ -132,60 +139,60 @@ namespace FlintLauncher.Web;
 // collection roots for the Technic list endpoints (standalone arrays are NOT auto-generated)
 [JsonSerializable(typeof(TechnicSearchResultView[]))]
 // migration layer (Prism→Flint import): request body + plan items
-[JsonSerializable(typeof(Endpoints.PrismImportRequest))]
-[JsonSerializable(typeof(Endpoints.PrismDeclineRequest))]
-[JsonSerializable(typeof(Core.Migration.PrismSourceDetector.PrismSourceCandidate[]))]
-[JsonSerializable(typeof(Endpoints.PrismImportPlanResponse))]
-[JsonSerializable(typeof(Endpoints.PrismImportDryRunResponse))]
-[JsonSerializable(typeof(Core.Migration.PrismImportPlanItem))]
+[JsonSerializable(typeof(PrismImportRequest))]
+[JsonSerializable(typeof(PrismDeclineRequest))]
+[JsonSerializable(typeof(PrismSourceDetector.PrismSourceCandidate[]))]
+[JsonSerializable(typeof(PrismImportPlanResponse))]
+[JsonSerializable(typeof(PrismImportDryRunResponse))]
+[JsonSerializable(typeof(PrismImportPlanItem))]
 // migration decision records (STATE S3) — TypedJsonFile root
-[JsonSerializable(typeof(Core.Migration.MigrationDecisionRecord))]
+[JsonSerializable(typeof(MigrationDecisionRecord))]
 // store completeness (CACHE E5): the derived {complete, missing[], bytes} report
-[JsonSerializable(typeof(Core.Store.StoreStatusReport))]
+[JsonSerializable(typeof(StoreStatusReport))]
 // launcher-state.json (STATE S5) — TypedJsonFile roots
-[JsonSerializable(typeof(Core.State.LauncherState))]
-[JsonSerializable(typeof(Core.State.PlaytimeState))]
-[JsonSerializable(typeof(Core.State.JavaDetectState))]
-[JsonSerializable(typeof(Core.State.JavaDetectEntry))]
-[JsonSerializable(typeof(Core.State.UiState))]
+[JsonSerializable(typeof(LauncherState))]
+[JsonSerializable(typeof(PlaytimeState))]
+[JsonSerializable(typeof(JavaDetectState))]
+[JsonSerializable(typeof(JavaDetectEntry))]
+[JsonSerializable(typeof(UiState))]
 // secrets.json (CONFIG C4) — TypedJsonFile root
-[JsonSerializable(typeof(Core.Secrets.SecretsFile))]
+[JsonSerializable(typeof(SecretsFile))]
 // flint.json (CONFIG C5) — TypedJsonFile root: the record domain full set (§2.2 finalized).
 // A missing root here is a RUNTIME 500, not a compile error (AOT red line)
-[JsonSerializable(typeof(Core.Config.FlintConfigFile))]
-[JsonSerializable(typeof(Core.Config.LauncherConfig))]
-[JsonSerializable(typeof(Core.Config.ConsoleConfig))]
-[JsonSerializable(typeof(Core.Config.GameTimeConfig))]
-[JsonSerializable(typeof(Core.Config.WindowConfig))]
-[JsonSerializable(typeof(Core.Config.MemoryConfig))]
-[JsonSerializable(typeof(Core.Config.PerformanceConfig))]
-[JsonSerializable(typeof(Core.Config.NativeLibConfig))]
-[JsonSerializable(typeof(Core.Config.CommandsConfig))]
-[JsonSerializable(typeof(Core.Config.MinecraftMiscConfig))]
-[JsonSerializable(typeof(Core.Config.ModDownloadConfig))]
-[JsonSerializable(typeof(Core.Config.JavaConfig))]
-[JsonSerializable(typeof(Core.Config.DirsConfig))]
-[JsonSerializable(typeof(Core.Config.LanguageConfig))]
-[JsonSerializable(typeof(Core.Config.MirrorConfig))]
-[JsonSerializable(typeof(Core.Config.ProxyConfig))]
-[JsonSerializable(typeof(Core.Config.ApiConfig))]
-[JsonSerializable(typeof(Core.Config.ToolsConfig))]
+[JsonSerializable(typeof(FlintConfigFile))]
+[JsonSerializable(typeof(LauncherConfig))]
+[JsonSerializable(typeof(ConsoleConfig))]
+[JsonSerializable(typeof(GameTimeConfig))]
+[JsonSerializable(typeof(WindowConfig))]
+[JsonSerializable(typeof(MemoryConfig))]
+[JsonSerializable(typeof(PerformanceConfig))]
+[JsonSerializable(typeof(NativeLibConfig))]
+[JsonSerializable(typeof(CommandsConfig))]
+[JsonSerializable(typeof(MinecraftMiscConfig))]
+[JsonSerializable(typeof(ModDownloadConfig))]
+[JsonSerializable(typeof(JavaConfig))]
+[JsonSerializable(typeof(DirsConfig))]
+[JsonSerializable(typeof(LanguageConfig))]
+[JsonSerializable(typeof(MirrorConfig))]
+[JsonSerializable(typeof(ProxyConfig))]
+[JsonSerializable(typeof(ApiConfig))]
+[JsonSerializable(typeof(ToolsConfig))]
 // instance.json (DATA D4) — TypedJsonFile root: the record domain full set. A missing root
 // here is a RUNTIME 500, not a compile error (AOT red line)
-[JsonSerializable(typeof(Core.Config.InstanceConfigFile))]
-[JsonSerializable(typeof(Core.Config.InstanceIdentityConfig))]
-[JsonSerializable(typeof(Core.Config.InstanceLaunchConfig))]
-[JsonSerializable(typeof(Core.Config.InstanceJavaConfig))]
-[JsonSerializable(typeof(Core.Config.InstanceMemoryConfig))]
-[JsonSerializable(typeof(Core.Config.InstanceWindowConfig))]
-[JsonSerializable(typeof(Core.Config.InstanceCommandsConfig))]
-[JsonSerializable(typeof(Core.Config.InstancePerformanceConfig))]
-[JsonSerializable(typeof(Core.Config.InstanceNativeLibConfig))]
-[JsonSerializable(typeof(Core.Config.InstanceManagedConfig))]
-[JsonSerializable(typeof(Core.Config.InstanceExportConfig))]
-[JsonSerializable(typeof(Core.Config.InstanceMiscConfig))]
-[JsonSerializable(typeof(Core.Config.InstanceConsoleConfig))]
-[JsonSerializable(typeof(Core.Config.InstanceGameTimeConfig))]
+[JsonSerializable(typeof(InstanceConfigFile))]
+[JsonSerializable(typeof(InstanceIdentityConfig))]
+[JsonSerializable(typeof(InstanceLaunchConfig))]
+[JsonSerializable(typeof(InstanceJavaConfig))]
+[JsonSerializable(typeof(InstanceMemoryConfig))]
+[JsonSerializable(typeof(InstanceWindowConfig))]
+[JsonSerializable(typeof(InstanceCommandsConfig))]
+[JsonSerializable(typeof(InstancePerformanceConfig))]
+[JsonSerializable(typeof(InstanceNativeLibConfig))]
+[JsonSerializable(typeof(InstanceManagedConfig))]
+[JsonSerializable(typeof(InstanceExportConfig))]
+[JsonSerializable(typeof(InstanceMiscConfig))]
+[JsonSerializable(typeof(InstanceConsoleConfig))]
+[JsonSerializable(typeof(InstanceGameTimeConfig))]
 // instance-state.json (DATA D4) — TypedJsonFile root (the per-instance runtime time trio)
-[JsonSerializable(typeof(Core.Config.InstanceStateFile))]
+[JsonSerializable(typeof(InstanceStateFile))]
 internal sealed partial class FlintJsonContext : JsonSerializerContext;

@@ -4,6 +4,7 @@
 // what QSettings itself reads back from the same files, so the parser is compared against Qt's
 // own interpretation. READ side only (CONFIG C5/D4: Flint never writes an INI — the writer
 // half and its byte-level round-trip tests retired with the instance.cfg write path).
+
 using FlintLauncher.Core.Settings;
 using Xunit;
 

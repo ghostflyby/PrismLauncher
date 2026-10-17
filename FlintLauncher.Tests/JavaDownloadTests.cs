@@ -49,7 +49,7 @@ public class JavaDownloadTests : IDisposable
         Directory.CreateDirectory(Path.Combine(sourceDir, "Contents/Home/bin"));
         File.WriteAllText(Path.Combine(sourceDir, "Contents/Home/bin/java"), "java-binary");
         File.WriteAllText(Path.Combine(sourceDir, "release"), "JAVA_VERSION=\"17.0.9\"");
-        Assert.True(MMCZip.CompressDir(zipPath, TempPath("jdk-src")));
+        Assert.True(MmcZip.CompressDir(zipPath, TempPath("jdk-src")));
 
         using var server = new TestHttpServer(ctx =>
         {

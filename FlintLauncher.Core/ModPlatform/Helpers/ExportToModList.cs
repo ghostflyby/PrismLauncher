@@ -10,6 +10,7 @@
 // trailing newline) and the CSV quoting rule for multi-author entries.
 
 using System.Text.Json.Nodes;
+using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 
 namespace FlintLauncher.Core.ModPlatform.Helpers;
@@ -17,12 +18,12 @@ namespace FlintLauncher.Core.ModPlatform.Helpers;
 /// <summary>Port of the Formats enum (CUSTOM is served by the line-template overload).</summary>
 public enum ModListFormat : byte
 {
-    HTML,
-    MARKDOWN,
-    PLAINTXT,
-    JSON,
-    CSV,
-    CUSTOM,
+    Html,
+    Markdown,
+    Plaintxt,
+    Json,
+    Csv,
+    Custom,
 }
 
 /// <summary>Port of the OptionalData flags.</summary>
@@ -255,7 +256,7 @@ public static class ExportToModList
     /// <summary>QJsonDocument::toJson(): QtJson's indented writer plus the trailing "\n".</summary>
     private static string ToIndentedStringWithTrailingNewline(JsonNode node)
     {
-        return Minecraft.QtJson.ToIndentedString(node) + "\n";
+        return QtJson.ToIndentedString(node) + "\n";
     }
 
     /// <summary>Port of ExportToModList::toCSV.</summary>
@@ -305,11 +306,11 @@ public static class ExportToModList
     {
         return format switch
         {
-            ModListFormat.HTML => ToHtml(mods, extraData),
-            ModListFormat.MARKDOWN => ToMarkdown(mods, extraData),
-            ModListFormat.PLAINTXT => ToPlainTxt(mods, extraData),
-            ModListFormat.JSON => ToJson(mods, extraData),
-            ModListFormat.CSV => ToCsv(mods, extraData),
+            ModListFormat.Html => ToHtml(mods, extraData),
+            ModListFormat.Markdown => ToMarkdown(mods, extraData),
+            ModListFormat.Plaintxt => ToPlainTxt(mods, extraData),
+            ModListFormat.Json => ToJson(mods, extraData),
+            ModListFormat.Csv => ToCsv(mods, extraData),
             _ => $"unknown format:{(byte)format}",
         };
     }

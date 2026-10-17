@@ -6,7 +6,9 @@
 // the LookupServerAddress step writes the resolved address/port back through the pointer and
 // LauncherPartLaunch reads them afterwards. The draft `record` was immutable, so the port is
 // now a plain mutable class matching the C++ shape (the parse logic is unchanged).
+
 using System.Globalization;
+
 namespace FlintLauncher.Core.Instances;
 
 public sealed class MinecraftTarget

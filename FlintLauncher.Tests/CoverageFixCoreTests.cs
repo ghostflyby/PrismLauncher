@@ -8,6 +8,8 @@
 //
 // Joins "LauncherJars": NetStack.Default.Configure/ManualRetries/RequestTimeout are process-global
 // statics — the tests mutate and restore them, so they must not race the API-host suites.
+
+using System.Security.Cryptography;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Launch;
@@ -150,7 +152,7 @@ public class CoverageFixCoreTests
             <log4j:event logger="net.minecraft.server" timestamp="1700000000" level="INFO" thread="Server thread"><log4j:Message>hello xml world</log4j:Message></log4j:event>
             """, MessageLevel.StdOut);
         task.OnLogLine("plain game line", MessageLevel.StdOut);
-        task.OnLogLine("launcher side line", MessageLevel.Launcher);
+        task.OnLogLine("launcher side line");
 
         var entries = task.GetLogModel().Entries;
         // the structured entry: [HH:mm:ss] [thread/LEVEL] [logger]: message, level from the event
@@ -266,7 +268,7 @@ public class CoverageFixCoreTests
             {
                 BaseId = "general",
                 RelativePath = "thing.bin",
-                Md5Sum = Convert.ToHexString(System.Security.Cryptography.MD5.HashData(File.ReadAllBytes(file)))
+                Md5Sum = Convert.ToHexString(MD5.HashData(File.ReadAllBytes(file)))
                     .ToLowerInvariant(),
             };
             entry.SetStale(false);

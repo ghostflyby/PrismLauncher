@@ -10,7 +10,7 @@
 //    ModFolderModel.GetMetadata).
 namespace FlintLauncher.Core.ModPlatform;
 
-using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
+using PackwizModel = Packwiz.Packwiz;
 
 public static class MetadataHandler
 {

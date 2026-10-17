@@ -5,6 +5,7 @@
 // QObject::tr() strings are kept as literal (untranslated) format strings. The upstream typo
 // of a missing space in "<filename>contains a library that doesn't have a 'name' field" is
 // preserved.
+
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 
@@ -32,7 +33,7 @@ public static class MojangVersionFormat
 
     private static string ReadString(JsonNode root, string key, string current)
     {
-        return Has(root, key) ? JsonUtils.RequireString(Ptr(root, key), "Value") : current;
+        return Has(root, key) ? JsonUtils.RequireString(Ptr(root, key)) : current;
     }
 
     private static void ReadDownloadInfo(MojangDownloadInfo outInfo, JsonNode obj)
@@ -40,7 +41,7 @@ public static class MojangVersionFormat
         // optional, not used
         if (Has(obj, "path"))
         {
-            outInfo.Path = JsonUtils.RequireString(Ptr(obj, "path"), "Value");
+            outInfo.Path = JsonUtils.RequireString(Ptr(obj, "path"));
         }
         // required!
         outInfo.Sha1 = JsonUtils.RequireString(obj, "sha1", "'sha1'");
@@ -165,7 +166,7 @@ public static class MojangVersionFormat
 
         if (Has(inObj, "minimumLauncherVersion"))
         {
-            outInfo.MinimumLauncherVersion = JsonUtils.RequireInteger(Ptr(inObj, "minimumLauncherVersion"), "Value");
+            outInfo.MinimumLauncherVersion = JsonUtils.RequireInteger(Ptr(inObj, "minimumLauncherVersion"));
             if (outInfo.MinimumLauncherVersion > CurrentMinimumLauncherVersion)
             {
                 outInfo.AddProblem(ProblemSeverity.Warning,
@@ -183,7 +184,7 @@ public static class MojangVersionFormat
         }
         if (Has(inObj, "compatibleJavaName"))
         {
-            outInfo.CompatibleJavaName = JsonUtils.RequireString(Ptr(inObj, "compatibleJavaName"), "Value");
+            outInfo.CompatibleJavaName = JsonUtils.RequireString(Ptr(inObj, "compatibleJavaName"));
         }
 
         if (Has(inObj, "downloads"))

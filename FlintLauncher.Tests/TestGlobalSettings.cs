@@ -8,7 +8,9 @@
 // the double converts implicitly to the InstanceEnvironment the instance ctors take (type
 // infos from the host's FlintJsonContext — tests reference Web for it).
 
+using System.Collections.Concurrent;
 using FlintLauncher.Core.Config;
+using FlintLauncher.Core.State;
 using FlintLauncher.Web;
 
 namespace Flint.Tests;
@@ -90,10 +92,10 @@ internal static class TestInstanceEnvironment
 /// store is handed straight to the instance list).</summary>
 internal static class TestLauncherState
 {
-    private static readonly System.Collections.Concurrent.ConcurrentBag<string> Dirs = [];
+    private static readonly ConcurrentBag<string> Dirs = [];
     private static bool _sweepRegistered;
 
-    public static FlintLauncher.Core.State.LauncherStateStore Create()
+    public static LauncherStateStore Create()
     {
         var dir = Path.Combine(Path.GetTempPath(), $"flint-state-{Guid.NewGuid():N}");
         lock (Dirs)

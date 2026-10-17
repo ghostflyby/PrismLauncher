@@ -11,15 +11,16 @@
 //    like the C++ (DependencyType upper-cases its input first, exactly like upstream).
 //  - QVariant ids become strings ("" = null QVariant); the Flame write path parses them
 //    back to integers like the C++ toInt() calls.
-namespace FlintLauncher.Core.ModPlatform;
 
-using Minecraft;
+using FlintLauncher.Core.Minecraft;
+
+namespace FlintLauncher.Core.ModPlatform;
 
 /// <summary>Port of ModPlatform::ResourceProvider.</summary>
 public enum ResourceProvider : byte
 {
-    MODRINTH = 0,
-    FLAME = 1,
+    Modrinth = 0,
+    Flame = 1,
 }
 
 /// <summary>Port of ModPlatform::ResourceType (modplatform/ResourceType.h).</summary>
@@ -39,13 +40,13 @@ public enum ResourceType : byte
 /// <summary>Port of ModPlatform::DependencyTypeValue (+ the EnumWrapper mapping).</summary>
 public enum DependencyTypeValue : byte
 {
-    REQUIRED,
-    OPTIONAL,
-    INCOMPATIBLE,
-    EMBEDDED,
-    TOOL,
-    INCLUDE,
-    UNKNOWN,
+    Required,
+    Optional,
+    Incompatible,
+    Embedded,
+    Tool,
+    Include,
+    Unknown,
 }
 
 /// <summary>Port of the DependencyType EnumWrapper.</summary>
@@ -55,18 +56,18 @@ public readonly record struct DependencyType
 
     public DependencyTypeValue Value { get; }
 
-    public static DependencyType Invalid => new(DependencyTypeValue.UNKNOWN);
+    public static DependencyType Invalid => new(DependencyTypeValue.Unknown);
 
-    public bool IsValid => Value != DependencyTypeValue.UNKNOWN;
+    public bool IsValid => Value != DependencyTypeValue.Unknown;
 
     public static string ToString(DependencyTypeValue value) => value switch
     {
-        DependencyTypeValue.REQUIRED => "REQUIRED",
-        DependencyTypeValue.OPTIONAL => "OPTIONAL",
-        DependencyTypeValue.INCOMPATIBLE => "INCOMPATIBLE",
-        DependencyTypeValue.EMBEDDED => "EMBEDDED",
-        DependencyTypeValue.TOOL => "TOOL",
-        DependencyTypeValue.INCLUDE => "INCLUDE",
+        DependencyTypeValue.Required => "REQUIRED",
+        DependencyTypeValue.Optional => "OPTIONAL",
+        DependencyTypeValue.Incompatible => "INCOMPATIBLE",
+        DependencyTypeValue.Embedded => "EMBEDDED",
+        DependencyTypeValue.Tool => "TOOL",
+        DependencyTypeValue.Include => "INCLUDE",
         _ => "UNKNOWN",
     };
 
@@ -219,22 +220,22 @@ public static class ProviderCapabilities
 {
     public static string Name(ResourceProvider p) => p switch
     {
-        ResourceProvider.MODRINTH => "modrinth",
-        ResourceProvider.FLAME => "curseforge",
+        ResourceProvider.Modrinth => "modrinth",
+        ResourceProvider.Flame => "curseforge",
         _ => "",
     };
 
     public static string ReadableName(ResourceProvider p) => p switch
     {
-        ResourceProvider.MODRINTH => "Modrinth",
-        ResourceProvider.FLAME => "CurseForge",
+        ResourceProvider.Modrinth => "Modrinth",
+        ResourceProvider.Flame => "CurseForge",
         _ => "",
     };
 
     public static IReadOnlyList<string> HashType(ResourceProvider p) => p switch
     {
-        ResourceProvider.MODRINTH => ["sha512", "sha1"],
-        ResourceProvider.FLAME => ["sha1", "md5", "murmur2"], // Try newer formats first, fall back to old format
+        ResourceProvider.Modrinth => ["sha512", "sha1"],
+        ResourceProvider.Flame => ["sha1", "md5", "murmur2"], // Try newer formats first, fall back to old format
         _ => [],
     };
 }
@@ -373,16 +374,16 @@ public static class ModIndex
     /// <summary>Port of ModPlatform::getOverrideDeps().</summary>
     public static List<OverrideDep> GetOverrideDeps() =>
     [
-        new OverrideDep(Quilt: "634179", Fabric: "306612", Slug: "API", Provider: ResourceProvider.FLAME),
-        new OverrideDep(Quilt: "720410", Fabric: "308769", Slug: "KotlinLibraries", Provider: ResourceProvider.FLAME),
+        new OverrideDep(Quilt: "634179", Fabric: "306612", Slug: "API", Provider: ResourceProvider.Flame),
+        new OverrideDep(Quilt: "720410", Fabric: "308769", Slug: "KotlinLibraries", Provider: ResourceProvider.Flame),
 
-        new OverrideDep(Quilt: "qvIfYCYJ", Fabric: "P7dR8mSH", Slug: "API", Provider: ResourceProvider.MODRINTH),
-        new OverrideDep(Quilt: "lwVhp9o5", Fabric: "Ha28R6CL", Slug: "KotlinLibraries", Provider: ResourceProvider.MODRINTH),
+        new OverrideDep(Quilt: "qvIfYCYJ", Fabric: "P7dR8mSH", Slug: "API", Provider: ResourceProvider.Modrinth),
+        new OverrideDep(Quilt: "lwVhp9o5", Fabric: "Ha28R6CL", Slug: "KotlinLibraries", Provider: ResourceProvider.Modrinth),
     ];
 
-    public static string GetMetaURL(ResourceProvider provider, string projectId)
+    public static string GetMetaUrl(ResourceProvider provider, string projectId)
     {
-        return (provider == ResourceProvider.FLAME ? "https://www.curseforge.com/projects/" : "https://modrinth.com/mod/") + projectId;
+        return (provider == ResourceProvider.Flame ? "https://www.curseforge.com/projects/" : "https://modrinth.com/mod/") + projectId;
     }
 
     /// <summary>Port of ModPlatform::getModLoaderAsString.</summary>
@@ -396,7 +397,7 @@ public static class ModIndex
         ModLoaderType.Quilt => "quilt",
         ModLoaderType.DataPack => "datapack",
         ModLoaderType.Babric => "babric",
-        ModLoaderType.BTA => "bta-babric",
+        ModLoaderType.Bta => "bta-babric",
         ModLoaderType.LegacyFabric => "legacy-fabric",
         ModLoaderType.Ornithe => "ornithe",
         ModLoaderType.Rift => "rift",
@@ -413,7 +414,7 @@ public static class ModIndex
         "fabric" => ModLoaderType.Fabric,
         "quilt" => ModLoaderType.Quilt,
         "babric" => ModLoaderType.Babric,
-        "bta-babric" => ModLoaderType.BTA,
+        "bta-babric" => ModLoaderType.Bta,
         "legacy-fabric" => ModLoaderType.LegacyFabric,
         "ornithe" => ModLoaderType.Ornithe,
         "rift" => ModLoaderType.Rift,
@@ -426,7 +427,7 @@ public static class ModIndex
         ModLoaderType[] loaderList =
         [
             ModLoaderType.NeoForge, ModLoaderType.Forge, ModLoaderType.Cauldron, ModLoaderType.LiteLoader, ModLoaderType.Quilt,
-            ModLoaderType.Fabric, ModLoaderType.Babric, ModLoaderType.BTA, ModLoaderType.LegacyFabric, ModLoaderType.Ornithe,
+            ModLoaderType.Fabric, ModLoaderType.Babric, ModLoaderType.Bta, ModLoaderType.LegacyFabric, ModLoaderType.Ornithe,
             ModLoaderType.Rift,
         ];
         var flagList = new List<ModLoaderType>();

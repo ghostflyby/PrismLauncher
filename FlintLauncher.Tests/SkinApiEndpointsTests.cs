@@ -8,9 +8,11 @@
 // every host starts with a stub-pointed options instance. The host fixture seeds accounts.json
 // BEFORE the app builds (the runtime loads the account list at startup), which gives an
 // MSA-shaped account with real profile skin data plus a token the stub can assert on.
+
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Flint.Tests;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Web;
@@ -111,30 +113,30 @@ public class SkinApiEndpointsTests : IDisposable
     /// profile id is fixed so tests can address it.</summary>
     public const string ProfileId = "b50ad385829d3141a2167e7d7539ba7f";
 
-    public static string AccountsJson => new System.Text.Json.Nodes.JsonObject
+    public static string AccountsJson => new JsonObject
     {
         ["formatVersion"] = 3,
-        ["accounts"] = new System.Text.Json.Nodes.JsonArray(
-            (System.Text.Json.Nodes.JsonNode?)new System.Text.Json.Nodes.JsonObject
+        ["accounts"] = new JsonArray(
+            new JsonObject
             {
                 ["type"] = "MSA",
-                ["ygg"] = new System.Text.Json.Nodes.JsonObject
+                ["ygg"] = new JsonObject
                 {
                     ["token"] = "SKIN_TOKEN_STUB",
                 },
-                ["profile"] = new System.Text.Json.Nodes.JsonObject
+                ["profile"] = new JsonObject
                 {
                     ["id"] = ProfileId,
                     ["name"] = "SkinTester",
-                    ["skin"] = new System.Text.Json.Nodes.JsonObject
+                    ["skin"] = new JsonObject
                     {
                         ["id"] = "skin-id",
                         // the stored texture URL carries the http scheme the loader rewrites
                         ["url"] = "http://textures.minecraft.net/texture/abc",
                         ["variant"] = "CLASSIC",
                     },
-                    ["capes"] = new System.Text.Json.Nodes.JsonArray(
-                        (System.Text.Json.Nodes.JsonNode?)new System.Text.Json.Nodes.JsonObject
+                    ["capes"] = new JsonArray(
+                        new JsonObject
                         {
                             ["id"] = "cape-id",
                             ["url"] = "https://textures.minecraft.net/cape.png",

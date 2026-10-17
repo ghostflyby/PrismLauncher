@@ -15,8 +15,10 @@
 //  - Remote downloads use MetaCache when set (APPLICATION->metacache()), otherwise a plain
 //    file download into the staging folder.
 //  - The Technic branch runs the TechnicPackProcessor (P6-b).
+
 using System.IO.Compression;
 using System.Text.RegularExpressions;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
@@ -30,7 +32,7 @@ public sealed partial class InstanceImportTask : InstanceTask
     private enum ModpackType : byte
     {
         Unknown,
-        MultiMC,
+        MultiMc,
         Technic,
         Flame,
         Modrinth,
@@ -41,8 +43,8 @@ public sealed partial class InstanceImportTask : InstanceTask
     private readonly FlameApi _flame;
     private readonly bool _trustedSource;
     private readonly IReadOnlyDictionary<string, string> _extraInfo;
-    private string _archivePath = "";
-    private ModpackType _modpackType = ModpackType.Unknown;
+    private string archivePath = "";
+    private ModpackType modpackType = ModpackType.Unknown;
 
     /// <summary>APPLICATION->metacache() hook; used for the download-from-URL path.</summary>
     public HttpMetaCache? MetaCache { get; set; }
@@ -70,7 +72,7 @@ public sealed partial class InstanceImportTask : InstanceTask
     {
         if (_sourceUrl.IsFile)
         {
-            _archivePath = _sourceUrl.LocalPath;
+            archivePath = _sourceUrl.LocalPath;
             await ProcessZipPack(cancellationToken);
         }
         else
@@ -88,7 +90,7 @@ public sealed partial class InstanceImportTask : InstanceTask
 
             var entry = MetaCache.ResolveEntry("general", path);
             entry.SetStale(true);
-            _archivePath = entry.GetFullPath();
+            archivePath = entry.GetFullPath();
 
             var filesNetJob = new NetJob("Modpack download");
             filesNetJob.AddNetRequest(NetRequest.MakeCached(MetaCache, _sourceUrl, entry));
@@ -102,9 +104,9 @@ public sealed partial class InstanceImportTask : InstanceTask
         else
         {
             // headless fallback: plain download into the staging folder
-            _archivePath = FileSystem.PathCombine(StagingPath, Path.GetFileName(_sourceUrl.AbsolutePath));
-            FileSystem.EnsureFilePathExists(_archivePath);
-            var request = NetRequest.MakeFile(_sourceUrl, _archivePath);
+            archivePath = FileSystem.PathCombine(StagingPath, Path.GetFileName(_sourceUrl.AbsolutePath));
+            FileSystem.EnsureFilePathExists(archivePath);
+            var request = NetRequest.MakeFile(_sourceUrl, archivePath);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
             {
@@ -129,7 +131,7 @@ public sealed partial class InstanceImportTask : InstanceTask
         var root = "";
         try
         {
-            using var packZip = ZipFile.OpenRead(_archivePath);
+            using var packZip = ZipFile.OpenRead(archivePath);
             foreach (var entry in packZip.Entries)
             {
                 var fileName = entry.FullName.Replace('\\', '/');
@@ -137,7 +139,7 @@ public sealed partial class InstanceImportTask : InstanceTask
                 if (fileName == "modrinth.index.json")
                 {
                     // process as Modrinth pack
-                    _modpackType = ModpackType.Modrinth;
+                    modpackType = ModpackType.Modrinth;
                     break;
                 }
                 if (fileName is "bin/modpack.jar" or "bin/version.json")
@@ -145,17 +147,17 @@ public sealed partial class InstanceImportTask : InstanceTask
                     // process as Technic pack
                     Directory.CreateDirectory(FileSystem.PathCombine(extractDir, "minecraft"));
                     extractDir = FileSystem.PathCombine(extractDir, "minecraft");
-                    _modpackType = ModpackType.Technic;
+                    modpackType = ModpackType.Technic;
                     break;
                 }
                 if (fileName == "manifest.json")
                 {
-                    _modpackType = ModpackType.Flame;
+                    modpackType = ModpackType.Flame;
                     break;
                 }
                 if (Path.GetFileName(fileName) == "instance.cfg")
                 {
-                    _modpackType = ModpackType.MultiMC;
+                    modpackType = ModpackType.MultiMc;
                     root = CleanPath(Path.GetDirectoryName(fileName)?.Replace('\\', '/') ?? "");
                     break;
                 }
@@ -168,7 +170,7 @@ public sealed partial class InstanceImportTask : InstanceTask
             return;
         }
 
-        if (_modpackType == ModpackType.Unknown)
+        if (modpackType == ModpackType.Unknown)
         {
             EmitFailed("Archive does not contain a recognized modpack type.");
             return;
@@ -176,7 +178,7 @@ public sealed partial class InstanceImportTask : InstanceTask
         EmitStatus("Extracting modpack");
 
         // make sure we extract just the pack
-        var extracted = MMCZip.ExtractDir(_archivePath, root, extractDir);
+        var extracted = MmcZip.ExtractDir(archivePath, root, extractDir);
         if (extracted is null)
         {
             EmitFailed("Failed to extract the modpack zip.");
@@ -188,10 +190,10 @@ public sealed partial class InstanceImportTask : InstanceTask
 
     private async Task ExtractFinished(CancellationToken cancellationToken)
     {
-        switch (_modpackType)
+        switch (modpackType)
         {
-            case ModpackType.MultiMC:
-                ProcessMultiMC();
+            case ModpackType.MultiMc:
+                ProcessMultiMc();
                 return;
             case ModpackType.Technic:
                 await ProcessTechnic(cancellationToken);
@@ -237,7 +239,7 @@ public sealed partial class InstanceImportTask : InstanceTask
 
         if (instCreationTask.WasSuccessful)
         {
-            SetOverride(instCreationTask.ShouldOverride, instCreationTask.OriginalInstanceID);
+            SetOverride(instCreationTask.ShouldOverride, instCreationTask.OriginalInstanceId);
             EmitSucceeded();
         }
         else
@@ -265,13 +267,13 @@ public sealed partial class InstanceImportTask : InstanceTask
         EmitSucceeded();
     }
 
-    private void ProcessMultiMC()
+    private void ProcessMultiMc()
     {
         // D4: the staged MultiMC import writes its fixups (fresh uuid, name, playtime reset)
         // through the typed adapter — the committed folder is Flint format (instance.json);
         // the cfg inside the zip, if any, stays untouched
         var instance = new NullInstance(
-            new Config.InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
+            new InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution.")),
             StagingPath);
 
@@ -332,7 +334,7 @@ public sealed partial class InstanceImportTask : InstanceTask
 
         if (instCreationTask.WasSuccessful)
         {
-            SetOverride(instCreationTask.ShouldOverride, instCreationTask.OriginalInstanceID);
+            SetOverride(instCreationTask.ShouldOverride, instCreationTask.OriginalInstanceId);
             EmitSucceeded();
         }
         else

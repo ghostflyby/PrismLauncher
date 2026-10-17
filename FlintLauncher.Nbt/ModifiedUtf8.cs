@@ -23,6 +23,8 @@
 // Lone surrogates encode/decode losslessly in 3-byte form (readUTF-compatible leniency;
 // DataOutput.writeUTF would reject them on the Java side).
 
+using System.Text;
+
 namespace FlintLauncher.Nbt;
 
 public static class ModifiedUtf8
@@ -84,7 +86,7 @@ public static class ModifiedUtf8
     /// <exception cref="NbtParseException">On malformed or truncated sequences.</exception>
     public static string Decode(ReadOnlySpan<byte> bytes)
     {
-        var sb = new System.Text.StringBuilder(bytes.Length);
+        var sb = new StringBuilder(bytes.Length);
         var i = 0;
         while (i < bytes.Length)
         {

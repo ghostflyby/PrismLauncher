@@ -13,10 +13,14 @@
 // Not covered: UpdateActionLatestRecommendedCompatible / UpdateActionImportantChanged (they
 // need a populated remote version list) and the hardcoded org.lwjgl/org.lwjgl3 version
 // decision hacks (upstream placeholders exercised only through real metadata).
+
 using System.Security.Cryptography;
+using System.Text.Json.Nodes;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
+using FlintLauncher.Core.Tasks;
 using Xunit;
+using Index = FlintLauncher.Core.Meta.Index;
 
 namespace FlintLauncher.Tests;
 
@@ -69,7 +73,7 @@ public class ComponentUpdateTaskTests : IDisposable
     private static string VersionFileJson(string uid, string version, string name, string? mainClass = null,
                                           (string uid, string equals)? requires = null, bool volatileValue = false)
     {
-        var obj = new System.Text.Json.Nodes.JsonObject
+        var obj = new JsonObject
         {
             ["formatVersion"] = 1,
             ["name"] = name,
@@ -82,9 +86,9 @@ public class ComponentUpdateTaskTests : IDisposable
         }
         if (requires is { } req)
         {
-            obj["requires"] = new System.Text.Json.Nodes.JsonArray
+            obj["requires"] = new JsonArray
             {
-                new System.Text.Json.Nodes.JsonObject { ["uid"] = req.uid, ["equals"] = req.equals },
+                new JsonObject { ["uid"] = req.uid, ["equals"] = req.equals },
             };
         }
         if (volatileValue)
@@ -96,11 +100,11 @@ public class ComponentUpdateTaskTests : IDisposable
 
     private void WritePack(params (string uid, string version, bool important)[] components)
     {
-        var pack = new System.Text.Json.Nodes.JsonObject { ["formatVersion"] = 1 };
-        var array = new System.Text.Json.Nodes.JsonArray();
+        var pack = new JsonObject { ["formatVersion"] = 1 };
+        var array = new JsonArray();
         foreach (var (uid, version, important) in components)
         {
-            var entry = new System.Text.Json.Nodes.JsonObject { ["uid"] = uid };
+            var entry = new JsonObject { ["uid"] = uid };
             if (version.Length != 0)
             {
                 entry["version"] = version;
@@ -123,7 +127,7 @@ public class ComponentUpdateTaskTests : IDisposable
     /// entity loaded in <paramref name="index"/> the way the online sha256 verification would.
     /// The test's Dispose owns the created folder.
     /// </summary>
-    private async Task SeedLoadedMetaVersion(FlintLauncher.Core.Meta.Index index, string uid, string version,
+    private async Task SeedLoadedMetaVersion(Index index, string uid, string version,
                                              string json)
     {
         var metaDir = MetaDirFor(uid);
@@ -142,7 +146,7 @@ public class ComponentUpdateTaskTests : IDisposable
     /// <summary>Meta-format version record (uid/version/releaseTime required by the meta parser).</summary>
     private static string MetaVersionJson(string uid, string version, string name, string? mainClass = null)
     {
-        var obj = new System.Text.Json.Nodes.JsonObject
+        var obj = new JsonObject
         {
             ["formatVersion"] = 1,
             ["name"] = name,
@@ -179,7 +183,8 @@ public class ComponentUpdateTaskTests : IDisposable
         Assert.Equal("net.minecraft.client.main.Main", launchProfile.GetMainClass());
 
         // components are loaded from their local patches and cached data updated
-        var lwjgl = profile.GetComponent("org.lwjgl3")!;
+        var lwjgl = profile.GetComponent("org.lwjgl3");
+        Assert.NotNull(lwjgl);
         Assert.True(lwjgl.Loaded);
         Assert.Equal("3.1.2", lwjgl.GetVersion());
         Assert.Equal("LWJGL 3", lwjgl.GetName());
@@ -204,7 +209,7 @@ public class ComponentUpdateTaskTests : IDisposable
         var task = new ComponentUpdateTask(ComponentUpdateTask.Mode.Resolution, NetMode.Offline, profile);
         await task.StartAsync();
 
-        Assert.Equal(Core.Tasks.TaskState.Failed, task.State);
+        Assert.Equal(TaskState.Failed, task.State);
         Assert.Equal("Some component metadata load tasks failed.", task.FailReason);
 
         // cleanup the shared meta cache folder (the profile does not own it)
@@ -256,10 +261,10 @@ public class ComponentUpdateTaskTests : IDisposable
             Assert.NotNull(profile.GetProfile());
 
             // the injected dependency sits before its first dependee and is dependency-only
-            Assert.Equal("test.deplib", profile.Components[0].GetID());
+            Assert.Equal("test.deplib", profile.Components[0].GetId());
             Assert.True(profile.Components[0].DependencyOnly);
             Assert.Equal("1.0", profile.Components[0].GetVersion());
-            Assert.Equal("test.modloader", profile.Components[1].GetID());
+            Assert.Equal("test.modloader", profile.Components[1].GetId());
 
             // both components ended up fully loaded, no problems reported
             Assert.Empty(profile.Components[0].GetProblems());
@@ -267,10 +272,10 @@ public class ComponentUpdateTaskTests : IDisposable
 
             // the injected component is persisted as dependencyOnly on the next save
             profile.SaveNow();
-            var pack = System.Text.Json.Nodes.JsonNode.Parse(
+            var pack = JsonNode.Parse(
                 File.ReadAllText(Path.Combine(_root, "mmc-pack.json")))!;
             var depEntry = pack["components"]!.AsArray()
-                .OfType<System.Text.Json.Nodes.JsonObject>()
+                .OfType<JsonObject>()
                 .First(o => o["uid"]!.ToString() == "test.deplib");
             Assert.True(depEntry["dependencyOnly"]!.GetValue<bool>());
             Assert.Equal("1.0", depEntry["version"]!.ToString());
@@ -299,14 +304,14 @@ public class ComponentUpdateTaskTests : IDisposable
         var result = await profile.ReloadAsync(NetMode.Offline);
         Assert.True(result.Ok, result.ErrorMessage);
 
-        Assert.DoesNotContain(profile.Components, c => c.GetID() == "test.dep");
+        Assert.DoesNotContain(profile.Components, c => c.GetId() == "test.dep");
         Assert.Null(profile.GetComponent("test.dep"));
         Assert.True(profile.GetProfile() is not null);
 
         // removal also deletes the patch file and persists the new list
         Assert.False(File.Exists(depPatchPath));
         profile.SaveNow();
-        var pack = System.Text.Json.Nodes.JsonNode.Parse(
+        var pack = JsonNode.Parse(
             File.ReadAllText(Path.Combine(_root, "mmc-pack.json")))!;
         Assert.Single(pack["components"]!.AsArray());
     }

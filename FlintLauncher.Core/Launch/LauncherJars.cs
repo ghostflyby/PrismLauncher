@@ -6,7 +6,9 @@
 // The jar layout matches the C++ original: jars live in <launcher root>/jars (with the
 // Linux "share/<launcher name>" variant) next to the application directory — the jars are
 // build outputs produced by the BuildJavaJars MSBuild target (javac/jar via Exec) and are NOT committed.
+
 using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Java;
 
 namespace FlintLauncher.Core.Launch;
 
@@ -47,7 +49,7 @@ public static class LauncherJars
         // nothing installed: extract the embedded copy to the per-user cache
         if (jarFile is NewLaunchJarName or NewLaunchLegacyJarName)
         {
-            var extracted = Java.EmbeddedJars.EnsureExtracted(jarFile, installRoot);
+            var extracted = EmbeddedJars.EnsureExtracted(jarFile, installRoot);
             return File.Exists(extracted) ? extracted : "";
         }
         return "";

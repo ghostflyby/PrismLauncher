@@ -5,6 +5,7 @@
 // proxy) lives on the instance, and re-applying a changed configuration rebuilds the
 // HttpClient — the "hot settings" semantics of the C++ Application::updateProxySettings,
 // with process-global state replaced by a reference the owner hands out.
+
 using System.Net;
 
 namespace FlintLauncher.Core.Net;
@@ -17,9 +18,9 @@ public sealed class NetStack
     public static NetStack Default { get; } = CreateDefault();
 
     private readonly object _lock = new();
-    private (string Type, string Host, int Port, string User, string Pass) _proxy = ("None", "", 0, "", "");
-    private (string Ua, string Type, string Host, int Port, string User, string Pass)? _applied;
-    private volatile HttpClient _client;
+    private (string Type, string Host, int Port, string User, string Pass) proxy = ("None", "", 0, "", "");
+    private (string Ua, string Type, string Host, int Port, string User, string Pass)? applied;
+    private volatile HttpClient client;
 
     public NetStack() : this(FlintConfig.Default.UserAgent, manualRetries: 1, TimeSpan.FromSeconds(60))
     {
@@ -30,7 +31,7 @@ public sealed class NetStack
         UserAgent = userAgent;
         ManualRetries = manualRetries;
         RequestTimeout = requestTimeout;
-        _client = CreateClient();
+        client = CreateClient();
     }
 
     /// <summary>Convenience factory with the C++ defaults (product user agent, 1 manual
@@ -51,9 +52,9 @@ public sealed class NetStack
 
     /// <summary>The proxy configuration currently baked into <see cref="Client"/>
     /// (Application::updateProxySettings state; diagnostics/tests).</summary>
-    public (string Type, string Host, int Port, string User, string Pass) ProxyConfig => _proxy;
+    public (string Type, string Host, int Port, string User, string Pass) ProxyConfig => proxy;
 
-    public HttpClient Client => _client;
+    public HttpClient Client => client;
 
     /// <summary>Port of Application::updateProxySettings (+ the UserAgent the client is built
     /// with): rebuild the shared client so the proxy/user-agent take effect. Proxy semantics
@@ -72,20 +73,20 @@ public sealed class NetStack
             type = "None";
         }
         var next = (ua, type, host, port, user ?? "", pass ?? "");
-        if (_applied is { } applied && applied.Equals(next))
+        if (this.applied is { } applied && applied.Equals(next))
         {
             return;
         }
         lock (_lock)
         {
-            if (_applied is { } appliedAgain && appliedAgain.Equals(next))
+            if (this.applied is { } appliedAgain && appliedAgain.Equals(next))
             {
                 return;
             }
-            _applied = next;
+            this.applied = next;
             UserAgent = ua;
-            _proxy = (type, host, port, user ?? "", pass ?? "");
-            _client = CreateClient();
+            proxy = (type, host, port, user ?? "", pass ?? "");
+            client = CreateClient();
         }
     }
 
@@ -104,10 +105,10 @@ public sealed class NetStack
         return client;
     }
 
-    private IWebProxy? BuildProxy() => _proxy.Type switch
+    private IWebProxy? BuildProxy() => proxy.Type switch
     {
-        "HTTP" => NamedProxy(new Uri($"http://{_proxy.Host}:{_proxy.Port}")),
-        "SOCKS5" => NamedProxy(new Uri($"socks5://{_proxy.Host}:{_proxy.Port}")),
+        "HTTP" => NamedProxy(new Uri($"http://{proxy.Host}:{proxy.Port}")),
+        "SOCKS5" => NamedProxy(new Uri($"socks5://{proxy.Host}:{proxy.Port}")),
         // explicit "no proxy"
         "None" => null,
         // C++ "DefaultProxy": the system proxy configuration
@@ -117,9 +118,9 @@ public sealed class NetStack
     private WebProxy NamedProxy(Uri uri)
     {
         var proxy = new WebProxy(uri);
-        if (_proxy.User.Length != 0)
+        if (this.proxy.User.Length != 0)
         {
-            proxy.Credentials = new NetworkCredential(_proxy.User, _proxy.Pass);
+            proxy.Credentials = new NetworkCredential(this.proxy.User, this.proxy.Pass);
         }
         return proxy;
     }

@@ -17,7 +17,7 @@ public enum ModLoaderType : ushort
     Quilt = 1 << 5,
     DataPack = 1 << 6,
     Babric = 1 << 7,
-    BTA = 1 << 8,
+    Bta = 1 << 8,
     LegacyFabric = 1 << 9,
     Ornithe = 1 << 10,
     Rift = 1 << 11,

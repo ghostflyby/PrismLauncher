@@ -5,9 +5,12 @@
 // component version, the resolved mod file downloaded from the stub and the per-mod .pw.toml
 // written with the [update.curseforge] table, plus the blocked-mods and untrusted-mods
 // behaviors.
+
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Tasks;
 using Xunit;
@@ -29,7 +32,7 @@ public class FlameImportTests : IDisposable
     {
         Directory.CreateDirectory(_root);
         _flameApi.BaseUrl = _server.Url;
-        _downloadSha1 = Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(_downloadBytes))
+        _downloadSha1 = Convert.ToHexString(SHA1.HashData(_downloadBytes))
             .ToLowerInvariant();
     }
 
@@ -136,7 +139,7 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(staging);
         var zipPath = TempPath("pack-fabric.zip");
         Assert.True(pack.WriteZip(zipPath));
-        Assert.NotNull(FlintLauncher.Core.IO.MMCZip.ExtractDir(zipPath, "", staging));
+        Assert.NotNull(MmcZip.ExtractDir(zipPath, "", staging));
 
         var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName("Fabric Flame");
@@ -162,7 +165,7 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(staging);
         var zipPath = TempPath("pack-blocked.zip");
         Assert.True(pack.WriteZip(zipPath));
-        Assert.NotNull(FlintLauncher.Core.IO.MMCZip.ExtractDir(zipPath, "", staging));
+        Assert.NotNull(MmcZip.ExtractDir(zipPath, "", staging));
 
         var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName("Blocked Pack");
@@ -188,7 +191,7 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(staging);
         var zipPath = TempPath("pack-matched.zip");
         Assert.True(pack.WriteZip(zipPath));
-        Assert.NotNull(FlintLauncher.Core.IO.MMCZip.ExtractDir(zipPath, "", staging));
+        Assert.NotNull(MmcZip.ExtractDir(zipPath, "", staging));
 
         var localCopy = TempPath("local-test.jar");
         await File.WriteAllBytesAsync(localCopy, _downloadBytes);
@@ -220,7 +223,7 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(staging);
         var zipPath = TempPath("pack-untrusted.zip");
         Assert.True(pack.WriteZip(zipPath));
-        Assert.NotNull(FlintLauncher.Core.IO.MMCZip.ExtractDir(zipPath, "", staging));
+        Assert.NotNull(MmcZip.ExtractDir(zipPath, "", staging));
 
         var task = new FlameCreationTask(staging, trustedSource: false, _global, flame: _flameApi);
         task.SetName("Untrusted Pack");
@@ -240,7 +243,7 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(staging);
         var zipPath = TempPath("pack-trusted.zip");
         Assert.True(pack.WriteZip(zipPath));
-        Assert.NotNull(FlintLauncher.Core.IO.MMCZip.ExtractDir(zipPath, "", staging));
+        Assert.NotNull(MmcZip.ExtractDir(zipPath, "", staging));
 
         var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
         task.SetName("Trusted Pack");

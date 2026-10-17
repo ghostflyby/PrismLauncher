@@ -10,6 +10,7 @@
 // never runs JavaCheck; primary entries stay listed with release-file metadata even when
 // their probe failed (degrade-and-keep), and legacy candidates without any establishable
 // JVM drop instead of listing as unknown.
+
 using JdkFind;
 
 namespace FlintLauncher.Core.Java;

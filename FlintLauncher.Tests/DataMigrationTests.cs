@@ -3,8 +3,10 @@
 // half of Application::handleDataMigration): the whitelist inventory, the dry-run/copy task
 // flow, the S3 migration decision records (with the legacy "_nomigrate.txt" marker upgrade)
 // and the idempotency decision tree.
+
 using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.Tasks;
+using FlintLauncher.Tests;
 using FlintLauncher.Web;
 using Xunit;
 
@@ -416,7 +418,7 @@ public class DataMigrationTests : IDisposable
     [Fact]
     public async Task Task_Copies_File_Symlinks_By_Content()
     {
-        if (!FlintLauncher.Tests.SymlinkSupport.CanCreateLinks())
+        if (!SymlinkSupport.CanCreateLinks())
         {
             return; // Windows without symlink privilege
         }

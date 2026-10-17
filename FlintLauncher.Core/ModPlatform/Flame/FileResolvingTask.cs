@@ -10,6 +10,7 @@
 // BlockedMod entries (name/websiteUrl/hash/targetFolder) for the BlockedModsDialog data
 // flow; the optional BlockedModLocalFileResolver hook stands in for the dialog's
 // match-a-local-file step (see FlameCreationTask).
+
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -52,7 +53,7 @@ public sealed class FileResolvingTask : FlintTask
     /// APPLICATION->settings()->get("FallbackMRBlockedMods") (upstream default: true): when
     /// set, files without a download URL are looked up on Modrinth by their sha1.
     /// </summary>
-    public bool FallbackMRBlockedMods { get; set; } = true;
+    public bool FallbackMrBlockedMods { get; set; } = true;
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -157,7 +158,7 @@ public sealed class FileResolvingTask : FlintTask
             if (doc is not null)
             {
                 {
-                    if (FallbackMRBlockedMods)
+                    if (FallbackMrBlockedMods)
                     {
                         try
                         {

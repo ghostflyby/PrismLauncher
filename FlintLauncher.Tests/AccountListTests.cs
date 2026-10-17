@@ -2,6 +2,7 @@
 // Tests for the AccountList port: accounts.json round-trip in the exact upstream layout
 // ({"accounts": [...], "formatVersion": 3} with per-account "active" flags), default-account
 // activation and add/remove/replace semantics.
+
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Auth;
 using Xunit;
@@ -171,7 +172,7 @@ public class AccountListTests : IDisposable
             Assert.Equal(list.At(i).ProfileId(), reloaded.At(i).ProfileId());
             Assert.Equal(list.At(i).AccessToken(), reloaded.At(i).AccessToken());
             Assert.Equal(list.At(i).ProfileName(), reloaded.At(i).ProfileName());
-            Assert.Equal(list.At(i).AccountType_, reloaded.At(i).AccountType_);
+            Assert.Equal(list.At(i).AccountType, reloaded.At(i).AccountType);
         }
     }
 

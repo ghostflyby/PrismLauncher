@@ -36,6 +36,7 @@
 //    booleans of the assets index JSON are consulted).
 //  - The OrSetting class in MinecraftInstance.cpp is dead code upstream (never used in the
 //    revision) and is not ported. getProblems() does not exist on instances upstream.
+
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -44,12 +45,15 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Launch;
+using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
+using FlintLauncher.Core.State;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FlintLauncher.Core.Instances;
 
@@ -60,18 +64,18 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     public MinecraftInstance(SettingsObject settings, string rootDir)
         : base(settings, rootDir)
     {
-        _components = new PackProfile(this);
+        Components = new PackProfile(this);
     }
 
     // Application-singleton hooks (see the file header)
     /// <summary>C++ APPLICATION->m_detectedOpenALPath; used by extraArguments().</summary>
-    public string DetectedOpenALPath { get; set; } = "";
+    public string DetectedOpenAlPath { get; set; } = "";
 
     /// <summary>C++ APPLICATION->m_detectedGLFWPath; used by extraArguments().</summary>
-    public string DetectedGLFWPath { get; set; } = "";
+    public string DetectedGlfwPath { get; set; } = "";
 
     /// <summary>C++ APPLICATION->m_detectedSDLPath; used by extraArguments().</summary>
-    public string DetectedSDLPath { get; set; } = "";
+    public string DetectedSdlPath { get; set; } = "";
 
     /// <summary>C++ APPLICATION->metacache(); used for the library_directory profile variable,
     /// the library/asset-index download caches and the metadata entities. E6 wiring: setting
@@ -79,18 +83,18 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// SetMetadataCache call the former static SharedCache default papered over).</summary>
     public HttpMetaCache? MetaCache
     {
-        get => _metaCache;
+        get => metaCache;
         set
         {
-            _metaCache = value;
+            metaCache = value;
             if (value is not null)
             {
-                _components?.SetMetadataCache(value);
+                Components?.SetMetadataCache(value);
             }
         }
     }
 
-    private HttpMetaCache? _metaCache;
+    private HttpMetaCache? metaCache;
 
     /// <summary>Injected data-directory layout (assets/libraries/java roots, instgroups.json).
     /// Null keeps the legacy CWD-anchored behavior for bare fixtures; hosts always set it
@@ -105,7 +109,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public override void SaveNow()
     {
-        _components!.SaveNow();
+        Components!.SaveNow();
     }
 
     public override void LoadSpecificSettings()
@@ -200,12 +204,15 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // probed architectures come from the state-side probe cache (S5 path-keyed map;
         // the former JavaArchitecture/JavaRealArchitecture settings keys are gone, C9).
         var detection = JavaDetection();
-        _runtimeContext.JavaArchitecture = detection?.Architecture ?? "";
-        _runtimeContext.JavaRealArchitecture = detection?.RealArchitecture ?? "";
-        _components!.InvalidateLaunchProfile();
+        // the struct property returns a copy — read-modify-write it back
+        var context = RuntimeContext;
+        context.JavaArchitecture = detection?.Architecture ?? "";
+        context.JavaRealArchitecture = detection?.RealArchitecture ?? "";
+        RuntimeContext = context;
+        Components!.InvalidateLaunchProfile();
     }
 
-    public PackProfile GetPackProfile() => _components!;
+    public PackProfile GetPackProfile() => Components!;
 
     public override IReadOnlySet<string> Traits()
     {
@@ -244,7 +251,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public string DataPacksDir()
     {
-        var relativePath = Variant.AsString(Settings().Get("GlobalDataPacksPath"));
+        var relativePath = Variant.AsString(Settings.Get("GlobalDataPacksPath"));
 
         if (relativePath.Length == 0)
         {
@@ -310,13 +317,13 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     public override List<FlintTask> CreateUpdateTask() =>
     [
         // create folders
-        new Launch.Steps.FoldersTask(this),
+        new FoldersTask(this),
         // libraries download
-        new Launch.Steps.LibrariesTask(this),
+        new LibrariesTask(this),
         // FML libraries download and copy into the instance
-        new Launch.Steps.LegacyFMLLibrariesTask(this),
+        new LegacyFmlLibrariesTask(this),
         // assets update
-        new Launch.Steps.AssetUpdateTask(this),
+        new AssetUpdateTask(this),
     ];
 
     /// <summary>Port of createLaunchTask() (2-arg form): builds the per-launch services from
@@ -339,22 +346,22 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         launchServices.Ui.SaveIcon?.Invoke(IconKey(), FileSystem.PathCombine(GameRoot(), "icon.png"));
 
         // print a header
-        process.AppendStep(new Launch.Steps.TextPrint(process, "Minecraft folder is:\n  " + GameRoot() + "\n",
+        process.AppendStep(new TextPrint(process, "Minecraft folder is:\n  " + GameRoot() + "\n",
             MessageLevel.Launcher));
 
         // create the .minecraft folder and server-resource-packs (workaround for Minecraft bug MCL-3732)
-        process.AppendStep(new Launch.Steps.CreateGameFolders(process));
+        process.AppendStep(new CreateGameFolders(process));
 
-        if (targetToJoin is null && Variant.AsBool(Settings().Get("JoinServerOnLaunch")))
+        if (targetToJoin is null && Variant.AsBool(Settings.Get("JoinServerOnLaunch")))
         {
-            var fullAddress = Variant.AsString(Settings().Get("JoinServerOnLaunchAddress"));
+            var fullAddress = Variant.AsString(Settings.Get("JoinServerOnLaunchAddress"));
             if (fullAddress.Length != 0)
             {
                 targetToJoin = MinecraftTarget.Parse(fullAddress, false);
             }
             else
             {
-                var world = Variant.AsString(Settings().Get("JoinWorldOnLaunch"));
+                var world = Variant.AsString(Settings.Get("JoinWorldOnLaunch"));
                 if (world.Length != 0)
                 {
                     targetToJoin = MinecraftTarget.Parse(world, true);
@@ -365,7 +372,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         if (targetToJoin is not null && targetToJoin.Port == 25565)
         {
             // Resolve server address to join on launch
-            var step = new Launch.Steps.LookupServerAddress(process, targetToJoin);
+            var step = new LookupServerAddress(process, targetToJoin);
             step.SetLookupAddress(targetToJoin.Address);
             process.AppendStep(step);
         }
@@ -373,7 +380,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // run pre-load command if that's needed, before the metadata is loaded
         if (GetPreLoadCommand().Length != 0)
         {
-            var step = new Launch.Steps.LaunchCommand(process, GetPreLoadCommand(), "Pre-Load");
+            var step = new LaunchCommand(process, GetPreLoadCommand(), "Pre-Load");
             step.SetWorkingDirectory(GameRoot());
             process.AppendStep(step);
         }
@@ -381,21 +388,21 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // load meta
         {
             var mode = session?.LaunchMode != LaunchMode.Offline ? NetMode.Online : NetMode.Offline;
-            process.AppendStep(new TaskStepWrapper(process, new Launch.Steps.MinecraftLoadAndCheck(this, mode)));
+            process.AppendStep(new TaskStepWrapper(process, new MinecraftLoadAndCheck(this, mode)));
         }
 
         // check java
         {
-            process.AppendStep(new Launch.Steps.AutoInstallJava(process));
-            process.AppendStep(new Launch.Steps.CheckJava(process));
+            process.AppendStep(new AutoInstallJava(process));
+            process.AppendStep(new CheckJava(process));
             // verify that minimum Java requirements are met
-            process.AppendStep(new Launch.Steps.VerifyJavaInstall(process));
+            process.AppendStep(new VerifyJavaInstall(process));
         }
 
         // run pre-launch command if that's needed
         if (GetPreLaunchCommand().Length != 0)
         {
-            var step = new Launch.Steps.LaunchCommand(process, GetPreLaunchCommand(), "Pre-Launch");
+            var step = new LaunchCommand(process, GetPreLaunchCommand(), "Pre-Launch");
             step.SetWorkingDirectory(GameRoot());
             process.AppendStep(step);
         }
@@ -403,7 +410,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // if we aren't in offline mode
         if (session?.LaunchMode != LaunchMode.Offline)
         {
-            process.AppendStep(new Launch.Steps.ClaimAccount(process, session));
+            process.AppendStep(new ClaimAccount(process, session));
             foreach (var t in CreateUpdateTask())
             {
                 process.AppendStep(new TaskStepWrapper(process, t));
@@ -411,30 +418,30 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         }
         else
         {
-            process.AppendStep(new Launch.Steps.EnsureOfflineLibraries(process, this));
+            process.AppendStep(new EnsureOfflineLibraries(process, this));
         }
 
         // if there are any jar mods
-        process.AppendStep(new Launch.Steps.ModMinecraftJar(process));
+        process.AppendStep(new ModMinecraftJar(process));
 
         // Scan mods folders for mods
-        process.AppendStep(new Launch.Steps.ScanModFolders(process));
+        process.AppendStep(new ScanModFolders(process));
 
         // make sure we have enough RAM, warn the user if we don't
-        process.AppendStep(new Launch.Steps.EnsureAvailableMemory(process, this));
+        process.AppendStep(new EnsureAvailableMemory(process, this));
 
         // print some instance info here...
-        process.AppendStep(new Launch.Steps.PrintInstanceInfo(process, session, targetToJoin));
+        process.AppendStep(new PrintInstanceInfo(process, session, targetToJoin));
 
         // extract native jars if needed
-        process.AppendStep(new Launch.Steps.ExtractNatives(process));
+        process.AppendStep(new ExtractNatives(process));
 
         // reconstruct assets if needed
-        process.AppendStep(new Launch.Steps.ReconstructAssets(process));
+        process.AppendStep(new ReconstructAssets(process));
 
         {
             // actually launch the game
-            var step = new Launch.Steps.LauncherPartLaunch(process);
+            var step = new LauncherPartLaunch(process);
             step.SetWorkingDirectory(GameRoot());
             step.SetAuthSession(session);
             step.SetTargetToJoin(targetToJoin);
@@ -444,7 +451,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // run post-exit command if that's needed
         if (GetPostExitCommand().Length != 0)
         {
-            var step = new Launch.Steps.LaunchCommand(process, GetPostExitCommand(), "Post-Launch");
+            var step = new LaunchCommand(process, GetPostExitCommand(), "Post-Launch");
             step.SetWorkingDirectory(GameRoot());
             process.AppendStep(step);
         }
@@ -454,9 +461,9 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         }
         if (Variant.AsBool(_settings.Get("QuitAfterGameStop")))
         {
-            process.AppendStep(new Launch.Steps.QuitAfterGameStop(process));
+            process.AppendStep(new QuitAfterGameStop(process));
         }
-        _launchProcess = process;
+        LaunchProcess = process;
         RaiseLaunchTaskChanged();
         return process;
     }
@@ -467,7 +474,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     private LaunchServices BuildLaunchServices() => new()
     {
         Paths = Paths ?? FlintPaths.FromHomeDir(Directory.GetCurrentDirectory()),
-        LoggerFactory = Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
+        LoggerFactory = NullLoggerFactory.Instance,
         MetaCache = MetaCache,
         Config = UserConfigStore,
         InstallRoot = Paths?.InstallRoot ?? AppContext.BaseDirectory,
@@ -481,11 +488,11 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         var launchScript = "";
 
-        if (_components is null)
+        if (Components is null)
         {
             return "";
         }
-        var profile = _components.GetProfile();
+        var profile = Components.GetProfile();
         if (profile is null)
         {
             return "";
@@ -524,7 +531,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // window size, title and state, legacy
         {
             string windowParams;
-            if (Variant.AsBool(Settings().Get("LaunchMaximized")))
+            if (Variant.AsBool(Settings.Get("LaunchMaximized")))
             {
                 // FIXME doesn't support maximisation
                 if (!IsLegacy())
@@ -533,8 +540,8 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                     // window frame margins; the headless core has no screen, so the injected
                     // UI hook (or the configured window size) fills in
                     var (width, height) = (services ?? LaunchServices)?.Ui.PrimaryScreenSize?.Invoke() ??
-                        (Variant.AsInt(Settings().Get("MinecraftWinWidth")),
-                         Variant.AsInt(Settings().Get("MinecraftWinHeight")));
+                        (Variant.AsInt(Settings.Get("MinecraftWinWidth")),
+                         Variant.AsInt(Settings.Get("MinecraftWinHeight")));
                     windowParams = FormattableString.Invariant($"{width}x{height}");
                 }
                 else
@@ -545,7 +552,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             else
             {
                 windowParams = FormattableString.Invariant(
-                    $"{Variant.AsInt(Settings().Get("MinecraftWinWidth"))}x{Variant.AsInt(Settings().Get("MinecraftWinHeight"))}");
+                    $"{Variant.AsInt(Settings.Get("MinecraftWinWidth"))}x{Variant.AsInt(Settings.Get("MinecraftWinHeight"))}");
             }
             launchScript += "windowTitle " + WindowTitle() + "\n";
             launchScript += "windowParams " + windowParams + "\n";
@@ -625,41 +632,41 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         }
 
         {
-            string openALPath = "";
+            string openAlPath = "";
             string glfwPath = "";
             string sdlPath = "";
 
-            if (Variant.AsBool(Settings().Get("UseNativeOpenAL")))
+            if (Variant.AsBool(Settings.Get("UseNativeOpenAL")))
             {
-                openALPath = DetectedOpenALPath;
-                var customPath = Variant.AsString(Settings().Get("CustomOpenALPath"));
+                openAlPath = DetectedOpenAlPath;
+                var customPath = Variant.AsString(Settings.Get("CustomOpenALPath"));
                 if (customPath.Length != 0)
                 {
-                    openALPath = customPath;
+                    openAlPath = customPath;
                 }
             }
-            if (Variant.AsBool(Settings().Get("UseNativeGLFW")))
+            if (Variant.AsBool(Settings.Get("UseNativeGLFW")))
             {
-                glfwPath = DetectedGLFWPath;
-                var customPath = Variant.AsString(Settings().Get("CustomGLFWPath"));
+                glfwPath = DetectedGlfwPath;
+                var customPath = Variant.AsString(Settings.Get("CustomGLFWPath"));
                 if (customPath.Length != 0)
                 {
                     glfwPath = customPath;
                 }
             }
-            if (Variant.AsBool(Settings().Get("UseNativeSDL")))
+            if (Variant.AsBool(Settings.Get("UseNativeSDL")))
             {
-                sdlPath = DetectedSDLPath;
-                var customPath = Variant.AsString(Settings().Get("CustomSDLPath"));
+                sdlPath = DetectedSdlPath;
+                var customPath = Variant.AsString(Settings.Get("CustomSDLPath"));
                 if (customPath.Length != 0)
                 {
                     sdlPath = customPath;
                 }
             }
 
-            if (openALPath.Length != 0 && FsExists(openALPath))
+            if (openAlPath.Length != 0 && FsExists(openAlPath))
             {
-                list.Add("-Dorg.lwjgl.openal.libname=" + Path.GetFullPath(openALPath));
+                list.Add("-Dorg.lwjgl.openal.libname=" + Path.GetFullPath(openAlPath));
             }
             if (glfwPath.Length != 0 && FsExists(glfwPath))
             {
@@ -705,14 +712,14 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // It *SHOULD* check for the executable to exist before trying to use it for queries but it doesnt,
         // so WE can and force disable xrandr if it is not available.
         if (OperatingSystem.IsLinux() &&
-            _components!.GetComponent("org.lwjgl") is not null &&
+            Components!.GetComponent("org.lwjgl") is not null &&
             FindExecutable("xrandr").Length == 0)
         {
             args.Add("-DLWJGL_DISABLE_XRANDR=true");
         }
 
-        var min = Variant.AsInt(Settings().Get("MinMemAlloc"));
-        var max = Variant.AsInt(Settings().Get("MaxMemAlloc"));
+        var min = Variant.AsInt(Settings.Get("MinMemAlloc"));
+        var max = Variant.AsInt(Settings.Get("MaxMemAlloc"));
         if (min < max)
         {
             args.Add($"-Xms{min}m");
@@ -751,7 +758,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public bool ShouldApplyOnlineFixes()
     {
-        return Traits().Contains("legacyServices") && Variant.AsBool(Settings().Get("OnlineFixes"));
+        return Traits().Contains("legacyServices") && Variant.AsBool(Settings.Get("OnlineFixes"));
     }
 
     public override SortedDictionary<string, string> GetVariables()
@@ -761,7 +768,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         outVars["INST_ID"] = Id();
         outVars["INST_DIR"] = ToNativeSeparators(QDirAbsolutePath(InstanceRoot()));
         outVars["INST_MC_DIR"] = ToNativeSeparators(QDirAbsolutePath(GameRoot()));
-        outVars["INST_JAVA"] = ToNativeSeparators(QDirAbsolutePath(Variant.AsString(Settings().Get("JavaPath"))));
+        outVars["INST_JAVA"] = ToNativeSeparators(QDirAbsolutePath(Variant.AsString(Settings.Get("JavaPath"))));
         outVars["INST_JAVA_ARGS"] = string.Join(" ", JavaArguments());
         outVars["NO_COLOR"] = "1";
         if (OperatingSystem.IsMacOS())
@@ -788,7 +795,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             env.Insert(key, value);
         }
         // custom env
-        InsertCustomEnv(env, Variant.AsString(Settings().Get("Env")));
+        InsertCustomEnv(env, Variant.AsString(Settings.Get("Env")));
         return env;
     }
 
@@ -799,7 +806,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
         if (OperatingSystem.IsLinux())
         {
-            if (Variant.AsBool(Settings().Get("EnableMangoHud")))
+            if (Variant.AsBool(Settings.Get("EnableMangoHud")))
             {
                 // TODO(P5): the C++ also checks APPLICATION->capabilities() and probes the
                 // MangoHud libraries with LibraryUtils::findMangoHud().
@@ -814,7 +821,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                 env.Insert("MANGOHUD", "1");
             }
 
-            if (Variant.AsBool(Settings().Get("UseDiscreteGpu")))
+            if (Variant.AsBool(Settings.Get("UseDiscreteGpu")))
             {
                 // TODO(P5): the C++ first tries switcheroo-control via DBus; without it the
                 // open/proprietary driver fallbacks below apply.
@@ -826,7 +833,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                 env.Insert("__GLX_VENDOR_LIBRARY_NAME", "nvidia");
             }
 
-            if (Variant.AsBool(Settings().Get("UseZink")))
+            if (Variant.AsBool(Settings.Get("UseZink")))
             {
                 // taken from https://wiki.archlinux.org/title/OpenGL#OpenGL_over_Vulkan_(Zink)
                 env.Insert("__GLX_VENDOR_LIBRARY_NAME", "mesa");
@@ -840,7 +847,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public List<string> ProcessMinecraftArgs(AuthSession? session, MinecraftTarget? targetToJoin)
     {
-        var profile = _components!.GetProfile()!;
+        var profile = Components!.GetProfile()!;
         var args = profile.GetMinecraftArguments()
             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .ToList();
@@ -913,7 +920,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             var component = components.Components[i];
             outList.Add(indent + FormattableString.Invariant(
-                $"{i + 1}) {component.GetName()} ({component.GetID()}) {component.GetVersion()}"));
+                $"{i + 1}) {component.GetName()} ({component.GetId()}) {component.GetVersion()}"));
         }
         outList.Add(emptyLine);
 
@@ -993,21 +1000,21 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         }
 
         // native libraries
-        var settings = Settings();
-        var nativeOpenAL = Variant.AsBool(settings.Get("UseNativeOpenAL"));
-        var nativeGLFW = Variant.AsBool(settings.Get("UseNativeGLFW"));
-        var nativeSDL = Variant.AsBool(settings.Get("UseNativeSDL"));
-        if (nativeOpenAL || nativeGLFW || nativeSDL)
+        var settings = Settings;
+        var nativeOpenAl = Variant.AsBool(settings.Get("UseNativeOpenAL"));
+        var nativeGlfw = Variant.AsBool(settings.Get("UseNativeGLFW"));
+        var nativeSdl = Variant.AsBool(settings.Get("UseNativeSDL"));
+        if (nativeOpenAl || nativeGlfw || nativeSdl)
         {
-            if (nativeOpenAL)
+            if (nativeOpenAl)
             {
                 outList.Add("Using system OpenAL.");
             }
-            if (nativeGLFW)
+            if (nativeGlfw)
             {
                 outList.Add("Using system GLFW.");
             }
-            if (nativeSDL)
+            if (nativeSdl)
             {
                 outList.Add("Using system SDL.");
             }
@@ -1039,9 +1046,9 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         outList.Add(emptyLine);
 
         // minecraft arguments
-        var params_ = ProcessMinecraftArgs(null, targetToJoin);
+        var @params = ProcessMinecraftArgs(null, targetToJoin);
         outList.Add("Minecraft arguments:");
-        outList.Add(indent + string.Join(' ', params_));
+        outList.Add(indent + string.Join(' ', @params));
         outList.Add(emptyLine);
 
         // window size
@@ -1144,16 +1151,16 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             traitsList.Add("broken");
         }
 
-        var mcVersion = _components!.GetComponentVersion("net.minecraft");
+        var mcVersion = Components!.GetComponentVersion("net.minecraft");
         if (mcVersion.Length == 0)
         {
             // Load component info if needed. Upstream calls PackProfile::reload(Offline): its
             // inline (synchronous) part is saveNow + invalidateLaunchProfile + load, only the
             // resolve is a task — mirror the synchronous part and re-read immediately.
-            _components.SaveNow();
-            _components.InvalidateLaunchProfile();
-            _components.Load();
-            mcVersion = _components.GetComponentVersion("net.minecraft");
+            Components.SaveNow();
+            Components.InvalidateLaunchProfile();
+            Components.Load();
+            mcVersion = Components.GetComponentVersion("net.minecraft");
         }
 
         var description = $"Minecraft {mcVersion}";
@@ -1185,7 +1192,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         var jars = new List<string>();
         var nativeJars = new List<string>();
-        var profile = _components!.GetProfile()!;
+        var profile = Components!.GetProfile()!;
         profile.GetLibraryFiles(RuntimeContext, jars, nativeJars, GetLocalLibraryPath(), BinRoot(),
             storageBase: LibraryStorageBase());
         return jars;
@@ -1195,7 +1202,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         var jars = new List<string>();
         var nativeJars = new List<string>();
-        var profile = _components!.GetProfile()!;
+        var profile = Components!.GetProfile()!;
         profile.GetLibraryFiles(RuntimeContext, jars, nativeJars, GetLocalLibraryPath(), BinRoot(),
             storageBase: LibraryStorageBase());
         return nativeJars;
@@ -1209,7 +1216,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public string GetMainClass()
     {
-        var profile = _components!.GetProfile()!;
+        var profile = Components!.GetProfile()!;
         return profile.GetMainClass();
     }
 
@@ -1231,13 +1238,13 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     /// <summary>The probe-cache entry for this instance's configured java (S5
     /// JavaDetectState.Detections), or null when that binary has not been probed (or no state
-    /// store is wired). Goes through Settings() so the specific settings (and the JavaPath
+    /// store is wired). Goes through Settings so the specific settings (and the JavaPath
     /// override) are loaded like every other reader, and reads the INSTANCE-stamped state
     /// store — instances discovered at startup carry it from InstanceList, while their
     /// LaunchServices may still be null (it is stamped later by the composition root).</summary>
-    public State.JavaDetectEntry? JavaDetection()
+    public JavaDetectEntry? JavaDetection()
     {
-        var key = JavaDetectKey(Variant.AsString(Settings().Get("JavaPath")));
+        var key = JavaDetectKey(Variant.AsString(Settings.Get("JavaPath")));
         if (key.Length == 0)
         {
             return null;
@@ -1249,33 +1256,33 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public ModFolderModel LoaderModList()
     {
-        if (_loaderModList is null)
+        if (loaderModList is null)
         {
             var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
-            _loaderModList = new ModFolderModel(ModsRoot(), isIndexed, createDir: true);
+            loaderModList = new ModFolderModel(ModsRoot(), isIndexed, createDir: true);
         }
-        return _loaderModList;
+        return loaderModList;
     }
 
     public ModFolderModel CoreModList()
     {
-        if (_coreModList is null)
+        if (coreModList is null)
         {
             var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
-            _coreModList = new ModFolderModel(CoreModsDir(), isIndexed, createDir: true);
+            coreModList = new ModFolderModel(CoreModsDir(), isIndexed, createDir: true);
         }
-        return _coreModList;
+        return coreModList;
     }
 
     public ModFolderModel NilModList()
     {
-        if (_nilModList is null)
+        if (nilModList is null)
         {
             var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
             // NOTE: upstream does not create the folder for the nil mod list (4th arg false)
-            _nilModList = new ModFolderModel(NilModsDir(), isIndexed, createDir: false);
+            nilModList = new ModFolderModel(NilModsDir(), isIndexed, createDir: false);
         }
-        return _nilModList;
+        return nilModList;
     }
 
     // (resourcePackList()/texturePackList()/shaderPackList()/dataPackList()/resourceLists()/
@@ -1284,7 +1291,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public List<Mod> GetJarMods()
     {
-        var profile = _components!.GetProfile()!;
+        var profile = Components!.GetProfile()!;
         var mods = new List<Mod>();
         foreach (var jarmod in profile.GetJarMods())
         {
@@ -1304,7 +1311,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     string IPackProfileEnv.InstanceName => Name();
 
-    RuntimeContext IPackProfileEnv.RuntimeContext => _runtimeContext;
+    RuntimeContext IPackProfileEnv.RuntimeContext => RuntimeContext;
 
     // ------------------------------------------------------------------------ helpers
 
@@ -1457,10 +1464,10 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     // ------------------------------------------------------------------------ data
 
-    protected readonly PackProfile? _components; // unique_ptr<PackProfile> m_components (set in ctor)
-    private ModFolderModel? _loaderModList;
-    private ModFolderModel? _coreModList;
-    private ModFolderModel? _nilModList;
+    protected readonly PackProfile? Components; // unique_ptr<PackProfile> m_components (set in ctor)
+    private ModFolderModel? loaderModList;
+    private ModFolderModel? coreModList;
+    private ModFolderModel? nilModList;
     // (the resource pack / texture pack / shader pack / data pack models and the world list
     //  arrive with the remaining P3b folder-model ports)
 }

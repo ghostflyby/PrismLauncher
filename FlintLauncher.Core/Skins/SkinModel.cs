@@ -8,16 +8,19 @@
 //  - SkinModel::isValid() validates the PNG texture dimensions via QImage; that decode is not
 //    ported, so a stored skin is considered valid when it has a name (the file existence part of
 //    the check stays in the UI layer).
+
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Minecraft;
 
 namespace FlintLauncher.Core.Skins;
 
 public enum SkinModelKind
 {
-    CLASSIC,
-    SLIM,
+    Classic,
+    Slim,
 }
 
 /// <summary>Data subset of SkinModel.</summary>
@@ -31,31 +34,31 @@ public sealed class SkinModel
     {
         CapeId = obj["capeId"]?.GetValue<string>() ?? "";
         Url = obj["url"]?.GetValue<string>() ?? "";
-        Model = obj["model"]?.GetValue<string>() == "SLIM" ? SkinModelKind.SLIM : SkinModelKind.CLASSIC;
+        Model = obj["model"]?.GetValue<string>() == "SLIM" ? SkinModelKind.Slim : SkinModelKind.Classic;
         var name = obj["name"]?.GetValue<string>() ?? "";
-        Path_ = Path.Combine(skinsDir, name + ".png");
+        Path = System.IO.Path.Combine(skinsDir, name + ".png");
     }
 
-    public string Path_ = "";
+    public string Path = "";
 
     public string CapeId { get; set; } = "";
 
-    public SkinModelKind Model { get; set; } = SkinModelKind.CLASSIC;
+    public SkinModelKind Model { get; set; } = SkinModelKind.Classic;
 
     public string Url { get; set; } = "";
 
     /// <summary>QFileInfo::completeBaseName of the path.</summary>
     public string Name()
     {
-        var fileName = Path.GetFileName(Path_);
+        var fileName = System.IO.Path.GetFileName(Path);
         var dot = fileName.LastIndexOf('.');
         return dot <= 0 ? fileName : fileName[..dot];
     }
 
     public string GetModelString() => Model switch
     {
-        SkinModelKind.CLASSIC => "CLASSIC",
-        SkinModelKind.SLIM => "SLIM",
+        SkinModelKind.Classic => "CLASSIC",
+        SkinModelKind.Slim => "SLIM",
         _ => "",
     };
 
@@ -123,7 +126,7 @@ public static class SkinListStore
         doc["skins"] = arr;
         // upstream goes through Json::write() (QJsonDocument::Indented): sorted keys, 4-space indent
         FileSystem.Write(Path.Combine(skinsDir, "index.json"),
-            System.Text.Encoding.UTF8.GetBytes(Minecraft.QtJson.ToIndentedString(doc)));
+            Encoding.UTF8.GetBytes(QtJson.ToIndentedString(doc)));
     }
 
     private static bool IsValid(SkinModel skin)

@@ -18,6 +18,7 @@
 //  - The progress/step plumbing of the Qt signals is reduced to status/progress updates.
 //  - The per-mod authors of the local-metadata path come from the parsed mod details
 //    (Mod::authors()); the API-filled path takes them from the project response.
+
 using System.Globalization;
 using System.IO.Compression;
 using System.Net;
@@ -27,14 +28,14 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
-using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Minecraft.Resources;
+using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
-using ResourceFolderType = FlintLauncher.Core.Minecraft.Resources.ResourceType;
+using ResourceFolderType = Minecraft.Resources.ResourceType;
 
 public sealed class FlamePackExportTask : FlintTask
 {
@@ -50,7 +51,7 @@ public sealed class FlamePackExportTask : FlintTask
         public bool OptionalFiles { get; init; }
         public required MinecraftInstance Instance { get; init; }
         public required string Output { get; init; }
-        public MMCZip.FilterFunction? Filter { get; init; }
+        public MmcZip.FilterFunction? Filter { get; init; }
         public int RecommendedRam { get; init; }
         public FlameApi? Flame { get; init; }
     }
@@ -105,7 +106,7 @@ public sealed class FlamePackExportTask : FlintTask
     private bool CollectFiles()
     {
         _files.Clear();
-        if (!MMCZip.CollectFileListRecursively(_options.Instance.GameRoot(), null, _files,
+        if (!MmcZip.CollectFileListRecursively(_options.Instance.GameRoot(), null, _files,
                 _options.Filter is null
                     ? null
                     : (Func<FileSystemInfo, bool>)(f => _options.Filter(GetRelativePath(f.FullName)))))
@@ -164,7 +165,7 @@ public sealed class FlamePackExportTask : FlintTask
                     continue;
                 }
                 var metadata = modList.GetMetadata(mod);
-                if (metadata is not null && metadata.Provider == ResourceProvider.FLAME)
+                if (metadata is not null && metadata.Provider == ResourceProvider.Flame)
                 {
                     _resolvedFiles[file] = new ResolvedFile
                     {
@@ -426,7 +427,7 @@ public sealed class FlamePackExportTask : FlintTask
             var modlistEntry = zip.CreateEntry("modlist.html", CompressionLevel.Optimal);
             using (var writer = new StreamWriter(modlistEntry.Open(), Encoding.UTF8))
             {
-                writer.Write(GenerateHTML());
+                writer.Write(GenerateHtml());
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
@@ -525,7 +526,7 @@ public sealed class FlamePackExportTask : FlintTask
         return obj.ToJsonString();
     }
 
-    private string GenerateHTML()
+    private string GenerateHtml()
     {
         var content = "";
         foreach (var mod in _resolvedFiles.Values)
@@ -537,7 +538,7 @@ public sealed class FlamePackExportTask : FlintTask
                     : "";
                 content += Template
                     .Replace("{name}", WebUtility.HtmlEncode(mod.Name))
-                    .Replace("{url}", WebUtility.HtmlEncode(ModIndex.GetMetaURL(ResourceProvider.FLAME,
+                    .Replace("{url}", WebUtility.HtmlEncode(ModIndex.GetMetaUrl(ResourceProvider.Flame,
                         mod.AddonId.ToString(CultureInfo.InvariantCulture))))
                     .Replace("{authors}", authors);
             }

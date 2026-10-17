@@ -7,6 +7,7 @@
 //  - Zip inspection uses System.IO.Compression; ArchiveReader::collectFiles(false) +
 //    ArchiveReader::exists are mirrored over the entry list (exact entry match or any
 //    entry below the directory, case-insensitively).
+
 using System.IO.Compression;
 using FlintLauncher.Core.IO;
 

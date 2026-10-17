@@ -6,6 +6,7 @@
 //    (the G1 home layout — what a host started with --home-dir sees);
 //  - IndependentRoots(): five separate temp roots (the precise-flag shape — catches any
 //    cross-root assumption the zero-implication discipline forbids).
+
 using System.Runtime.CompilerServices;
 using FlintLauncher.Core;
 

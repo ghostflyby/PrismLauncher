@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/launch/EnsureOfflineLibraries.{h,cpp}: fail the launch with a
 // clear message when the instance's libraries are missing (offline mode has no downloads).
+
 using FlintLauncher.Core.Instances;
 
 namespace FlintLauncher.Core.Launch.Steps;

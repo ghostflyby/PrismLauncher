@@ -16,6 +16,7 @@
 //  - The readyForLaunch()/proceed() gating is modeled with mayProceed state exactly like the
 //    C++: the Running state arms `mayProceed` and emits ReadyForLaunch; Proceed() writes
 //    "launch\n", AbortStep() writes "abort\n" (or kills).
+
 using System.Text;
 using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Instances;
@@ -32,16 +33,16 @@ public sealed class LauncherPartLaunch : LaunchStep
 
     private readonly LoggedProcess _process;
     private readonly bool _closeAfterLaunch;
-    private bool _closeAfterLaunchTriggered;
-    private AuthSession? _session;
-    private MinecraftTarget? _targetToJoin;
-    private string _launchScript = "";
-    private bool _mayProceed;
-    private TaskCompletionSource? _exitSignal;
+    private bool closeAfterLaunchTriggered;
+    private AuthSession? session;
+    private MinecraftTarget? targetToJoin;
+    private string launchScript = "";
+    private bool mayProceed;
+    private TaskCompletionSource? exitSignal;
 
     public LauncherPartLaunch(LaunchTask parent) : base(parent)
     {
-        _closeAfterLaunch = Variant.AsBool(parent.Instance.Settings().Get("CloseAfterLaunch"));
+        _closeAfterLaunch = Variant.AsBool(parent.Instance.Settings.Get("CloseAfterLaunch"));
         _process = new LoggedProcess(
             parent.Instance.GetJavaVersion().DefaultsToUtf8() ? Encoding.UTF8 : null,
             parent.Services.LoggerFactory);
@@ -52,17 +53,17 @@ public sealed class LauncherPartLaunch : LaunchStep
 
     private void OnProcessLog(List<string> lines, MessageLevel level)
     {
-        if (_closeAfterLaunch && !_closeAfterLaunchTriggered && LaunchTask.MatchesCloseAfterLaunch(lines))
+        if (_closeAfterLaunch && !closeAfterLaunchTriggered && LaunchTask.MatchesCloseAfterLaunch(lines))
         {
-            _closeAfterLaunchTriggered = true;
+            closeAfterLaunchTriggered = true;
             Services.Ui.CloseAfterLaunch?.Invoke();
         }
         EmitLogLines(lines, level);
     }
 
-    public void SetAuthSession(AuthSession? session) => _session = session;
+    public void SetAuthSession(AuthSession? session) => this.session = session;
 
-    public void SetTargetToJoin(MinecraftTarget? targetToJoin) => _targetToJoin = targetToJoin;
+    public void SetTargetToJoin(MinecraftTarget? targetToJoin) => this.targetToJoin = targetToJoin;
 
     public void SetWorkingDirectory(string workingDirectory) => _process.SetWorkingDirectory(workingDirectory);
 
@@ -92,12 +93,12 @@ public sealed class LauncherPartLaunch : LaunchStep
             }
         }
 
-        _launchScript = instance.CreateLaunchScript(_session, _targetToJoin, Services);
+        launchScript = instance.CreateLaunchScript(session, targetToJoin, Services);
         var args = instance.JavaArguments();
         var allArgs = string.Join(" ", args);
         EmitLogLine("Java arguments:\n  " + Parent.CensorPrivateInfo(allArgs) + "\n", MessageLevel.Launcher);
 
-        var javaPath = LauncherJars.ResolveExecutable(Variant.AsString(instance.Settings().Get("JavaPath")));
+        var javaPath = LauncherJars.ResolveExecutable(Variant.AsString(instance.Settings.Get("JavaPath")));
 
         _process.SetProcessEnvironment(instance.CreateLaunchEnvironment());
 
@@ -145,8 +146,8 @@ public sealed class LauncherPartLaunch : LaunchStep
         // (Linux only: gamemode_request_start_for — not ported, see header)
 
         // park until the process reaches a terminal state (the game exiting)
-        _exitSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        return _exitSignal.Task.WaitAsync(cancellationToken);
+        exitSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        return exitSignal.Task.WaitAsync(cancellationToken);
     }
 
     private void OnState(LoggedProcessState state)
@@ -201,31 +202,29 @@ public sealed class LauncherPartLaunch : LaunchStep
                 EmitLogLine($"Minecraft process ID: {_process.ProcessId}\n\n", MessageLevel.Launcher);
                 Parent.Pid = _process.ProcessId;
                 // send the launch script to the launcher part
-                _process.Write(_launchScript);
+                _process.Write(launchScript);
                 // the script write and the gate below are the two events a "game never
                 // started" investigation turns on — surface them in both channels
-                Log.ScriptWritten(_launchScript.Length);
-                EmitLogLine($"Launch script piped to stdin ({_launchScript.Length} chars).", MessageLevel.Launcher);
+                Log.ScriptWritten(launchScript.Length);
+                EmitLogLine($"Launch script piped to stdin ({launchScript.Length} chars).", MessageLevel.Launcher);
 
-                _mayProceed = true;
+                mayProceed = true;
                 EmitReadyForLaunch();
                 break;
             }
-            default:
-                break;
         }
     }
 
-    private void CompleteExit() => _exitSignal?.TrySetResult();
+    private void CompleteExit() => exitSignal?.TrySetResult();
 
     public override void Proceed()
     {
-        if (_mayProceed)
+        if (mayProceed)
         {
             Parent.Instance.SetMinecraftRunning(true);
             const string launchString = "launch\n";
             _process.Write(launchString);
-            _mayProceed = false;
+            mayProceed = false;
             Log.LaunchSignalSent();
             EmitLogLine("Launch signal ('launch') sent to the game process.", MessageLevel.Launcher);
         }
@@ -239,9 +238,9 @@ public sealed class LauncherPartLaunch : LaunchStep
 
     public override bool AbortStep()
     {
-        if (_mayProceed)
+        if (mayProceed)
         {
-            _mayProceed = false;
+            mayProceed = false;
             const string launchString = "abort\n";
             _process.Write(launchString);
         }

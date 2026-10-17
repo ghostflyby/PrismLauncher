@@ -11,6 +11,7 @@
 //  - The consumed-character bookkeeping uses IXmlLineInfo (the '<' of the event's end tag plus
 //    its text length) in place of QXmlStreamReader::characterOffset().
 //  - QXmlStreamReader::Error codes are collapsed into the error message string only.
+
 using System.Globalization;
 using System.Text;
 using System.Xml;
@@ -43,48 +44,48 @@ public sealed class LogParser
 
     private const string TargetStart = "<log4j:event";
 
-    private string _buffer = "";
-    private string _partialData = "";
-    private ParseError? _error;
+    private string buffer = "";
+    private string partialData = "";
+    private ParseError? error;
 
     /// <summary>Port of appendLine(): completes a pending partial with a newline separator, then
     /// appends the incoming data.</summary>
     public void AppendLine(string data)
     {
-        if (_partialData.Length > 0)
+        if (partialData.Length > 0)
         {
-            _buffer = _partialData;
-            _buffer += "\n";
-            _partialData = "";
+            buffer = partialData;
+            buffer += "\n";
+            partialData = "";
         }
-        _buffer += data;
+        buffer += data;
     }
 
     /// <summary>Port of getError().</summary>
-    public ParseError? GetError() => _error;
+    public ParseError? GetError() => error;
 
     /// <summary>Port of parseNext(): null when the buffer is exhausted.</summary>
     public ParsedItem? ParseNext()
     {
-        _error = null;
+        error = null;
 
-        if (_buffer.Length == 0)
+        if (buffer.Length == 0)
         {
             return null;
         }
 
-        if (_buffer.Trim().Length == 0)
+        if (buffer.Trim().Length == 0)
         {
-            var text = _buffer;
-            _buffer = "";
+            var text = buffer;
+            buffer = "";
             return new PlainText(text);
         }
 
         // check if we have a full xml log4j event
-        var isCompleteLog4j = false;
+        var isCompleteLog4J = false;
         try
         {
-            using var parser = CreateReader(_buffer);
+            using var parser = CreateReader(buffer);
             if (ReadNextStartElement(parser) && MatchesEvent(parser.Name))
             {
                 var depth = 1;
@@ -107,54 +108,54 @@ public sealed class LogParser
                         // which the EOF break above treats as an incomplete event.)
                     }
                 }
-                isCompleteLog4j = depth == 0 && !eod;
+                isCompleteLog4J = depth == 0 && !eod;
             }
         }
         catch (XmlException)
         {
-            isCompleteLog4j = false;
+            isCompleteLog4J = false;
         }
 
-        if (isCompleteLog4j)
+        if (isCompleteLog4J)
         {
             return ParseLog4J();
         }
 
-        if (IsPotentialLog4JStart(_buffer))
+        if (IsPotentialLog4JStart(buffer))
         {
-            _partialData = _buffer;
-            return new Partial(_buffer);
+            partialData = buffer;
+            return new Partial(buffer);
         }
 
         var start = 0;
-        while (start < _buffer.Length)
+        while (start < buffer.Length)
         {
-            var pos = _buffer.IndexOf('<', start);
+            var pos = buffer.IndexOf('<', start);
             if (pos == -1)
             {
                 break;
             }
-            var slice = _buffer[pos..];
+            var slice = buffer[pos..];
             if (IsPotentialLog4JStart(slice))
             {
                 if (pos > 0)
                 {
-                    var text = _buffer[..pos];
-                    _buffer = _buffer[pos..];
+                    var text = buffer[..pos];
+                    buffer = buffer[pos..];
                     if (text.Trim().Length > 0)
                     {
                         return new PlainText(text);
                     }
                 }
-                _partialData = _buffer;
-                return new Partial(_buffer);
+                partialData = buffer;
+                return new Partial(buffer);
             }
             start = pos + 1;
         }
 
         // no log4j found, all plain text
-        var allText = _buffer;
-        _buffer = "";
+        var allText = buffer;
+        buffer = "";
         return new PlainText(allText);
     }
 
@@ -166,18 +167,18 @@ public sealed class LogParser
         var doNext = true;
         while (doNext)
         {
-            var item_ = ParseNext();
-            if (_error is not null)
+            var item = ParseNext();
+            if (error is not null)
             {
                 return [];
             }
-            if (item_ is not null)
+            if (item is not null)
             {
-                if (item_ is Partial)
+                if (item is Partial)
                 {
                     break;
                 }
-                items.Add(item_);
+                items.Add(item);
             }
             else
             {
@@ -191,7 +192,7 @@ public sealed class LogParser
 
     private ParsedItem? ParseLog4J()
     {
-        using var parser = CreateReader(_buffer);
+        using var parser = CreateReader(buffer);
         try
         {
             if (!ReadNextStartElement(parser) || !MatchesEvent(parser.Name))
@@ -260,16 +261,16 @@ public sealed class LogParser
                         {
                             if (foundMessage)
                             {
-                                var consumed = ConsumedOffset(parser, _buffer);
-                                if (consumed > 0 && consumed <= _buffer.Length)
+                                var consumed = ConsumedOffset(parser, buffer);
+                                if (consumed > 0 && consumed <= buffer.Length)
                                 {
-                                    _buffer = _buffer[consumed..];
+                                    buffer = buffer[consumed..];
                                     // potential whitespace preserved for next item
                                 }
-                                _error = null; // clearError
+                                error = null; // clearError
                                 return entry; // entryReady
                             }
-                            _error = new ParseError("log4j:Event Missing required attribute: message");
+                            error = new ParseError("log4j:Event Missing required attribute: message");
                             return null;
                         }
                         break;
@@ -280,7 +281,7 @@ public sealed class LogParser
         }
         catch (XmlException e)
         {
-            _error = new ParseError(e.Message);
+            error = new ParseError(e.Message);
             return null;
         }
     }
@@ -306,7 +307,7 @@ public sealed class LogParser
                     case "timestamp":
                         if (value.Length == 0)
                         {
-                            _error = new ParseError("log4j:Event Missing required attribute: timestamp");
+                            error = new ParseError("log4j:Event Missing required attribute: timestamp");
                             return null;
                         }
                         entry = entry with { Timestamp = FromMSecsSinceEpoch(value) };
@@ -323,7 +324,7 @@ public sealed class LogParser
         parser.MoveToElement();
         if (logger.Length == 0)
         {
-            _error = new ParseError("log4j:Event Missing required attribute: logger");
+            error = new ParseError("log4j:Event Missing required attribute: logger");
             return null;
         }
         return entry with { Logger = logger };

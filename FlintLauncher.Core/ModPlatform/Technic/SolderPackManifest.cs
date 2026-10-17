@@ -2,6 +2,7 @@
 // Port of modplatform/technic/SolderPackManifest.{h,cpp}: the Solder API models —
 // /modpack/{slug} (recommended/latest/builds) and /modpack/{slug}/{build} (minecraft + mods).
 // Reads go through the JsonNode model (single-DOM).
+
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 

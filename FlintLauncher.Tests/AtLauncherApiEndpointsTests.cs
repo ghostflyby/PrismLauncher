@@ -7,6 +7,7 @@
 //
 // Every host gets its own AtLauncherApi client pointed at the stub (DownloadServerUrl/
 // ApiBaseUrl are per-instance state now, so no [Collection] serialization is needed).
+
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -38,7 +39,7 @@ public class AtLauncherApiEndpointsTests : IDisposable
 
     /// <summary>The two-entry packsnew.json index fixture (public + private pack).</summary>
     private static string PacksNewJson => new JsonArray(
-        (JsonNode?)new JsonObject
+        new JsonObject
         {
             ["id"] = 1,
             ["position"] = 10,
@@ -47,10 +48,10 @@ public class AtLauncherApiEndpointsTests : IDisposable
             ["system"] = false,
             ["description"] = "A public pack",
             ["versions"] = new JsonArray(
-                (JsonNode?)new JsonObject { ["version"] = "1.0.0", ["minecraft"] = "1.20.1" },
-                (JsonNode?)new JsonObject { ["version"] = "1.1.0", ["minecraft"] = "1.20.4" }),
+                new JsonObject { ["version"] = "1.0.0", ["minecraft"] = "1.20.1" },
+                new JsonObject { ["version"] = "1.1.0", ["minecraft"] = "1.20.4" }),
         },
-        (JsonNode?)new JsonObject
+        new JsonObject
         {
             ["id"] = 2,
             ["position"] = 5,

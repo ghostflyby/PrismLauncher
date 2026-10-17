@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/SysInfo.{h,cpp} (the three functions the launch pipeline uses):
 // currentSystem(), useQTForArch() and the getSupportedJavaArchitecture() free function.
+
+using System.Runtime.InteropServices;
+
 namespace FlintLauncher.Core.Launch;
 
 public static class SysInfo
@@ -28,12 +31,12 @@ public static class SysInfo
     }
 
     /// <summary>Port of SysInfo::useQTForArch (QSysInfo::buildCpuArchitecture).</summary>
-    public static string UseQtForArch() => System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture switch
+    public static string UseQtForArch() => RuntimeInformation.ProcessArchitecture switch
     {
-        System.Runtime.InteropServices.Architecture.X64 => "x86_64",
-        System.Runtime.InteropServices.Architecture.X86 => "i386",
-        System.Runtime.InteropServices.Architecture.Arm64 => "arm64",
-        System.Runtime.InteropServices.Architecture.Arm => "arm",
+        Architecture.X64 => "x86_64",
+        Architecture.X86 => "i386",
+        Architecture.Arm64 => "arm64",
+        Architecture.Arm => "arm",
         _ => "unknown",
     };
 

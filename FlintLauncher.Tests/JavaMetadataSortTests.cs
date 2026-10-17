@@ -2,6 +2,7 @@
 // Tests for the Java::Metadata and JavaInstall comparators and the metadata parser. The C++
 // tests directory only carries JavaVersion_test.cpp (no JavaMetadata/JavaInstall comparator
 // tests), so these are table checks written against the upstream operator semantics.
+
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Java;
 using Xunit;
@@ -11,7 +12,7 @@ namespace FlintLauncher.Tests;
 public class JavaMetadataSortTests
 {
     private static JavaMetadata Meta(string name, string version, string releaseTime, string vendor = "vendor",
-                                     string downloadType = "archive", string runtimeOS = "osx")
+                                     string downloadType = "archive", string runtimeOs = "osx")
     {
         // mirror the meta format: the numeric fields are parsed out of the dotted version
         var parts = version.Split('.');
@@ -26,7 +27,7 @@ public class JavaMetadataSortTests
             ["releaseTime"] = releaseTime,
             ["downloadType"] = downloadType,
             ["packageType"] = "tar.gz",
-            ["runtimeOS"] = runtimeOS,
+            ["runtimeOS"] = runtimeOs,
             ["checksum"] = new JsonObject
             {
                 ["type"] = "sha1",
@@ -174,17 +175,17 @@ public class JavaMetadataSortTests
     [Fact]
     public void JavaInstall_SortsByArchThenVersionThenPath()
     {
-        var x64new = new JavaInstall("17.0.9", "x86_64", "/a");
-        var x64old = new JavaInstall("11.0.2", "x86_64", "/b");
+        var x64New = new JavaInstall("17.0.9", "x86_64", "/a");
+        var x64Old = new JavaInstall("11.0.2", "x86_64", "/b");
         var arm64 = new JavaInstall("21", "aarch64", "/c");
 
         // architecture compares first (natural, case-insensitive: aarch64 < x86_64)
-        Assert.True(arm64 < x64new);
-        Assert.True(x64old < x64new);
+        Assert.True(arm64 < x64New);
+        Assert.True(x64Old < x64New);
         // equal arch + version: the path breaks the tie
         Assert.True(new JavaInstall("17", "x86_64", "/a") < new JavaInstall("17", "x86_64", "/b"));
-        Assert.True(x64new == new JavaInstall("17.0.9", "x86_64", "/a"));
-        Assert.True(x64new > x64old);
+        Assert.True(x64New == new JavaInstall("17.0.9", "x86_64", "/a"));
+        Assert.True(x64New > x64Old);
     }
 
     [Fact]

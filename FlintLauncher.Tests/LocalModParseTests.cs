@@ -5,6 +5,7 @@
 // the ModFolderModel.Update() details-population pass. Synthetic jars are built in-test
 // with System.IO.Compression (entry order matters for the forge jarVersion/MANIFEST dance
 // and the nilloader canary pair).
+
 using System.IO.Compression;
 using System.Text;
 using FlintLauncher.Core.Minecraft.Resources;

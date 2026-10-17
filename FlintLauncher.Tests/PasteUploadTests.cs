@@ -3,6 +3,8 @@
 // the provider table, the URL resolution (incl. the paste.gg api.paste.gg HACK), the exact
 // request bodies of all four providers, the anonymization rules and the response parsing of
 // every provider (success, provider error, malformed body, HTTP status gate).
+
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using FlintLauncher.Core.Net;
@@ -36,9 +38,9 @@ public class PasteUploadTests : IDisposable
         Assert.Equal("https://hst.sh", PasteUpload.PasteTypes[(int)PasteUpload.PasteType.Hastebin].DefaultBase);
         Assert.Equal("/documents", PasteUpload.PasteTypes[(int)PasteUpload.PasteType.Hastebin].EndpointPath);
 
-        Assert.Equal("paste.gg", PasteUpload.PasteTypes[(int)PasteUpload.PasteType.PasteGG].Name);
-        Assert.Equal("https://paste.gg", PasteUpload.PasteTypes[(int)PasteUpload.PasteType.PasteGG].DefaultBase);
-        Assert.Equal("/api/v1/pastes", PasteUpload.PasteTypes[(int)PasteUpload.PasteType.PasteGG].EndpointPath);
+        Assert.Equal("paste.gg", PasteUpload.PasteTypes[(int)PasteUpload.PasteType.PasteGg].Name);
+        Assert.Equal("https://paste.gg", PasteUpload.PasteTypes[(int)PasteUpload.PasteType.PasteGg].DefaultBase);
+        Assert.Equal("/api/v1/pastes", PasteUpload.PasteTypes[(int)PasteUpload.PasteType.PasteGg].EndpointPath);
 
         Assert.Equal("mclo.gs", PasteUpload.PasteTypes[(int)PasteUpload.PasteType.Mclogs].Name);
         Assert.Equal("https://api.mclo.gs", PasteUpload.PasteTypes[(int)PasteUpload.PasteType.Mclogs].DefaultBase);
@@ -64,10 +66,10 @@ public class PasteUploadTests : IDisposable
 
         // HACK: the official paste.gg instance does not follow its own documented api path
         Assert.Equal("https://api.paste.gg/v1/pastes",
-            new PasteUpload(LogLine, "", PasteUpload.PasteType.PasteGG).EndpointUrl);
+            new PasteUpload(LogLine, "", PasteUpload.PasteType.PasteGg).EndpointUrl);
         // ... but a custom paste.gg base keeps the endpoint path suffix
         Assert.Equal(_server.BaseUrl + "/api/v1/pastes",
-            new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.PasteGG).EndpointUrl);
+            new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.PasteGg).EndpointUrl);
     }
 
     // ---------------------------------------------------------------- AnonymizeLog.cpp
@@ -192,7 +194,7 @@ public class PasteUploadTests : IDisposable
     {
         _server.Responder = _ => (200, """{"status":"success","result":{"id":"abcdef"}}""", "OK");
 
-        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.PasteGG);
+        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.PasteGg);
         await upload.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, upload.State);
@@ -206,7 +208,7 @@ public class PasteUploadTests : IDisposable
         var root = doc.RootElement;
         // expires = upload time + 100 days (Qt ISODate, UTC)
         var expires = DateTime.Parse(root.GetProperty("expires").GetString()!, null,
-            System.Globalization.DateTimeStyles.RoundtripKind);
+            DateTimeStyles.RoundtripKind);
         var delta = expires - DateTime.UtcNow;
         Assert.True(delta > TimeSpan.FromDays(99.9) && delta < TimeSpan.FromDays(100.1),
             "expires should be ~100 days out, got " + delta);
@@ -256,7 +258,7 @@ public class PasteUploadTests : IDisposable
     public async Task PasteGG_Error_Code_Includes_Error_And_Message()
     {
         _server.Responder = _ => (200, """{"status":"error","error":"expired","message":"too old"}""", "OK");
-        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.PasteGG);
+        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.PasteGg);
         await upload.StartAsync();
         Assert.Equal(TaskState.Failed, upload.State);
         Assert.Equal($"Error: {_server.BaseUrl}/api/v1/pastes returned an error code: expired\nError message: too old",
@@ -267,7 +269,7 @@ public class PasteUploadTests : IDisposable
     public async Task PasteGG_Error_Code_Defaults_Message_To_None()
     {
         _server.Responder = _ => (200, """{"status":"error","error":"nope"}""", "OK");
-        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.PasteGG);
+        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.PasteGg);
         await upload.StartAsync();
         Assert.Equal(TaskState.Failed, upload.State);
         Assert.Contains("Error message: none", upload.FailReason);
@@ -282,7 +284,7 @@ public class PasteUploadTests : IDisposable
                  {
                      (PasteUpload.PasteType.Hastebin, "hastebin"),
                      (PasteUpload.PasteType.Mclogs, "mclogs"),
-                     (PasteUpload.PasteType.PasteGG, "pasteGG"),
+                     (PasteGG: PasteUpload.PasteType.PasteGg, "pasteGG"),
                  })
         {
             var upload = new PasteUpload(LogLine, _server.BaseUrl, type);

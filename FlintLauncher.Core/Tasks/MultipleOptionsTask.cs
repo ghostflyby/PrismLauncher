@@ -23,11 +23,11 @@ public class MultipleOptionsTask : ConcurrentTask
         // m_done counts finished subtasks of either kind while m_failed only counts failures:
         // done != failed therefore means one attempt succeeded.
         int done, failed, queued;
-        lock (_gate)
+        lock (Gate)
         {
-            done = _done.Count;
-            failed = _failed.Count;
-            queued = _queue.Count;
+            done = Done.Count;
+            failed = Failed.Count;
+            queued = Queue.Count;
         }
 
         if (done != failed)
@@ -51,11 +51,11 @@ public class MultipleOptionsTask : ConcurrentTask
         // snapshot captured under the gate is emitted only while it is still the freshest.
         long stamp;
         int doing, done, totalSize;
-        lock (_gate)
+        lock (Gate)
         {
             stamp = BeginStateUpdateLocked();
-            doing = _doing.Count;
-            done = _done.Count;
+            doing = Doing.Count;
+            done = Done.Count;
             totalSize = TotalSizeLocked();
         }
 

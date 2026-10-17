@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/mod/ResourcePack.{h,cpp}: a DataPack whose pack_format maps
 // through the resource pack format table.
+
 using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.Minecraft.Resources;

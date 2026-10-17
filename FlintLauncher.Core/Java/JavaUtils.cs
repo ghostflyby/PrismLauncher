@@ -158,7 +158,7 @@ public static class JavaUtils
         }
         else if (OperatingSystem.IsMacOS())
         {
-            javas = FindJavaPathsMacOS();
+            javas = FindJavaPathsMacOs();
         }
         else if (OperatingSystem.IsLinux() || OperatingSystem.IsFreeBSD() || IsOpenBsd())
         {
@@ -183,15 +183,15 @@ public static class JavaUtils
     /// died with the Java &lt;8 support floor — only Contents/Home bundles and the JDK 8
     /// inner JRE variant remain.
     /// </summary>
-    private static List<string> FindJavaPathsMacOS()
+    private static List<string> FindJavaPathsMacOs()
     {
         var javas = new List<string> { GetDefaultJava().Path };
 
-        var libraryJVMDir = "/Library/Java/JavaVirtualMachines/";
-        foreach (var java in DirectoryNames(libraryJVMDir))
+        var libraryJvmDir = "/Library/Java/JavaVirtualMachines/";
+        foreach (var java in DirectoryNames(libraryJvmDir))
         {
-            javas.Add(FileSystem.PathCombine(libraryJVMDir, java, "Contents/Home/bin/java"));
-            javas.Add(FileSystem.PathCombine(libraryJVMDir, java, "Contents/Home/jre/bin/java"));
+            javas.Add(FileSystem.PathCombine(libraryJvmDir, java, "Contents/Home/bin/java"));
+            javas.Add(FileSystem.PathCombine(libraryJvmDir, java, "Contents/Home/jre/bin/java"));
         }
 
         var home = Environment.GetEnvironmentVariable("HOME") ?? "";
@@ -213,10 +213,10 @@ public static class JavaUtils
         }
 
         // java in user library folder (like from intellij downloads)
-        var userLibraryJVMDir = FileSystem.PathCombine(home, "Library/Java/JavaVirtualMachines/");
-        foreach (var java in DirectoryNames(userLibraryJVMDir))
+        var userLibraryJvmDir = FileSystem.PathCombine(home, "Library/Java/JavaVirtualMachines/");
+        foreach (var java in DirectoryNames(userLibraryJvmDir))
         {
-            javas.Add(FileSystem.PathCombine(userLibraryJVMDir, java, "Contents/Home/bin/java"));
+            javas.Add(FileSystem.PathCombine(userLibraryJvmDir, java, "Contents/Home/bin/java"));
         }
 
         return javas;
@@ -361,8 +361,8 @@ public static class JavaUtils
             // add the microsoft store version of the launcher to the search. the current path is:
             // C:\Users\USERNAME\AppData\Local\Packages\Microsoft.4297127D64EC6_8wekyb3d8bbwe\LocalCache\Local\runtime
             var localAppDataPath = Environment.GetEnvironmentVariable("LOCALAPPDATA") ?? "";
-            var minecraftMSStorePath = FileSystem.PathCombine(Path.GetFullPath(localAppDataPath), "Packages", "Microsoft.4297127D64EC6_8wekyb3d8bbwe");
-            processpaths.Add(FileSystem.PathCombine(minecraftMSStorePath, "LocalCache", "Local", "runtime"));
+            var minecraftMsStorePath = FileSystem.PathCombine(Path.GetFullPath(localAppDataPath), "Packages", "Microsoft.4297127D64EC6_8wekyb3d8bbwe");
+            processpaths.Add(FileSystem.PathCombine(minecraftMsStorePath, "LocalCache", "Local", "runtime"));
         }
         else
         {

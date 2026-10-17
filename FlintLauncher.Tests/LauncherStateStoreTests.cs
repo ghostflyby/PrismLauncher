@@ -3,7 +3,10 @@
 // atomic writes, corrupt-payload fallback, the path-keyed java probe map (the multi-JVM fix)
 // and the round-trip through the real FlintJsonContext registration (the AOT smoke: a root
 // type missing from the context is a RUNTIME failure, not a compile error).
+
 using System.Text.Json;
+using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.State;
 using FlintLauncher.Web;
 using Xunit;
@@ -177,10 +180,10 @@ public class LaunchControllerOfflineNameStateTests
         // The controller task only terminates with the game session, so poll for the name
         // decision (it happens before the launch task is built) and abort the pipeline.
         var instance = await fixture.CreateInstance();
-        var first = new Core.Launch.LaunchController
+        var first = new LaunchController
         {
             Instance = instance,
-            WantedLaunchMode = Core.Instances.LaunchMode.Offline,
+            WantedLaunchMode = LaunchMode.Offline,
             Services = fixture.CreateServices(),
         };
         await first.StartAsync();
@@ -190,10 +193,10 @@ public class LaunchControllerOfflineNameStateTests
         // the handler (dialog) path: the suggestion prefills from the stored name (C++
         // LastOfflinePlayerName parity) and the picked name is written back
         string? capturedSuggestion = null;
-        var second = new Core.Launch.LaunchController
+        var second = new LaunchController
         {
             Instance = instance,
-            WantedLaunchMode = Core.Instances.LaunchMode.Offline,
+            WantedLaunchMode = LaunchMode.Offline,
             Services = fixture.CreateServices(),
             AskOfflineNameHandler = (_, _, suggestion) =>
             {

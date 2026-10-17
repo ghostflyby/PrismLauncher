@@ -3,6 +3,8 @@
 // FTB pack codes, one code per line in "private_packs.txt" (the C++ keeps the file name
 // relative to the launcher's working directory; the path is injectable here so tests can
 // point it at a temp dir). Saves are skipped unless the set changed since the load (dirty).
+
+using System.Security;
 using System.Text;
 using FlintLauncher.Core.IO;
 
@@ -12,7 +14,7 @@ public sealed class PrivatePackManager
 {
     private readonly string _filename;
     private readonly HashSet<string> _currentPacks = new(StringComparer.Ordinal);
-    private bool _dirty;
+    private bool dirty;
 
     public PrivatePackManager(string? filename = null)
     {
@@ -35,10 +37,10 @@ public sealed class PrivatePackManager
             {
                 _currentPacks.Add(code);
             }
-            _dirty = false;
+            dirty = false;
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
-                                  or System.Security.SecurityException)
+                                  or SecurityException)
         {
             _currentPacks.Clear();
         }
@@ -48,17 +50,17 @@ public sealed class PrivatePackManager
     /// the set changed (dirty). Write failures are swallowed like the C++ (warn only).</summary>
     public void Save()
     {
-        if (!_dirty)
+        if (!dirty)
         {
             return;
         }
         try
         {
             FileSystem.Write(_filename, Encoding.UTF8.GetBytes(string.Join('\n', _currentPacks)));
-            _dirty = false;
+            dirty = false;
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
-                                  or System.Security.SecurityException)
+                                  or SecurityException)
         {
         }
     }
@@ -66,12 +68,12 @@ public sealed class PrivatePackManager
     public void Add(string code)
     {
         _currentPacks.Add(code);
-        _dirty = true;
+        dirty = true;
     }
 
     public bool Remove(string code)
     {
-        _dirty = true;
+        dirty = true;
         return _currentPacks.Remove(code);
     }
 }

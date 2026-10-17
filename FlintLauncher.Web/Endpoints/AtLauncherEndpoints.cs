@@ -11,7 +11,9 @@
 // constants). The install's `serverUrl` body field selects a per-request derived client
 // instead of mutating the shared one, so an override can never leak into other requests
 // (and needs no restore).
+
 using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Json;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
@@ -27,7 +29,7 @@ public static class AtLauncherEndpoints
         // the packsnew.json pass-through (AtlListModel::loadIndexedPack's mapping)
         api.MapGet("/modplatform/atlauncher/packs", (LauncherRuntime runtime) => WithIndexAsync(
             runtime, packs => Results.Ok(packs.Select(PackView).ToArray())))
-            .Produces<AtLauncherPackView[]>(200);
+            .Produces<AtLauncherPackView[]>();
 
         // ---------------------------------------- modplatform/atlauncher/packs/{name}/versions
         // the index carries each pack's version list (the ATL CDN has no per-pack index URL,
@@ -45,7 +47,7 @@ public static class AtLauncherEndpoints
                         .Select(version => new AtLauncherPackVersionView(version.Version, version.Minecraft))
                         .ToArray());
             }))
-            .Produces<AtLauncherPackVersionView[]>(200);
+            .Produces<AtLauncherPackVersionView[]>();
 
         // ------------------------------------------------ modplatform/atlauncher/install
         api.MapPost("/modplatform/atlauncher/install", async Task<IResult> (
@@ -162,7 +164,7 @@ public static class AtLauncherEndpoints
         {
             packs = AtLauncherApi.LoadPackIndex(request.BodyAsString);
         }
-        catch (Core.Json.JsonParseException e)
+        catch (JsonParseException e)
         {
             return ApiJson.Error("atlauncher_invalid_response",
                 $"atlauncher pack index is invalid: {e.Message}", 502);

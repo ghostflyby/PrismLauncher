@@ -2,6 +2,7 @@
 // Tests for the seeded-profile launch pipeline data pieces: createLaunchScript's exact line
 // set (MinecraftInstance::createLaunchScript), processMinecraftArgs token substitution
 // (including the auth tokens) and LaunchTask's censorPrivateInfo session filter.
+
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using Xunit;
@@ -15,7 +16,7 @@ public class LaunchScriptTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var session = fixture.OfflineSession("Steve");
+        var session = fixture.OfflineSession();
 
         var script = instance.CreateLaunchScript(session, null);
         var lines = script.Split('\n');
@@ -72,7 +73,7 @@ public class LaunchScriptTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var session = fixture.OfflineSession("Steve");
+        var session = fixture.OfflineSession();
         var target = new MinecraftTarget("mc.example.com", 25565, "");
 
         var script = instance.CreateLaunchScript(session, target);
@@ -132,7 +133,7 @@ public class LaunchScriptTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var session = fixture.OfflineSession("Steve");
+        var session = fixture.OfflineSession();
 
         var args = instance.ProcessMinecraftArgs(session, null);
 
@@ -186,7 +187,7 @@ public class LaunchScriptTests
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
         var task = LaunchTask.Create(instance, fixture.CreateServices());
-        var session = fixture.OfflineSession("Steve");
+        var session = fixture.OfflineSession();
 
         // MinecraftInstance::createCensorFilterFromSession shape
         var filter = new SortedDictionary<string, string>(StringComparer.Ordinal);

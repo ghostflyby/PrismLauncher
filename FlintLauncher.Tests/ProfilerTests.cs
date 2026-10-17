@@ -3,6 +3,7 @@
 // registry keys from Application.cpp, the registered settings (JProfilerPath/JProfilerPort/
 // JVisualVMPath with the PATH-search default), the factories' check() messages and the argv the
 // profilers would spawn (the port never starts processes).
+
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tools;
 using Xunit;
@@ -131,7 +132,7 @@ public class ProfilerTests
     public void JVisualVM_Builds_The_Openpid_Command()
     {
         var settings = new TestSettings();
-        var factory = (JVisualVMFactory)Profilers.Value("jvisualvm")!;
+        var factory = (JVisualVmFactory)Profilers.Value("jvisualvm")!;
         factory.RegisterSettings(settings);
         settings.Set("JVisualVMPath", "/usr/bin/visualvm");
 
@@ -145,7 +146,7 @@ public class ProfilerTests
     [Fact]
     public void JVisualVM_Check_Messages()
     {
-        var factory = (JVisualVMFactory)Profilers.Value("jvisualvm")!;
+        var factory = (JVisualVmFactory)Profilers.Value("jvisualvm")!;
 
         Assert.False(factory.Check("", out var emptyError));
         Assert.Equal("Empty path", emptyError);
@@ -188,13 +189,13 @@ public class ProfilerTests
     public void JVisualVM_Registered_Default_Comes_From_The_Path_Search()
     {
         var settings = new TestSettings();
-        var factory = (JVisualVMFactory)Profilers.Value("jvisualvm")!;
+        var factory = (JVisualVmFactory)Profilers.Value("jvisualvm")!;
         factory.RegisterSettings(settings);
 
-        var expected = JVisualVMFactory.FindExecutable("jvisualvm");
+        var expected = JVisualVmFactory.FindExecutable("jvisualvm");
         if (expected.Length == 0)
         {
-            expected = JVisualVMFactory.FindExecutable("visualvm");
+            expected = JVisualVmFactory.FindExecutable("visualvm");
         }
         Assert.Equal(expected, Variant.AsString(settings.Get("JVisualVMPath")));
     }

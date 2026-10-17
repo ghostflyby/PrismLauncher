@@ -21,23 +21,23 @@ public class ConcurrentTask : FlintTask
     /// <summary>C++ constructor default: explicit ConcurrentTask(QString task_name = "", int max_concurrent = 6).</summary>
     public const int DefaultMaxConcurrent = 6;
 
-    private protected readonly object _gate = new();
-    private protected readonly Queue<FlintTask> _queue = new();
-    private protected readonly Dictionary<FlintTask, Task?> _doing = new();
-    private protected readonly Dictionary<FlintTask, FlintTask> _done = new();
-    private protected readonly Dictionary<FlintTask, FlintTask> _failed = new();
-    private protected readonly Dictionary<FlintTask, FlintTask> _succeeded = new();
-    private protected readonly Dictionary<Guid, TaskStepProgress> _taskProgress = new();
-    private protected int _totalMaxSize;
-    private CancellationToken _runToken;
-    private volatile bool _aborting;
+    private protected readonly object Gate = new();
+    private protected readonly Queue<FlintTask> Queue = new();
+    private protected readonly Dictionary<FlintTask, Task?> Doing = new();
+    private protected readonly Dictionary<FlintTask, FlintTask> Done = new();
+    private protected readonly Dictionary<FlintTask, FlintTask> Failed = new();
+    private protected readonly Dictionary<FlintTask, FlintTask> Succeeded = new();
+    private protected readonly Dictionary<Guid, TaskStepProgress> TaskProgress = new();
+    private protected int TotalMaxSize;
+    private CancellationToken runToken;
+    private volatile bool aborting;
     /// <summary>
     /// Subtask completions whose bookkeeping is still in flight (between RunSubTaskAsync's yield
     /// and OnSubTaskFinished returning). The driver loop must not start new work while this is
     /// non-zero, otherwise it can observe a drained _doing before the completion handler decided
     /// the outcome and start a subtask that should never have run (SequentialTask fail-fast).
     /// </summary>
-    private int _pendingCompletions;
+    private int pendingCompletions;
     /// <summary>
     /// Gate-guarded stamp bumped on every composition mutation (subtask finished / next
     /// dequeued). UpdateState captures the stamp together with its snapshot; the emission is
@@ -46,21 +46,21 @@ public class ConcurrentTask : FlintTask
     /// STALE snapshot could be the last status emitted (the C++ got ordering for free from
     /// the single-threaded event loop; ConcurrentTaskAggregatesProgressTotals caught it).
     /// </summary>
-    private long _stateStamp;
+    private long stateStamp;
     private readonly object _emitLock = new();
 
     public ConcurrentTask(string taskName = "", int maxConcurrent = DefaultMaxConcurrent)
     {
         // `taskName` mirrors the C++ QObject objectName, which has no equivalent here.
-        _totalMaxSize = maxConcurrent;
+        TotalMaxSize = maxConcurrent;
     }
 
     /// <summary>Adds a task to execute in this ConcurrentTask (safe to call before starting).</summary>
     public void AddTask(FlintTask task)
     {
-        lock (_gate)
+        lock (Gate)
         {
-            _queue.Enqueue(task);
+            Queue.Enqueue(task);
         }
     }
 
@@ -75,12 +75,12 @@ public class ConcurrentTask : FlintTask
             throw new InvalidOperationException("Cannot clear a ConcurrentTask while it is running.");
         }
 
-        lock (_gate)
+        lock (Gate)
         {
-            _done.Clear();
-            _failed.Clear();
-            _queue.Clear();
-            _taskProgress.Clear();
+            Done.Clear();
+            Failed.Clear();
+            Queue.Clear();
+            TaskProgress.Clear();
         }
         ResetProgress();
     }
@@ -93,17 +93,17 @@ public class ConcurrentTask : FlintTask
         // the running subtasks. Like the C++ original, the parent finishes immediately instead of
         // waiting for the subtasks; `_aborting` mirrors disconnect(child, aborted, this) so that
         // late subtask completions are ignored.
-        _aborting = true;
+        aborting = true;
 
-        lock (_gate)
+        lock (Gate)
         {
-            _queue.Clear();
+            Queue.Clear();
         }
 
         FlintTask[] doing;
-        lock (_gate)
+        lock (Gate)
         {
-            doing = _doing.Keys.ToArray();
+            doing = Doing.Keys.ToArray();
         }
         foreach (var task in doing)
         {
@@ -122,9 +122,9 @@ public class ConcurrentTask : FlintTask
     {
         // Port of ConcurrentTask::getStepProgress(): the progress entries of the started,
         // not-yet-finished subtasks.
-        lock (_gate)
+        lock (Gate)
         {
-            return [.. _taskProgress.Values];
+            return [.. TaskProgress.Values];
         }
     }
 
@@ -134,11 +134,11 @@ public class ConcurrentTask : FlintTask
     /// </summary>
     public override TaskStepProgress GetProgress()
     {
-        lock (_gate)
+        lock (Gate)
         {
             return new TaskStepProgress(Uid)
             {
-                Current = _done.Count,
+                Current = Done.Count,
                 Total = TotalSizeLocked(),
                 Status = Status,
                 Details = GetDetails(),
@@ -149,12 +149,12 @@ public class ConcurrentTask : FlintTask
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        _runToken = cancellationToken;
-        _aborting = false; // allow reuse after Abort(), like any Task restart
+        runToken = cancellationToken;
+        aborting = false; // allow reuse after Abort(), like any Task restart
 
         // Port of ConcurrentTask::executeTask(): queue one start per concurrency slot.
         // Extra invocations no-op while the running set is full or the queue is empty.
-        for (var i = 0; i < _totalMaxSize; i++)
+        for (var i = 0; i < TotalMaxSize; i++)
         {
             ExecuteNextSubTask();
         }
@@ -174,9 +174,9 @@ public class ConcurrentTask : FlintTask
             {
                 Task? pending = null;
                 var reserved = false;
-                lock (_gate)
+                lock (Gate)
                 {
-                    foreach (var runTask in _doing.Values)
+                    foreach (var runTask in Doing.Values)
                     {
                         if (runTask is null)
                         {
@@ -196,7 +196,7 @@ public class ConcurrentTask : FlintTask
                     // Wait for in-flight completion bookkeeping (or a reservation being filled)
                     // before (re)starting anything, so the completion handler's decision (e.g.
                     // SequentialTask failing the parent) is observed atomically by this loop.
-                    if (reserved || Volatile.Read(ref _pendingCompletions) > 0)
+                    if (reserved || Volatile.Read(ref pendingCompletions) > 0)
                     {
                         await Task.Yield();
                         continue;
@@ -227,23 +227,23 @@ public class ConcurrentTask : FlintTask
         }
 
         FlintTask? next = null;
-        lock (_gate)
+        lock (Gate)
         {
-            if (_doing.Count >= _totalMaxSize)
+            if (Doing.Count >= TotalMaxSize)
             {
                 return;
             }
 
-            if (_queue.Count > 0)
+            if (Queue.Count > 0)
             {
-                next = _queue.Dequeue();
+                next = Queue.Dequeue();
                 // Reserve the bookkeeping slot now; the run task is filled in by StartSubTask
                 // (C++ inserts into m_doing before the queued child start).
-                _doing[next] = null;
-                _taskProgress[next.Uid] = new TaskStepProgress(next.Uid);
-                _stateStamp++;
+                Doing[next] = null;
+                TaskProgress[next.Uid] = new TaskStepProgress(next.Uid);
+                stateStamp++;
             }
-            else if (_doing.Count == 0)
+            else if (Doing.Count == 0)
             {
                 // The queue and the running set are empty: the task is done.
                 FinishLocked();
@@ -268,13 +268,13 @@ public class ConcurrentTask : FlintTask
         UpdateState();
 
         var runTask = RunSubTaskAsync(next);
-        lock (_gate)
+        lock (Gate)
         {
             // If the subtask already finished, its completion handler removed the entry; don't
             // resurrect it.
-            if (_doing.TryGetValue(next, out var reserved) && reserved is null)
+            if (Doing.TryGetValue(next, out var reserved) && reserved is null)
             {
-                _doing[next] = runTask;
+                Doing[next] = runTask;
             }
         }
     }
@@ -283,7 +283,7 @@ public class ConcurrentTask : FlintTask
     {
         try
         {
-            await next.StartAsync(_runToken).ConfigureAwait(false);
+            await next.StartAsync(runToken).ConfigureAwait(false);
         }
         catch
         {
@@ -296,7 +296,7 @@ public class ConcurrentTask : FlintTask
         // this moment the subtask is (or is about to be) terminal, so every observer must see
         // _pendingCompletions > 0 until the outcome (success/failure/parent-fail) has been
         // fully applied — no window where a terminal subtask is unannounced.
-        Interlocked.Increment(ref _pendingCompletions);
+        Interlocked.Increment(ref pendingCompletions);
         try
         {
             await Task.Yield();
@@ -304,13 +304,13 @@ public class ConcurrentTask : FlintTask
         }
         finally
         {
-            Interlocked.Decrement(ref _pendingCompletions);
+            Interlocked.Decrement(ref pendingCompletions);
         }
     }
 
     private void OnSubTaskFinished(FlintTask next)
     {
-        if (_aborting)
+        if (aborting)
         {
             // ConcurrentTask::abort() disconnects the subtask's signals; ignore late completions.
             return;
@@ -346,22 +346,22 @@ public class ConcurrentTask : FlintTask
     {
         TaskStepProgress finalProgress = default;
         var emitProgress = false;
-        lock (_gate)
+        lock (Gate)
         {
-            _done[task] = task;
+            Done[task] = task;
             if (state == TaskStepState.Succeeded)
             {
-                _succeeded[task] = task;
+                Succeeded[task] = task;
             }
             else
             {
-                _failed[task] = task;
+                Failed[task] = task;
             }
-            _doing.Remove(task);
-            _stateStamp++;
+            Doing.Remove(task);
+            stateStamp++;
 
             // C++ copies the progress entry by value, sets the state and removes it from the map.
-            if (_taskProgress.Remove(task.Uid, out var progress))
+            if (TaskProgress.Remove(task.Uid, out var progress))
             {
                 progress.State = state;
                 finalProgress = progress;
@@ -386,15 +386,15 @@ public class ConcurrentTask : FlintTask
     {
         TaskStepProgress progress;
         int totalSize;
-        lock (_gate)
+        lock (Gate)
         {
-            if (!_taskProgress.TryGetValue(task.Uid, out progress))
+            if (!TaskProgress.TryGetValue(task.Uid, out progress))
             {
                 return;
             }
             progress.Status = msg;
             progress.State = TaskStepState.Running;
-            _taskProgress[task.Uid] = progress;
+            TaskProgress[task.Uid] = progress;
             totalSize = TotalSizeLocked();
         }
 
@@ -410,15 +410,15 @@ public class ConcurrentTask : FlintTask
     {
         TaskStepProgress progress;
         int totalSize;
-        lock (_gate)
+        lock (Gate)
         {
-            if (!_taskProgress.TryGetValue(task.Uid, out progress))
+            if (!TaskProgress.TryGetValue(task.Uid, out progress))
             {
                 return;
             }
             progress.Details = msg;
             progress.State = TaskStepState.Running;
-            _taskProgress[task.Uid] = progress;
+            TaskProgress[task.Uid] = progress;
             totalSize = TotalSizeLocked();
         }
 
@@ -434,14 +434,14 @@ public class ConcurrentTask : FlintTask
     {
         TaskStepProgress progress;
         int totalSize;
-        lock (_gate)
+        lock (Gate)
         {
-            if (!_taskProgress.TryGetValue(task.Uid, out progress))
+            if (!TaskProgress.TryGetValue(task.Uid, out progress))
             {
                 return;
             }
             progress.Update(taskProgress.Current, taskProgress.Total);
-            _taskProgress[task.Uid] = progress;
+            TaskProgress[task.Uid] = progress;
             totalSize = TotalSizeLocked();
         }
 
@@ -457,15 +457,15 @@ public class ConcurrentTask : FlintTask
     /// <summary>The terminal decision once the queue and the running set are empty (gate held).</summary>
     private void FinishLocked()
     {
-        if (_failed.Count == 0)
+        if (Failed.Count == 0)
         {
             EmitSucceeded();
             return;
         }
 
-        if (_failed.Count == 1)
+        if (Failed.Count == 1)
         {
-            var task = _failed.Keys.First();
+            var task = Failed.Keys.First();
             var reason = task.FailReason;
             if (reason.Length == 0)
             {
@@ -476,7 +476,7 @@ public class ConcurrentTask : FlintTask
         }
 
         List<string> failReasons = [];
-        foreach (var failed in _failed.Values)
+        foreach (var failed in Failed.Values)
         {
             var reason = failed.FailReason;
             if (reason.Length > 0)
@@ -496,12 +496,12 @@ public class ConcurrentTask : FlintTask
     {
         long stamp;
         int doing, done, queued, totalSize;
-        lock (_gate)
+        lock (Gate)
         {
-            stamp = ++_stateStamp;
-            doing = _doing.Count;
-            done = _done.Count;
-            queued = _queue.Count;
+            stamp = ++stateStamp;
+            doing = Doing.Count;
+            done = Done.Count;
+            queued = Queue.Count;
             totalSize = TotalSizeLocked();
         }
 
@@ -534,7 +534,7 @@ public class ConcurrentTask : FlintTask
 
     /// <summary>Capture a state stamp (gate held): the caller's snapshot is the freshest for
     /// this stamp until a later gate section bumps it again.</summary>
-    private protected long BeginStateUpdateLocked() => ++_stateStamp;
+    private protected long BeginStateUpdateLocked() => ++stateStamp;
 
     /// <summary>Emit one stamped state update. A superseded stamp (a later mutation already
     /// captured a newer snapshot) is dropped: concurrent completions may reach this point in
@@ -544,7 +544,7 @@ public class ConcurrentTask : FlintTask
     {
         lock (_emitLock)
         {
-            if (Volatile.Read(ref _stateStamp) != stamp)
+            if (Volatile.Read(ref stateStamp) != stamp)
             {
                 return; // a newer snapshot exists — its own update supersedes this one
             }
@@ -555,12 +555,12 @@ public class ConcurrentTask : FlintTask
     /// <summary>Port of ConcurrentTask::totalSize(): queue + doing + done (lock free variant).</summary>
     private int TotalSize()
     {
-        lock (_gate)
+        lock (Gate)
         {
             return TotalSizeLocked();
         }
     }
 
-    /// <summary>totalSize() for callers that already hold <see cref="_gate"/>.</summary>
-    private protected int TotalSizeLocked() => _queue.Count + _doing.Count + _done.Count;
+    /// <summary>totalSize() for callers that already hold <see cref="Gate"/>.</summary>
+    private protected int TotalSizeLocked() => Queue.Count + Doing.Count + Done.Count;
 }

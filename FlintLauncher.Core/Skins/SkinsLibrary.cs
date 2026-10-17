@@ -11,6 +11,8 @@
 //
 // Not ported from the C++ SkinList: the QAbstractListModel surface, the QImage preview
 // generation and the file watching — the API serves the stored data and the texture files.
+
+using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 
 namespace FlintLauncher.Core.Skins;
@@ -30,7 +32,7 @@ public sealed class SkinsLibrary
     public string SkinsDir => _skinsDir();
 
     /// <summary>The stored skins (the index.json order). Entries whose texture file went
-    /// missing stay listed with the caller checking <see cref="SkinModel.Path_"/> — the C++
+    /// missing stay listed with the caller checking <see cref="SkinModel.Path"/> — the C++
     /// model kept such entries visible in the manage dialog too.</summary>
     public List<SkinModel> List() => SkinListStore.Load(_skinsDir());
 
@@ -48,7 +50,7 @@ public sealed class SkinsLibrary
     }
 
     /// <summary>The texture file of a stored skin, when it exists on disk ("" otherwise).</summary>
-    public string TextureFileOf(SkinModel skin) => File.Exists(skin.Path_) ? skin.Path_ : "";
+    public string TextureFileOf(SkinModel skin) => File.Exists(skin.Path) ? skin.Path : "";
 
     /// <summary>Store one skin texture: copies <paramref name="sourceFile"/> into the
     /// library as &lt;name&gt;.png and upserts the index entry. Returns false when the
@@ -82,12 +84,12 @@ public sealed class SkinsLibrary
 
         var skins = SkinListStore.Load(dir);
         skins.RemoveAll(skin => skin.Name() == name);
-        skins.Add(new SkinModel(dir, new System.Text.Json.Nodes.JsonObject
+        skins.Add(new SkinModel(dir, new JsonObject
         {
             ["name"] = name,
             ["capeId"] = "",
             ["url"] = "",
-            ["model"] = model == SkinModelKind.SLIM ? "SLIM" : "CLASSIC",
+            ["model"] = model == SkinModelKind.Slim ? "SLIM" : "CLASSIC",
         }));
         SkinListStore.Save(dir, skins);
         return true;

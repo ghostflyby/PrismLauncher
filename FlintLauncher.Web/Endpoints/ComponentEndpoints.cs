@@ -19,6 +19,7 @@
 // Every mutation runs through PackProfile (the same code paths the C++ page drives) and
 // SaveNow()s the profile afterwards (the C++ schedules a 5s deferred save; the port saves
 // eagerly because there is no event loop at this layer).
+
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Web.Models;
@@ -51,7 +52,7 @@ public static class ComponentEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).Produces<ComponentView[]>(200);
+        }).Produces<ComponentView[]>();
 
         // ------------------------------------------------- change version / important
         api.MapPatch("/instances/{id}/components/{uid}", async (string id, string uid,
@@ -291,7 +292,7 @@ public static class ComponentEndpoints
     {
         for (var i = 0; i < profile.Components.Count; i++)
         {
-            if (profile.Components[i].GetID() == uid)
+            if (profile.Components[i].GetId() == uid)
             {
                 return i;
             }
@@ -320,7 +321,7 @@ public static class ComponentEndpoints
             }
         }
         return new ComponentView(
-            component.GetID(),
+            component.GetId(),
             component.GetVersion().Length != 0 ? component.GetVersion() : null,
             component.GetName(),
             component.Important,

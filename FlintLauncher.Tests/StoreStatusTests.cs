@@ -3,6 +3,7 @@
 // file existence, local/inactive exclusion, ${arch} expansion, unsafe-ref refusal) at the
 // Core level, and the two routes (GET /store/status/libraries/{versionRef},
 // GET /store/status/assets/{assetsId}) end-to-end through the real host.
+
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -78,7 +79,7 @@ public class StoreCompletenessTests : IDisposable
         const string brigadier = "com/mojang/brigadier/1.0.18/brigadier-1.0.18.jar";
         const string dfu = "com/mojang/datafixerupper/8.0.16/datafixerupper-8.0.16.jar";
         WriteVersionManifest(paths.MetaDir, "1.21.4",
-            $$"""[{"name":"com.mojang:brigadier:1.0.18"},{"name":"com.mojang:datafixerupper:8.0.16"}]""");
+            """[{"name":"com.mojang:brigadier:1.0.18"},{"name":"com.mojang:datafixerupper:8.0.16"}]""");
         // brigadier: file on the store root AND a live ledger entry → counted
         WriteFile(Path.Combine(paths.LibrariesRoot, brigadier), "jar!");
         using var cache = CacheWithLedger($$"""
@@ -182,11 +183,11 @@ public class StoreStatusApiTests
             const string brigadier = "com/mojang/brigadier/1.0.18/brigadier-1.0.18.jar";
             const string dfu = "com/mojang/datafixerupper/8.0.16/datafixerupper-8.0.16.jar";
             Directory.CreateDirectory(Path.Combine(paths.MetaDir, "net.minecraft"));
-            File.WriteAllText(Path.Combine(paths.MetaDir, "net.minecraft", "1.21.4.json"), $$"""
-                {"formatVersion":1,"uid":"net.minecraft","version":"1.21.4",
-                 "releaseTime":"2024-12-03T10:15:07+00:00","type":"release",
-                 "libraries":[{"name":"com.mojang:brigadier:1.0.18"},{"name":"com.mojang:datafixerupper:8.0.16"}]}
-                """);
+            File.WriteAllText(Path.Combine(paths.MetaDir, "net.minecraft", "1.21.4.json"), """
+                                                                                           {"formatVersion":1,"uid":"net.minecraft","version":"1.21.4",
+                                                                                            "releaseTime":"2024-12-03T10:15:07+00:00","type":"release",
+                                                                                            "libraries":[{"name":"com.mojang:brigadier:1.0.18"},{"name":"com.mojang:datafixerupper:8.0.16"}]}
+                                                                                           """);
             Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(paths.LibrariesRoot, brigadier))!);
             File.WriteAllText(Path.Combine(paths.LibrariesRoot, brigadier), "jar!");
             Directory.CreateDirectory(Path.GetDirectoryName(paths.MetacacheFile)!);

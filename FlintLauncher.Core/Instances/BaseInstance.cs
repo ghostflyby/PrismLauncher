@@ -30,12 +30,16 @@
 //  - The C++ registerPassthrough(setting, nullptr) calls (ConsoleMaxLines/
 //    ConsoleOverflowStop) become plain registrations whose values the adapter resolves from
 //    the user layer — the C7 passthrough pair is global-only, instance writes are dropped.
+
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Json;
+using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Settings;
+using FlintLauncher.Core.State;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Text;
 
@@ -67,7 +71,7 @@ public abstract class BaseInstance
 
     protected BaseInstance(SettingsObject settings, string rootDir)
     {
-        _rootDir = rootDir;
+        RootDir = rootDir;
         _settings = settings;
 
         _settings.RegisterSetting("name", "Unnamed Instance");
@@ -96,7 +100,7 @@ public abstract class BaseInstance
         }
         else
         {
-            _uuid = savedUuid;
+            uuid = savedUuid;
         }
 
         // Game time override family (C7: the gate key stays readable; its value is derived
@@ -217,37 +221,37 @@ public abstract class BaseInstance
     /// </summary>
     public string Id() => Path.GetFileName(InstanceRoot());
 
-    public string Uuid => _uuid;
+    public string Uuid => uuid;
 
     public void RegenerateUuid()
     {
         // QUuid::createUuid().toString(QUuid::Id128): 32 hexadecimal digits without separators
         var newUuid = Guid.NewGuid().ToString("N");
         _settings.Set("uuid", newUuid);
-        _uuid = newUuid;
+        uuid = newUuid;
     }
 
     public void SetMinecraftRunning(bool running)
     {
-        if (!Variant.AsBool(Settings().Get("RecordGameTime")))
+        if (!Variant.AsBool(Settings.Get("RecordGameTime")))
         {
             return;
         }
 
         if (running)
         {
-            _timeStarted = DateTimeOffset.Now;
-            SetLastLaunch(_timeStarted.Value.ToUnixTimeMilliseconds());
+            TimeStarted = DateTimeOffset.Now;
+            SetLastLaunch(TimeStarted.Value.ToUnixTimeMilliseconds());
         }
         else
         {
             var timeEnded = DateTimeOffset.Now;
             // QDateTime::secsTo on an invalid (never started) datetime is 0
-            var secondsPlayed = _timeStarted is { } timeStarted ? (long)(timeEnded - timeStarted).TotalSeconds : 0;
+            var secondsPlayed = TimeStarted is { } timeStarted ? (long)(timeEnded - timeStarted).TotalSeconds : 0;
 
-            var current = Variant.AsLong(Settings().Get("totalTimePlayed"));
-            Settings().Set("totalTimePlayed", current + secondsPlayed);
-            Settings().Set("lastTimePlayed", secondsPlayed);
+            var current = Variant.AsLong(Settings.Get("totalTimePlayed"));
+            Settings.Set("totalTimePlayed", current + secondsPlayed);
+            Settings.Set("lastTimePlayed", secondsPlayed);
 
             if (CountTimePlayed() && LauncherState is not null)
             {
@@ -264,35 +268,35 @@ public abstract class BaseInstance
 
     public void SetRunning(bool running)
     {
-        if (running == _isRunning)
+        if (running == IsRunning)
         {
             return;
         }
 
-        _isRunning = running;
+        IsRunning = running;
 
         RunningStatusChanged?.Invoke(running);
     }
 
-    public bool IsRunning => _isRunning;
+    public bool IsRunning { get; private set; }
 
     public long TotalTimePlayed()
     {
         var current = Variant.AsLong(_settings.Get("totalTimePlayed"));
-        if (_isRunning)
+        if (IsRunning)
         {
             var timeNow = DateTimeOffset.Now;
-            return current + (_timeStarted is { } timeStarted ? (long)(timeNow - timeStarted).TotalSeconds : 0);
+            return current + (TimeStarted is { } timeStarted ? (long)(timeNow - timeStarted).TotalSeconds : 0);
         }
         return current;
     }
 
     public long LastTimePlayed()
     {
-        if (_isRunning)
+        if (IsRunning)
         {
             var timeNow = DateTimeOffset.Now;
-            return _timeStarted is { } timeStarted ? (long)(timeNow - timeStarted).TotalSeconds : 0;
+            return TimeStarted is { } timeStarted ? (long)(timeNow - timeStarted).TotalSeconds : 0;
         }
         return Variant.AsLong(_settings.Get("lastTimePlayed"));
     }
@@ -301,15 +305,15 @@ public abstract class BaseInstance
 
     public void ResetTimePlayed()
     {
-        Settings().Reset("totalTimePlayed");
-        Settings().Reset("lastTimePlayed");
+        Settings.Reset("totalTimePlayed");
+        Settings.Reset("lastTimePlayed");
     }
 
     /// <summary>get the type of this instance</summary>
     public string InstanceType() => Variant.AsString(_settings.Get("InstanceType"));
 
     /// <summary>Path to the instance's root directory.</summary>
-    public string InstanceRoot() => _rootDir;
+    public string InstanceRoot() => RootDir;
 
     /// <summary>Path to the instance's game root directory.</summary>
     public virtual string GameRoot() => InstanceRoot();
@@ -442,23 +446,23 @@ public abstract class BaseInstance
         _settings.Set("notes", val);
     }
 
-    public string GetPreLoadCommand() => Variant.AsString(Settings().Get("PreLoadCommand"));
+    public string GetPreLoadCommand() => Variant.AsString(Settings.Get("PreLoadCommand"));
 
-    public string GetPreLaunchCommand() => Variant.AsString(Settings().Get("PreLaunchCommand"));
+    public string GetPreLaunchCommand() => Variant.AsString(Settings.Get("PreLaunchCommand"));
 
-    public string GetPostExitCommand() => Variant.AsString(Settings().Get("PostExitCommand"));
+    public string GetPostExitCommand() => Variant.AsString(Settings.Get("PostExitCommand"));
 
-    public string GetWrapperCommand() => Variant.AsString(Settings().Get("WrapperCommand"));
+    public string GetWrapperCommand() => Variant.AsString(Settings.Get("WrapperCommand"));
 
     public bool IsManagedPack() => Variant.AsBool(_settings.Get("ManagedPack"));
 
     public string GetManagedPackType() => Variant.AsString(_settings.Get("ManagedPackType"));
 
-    public string GetManagedPackID() => Variant.AsString(_settings.Get("ManagedPackID"));
+    public string GetManagedPackId() => Variant.AsString(_settings.Get("ManagedPackID"));
 
     public string GetManagedPackName() => Variant.AsString(_settings.Get("ManagedPackName"));
 
-    public string GetManagedPackVersionID() => Variant.AsString(_settings.Get("ManagedPackVersionID"));
+    public string GetManagedPackVersionId() => Variant.AsString(_settings.Get("ManagedPackVersionID"));
 
     public string GetManagedPackVersionName() => Variant.AsString(_settings.Get("ManagedPackVersionName"));
 
@@ -485,7 +489,7 @@ public abstract class BaseInstance
 
     public virtual List<string> ExtraArguments()
     {
-        return Commandline.SplitArgs(Variant.AsString(Settings().Get("JvmArgs")));
+        return Commandline.SplitArgs(Variant.AsString(Settings.Get("JvmArgs")));
     }
 
     /// <summary>Traits. Normally inside the version, depends on instance implementation.</summary>
@@ -508,13 +512,16 @@ public abstract class BaseInstance
 
     /// <summary>
     /// Gets this instance's settings object. This settings object stores instance-specific
-    /// settings. May call loadSpecificSettings() to ensure those are loaded.
+    /// settings. Reading may load the type-specific settings first (loadSpecificSettings).
     /// </summary>
-    public virtual SettingsObject Settings()
+    public virtual SettingsObject Settings
     {
-        LoadSpecificSettings();
+        get
+        {
+            LoadSpecificSettings();
 
-        return _settings;
+            return _settings;
+        }
     }
 
     /// <summary>Loads settings specific to an instance type if they're not already loaded.</summary>
@@ -527,10 +534,10 @@ public abstract class BaseInstance
     /// returns a valid launcher (task container). P5: returns the LaunchTask (LaunchTask
     /// derives from FlintTask, like the C++ LaunchTask derives from Task).
     /// </summary>
-    public abstract Launch.LaunchTask? CreateLaunchTask(AuthSession? account, MinecraftTarget? targetToJoin);
+    public abstract LaunchTask? CreateLaunchTask(AuthSession? account, MinecraftTarget? targetToJoin);
 
     /// <summary>returns the current launch task (if any)</summary>
-    public Launch.LaunchTask? GetLaunchTask() => _launchProcess;
+    public LaunchTask? GetLaunchTask() => LaunchProcess;
 
     /// <summary>Create environment variables for running the instance.</summary>
     public abstract ProcessEnvironment CreateEnvironment();
@@ -553,37 +560,38 @@ public abstract class BaseInstance
         // NOOP
     }
 
-    public RuntimeContext RuntimeContext => _runtimeContext;
+    // NOTE: struct properties need an explicit construction here or System would stay null
+    public RuntimeContext RuntimeContext { get; protected set; } = new();
 
-    public bool HasVersionBroken => _hasBrokenVersion;
+    public bool HasVersionBroken => hasBrokenVersion;
 
     public void SetVersionBroken(bool value)
     {
-        if (_hasBrokenVersion != value)
+        if (hasBrokenVersion != value)
         {
-            _hasBrokenVersion = value;
+            hasBrokenVersion = value;
             PropertiesChanged?.Invoke();
         }
     }
 
-    public bool HasUpdateAvailable => _hasUpdate;
+    public bool HasUpdateAvailable => hasUpdate;
 
     public void SetUpdateAvailable(bool value)
     {
-        if (_hasUpdate != value)
+        if (hasUpdate != value)
         {
-            _hasUpdate = value;
+            hasUpdate = value;
             PropertiesChanged?.Invoke();
         }
     }
 
-    public bool HasCrashed => _crashed;
+    public bool HasCrashed => crashed;
 
     public void SetCrashed(bool value)
     {
-        if (_crashed != value)
+        if (crashed != value)
         {
-            _crashed = value;
+            crashed = value;
             PropertiesChanged?.Invoke();
         }
     }
@@ -602,7 +610,7 @@ public abstract class BaseInstance
     /// <summary>'print' a verbose description of the instance into a list of strings.</summary>
     public abstract List<string> VerboseDescription(AuthSession? session, MinecraftTarget? targetToJoin);
 
-    public Status CurrentStatus() => _status;
+    public Status CurrentStatus() => status;
 
     public List<string> GetLinkedInstances()
     {
@@ -652,7 +660,7 @@ public abstract class BaseInstance
         var status = CurrentStatus();
         if (status != newStatus)
         {
-            _status = newStatus;
+            this.status = newStatus;
             StatusChanged?.Invoke(status, newStatus);
         }
     }
@@ -660,34 +668,33 @@ public abstract class BaseInstance
     /// <summary>The resolved user layer (flint.json) behind the typed settings stack — the
     /// C++ reads of APPLICATION->settings() on the instance side. Defaults when the settings
     /// object is not the typed adapter (bare test doubles).</summary>
-    protected Config.FlintConfigFile UserLayer =>
-        (_settings as Config.InstanceJsonSettingsObject)?.UserLayer ?? Config.FlintConfigFile.Default();
+    protected FlintConfigFile UserLayer =>
+        (_settings as InstanceJsonSettingsObject)?.UserLayer ?? FlintConfigFile.Default();
 
     /// <summary>The live user-layer store (flint.json) when the settings object is the typed
     /// adapter — handed to LaunchServices so the launch pipeline reads the same stack.</summary>
-    protected Config.FlintConfigStore? UserConfigStore =>
-        (_settings as Config.InstanceJsonSettingsObject)?.UserConfig;
+    protected FlintConfigStore? UserConfigStore =>
+        (_settings as InstanceJsonSettingsObject)?.UserConfig;
 
-    protected bool IsSpecificSettingsLoaded() => _specificSettingsLoaded;
+    protected bool IsSpecificSettingsLoaded() => specificSettingsLoaded;
 
-    protected void SetSpecificSettingsLoaded(bool loaded) => _specificSettingsLoaded = loaded;
+    protected void SetSpecificSettingsLoaded(bool loaded) => specificSettingsLoaded = loaded;
 
     // ---------------------------------------------------------------------- data
 
-    protected readonly string _rootDir;
+    protected readonly string RootDir;
+    /// <summary>The backing store of <see cref="Settings"/>; shared with subclasses that
+    /// register their instance-type keys (MinecraftInstance).</summary>
     protected readonly SettingsObject _settings;
-    protected bool _isRunning;
     /// <summary>std::unique_ptr&lt;LaunchTask&gt; m_launchProcess.</summary>
-    protected Launch.LaunchTask? _launchProcess;
-    protected DateTimeOffset? _timeStarted;
-    // NOTE: struct fields need an explicit construction here or System would stay null
-    protected RuntimeContext _runtimeContext = new();
+    protected LaunchTask? LaunchProcess;
+    protected DateTimeOffset? TimeStarted;
 
     /// <summary>The launcher runtime state (launcher-state.json, S5) — the playtime
     /// accumulation lands in <c>Playtime.Total</c> (the former TotalPlayTime settings key,
     /// CONFIG C9). Null skips the global accumulation; the instance list stamps it at
     /// discovery.</summary>
-    public State.LauncherStateStore? LauncherState { get; set; }
+    public LauncherStateStore? LauncherState { get; set; }
 
     /// <summary>D3: resolves an instance reference (dirname or uuid) to the referenced
     /// instance's uuid — the persisted linkedInstances form. Port-internal wiring (no C++
@@ -696,11 +703,11 @@ public abstract class BaseInstance
     /// references append verbatim; the LoadList conversion pass is the backstop.</summary>
     internal Func<string, string?>? UuidResolver { get; set; }
 
-    private string _uuid = "";
-    private Status _status = Status.Present;
-    private bool _crashed;
-    private bool _hasUpdate;
-    private bool _hasBrokenVersion;
+    private string uuid = "";
+    private Status status = Status.Present;
+    private bool crashed;
+    private bool hasUpdate;
+    private bool hasBrokenVersion;
 
-    private bool _specificSettingsLoaded;
+    private bool specificSettingsLoaded;
 }

@@ -6,12 +6,15 @@
 // serves the OtherLogsPage surface (game logs + crash reports, content capped to a 512KB
 // tail).
 
+using System.Text;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Helpers;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.ModPlatform.Modrinth;
+using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
+using FlintLauncher.Web.OpenApi;
 using FlintLauncher.Web.Services;
 
 namespace FlintLauncher.Web.Endpoints;
@@ -61,7 +64,7 @@ public static class ExportEndpoints
                 Directory.CreateDirectory(instanceRoot);
                 // DirNameFromString strips characters that are invalid in paths (like the
                 // C++ export file-name suggestion)
-                var baseName = Core.IO.FileSystem.DirNameFromString($"{name}-{versionId}", instanceRoot);
+                var baseName = FileSystem.DirNameFromString($"{name}-{versionId}", instanceRoot);
                 var extension = format switch
                 {
                     "modrinth" => "mrpack",
@@ -139,7 +142,7 @@ public static class ExportEndpoints
             {
                 runtime.InstanceLock.Release();
             }
-        }).Produces<LogFileView[]>(200);
+        }).Produces<LogFileView[]>();
 
         // ---------------------------------------------------------------- log contents
         api.MapGet("/instances/{id}/logs/{dir}/{name}", async (string id, string dir, string name,
@@ -162,13 +165,13 @@ public static class ExportEndpoints
                     return ApiJson.NotFound("log_not_found", $"no log file '{name}' in '{dir}'");
                 }
                 return Results.Text(ReadTail(path, MaxLogBytes), "text/plain",
-                    System.Text.Encoding.UTF8);
+                    Encoding.UTF8);
             }
             finally
             {
                 runtime.InstanceLock.Release();
             }
-        }).WithMetadata(new OpenApi.PlainTextMarker());
+        }).WithMetadata(new PlainTextMarker());
     }
 
     // ----------------------------------------------------------------------- helpers
@@ -248,7 +251,7 @@ public static class ExportEndpoints
             using var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             if (length <= maxBytes)
             {
-                using var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
+                using var reader = new StreamReader(stream, Encoding.UTF8);
                 return reader.ReadToEnd();
             }
             stream.Seek(length - maxBytes, SeekOrigin.Begin);
@@ -263,7 +266,7 @@ public static class ExportEndpoints
                 }
                 read += chunk;
             }
-            var text = System.Text.Encoding.UTF8.GetString(buffer, 0, read);
+            var text = Encoding.UTF8.GetString(buffer, 0, read);
             // skip the (probably partial) first line
             var newline = text.IndexOf('\n');
             return newline >= 0 && newline < text.Length - 1 ? text[(newline + 1)..] : text;

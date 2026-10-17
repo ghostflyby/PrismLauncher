@@ -3,6 +3,7 @@
 // (IndexedPack/IndexedVersion) and its parser. The safeName is the C++ normalized pack
 // image name ("[^A-Za-z0-9]" stripped, lowercased, ".png" appended). Reads go through the
 // JsonNode model (single-DOM, the JsonUtils node-side family).
+
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Json;

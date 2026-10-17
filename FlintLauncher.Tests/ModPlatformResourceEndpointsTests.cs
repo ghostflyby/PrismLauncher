@@ -7,6 +7,7 @@
 // so these classes join the suites that own them (see ModPlatformApiTests):
 //  - the flame class joins "FlameApi" (FlameConfig.BaseUrl / ApiKeyProvider);
 //  - the modrinth class joins "ModrinthApi" (ModrinthApi.BaseUrl).
+
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -91,13 +92,13 @@ public class FlintApiFlameResourceTests : IDisposable
         _server.CategoriesJson = new JsonObject
         {
             ["data"] = new JsonArray(
-                (JsonNode?)new JsonObject
+                new JsonObject
                 {
                     ["id"] = 4736,
                     ["name"] = "Magic",
                     ["icon"] = "https://cdn.test/magic.png",
                 },
-                (JsonNode?)new JsonObject { ["id"] = 406, ["name"] = "Technology" }),
+                new JsonObject { ["id"] = 406, ["name"] = "Technology" }),
         }.ToJsonString();
 
         await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
@@ -253,11 +254,11 @@ public class FlintApiModrinthResourceTests : IDisposable
     private readonly StubModrinthServer _server = new();
     private readonly StubModrinthResourceServer _resourceServer = new();
 
-    private ModrinthApi _modrinthApi = new();
+    private ModrinthApi modrinthApi = new();
 
     public FlintApiModrinthResourceTests()
     {
-        _modrinthApi.BaseUrl = _server.Url;
+        modrinthApi.BaseUrl = _server.Url;
     }
 
     public void Dispose()
@@ -269,7 +270,7 @@ public class FlintApiModrinthResourceTests : IDisposable
     [Fact]
     public async Task Modrinth_Search_TypeParam_SelectsProjectTypeFacet()
     {
-        await using var host = await FlintApiHost.StartAsync(_modrinthApi);
+        await using var host = await FlintApiHost.StartAsync(modrinthApi);
         var response = await host.GetAsync("/api/v1/modplatform/modrinth/search?type=resourcepacks");
         response.EnsureSuccessStatusCode();
 
@@ -281,7 +282,7 @@ public class FlintApiModrinthResourceTests : IDisposable
     [Fact]
     public async Task Modrinth_Search_Datapacks_Facet()
     {
-        await using var host = await FlintApiHost.StartAsync(_modrinthApi);
+        await using var host = await FlintApiHost.StartAsync(modrinthApi);
         var response = await host.GetAsync("/api/v1/modplatform/modrinth/search?type=datapacks");
         response.EnsureSuccessStatusCode();
 
@@ -302,26 +303,26 @@ public class FlintApiModrinthResourceTests : IDisposable
     public async Task Modrinth_Categories_FiltersByProjectType()
     {
         _resourceServer.CategoriesJson = new JsonArray(
-            (JsonNode?)new JsonObject
+            new JsonObject
             {
                 ["name"] = "adventure",
                 ["project_type"] = "mod",
                 ["icon"] = "https://cdn.modrinth.test/adventure.png",
             },
-            (JsonNode?)new JsonObject
+            new JsonObject
             {
                 ["name"] = "8x-",
                 ["project_type"] = "resourcepack",
                 ["icon"] = "https://cdn.modrinth.test/8x-.png",
             },
-            (JsonNode?)new JsonObject
+            new JsonObject
             {
                 ["name"] = "16x",
                 ["project_type"] = "resourcepack",
             }).ToJsonString();
 
-        _modrinthApi = new ModrinthApi { BaseUrl = _resourceServer.Url };
-        await using var host = await FlintApiHost.StartAsync(_modrinthApi);
+        modrinthApi = new ModrinthApi { BaseUrl = _resourceServer.Url };
+        await using var host = await FlintApiHost.StartAsync(modrinthApi);
         var response = await host.GetAsync("/api/v1/modplatform/modrinth/categories?type=resourcepacks");
         response.EnsureSuccessStatusCode();
         var categories = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
@@ -342,8 +343,8 @@ public class FlintApiModrinthResourceTests : IDisposable
     {
         _resourceServer.DescriptionText = "This is a plain-text project body.";
 
-        _modrinthApi = new ModrinthApi { BaseUrl = _resourceServer.Url };
-        await using var host = await FlintApiHost.StartAsync(_modrinthApi);
+        modrinthApi = new ModrinthApi { BaseUrl = _resourceServer.Url };
+        await using var host = await FlintApiHost.StartAsync(modrinthApi);
         var response = await host.GetAsync("/api/v1/modplatform/modrinth/mods/projId1/description");
         response.EnsureSuccessStatusCode();
         var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;

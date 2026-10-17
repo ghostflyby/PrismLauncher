@@ -17,9 +17,12 @@
 //  - `finalize()` is named FinalizeStep() (System.Object::Finalize clash).
 //  - C++ Task::canAbort() defaults to a false m_can_abort flag; steps that can be aborted
 //    override it. The port keeps that default.
+
+using FlintLauncher.Core.Tasks;
+
 namespace FlintLauncher.Core.Launch;
 
-public abstract class LaunchStep : Tasks.FlintTask
+public abstract class LaunchStep : FlintTask
 {
     protected LaunchStep(LaunchTask parent)
     {

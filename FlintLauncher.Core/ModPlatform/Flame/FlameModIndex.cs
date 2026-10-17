@@ -9,10 +9,12 @@
 //  - loadBody (the description fetch) becomes LoadBodyAsync for the same reason.
 //  - the upstream quirk that resets file.side to NoSide on every gameVersions iteration is
 //    kept verbatim (the "both sides" branch is unreachable, exactly like the C++).
+
 using System.Globalization;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
+using FlintLauncher.Core.Minecraft;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
@@ -77,7 +79,7 @@ public static class FlameMod
     public static void LoadIndexedPack(IndexedPack pack, JsonNode obj)
     {
         pack.AddonId = FlameJson.RequireInteger(obj, "id").ToString(CultureInfo.InvariantCulture);
-        pack.Provider = ResourceProvider.FLAME;
+        pack.Provider = ResourceProvider.Flame;
         pack.Name = FlameJson.RequireString(obj, "name");
         pack.Slug = FlameJson.RequireString(obj, "slug");
         pack.WebsiteUrl = FlameJson.Str(FlameJson.Obj(obj, "links"), "websiteUrl");
@@ -107,11 +109,11 @@ public static class FlameMod
 
         pack.ResourceType = FlameApi.GetResourceType(FlameJson.Int(obj, "classId"));
         pack.ExtraDataLoaded = false;
-        LoadURLs(pack, obj);
+        LoadUrLs(pack, obj);
     }
 
     /// <summary>Port of FlameMod::loadURLs.</summary>
-    public static void LoadURLs(IndexedPack pack, JsonNode obj)
+    public static void LoadUrLs(IndexedPack pack, JsonNode obj)
     {
         var linksObj = FlameJson.Obj(obj, "links");
 
@@ -197,27 +199,27 @@ public static class FlameMod
             var loader = str.ToLowerInvariant();
             if (loader == "neoforge")
             {
-                file.Loaders |= Minecraft.ModLoaderType.NeoForge;
+                file.Loaders |= ModLoaderType.NeoForge;
             }
             else if (loader == "forge")
             {
-                file.Loaders |= Minecraft.ModLoaderType.Forge;
+                file.Loaders |= ModLoaderType.Forge;
             }
             else if (loader == "cauldron")
             {
-                file.Loaders |= Minecraft.ModLoaderType.Cauldron;
+                file.Loaders |= ModLoaderType.Cauldron;
             }
             else if (loader == "liteloader")
             {
-                file.Loaders |= Minecraft.ModLoaderType.LiteLoader;
+                file.Loaders |= ModLoaderType.LiteLoader;
             }
             else if (loader == "fabric")
             {
-                file.Loaders |= Minecraft.ModLoaderType.Fabric;
+                file.Loaders |= ModLoaderType.Fabric;
             }
             else if (loader == "quilt")
             {
-                file.Loaders |= Minecraft.ModLoaderType.Quilt;
+                file.Loaders |= ModLoaderType.Quilt;
             }
             else if (loader is "server" or "client")
             {
@@ -250,7 +252,7 @@ public static class FlameMod
         var hashList = FlameJson.Arr(obj, "hashes");
         foreach (var hashEntry in hashList)
         {
-            var hashTypes = ProviderCapabilities.HashType(ResourceProvider.FLAME);
+            var hashTypes = ProviderCapabilities.HashType(ResourceProvider.Flame);
             var hashAlgo = EnumToString(FlameJson.Int(hashEntry, "algo", 1));
             if (hashTypes.Contains(hashAlgo))
             {
@@ -269,12 +271,12 @@ public static class FlameMod
             };
             dependency.Type = FlameJson.RequireInteger(dep, "relationType") switch
             {
-                1 => new DependencyType(DependencyTypeValue.EMBEDDED), // EmbeddedLibrary
-                2 => new DependencyType(DependencyTypeValue.OPTIONAL), // OptionalDependency
-                3 => new DependencyType(DependencyTypeValue.REQUIRED), // RequiredDependency
-                4 => new DependencyType(DependencyTypeValue.TOOL), // Tool
-                5 => new DependencyType(DependencyTypeValue.INCOMPATIBLE), // Incompatible
-                6 => new DependencyType(DependencyTypeValue.INCLUDE), // Include
+                1 => new DependencyType(DependencyTypeValue.Embedded), // EmbeddedLibrary
+                2 => new DependencyType(DependencyTypeValue.Optional), // OptionalDependency
+                3 => new DependencyType(DependencyTypeValue.Required), // RequiredDependency
+                4 => new DependencyType(DependencyTypeValue.Tool), // Tool
+                5 => new DependencyType(DependencyTypeValue.Incompatible), // Incompatible
+                6 => new DependencyType(DependencyTypeValue.Include), // Include
                 _ => DependencyType.Invalid,
             };
             file.Dependencies.Add(dependency);

@@ -43,12 +43,15 @@
 //    the port writes ids sorted (ordinal) for deterministic output.
 //  - CommitStagedInstance's override path re-implements FS::overrideFolder as an
 //    overwrite-copy of the staging folder over the destination.
+
 using System.Globalization;
 using System.Text.Json;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
+using FlintLauncher.Core.State;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Instances;
@@ -82,8 +85,8 @@ public class InstanceList
     // and the state-side collapse flags; the list only translates instance handles.
     private readonly InstanceGroupModel _groups;
 
-    private bool _groupsLoaded;
-    private bool _instancesProbed;
+    private bool groupsLoaded;
+    private bool instancesProbed;
 
     public InstanceList(IEnumerable<string> instDirs)
     {
@@ -103,14 +106,14 @@ public class InstanceList
             CanonicalGroupFile,
             LegacyGroupFiles,
             () => LauncherState,
-            canPersist: () => _instancesProbed);
+            canPersist: () => instancesProbed);
     }
 
     /// <summary>The typed instance-layer environment (D4): the user-layer flint.json store
     /// plus the instance.json / instance-state.json type infos. The C++ passed the global
     /// SettingsObject here; the typed stack replaced it (CONFIG C6/C7). Must be stamped
     /// before LoadList — discovery cannot build instances without it.</summary>
-    public Config.InstanceEnvironment? Environment { get; set; }
+    public InstanceEnvironment? Environment { get; set; }
 
     /// <summary>Injected data-directory layout — stamped onto discovered instances (their
     /// asset/library/java anchors) and used for instgroups.json. Set by the composition root.</summary>
@@ -143,7 +146,7 @@ public class InstanceList
     /// migration and the group collapse ("hidden") persistence land here; null skips both
     /// (no state root in a bare fixture).
     /// </summary>
-    public State.LauncherStateStore? LauncherState { get; set; }
+    public LauncherStateStore? LauncherState { get; set; }
 
     /// <summary>
     /// Overrides the C8 groups-file location (tests/embedding). When set, it IS the
@@ -218,7 +221,7 @@ public class InstanceList
         }
         RebuildInodeIndex(); // D2: the inode index follows every (re)discovery
         ConvertLinkedInstanceReferences(); // D3: persisted link references are uuids
-        if (_groupsLoaded)
+        if (groupsLoaded)
         {
             // D3: discovery is complete — dirname members resolve now (the model was loaded
             // earlier in this session with some references unresolvable; without this the
@@ -501,9 +504,9 @@ public class InstanceList
     /// (e.g. a Prism import landing instgroups.json mid-session).</summary>
     private void EnsureGroupsLoaded()
     {
-        if (!_groupsLoaded)
+        if (!groupsLoaded)
         {
-            _groupsLoaded = _groups.Load(ResolveMemberUuid);
+            groupsLoaded = _groups.Load(ResolveMemberUuid);
         }
     }
 
@@ -652,7 +655,7 @@ public class InstanceList
 
         if (shouldOverride)
         {
-            instId = instanceTask.OriginalInstanceID;
+            instId = instanceTask.OriginalInstanceId;
         }
         else
         {
@@ -738,13 +741,13 @@ public class InstanceList
             return;
         }
 
-        if (_groupsLoaded)
+        if (groupsLoaded)
         {
             _groups.Save();
         }
         _instDirs.Clear();
         _instDirs.AddRange(newDirs);
-        _groupsLoaded = false;
+        groupsLoaded = false;
         _instances.Clear();
         // (upstream emits instancesChanged; the connected providerUpdated reloads right away)
         InstanceListChanged?.Invoke();
@@ -814,7 +817,7 @@ public class InstanceList
         {
             _instanceSet.Add(id);
         }
-        _instancesProbed = true;
+        instancesProbed = true;
         return outList;
     }
 
@@ -832,7 +835,7 @@ public class InstanceList
         var instanceRoot = FileSystem.PathCombine(RootDirOf(id), id);
         // the typed layer stack (D4): instance.json when present (Flint format), otherwise
         // the read-only instance.cfg import in memory — no write happens on discovery
-        var instanceSettings = new Config.InstanceJsonSettingsObject(instanceRoot, environment);
+        var instanceSettings = new InstanceJsonSettingsObject(instanceRoot, environment);
         // register the discriminator before dispatch (BaseInstance would only register it
         // inside the ctor, which the dispatch below decides)
         instanceSettings.RegisterSetting("InstanceType", "OneSix");
@@ -901,7 +904,7 @@ public class InstanceList
                 }
                 return "";
             }
-            var cfgPath = FileSystem.PathCombine(instanceRoot, Config.InstanceIniImporter.LegacyFileName);
+            var cfgPath = FileSystem.PathCombine(instanceRoot, InstanceIniImporter.LegacyFileName);
             if (File.Exists(cfgPath))
             {
                 var ini = new IniFile();
@@ -942,7 +945,7 @@ public class InstanceList
         // (S5: the former TotalPlayTime/TotalPlayTimeMigrated settings keys, CONFIG C9)
         LauncherState.Update(state => state with
         {
-            Playtime = new State.PlaytimeState
+            Playtime = new PlaytimeState
             {
                 Total = state.Playtime.Total + existingTotal,
                 Migrated = true,

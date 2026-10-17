@@ -16,6 +16,7 @@
 //    FlameAPI::getLatestVersion over the project's file list.
 //  - ModsUpdateTask skips mods without packwiz metadata (the C++ update dialog reports them
 //    as an error row; the API surface has no per-resource error channel yet).
+
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
@@ -47,20 +48,20 @@ public static class ModPlatformTasks
 
     /// <summary>The lowercase API-level provider key ("modrinth" / "flame").</summary>
     public static string ProviderKey(ResourceProvider provider) =>
-        provider == ResourceProvider.MODRINTH ? ModrinthKey : FlameKey;
+        provider == ResourceProvider.Modrinth ? ModrinthKey : FlameKey;
 
     public static bool TryParseProvider(string? name, out ResourceProvider provider)
     {
         switch ((name ?? "").Trim().ToLowerInvariant())
         {
             case ModrinthKey:
-                provider = ResourceProvider.MODRINTH;
+                provider = ResourceProvider.Modrinth;
                 return true;
             case FlameKey:
-                provider = ResourceProvider.FLAME;
+                provider = ResourceProvider.Flame;
                 return true;
             default:
-                provider = ResourceProvider.MODRINTH;
+                provider = ResourceProvider.Modrinth;
                 return false;
         }
     }
@@ -95,7 +96,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
     {
         var pack = new IndexedPack { AddonId = projectId, Provider = provider };
 
-        if (provider == ResourceProvider.FLAME)
+        if (provider == ResourceProvider.Flame)
         {
             var (job, request) = _flame.GetProject(projectId);
             await job.StartAsync(cancellationToken);
@@ -161,7 +162,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
     {
         try
         {
-            if (provider == ResourceProvider.FLAME)
+            if (provider == ResourceProvider.Flame)
             {
                 var (job, request) = _flame.GetFile(projectId, versionId);
                 await job.StartAsync(cancellationToken);
@@ -203,9 +204,9 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         CancellationToken cancellationToken)
     {
         var args = new VersionSearchArgs { Pack = pack, McVersions = [mcVersion] };
-        var url = provider == ResourceProvider.FLAME
-            ? _flame.GetVersionsURL(args)
-            : _modrinth.GetVersionsURL(new VersionSearchArgs
+        var url = provider == ResourceProvider.Flame
+            ? _flame.GetVersionsUrl(args)
+            : _modrinth.GetVersionsUrl(new VersionSearchArgs
             {
                 Pack = pack,
                 McVersions = [mcVersion],
@@ -224,7 +225,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         }
 
         var bodyRoot = ParseBodyNode(request.BodyAsString, $"the version list of {pack.AddonId}");
-        if (provider == ResourceProvider.FLAME)
+        if (provider == ResourceProvider.Flame)
         {
             if (bodyRoot is not JsonObject flameRoot || flameRoot["data"] is not JsonArray data)
             {
@@ -364,7 +365,7 @@ public sealed class ModInstallTask : FlintTask
             _installed.Add(new ModInstallEntryView(
                 entry.Version.FileName,
                 ModPlatformTasks.ProviderKey(entry.Pack.Provider),
-                entry.Pack.AddonId.ToString(),
+                entry.Pack.AddonId,
                 entry.Version.Version,
                 isDependency,
                 requiredBy));
@@ -478,11 +479,11 @@ public sealed class ModsUpdateTask : FlintTask
             {
                 continue;
             }
-            if (metadata.Provider == ResourceProvider.MODRINTH)
+            if (metadata.Provider == ResourceProvider.Modrinth)
             {
                 modrinth.Add(mod);
             }
-            else if (metadata.Provider == ResourceProvider.FLAME)
+            else if (metadata.Provider == ResourceProvider.Flame)
             {
                 flame.Add(mod);
             }
@@ -544,7 +545,7 @@ public sealed class ModsUpdateTask : FlintTask
                 AddonId = update.ProjectId,
                 Slug = update.Slug,
                 Name = update.Name,
-                Provider = update.View.Provider == "modrinth" ? ResourceProvider.MODRINTH : ResourceProvider.FLAME,
+                Provider = update.View.Provider == "modrinth" ? ResourceProvider.Modrinth : ResourceProvider.Flame,
             },
             update.Version,
             _folder,

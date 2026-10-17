@@ -19,8 +19,8 @@ public sealed class NbtReader(Stream input)
     public const int MaxDepth = 1024;
 
     private readonly Stream _input = input ?? throw new ArgumentNullException(nameof(input));
-    private long _offset;
-    private int _depth;
+    private long offset;
+    private int depth;
 
     /// <summary>
     /// Port of nbt::io::read_compound: reads a named root compound.
@@ -66,14 +66,14 @@ public sealed class NbtReader(Stream input)
         }
         catch (Exception e) when (e is IOException or EndOfStreamException or InvalidDataException or ObjectDisposedException)
         {
-            throw new NbtParseException($"Error reading NBT data at offset {_offset}: {e.Message}", e);
+            throw new NbtParseException($"Error reading NBT data at offset {offset}: {e.Message}", e);
         }
     }
 
     /// <summary>Port of stream_reader::read_payload: reads a payload-only tag of the given type.</summary>
     private NbtTag ReadPayload(NbtTagType type)
     {
-        if (++_depth > MaxDepth)
+        if (++depth > MaxDepth)
         {
             throw new NbtParseException($"Too deeply nested (more than {MaxDepth} levels)");
         }
@@ -114,7 +114,7 @@ public sealed class NbtReader(Stream input)
         }
         finally
         {
-            _depth--;
+            depth--;
         }
     }
 
@@ -248,9 +248,9 @@ public sealed class NbtReader(Stream input)
         var b = _input.ReadByte();
         if (b < 0)
         {
-            throw new NbtParseException($"Unexpected end of NBT data at offset {_offset} while reading a tag type");
+            throw new NbtParseException($"Unexpected end of NBT data at offset {offset} while reading a tag type");
         }
-        _offset++;
+        offset++;
         return (byte)b;
     }
 
@@ -263,10 +263,10 @@ public sealed class NbtReader(Stream input)
             if (n <= 0)
             {
                 throw new NbtParseException(
-                    $"Unexpected end of NBT data at offset {_offset} (needed {buffer.Length - read} more bytes)");
+                    $"Unexpected end of NBT data at offset {offset} (needed {buffer.Length - read} more bytes)");
             }
             read += n;
-            _offset += n;
+            offset += n;
         }
     }
 
@@ -278,7 +278,7 @@ public sealed class NbtReader(Stream input)
     {
         if (count is < 0 or > int.MaxValue)
         {
-            throw new NbtParseException($"Invalid NBT read length {count} at offset {_offset}");
+            throw new NbtParseException($"Invalid NBT read length {count} at offset {offset}");
         }
         if (count <= 64 * 1024)
         {
