@@ -221,7 +221,7 @@ public sealed class ComponentUpdateTask : FlintTask
                     Task = loadTask,
                 };
                 _remoteLoadStatusList.Add(status);
-                waitTasks.Add(AwaitRemoteLoadAsync(taskIndex, status));
+                waitTasks.Add(AwaitRemoteLoadAsync(status));
                 taskIndex++;
             }
 
@@ -259,7 +259,7 @@ public sealed class ComponentUpdateTask : FlintTask
     /// Waits for one remote load started by LoadComponent and records the outcome (C++: the
     /// remoteLoadSucceeded/remoteLoadFailed signal handlers).
     /// </summary>
-    private async Task AwaitRemoteLoadAsync(int taskIndex, RemoteLoadStatus status)
+    private async Task AwaitRemoteLoadAsync(RemoteLoadStatus status)
     {
         var loadTask = status.Task!;
         // the task is already running; StartAsync returns the in-flight run
@@ -276,15 +276,15 @@ public sealed class ComponentUpdateTask : FlintTask
         }
         else if (loadTask.State == TaskState.AbortedByUser)
         {
-            RemoteLoadFinished(status, loadSucceeded: false, "Aborted");
+            RemoteLoadFinished(status, loadSucceeded: false);
         }
         else
         {
-            RemoteLoadFinished(status, loadSucceeded: false, loadTask.FailReason);
+            RemoteLoadFinished(status, loadSucceeded: false);
         }
     }
 
-    private void RemoteLoadFinished(RemoteLoadStatus status, bool loadSucceeded, string? message = null)
+    private void RemoteLoadFinished(RemoteLoadStatus status, bool loadSucceeded)
     {
         if (loadSucceeded)
         {

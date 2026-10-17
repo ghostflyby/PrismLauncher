@@ -77,7 +77,7 @@ public static class ProfileUtils
         return dot > 0 ? name[..dot] : name;
     }
 
-    private static VersionFile CreateErrorVersionFile(string fileId, string filepath, string error)
+    private static VersionFile CreateErrorVersionFile(string fileId, string error)
     {
         var outError = new VersionFile();
         outError.Uid = outError.Name = fileId;
@@ -95,7 +95,7 @@ public static class ProfileUtils
         }
         catch (Exception e) when (e is JsonParseException or JsonException)
         {
-            return CreateErrorVersionFile(fileId, filepath, e.Message);
+            return CreateErrorVersionFile(fileId, e.Message);
         }
     }
 
@@ -111,7 +111,7 @@ public static class ProfileUtils
                                       or ArgumentException)
         {
             var errorStr = $"Unable to open the version file {Path.GetFileName(filePath)}: {e.Message}.";
-            return CreateErrorVersionFile(CompleteBaseName(filePath), filePath, errorStr);
+            return CreateErrorVersionFile(CompleteBaseName(filePath), errorStr);
         }
 
         JsonNode? root;
@@ -126,7 +126,7 @@ public static class ProfileUtils
             var line = (e.LineNumber ?? 0) + 1;
             var column = e.BytePositionInLine ?? 0;
             var errorStr = $"Unable to process the version file {Path.GetFileName(filePath)}: {e.Message} at line {line} column {column}.";
-            return CreateErrorVersionFile(CompleteBaseName(filePath), filePath, errorStr);
+            return CreateErrorVersionFile(CompleteBaseName(filePath), errorStr);
         }
 
         return GuardedParseJson(root, CompleteBaseName(filePath), filePath, requireOrder);

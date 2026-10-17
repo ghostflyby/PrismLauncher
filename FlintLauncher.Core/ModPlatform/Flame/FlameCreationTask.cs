@@ -544,7 +544,7 @@ public sealed partial class FlameCreationTask : InstanceTask
             return;
         }
 
-        await ValidateOtherResources(modIdResolver, cancellationToken);
+        await ValidateOtherResources(modIdResolver);
     }
 
     /// <summary>copyBlockedMods: copy the matched blocked mods to the instance staging area.</summary>
@@ -597,7 +597,7 @@ public sealed partial class FlameCreationTask : InstanceTask
 
     /// <summary>Port of FlameCreationTask::validateOtherResources (+ the metadata pass of the
     /// LocalResourceUpdateTask loop and finishInstall).</summary>
-    private async Task ValidateOtherResources(FileResolvingTask modIdResolver, CancellationToken cancellationToken)
+    private async Task ValidateOtherResources(FileResolvingTask modIdResolver)
     {
         var zipMods = new List<string>();
         var results = modIdResolver.GetResults().Files.Values.ToList();

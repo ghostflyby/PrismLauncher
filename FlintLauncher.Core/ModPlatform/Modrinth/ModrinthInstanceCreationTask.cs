@@ -251,7 +251,7 @@ public sealed class ModrinthCreationTask : InstanceTask
         }
 
         EmitStatus("Downloading mods...");
-        downloadJob.Progress += (_, progress) =>
+        downloadJob.Progress += (_, _) =>
         {
             EmitDetails($"{downloadTasks.Count(t => t.IsFinished)} out of {downloadTasks.Count} complete");
             SetProgress(downloadTasks.Count(t => t.IsFinished), downloadTasks.Count);

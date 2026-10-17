@@ -100,7 +100,7 @@ public sealed class FlamePackExportTask : FlintTask
             return;
         }
 
-        await CollectHashes(cancellationToken);
+        await CollectHashes();
         await MakeApiRequest(cancellationToken);
     }
 
@@ -119,7 +119,7 @@ public sealed class FlamePackExportTask : FlintTask
         return true;
     }
 
-    private async Task CollectHashes(CancellationToken cancellationToken)
+    private async Task CollectHashes()
     {
         await Task.CompletedTask; // keep the async shape of the C++ callback chain
 

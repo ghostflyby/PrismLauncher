@@ -59,6 +59,7 @@ public class ConcurrentTask : FlintTask
     public ConcurrentTask(string taskName = "", int maxConcurrent = DefaultMaxConcurrent)
     {
         // `taskName` mirrors the C++ QObject objectName, which has no equivalent here.
+        _ = taskName;
         TotalMaxSize = maxConcurrent;
     }
 

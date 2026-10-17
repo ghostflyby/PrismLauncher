@@ -93,7 +93,7 @@ public class ModUpdateTaskTests : IDisposable
 
         // 1. check: the Flame update pass finds the newer file 789
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
-            resource => MetadataHandler.Get(IndexDir, "test-mod"), flame: _flameApi);
+            _ => MetadataHandler.Get(IndexDir, "test-mod"), flame: _flameApi);
         await check.StartAsync();
         Assert.True(check.WasSuccessful, check.FailReason);
         var update = Assert.Single(check.GetUpdates());

@@ -27,7 +27,7 @@ internal sealed class SkinApiHost : IAsyncDisposable
     private readonly WebApplication _app;
     private readonly string _previousCwd;
 
-    private SkinApiHost(WebApplication app, HttpClient client, string homeDir, string dataDir,
+    private SkinApiHost(WebApplication app, HttpClient client, string homeDir,
         string previousCwd)
     {
         _app = app;
@@ -72,7 +72,7 @@ internal sealed class SkinApiHost : IAsyncDisposable
         await app.StartAsync();
         var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
         client.DefaultRequestHeaders.Add("X-Api-Token", token);
-        return new SkinApiHost(app, client, homeDir, dataDir, previousCwd);
+        return new SkinApiHost(app, client, homeDir, previousCwd);
     }
 
     public async ValueTask DisposeAsync()

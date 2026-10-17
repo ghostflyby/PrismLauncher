@@ -205,7 +205,7 @@ public sealed class EnsureMetadataTask : FlintTask
 
                 if (_tempVersions.TryGetValue(hash, out var version))
                 {
-                    await UpdateMetadata(pack, version, resource, cancellationToken);
+                    await UpdateMetadata(pack, version, resource);
                 }
             }
         }
@@ -378,7 +378,7 @@ public sealed class EnsureMetadataTask : FlintTask
                     continue;
                 }
 
-                await UpdateMetadata(pack, version, resource, cancellationToken);
+                await UpdateMetadata(pack, version, resource);
             }
         }
     }
@@ -388,8 +388,7 @@ public sealed class EnsureMetadataTask : FlintTask
     /// LocalResourceUpdateTask::executeTask semantics inlined (old-metadata slug rescue,
     /// create + write the .pw.toml index).
     /// </summary>
-    private async Task UpdateMetadata(IndexedPack pack, IndexedVersion ver, Resource resource,
-        CancellationToken cancellationToken)
+    private async Task UpdateMetadata(IndexedPack pack, IndexedVersion ver, Resource resource)
     {
         await Task.CompletedTask; // async signature for future network work; AOT-friendly no-op
 

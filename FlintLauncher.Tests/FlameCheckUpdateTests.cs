@@ -86,7 +86,7 @@ public class FlameCheckUpdateTests : IDisposable
         }.ToJsonString();
 
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
-            resource => MetadataHandler.Get(Path.Combine(TempPath("mods"), ".index"), "test-mod"), flame: _flameApi);
+            _ => MetadataHandler.Get(Path.Combine(TempPath("mods"), ".index"), "test-mod"), flame: _flameApi);
 
         var failures = new List<(Resource Resource, string Reason, string RecoverUrl)>();
         check.CheckFailed += (resource, reason, recoverUrl) => failures.Add((resource, reason, recoverUrl));
@@ -121,7 +121,7 @@ public class FlameCheckUpdateTests : IDisposable
         }.ToJsonString();
 
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
-            resource => MetadataHandler.Get(Path.Combine(TempPath("mods"), ".index"), "test-mod"), flame: _flameApi);
+            _ => MetadataHandler.Get(Path.Combine(TempPath("mods"), ".index"), "test-mod"), flame: _flameApi);
         await check.StartAsync();
 
         Assert.True(check.WasSuccessful, check.FailReason);
@@ -147,7 +147,7 @@ public class FlameCheckUpdateTests : IDisposable
         }.ToJsonString();
 
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
-            resource => MetadataHandler.Get(Path.Combine(TempPath("mods"), ".index"), "test-mod"), flame: _flameApi);
+            _ => MetadataHandler.Get(Path.Combine(TempPath("mods"), ".index"), "test-mod"), flame: _flameApi);
 
         var failures = new List<(Resource Resource, string Reason, string RecoverUrl)>();
         check.CheckFailed += (resource, reason, recoverUrl) => failures.Add((resource, reason, recoverUrl));
@@ -177,7 +177,7 @@ public class FlameCheckUpdateTests : IDisposable
         }.ToJsonString();
 
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
-            resource => MetadataHandler.Get(Path.Combine(TempPath("mods"), ".index"), "test-mod"), flame: _flameApi);
+            _ => MetadataHandler.Get(Path.Combine(TempPath("mods"), ".index"), "test-mod"), flame: _flameApi);
 
         var failures = new List<(Resource Resource, string Reason, string RecoverUrl)>();
         check.CheckFailed += (resource, reason, recoverUrl) => failures.Add((resource, reason, recoverUrl));

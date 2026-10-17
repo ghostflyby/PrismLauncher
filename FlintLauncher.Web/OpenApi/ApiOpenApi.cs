@@ -46,7 +46,7 @@ internal static class ApiOpenApi
 
     public static void Configure(OpenApiOptions options)
     {
-        options.AddDocumentTransformer((document, context, cancellationToken) =>
+        options.AddDocumentTransformer((document, _, _) =>
         {
             document.Info = new OpenApiInfo
             {
@@ -72,7 +72,7 @@ internal static class ApiOpenApi
             return Task.CompletedTask;
         });
 
-        options.AddOperationTransformer((operation, context, cancellationToken) =>
+        options.AddOperationTransformer((operation, context, _) =>
         {
             var relative = context.Description?.RelativePath ?? string.Empty;
             var authenticated = relative != "healthz" && relative != "api/v1/info";

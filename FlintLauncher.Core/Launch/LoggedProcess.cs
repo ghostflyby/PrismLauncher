@@ -203,7 +203,7 @@ public sealed class LoggedProcess : IDisposable
         var exitTask = _process.WaitForExitAsync();
 
         _ = Task.WhenAll(stdoutTask, stderrTask, exitTask).ContinueWith(
-            static (t, state) => ((LoggedProcess)state!).OnTerminated(),
+            static (_, state) => ((LoggedProcess)state!).OnTerminated(),
             this,
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,

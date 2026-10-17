@@ -300,8 +300,8 @@ public sealed class PackProfile : IDisposable
         var updateTask = new ComponentUpdateTask(ComponentUpdateTask.Mode.Resolution, netmode, this);
         this.updateTask = updateTask;
         updateTask.Succeeded += _ => UpdateSucceeded();
-        updateTask.Failed += (_, error) => UpdateFailed(error);
-        updateTask.Aborted += _ => UpdateFailed("Aborted");
+        updateTask.Failed += (_, _) => UpdateFailed();
+        updateTask.Aborted += _ => UpdateFailed();
         return updateTask.StartAsync(cancellationToken);
     }
 
@@ -311,7 +311,7 @@ public sealed class PackProfile : IDisposable
         InvalidateLaunchProfile();
     }
 
-    private void UpdateFailed(string error)
+    private void UpdateFailed()
     {
         updateTask = null;
         InvalidateLaunchProfile();
@@ -367,7 +367,7 @@ public sealed class PackProfile : IDisposable
         return obj;
     }
 
-    private static Component ComponentFromJsonV1(PackProfile parent, string componentJsonPattern, JsonObject obj)
+    private static Component ComponentFromJsonV1(PackProfile parent, JsonObject obj)
     {
         // critical
         var uid = JsonUtils.RequireString(obj, "uid");
@@ -460,7 +460,7 @@ public sealed class PackProfile : IDisposable
             foreach (var item in orderArray)
             {
                 var compObj = JsonUtils.RequireObject(item, "Component must be an object.");
-                container.Add(ComponentFromJsonV1(parent, componentJsonPattern, compObj));
+                container.Add(ComponentFromJsonV1(parent, compObj));
             }
         }
         catch (JsonParseException)
