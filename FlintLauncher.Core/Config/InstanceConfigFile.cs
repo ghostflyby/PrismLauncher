@@ -29,11 +29,17 @@ public sealed record InstanceConfigFile
     /// <summary>The fresh-instance shape: empty domains, every member unset.</summary>
     public static InstanceConfigFile Default() => new();
 
-    public InstanceIdentityConfig Identity { get; init; } = new();
-    public InstanceLaunchConfig Launch { get; init; } = new();
-    public InstanceManagedConfig Managed { get; init; } = new();
-    public InstanceExportConfig Export { get; init; } = new();
-    public InstanceMiscConfig Misc { get; init; } = new();
+    // NOTE: the domain members are NULLABLE despite the `= new()` initializers — same
+    // finding as FlintConfigFile: the source-generated deserializer does not honor
+    // property initializers for members absent from a payload, and
+    // InstanceConfigStore.Current IS the raw payload ("nulls are the layer", C6/C7).
+    // Only new()/Default() and INI-imported (write-time converted) payloads are
+    // guaranteed materialized; readers therefore null-guard the domains.
+    public InstanceIdentityConfig? Identity { get; init; } = new();
+    public InstanceLaunchConfig? Launch { get; init; } = new();
+    public InstanceManagedConfig? Managed { get; init; } = new();
+    public InstanceExportConfig? Export { get; init; } = new();
+    public InstanceMiscConfig? Misc { get; init; } = new();
 }
 
 /// <summary>Who this instance is (D4: uuid is identity, not state). Name/iconKey/notes
