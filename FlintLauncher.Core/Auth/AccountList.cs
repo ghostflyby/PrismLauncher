@@ -11,12 +11,12 @@
 //  - QSaveFile + QFile::setPermissions(ReadOwner|WriteOwner|ReadUser|WriteUser) maps to an
 //    atomic temp-file write with unix mode 0600 (where the OS supports it).
 //  - loadV3() clears the list before loading (upstream only ever calls it on a fresh model).
-//  - The JSON is written sorted-by-key with Qt's 4-space indentation (QJsonDocument::Indented),
-//    matching the QtJson helper used by the other persisted formats.
+//  - The file is the typed wire of AccountWire.cs (docs/JSON-MIGRATION.md): written as
+//    standard indented JSON through AuthJsonContext, read leniently (a structurally broken
+//    account document is skipped instead of half-loaded; the format version also accepts
+//    the QVariant digit-string form).
 
-using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 
@@ -199,10 +199,10 @@ public sealed class AccountList
             return false;
         }
 
-        JsonNode? node;
+        AccountFileJson? root;
         try
         {
-            node = JsonNode.Parse(jsonData);
+            root = JsonSerializer.Deserialize(jsonData, AuthJsonContext.Default.AccountFileJson);
         }
         catch (JsonException)
         {
@@ -210,14 +210,13 @@ public sealed class AccountList
             return false;
         }
 
-        if (node is not JsonObject root)
+        if (root is null)
         {
             return false;
         }
 
         // Make sure the format version matches.
-        var listVersion = EnsureIntegerLike(root["formatVersion"]);
-        if (listVersion == (int)AccountListVersion.MojangMsa)
+        if (root.FormatVersion == (int)AccountListVersion.MojangMsa)
         {
             return LoadV3(root);
         }
@@ -242,23 +241,40 @@ public sealed class AccountList
         return false;
     }
 
-    public bool LoadV3(JsonObject root)
+    public bool LoadV3(AccountFileJson root)
     {
         _accounts.Clear();
         defaultAccount = null;
-        if (root["accounts"] is not JsonArray accounts)
+        if (root.Accounts is null)
         {
             return true;
         }
 
-        foreach (var accountVal in accounts)
+        foreach (var accountElement in root.Accounts)
         {
-            if (accountVal is not JsonObject accountObj)
+            if (accountElement.ValueKind != JsonValueKind.Object)
             {
                 continue;
             }
 
-            var account = MinecraftAccount.LoadFromJsonV3(accountObj);
+            AccountJson? wire;
+            try
+            {
+                wire = accountElement.Deserialize(AuthJsonContext.Default.AccountJson);
+            }
+            catch (JsonException)
+            {
+                // a structurally broken account is skipped, not half-loaded with silently
+                // empty members (the deliberate divergence from the per-field C++ probing)
+                continue;
+            }
+
+            if (wire is null)
+            {
+                continue;
+            }
+
+            var account = MinecraftAccount.LoadFromJsonV3(wire);
             if (account is not null)
             {
                 var profileId = account.ProfileId();
@@ -271,7 +287,7 @@ public sealed class AccountList
                 }
 
                 _accounts.Add(account);
-                if (AccountData.EnsureBool(accountObj["active"]))
+                if (wire.Active == true)
                 {
                     defaultAccount = account;
                 }
@@ -308,29 +324,26 @@ public sealed class AccountList
             }
         }
 
-        // Build the JSON document to write to the list file.
-        JsonObject root = new()
+        // Build the typed wire document and write it through the source-generated context
+        // (the write shape is ours; the read side is the compatibility surface). The
+        // per-account documents go through JsonElement so the read side keeps skipping a
+        // structurally broken account instead of failing the whole file.
+        AccountFileJson root = new()
         {
-            ["formatVersion"] = (int)AccountListVersion.MojangMsa,
+            FormatVersion = (int)AccountListVersion.MojangMsa,
+            Accounts = _accounts.Select(account =>
+            {
+                var wire = account.SaveToJson();
+                if (ReferenceEquals(defaultAccount, account))
+                {
+                    wire = wire with { Active = true };
+                }
+
+                return JsonSerializer.SerializeToElement(wire, AuthJsonContext.Default.AccountJson);
+            }).ToArray(),
         };
 
-        // Build a list of accounts.
-        var accounts = new JsonArray();
-        foreach (var account in _accounts)
-        {
-            var accountObj = account.SaveToJson();
-            if (ReferenceEquals(defaultAccount, account))
-            {
-                accountObj["active"] = true;
-            }
-
-            accounts.Add((JsonNode?)accountObj);
-        }
-
-        root["accounts"] = accounts;
-
-        // Now that we're done building the JSON object, we can write it to the file.
-        var bytes = Encoding.UTF8.GetBytes(QtJson.ToIndentedString(root));
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(root, AuthJsonContext.Default.AccountFileJson);
         try
         {
             // QSaveFile: write to a temporary file and atomically rename over the target
@@ -388,28 +401,4 @@ public sealed class AccountList
     private MinecraftAccount? defaultAccount;
     private string listFilePath = "";
     private bool autosave;
-
-    /// <summary>QVariant::toInt over the formatVersion value (numbers and digit strings).</summary>
-    private static int EnsureIntegerLike(JsonNode? node)
-    {
-        if (node is JsonValue value)
-        {
-            if (value.TryGetValue<int>(out var i))
-            {
-                return i;
-            }
-
-            if (value.TryGetValue<double>(out var d) && (int)d == d)
-            {
-                return (int)d;
-            }
-
-            if (value.TryGetValue<string>(out var s) && int.TryParse(s, out var parsed))
-            {
-                return parsed;
-            }
-        }
-
-        return 0;
-    }
 }

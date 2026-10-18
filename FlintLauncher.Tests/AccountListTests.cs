@@ -3,7 +3,7 @@
 // ({"accounts": [...], "formatVersion": 3} with per-account "active" flags), default-account
 // activation and add/remove/replace semantics.
 
-using System.Text.Json.Nodes;
+using System.Text.Json;
 using FlintLauncher.Core.Auth;
 using Xunit;
 
@@ -133,22 +133,21 @@ public class AccountListTests : IDisposable
         list.SetListFilePath(savePath);
         Assert.True(list.SaveList());
 
-        var root = JsonNode.Parse(File.ReadAllText(savePath))!.AsObject();
-        Assert.Equal(new HashSet<string> { "accounts", "formatVersion" }, new HashSet<string>(root.Select(p => p.Key)));
-        Assert.Equal(3, root["formatVersion"]!.GetValue<int>());
+        // the written file is the typed wire: formatVersion 3, both accounts, the default
+        // carrying "active" (the write shape is ours; the values are the gate)
+        var root = JsonSerializer.Deserialize(
+            File.ReadAllText(savePath), AuthJsonContext.Default.AccountFileJson)!;
+        Assert.Equal(3, root.FormatVersion);
+        Assert.Equal(2, root.Accounts!.Length);
 
-        var accounts = root["accounts"]!.AsArray();
-        Assert.Equal(2, accounts.Count);
-
-        // the account objects carry exactly the upstream saveState key set (+ the active flag)
-        Assert.Equal(
-            new HashSet<string> { "type", "msa-client-id", "msa", "utoken", "xrp-mc", "ygg", "profile", "entitlement", "active" },
-            new HashSet<string>(accounts[0]!.AsObject().Select(p => p.Key)));
-        Assert.Equal(
-            new HashSet<string> { "type", "ygg", "profile", "entitlement" },
-            new HashSet<string>(accounts[1]!.AsObject().Select(p => p.Key)));
-        Assert.True(accounts[0]!["active"]!.GetValue<bool>());
-        Assert.Null(accounts[1]!["active"]);
+        var first = root.Accounts[0].Deserialize(AuthJsonContext.Default.AccountJson)!;
+        var second = root.Accounts[1].Deserialize(AuthJsonContext.Default.AccountJson)!;
+        Assert.True(first.Active);
+        Assert.Equal("MSA", first.Type);
+        Assert.Equal("b50ad385829d3141a2167e7d7539ba7f", first.Profile!.Id);
+        Assert.Null(second.Active);
+        Assert.Equal("Offline", second.Type);
+        Assert.Equal("cb7ecbf7173e39428f9fb92995eab3d0", second.Profile!.Id);
     }
 
     [Fact]

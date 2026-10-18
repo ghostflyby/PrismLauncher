@@ -10,7 +10,6 @@
 
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 
 namespace FlintLauncher.Core.Auth;
@@ -24,7 +23,7 @@ public sealed class MinecraftAccount
         Data.InternalId = Guid.NewGuid().ToString("N");
     }
 
-    public static MinecraftAccount? LoadFromJsonV3(JsonObject json)
+    public static MinecraftAccount? LoadFromJsonV3(AccountJson json)
     {
         var account = new MinecraftAccount();
         if (account.Data.ResumeStateFromV3(json))
@@ -113,8 +112,8 @@ public sealed class MinecraftAccount
         return new Guid(rfcBytes.ToArray());
     }
 
-    /// <summary>Saves a MinecraftAccount to a JSON object and returns it.</summary>
-    public JsonObject SaveToJson() => Data.SaveState();
+    /// <summary>Saves a MinecraftAccount to its wire record and returns it.</summary>
+    public AccountJson SaveToJson() => Data.SaveState();
 
     public AuthFlow Login(bool useDeviceCode = false, AuthEndpointsOptions? auth = null)
     {

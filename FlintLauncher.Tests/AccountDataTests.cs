@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Tests for the AccountData port: v3 JSON resume/save round-trips on the exact upstream key
+// Tests for the AccountData port: v3 wire resume/save round-trips on the exact upstream key
 // layout, the legacy "offline" ygg token migration, the entitlement fallback from profile
-// validity, the http->https textures rewrite and unknown-type rejection.
+// validity, the http->https textures rewrite and unknown-type rejection. The wire is the
+// typed AccountWire record set; the former upstream byte gate is retired (the accounts.json
+// write shape has no external consumer — docs/JSON-MIGRATION.md), value assertions remain.
 
 using System.Text;
-using System.Text.Json.Nodes;
+using System.Text.Json;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Minecraft;
 using Xunit;
@@ -72,16 +74,14 @@ public class AccountDataTests
                                           }
                                           """;
 
+    private static AccountJson Wire(string json) =>
+        JsonSerializer.Deserialize(json, AuthJsonContext.Default.AccountJson)!;
+
     private static AccountData ResumedMsaAccount()
     {
         var data = new AccountData();
-        Assert.True(data.ResumeStateFromV3(JsonNode.Parse(MsaAccountJson)!.AsObject()));
+        Assert.True(data.ResumeStateFromV3(Wire(MsaAccountJson)));
         return data;
-    }
-
-    private static void AssertKeySet(JsonObject obj, params string[] keys)
-    {
-        Assert.Equal(new HashSet<string>(keys), new HashSet<string>(obj.Select(p => p.Key)));
     }
 
     [Fact]
@@ -118,31 +118,56 @@ public class AccountDataTests
     }
 
     [Fact]
-    public void Save_Restores_The_Upstream_Key_Layout()
+    public void Save_Restores_The_Upstream_Key_Values()
     {
-        var data = ResumedMsaAccount();
-        var saved = data.SaveState();
+        // the saved wire carries the same member set the upstream saveState wrote (now as
+        // record members — the write shape is ours, the values are the gate)
+        var saved = ResumedMsaAccount().SaveState();
 
-        AssertKeySet(saved, "type", "msa-client-id", "msa", "utoken", "xrp-mc", "ygg", "profile", "entitlement");
-        AssertKeySet(saved["msa"]!.AsObject(), "iat", "exp", "token", "refresh_token", "extra");
-        AssertKeySet(saved["profile"]!.AsObject(), "id", "name", "cape", "skin", "capes");
-        AssertKeySet(saved["profile"]!["skin"]!.AsObject(), "id", "url", "variant", "data");
-        AssertKeySet(saved["entitlement"]!.AsObject(), "ownsMinecraft", "canPlayMinecraft");
+        Assert.Equal("MSA", saved.Type);
+        Assert.Equal("c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb", saved.MsaClientId);
+
+        var msa = saved.Msa!;
+        Assert.Equal(1638904328, msa.Iat);
+        Assert.Equal(1638990728, msa.Exp);
+        Assert.Equal("MSA_TOKEN", msa.Token);
+        Assert.Equal("MSA_REFRESH", msa.RefreshToken);
+        Assert.Equal("Bearer", AccountData.GetString(msa.Extra!["token_type"]));
+        Assert.Equal("86400", msa.Extra!["expires_in"].GetRawText());
+
+        Assert.Equal("USER_TOKEN", saved.Utoken!.Token);
+        Assert.Equal("XSTS_TOKEN", saved.XrpMc!.Token);
+
+        var ygg = saved.Ygg!;
+        Assert.Equal("YGG_TOKEN", ygg.Token);
+        Assert.Equal(1638904328, ygg.Iat);
+        Assert.Equal(1638907928, ygg.Exp);
+
+        var profile = saved.Profile!;
+        Assert.Equal("b50ad385829d3141a2167e7d7539ba7f", profile.Id);
+        Assert.Equal("TestPlayer", profile.Name);
+        Assert.Equal("cape-id", profile.Cape);
+        Assert.Equal("skin-id", profile.Skin!.Id);
+        Assert.Equal("aGVsbG8gc2tpbg==", profile.Skin.Data);
+        var cape = Assert.Single(profile.Capes!);
+        Assert.Equal("cape-id", cape.Id);
+        Assert.Equal("Migrator", cape.Alias);
+
+        Assert.True(saved.Entitlement!.OwnsMinecraft);
+        Assert.True(saved.Entitlement.CanPlayMinecraft);
     }
 
     [Fact]
-    public void SaveState_Byte_Matches_The_Upstream_Layout()
+    public void SaveState_Carries_The_Rewritten_Texture_Urls()
     {
-        // the byte gate for every future accounts.json change: resume the fixture (the exact
-        // upstream saveState layout) and re-save — the production Qt write shape of the two
-        // must be byte-identical (the textures http->https rewrite applies on resume)
-        var data = ResumedMsaAccount();
-        var saved = data.SaveState();
+        // the former upstream BYTE gate is retired (the write shape has no external
+        // consumer); the one behavior it pinned beyond the value assertions above — the
+        // textures http->https rewrite landing in the SAVED document — stays as a value gate
+        var saved = ResumedMsaAccount().SaveState();
 
-        var expectedJson = MsaAccountJson.Replace(
-            "http://textures.minecraft.net", "https://textures.minecraft.net");
-        var expected = QtJson.ToIndentedString(JsonNode.Parse(expectedJson)!.AsObject());
-        Assert.Equal(expected, QtJson.ToIndentedString(saved));
+        Assert.Equal("https://textures.minecraft.net/texture/skinhash", saved.Profile!.Skin!.Url);
+        Assert.Equal("https://textures.minecraft.net/texture/capehash",
+            Assert.Single(saved.Profile.Capes!).Url);
     }
 
     [Fact]
@@ -155,11 +180,10 @@ public class AccountDataTests
         Assert.True(second.ResumeStateFromV3(saved));
         var saved2 = second.SaveState();
 
-        // byte-shape: keys and values round-trip (QJsonObject key order is sorted, so compare
-        // the sorted serializations)
-        var a = saved.ToJsonString();
-        var b = saved2.ToJsonString();
-        Assert.Equal(a, b);
+        // self-stability of the typed wire: both saves of the same state serialize alike
+        Assert.Equal(
+            JsonSerializer.SerializeToUtf8Bytes(saved, AuthJsonContext.Default.AccountJson),
+            JsonSerializer.SerializeToUtf8Bytes(saved2, AuthJsonContext.Default.AccountJson));
     }
 
     [Fact]
@@ -177,56 +201,53 @@ public class AccountDataTests
     [Fact]
     public void CurrentCape_Ignored_When_Not_In_Capes()
     {
-        var json = JsonNode.Parse("""
-                                  {
-                                      "type": "MSA",
-                                      "profile": {
-                                          "id": "abc",
-                                          "name": "Name",
-                                          "cape": "missing-cape",
-                                          "skin": { "id": "s", "url": "https://x/y", "variant": "CLASSIC" },
-                                          "capes": []
-                                      }
-                                  }
-                                  """)!.AsObject();
         var data = new AccountData();
-        Assert.True(data.ResumeStateFromV3(json));
+        Assert.True(data.ResumeStateFromV3(Wire("""
+                                                {
+                                                    "type": "MSA",
+                                                    "profile": {
+                                                        "id": "abc",
+                                                        "name": "Name",
+                                                        "cape": "missing-cape",
+                                                        "skin": { "id": "s", "url": "https://x/y", "variant": "CLASSIC" },
+                                                        "capes": []
+                                                    }
+                                                }
+                                                """)));
         Assert.Equal("", data.MinecraftProfile.CurrentCape);
     }
 
     [Fact]
     public void Legacy_Offline_Ygg_Token_Migrates_To_Zero()
     {
-        var json = JsonNode.Parse("""
-                                  {
-                                      "type": "Offline",
-                                      "ygg": { "token": "offline" }
-                                  }
-                                  """)!.AsObject();
         var data = new AccountData();
-        Assert.True(data.ResumeStateFromV3(json));
+        Assert.True(data.ResumeStateFromV3(Wire("""
+                                                {
+                                                    "type": "Offline",
+                                                    "ygg": { "token": "offline" }
+                                                }
+                                                """)));
         Assert.Equal("0", data.AccessToken());
         // and it saves the migrated value
-        Assert.Equal("0", data.SaveState()["ygg"]!["token"]!.GetValue<string>());
+        Assert.Equal("0", data.SaveState().Ygg!.Token);
     }
 
     [Fact]
     public void Entitlement_Fallback_From_Profile_Validity()
     {
         // no entitlement object, but a valid profile -> assumed ownership
-        var json = JsonNode.Parse("""
-                                  {
-                                      "type": "MSA",
-                                      "profile": {
-                                          "id": "abc",
-                                          "name": "Name",
-                                          "skin": { "id": "s", "url": "https://x/y", "variant": "CLASSIC" },
-                                          "capes": []
-                                      }
-                                  }
-                                  """)!.AsObject();
         var data = new AccountData();
-        Assert.True(data.ResumeStateFromV3(json));
+        Assert.True(data.ResumeStateFromV3(Wire("""
+                                                {
+                                                    "type": "MSA",
+                                                    "profile": {
+                                                        "id": "abc",
+                                                        "name": "Name",
+                                                        "skin": { "id": "s", "url": "https://x/y", "variant": "CLASSIC" },
+                                                        "capes": []
+                                                    }
+                                                }
+                                                """)));
         Assert.True(data.MinecraftEntitlement.OwnsMinecraft);
         Assert.True(data.MinecraftEntitlement.CanPlayMinecraft);
         Assert.Equal(Validity.Assumed, data.MinecraftEntitlement.Validity);
@@ -236,18 +257,17 @@ public class AccountDataTests
     public void Broken_Profile_Does_Not_Grant_Entitlement_Fallback()
     {
         // profile present but missing the mandatory skin attributes -> profile invalid -> no fallback
-        var json = JsonNode.Parse("""
-                                  {
-                                      "type": "MSA",
-                                      "profile": {
-                                          "id": "abc",
-                                          "name": "Name",
-                                          "capes": []
-                                      }
-                                  }
-                                  """)!.AsObject();
         var data = new AccountData();
-        Assert.True(data.ResumeStateFromV3(json));
+        Assert.True(data.ResumeStateFromV3(Wire("""
+                                                {
+                                                    "type": "MSA",
+                                                    "profile": {
+                                                        "id": "abc",
+                                                        "name": "Name",
+                                                        "capes": []
+                                                    }
+                                                }
+                                                """)));
         Assert.Equal(Validity.None, data.MinecraftEntitlement.Validity);
         Assert.False(data.MinecraftEntitlement.OwnsMinecraft);
     }
@@ -256,8 +276,8 @@ public class AccountDataTests
     public void Unknown_Type_Is_Rejected()
     {
         var data = new AccountData();
-        Assert.False(data.ResumeStateFromV3(JsonNode.Parse("""{"type": "Elsewhere"}""")!.AsObject()));
-        Assert.False(data.ResumeStateFromV3(JsonNode.Parse("""{"noTypeHere": true}""")!.AsObject()));
+        Assert.False(data.ResumeStateFromV3(Wire("""{"type": "Elsewhere"}""")));
+        Assert.False(data.ResumeStateFromV3(Wire("""{"noTypeHere": true}""")));
     }
 
     [Fact]
@@ -266,8 +286,8 @@ public class AccountDataTests
         var data = ResumedMsaAccount();
         data.MsaToken.Persistent = false;
         var saved = data.SaveState();
-        Assert.False(saved.ContainsKey("msa"));
-        Assert.True(saved.ContainsKey("ygg"));
+        Assert.Null(saved.Msa);
+        Assert.NotNull(saved.Ygg);
     }
 
     [Fact]
@@ -275,10 +295,13 @@ public class AccountDataTests
     {
         var account = MinecraftAccount.CreateOffline("Notch");
         var saved = account.SaveToJson();
-        AssertKeySet(saved, "type", "ygg", "profile");
-        Assert.Equal("Offline", saved["type"]!.GetValue<string>());
-        Assert.Equal("0", saved["ygg"]!["token"]!.GetValue<string>());
-        Assert.Equal("Notch", saved["profile"]!["name"]!.GetValue<string>());
+        Assert.Equal("Offline", saved.Type);
+        Assert.Null(saved.Msa);
+        Assert.Null(saved.Utoken);
+        Assert.Null(saved.XrpMc);
+        Assert.Null(saved.Entitlement); // the offline entitlement never parsed -> Validity None
+        Assert.Equal("0", saved.Ygg!.Token);
+        Assert.Equal("Notch", saved.Profile!.Name);
     }
 
     [Fact]

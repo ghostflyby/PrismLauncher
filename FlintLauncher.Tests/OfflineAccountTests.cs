@@ -3,7 +3,7 @@
 // (Java UUID#nameUUIDFromBytes over "OfflinePlayer:<name>", ported via MD5 + QUuid byte order),
 // the format of the random pieces and the saved JSON.
 
-using System.Text.Json.Nodes;
+using System.Text.Json;
 using FlintLauncher.Core.Auth;
 using Xunit;
 
@@ -96,7 +96,8 @@ public class OfflineAccountTests
     [Fact]
     public void LoadFromJsonV3_Rejects_Garbage()
     {
-        Assert.Null(MinecraftAccount.LoadFromJsonV3(new JsonObject()));
-        Assert.Null(MinecraftAccount.LoadFromJsonV3(JsonNode.Parse("""{"type": "Nonsense"}""")!.AsObject()));
+        Assert.Null(MinecraftAccount.LoadFromJsonV3(new AccountJson()));
+        Assert.Null(MinecraftAccount.LoadFromJsonV3(
+            JsonSerializer.Deserialize("""{"type": "Nonsense"}""", AuthJsonContext.Default.AccountJson)!));
     }
 }

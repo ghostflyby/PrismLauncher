@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/auth/AccountData.{h,cpp}.
 //
-// Serialization note (the accounts.json decision): SaveState/ResumeStateFromV3 stay
-// node-based on purpose. The wire is the QJsonValue type-probing kind — every member is
-// read leniently (a wrong-kind token/iat/extra degrades that FIELD, not the account), and
-// the write tail is the Qt sorted-keys + 4-space-indent shape of AccountList. A typed DTO
-// would turn those per-field degradations into whole-document failures and need a custom
-// key-sorting writer; the data types here ARE the ledger (Token/Skin/Cape/MinecraftProfile)
-// and the extra bag is already an immutable JsonElement value bag. The byte shape is pinned
-// by AccountDataTests.SaveState_Byte_Matches_The_Upstream_Layout.
+// Serialization note (docs/JSON-MIGRATION.md, the accounts.json batch): the wire is the
+// typed record set in AccountWire.cs. SaveState()/ResumeStateFromV3() map between the
+// ledger (Token/Skin/Cape/MinecraftProfile, the data types below) and those records; the
+// C++ per-field lenient reads that were probing QJsonValue tokens are now either record
+// semantics (null member = field absent) or mapper validation (the mandatory profile
+// attributes, the entitlement fallback). The write shape is ours — standard indented JSON
+// via AuthJsonContext; the former Qt sorted-keys byte shape is retired with its byte gate.
 //
 // Deviations from the C++ original:
 //  - Token::extra is a QVariantMap upstream; it stores the Xbox display claims (strings) and,
@@ -26,12 +25,8 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.Json.Serialization;
 
 namespace FlintLauncher.Core.Auth;
-
-[JsonSerializable(typeof(JsonElement))]
-internal sealed partial class AuthJsonContext : JsonSerializerContext;
 
 public enum Validity
 {
@@ -143,76 +138,67 @@ public enum AccountState
 /// <summary>Port of AccountData.</summary>
 public sealed class AccountData
 {
-    /// <summary>Port of saveState(): the per-account JSON object ("type", "msa-client-id",
-    /// "msa", "utoken", "xrp-mc", "ygg", "profile", "entitlement" keys).</summary>
-    public JsonObject SaveState()
+    /// <summary>Port of saveState(): the per-account wire document ("type", "msa-client-id",
+    /// "msa", "utoken", "xrp-mc", "ygg", "profile", "entitlement" members).</summary>
+    public AccountJson SaveState()
     {
-        var output = new JsonObject();
+        var wire = new AccountJson
+        {
+            Type = Type == AccountType.Msa ? "MSA" : "Offline",
+            Ygg = TokenToWire(YggdrasilToken),
+            Profile = ProfileToWire(MinecraftProfile),
+            Entitlement = EntitlementToWire(MinecraftEntitlement),
+        };
         if (Type == AccountType.Msa)
         {
-            output["type"] = "MSA";
-            output["msa-client-id"] = JsonValue.Create(MsaClientId);
-            TokenToJsonv3(output, MsaToken, "msa");
-            TokenToJsonv3(output, UserToken, "utoken");
-            TokenToJsonv3(output, MojangServicesToken, "xrp-mc");
-        }
-        else if (Type == AccountType.Offline)
-        {
-            output["type"] = "Offline";
+            wire = wire with
+            {
+                MsaClientId = MsaClientId,
+                Msa = TokenToWire(MsaToken),
+                Utoken = TokenToWire(UserToken),
+                XrpMc = TokenToWire(MojangServicesToken),
+            };
         }
 
-        TokenToJsonv3(output, YggdrasilToken, "ygg");
-        ProfileToJsonv3(output, MinecraftProfile, "profile");
-        EntitlementToJsonv3(output, MinecraftEntitlement);
-        return output;
+        return wire;
     }
 
-    /// <summary>Port of resumeStateFromV3(QJsonObject): false when the account cannot be parsed.</summary>
-    public bool ResumeStateFromV3(JsonObject data)
+    /// <summary>Port of resumeStateFromV3(): false when the account cannot be parsed (the
+    /// type member is missing or unrecognized). Structural wrong-kind members never get
+    /// here — they fail the wire deserialization, where AccountList skips the account.</summary>
+    public bool ResumeStateFromV3(AccountJson wire)
     {
-        var typeV = Get(data, "type");
-        if (typeV is not JsonValue typeVal || !typeVal.TryGetValue(out string? typeS))
+        switch (wire.Type)
         {
-            // qWarning() << "Failed to parse account data: type is missing.";
-            return false;
-        }
-
-        if (typeS == "MSA")
-        {
-            Type = AccountType.Msa;
-        }
-        else if (typeS == "Offline")
-        {
-            Type = AccountType.Offline;
-        }
-        else
-        {
-            // qWarning() << "Failed to parse account data: type is not recognized.";
-            return false;
+            case "MSA":
+                Type = AccountType.Msa;
+                break;
+            case "Offline":
+                Type = AccountType.Offline;
+                break;
+            default:
+                // qWarning() << "Failed to parse account data: type is missing/not recognized.";
+                return false;
         }
 
         if (Type == AccountType.Msa)
         {
-            var clientIdv = Get(data, "msa-client-id");
-            if (clientIdv is JsonValue clientIdVal && clientIdVal.TryGetValue(out string? clientId))
-            {
-                MsaClientId = clientId;
-            } // leave msaClientID empty if it doesn't exist or isn't a string
-
-            MsaToken = TokenFromJsonv3(data, "msa");
-            UserToken = TokenFromJsonv3(data, "utoken");
-            MojangServicesToken = TokenFromJsonv3(data, "xrp-mc");
+            // an absent/empty client id stays empty (the C++ left msaClientID untouched)
+            MsaClientId = wire.MsaClientId ?? "";
+            MsaToken = TokenFromWire(wire.Msa);
+            UserToken = TokenFromWire(wire.Utoken);
+            MojangServicesToken = TokenFromWire(wire.XrpMc);
         }
 
-        YggdrasilToken = TokenFromJsonv3(data, "ygg");
+        YggdrasilToken = TokenFromWire(wire.Ygg);
         // versions before 7.2 used "offline" as the offline token
         if (YggdrasilToken.Value == "offline")
         {
             YggdrasilToken.Value = "0";
         }
 
-        MinecraftProfile = ProfileFromJsonv3(data, "profile");
-        if (!EntitlementFromJsonv3(data, MinecraftEntitlement))
+        MinecraftProfile = ProfileFromWire(wire.Profile);
+        if (!EntitlementFromWire(wire.Entitlement, MinecraftEntitlement))
         {
             if (MinecraftProfile.Validity != Validity.None)
             {
@@ -262,6 +248,10 @@ public sealed class AccountData
     {
         return obj.TryGetPropertyValue(key, out var node) ? node : null;
     }
+
+    // The QJsonValue probing helpers below serve the AUTH PROTOCOL responses (the MSA
+    // device-code/token endpoints, the XSTS display claims — every caller is an auth step
+    // or Parsers), not the accounts.json wire; that one is the typed AccountWire set.
 
     /// <summary>QJsonValue::isDouble() equivalent (missing key -> undefined -> false). Note:
     /// JsonValue.TryGetValue only matches the stored primitive type, so every numeric storage
@@ -339,283 +329,207 @@ public sealed class AccountData
 
     // ------------------------------------------------------------- (de)serialization
 
-    internal static void TokenToJsonv3(JsonObject parent, Token t, string tokenName)
+    /// <summary>The ledger token → wire (the C++ TokenToJsonv3). A non-persistent token
+    /// saves nothing, and an empty token (nothing but iat/exp) saves nothing either.</summary>
+    internal static TokenJson? TokenToWire(Token t)
     {
         if (!t.Persistent)
         {
-            return;
+            return null;
         }
 
-        var outObj = new JsonObject();
-        if (t.IssueInstant is { } issueInstant)
+        var wire = new TokenJson
         {
-            outObj["iat"] = ((DateTimeOffset)issueInstant).ToUnixTimeSeconds();
-        }
-
-        if (t.NotAfter is { } notAfter)
-        {
-            outObj["exp"] = ((DateTimeOffset)notAfter).ToUnixTimeSeconds();
-        }
-
-        var save = false;
-        if (t.Value.Length != 0)
-        {
-            outObj["token"] = t.Value;
-            save = true;
-        }
-
-        if (t.RefreshToken.Length != 0)
-        {
-            outObj["refresh_token"] = t.RefreshToken;
-            save = true;
-        }
-
-        if (t.Extra.Count != 0)
-        {
-            // QJsonObject::fromVariantMap(QVariantMap): keys sorted like QMap
-            var extra = new JsonObject();
-            foreach (var (key, value) in t.Extra.OrderBy(p => p.Key, StringComparer.Ordinal))
-            {
-                extra[key] = JsonNode.Parse(value.GetRawText());
-            }
-
-            outObj["extra"] = extra;
-            save = true;
-        }
-
-        if (save)
-        {
-            parent[tokenName] = outObj;
-        }
+            Iat = t.IssueInstant is { } issueInstant
+                ? new DateTimeOffset(issueInstant).ToUnixTimeSeconds()
+                : null,
+            Exp = t.NotAfter is { } notAfter
+                ? new DateTimeOffset(notAfter).ToUnixTimeSeconds()
+                : null,
+            Token = t.Value.Length != 0 ? t.Value : null,
+            RefreshToken = t.RefreshToken.Length != 0 ? t.RefreshToken : null,
+            Extra = t.Extra.Count != 0 ? new Dictionary<string, JsonElement>(t.Extra) : null,
+        };
+        return wire.Token is not null || wire.RefreshToken is not null || wire.Extra is not null
+            ? wire
+            : null;
     }
 
-    internal static Token TokenFromJsonv3(JsonObject parent, string tokenName)
+    /// <summary>The wire token → ledger (the C++ TokenFromJsonv3): iat/exp are epoch
+    /// seconds, a non-empty token grants Assumed validity, null extra entries drop.</summary>
+    internal static Token TokenFromWire(TokenJson? wire)
     {
-        var outToken = new Token();
-        var tokenObject = Get(parent, tokenName) as JsonObject;
-        if (tokenObject is null || tokenObject.Count == 0)
+        var token = new Token();
+        if (wire is null)
         {
-            return outToken;
+            return token;
         }
 
-        var issueInstant = Get(tokenObject, "iat");
-        if (IsNumber(issueInstant))
+        if (wire.Iat is { } iat)
         {
-            outToken.IssueInstant = DateTimeOffset.FromUnixTimeMilliseconds((long)GetNumber(issueInstant) * 1000).UtcDateTime;
+            token.IssueInstant = DateTimeOffset.FromUnixTimeSeconds(iat).UtcDateTime;
         }
 
-        var notAfter = Get(tokenObject, "exp");
-        if (IsNumber(notAfter))
+        if (wire.Exp is { } exp)
         {
-            outToken.NotAfter = DateTimeOffset.FromUnixTimeMilliseconds((long)GetNumber(notAfter) * 1000).UtcDateTime;
+            token.NotAfter = DateTimeOffset.FromUnixTimeSeconds(exp).UtcDateTime;
         }
 
-        var token = Get(tokenObject, "token");
-        if (IsString(token))
+        if (wire.Token is { } value)
         {
-            outToken.Value = GetString(token);
-            outToken.Validity = Validity.Assumed;
+            token.Value = value;
+            token.Validity = Validity.Assumed;
         }
 
-        var refreshToken = Get(tokenObject, "refresh_token");
-        if (IsString(refreshToken))
+        if (wire.RefreshToken is { } refreshToken)
         {
-            outToken.RefreshToken = GetString(refreshToken);
+            token.RefreshToken = refreshToken;
         }
 
-        var extra = Get(tokenObject, "extra");
-        if (extra is JsonObject extraObj)
+        if (wire.Extra is { } extra)
         {
-            foreach (var (key, value) in extraObj)
+            foreach (var (key, element) in extra)
             {
-                if (value is not null)
+                if (element.ValueKind != JsonValueKind.Null)
                 {
-                    outToken.Extra[key] = ToElement(value);
+                    token.Extra[key] = element;
                 }
             }
         }
 
-        return outToken;
+        return token;
     }
 
-    internal static void ProfileToJsonv3(JsonObject parent, MinecraftProfile p, string tokenName)
+    /// <summary>The ledger profile → wire (the C++ ProfileToJsonv3): an id-less profile
+    /// saves nothing; capes keep the QMap ordering (sorted by id, the SortedDictionary).</summary>
+    internal static ProfileJson? ProfileToWire(MinecraftProfile p)
     {
         if (p.Id.Length == 0)
         {
-            return;
+            return null;
         }
 
-        var outObj = new JsonObject
-        {
-            ["id"] = p.Id,
-            ["name"] = p.Name,
-        };
-        if (p.CurrentCape.Length != 0)
-        {
-            outObj["cape"] = p.CurrentCape;
-        }
-
-        {
-            var skinObj = new JsonObject
-            {
-                ["id"] = p.SkinField.Id,
-                ["url"] = p.SkinField.Url,
-                ["variant"] = p.SkinField.Variant,
-            };
-            if (p.SkinField.Data.Length != 0)
-            {
-                skinObj["data"] = Convert.ToBase64String(p.SkinField.Data);
-            }
-
-            outObj["skin"] = skinObj;
-        }
-
-        var capesArray = new JsonArray();
+        var capes = new List<CapeJson>();
         foreach (var cape in p.Capes.Values)
         {
-            var capeObj = new JsonObject
+            capes.Add(new CapeJson
             {
-                ["id"] = cape.Id,
-                ["url"] = cape.Url,
-                ["alias"] = cape.Alias,
-            };
-            if (cape.Data.Length != 0)
-            {
-                capeObj["data"] = Convert.ToBase64String(cape.Data);
-            }
-
-            capesArray.Add((JsonNode?)capeObj);
+                Id = cape.Id,
+                Url = cape.Url,
+                Alias = cape.Alias,
+                Data = cape.Data.Length != 0 ? Convert.ToBase64String(cape.Data) : null,
+            });
         }
 
-        outObj["capes"] = capesArray;
-        parent[tokenName] = outObj;
+        return new ProfileJson
+        {
+            Id = p.Id,
+            Name = p.Name,
+            Cape = p.CurrentCape.Length != 0 ? p.CurrentCape : null,
+            Skin = new SkinJson
+            {
+                Id = p.SkinField.Id,
+                Url = p.SkinField.Url,
+                Variant = p.SkinField.Variant,
+                Data = p.SkinField.Data.Length != 0 ? Convert.ToBase64String(p.SkinField.Data) : null,
+            },
+            Capes = capes.ToArray(),
+        };
+    }
+
+    /// <summary>The wire profile → ledger (the C++ ProfileFromJsonv3): the mandatory
+    /// id/name/skin trio, optional textures data (lenient base64), the cape list and the
+    /// current-cape reference check. A broken member yields the empty profile.</summary>
+    internal static MinecraftProfile ProfileFromWire(ProfileJson? wire)
+    {
+        var profile = new MinecraftProfile();
+        if (wire is null)
+        {
+            return profile;
+        }
+
+        if (string.IsNullOrEmpty(wire.Id) || string.IsNullOrEmpty(wire.Name))
+        {
+            // qWarning() << "mandatory profile attributes are missing or of unexpected type";
+            return new MinecraftProfile();
+        }
+
+        if (wire.Skin is not { } skin || skin.Id is null || skin.Url is null || skin.Variant is null)
+        {
+            // qWarning() << "skin is missing / mandatory skin attributes are missing";
+            return new MinecraftProfile();
+        }
+
+        profile.Name = wire.Name;
+        profile.Id = wire.Id;
+        profile.SkinField.Id = skin.Id;
+        profile.SkinField.Url = RewriteTextureUrl(skin.Url);
+        profile.SkinField.Variant = skin.Variant;
+        if (skin.Data is { } skinData)
+        {
+            profile.SkinField.Data = FromBase64(skinData);
+        }
+
+        foreach (var capeWire in wire.Capes ?? [])
+        {
+            if (capeWire.Id is null || capeWire.Url is null || capeWire.Alias is null)
+            {
+                // qWarning() << "cape is not an object / mandatory attributes are missing";
+                return new MinecraftProfile();
+            }
+
+            var cape = new Cape
+            {
+                Id = capeWire.Id,
+                Url = RewriteTextureUrl(capeWire.Url),
+                Alias = capeWire.Alias,
+            };
+            if (capeWire.Data is { } capeData)
+            {
+                cape.Data = FromBase64(capeData);
+            }
+
+            profile.Capes[cape.Id] = cape;
+        }
+
+        // current cape only sticks when it names a cape of the list
+        if (wire.Cape is { } currentCape && profile.Capes.ContainsKey(currentCape))
+        {
+            profile.CurrentCape = currentCape;
+        }
+
+        profile.Validity = Validity.Assumed;
+        return profile;
+    }
+
+    /// <summary>The wire entitlement → ledger (the C++ EntitlementFromJsonv3): false when
+    /// the object is absent or either boolean is missing.</summary>
+    internal static bool EntitlementFromWire(EntitlementJson? wire, MinecraftEntitlement outEntitlement)
+    {
+        if (wire is null || wire.OwnsMinecraft is not { } owns || wire.CanPlayMinecraft is not { } canPlay)
+        {
+            return false;
+        }
+
+        outEntitlement.CanPlayMinecraft = canPlay;
+        outEntitlement.OwnsMinecraft = owns;
+        outEntitlement.Validity = Validity.Assumed;
+        return true;
+    }
+
+    /// <summary>The ledger entitlement → wire (the C++ EntitlementToJsonv3): a None-validity
+    /// entitlement saves nothing.</summary>
+    internal static EntitlementJson? EntitlementToWire(MinecraftEntitlement p)
+    {
+        return p.Validity == Validity.None
+            ? null
+            : new EntitlementJson { OwnsMinecraft = p.OwnsMinecraft, CanPlayMinecraft = p.CanPlayMinecraft };
     }
 
     /// <summary>The http->https textures rewrite, shared by profile parsing and resume.</summary>
     internal static string RewriteTextureUrl(string url)
     {
         return url.Replace("http://textures.minecraft.net", "https://textures.minecraft.net");
-    }
-
-    internal static MinecraftProfile ProfileFromJsonv3(JsonObject parent, string tokenName)
-    {
-        var outProfile = new MinecraftProfile();
-        var tokenObject = Get(parent, tokenName) as JsonObject;
-        if (tokenObject is null || tokenObject.Count == 0)
-        {
-            return outProfile;
-        }
-
-        {
-            var idV = Get(tokenObject, "id");
-            var nameV = Get(tokenObject, "name");
-            if (!IsString(idV) || !IsString(nameV))
-            {
-                // qWarning() << "mandatory profile attributes are missing or of unexpected type";
-                return new MinecraftProfile();
-            }
-
-            outProfile.Name = GetString(nameV);
-            outProfile.Id = GetString(idV);
-        }
-
-        {
-            var skinV = Get(tokenObject, "skin");
-            if (skinV is not JsonObject skinObj)
-            {
-                // qWarning() << "skin is missing";
-                return new MinecraftProfile();
-            }
-
-            var idV = Get(skinObj, "id");
-            var urlV = Get(skinObj, "url");
-            var variantV = Get(skinObj, "variant");
-            if (!IsString(idV) || !IsString(urlV) || !IsString(variantV))
-            {
-                // qWarning() << "mandatory skin attributes are missing or of unexpected type";
-                return new MinecraftProfile();
-            }
-
-            outProfile.SkinField.Id = GetString(idV);
-            outProfile.SkinField.Url = RewriteTextureUrl(GetString(urlV));
-            outProfile.SkinField.Variant = GetString(variantV);
-
-            // data for skin is optional
-            var dataV = Get(skinObj, "data");
-            if (IsString(dataV))
-            {
-                // TODO: validate base64
-                outProfile.SkinField.Data = FromBase64(GetString(dataV));
-            }
-            else if (dataV is not null)
-            {
-                // qWarning() << "skin data is something unexpected";
-                return new MinecraftProfile();
-            }
-        }
-
-        {
-            var capesV = Get(tokenObject, "capes");
-            if (capesV is not JsonArray capesArray)
-            {
-                // qWarning() << "capes is not an array!";
-                return new MinecraftProfile();
-            }
-
-            foreach (var capeV in capesArray)
-            {
-                if (capeV is not JsonObject capeObj)
-                {
-                    // qWarning() << "cape is not an object!";
-                    return new MinecraftProfile();
-                }
-
-                var idV = Get(capeObj, "id");
-                var urlV = Get(capeObj, "url");
-                var aliasV = Get(capeObj, "alias");
-                if (!IsString(idV) || !IsString(urlV) || !IsString(aliasV))
-                {
-                    // qWarning() << "mandatory skin attributes are missing or of unexpected type";
-                    return new MinecraftProfile();
-                }
-
-                var cape = new Cape
-                {
-                    Id = GetString(idV),
-                    Url = RewriteTextureUrl(GetString(urlV)),
-                    Alias = GetString(aliasV),
-                };
-
-                // data for cape is optional.
-                var dataV = Get(capeObj, "data");
-                if (IsString(dataV))
-                {
-                    // TODO: validate base64
-                    cape.Data = FromBase64(GetString(dataV));
-                }
-                else if (dataV is not null)
-                {
-                    // qWarning() << "cape data is something unexpected";
-                    return new MinecraftProfile();
-                }
-
-                outProfile.Capes[cape.Id] = cape;
-            }
-        }
-        // current cape
-        {
-            var capeV = Get(tokenObject, "cape");
-            if (IsString(capeV))
-            {
-                var currentCape = GetString(capeV);
-                if (outProfile.Capes.ContainsKey(currentCape))
-                {
-                    outProfile.CurrentCape = currentCape;
-                }
-            }
-        }
-        outProfile.Validity = Validity.Assumed;
-        return outProfile;
     }
 
     /// <summary>QByteArray::fromBase64 (default lenient mode: whitespace/invalid chars skipped).</summary>
@@ -631,54 +545,6 @@ public sealed class AccountData
         }
 
         return Convert.FromBase64String(sb.ToString());
-    }
-
-    internal static void EntitlementToJsonv3(JsonObject parent, MinecraftEntitlement p)
-    {
-        if (p.Validity == Validity.None)
-        {
-            return;
-        }
-
-        var outObj = new JsonObject
-        {
-            ["ownsMinecraft"] = p.OwnsMinecraft,
-            ["canPlayMinecraft"] = p.CanPlayMinecraft,
-        };
-        parent["entitlement"] = outObj;
-    }
-
-    internal static bool EntitlementFromJsonv3(JsonObject parent, MinecraftEntitlement outEntitlement)
-    {
-        if (Get(parent, "entitlement") is not JsonObject entitlementObject || entitlementObject.Count == 0)
-        {
-            return false;
-        }
-
-        {
-            var ownsMinecraftV = Get(entitlementObject, "ownsMinecraft");
-            var canPlayMinecraftV = Get(entitlementObject, "canPlayMinecraft");
-            if (!IsBool(ownsMinecraftV) || !IsBool(canPlayMinecraftV))
-            {
-                // qWarning() << "mandatory attributes are missing or of unexpected type";
-                return false;
-            }
-
-            outEntitlement.CanPlayMinecraft = EnsureBool(canPlayMinecraftV);
-            outEntitlement.OwnsMinecraft = EnsureBool(ownsMinecraftV);
-            outEntitlement.Validity = Validity.Assumed;
-        }
-        return true;
-    }
-
-    internal static bool IsBool(JsonNode? node)
-    {
-        return node is JsonValue value && value.TryGetValue<bool>(out _);
-    }
-
-    internal static bool EnsureBool(JsonNode? node)
-    {
-        return node is JsonValue value && value.TryGetValue<bool>(out var b) ? b : false;
     }
 
     // -------------------------------------------------------- element-bag helpers
