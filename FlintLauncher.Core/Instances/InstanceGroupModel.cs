@@ -20,12 +20,55 @@
 
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.State;
 
 namespace FlintLauncher.Core.Instances;
+
+/// <summary>The instgroups.json wire shape. The group-name map is the dictionary modeling
+/// of the opaque dynamic-key region; formatVersion keeps its dual-shape input compat
+/// (number or numeric string — the file literally writes the string "1") through
+/// GroupFormatVersionConverter.</summary>
+internal sealed record GroupFileJson(
+    [property: JsonPropertyName("formatVersion"), JsonConverter(typeof(GroupFormatVersionConverter))] int Version,
+    [property: JsonPropertyName("groups")] Dictionary<string, GroupBodyJson>? Groups,
+    [property: JsonPropertyName("ungrouped")] GroupBodyJson? Ungrouped);
+
+internal sealed record GroupBodyJson(
+    [property: JsonPropertyName("instances")] List<string?>? Instances,
+    [property: JsonPropertyName("hidden")] bool? Hidden);
+
+/// <summary>Input compat for the dual-shape formatVersion: a JSON number uses TryGetInt32
+/// (silent reject on overflow), a numeric string parses, everything else fails.</summary>
+internal sealed class GroupFormatVersionConverter : JsonConverter<int>
+{
+    public override int Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Number)
+        {
+            if (reader.TryGetInt32(out var number))
+            {
+                return number;
+            }
+        }
+        else if (reader.TokenType == JsonTokenType.String && int.TryParse(reader.GetString(), out var parsed))
+        {
+            return parsed;
+        }
+
+        throw new JsonException("invalid group file format version");
+    }
+
+    public override void Write(Utf8JsonWriter writer, int value, JsonSerializerOptions options) =>
+        writer.WriteNumberValue(value);
+}
+
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(GroupFileJson))]
+internal sealed partial class GroupJsonContext : JsonSerializerContext;
 
 public sealed class InstanceGroupModel
 {
@@ -347,10 +390,10 @@ public sealed class InstanceGroupModel
             return false;
         }
 
-        JsonDocument jsonDoc;
+        GroupFileJson? file;
         try
         {
-            jsonDoc = JsonDocument.Parse(jsonData);
+            file = JsonSerializer.Deserialize(jsonData, GroupJsonContext.Default.GroupFileJson);
         }
         catch (JsonException)
         {
@@ -358,109 +401,75 @@ public sealed class InstanceGroupModel
             return false;
         }
 
-        using (jsonDoc)
+        if (file is null || file.Groups is null)
         {
-            var rootObj = jsonDoc.RootElement;
+            // qWarning: invalid group file. Root entry should be an object carrying 'groups'.
+            return false;
+        }
 
-            // if the root of the json wasn't an object, fail
-            if (rootObj.ValueKind != JsonValueKind.Object)
+        // the file is real: rebuild the member maps from it (upstream cleared its maps
+        // on every LoadGroupList run — here only the successful-parse path clears, so
+        // a transient absence never erases live assignments)
+        _memberGroups.Clear();
+        _groupCounts.Clear();
+
+        foreach (var (groupName, groupValue) in file.Groups)
+        {
+            if (groupName.Length == 0)
             {
-                // qWarning: invalid group file. Root entry should be an object.
-                return false;
+                // qWarning: redundant empty group found
+                continue;
             }
 
-            // Make sure the format version matches, otherwise fail.
-            // (QJsonValue::toVariant().toInt() accepts both numbers and numeric strings)
-            // toVariant().toInt() never throws upstream — an unrepresentable number simply
-            // fails the version match (a decimal like 1.5 rounds to 2 and is rejected there
-            // too). TryGetInt32 keeps that silent-reject shape; a raw GetInt32 would unwind
-            // a FormatException through Load into a group-endpoint 500.
-            if (!TryGetFormatVersion(rootObj, out var formatVersion) || formatVersion != GroupFormatVersion)
+            if (groupValue is null)
             {
-                return false;
+                // qWarning: group 'X' in the group list should be an object
+                continue;
             }
 
-            // Get the groups. if it's not an object, fail
-            if (!rootObj.TryGetProperty("groups", out var groupsValue) || groupsValue.ValueKind != JsonValueKind.Object)
+            if (groupValue.Instances is not { } instances)
             {
-                // qWarning: invalid group list JSON: 'groups' should be an object.
-                return false;
+                // qWarning: group 'X' is invalid, it should contain an array called 'instances'
+                continue;
             }
 
-            // the file is real: rebuild the member maps from it (upstream cleared its maps
-            // on every LoadGroupList run — here only the successful-parse path clears, so
-            // a transient absence never erases live assignments)
-            _memberGroups.Clear();
-            _groupCounts.Clear();
-
-            foreach (var groupProp in groupsValue.EnumerateObject())
-            {
-                var groupName = groupProp.Name;
-                if (groupName.Length == 0)
-                {
-                    // qWarning: redundant empty group found
-                    continue;
-                }
-
-                if (groupProp.Value.ValueKind != JsonValueKind.Object)
-                {
-                    // qWarning: group 'X' in the group list should be an object
-                    continue;
-                }
-
-                var groupObj = groupProp.Value;
-                if (!groupObj.TryGetProperty("instances", out var instancesValue) ||
-                    instancesValue.ValueKind != JsonValueKind.Array)
-                {
-                    // qWarning: group 'X' is invalid, it should contain an array called 'instances'
-                    continue;
-                }
-
-                // QJsonValue::toBool(false): only a real JSON true counts
-                var hidden = groupObj.TryGetProperty("hidden", out var hiddenValue) &&
-                             hiddenValue.ValueKind == JsonValueKind.True;
-                if (hidden)
-                {
-                    fileCarriedHidden = true;
-                    if (_collapsed.Add(groupName))
-                    {
-                        stateSeededHidden = true;
-                    }
-                }
-
-                foreach (var value in instancesValue.EnumerateArray())
-                {
-                    // QJsonValue::toString() yields "" for non-strings
-                    var member = value.ValueKind == JsonValueKind.String ? value.GetString()! : "";
-                    // D3 import conversion: a dirname member becomes the instance's uuid
-                    // when the current discovery can resolve it; unknown members persist
-                    // verbatim (the conversion retries on the next load)
-                    member = uuidResolver(member) is { Length: > 0 } uuid ? uuid : member;
-                    _memberGroups[member] = groupName;
-                    IncreaseGroupCount(groupName);
-                }
-            }
-
-            var ungroupedHidden = false;
-            if (rootObj.TryGetProperty("ungrouped", out var ungroupedValue) &&
-                ungroupedValue.ValueKind == JsonValueKind.Object &&
-                ungroupedValue.TryGetProperty("hidden", out var ungroupedHiddenValue))
-            {
-                ungroupedHidden = ungroupedHiddenValue.ValueKind == JsonValueKind.True;
-            }
-
-            if (ungroupedHidden)
+            // QJsonValue::toBool(false): only a real JSON true counts
+            var hidden = groupValue.Hidden == true;
+            if (hidden)
             {
                 fileCarriedHidden = true;
-                if (_collapsed.Add(""))
+                if (_collapsed.Add(groupName))
                 {
-                    // empty string represents ungrouped "group"
                     stateSeededHidden = true;
                 }
             }
 
-            loaded = true;
+            foreach (var value in instances)
+            {
+                // QJsonValue::toString() yields "" for non-strings
+                var member = value ?? "";
+                // D3 import conversion: a dirname member becomes the instance's uuid
+                // when the current discovery can resolve it; unknown members persist
+                // verbatim (the conversion retries on the next load)
+                member = uuidResolver(member) is { Length: > 0 } uuid ? uuid : member;
+                _memberGroups[member] = groupName;
+                IncreaseGroupCount(groupName);
+            }
         }
+
+        var ungroupedHidden = file.Ungrouped?.Hidden == true;
+
+        if (ungroupedHidden)
+        {
+            fileCarriedHidden = true;
+            if (_collapsed.Add(""))
+            {
+                // empty string represents ungrouped "group"
+                stateSeededHidden = true;
+            }
+        }
+
+            loaded = true;
 
         if (stateSeededHidden)
         {
@@ -625,30 +634,6 @@ public sealed class InstanceGroupModel
                                       or UnauthorizedAccessException or NotSupportedException)
         {
             // best-effort — see the summary
-        }
-    }
-
-    private static bool TryGetFormatVersion(JsonElement rootObj, out int version)
-    {
-        version = 0;
-        if (!rootObj.TryGetProperty("formatVersion", out var value))
-        {
-            return false;
-        }
-
-        switch (value.ValueKind)
-        {
-            case JsonValueKind.Number:
-                if (!value.TryGetInt32(out version))
-                {
-                    return false;
-                }
-
-                return true;
-            case JsonValueKind.String:
-                return int.TryParse(value.GetString(), out version);
-            default:
-                return false;
         }
     }
 
