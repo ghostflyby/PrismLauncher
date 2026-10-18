@@ -33,7 +33,12 @@
 | 批次2 Qt 写尾迁移（版本格式 *OutJson、mmc-pack、instgroups Save、皮肤 index、mod-list 导出、paste.gg） | `191fef389` |
 | 批次3 mod 信息读取类型化（ModMetadataWire、pack.mcmeta/ChatComponentJson、Technic version.json、LegacyFtb pack.json、status ping） | `9fd411303` |
 | 批次4 Flame 指纹流类型化 + ParseRequires/SerializeRequires 收敛（单一 MetaRequireJson wire） | `dfd41baf6` |
-| 审查修复轮：mmc-pack/mcmod null 元素 NRE、mods 门保真、active/contact/metadata/arguments/players 逐字段退化、MapRequires/equals 守卫 | （本提交） |
+| 审查修复轮：mmc-pack/mcmod null 元素 NRE、mods 门保真、active/contact/metadata/arguments/players 逐字段退化、MapRequires/equals 守卫 | `1b47966e5` |
+| QtJson 删除（NumberToString 就近下沉） | `0bc949b73` |
+| FlameJson 删除（指纹/项目/分类流类型化，公共封装 LoadIndexedPackVersionsFromResponse） | `e7a40adf0` |
+| FtbApp 类型化（instance.json required 成员、legacy targets、settings.json） | `fc0decb5b` |
+| Meta/实例/设置尾巴（formatVersion → 原生 JsonElement 门、SettingsJson 迁域） | `1bea2e548` |
+| **JsonUtils 删除**（JsonParseException 独立；其节点家族的测试随之退役，SettingsJson 两测接棒） | （本提交） |
 
 ### 4.1 审查轮接受并记录的偏差（均为垃圾/手改文件才触发的形状，真实上游文件不受影响）
 
@@ -43,6 +48,12 @@
 - Flame 指纹/文件响应中 `data`/`exactMatches`/`file` 类型错误、`fileFingerprint` 垃圾 → 整个响应 EmitFailed（旧为静默跳过或 "0" 未命中继续）；Projects 步骤语法垃圾静默返回（旧为 EmitFailed(e.Message)，依赖 ExecuteAsync 的残留失效上报）。
 - 版本格式/instgroups/皮肤 index 写侧从 Qt 4-space 排序字节形改为 context 标准缩进（写形状自由）。
 - `"requires": null`（字面 null 成员）在 OneSix 版本格式读为空集（旧整档失败）。
+- formatVersion 显式 JSON null 与缺失同判（JsonElement? 可空绑定；缺失时非必需门回落 InitialRelease，必需门仍失败）——两条路径（探针/直接元素）行为一致。
+- Flame 版本列表端点的语法/形状错误统一为 invalid-response 502（旧语法单独 502、缺 data 静默空集）。
+
+## 5. 目标达成
+
+`JsonUtils`、`FlameJson`、`QtJson` 三个类型已彻底删除（2026-10）。`FlintLauncher.Core/Json/` 仅剩 `JsonParseException`（公共异常类型，独立成文件）与 `QtConverters`（QJsonValue 语义 converter 家族）；设置层的两个动态形状文本助手（ToMap/ToStringList）按 §1 判据迁移到消费域 `Settings/SettingsJson.cs`。后续新格式一律按本档原则直接类型化。
 
 ## 4. 剩余批次
 
