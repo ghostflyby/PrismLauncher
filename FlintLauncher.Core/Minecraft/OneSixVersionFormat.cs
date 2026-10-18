@@ -71,7 +71,9 @@ public static partial class OneSixVersionFormat
     {
         var outInfo = new VersionFile();
 
-        var formatVersion = MetaJsonFormat.ParseFormatVersion(root, false);
+        var dto = Probe(root, filename, VersionFormatJsonContext.Default.VersionFileJson);
+
+        var formatVersion = MetaJsonFormat.ParseFormatVersion(dto.FormatVersion, false);
         switch (formatVersion)
         {
             case MetadataVersion.InitialRelease:
@@ -79,8 +81,6 @@ public static partial class OneSixVersionFormat
             case MetadataVersion.Invalid:
                 throw new JsonParseException(filename + " does not contain a recognizable version of the metadata format.");
         }
-
-        var dto = Probe(root, filename, VersionFormatJsonContext.Default.VersionFileJson);
 
         if (requireOrder)
         {

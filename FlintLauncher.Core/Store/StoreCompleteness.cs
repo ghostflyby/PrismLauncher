@@ -7,6 +7,8 @@
 // The Web layer serves this as GET /store/status/libraries/{versionRef} and
 // GET /store/status/assets/{assetsId}.
 
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Meta;
@@ -50,9 +52,7 @@ public static class StoreCompleteness
         }
 
         var metaVersion = new MetaVersion("net.minecraft", versionRef);
-        MetaJsonFormat.ParseVersion(
-            JsonUtils.RequireObject(JsonUtils.RequireNodeFromFile(manifestPath, manifestPath)),
-            metaVersion);
+        MetaJsonFormat.ParseVersion(ParseManifest(manifestPath), metaVersion);
         var manifest = metaVersion.Data ?? throw new MetaParseException(
             $"the version manifest '{manifestPath}' parsed without a version file");
 
@@ -158,6 +158,22 @@ public static class StoreCompleteness
 
     /// <summary>Route refs become file names — anything path-like is refused rather than
     /// escaped into a surprising location (the MigrationDecisionStore guard convention).</summary>
+    /// <summary>The version-manifest document read (the former RequireObject-of-
+    /// RequireNodeFromFile): a broken or non-object manifest fails as a MetaParseException
+    /// like every other manifest consumer here.</summary>
+    private static JsonObject ParseManifest(string manifestPath)
+    {
+        try
+        {
+            return JsonNode.Parse(File.ReadAllText(manifestPath)) as JsonObject
+                   ?? throw new MetaParseException($"the version manifest '{manifestPath}' is not an object");
+        }
+        catch (JsonException e)
+        {
+            throw new MetaParseException($"the version manifest '{manifestPath}' is invalid: {e.Message}");
+        }
+    }
+
     private static bool IsUnsafeRef(string reference) =>
         string.IsNullOrEmpty(reference) || reference.Contains('/') || reference.Contains('\\') ||
         reference == "." || reference == ".." ||

@@ -17,6 +17,7 @@
 
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
@@ -24,6 +25,25 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Meta;
+
+/// <summary>The former RequireObject(RequireNode(...)) gate shared by the meta entity
+/// readers: a syntax-broken or non-object document fails as a JsonParseException like the
+/// wrapper family.</summary>
+internal static class MetaDocumentParse
+{
+    public static JsonObject ParseDocument(byte[] data, string fname)
+    {
+        try
+        {
+            return JsonNode.Parse(Encoding.UTF8.GetString([.. data])) as JsonObject
+                   ?? throw new JsonParseException(fname + ": Error parsing JSON: document is null or not an object");
+        }
+        catch (JsonException e)
+        {
+            throw new JsonParseException(fname + ": Error parsing JSON: " + e.Message);
+        }
+    }
+}
 
 public enum LoadStatus
 {
@@ -122,9 +142,7 @@ public abstract class MetaEntity
             var fname = entity.LocalFilename;
             try
             {
-                var obj = JsonUtils.RequireObject(
-                    JsonUtils.RequireNode(Encoding.UTF8.GetString([.. _data]), fname), fname);
-                entity.Parse(obj);
+                entity.Parse(MetaDocumentParse.ParseDocument([.. _data], fname));
                 return true;
             }
             catch (Exception e) when (e is JsonParseException or MetaParseException or FormatException)
@@ -169,9 +187,7 @@ public abstract class MetaEntity
                     // load local file
                     if (entity.loadStatus == LoadStatus.NotLoaded)
                     {
-                        var obj = JsonUtils.RequireObject(
-                            JsonUtils.RequireNode(Encoding.UTF8.GetString(fileData), fname), fname);
-                        entity.Parse(obj);
+                        entity.Parse(MetaDocumentParse.ParseDocument(fileData, fname));
                         entity.loadStatus = LoadStatus.Local;
                     }
                 }

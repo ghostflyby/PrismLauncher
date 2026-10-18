@@ -910,7 +910,7 @@ public static class InstanceConfigKeys
         null => null,
         IReadOnlyList<string> list => list,
         IEnumerable<string> en => en.ToList(),
-        string text => JsonUtils.ToStringList(text),
+        string text => SettingsJson.ToStringList(text),
         _ => null
     };
 }

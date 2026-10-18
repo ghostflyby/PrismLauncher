@@ -89,6 +89,7 @@ internal sealed record MetaRequireJson(
 /// <summary>The version DOCUMENT header (uid + the common version members); the OneSix
 /// body keys are read by OneSixVersionFormat over the same node.</summary>
 internal sealed record MetaVersionDocumentJson(
+    JsonElement? FormatVersion,
     string? Uid,
     string? Version,
     string? ReleaseTime,
@@ -134,25 +135,8 @@ public static class MetaJsonFormat
     private static MetaParseException MissingMember(string key) =>
         new($"The metadata document has no '{key}' member.");
 
-    // ------------------------------------------------- node-side member readers
-    //
-    // FlameJson convention: the helper parameters are JsonNode? so JsonObject arguments upcast
-    // at the call site instead of re-binding the (JsonObject, key, what) element-bridge
-    // overloads — see the JsonUtils node-family migration rule.
-
-    /// <summary>obj["key"] equivalent: null node when missing or not an object.</summary>
-    private static JsonNode? Ptr(JsonNode? node, string key) => node is JsonObject obj ? obj[key] : null;
-
     /// <summary>QJsonObject::contains(key) equivalent: true even when the member holds JSON null.</summary>
     private static bool Has(JsonNode? node, string key) => node is JsonObject obj && obj.Contains(key);
-
-    /// <summary>Port of require&lt;String&gt;(parent, key).</summary>
-    private static string RequireStringOf(JsonNode? parent, string key) =>
-        JsonUtils.RequireString(parent, key, "'" + key + "'");
-
-    /// <summary>parent.value(key).toString(default) equivalent.</summary>
-    private static string Str(JsonNode? node, string key, string def = "") =>
-        JsonObjectExtensions.StringOr(Ptr(node, key), def);
 
     // ------------------------------------------------------------------ Index
 
@@ -183,9 +167,8 @@ public static class MetaJsonFormat
     // The version DOCUMENT parse stays node-based: it shares the Require reads with the
     // OneSix version format and hands the whole object to OneSixVersionFormat (own batch).
 
-    private static MetaVersion ParseVersionInternal(JsonNode obj)
+    private static MetaVersion ParseVersionInternal(JsonObject obj, MetaVersionDocumentJson dto)
     {
-        var dto = DeserializeDocument((JsonObject)obj, "version", MetaJsonContext.Default.MetaVersionDocumentJson);
         var version = MapCommonVersion(RequireStringOf(dto.Uid, "uid"), new MetaVersionEntryJson(
             dto.Version, dto.ReleaseTime, dto.Type, dto.Recommended, dto.Volatile,
             dto.Requires, dto.Conflicts, dto.Sha256));
@@ -272,26 +255,27 @@ public static class MetaJsonFormat
 
     // ------------------------------------------------------------ format version
 
-    public static MetadataVersion ParseFormatVersion(JsonNode obj, bool required = true)
+    /// <summary>The formatVersion gate over the RAW member element (the probes carry it as
+    /// an unbound JsonElement?, so any token binds): a JSON number of 0 or 1 is the
+    /// InitialRelease, any other PRESENT value fails the document in both modes, and only
+    /// the ABSENT member falls back (Invalid when required, InitialRelease otherwise) — the
+    /// EnsureDouble(raw token) input compatibility of the former read.</summary>
+    public static MetadataVersion ParseFormatVersion(JsonElement? formatVersion, bool required = true)
     {
-        if (obj is not JsonObject map || !map.Contains("formatVersion"))
+        if (formatVersion is null || formatVersion.Value.ValueKind == JsonValueKind.Null)
         {
-            if (required)
-            {
-                return MetadataVersion.Invalid;
-            }
-
-            return MetadataVersion.InitialRelease;
+            // the ABSENT member falls back; an explicit JSON null counts as absent too,
+            // uniformly on both the probe path (the nullable binds it as no value) and the
+            // direct Null-kind element path (accepted deviation, ledger 4.1)
+            return required ? MetadataVersion.Invalid : MetadataVersion.InitialRelease;
         }
 
-        // isDouble(): any JSON number. Node-side read (raw token text) — not TryGetValue<T>,
-        // whose result depends on whether the JsonValue is parsed-backed or created in code.
-        var raw = JsonUtils.EnsureDouble(map["formatVersion"], double.NaN);
-        return raw switch
-        {
-            0 or 1 => MetadataVersion.InitialRelease,
-            _ => MetadataVersion.Invalid,
-        };
+        var value = formatVersion.Value.ValueKind == JsonValueKind.Number
+            ? formatVersion.Value.GetDouble()
+            : double.NaN;
+        return value is 0 or 1
+            ? MetadataVersion.InitialRelease
+            : MetadataVersion.Invalid;
     }
 
     public static void SerializeFormatVersion(JsonObject obj, MetadataVersion version)
@@ -334,11 +318,11 @@ public static class MetaJsonFormat
 
     public static void ParseVersion(JsonObject obj, MetaVersion ptr)
     {
-        var version = ParseFormatVersion(obj);
-        switch (version)
+        var dto = DeserializeDocument(obj, "version", MetaJsonContext.Default.MetaVersionDocumentJson);
+        switch (ParseFormatVersion(dto.FormatVersion))
         {
             case MetadataVersion.InitialRelease:
-                ptr.Merge(ParseVersionInternal(obj));
+                ptr.Merge(ParseVersionInternal(obj, dto));
                 break;
             case MetadataVersion.Invalid:
                 throw new MetaParseException("Unknown format version!");

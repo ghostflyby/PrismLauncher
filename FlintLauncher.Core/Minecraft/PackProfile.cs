@@ -500,9 +500,9 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         // read below reports the kind/shape failures as "bad file format")
         try
         {
-            JsonUtils.RequireNode(data, filename);
+            JsonNode.Parse(data);
         }
-        catch (JsonParseException e)
+        catch (JsonException e)
         {
             return Result.Error($"Couldn't parse {filename} as json: {e.Message}");
         }

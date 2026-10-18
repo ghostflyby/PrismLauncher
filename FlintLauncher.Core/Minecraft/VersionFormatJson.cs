@@ -70,6 +70,10 @@ internal sealed record JavaRuntimeJson(
 internal sealed record VersionFileJson
 {
     // OneSix
+    /// <summary>The unbound formatVersion member (any token binds; ParseFormatVersion
+    /// judges the raw number token).</summary>
+    public JsonElement? FormatVersion { get; init; }
+
     public int? Order { get; init; }
     public string? Name { get; init; }
     public string? Uid { get; init; }

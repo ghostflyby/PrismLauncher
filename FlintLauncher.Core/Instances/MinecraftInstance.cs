@@ -1100,7 +1100,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
         // environment variables
         var env = Variant.AsString(settings.Get("Env"));
-        var envMap = JsonUtils.ToMap(env);
+        var envMap = SettingsJson.ToMap(env);
         if (envMap.Count != 0)
         {
             outList.Add("Custom environment variables:");
@@ -1361,7 +1361,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     private static void InsertCustomEnv(ProcessEnvironment env, string value)
     {
-        var envMap = JsonUtils.ToMap(value);
+        var envMap = SettingsJson.ToMap(value);
         if (envMap.Count == 0)
         {
             return;

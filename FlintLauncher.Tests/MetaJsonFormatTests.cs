@@ -3,6 +3,7 @@
 // JsonNode model: format-version number semantics (no TryGetValue<T>), Require/Ensure message
 // parity, require-set round trips and the requireIsArrayOf<QJsonObject> quirks.
 
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Meta;
@@ -23,6 +24,17 @@ public class MetaJsonFormatTests
 
     // ------------------------------------------------------------- format version
 
+    /// <summary>The raw formatVersion member element, exactly as the document probes carry
+    /// it (an unbound JsonElement?; null = absent).</summary>
+    private static JsonElement? FormatVersionMember(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.ValueKind == JsonValueKind.Object &&
+               doc.RootElement.TryGetProperty("formatVersion", out var member)
+            ? member.Clone()
+            : null;
+    }
+
     [Theory]
     [InlineData("""{"formatVersion":1}""", MetadataVersion.InitialRelease)]
     [InlineData("""{"formatVersion":0}""", MetadataVersion.InitialRelease)]
@@ -35,24 +47,30 @@ public class MetaJsonFormatTests
     [InlineData("""{}""", MetadataVersion.Invalid)]
     public void ParseFormatVersion_NumberSemantics(string json, MetadataVersion expected)
     {
-        Assert.Equal(expected, MetaJsonFormat.ParseFormatVersion(Parse(json)));
+        Assert.Equal(expected, MetaJsonFormat.ParseFormatVersion(FormatVersionMember(json)));
     }
 
     [Fact]
     public void ParseFormatVersion_NotRequired_FallsBackToInitialRelease()
     {
-        Assert.Equal(MetadataVersion.InitialRelease, MetaJsonFormat.ParseFormatVersion(Parse("{}"), required: false));
+        Assert.Equal(MetadataVersion.InitialRelease,
+            MetaJsonFormat.ParseFormatVersion(FormatVersionMember("{}"), required: false));
         // a present but non-numeric formatVersion is still invalid when not required
-        Assert.Equal(MetadataVersion.Invalid, MetaJsonFormat.ParseFormatVersion(Parse("""{"formatVersion":"x"}"""), required: false));
+        Assert.Equal(MetadataVersion.Invalid,
+            MetaJsonFormat.ParseFormatVersion(FormatVersionMember("""{"formatVersion":"x"}"""), required: false));
     }
 
     [Fact]
-    public void ParseFormatVersion_CreatedPrimitives_ReadLikeParsedNumbers()
+    public void ParseFormatVersion_ExplicitNull_Binds_As_Absent()
     {
-        // a member built in code (JsonValue.Create) must not be rejected like the old
-        // TryGetValue<double> read did for created (non parsed-backed) values
-        var obj = new JsonObject { ["formatVersion"] = JsonValue.Create(1) };
-        Assert.Equal(MetadataVersion.InitialRelease, MetaJsonFormat.ParseFormatVersion(obj));
+        // the JsonElement? carrier binds an explicit JSON null as ABSENT (ledger 4.1): the
+        // not-required gate falls back to InitialRelease, the required gate still fails
+        using var doc = JsonDocument.Parse("""{"formatVersion":null}""");
+        JsonElement? explicitNull = doc.RootElement.GetProperty("formatVersion").Clone();
+        Assert.Equal(MetadataVersion.InitialRelease,
+            MetaJsonFormat.ParseFormatVersion(explicitNull, required: false));
+        Assert.Equal(MetadataVersion.Invalid,
+            MetaJsonFormat.ParseFormatVersion(explicitNull));
     }
 
     // ------------------------------------------------------------------ version

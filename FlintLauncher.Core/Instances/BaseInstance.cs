@@ -629,7 +629,7 @@ public abstract class BaseInstance
         // round-tripping through a plain SettingsObject double) still parses
         return _settings.Get("linkedInstances") is IReadOnlyList<string> list
             ? list.ToList()
-            : JsonUtils.ToStringList(Variant.AsString(_settings.Get("linkedInstances")));
+            : SettingsJson.ToStringList(Variant.AsString(_settings.Get("linkedInstances")));
     }
 
     public void SetLinkedInstances(IReadOnlyList<string> list)

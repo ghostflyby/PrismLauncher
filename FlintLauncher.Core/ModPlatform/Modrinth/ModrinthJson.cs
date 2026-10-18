@@ -6,7 +6,7 @@
 //
 // Serialization notes:
 //  - request bodies serialize with WhenWritingNull: a null member means "omit the key",
-//    matching the JsonUtils.WriteString/WriteStringList semantics it replaces;
+//    matching the Json::writeString/writeStringList semantics it replaces;
 //  - `hashes` maps of versions/projects are keyed by arbitrary algorithm names and stay
 //    Dictionary<string, string>;
 //  - the POST /version_files (update) responses are hash-keyed maps of versions, so their
@@ -296,7 +296,7 @@ public static class ModrinthJson
     }
 }
 
-/// <summary>Required-member checks over the parsed DTOs, mirroring the JsonUtils.Require*
+/// <summary>Required-member checks over the parsed DTOs, mirroring the former requireIsType*
 /// messages the former node readers produced (the "key is not a …" half; the DTO cannot tell
 /// a missing key from a wrong-kind one, so both collapse onto the kind message).</summary>
 internal static class ModrinthRequire

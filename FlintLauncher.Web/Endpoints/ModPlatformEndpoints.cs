@@ -14,6 +14,7 @@ using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
+using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
@@ -417,7 +418,7 @@ public static class ModPlatformEndpoints
                 IReadOnlyList<IndexedVersionType> releaseTypes =
                     filter?.ReleaseTypes is { Count: > 0 } requested
                         ? IndexedVersionType.FromStringList(requested)
-                        : IndexedVersionType.FromStringList(JsonUtils.ToStringList(
+                        : IndexedVersionType.FromStringList(SettingsJson.ToStringList(
                             runtime.Config.Current.ModDownload.ModUpdateReleaseTypes ?? "[]"));
 
                 var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, releaseTypes, runtime.Modrinth, runtime.Flame);
