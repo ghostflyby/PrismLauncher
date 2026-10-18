@@ -18,30 +18,16 @@ namespace FlintLauncher.Core.ModPlatform.Flame;
 /// <summary>The manifest.json wire shape (the load-side probe; optional members carry the
 /// QJsonValue defaults, required ones are validated by the loader).</summary>
 internal sealed record FlameManifestJson(
-    [property: JsonPropertyName("manifestType")] string? ManifestType,
-    [property: JsonPropertyName("manifestVersion")] int? ManifestVersion,
-    [property: JsonPropertyName("minecraft")] FlameMinecraftJson? Minecraft,
-    [property: JsonPropertyName("name")] string? Name,
-    [property: JsonPropertyName("version")] string? Version,
-    [property: JsonPropertyName("author")] string? Author,
-    [property: JsonPropertyName("files")] List<FlameFileJson>? Files,
-    [property: JsonPropertyName("overrides")] string? Overrides);
-
+    string? ManifestType,    int? ManifestVersion,    FlameMinecraftJson? Minecraft,    string? Name,    string? Version,    string? Author,    List<FlameFileJson>? Files,    string? Overrides);
 internal sealed record FlameMinecraftJson(
-    [property: JsonPropertyName("version")] string? Version,
-    [property: JsonPropertyName("libraries")] string? Libraries,
-    [property: JsonPropertyName("modLoaders")] List<FlameModloaderJson>? ModLoaders,
-    [property: JsonPropertyName("recommendedRam")] int? RecommendedRam);
-
+    string? Version,    string? Libraries,    List<FlameModloaderJson>? ModLoaders,    int? RecommendedRam);
 internal sealed record FlameModloaderJson(
-    [property: JsonPropertyName("id")] string? Id,
-    [property: JsonPropertyName("primary")] bool? Primary);
-
+    string? Id,    bool? Primary);
 internal sealed record FlameFileJson(
     [property: JsonPropertyName("projectID")] long? ProjectId,
     [property: JsonPropertyName("fileID")] long? FileId,
-    [property: JsonPropertyName("required")] bool? Required);
-
+    bool? Required);
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(FlameManifestJson))]
 // a JsonSerializerContext of its own: the STJ source generator emits per-primitive helper
 // files named "<Context>.<Type>.g.cs", so one context class cannot be declared across two

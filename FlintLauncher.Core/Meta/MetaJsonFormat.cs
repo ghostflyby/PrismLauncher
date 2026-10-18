@@ -70,35 +70,17 @@ public sealed class Require: IEquatable<Require>, IComparable<Require>
 /// preserved (a quoted "1" is NOT a format version); the required strings are validated by
 /// the mappers with document-level failures.</summary>
 internal sealed record MetaIndexJson(
-    [property: JsonPropertyName("formatVersion")] JsonElement? FormatVersion,
-    [property: JsonPropertyName("packages")] List<MetaPackageJson>? Packages);
-
+    JsonElement? FormatVersion,    List<MetaPackageJson>? Packages);
 internal sealed record MetaPackageJson(
-    [property: JsonPropertyName("uid")] string? Uid,
-    [property: JsonPropertyName("name")] string? Name,
-    [property: JsonPropertyName("sha256")] string? Sha256);
-
+    string? Uid,    string? Name,    string? Sha256);
 internal sealed record MetaVersionListJson(
-    [property: JsonPropertyName("formatVersion")] JsonElement? FormatVersion,
-    [property: JsonPropertyName("uid")] string? Uid,
-    [property: JsonPropertyName("name")] string? Name,
-    [property: JsonPropertyName("versions")] List<MetaVersionEntryJson>? Versions);
-
+    JsonElement? FormatVersion,    string? Uid,    string? Name,    List<MetaVersionEntryJson>? Versions);
 internal sealed record MetaVersionEntryJson(
-    [property: JsonPropertyName("version")] string? Version,
-    [property: JsonPropertyName("releaseTime")] string? ReleaseTime,
-    [property: JsonPropertyName("type")] string? Type,
-    [property: JsonPropertyName("recommended")] bool? Recommended,
-    [property: JsonPropertyName("volatile")] bool? Volatile,
-    [property: JsonPropertyName("requires")] List<MetaRequireJson>? Requires,
-    [property: JsonPropertyName("conflicts")] List<MetaRequireJson>? Conflicts,
-    [property: JsonPropertyName("sha256")] string? Sha256);
-
+    string? Version,    string? ReleaseTime,    string? Type,    bool? Recommended,    bool? Volatile,    List<MetaRequireJson>? Requires,    List<MetaRequireJson>? Conflicts,    string? Sha256);
 internal sealed record MetaRequireJson(
-    [property: JsonPropertyName("uid")] string? Uid,
-    [property: JsonPropertyName("equals")] string? EqualsVersion,
-    [property: JsonPropertyName("suggests")] string? Suggests);
-
+    string? Uid,    [property: JsonPropertyName("equals")] string? EqualsVersion,
+    string? Suggests);
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(MetaIndexJson))]
 [JsonSerializable(typeof(MetaVersionListJson))]
 internal sealed partial class MetaJsonContext : JsonSerializerContext;

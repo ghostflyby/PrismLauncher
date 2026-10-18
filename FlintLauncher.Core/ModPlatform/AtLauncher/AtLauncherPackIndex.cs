@@ -13,39 +13,34 @@ namespace FlintLauncher.Core.ModPlatform.AtLauncher;
 
 public sealed class IndexedVersion
 {
-    [JsonPropertyName("version")]
     public required string Version { get; set; }
 
-    [JsonPropertyName("minecraft")]
     public required string Minecraft { get; set; }
 }
 
 public sealed class IndexedPack
 {
-    [JsonPropertyName("id")]
     public required int Id { get; set; }
 
-    [JsonPropertyName("position")]
     public required int Position { get; set; }
 
-    [JsonPropertyName("name")]
     public required string Name { get; set; }
 
     // the wire value is the raw "private"/"public" text; PackType stays the computed view
     [JsonPropertyName("type")]
     public required string TypeRaw { get; set; }
 
-    [JsonPropertyName("versions")]
     public required List<IndexedVersion> Versions { get; init; }
 
-    [JsonPropertyName("system")]
     [JsonConverter(typeof(QtCoercingBoolConverter))]
     public bool System { get; set; }
 
-    [JsonPropertyName("description")]
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Description { get; set; } = "";
 
+    // [JsonIgnore]: with the naming policy the computed getter's name ("type") would
+    // collide with TypeRaw's explicit wire name
+    [JsonIgnore]
     public PackType Type => TypeRaw == "private" ? PackType.Private : PackType.Public;
 
     public string SafeName => AtLauncherPackIndex.SafePackName(Name).ToLowerInvariant() + ".png";

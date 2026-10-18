@@ -68,11 +68,9 @@ public sealed class VersionLoader
     [JsonPropertyName("type")]
     public string Type { get; set; } = "";
 
-    [JsonPropertyName("choose")]
     [JsonConverter(typeof(QtCoercingBoolConverter))]
     public bool Choose { get; set; }
 
-    [JsonPropertyName("metadata")]
     public VersionLoaderMetadata Metadata { get; set; } = new();
 
     public bool Latest => Metadata.Latest;
@@ -91,11 +89,9 @@ public sealed class VersionLoader
 
 public sealed class VersionLoaderMetadata
 {
-    [JsonPropertyName("latest")]
     [JsonConverter(typeof(QtCoercingBoolConverter))]
     public bool Latest { get; set; }
 
-    [JsonPropertyName("recommended")]
     [JsonConverter(typeof(QtCoercingBoolConverter))]
     public bool Recommended { get; set; }
 
@@ -110,51 +106,46 @@ public sealed class VersionLoaderMetadata
 
 public sealed class VersionLibrary
 {
-    [JsonPropertyName("url")]
     public required string Url { get; set; }
 
-    [JsonPropertyName("file")]
     public required string File { get; set; }
 
-    [JsonPropertyName("server")]
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Server { get; set; } = "";
 
-    [JsonPropertyName("md5")]
     public required string Md5 { get; set; }
 
     [JsonPropertyName("download")]
     public required string DownloadRaw { get; set; }
 
+    [JsonIgnore]
     public DownloadType Download => AtLauncherPackManifest.ParseDownloadType(DownloadRaw);
 }
 
 public sealed class VersionMod
 {
-    [JsonPropertyName("name")]
     public required string Name { get; set; }
 
     [JsonPropertyName("version")]
     public required string ModVersion { get; set; }
 
-    [JsonPropertyName("url")]
     public required string Url { get; set; }
 
-    [JsonPropertyName("file")]
     public required string File { get; set; }
 
-    [JsonPropertyName("md5")]
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Md5 { get; set; } = "";
 
     [JsonPropertyName("download")]
     public required string DownloadRaw { get; set; }
 
+    [JsonIgnore]
     public DownloadType Download => AtLauncherPackManifest.ParseDownloadType(DownloadRaw);
 
     [JsonPropertyName("type")]
     public required string TypeRaw { get; set; }
 
+    [JsonIgnore]
     public ModType Type => AtLauncherPackManifest.ParseModType(TypeRaw);
 
     // absent extractTo/decompType keep the ModType.Root zero (the former property default),
@@ -163,9 +154,9 @@ public sealed class VersionMod
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string ExtractToRaw { get; set; } = "";
 
+    [JsonIgnore]
     public ModType ExtractTo => ExtractToRaw.Length == 0 ? ModType.Root : AtLauncherPackManifest.ParseModType(ExtractToRaw);
 
-    [JsonPropertyName("extractFolder")]
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string ExtractFolder { get; set; } = "";
 
@@ -173,52 +164,41 @@ public sealed class VersionMod
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string DecompTypeRaw { get; set; } = "";
 
+    [JsonIgnore]
     public ModType DecompType => DecompTypeRaw.Length == 0 ? ModType.Root : AtLauncherPackManifest.ParseModType(DecompTypeRaw);
 
-    [JsonPropertyName("decompFile")]
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string DecompFile { get; set; } = "";
 
-    [JsonPropertyName("description")]
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Description { get; set; } = "";
 
-    [JsonPropertyName("optional")]
     [JsonConverter(typeof(QtCoercingBoolConverter))]
     public bool Optional { get; set; }
 
-    [JsonPropertyName("recommended")]
     [JsonConverter(typeof(QtCoercingBoolConverter))]
     public bool Recommended { get; set; }
 
-    [JsonPropertyName("selected")]
     [JsonConverter(typeof(QtCoercingBoolConverter))]
     public bool Selected { get; set; }
 
-    [JsonPropertyName("hidden")]
     [JsonConverter(typeof(QtCoercingBoolConverter))]
     public bool Hidden { get; set; }
 
-    [JsonPropertyName("library")]
     [JsonConverter(typeof(QtCoercingBoolConverter))]
     public bool Library { get; set; }
 
-    [JsonPropertyName("group")]
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Group { get; set; } = "";
 
-    [JsonPropertyName("depends")]
     public List<string> Depends { get; set; } = [];
 
-    [JsonPropertyName("colour")]
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Colour { get; set; } = "";
 
-    [JsonPropertyName("warning")]
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Warning { get; set; } = "";
 
-    [JsonPropertyName("client")]
     [JsonConverter(typeof(QtCoercingBoolConverter))]
     public bool Client { get; set; }
 
@@ -228,59 +208,47 @@ public sealed class VersionMod
 
 public sealed class VersionConfigs
 {
-    [JsonPropertyName("filesize")]
     [JsonConverter(typeof(QtCoercingIntConverter))]
     public int Filesize { get; set; }
 
-    [JsonPropertyName("sha1")]
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Sha1 { get; set; } = "";
 }
 
 public sealed class VersionMessages
 {
-    [JsonPropertyName("install")]
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Install { get; set; } = "";
 
-    [JsonPropertyName("update")]
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Update { get; set; } = "";
 }
 
 public sealed class VersionKeep
 {
-    [JsonPropertyName("base")]
     public required string Base { get; set; }
 
-    [JsonPropertyName("target")]
     public required string Target { get; set; }
 }
 
 public sealed class VersionKeeps
 {
-    [JsonPropertyName("files")]
     public List<VersionKeep> Files { get; set; } = [];
 
-    [JsonPropertyName("folders")]
     public List<VersionKeep> Folders { get; set; } = [];
 }
 
 public sealed class VersionDelete
 {
-    [JsonPropertyName("base")]
     public required string Base { get; set; }
 
-    [JsonPropertyName("target")]
     public required string Target { get; set; }
 }
 
 public sealed class VersionDeletes
 {
-    [JsonPropertyName("files")]
     public List<VersionDelete> Files { get; set; } = [];
 
-    [JsonPropertyName("folders")]
     public List<VersionDelete> Folders { get; set; } = [];
 }
 
@@ -290,18 +258,15 @@ public sealed class PackVersionMainClass
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string MainClass { get; set; } = "";
 
-    [JsonPropertyName("depends")]
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Depends { get; set; } = "";
 }
 
 public sealed class PackVersionExtraArguments
 {
-    [JsonPropertyName("arguments")]
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Arguments { get; set; } = "";
 
-    [JsonPropertyName("depends")]
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Depends { get; set; } = "";
 }
@@ -311,58 +276,59 @@ public sealed class PackVersion
     [JsonPropertyName("version")]
     public required string Version { get; set; }
 
-    [JsonPropertyName("minecraft")]
     public required string Minecraft { get; set; }
 
-    [JsonPropertyName("noConfigs")]
     [JsonConverter(typeof(QtCoercingBoolConverter))]
     public bool NoConfigs { get; set; }
 
     [JsonPropertyName("mainClass")]
     public PackVersionMainClass? MainClassRaw { get; init; }
 
+    [JsonIgnore]
     public PackVersionMainClass MainClass => MainClassRaw ?? new();
 
     [JsonPropertyName("extraArguments")]
     public PackVersionExtraArguments? ExtraArgumentsRaw { get; init; }
 
+    [JsonIgnore]
     public PackVersionExtraArguments ExtraArguments => ExtraArgumentsRaw ?? new();
 
     [JsonPropertyName("loader")]
     public VersionLoader? LoaderRaw { get; init; }
 
+    [JsonIgnore]
     public VersionLoader Loader => LoaderRaw ?? new();
 
-    [JsonPropertyName("libraries")]
     public List<VersionLibrary> Libraries { get; set; } = [];
 
-    [JsonPropertyName("mods")]
     public List<VersionMod> Mods { get; set; } = [];
 
     [JsonPropertyName("configs")]
     public VersionConfigs? ConfigsRaw { get; init; }
 
+    [JsonIgnore]
     public VersionConfigs Configs => ConfigsRaw ?? new();
 
-    [JsonPropertyName("colours")]
     public Dictionary<string, string> Colours { get; set; } = new();
 
-    [JsonPropertyName("warnings")]
     public Dictionary<string, string> Warnings { get; set; } = new();
 
     [JsonPropertyName("messages")]
     public VersionMessages? MessagesRaw { get; init; }
 
+    [JsonIgnore]
     public VersionMessages Messages => MessagesRaw ?? new();
 
     [JsonPropertyName("keeps")]
     public VersionKeeps? KeepsRaw { get; init; }
 
+    [JsonIgnore]
     public VersionKeeps Keeps => KeepsRaw ?? new();
 
     [JsonPropertyName("deletes")]
     public VersionDeletes? DeletesRaw { get; init; }
 
+    [JsonIgnore]
     public VersionDeletes Deletes => DeletesRaw ?? new();
 }
 

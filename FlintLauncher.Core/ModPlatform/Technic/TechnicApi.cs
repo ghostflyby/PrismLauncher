@@ -28,28 +28,21 @@ namespace FlintLauncher.Core.ModPlatform.Technic;
 
 /// <summary>The trending/search list root.</summary>
 public sealed record TechnicSearchListJson(
-    [property: JsonPropertyName("modpacks")] List<TechnicListEntryJson>? Modpacks);
-
+    List<TechnicListEntryJson>? Modpacks);
 /// <summary>One trending/search entry; the iconUrl member keeps the QJsonValue
 /// toString("null") fallback — a missing/null/non-string value carries the literal "null"
 /// sentinel (the caller maps it to the null-logo placeholder), hence the raw element.</summary>
 public sealed record TechnicListEntryJson(
-    [property: JsonPropertyName("name")] string? Name,
-    [property: JsonPropertyName("slug")] string? Slug,
-    [property: JsonPropertyName("iconUrl")] JsonElement? IconUrl);
-
+    string? Name,    string? Slug,    JsonElement? IconUrl);
 /// <summary>The single-pack response; unbound members (the "error" sentinel above all)
 /// land in Extension. Not a positional record: an extension-data property cannot bind to a
 /// deserialization constructor parameter.</summary>
 public sealed class TechnicSinglePackJson
 {
-    [JsonPropertyName("displayName")]
     public string? DisplayName { get; init; }
 
-    [JsonPropertyName("name")]
     public string? Name { get; init; }
 
-    [JsonPropertyName("icon")]
     public TechnicIconJson? Icon { get; init; }
 
     [JsonExtensionData]
@@ -57,25 +50,18 @@ public sealed class TechnicSinglePackJson
 }
 
 public sealed record TechnicIconJson(
-    [property: JsonPropertyName("url")] string? Url);
-
+    string? Url);
 /// <summary>The pack metadata response: a string "url" (direct zip) wins over a string
 /// "solder" (Solder API root); neither fails the load. The remaining members keep the
 /// QJsonValue toString("") fallback (a missing/junk value becomes "").</summary>
 public sealed record TechnicMetadataJson(
-    [property: JsonPropertyName("url")] string? Url,
-    [property: JsonPropertyName("solder")] string? Solder,
-    [property: JsonPropertyName("minecraft")]
-    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Minecraft,
-    [property: JsonPropertyName("platformUrl")]
-    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? PlatformUrl,
-    [property: JsonPropertyName("user")]
-    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? User,
-    [property: JsonPropertyName("description")]
-    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Description,
-    [property: JsonPropertyName("version")]
-    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Version);
+    string? Url,    string? Solder,        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Minecraft,
+        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? PlatformUrl,
+        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? User,
+        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Description,
+        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Version);
 
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(TechnicSearchListJson))]
 [JsonSerializable(typeof(TechnicSinglePackJson))]
 [JsonSerializable(typeof(TechnicMetadataJson))]

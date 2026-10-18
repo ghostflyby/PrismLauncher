@@ -20,45 +20,24 @@ using FlintLauncher.Core.Meta;
 namespace FlintLauncher.Core.Minecraft;
 
 internal sealed record MojangDownloadInfoJson(
-    [property: JsonPropertyName("path")] string? Path,
-    [property: JsonPropertyName("sha1")] string? Sha1,
-    [property: JsonPropertyName("url")] string? Url,
-    [property: JsonPropertyName("size")] int? Size);
-
+    string? Path,    string? Sha1,    string? Url,    int? Size);
 internal sealed record MojangAssetIndexJson(
-    [property: JsonPropertyName("path")] string? Path,
-    [property: JsonPropertyName("sha1")] string? Sha1,
-    [property: JsonPropertyName("url")] string? Url,
-    [property: JsonPropertyName("size")] int? Size,
-    [property: JsonPropertyName("totalSize")] int? TotalSize,
-    [property: JsonPropertyName("id")] string? Id);
-
+    string? Path,    string? Sha1,    string? Url,    int? Size,    int? TotalSize,    string? Id);
 internal sealed record MojangLibraryDownloadsJson(
-    [property: JsonPropertyName("artifact")] MojangDownloadInfoJson? Artifact,
-    [property: JsonPropertyName("classifiers")] Dictionary<string, MojangDownloadInfoJson>? Classifiers);
-
+    MojangDownloadInfoJson? Artifact,    Dictionary<string, MojangDownloadInfoJson>? Classifiers);
 internal sealed record LibraryExtractJson(
-    [property: JsonPropertyName("exclude")] List<string>? Exclude);
-
+    List<string>? Exclude);
 internal sealed record RuleJson(
-    [property: JsonPropertyName("action")] JsonElement? Action,
-    [property: JsonPropertyName("os")] JsonElement? Os);
-
+    JsonElement? Action,    JsonElement? Os);
 internal sealed record LibraryJson
 {
-    [JsonPropertyName("name")] public string? Name { get; init; }
-
-    [JsonPropertyName("url")] public string? Url { get; init; }
-
-    [JsonPropertyName("extract")] public LibraryExtractJson? Extract { get; init; }
-
+    public string? Name { get; init; }
+    public string? Url { get; init; }
+    public LibraryExtractJson? Extract { get; init; }
     /// <summary>raw elements: non-string native classifiers fall back to "" (QJsonValue::toString default), like the former EnsureString read.</summary>
-    [JsonPropertyName("natives")] public Dictionary<string, JsonElement>? Natives { get; init; }
-
-    [JsonPropertyName("rules")] public List<RuleJson>? Rules { get; init; }
-
-    [JsonPropertyName("downloads")] public MojangLibraryDownloadsJson? Downloads { get; init; }
-
+    public Dictionary<string, JsonElement>? Natives { get; init; }
+    public List<RuleJson>? Rules { get; init; }
+    public MojangLibraryDownloadsJson? Downloads { get; init; }
     // OneSix MMC extensions (+ the +agents argument member)
     [JsonPropertyName("MMC-hint")] public string? MmcHint { get; init; }
 
@@ -70,104 +49,63 @@ internal sealed record LibraryJson
 
     [JsonPropertyName("MMC-displayname")] public string? MmcDisplayname { get; init; }
 
-    [JsonPropertyName("argument")] public string? Argument { get; init; }
-}
+    public string? Argument { get; init; }}
 
 /// <summary>The DEPRECATED '+jarMods' entry shape.</summary>
 internal sealed record PlusJarModJson(
-    [property: JsonPropertyName("name")] string? Name,
-    [property: JsonPropertyName("originalName")] string? OriginalName);
-
+    string? Name,    string? OriginalName);
 internal sealed record JavaChecksumJson(
-    [property: JsonPropertyName("hash")] string? Hash,
-    [property: JsonPropertyName("type")] string? Type);
-
+    string? Hash,    string? Type);
 internal sealed record JavaVersionJson(
-    [property: JsonPropertyName("name")] string? Name,
-    [property: JsonPropertyName("major")] int? Major,
-    [property: JsonPropertyName("minor")] int? Minor,
-    [property: JsonPropertyName("security")] int? Security,
-    [property: JsonPropertyName("build")] int? Build);
-
+    string? Name,    int? Major,    int? Minor,    int? Security,    int? Build);
 internal sealed record JavaRuntimeJson(
-    [property: JsonPropertyName("name")] string? Name,
-    [property: JsonPropertyName("vendor")] string? Vendor,
-    [property: JsonPropertyName("url")] string? Url,
-    [property: JsonPropertyName("releaseTime")] string? ReleaseTime,
-    [property: JsonPropertyName("downloadType")] string? DownloadType,
-    [property: JsonPropertyName("packageType")] string? PackageType,
+    string? Name,    string? Vendor,    string? Url,    string? ReleaseTime,    string? DownloadType,
+    string? PackageType,
+    // all-caps "OS" on the wire — camelCase would produce "runtimeOs"
     [property: JsonPropertyName("runtimeOS")] string? RuntimeOs,
-    [property: JsonPropertyName("checksum")] JavaChecksumJson? Checksum,
-    [property: JsonPropertyName("version")] JavaVersionJson? Version);
-
+    JavaChecksumJson? Checksum,    JavaVersionJson? Version);
 internal sealed record VersionFileJson
 {
     // OneSix
-    [JsonPropertyName("order")] public int? Order { get; init; }
-
-    [JsonPropertyName("name")] public string? Name { get; init; }
-
-    [JsonPropertyName("uid")] public string? Uid { get; init; }
-
-    [JsonPropertyName("fileId")] public string? FileId { get; init; }
-
-    [JsonPropertyName("version")] public string? Version { get; init; }
-
-    [JsonPropertyName("mcVersion")] public string? McVersion { get; init; }
-
-    [JsonPropertyName("appletClass")] public string? AppletClass { get; init; }
-
+    public int? Order { get; init; }
+    public string? Name { get; init; }
+    public string? Uid { get; init; }
+    public string? FileId { get; init; }
+    public string? Version { get; init; }
+    public string? McVersion { get; init; }
+    public string? AppletClass { get; init; }
     [JsonPropertyName("+tweakers")] public List<string>? AddTweakers { get; init; }
 
     [JsonPropertyName("+traits")] public List<string>? AddTraits { get; init; }
 
     [JsonPropertyName("+jvmArgs")] public List<string>? AddJvmArgs { get; init; }
 
-    [JsonPropertyName("jarMods")] public List<LibraryJson>? JarMods { get; init; }
-
+    public List<LibraryJson>? JarMods { get; init; }
     [JsonPropertyName("+jarMods")] public List<PlusJarModJson>? PlusJarMods { get; init; }
 
-    [JsonPropertyName("mods")] public List<LibraryJson>? Mods { get; init; }
-
-    [JsonPropertyName("libraries")] public List<LibraryJson>? Libraries { get; init; }
-
+    public List<LibraryJson>? Mods { get; init; }
+    public List<LibraryJson>? Libraries { get; init; }
     [JsonPropertyName("+libraries")] public List<LibraryJson>? PlusLibraries { get; init; }
 
-    [JsonPropertyName("mavenFiles")] public List<LibraryJson>? MavenFiles { get; init; }
-
+    public List<LibraryJson>? MavenFiles { get; init; }
     [JsonPropertyName("+agents")] public List<LibraryJson>? Agents { get; init; }
 
-    [JsonPropertyName("mainJar")] public LibraryJson? MainJar { get; init; }
-
-    [JsonPropertyName("volatile")] public bool? Volatile { get; init; }
-
-    [JsonPropertyName("runtimes")] public List<JavaRuntimeJson>? Runtimes { get; init; }
-
+    public LibraryJson? MainJar { get; init; }
+    public bool? Volatile { get; init; }
+    public List<JavaRuntimeJson>? Runtimes { get; init; }
     // Mojang
-    [JsonPropertyName("id")] public string? Id { get; init; }
-
-    [JsonPropertyName("mainClass")] public string? MainClass { get; init; }
-
-    [JsonPropertyName("minecraftArguments")] public string? MinecraftArguments { get; init; }
-
-    [JsonPropertyName("type")] public string? Type { get; init; }
-
-    [JsonPropertyName("assets")] public string? Assets { get; init; }
-
-    [JsonPropertyName("assetIndex")] public MojangAssetIndexJson? AssetIndex { get; init; }
-
-    [JsonPropertyName("releaseTime")] public string? ReleaseTime { get; init; }
-
-    [JsonPropertyName("time")] public string? Time { get; init; }
-
-    [JsonPropertyName("minimumLauncherVersion")] public int? MinimumLauncherVersion { get; init; }
-
-    [JsonPropertyName("compatibleJavaMajors")] public List<int>? CompatibleJavaMajors { get; init; }
-
-    [JsonPropertyName("compatibleJavaName")] public string? CompatibleJavaName { get; init; }
-
-    [JsonPropertyName("downloads")] public Dictionary<string, MojangDownloadInfoJson>? Downloads { get; init; }
-
+    public string? Id { get; init; }
+    public string? MainClass { get; init; }
+    public string? MinecraftArguments { get; init; }
+    public string? Type { get; init; }
+    public string? Assets { get; init; }
+    public MojangAssetIndexJson? AssetIndex { get; init; }
+    public string? ReleaseTime { get; init; }
+    public string? Time { get; init; }
+    public int? MinimumLauncherVersion { get; init; }
+    public List<int>? CompatibleJavaMajors { get; init; }
+    public string? CompatibleJavaName { get; init; }
+    public Dictionary<string, MojangDownloadInfoJson>? Downloads { get; init; }
     // removed features — only the PRESENCE matters (each adds a problem)
     [JsonPropertyName("tweakers")] public JsonElement? RemovedTweakers { get; init; }
 
@@ -180,7 +118,8 @@ internal sealed record VersionFileJson
     [JsonPropertyName("+minecraftArguments")] public JsonElement? RemovedPlusMinecraftArguments { get; init; }
 }
 
-[JsonSourceGenerationOptions(RespectNullableAnnotations = true)]
+[JsonSourceGenerationOptions(RespectNullableAnnotations = true,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(VersionFileJson))]
 [JsonSerializable(typeof(LibraryJson))]
 [JsonSerializable(typeof(RuleJson))]

@@ -24,127 +24,92 @@ namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
 /// <summary>POST /version_files body (hash list lookup).</summary>
 public sealed record ModrinthHashLookupRequest(
-    [property: JsonPropertyName("hashes")] List<string>? Hashes,
-    [property: JsonPropertyName("algorithm")] string? Algorithm);
+    List<string>? Hashes,
+    string? Algorithm);
 
 /// <summary>POST /version_file/{hash}/update and POST /version_files/update bodies; the
 /// hashes/algorithm members are only set by the batch form.</summary>
 public sealed record ModrinthVersionUpdateRequest(
-    [property: JsonPropertyName("hashes")] List<string>? Hashes,
-    [property: JsonPropertyName("algorithm")] string? Algorithm,
-    [property: JsonPropertyName("loaders")] List<string>? Loaders,
-    [property: JsonPropertyName("game_versions")] List<string>? GameVersions,
-    [property: JsonPropertyName("version_types")] List<string>? VersionTypes);
-
+    List<string>? Hashes,
+    string? Algorithm,
+    List<string>? Loaders,
+    List<string>? GameVersions,
+    List<string>? VersionTypes);
 /// <summary>The modrinth-download-meta request header payload (net/ApiHeaderProxy).</summary>
 public sealed record ModrinthDownloadMetaJson(
-    [property: JsonPropertyName("reason")] string? Reason,
-    [property: JsonPropertyName("game_version")] string? GameVersion,
-    [property: JsonPropertyName("loader")] string? Loader,
-    [property: JsonPropertyName("dependent_on")] string? DependentOn);
+    string? Reason,
+    string? GameVersion,    string? Loader,
+    string? DependentOn);
 
 // ------------------------------------------------------------------------ response models
 
 /// <summary>Modrinth project/search-hit shape (https://docs.modrinth.com GET /project).</summary>
 public sealed record ModrinthProjectJson
 {
-    [JsonPropertyName("project_id")] public string? ProjectId { get; init; }
-
-    [JsonPropertyName("id")] public string? Id { get; init; }
-
-    [JsonPropertyName("title")] public string? Title { get; init; }
-
-    [JsonPropertyName("project_type")] public string? ProjectType { get; init; }
-
-    [JsonPropertyName("loaders")] public List<string>? Loaders { get; init; }
-
-    [JsonPropertyName("all_project_types")] public List<string>? AllProjectTypes { get; init; }
-
-    [JsonPropertyName("slug")] public string? Slug { get; init; }
-
-    [JsonPropertyName("description")] public string? Description { get; init; }
-
-    [JsonPropertyName("icon_url")] public string? IconUrl { get; init; }
-
-    [JsonPropertyName("author")] public string? Author { get; init; }
-
-    [JsonPropertyName("client_side")] public string? ClientSide { get; init; }
-
-    [JsonPropertyName("server_side")] public string? ServerSide { get; init; }
-
+    public string? ProjectId { get; init; }
+    public string? Id { get; init; }
+    public string? Title { get; init; }
+    public string? ProjectType { get; init; }
+    public List<string>? Loaders { get; init; }
+    public List<string>? AllProjectTypes { get; init; }
+    public string? Slug { get; init; }
+    public string? Description { get; init; }
+    public string? IconUrl { get; init; }
+    public string? Author { get; init; }
+    public string? ClientSide { get; init; }
+    public string? ServerSide { get; init; }
     /// <summary>Search hits only: the raw download count member. Left as JsonElement so the
     /// "only real JSON number tokens count" sniff survives (a quoted "123" stays 0).</summary>
-    [JsonPropertyName("downloads")] public JsonElement? Downloads { get; init; }
-
-    [JsonPropertyName("issues_url")] public string? IssuesUrl { get; init; }
-
-    [JsonPropertyName("source_url")] public string? SourceUrl { get; init; }
-
-    [JsonPropertyName("wiki_url")] public string? WikiUrl { get; init; }
-
-    [JsonPropertyName("discord_url")] public string? DiscordUrl { get; init; }
-
-    [JsonPropertyName("donation_urls")] public List<ModrinthDonationJson>? DonationUrls { get; init; }
-
-    [JsonPropertyName("status")] public string? Status { get; init; }
-
-    [JsonPropertyName("body")] public string? Body { get; init; }
-}
+    public JsonElement? Downloads { get; init; }
+    public string? IssuesUrl { get; init; }
+    public string? SourceUrl { get; init; }
+    public string? WikiUrl { get; init; }
+    public string? DiscordUrl { get; init; }
+    public List<ModrinthDonationJson>? DonationUrls { get; init; }
+    public string? Status { get; init; }
+    public string? Body { get; init; }}
 
 public sealed record ModrinthDonationJson(
-    [property: JsonPropertyName("id")] string? Id,
-    [property: JsonPropertyName("platform")] string? Platform,
-    [property: JsonPropertyName("url")] string? Url);
-
+    string? Id,
+    string? Platform,
+    string? Url);
 /// <summary>GET /search body ({hits: [...]}).</summary>
 public sealed record ModrinthSearchResponseJson(
-    [property: JsonPropertyName("hits")] List<ModrinthProjectJson>? Hits);
+    List<ModrinthProjectJson>? Hits);
 
 /// <summary>GET /tag/category entries (the category id is its name).</summary>
 public sealed record ModrinthCategoryJson(
-    [property: JsonPropertyName("name")] string? Name,
-    [property: JsonPropertyName("project_type")] string? ProjectType,
-    [property: JsonPropertyName("icon")] string? Icon);
+    string? Name,
+    string? ProjectType,
+    string? Icon);
 
 /// <summary>Modrinth version shape (project version lists, hash lookups, update responses).
 /// The changelog and dependencies ride on the version object.</summary>
 public sealed record ModrinthVersionJson
 {
-    [JsonPropertyName("project_id")] public string? ProjectId { get; init; }
-
-    [JsonPropertyName("id")] public string? Id { get; init; }
-
-    [JsonPropertyName("date_published")] public string? DatePublished { get; init; }
-
-    [JsonPropertyName("game_versions")] public List<string>? GameVersions { get; init; }
-
-    [JsonPropertyName("loaders")] public List<string>? Loaders { get; init; }
-
-    [JsonPropertyName("name")] public string? Name { get; init; }
-
-    [JsonPropertyName("version_number")] public string? VersionNumber { get; init; }
-
-    [JsonPropertyName("version_type")] public string? VersionType { get; init; }
-
-    [JsonPropertyName("changelog")] public string? Changelog { get; init; }
-
-    [JsonPropertyName("dependencies")] public List<ModrinthDependencyJson>? Dependencies { get; init; }
-
-    [JsonPropertyName("files")] public List<ModrinthVersionFileJson>? Files { get; init; }
-}
+    public string? ProjectId { get; init; }
+    public string? Id { get; init; }
+    public string? DatePublished { get; init; }
+    public List<string>? GameVersions { get; init; }
+    public List<string>? Loaders { get; init; }
+    public string? Name { get; init; }
+    public string? VersionNumber { get; init; }
+    public string? VersionType { get; init; }
+    public string? Changelog { get; init; }
+    public List<ModrinthDependencyJson>? Dependencies { get; init; }
+    public List<ModrinthVersionFileJson>? Files { get; init; }}
 
 public sealed record ModrinthDependencyJson(
-    [property: JsonPropertyName("project_id")] string? ProjectId,
-    [property: JsonPropertyName("version_id")] string? VersionId,
-    [property: JsonPropertyName("dependency_type")] string? DependencyType);
+    string? ProjectId,
+    string? VersionId,
+    string? DependencyType);
 
 /// <summary>One downloadable file of a version; hashes is keyed by algorithm name.</summary>
 public sealed record ModrinthVersionFileJson(
-    [property: JsonPropertyName("filename")] string? Filename,
-    [property: JsonPropertyName("primary")] bool? Primary,
-    [property: JsonPropertyName("url")] string? Url,
-    [property: JsonPropertyName("size")] long? Size,
-    [property: JsonPropertyName("hashes")] Dictionary<string, string>? Hashes);
+    string? Filename,
+    bool? Primary,
+    string? Url,    long? Size,
+    Dictionary<string, string>? Hashes);
 
 // ------------------------------------------------------------------------- .mrpack format
 
@@ -153,35 +118,27 @@ public sealed record ModrinthVersionFileJson(
 /// validated against the known-loader whitelist by the import mapping.</summary>
 public sealed record MrPackIndexJson
 {
-    [JsonPropertyName("formatVersion")] public int? FormatVersion { get; init; }
-
-    [JsonPropertyName("game")] public string? Game { get; init; }
-
-    [JsonPropertyName("name")] public string? Name { get; init; }
-
-    [JsonPropertyName("versionId")] public string? VersionId { get; init; }
-
-    [JsonPropertyName("summary")] public string? Summary { get; init; }
-
-    [JsonPropertyName("dependencies")] public Dictionary<string, string?>? Dependencies { get; init; }
-
-    [JsonPropertyName("files")] public List<MrPackFileJson>? Files { get; init; }
-}
+    public int? FormatVersion { get; init; }
+    public string? Game { get; init; }
+    public string? Name { get; init; }
+    public string? VersionId { get; init; }
+    public string? Summary { get; init; }
+    public Dictionary<string, string?>? Dependencies { get; init; }
+    public List<MrPackFileJson>? Files { get; init; }}
 
 public sealed record MrPackFileJson(
-    [property: JsonPropertyName("env")] MrPackEnvJson? Env,
-    [property: JsonPropertyName("path")] string? Path,
-    [property: JsonPropertyName("downloads")] List<string>? Downloads,
-    [property: JsonPropertyName("hashes")] Dictionary<string, string>? Hashes,
-    [property: JsonPropertyName("fileSize")] long? FileSize);
-
+    MrPackEnvJson? Env,    string? Path,    List<string>? Downloads,
+    Dictionary<string, string>? Hashes,
+    long? FileSize);
 public sealed record MrPackEnvJson(
-    [property: JsonPropertyName("client")] string? Client,
-    [property: JsonPropertyName("server")] string? Server);
-
+    string? Client,    string? Server);
 // ------------------------------------------------------------------------------- context
 
-[JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+// The Modrinth v2 API is snake_case end to end (project_id, date_published, game_versions,
+// ...) — the context-wide SnakeCaseLower policy carries the naming; the .mrpack index is
+// camelCase (formatVersion / versionId / fileSize) and gets its own camel context.
+[JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
 [JsonSerializable(typeof(ModrinthHashLookupRequest))]
 [JsonSerializable(typeof(ModrinthVersionUpdateRequest))]
 [JsonSerializable(typeof(ModrinthDownloadMetaJson))]
@@ -193,8 +150,12 @@ public sealed record MrPackEnvJson(
 [JsonSerializable(typeof(ModrinthVersionJson))]
 [JsonSerializable(typeof(List<ModrinthVersionJson>))]
 [JsonSerializable(typeof(Dictionary<string, ModrinthVersionJson>))]
-[JsonSerializable(typeof(MrPackIndexJson))]
 public sealed partial class ModrinthJsonContext : JsonSerializerContext;
+
+[JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(MrPackIndexJson))]
+public sealed partial class MrPackJsonContext : JsonSerializerContext;
 
 /// <summary>Parse helpers over the raw response bodies (the seam where JsonException becomes
 /// a null/empty result, preserving the tolerant node-parse outcomes of the former readers).</summary>
@@ -283,7 +244,7 @@ public static class ModrinthJson
         Parse(json, ModrinthJsonContext.Default.ListModrinthCategoryJson);
 
     public static MrPackIndexJson? ParseMrPackIndex(string json) =>
-        Parse(json, ModrinthJsonContext.Default.MrPackIndexJson);
+        Parse(json, MrPackJsonContext.Default.MrPackIndexJson);
 
     /// <summary>Deserialize a version DTO from an already-parsed node (the provider-dispatch
     /// seams that sniff the response shape before knowing the provider). Null when the node

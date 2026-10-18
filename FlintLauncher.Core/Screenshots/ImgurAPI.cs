@@ -27,14 +27,13 @@ namespace FlintLauncher.Core.Screenshots;
 /// <summary>The imgur response envelope {"success": true, "data": {...}} — shared by the
 /// image upload and album creation parse functions (the RPC::Sink payloads).</summary>
 public sealed record ImgurResponseJson(
-    [property: JsonPropertyName("success")] bool? Success,
-    [property: JsonPropertyName("data")] ImgurDataJson? Data);
+    bool? Success,    ImgurDataJson? Data);
 
 public sealed record ImgurDataJson(
-    [property: JsonPropertyName("id")] string? Id,
-    [property: JsonPropertyName("link")] string? Link,
+    string? Id,    string? Link,
+    // all-lowercase on the wire — camelCase would produce "deleteHash"
     [property: JsonPropertyName("deletehash")] string? DeleteHash);
-
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(ImgurResponseJson))]
 internal sealed partial class ImgurJsonContext : JsonSerializerContext;
 

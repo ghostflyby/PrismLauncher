@@ -279,7 +279,7 @@ public sealed class ModrinthCreationTask : InstanceTask
             try
             {
                 parsed = JsonSerializer.Deserialize(System.IO.File.ReadAllText(indexPath),
-                    ModrinthJsonContext.Default.MrPackIndexJson);
+                    MrPackJsonContext.Default.MrPackIndexJson);
             }
             catch (JsonException e)
             {

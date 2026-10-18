@@ -24,7 +24,8 @@ namespace FlintLauncher.Core.ModPlatform.AtLauncher;
 /// <summary>The source-generated context of the ATL wire models (the share-code probe, the
 /// packsnew.json index and the Configs.json PackVersion); the models carry their own
 /// [JsonPropertyName] annotations and the QJsonValue-semantics converters.</summary>
-[JsonSourceGenerationOptions(RespectNullableAnnotations = true)]
+[JsonSourceGenerationOptions(RespectNullableAnnotations = true,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(AtlShareCodeResponseJson))]
 [JsonSerializable(typeof(List<IndexedPack>))]
 [JsonSerializable(typeof(PackVersion))]

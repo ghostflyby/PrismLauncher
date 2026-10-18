@@ -12,23 +12,13 @@ namespace FlintLauncher.Core.ModPlatform.AtLauncher;
 
 /// <summary>The share-codes/{code} wire shape; `message` may be a JSON null.</summary>
 public sealed record AtlShareCodeResponseJson(
-    [property: JsonPropertyName("error")] bool? Error,
-    [property: JsonPropertyName("code")] int? Code,
-    [property: JsonPropertyName("message")] string? Message,
-    [property: JsonPropertyName("data")] AtlShareCodeJson? Data);
-
+    bool? Error,    int? Code,    string? Message,    AtlShareCodeJson? Data);
 public sealed record AtlShareCodeJson(
-    [property: JsonPropertyName("pack")] string? Pack,
-    [property: JsonPropertyName("version")] string? Version,
-    [property: JsonPropertyName("mods")] AtlShareCodeModsJson? Mods);
-
+    string? Pack,    string? Version,    AtlShareCodeModsJson? Mods);
 public sealed record AtlShareCodeModsJson(
-    [property: JsonPropertyName("optional")] List<AtlShareCodeModJson>? Optional);
-
+    List<AtlShareCodeModJson>? Optional);
 public sealed record AtlShareCodeModJson(
-    [property: JsonPropertyName("selected")] bool? Selected,
-    [property: JsonPropertyName("name")] string? Name);
-
+    bool? Selected,    string? Name);
 // (the AtLauncherJsonContext declaration lives in AtLauncherApi.cs beside the parse
 // entries — the STJ source generator cannot declare one context across two files)
 

@@ -19,29 +19,20 @@ namespace FlintLauncher.Core.Net;
 /// converters keep the QJsonValue fallbacks of the former readers (junk timestamps/ages
 /// truncate to 0, junk strings become "").</summary>
 public sealed record MetaCacheFileJson(
-    [property: JsonPropertyName("version")] string? Version,
-    [property: JsonPropertyName("entries")] List<MetaCacheEntryJson>? Entries);
-
+    string? Version,    List<MetaCacheEntryJson>? Entries);
 public sealed record MetaCacheEntryJson(
-    [property: JsonPropertyName("base")]
-    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Base,
-    [property: JsonPropertyName("path")]
-    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Path,
+        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Base,
+        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Path,
     [property: JsonPropertyName("md5sum")]
     [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Md5Sum,
-    [property: JsonPropertyName("etag")]
-    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Etag,
-    [property: JsonPropertyName("last_changed_timestamp")]
-    [property: JsonConverter(typeof(QtCoercingLongConverter))] long LastChangedTimestamp,
-    [property: JsonPropertyName("remote_changed_timestamp")]
-    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? RemoteChangedTimestamp,
-    [property: JsonPropertyName("eternal")] bool? Eternal,
-    [property: JsonPropertyName("current_age")]
-    [property: JsonConverter(typeof(QtCoercingLongConverter))] long? CurrentAge,
-    [property: JsonPropertyName("max_age")]
-    [property: JsonConverter(typeof(QtCoercingLongConverter))] long? MaxAge);
+        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Etag,
+        [property: JsonConverter(typeof(QtCoercingLongConverter))] long LastChangedTimestamp,
+        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? RemoteChangedTimestamp,
+    bool? Eternal,        [property: JsonConverter(typeof(QtCoercingLongConverter))] long? CurrentAge,
+        [property: JsonConverter(typeof(QtCoercingLongConverter))] long? MaxAge);
 
-[JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+[JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
 [JsonSerializable(typeof(MetaCacheFileJson))]
 internal sealed partial class MetaCacheJsonContext : JsonSerializerContext;
 

@@ -323,7 +323,7 @@ public sealed class ModrinthPackExportTask(
             Files = filesOut,
         };
 
-        return JsonSerializer.Serialize(index, ModrinthJsonContext.Default.MrPackIndexJson);
+        return JsonSerializer.Serialize(index, MrPackJsonContext.Default.MrPackIndexJson);
     }
 
     private string GetRelativePath(string file)

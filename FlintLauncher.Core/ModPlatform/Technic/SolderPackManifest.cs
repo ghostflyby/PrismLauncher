@@ -11,38 +11,29 @@ namespace FlintLauncher.Core.ModPlatform.Technic;
 
 public sealed class SolderPack
 {
-    [JsonPropertyName("recommended")]
     public required string Recommended { get; set; }
 
-    [JsonPropertyName("latest")]
     public required string Latest { get; set; }
 
-    [JsonPropertyName("builds")]
     public required List<string> Builds { get; init; }
 }
 
 public sealed class SolderPackBuildMod
 {
-    [JsonPropertyName("name")]
     public required string Name { get; set; }
 
     // optional: toString() of a missing/junk value -> ""
-    [JsonPropertyName("version")]
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Version { get; set; } = "";
 
-    [JsonPropertyName("md5")]
     public required string Md5 { get; set; }
 
-    [JsonPropertyName("url")]
     public required string Url { get; set; }
 }
 
 public sealed class SolderPackBuild
 {
-    [JsonPropertyName("minecraft")]
     public required string Minecraft { get; set; }
 
-    [JsonPropertyName("mods")]
     public required List<SolderPackBuildMod> Mods { get; init; }
 }

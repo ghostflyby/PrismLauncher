@@ -23,12 +23,12 @@ namespace FlintLauncher.Core.ModPlatform.Ftb;
 /// (fractional doubles truncate, junk zeroes) through the packs list converter.</summary>
 public sealed class FtbPackIndexFile
 {
-    [JsonPropertyName("packs")]
     [JsonConverter(typeof(QtCoercingIntListConverter))]
     public List<int> Packs { get; init; } = [];
 }
 
-[JsonSourceGenerationOptions(RespectNullableAnnotations = true)]
+[JsonSourceGenerationOptions(RespectNullableAnnotations = true,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(FtbPackIndexFile))]
 [JsonSerializable(typeof(FtbModpack))]
 [JsonSerializable(typeof(FtbVersion))]

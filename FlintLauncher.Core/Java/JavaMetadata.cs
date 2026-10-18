@@ -20,6 +20,7 @@ using FlintLauncher.Core.Text;
 
 namespace FlintLauncher.Core.Java;
 
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(JavaRuntimeJson))]
 internal sealed partial class JavaJsonContext : JsonSerializerContext;
 
