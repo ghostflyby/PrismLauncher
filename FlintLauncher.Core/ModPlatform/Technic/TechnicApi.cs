@@ -9,13 +9,79 @@
 // BaseUrl / ApiBuild are per-instance (tests construct their own client pointed at a stub);
 // the client rides the injected NetStack (LauncherRuntime.Technic — see the Modrinth/Flame
 // de-singletoning for the same story). The parsers and the Solder URL builders are pure
-// helpers and stay static; reads go through the JsonNode model (see TechnicJson/JsonUtils).
+// helpers and stay static; the wire shapes deserialize through the source-generated
+// TechnicJsonContext (the Solder models carry their annotations themselves).
+//
+// Wire-model notes:
+//  - the single-pack response's "error" member is an ERROR *presence* sentinel (the key
+//    counts even when it holds JSON null) — captured through [JsonExtensionData] instead
+//    of a property, so ContainsKey keeps the exact QJsonObject::contains semantics;
+//  - a missing/other-kind iconUrl falls back to the literal "null" logo sentinel.
 
-using System.Text.Json.Nodes;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.ModPlatform.Technic;
+
+/// <summary>The trending/search list root.</summary>
+public sealed record TechnicSearchListJson(
+    [property: JsonPropertyName("modpacks")] List<TechnicListEntryJson>? Modpacks);
+
+/// <summary>One trending/search entry; the iconUrl member keeps the QJsonValue
+/// toString("null") fallback — a missing/null/non-string value carries the literal "null"
+/// sentinel (the caller maps it to the null-logo placeholder), hence the raw element.</summary>
+public sealed record TechnicListEntryJson(
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("slug")] string? Slug,
+    [property: JsonPropertyName("iconUrl")] JsonElement? IconUrl);
+
+/// <summary>The single-pack response; unbound members (the "error" sentinel above all)
+/// land in Extension. Not a positional record: an extension-data property cannot bind to a
+/// deserialization constructor parameter.</summary>
+public sealed class TechnicSinglePackJson
+{
+    [JsonPropertyName("displayName")]
+    public string? DisplayName { get; init; }
+
+    [JsonPropertyName("name")]
+    public string? Name { get; init; }
+
+    [JsonPropertyName("icon")]
+    public TechnicIconJson? Icon { get; init; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement> Extension { get; set; } = new();
+}
+
+public sealed record TechnicIconJson(
+    [property: JsonPropertyName("url")] string? Url);
+
+/// <summary>The pack metadata response: a string "url" (direct zip) wins over a string
+/// "solder" (Solder API root); neither fails the load. The remaining members keep the
+/// QJsonValue toString("") fallback (a missing/junk value becomes "").</summary>
+public sealed record TechnicMetadataJson(
+    [property: JsonPropertyName("url")] string? Url,
+    [property: JsonPropertyName("solder")] string? Solder,
+    [property: JsonPropertyName("minecraft")]
+    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Minecraft,
+    [property: JsonPropertyName("platformUrl")]
+    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? PlatformUrl,
+    [property: JsonPropertyName("user")]
+    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? User,
+    [property: JsonPropertyName("description")]
+    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Description,
+    [property: JsonPropertyName("version")]
+    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Version);
+
+[JsonSerializable(typeof(TechnicSearchListJson))]
+[JsonSerializable(typeof(TechnicSinglePackJson))]
+[JsonSerializable(typeof(TechnicMetadataJson))]
+[JsonSerializable(typeof(SolderPack))]
+[JsonSerializable(typeof(SolderPackBuild))]
+internal sealed partial class TechnicJsonContext : JsonSerializerContext;
 
 /// <summary>Port of Technic::Modpack (TechnicData.h).</summary>
 public sealed class TechnicModpack
@@ -111,60 +177,54 @@ public sealed class TechnicApi(NetStack? net = null)
 
     // ------------------------------------------------------------------ parsers
 
-    // node-side member readers (the MetaJsonFormat/FlameJson convention: JsonNode? parameters
-    // so the node-family overloads bind instead of the (JsonObject, key, what) element bridges)
+    /// <summary>Document parse with the "{what}: Error parsing JSON: ..." wrapping; a JSON
+    /// null document parses to null (the callers' failure paths treat it like the rest).</summary>
+    private static T? DeserializeDocument<T>(string json, string what, JsonTypeInfo<T> typeInfo) where T : class
+    {
+        try
+        {
+            return JsonSerializer.Deserialize(json, typeInfo);
+        }
+        catch (JsonException e)
+        {
+            throw new JsonParseException(what + ": Error parsing JSON: " + e.Message);
+        }
+    }
 
-    /// <summary>QJsonObject::contains(key) equivalent: true even when the member holds JSON null.</summary>
-    private static bool Has(JsonNode? node, string key) => node is JsonObject map && map.ContainsKey(key);
+    private static string RequireMember(string? value, string key) =>
+        value ?? throw new JsonParseException("'" + key + "' is not a string");
 
-    /// <summary>obj["key"] equivalent: null node when missing or not an object.</summary>
-    private static JsonNode? Ptr(JsonNode? node, string key) => node is JsonObject map ? map[key] : null;
+    private static List<T> RequireMember<T>(List<T>? value, string key) where T : class =>
+        value ?? throw new JsonParseException("'" + key + "' is not an array");
 
     /// <summary>Port of ListModel::searchRequestFinished. Returns the parsed packs; an empty
     /// list mirrors the C++ parse-failure / "error" payload paths (nothing is appended).</summary>
     public static List<TechnicModpack> LoadSearchResults(string response, TechnicSearchMode mode)
     {
         var newList = new List<TechnicModpack>();
-        JsonNode root;
-        try
-        {
-            root = TechnicJson.RequireDocument(response, "JSON response from Technic");
-        }
-        catch (JsonParseException)
-        {
-            return newList;
-        }
-
-        if (root is not JsonObject)
-        {
-            // the old Json::requireObject(doc) "Document is not an object" path
-            return newList;
-        }
-
         try
         {
             switch (mode)
             {
                 case TechnicSearchMode.List:
                 {
-                    foreach (var technicPackRaw in JsonUtils.RequireArray(root, "modpacks", "'modpacks'"))
+                    var root = DeserializeDocument<TechnicSearchListJson>(response, "JSON response from Technic",
+                        TechnicJsonContext.Default.TechnicSearchListJson);
+                    foreach (var raw in RequireMember(root?.Modpacks, "modpacks"))
                     {
-                        // JsonNode-typed receiver so the reads below hit the node family (not
-                        // the (JsonObject, key, what) element bridges); the downcast keeps the
-                        // old hard-cast behavior for a non-object entry
-                        JsonNode technicPack = (JsonObject)(technicPackRaw
-                                                            ?? throw new JsonParseException("modpacks entry is not an object"));
                         var pack = new TechnicModpack
                         {
-                            Name = JsonUtils.RequireString(technicPack, "name", "'name'"),
-                            Slug = JsonUtils.RequireString(technicPack, "slug", "'slug'"),
+                            Name = RequireMember(raw.Name, "name"),
+                            Slug = RequireMember(raw.Slug, "slug"),
                         };
                         if (pack.Slug == "vanilla")
                         {
                             continue;
                         }
 
-                        var rawUrl = JsonUtils.EnsureString(technicPack["iconUrl"], "null");
+                        var rawUrl = raw.IconUrl is { ValueKind: JsonValueKind.String } iconUrlNode
+                            ? iconUrlNode.GetString() ?? "null"
+                            : "null";
                         if (rawUrl == "null")
                         {
                             pack.LogoUrl = "null";
@@ -184,7 +244,9 @@ public sealed class TechnicApi(NetStack? net = null)
                 }
                 case TechnicSearchMode.Single:
                 {
-                    if (Has(root, "error"))
+                    var root = DeserializeDocument<TechnicSinglePackJson>(response, "JSON response from Technic",
+                        TechnicJsonContext.Default.TechnicSinglePackJson);
+                    if (root?.Extension is { Count: > 0 } extension && extension.ContainsKey("error"))
                     {
                         // Invalid API url
                         break;
@@ -192,15 +254,12 @@ public sealed class TechnicApi(NetStack? net = null)
 
                     var pack = new TechnicModpack
                     {
-                        Name = JsonUtils.RequireString(root, "displayName", "'displayName'"),
-                        Slug = JsonUtils.RequireString(root, "name", "'name'"),
+                        Name = RequireMember(root?.DisplayName, "displayName"),
+                        Slug = RequireMember(root?.Name, "name"),
                     };
 
-                    if (Has(root, "icon"))
+                    if (root?.Icon?.Url is { } iconUrl)
                     {
-                        JsonNode iconObj = JsonUtils.RequireObject(root, "icon", "'icon'");
-                        var iconUrl = JsonUtils.RequireString(iconObj, "url", "'url'");
-
                         pack.LogoUrl = iconUrl;
                         pack.LogoName = pack.Slug + "." + UrlFileNameSuffix(iconUrl);
                     }
@@ -226,55 +285,43 @@ public sealed class TechnicApi(NetStack? net = null)
 
     /// <summary>
     /// Port of TechnicPage::onSlectionChanged's metadata step (the metadataLoaded JSON):
-    /// fills url/isSolder (the "solder" field presence marks a Solder pack), minecraft,
-    /// platformUrl, user, description and version. Returns false when the payload has
-    /// neither a string url nor a string solder key (upstream bails out with a warning).
+    /// fills url/isSolder (a string "url" wins over a string "solder"; neither fails the
+    /// load), minecraft, platformUrl, user, description and version. Returns false when the
+    /// payload has neither a string url nor a string solder key (upstream bails out with a
+    /// warning).
     /// </summary>
     public static bool LoadPackMetadata(string response, TechnicModpack current)
     {
-        JsonNode obj;
+        TechnicMetadataJson? obj;
         try
         {
-            obj = TechnicJson.RequireDocument(response, "JSON response from Technic");
+            obj = DeserializeDocument<TechnicMetadataJson>(response, "JSON response from Technic",
+                TechnicJsonContext.Default.TechnicMetadataJson);
         }
         catch (JsonParseException)
         {
             return false;
         }
 
-        if (obj is not JsonObject)
-        {
-            // the old Json::requireObject(doc) "Document is not an object" path
-            return false;
-        }
-
-        static string? StringOrNothing(JsonNode? o, string key)
-        {
-            return Ptr(o, key) is JsonValue value && value.TryGetValue<string>(out var str) ? str : null;
-        }
-
-        var url = StringOrNothing(obj, "url");
-        if (url is not null)
+        if (obj?.Url is { } url)
         {
             current.Url = url;
         }
-        else
+        else if (obj?.Solder is { } solderUrl)
         {
-            var solderUrl = StringOrNothing(obj, "solder");
-            if (solderUrl is null)
-            {
-                return false;
-            }
-
             current.Url = solderUrl;
             current.IsSolder = true;
         }
+        else
+        {
+            return false;
+        }
 
-        current.MinecraftVersion = JsonUtils.EnsureString(Ptr(obj, "minecraft"));
-        current.WebsiteUrl = JsonUtils.EnsureString(Ptr(obj, "platformUrl"));
-        current.Author = JsonUtils.EnsureString(Ptr(obj, "user"));
-        current.Description = JsonUtils.EnsureString(Ptr(obj, "description"));
-        current.CurrentVersion = JsonUtils.EnsureString(Ptr(obj, "version"));
+        current.MinecraftVersion = obj.Minecraft ?? "";
+        current.WebsiteUrl = obj.PlatformUrl ?? "";
+        current.Author = obj.User ?? "";
+        current.Description = obj.Description ?? "";
+        current.CurrentVersion = obj.Version ?? "";
         current.MetadataLoaded = true;
         return true;
     }
@@ -283,32 +330,25 @@ public sealed class TechnicApi(NetStack? net = null)
     /// Returns null on parse errors (the C++ falls back to the current version).</summary>
     public static SolderPack? LoadSolderPack(string response)
     {
-        JsonNode obj;
         try
         {
-            obj = TechnicJson.RequireDocument(response, "JSON response from Solder");
+            return DeserializeDocument<SolderPack>(response, "JSON response from Solder",
+                TechnicJsonContext.Default.SolderPack);
         }
         catch (JsonParseException)
         {
             return null;
         }
+    }
 
-        if (obj is not JsonObject)
-        {
-            // the old Json::requireObject(doc) "Document is not an object" path
-            return null;
-        }
-
-        try
-        {
-            var pack = new SolderPack();
-            TechnicSolder.LoadPack(pack, obj);
-            return pack;
-        }
-        catch (JsonParseException)
-        {
-            return null;
-        }
+    /// <summary>Port of TechnicSolder::loadPackBuild (the SolderPackInstallTask entry).
+    /// Throws <see cref="JsonParseException"/> with the Solder wrapper on any failure.</summary>
+    public static SolderPackBuild LoadSolderPackBuild(string response)
+    {
+        var build = DeserializeDocument<SolderPackBuild>(response, "JSON response from Solder",
+            TechnicJsonContext.Default.SolderPackBuild);
+        return build
+               ?? throw new JsonParseException("JSON response from Solder: Error parsing JSON: document is null");
     }
 
     /// <summary>QFileInfo(QUrl(url).fileName()).suffix() equivalent: the extension of the

@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Shared node-model accessors for the ATL parsers. Reads go through the JsonNode model
-// (single-DOM, the JsonUtils node-side family — same migration as TechnicJson); the
-// former element→node bridges are gone. What remains is the response-body entry point
-// (JsonNode.Parse with the C++ Json::requireDocument "{what}: Error parsing JSON: ..."
-// wrapping) and the QJsonValue object cast ("Value is not an object") the array-entry
-// and root-document paths share.
+// Response-body entry point shared by the ATL parsers (the wire models deserialize through
+// the AtLauncherJsonContext — see AtLauncherApi.cs): JsonNode.Parse with the C++
+// Json::requireDocument "{what}: Error parsing JSON: ..." wrapping, kept for the surfaced
+// "Could not understand ..." failure messages.
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -28,12 +26,5 @@ internal static class AtLauncherJson
         {
             throw new JsonParseException(what + ": Error parsing JSON: " + e.Message);
         }
-    }
-
-    /// <summary>Json::requireObject(value) as a JsonObject cast: throws for both a missing
-    /// value and a non-object (the QJsonValue cast's "Value is not an object" path).</summary>
-    public static JsonObject Object(JsonNode? node)
-    {
-        return node is JsonObject obj ? obj : throw new JsonParseException("Value is not an object");
     }
 }

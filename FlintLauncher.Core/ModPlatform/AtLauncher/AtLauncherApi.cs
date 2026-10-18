@@ -8,13 +8,27 @@
 // DownloadServerUrl / ApiBaseUrl are per-instance (tests construct their own client pointed
 // at a stub); the client rides the injected NetStack (LauncherRuntime.AtLauncher — see the
 // Modrinth/Flame/Technic de-singletoning for the same story). The parsers are pure helpers
-// and stay static; reads go through the JsonNode model (see AtLauncherJson/JsonUtils).
+// and stay static; the wire shapes deserialize through the source-generated
+// AtLauncherJsonContext (the ATL models carry their own annotations; the document parse of
+// each entry keeps the "{what}: Error parsing JSON: ..." wrapper via AtLauncherJson).
 
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.ModPlatform.AtLauncher;
+
+/// <summary>The source-generated context of the ATL wire models (the share-code probe, the
+/// packsnew.json index and the Configs.json PackVersion); the models carry their own
+/// [JsonPropertyName] annotations and the QJsonValue-semantics converters.</summary>
+[JsonSourceGenerationOptions(RespectNullableAnnotations = true)]
+[JsonSerializable(typeof(AtlShareCodeResponseJson))]
+[JsonSerializable(typeof(List<IndexedPack>))]
+[JsonSerializable(typeof(PackVersion))]
+internal sealed partial class AtLauncherJsonContext : JsonSerializerContext;
 
 public sealed class AtLauncherApi(NetStack? net = null)
 {
@@ -72,16 +86,17 @@ public sealed class AtLauncherApi(NetStack? net = null)
     /// <summary>Parses the packsnew.json index (AtlListModel::searchRequestFinished).</summary>
     public static List<IndexedPack> LoadPackIndex(string response)
     {
-        var packs = new List<IndexedPack>();
         var root = AtLauncherJson.RequireDocument(response, "JSON response from ATLauncher");
-        foreach (var packRaw in JsonUtils.RequireArray(root, "Document"))
+        try
         {
-            var pack = new IndexedPack();
-            AtLauncherPackIndex.LoadIndexedPack(pack, AtLauncherJson.Object(packRaw));
-            packs.Add(pack);
+            return JsonSerializer.Deserialize(root, AtLauncherJsonContext.Default.ListIndexedPack) ?? [];
         }
-
-        return packs;
+        catch (JsonException e)
+        {
+            // binding failures (a non-array root, a non-object entry, a missing required
+            // member) keep the parse wrapper of the former per-entry Require reads
+            throw new JsonParseException("JSON response from ATLauncher: Error parsing JSON: " + e.Message);
+        }
     }
 
     /// <summary>
@@ -115,12 +130,24 @@ public sealed class AtLauncherApi(NetStack? net = null)
         return shareCodeResponse.Data;
     }
 
-    /// <summary>Parses Configs.json into a PackVersion (PackInstallTask::onDownloadSucceeded).</summary>
+    /// <summary>Parses Configs.json into a PackVersion (PackInstallTask::onDownloadSucceeded);
+    /// runs the load-time fixups (the Minecraft-Forge-as-jar correction, the extractFolder
+    /// %s% rewrite) after the deserialization.</summary>
     public static PackVersion LoadPackVersion(string response)
     {
         var root = AtLauncherJson.RequireDocument(response, "JSON response from ATLauncher");
-        var version = new PackVersion();
-        AtLauncherPackManifest.LoadVersion(version, AtLauncherJson.Object(root));
+        PackVersion? version;
+        try
+        {
+            version = JsonSerializer.Deserialize(root, AtLauncherJsonContext.Default.PackVersion)
+                      ?? throw new JsonParseException("Value is not an object");
+        }
+        catch (JsonException e)
+        {
+            throw new JsonParseException("JSON response from ATLauncher: Error parsing JSON: " + e.Message);
+        }
+
+        AtLauncherPackManifest.Normalize(version);
         return version;
     }
 }

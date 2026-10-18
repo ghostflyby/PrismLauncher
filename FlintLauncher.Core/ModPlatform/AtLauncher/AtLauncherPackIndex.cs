@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of modplatform/atlauncher/ATLPackIndex.{h,cpp}: the packsnew.json index model
 // (IndexedPack/IndexedVersion) and its parser. The safeName is the C++ normalized pack
-// image name ("[^A-Za-z0-9]" stripped, lowercased, ".png" appended). Reads go through the
-// JsonNode model (single-DOM, the JsonUtils node-side family).
+// image name ("[^A-Za-z0-9]" stripped, lowercased, ".png" appended). The wire shape is
+// annotated on the model properties; deserialization goes through the AtLauncherJsonContext
+// (AtLauncherApi.cs).
 
-using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Json;
 
@@ -12,52 +13,46 @@ namespace FlintLauncher.Core.ModPlatform.AtLauncher;
 
 public sealed class IndexedVersion
 {
-    public string Version { get; set; } = "";
-    public string Minecraft { get; set; } = "";
+    [JsonPropertyName("version")]
+    public required string Version { get; set; }
+
+    [JsonPropertyName("minecraft")]
+    public required string Minecraft { get; set; }
 }
 
 public sealed class IndexedPack
 {
-    public int Id { get; set; }
-    public int Position { get; set; }
-    public string Name { get; set; } = "";
-    public PackType Type { get; set; }
-    public List<IndexedVersion> Versions { get; } = [];
+    [JsonPropertyName("id")]
+    public required int Id { get; set; }
+
+    [JsonPropertyName("position")]
+    public required int Position { get; set; }
+
+    [JsonPropertyName("name")]
+    public required string Name { get; set; }
+
+    // the wire value is the raw "private"/"public" text; PackType stays the computed view
+    [JsonPropertyName("type")]
+    public required string TypeRaw { get; set; }
+
+    [JsonPropertyName("versions")]
+    public required List<IndexedVersion> Versions { get; init; }
+
+    [JsonPropertyName("system")]
+    [JsonConverter(typeof(QtCoercingBoolConverter))]
     public bool System { get; set; }
+
+    [JsonPropertyName("description")]
+    [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Description { get; set; } = "";
 
-    public string SafeName { get; set; } = "";
+    public PackType Type => TypeRaw == "private" ? PackType.Private : PackType.Public;
+
+    public string SafeName => AtLauncherPackIndex.SafePackName(Name).ToLowerInvariant() + ".png";
 }
 
 public static partial class AtLauncherPackIndex
 {
-    private static void LoadIndexedVersion(IndexedVersion v, JsonNode obj)
-    {
-        v.Version = JsonUtils.RequireString(obj, "version", "'version'");
-        v.Minecraft = JsonUtils.RequireString(obj, "minecraft", "'minecraft'");
-    }
-
-    /// <summary>Port of ATLauncher::loadIndexedPack.</summary>
-    public static void LoadIndexedPack(IndexedPack m, JsonNode obj)
-    {
-        m.Id = JsonUtils.RequireInteger(obj, "id", "'id'");
-        m.Position = JsonUtils.RequireInteger(obj, "position", "'position'");
-        m.Name = JsonUtils.RequireString(obj, "name", "'name'");
-        m.Type = JsonUtils.RequireString(obj, "type", "'type'") == "private" ? PackType.Private : PackType.Public;
-        var versionsArr = JsonUtils.RequireArray(obj, "versions", "'versions'");
-        foreach (var versionRaw in versionsArr)
-        {
-            var version = new IndexedVersion();
-            LoadIndexedVersion(version, AtLauncherJson.Object(versionRaw));
-            m.Versions.Add(version);
-        }
-
-        m.System = JsonUtils.EnsureBoolean(obj["system"]);
-        m.Description = JsonUtils.EnsureString(obj["description"]);
-
-        m.SafeName = SafePackName(JsonUtils.RequireString(obj, "name", "'name'")).ToLowerInvariant() + ".png";
-    }
-
     /// <summary>The "[^A-Za-z0-9]" -> "" replacement shared with the install task's packSafeName.</summary>
     public static string SafePackName(string name) => UnsafeCharsRegex().Replace(name, "");
 

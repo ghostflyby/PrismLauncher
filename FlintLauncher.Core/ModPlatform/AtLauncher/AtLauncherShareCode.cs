@@ -29,8 +29,8 @@ public sealed record AtlShareCodeModJson(
     [property: JsonPropertyName("selected")] bool? Selected,
     [property: JsonPropertyName("name")] string? Name);
 
-[JsonSerializable(typeof(AtlShareCodeResponseJson))]
-internal sealed partial class AtLauncherJsonContext : JsonSerializerContext;
+// (the AtLauncherJsonContext declaration lives in AtLauncherApi.cs beside the parse
+// entries — the STJ source generator cannot declare one context across two files)
 
 public sealed class ShareCodeMod
 {

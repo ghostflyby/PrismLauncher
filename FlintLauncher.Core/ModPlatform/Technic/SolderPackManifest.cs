@@ -1,71 +1,48 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of modplatform/technic/SolderPackManifest.{h,cpp}: the Solder API models —
 // /modpack/{slug} (recommended/latest/builds) and /modpack/{slug}/{build} (minecraft + mods).
-// Reads go through the JsonNode model (single-DOM).
+// The wire shape is annotated on the model properties; the Solder members are all required
+// except a mod's version (toString() of a missing/junk value -> "", the coercing converter).
 
-using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.ModPlatform.Technic;
 
 public sealed class SolderPack
 {
-    public string Recommended { get; set; } = "";
-    public string Latest { get; set; } = "";
-    public List<string> Builds { get; } = [];
+    [JsonPropertyName("recommended")]
+    public required string Recommended { get; set; }
+
+    [JsonPropertyName("latest")]
+    public required string Latest { get; set; }
+
+    [JsonPropertyName("builds")]
+    public required List<string> Builds { get; init; }
 }
 
 public sealed class SolderPackBuildMod
 {
-    public string Name { get; set; } = "";
+    [JsonPropertyName("name")]
+    public required string Name { get; set; }
+
+    // optional: toString() of a missing/junk value -> ""
+    [JsonPropertyName("version")]
+    [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Version { get; set; } = "";
-    public string Md5 { get; set; } = "";
-    public string Url { get; set; } = "";
+
+    [JsonPropertyName("md5")]
+    public required string Md5 { get; set; }
+
+    [JsonPropertyName("url")]
+    public required string Url { get; set; }
 }
 
 public sealed class SolderPackBuild
 {
-    public string Minecraft { get; set; } = "";
-    public List<SolderPackBuildMod> Mods { get; } = [];
-}
+    [JsonPropertyName("minecraft")]
+    public required string Minecraft { get; set; }
 
-public static class TechnicSolder
-{
-    /// <summary>Port of TechnicSolder::loadPack.</summary>
-    public static void LoadPack(SolderPack v, JsonNode obj)
-    {
-        v.Recommended = JsonUtils.RequireString(obj, "recommended", "'recommended'");
-        v.Latest = JsonUtils.RequireString(obj, "latest", "'latest'");
-
-        var builds = JsonUtils.RequireArray(obj, "builds", "'builds'");
-        foreach (var buildRaw in builds)
-        {
-            v.Builds.Add(buildRaw is JsonValue buildValue && buildValue.TryGetValue<string>(out var build)
-                ? build
-                : throw new JsonParseException("Value is not a string"));
-        }
-    }
-
-    private static void LoadPackBuildMod(SolderPackBuildMod b, JsonNode obj)
-    {
-        b.Name = JsonUtils.RequireString(obj, "name", "'name'");
-        b.Version = JsonUtils.EnsureString(obj["version"]);
-        b.Md5 = JsonUtils.RequireString(obj, "md5", "'md5'");
-        b.Url = JsonUtils.RequireString(obj, "url", "'url'");
-    }
-
-    /// <summary>Port of TechnicSolder::loadPackBuild.</summary>
-    public static void LoadPackBuild(SolderPackBuild v, JsonNode obj)
-    {
-        v.Minecraft = JsonUtils.RequireString(obj, "minecraft", "'minecraft'");
-
-        var mods = JsonUtils.RequireArray(obj, "mods", "'mods'");
-        foreach (var modRaw in mods)
-        {
-            var mod = new SolderPackBuildMod();
-            // the downcast keeps the old hard-cast behavior for a non-object entry
-            LoadPackBuildMod(mod, (JsonObject)(modRaw ?? throw new JsonParseException("Value is not an object")));
-            v.Mods.Add(mod);
-        }
-    }
+    [JsonPropertyName("mods")]
+    public required List<SolderPackBuildMod> Mods { get; init; }
 }

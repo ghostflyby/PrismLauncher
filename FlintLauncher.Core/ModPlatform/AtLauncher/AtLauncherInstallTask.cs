@@ -104,7 +104,9 @@ public sealed partial class AtLauncherPackInstallTask(
 
     // -------------------------------------------------------------------- state
 
-    private readonly PackVersion _version = new();
+    // assigned by OnDownloadSucceeded before any read (required members make the model
+    // constructible only through deserialization)
+    private PackVersion _version = null!;
     private string archivePath = "";
     private readonly List<string> _jarMods = [];
     private VersionFile? minecraftVersionData;
@@ -135,8 +137,9 @@ public sealed partial class AtLauncherPackInstallTask(
     {
         try
         {
-            var root = AtLauncherJson.RequireDocument(response, "JSON response from ATLauncher");
-            AtLauncherPackManifest.LoadVersion(_version, AtLauncherJson.Object(root));
+            // (the parse keeps the "JSON response from ATLauncher" wrapper of the former
+            // RequireDocument + LoadVersion reads; Normalize runs the load-time fixups)
+            _version = AtLauncherApi.LoadPackVersion(response);
         }
         catch (JsonParseException e)
         {

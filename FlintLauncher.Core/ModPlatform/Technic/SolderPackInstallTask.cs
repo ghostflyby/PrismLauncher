@@ -45,9 +45,7 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
         SolderPackBuild build;
         try
         {
-            var root = TechnicJson.RequireDocument(response, "JSON response from Solder");
-            build = new SolderPackBuild();
-            TechnicSolder.LoadPackBuild(build, JsonUtils.RequireObject(root, "Document"));
+            build = TechnicApi.LoadSolderPackBuild(response);
         }
         catch (JsonParseException e)
         {

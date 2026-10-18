@@ -46,6 +46,17 @@ public sealed class QtCoercingStringConverter : JsonConverter<string>
         writer.WriteStringValue(value);
 }
 
+/// <summary>QJsonValue::toBool(default false) for OPTIONAL members: a bool token yields its
+/// value, every other token (string/number/null) yields false.</summary>
+public sealed class QtCoercingBoolConverter : JsonConverter<bool>
+{
+    public override bool Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.TokenType is JsonTokenType.True;
+
+    public override void Write(Utf8JsonWriter writer, bool value, JsonSerializerOptions options) =>
+        writer.WriteBooleanValue(value);
+}
+
 /// <summary>The {"packs":[id,...]} index arrays: QJsonValue::toInt() per element (doubles
 /// truncate, junk zeroes); a missing member keeps the property default, a JSON null yields
 /// an empty list.</summary>
