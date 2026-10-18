@@ -175,7 +175,7 @@ public static class Parsers
                     return false;
                 }
 
-                output.Extra[key] = JsonValue.Create(claim);
+                output.Extra[key] = AccountData.StringElement(claim);
             }
 
             break;

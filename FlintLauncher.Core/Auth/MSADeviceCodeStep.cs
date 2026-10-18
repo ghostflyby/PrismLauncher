@@ -224,21 +224,21 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
         int ExpiresIn,
         string Error,
         string ErrorDescription,
-        Dictionary<string, JsonNode> Extra);
+        Dictionary<string, JsonElement> Extra);
 
     private static AuthenticationResponse ParseAuthenticationResponse(byte[] data)
     {
         if (TryParseObject(data) is not { } obj)
         {
-            return new AuthenticationResponse("", "", "", 0, "", "", new Dictionary<string, JsonNode>());
+            return new AuthenticationResponse("", "", "", 0, "", "", new Dictionary<string, JsonElement>());
         }
 
-        var extra = new Dictionary<string, JsonNode>();
+        var extra = new Dictionary<string, JsonElement>();
         foreach (var (key, value) in obj)
         {
             if (value is not null)
             {
-                extra[key] = value.DeepClone();
+                extra[key] = AccountData.ToElement(value);
             }
         }
 

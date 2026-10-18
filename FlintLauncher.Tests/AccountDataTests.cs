@@ -98,7 +98,7 @@ public class AccountDataTests
         Assert.Equal(1638990728, new DateTimeOffset(data.MsaToken.NotAfter!.Value).ToUnixTimeSeconds());
         // the numeric extra value must survive as a number
         Assert.True(data.MsaToken.Extra.TryGetValue("expires_in", out var expiresIn));
-        Assert.Equal("86400", expiresIn.ToJsonString());
+        Assert.Equal("86400", expiresIn.GetRawText());
 
         Assert.Equal("USER_TOKEN", data.UserToken.Value);
         Assert.Equal("UHS123", AccountData.GetString(data.UserToken.Extra["uhs"]));

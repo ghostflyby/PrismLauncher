@@ -93,7 +93,7 @@ public sealed class XboxAuthorizationStep(
         EmitFinished(AccountTaskState.Working, $"Got authorization to access {relyingParty}");
     }
 
-    private static JsonNode? ExtraValue(Dictionary<string, JsonNode> extra, string key)
+    private static JsonElement ExtraValue(Dictionary<string, JsonElement> extra, string key)
     {
         return extra.GetValueOrDefault(key);
     }

@@ -15,9 +15,14 @@
 //  - qWarning()/qDebug() diagnostics are dropped (comment markers where they carried meaning).
 
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
 namespace FlintLauncher.Core.Auth;
+
+[JsonSerializable(typeof(JsonElement))]
+internal sealed partial class AuthJsonContext : JsonSerializerContext;
 
 public enum Validity
 {
@@ -42,8 +47,10 @@ public sealed class Token
     /// <summary>C++ member refresh_token.</summary>
     public string RefreshToken = "";
 
-    /// <summary>QVariantMap extra; values are owned JSON nodes (strings/numbers/objects).</summary>
-    public Dictionary<string, JsonNode> Extra = new();
+    /// <summary>QVariantMap extra; values are owned immutable JSON values (strings/numbers/
+    /// objects). Storing <see cref="JsonElement"/>s (not nodes) keeps the bag a value bag:
+    /// no DeepClone on copy, no shared mutable trees between the auth steps and the ledger.</summary>
+    public Dictionary<string, JsonElement> Extra = new();
 
     public Validity Validity = Validity.None;
 
@@ -59,12 +66,8 @@ public sealed class Token
             RefreshToken = RefreshToken,
             Validity = Validity,
             Persistent = Persistent,
+            Extra = new Dictionary<string, JsonElement>(Extra),
         };
-        foreach (var (key, value) in Extra)
-        {
-            copy.Extra[key] = value.DeepClone();
-        }
-
         return copy;
     }
 }
@@ -364,7 +367,7 @@ public sealed class AccountData
             var extra = new JsonObject();
             foreach (var (key, value) in t.Extra.OrderBy(p => p.Key, StringComparer.Ordinal))
             {
-                extra[key] = value?.DeepClone();
+                extra[key] = JsonNode.Parse(value.GetRawText());
             }
 
             outObj["extra"] = extra;
@@ -418,7 +421,7 @@ public sealed class AccountData
             {
                 if (value is not null)
                 {
-                    outToken.Extra[key] = value.DeepClone();
+                    outToken.Extra[key] = ToElement(value);
                 }
             }
         }
@@ -667,5 +670,34 @@ public sealed class AccountData
     internal static bool EnsureBool(JsonNode? node)
     {
         return node is JsonValue value && value.TryGetValue<bool>(out var b) ? b : false;
+    }
+
+    // -------------------------------------------------------- element-bag helpers
+
+    /// <summary>Reads a string out of the extra bag (QJsonValue::toString("") semantics;
+    /// a default-initialized element reads as "").</summary>
+    internal static string GetString(JsonElement element)
+    {
+        return element.ValueKind == JsonValueKind.String ? element.GetString() ?? "" : "";
+    }
+
+    /// <summary>An owned immutable copy of a node as an extra-bag value (the former
+    /// DeepClone; the JSON text round-trip keeps the exact value).</summary>
+    internal static JsonElement ToElement(JsonNode? node)
+    {
+        return JsonDocument.Parse(node?.ToJsonString() ?? "null").RootElement.Clone();
+    }
+
+    /// <summary>An extra-bag string value built without touching the reflection serializer
+    /// (written through the raw UTF-8 writer, parsed back through the source-gen context).</summary>
+    internal static JsonElement StringElement(string value)
+    {
+        var buffer = new System.Buffers.ArrayBufferWriter<byte>(Encoding.UTF8.GetMaxByteCount(value.Length) + 16);
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            writer.WriteStringValue(value);
+        }
+
+        return JsonSerializer.Deserialize(buffer.WrittenSpan, AuthJsonContext.Default.JsonElement);
     }
 }

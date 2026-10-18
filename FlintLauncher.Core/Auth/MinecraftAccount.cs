@@ -61,8 +61,8 @@ public sealed class MinecraftAccount
                     IssueInstant = DateTime.UtcNow,
                     Extra =
                     {
-                        ["userName"] = JsonValue.Create(username),
-                        ["clientToken"] = JsonValue.Create(Guid.NewGuid().ToString("N"))
+                        ["userName"] = AccountData.StringElement(username),
+                        ["clientToken"] = AccountData.StringElement(Guid.NewGuid().ToString("N"))
                     }
                 },
                 MinecraftProfile =

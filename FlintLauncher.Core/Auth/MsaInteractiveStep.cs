@@ -265,7 +265,7 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
         int ExpiresIn,
         string Error,
         string ErrorDescription,
-        Dictionary<string, JsonNode> Extra);
+        Dictionary<string, JsonElement> Extra);
 
     private static TokenResponse ParseTokenResponse(byte[] data)
     {
@@ -281,15 +281,15 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
 
         if (obj is null)
         {
-            return new TokenResponse("", "", 0, "", "", new Dictionary<string, JsonNode>());
+            return new TokenResponse("", "", 0, "", "", new Dictionary<string, JsonElement>());
         }
 
-        var extra = new Dictionary<string, JsonNode>();
+        var extra = new Dictionary<string, JsonElement>();
         foreach (var (key, value) in obj)
         {
             if (value is not null)
             {
-                extra[key] = value.DeepClone();
+                extra[key] = AccountData.ToElement(value);
             }
         }
 
