@@ -2,6 +2,13 @@
 // Port of launcher/meta/JsonFormat.{h,cpp}: the shared metadata format version handling and
 // the Require type plus the index/version/version-list parsers. Reads go through
 // the JsonNode model (single-DOM); the Parse(JsonObject) entity entry points keep JsonObject.
+//
+// Serialization note (the meta-format decision): the index/version-list readers stay
+// node-based ON PURPOSE — MetaJsonFormatTests.ParseIndex_ErrorAndQuirkParity pins the exact
+// requireIsArrayOf quirks as features (a NON-ARRAY packages/versions member parses to an
+// empty list, a non-object element throws the "Document is not an object" label, and the
+// per-key require messages are exact). Typed binding collapses those into whole-document
+// failures with STJ texts; like accounts.json, quirk parity wins over typing here.
 
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Java;

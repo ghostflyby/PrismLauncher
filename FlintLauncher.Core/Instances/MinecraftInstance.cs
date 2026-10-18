@@ -608,10 +608,6 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         var list = base.ExtraArguments();
         var version = GetPackProfile();
-        if (version is null)
-        {
-            return list;
-        }
 
         var jarMods = GetJarMods();
         if (jarMods.Count != 0)
