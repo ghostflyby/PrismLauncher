@@ -22,7 +22,7 @@ public sealed class MetaParseException(string message) : Exception(message) { }
 
 /// <summary>Port of Meta::Require. Set identity is by uid only, like the C++ operator==/operator&lt;.
 /// DeepEquals compares all fields (used by Component's deep-inspect change detection).</summary>
-public sealed class Require: IEquatable<Require>
+public sealed class Require: IEquatable<Require>, IComparable<Require>
 {
     public required string Uid { get; init; }
 
@@ -36,6 +36,10 @@ public sealed class Require: IEquatable<Require>
     public override bool Equals(object? obj) => Equals(obj as Require);
 
     public override int GetHashCode() => Uid.GetHashCode();
+
+    /// <summary>Uid-only ordering — matches the C++ operator&lt; (port of std::set ordering).</summary>
+    public int CompareTo(Require? other) =>
+        other is null ? 1 : string.CompareOrdinal(Uid, other.Uid);
 
     /// <summary>Full-field comparison — detects content changes within the same uid.</summary>
     public bool DeepEquals(Require rhs)
@@ -106,8 +110,8 @@ public static class MetaJsonFormat
         version.Type = Str(obj, "type");
         version.IsRecommended = Bool(obj, "recommended");
         version.SetVolatile(Bool(obj, "volatile"));
-        var reqs = new HashSet<Require>();
-        var conflicts = new HashSet<Require>();
+        var reqs = new SortedSet<Require>();
+        var conflicts = new SortedSet<Require>();
         ParseRequires(obj, reqs);
         ParseRequires(obj, conflicts, "conflicts");
         version.SetRequires(reqs, conflicts);
@@ -236,7 +240,7 @@ public static class MetaJsonFormat
     {"uid":"foo", "equals":"version"}
     ]
     */
-    public static void ParseRequires(JsonNode obj, HashSet<Require> ptr, string keyName = "requires")
+    public static void ParseRequires(JsonNode obj, SortedSet<Require> ptr, string keyName = "requires")
     {
         if (Has(obj, keyName))
         {
@@ -252,7 +256,7 @@ public static class MetaJsonFormat
         }
     }
 
-    public static void SerializeRequires(JsonObject obj, HashSet<Require>? ptr, string keyName = "requires")
+    public static void SerializeRequires(JsonObject obj, SortedSet<Require>? ptr, string keyName = "requires")
     {
         if (ptr is null || ptr.Count == 0)
         {

@@ -16,7 +16,7 @@ public sealed class MetaVersion(string uid, string version) : MetaEntity
     // NOTE: the C++ m_name member is dead there as well (never written); dropped to keep
     // the port warning-clean
 
-    private HashSet<Require> conflicts = new();
+    private SortedSet<Require> conflicts = new();
 
     private bool @volatile;
 
@@ -34,7 +34,7 @@ public sealed class MetaVersion(string uid, string version) : MetaEntity
 
     public long RawTime { get; set; }
 
-    public HashSet<Require> RequiredSet { get; private set; } = [];
+    public SortedSet<Require> RequiredSet { get; private set; } = [];
 
     public VersionFile? Data { get; set; }
 
@@ -107,7 +107,7 @@ public sealed class MetaVersion(string uid, string version) : MetaEntity
 
     // ------------------------------------------------- for usage by format parsers only
 
-    public void SetRequires(HashSet<Require> reqs, HashSet<Require> conflicts)
+    public void SetRequires(SortedSet<Require> reqs, SortedSet<Require> conflicts)
     {
         RequiredSet = reqs;
         this.conflicts = conflicts;

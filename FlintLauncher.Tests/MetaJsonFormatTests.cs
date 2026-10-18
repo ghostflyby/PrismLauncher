@@ -134,14 +134,14 @@ public class MetaJsonFormatTests
     [Fact]
     public void ParseRequires_SerializeParseRoundTrip()
     {
-        var original = new HashSet<Require>
+        var original = new SortedSet<Require>
         {
             new Require { Uid = "org.lwjgl3", EqualsVersion = "3.2.2" },
             new Require { Uid = "net.fabricmc.intermediary", Suggests = "1.18" },
         };
         var obj = new JsonObject();
         MetaJsonFormat.SerializeRequires(obj, original);
-        var parsed = new HashSet<Require>();
+        var parsed = new SortedSet<Require>();
         MetaJsonFormat.ParseRequires(obj, parsed);
 
         Assert.Equal(2, parsed.Count);
@@ -154,15 +154,15 @@ public class MetaJsonFormatTests
     public void ParseRequires_CustomKeyName_MatchesSerialize()
     {
         // the PackProfile cachedRequires/cachedConflicts path
-        var original = new HashSet<Require> { new Require { Uid = "a.b.c" } };
+        var original = new SortedSet<Require> { new Require { Uid = "a.b.c" } };
         var obj = new JsonObject();
         MetaJsonFormat.SerializeRequires(obj, original, "cachedRequires");
-        var parsed = new HashSet<Require>();
+        var parsed = new SortedSet<Require>();
         MetaJsonFormat.ParseRequires(obj, parsed, "cachedRequires");
         Assert.True(parsed.SetEquals(original));
 
         // a different key name finds nothing
-        var other = new HashSet<Require>();
+        var other = new SortedSet<Require>();
         MetaJsonFormat.ParseRequires(obj, other);
         Assert.Empty(other);
     }
@@ -170,7 +170,7 @@ public class MetaJsonFormatTests
     [Fact]
     public void ParseRequires_ErrorMessages_MatchTheFamily()
     {
-        var ptr = new HashSet<Require>();
+        var ptr = new SortedSet<Require>();
 
         var nonArray = (JsonObject)Parse("""{"requires":"nope"}""");
         Assert.Equal("'requires' is not an array",

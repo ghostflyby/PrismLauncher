@@ -104,10 +104,10 @@ public class Component : ProblemProvider
     public string CachedVersion { get; set; } = "";
 
     /// cached set of requirements, taken from the version file (meta or local override)
-    public HashSet<Require> CachedRequires { get; set; } = new();
+    public SortedSet<Require> CachedRequires { get; set; } = new();
 
     /// cached set of conflicts, taken from the version file (meta or local override)
-    public HashSet<Require> CachedConflicts { get; set; } = new();
+    public SortedSet<Require> CachedConflicts { get; set; } = new();
 
     /// if true, the component is volatile and may be automatically removed when no longer needed
     public bool CachedVolatile { get; set; }
@@ -470,7 +470,7 @@ public class Component : ProblemProvider
 
     /// <summary>deep inspecting compare for requirement sets — compares all fields of the Require structs.</summary>
     /// <summary>deep inspecting compare for requirement sets — compares all fields of the Require structs.</summary>
-    private static bool DeepCompare(HashSet<Require> a, HashSet<Require> b)
+    private static bool DeepCompare(SortedSet<Require> a, SortedSet<Require> b)
     {
         if (a.Count != b.Count)
         {
