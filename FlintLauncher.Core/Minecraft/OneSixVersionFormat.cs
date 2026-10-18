@@ -231,7 +231,7 @@ public static partial class OneSixVersionFormat
         else if (outInfo.MinecraftVersion.Length != 0)
         {
             var lib = new Library();
-            lib.SetRawName(new GradleSpecifier($"com.mojang:minecraft:{outInfo.MinecraftVersion}:client"));
+            lib.Name = new GradleSpecifier($"com.mojang:minecraft:{outInfo.MinecraftVersion}:client");
             // we have a reliable client download, use it.
             if (outInfo.MojangDownloads.TryGetValue("client", out var clientDownload))
             {
@@ -239,7 +239,7 @@ public static partial class OneSixVersionFormat
                 {
                     Artifact = clientDownload,
                 };
-                lib.SetMojangDownloadInfo(libDlInfo);
+                lib.MojangDownloads = libDlInfo;
             }
             // we got nothing...
             else
@@ -436,13 +436,13 @@ public static partial class OneSixVersionFormat
 
         // just make up something unique on the spot for the library name.
         var id = Guid.NewGuid().ToString(); // QUuid::createUuid().toString(QUuid::WithoutBraces)
-        outLib.SetRawName(new GradleSpecifier("org.multimc.jarmods:" + id + ":1"));
+        outLib.Name = new GradleSpecifier("org.multimc.jarmods:" + id + ":1");
 
         // filename override is the old name
-        outLib.SetFilename(libObj.StringOr("name"));
+        outLib.FilenameOverride = libObj.StringOr("name");
 
         // it needs to be local, it is stored in the instance jarmods folder
-        outLib.SetHint("local");
+        outLib.Hint = "local";
 
         // read the original name if present - some versions did not set it
         // it is the original jar mod filename before it got renamed at the point of addition
@@ -450,11 +450,11 @@ public static partial class OneSixVersionFormat
         if (displayName.Length == 0)
         {
             var fixedName = originalName.Replace(" (jar mod)", "");
-            outLib.SetDisplayName(fixedName);
+            outLib.DisplayNameValue = fixedName;
         }
         else
         {
-            outLib.SetDisplayName(displayName);
+            outLib.DisplayNameValue = displayName;
         }
 
         return outLib;

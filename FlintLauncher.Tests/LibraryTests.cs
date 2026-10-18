@@ -85,7 +85,7 @@ public class LibraryTests
         var r = DummyContext();
         var failedFiles = new List<string>();
         var test = new Library("test.package:testname:testversion");
-        test.SetRepositoryUrl("file://foo/bar");
+        test.RepositoryUrl = "file://foo/bar";
         var downloads = test.GetDownloads(r, _cache, failedFiles, "");
         Assert.Single(downloads);
         Assert.Empty(failedFiles);
@@ -100,7 +100,7 @@ public class LibraryTests
         var test = new Library("test.package:testname:testversion");
         Assert.False(test.IsNative());
         var failedFiles = new List<string>();
-        test.SetHint("local");
+        test.Hint = "local";
         var downloads = test.GetDownloads(r, _cache, failedFiles, "");
         Assert.Empty(downloads);
         Assert.Equal(["testname-testversion.jar"], failedFiles);
@@ -113,7 +113,7 @@ public class LibraryTests
         var test = new Library("com.paulscode:codecwav:20101023");
         Assert.False(test.IsNative());
         var failedFiles = new List<string>();
-        test.SetHint("local");
+        test.Hint = "local";
         var downloads = test.GetDownloads(r, _cache, failedFiles, _dataDir);
         Assert.Empty(downloads);
         Assert.Empty(failedFiles);
@@ -134,7 +134,7 @@ public class LibraryTests
         var test = new Library("test.package:testname:testversion");
         test.NativeClassifiers["linux"] = "linux";
         Assert.True(test.IsNative());
-        test.SetRepositoryUrl("file://foo/bar");
+        test.RepositoryUrl = "file://foo/bar";
         {
             GetApplicableFiles(test, r, out var jar, out var native, out var native32, out var native64, "");
             Assert.Empty(jar);
@@ -159,7 +159,7 @@ public class LibraryTests
         test.NativeClassifiers["osx"] = "osx-${arch}";
         test.NativeClassifiers["windows"] = "windows-${arch}";
         Assert.True(test.IsNative());
-        test.SetRepositoryUrl("file://foo/bar");
+        test.RepositoryUrl = "file://foo/bar";
         {
             GetApplicableFiles(test, r, out var jar, out var native, out var native32, out var native64, "");
             Assert.Empty(jar);
@@ -209,9 +209,9 @@ public class LibraryTests
         var r = DummyContext();
         var test = new Library("test.package:testname:testversion");
         test.NativeClassifiers["linux"] = "linux-${arch}";
-        test.SetHint("local");
+        test.Hint = "local";
         Assert.True(test.IsNative());
-        test.SetRepositoryUrl("file://foo/bar");
+        test.RepositoryUrl = "file://foo/bar";
         {
             GetApplicableFiles(test, r, out var jar, out var native, out var native32, out var native64, _dataDir);
             Assert.Empty(jar);
@@ -246,7 +246,7 @@ public class LibraryTests
             Assert.Equal("https://libraries.minecraft.net/com/paulscode/codecwav/20101023/codecwav-20101023.jar", dls[0].Url.ToString());
         }
         r.System = "osx";
-        test.SetHint("local");
+        test.Hint = "local";
         {
             GetApplicableFiles(test, r, out var jar, out var native, out var native32, out var native64, _dataDir);
             Assert.Equal([FileSystem.PathCombine(_dataDir, "codecwav-20101023.jar")], jar);
@@ -268,7 +268,7 @@ public class LibraryTests
     {
         var r = DummyContext("osx");
         var test = ReadMojangJson(Path.Combine(_dataDir, "lib-simple.json"));
-        test.SetHint("local");
+        test.Hint = "local";
         {
             GetApplicableFiles(test, r, out var jar, out var native, out var native32, out var native64, _dataDir);
             Assert.Equal([FileSystem.PathCombine(_dataDir, "codecwav-20101023.jar")], jar);

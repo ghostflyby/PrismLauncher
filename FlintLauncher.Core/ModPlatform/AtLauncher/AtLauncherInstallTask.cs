@@ -512,15 +512,15 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
             }
 
             var library = new Library();
-            library.SetRawName(new GradleSpecifier(libName));
+            library.Name = new GradleSpecifier(libName);
 
             switch (lib.Download)
             {
                 case DownloadType.Server:
-                    library.SetAbsoluteUrl(_api.DownloadServerUrl + lib.Url);
+                    library.AbsoluteUrl = _api.DownloadServerUrl + lib.Url;
                     break;
                 case DownloadType.Direct:
-                    library.SetAbsoluteUrl(lib.Url);
+                    library.AbsoluteUrl = lib.Url;
                     break;
                 case DownloadType.Browser:
                 case DownloadType.Unknown:

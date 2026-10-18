@@ -799,10 +799,10 @@ public sealed class PackProfile : IDisposable
 
             var f = new VersionFile();
             var jarMod = new Library();
-            jarMod.SetRawName(new GradleSpecifier("custom.jarmods:" + id + ":1"));
-            jarMod.SetFilename(targetFilename);
-            jarMod.SetDisplayName(CompleteBaseName(filepath));
-            jarMod.SetHint("local");
+            jarMod.Name = new GradleSpecifier("custom.jarmods:" + id + ":1");
+            jarMod.FilenameOverride = targetFilename;
+            jarMod.DisplayNameValue = CompleteBaseName(filepath);
+            jarMod.Hint = "local";
             f.JarMods.Add(jarMod);
             f.Name = targetName;
             f.Uid = targetId;
@@ -858,9 +858,9 @@ public sealed class PackProfile : IDisposable
 
         var f = new VersionFile();
         var jarMod = new Library();
-        jarMod.SetRawName(specifier);
-        jarMod.SetDisplayName(CompleteBaseName(filepath));
-        jarMod.SetHint("local");
+        jarMod.Name = specifier;
+        jarMod.DisplayNameValue = CompleteBaseName(filepath);
+        jarMod.Hint = "local";
         f.MainJar = jarMod;
         f.Name = targetName;
         f.Uid = targetId;
@@ -914,10 +914,10 @@ public sealed class PackProfile : IDisposable
             var versionFile = new VersionFile();
 
             var agent = new Library();
-            agent.SetRawName(new GradleSpecifier("custom.agents:" + id + ":1"));
-            agent.SetFilename(targetBaseName);
-            agent.SetDisplayName(CompleteBaseName(source));
-            agent.SetHint("local");
+            agent.Name = new GradleSpecifier("custom.agents:" + id + ":1");
+            agent.FilenameOverride = targetBaseName;
+            agent.DisplayNameValue = CompleteBaseName(source);
+            agent.Hint = "local";
 
             versionFile.Agents.Add(new Agent(agent, ""));
             versionFile.Name = targetName;

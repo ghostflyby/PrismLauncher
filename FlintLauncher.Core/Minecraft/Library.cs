@@ -100,8 +100,6 @@ public class Library
     /// <summary>Returns the raw name field</summary>
     public GradleSpecifier RawName() => Name;
 
-    public void SetRawName(GradleSpecifier spec) => Name = spec;
-
     public void SetClassifier(string spec) => Name = Name.WithClassifier(spec);
 
     /// <summary>returns the full group and artifact prefix</summary>
@@ -115,22 +113,6 @@ public class Library
 
     /// <summary>Returns true if the library is native</summary>
     public bool IsNative() => NativeClassifiers.Count != 0;
-
-    public void SetStoragePrefix(string prefix = "") => StoragePrefixValue = prefix;
-
-    /// <summary>Set the url base for downloads</summary>
-    public void SetRepositoryUrl(string baseUrl) => RepositoryUrl = baseUrl;
-
-    public void SetAbsoluteUrl(string absoluteUrl) => AbsoluteUrl = absoluteUrl;
-
-    public void SetFilename(string filename) => FilenameOverride = filename;
-
-    /// <summary>DEPRECATED: set a display name, used by jar mods only</summary>
-    public void SetDisplayName(string displayName) => DisplayNameValue = displayName;
-
-    public void SetMojangDownloadInfo(MojangLibraryDownloadInfo info) => MojangDownloads = info;
-
-    public void SetHint(string hint) => Hint = hint;
 
     /// <summary>Set the load rules</summary>
     public void SetRules(IEnumerable<Rule> rules)
