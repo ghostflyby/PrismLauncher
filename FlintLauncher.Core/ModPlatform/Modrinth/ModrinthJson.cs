@@ -203,13 +203,70 @@ public static class ModrinthJson
     /// <summary>The {hash: version} lookup responses of POST /version_files(/update). Null
     /// when the body is not a JSON object — every lookup then just misses, like indexing a
     /// non-object node did.</summary>
-    public static Dictionary<string, ModrinthVersionJson>? ParseVersionLookup(string json) =>
-        Parse(json, ModrinthJsonContext.Default.DictionaryStringModrinthVersionJson);
+    public static Dictionary<string, ModrinthVersionJson>? ParseVersionLookup(string json)
+    {
+        // per-entry tolerance like the former node readers: one malformed version entry
+        // costs that entry, not the whole lookup
+        JsonNode? root;
+        try
+        {
+            root = JsonNode.Parse(json);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
 
-    /// <summary>A JSON array of versions (project version lists). Non-array bodies parse to an
-    /// empty list — the array sniff of the former readers.</summary>
-    public static List<ModrinthVersionJson> ParseVersionListOrEmpty(string json) =>
-        Parse(json, ModrinthJsonContext.Default.ListModrinthVersionJson) ?? [];
+        if (root is not JsonObject obj)
+        {
+            return null;
+        }
+
+        var result = new Dictionary<string, ModrinthVersionJson>(StringComparer.Ordinal);
+        foreach (var (hash, node) in obj)
+        {
+            var version = VersionFromNode(node);
+            if (version is not null)
+            {
+                result[hash] = version;
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>A JSON array of versions (project version lists), with the former per-entry
+    /// tolerance: a non-array body or a malformed entry parses to an empty list / is skipped.
+    /// </summary>
+    public static List<ModrinthVersionJson> ParseVersionListOrEmpty(string json)
+    {
+        JsonNode? root;
+        try
+        {
+            root = JsonNode.Parse(json);
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+
+        if (root is not JsonArray array)
+        {
+            return [];
+        }
+
+        var result = new List<ModrinthVersionJson>();
+        foreach (var entry in array)
+        {
+            var version = VersionFromNode(entry);
+            if (version is not null)
+            {
+                result.Add(version);
+            }
+        }
+
+        return result;
+    }
 
     public static ModrinthProjectJson? ParseProject(string json) =>
         Parse(json, ModrinthJsonContext.Default.ModrinthProjectJson);

@@ -83,7 +83,7 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
 
     public static JavaMetadata ParseJavaMeta(JsonObject obj)
     {
-        var meta = MapJavaMeta(obj);
+        var meta = MapJavaMeta(MapJavaMetaNode(obj));
         return meta;
     }
 
@@ -121,11 +121,17 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
         return meta;
     }
 
-    private static JavaMetadata MapJavaMeta(JsonObject obj)
+    private static JavaRuntimeJson MapJavaMetaNode(JsonObject obj)
     {
-        var dto = JsonSerializer.Deserialize(obj, JavaJsonContext.Default.JavaRuntimeJson)
-                  ?? throw new JsonParseException("java runtime: Error parsing JSON: document is null");
-        return MapJavaMeta(dto);
+        try
+        {
+            return JsonSerializer.Deserialize(obj, JavaJsonContext.Default.JavaRuntimeJson)
+                   ?? throw new JsonParseException("java runtime: Error parsing JSON: document is null");
+        }
+        catch (JsonException e)
+        {
+            throw new JsonParseException("java runtime: Error parsing JSON: " + e.Message);
+        }
     }
 
     // ------------------------------------------------------------- comparators

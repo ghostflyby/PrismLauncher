@@ -401,9 +401,11 @@ public static class AtLauncherPackManifest
         _ => ModType.Unknown,
     };
 
-    /// <summary>The load-time fixups of the former LoadVersionMod: the "Minecraft
-    /// Forge"-as-jar correction (the Forge detection relies on mod.type being Forge, and
-    /// some packs regretfully use "jar") and the extractFolder %s% -> / rewrite.</summary>
+    /// <summary>The load-time fixups and the require checks of the former LoadVersionMod /
+    /// LoadVersionLoader / LoadVersionConfigs: the "Minecraft Forge"-as-jar correction, the
+    /// extractFolder %s% -> / rewrite, and the required loader.type / loader.metadata /
+    /// configs.sha1 / decompFile members (a missing one fails the manifest instead of
+    /// silently skipping the loader or installing configs without integrity checks).</summary>
     public static void Normalize(PackVersion version)
     {
         foreach (var mod in version.Mods)
@@ -413,7 +415,22 @@ public static class AtLauncherPackManifest
                 mod.TypeRaw = "forge";
             }
 
+            if (mod.DecompTypeRaw.Length != 0 && mod.DecompFile.Length == 0)
+            {
+                throw new JsonParseException("'decompFile' is not a string");
+            }
+
             mod.ExtractFolder = mod.ExtractFolder.Replace("%s%", "/");
+        }
+
+        if (version.LoaderRaw is { } loader && loader.Type.Length == 0)
+        {
+            throw new JsonParseException("'type' is not a string");
+        }
+
+        if (version.ConfigsRaw is { } configs && configs.Sha1.Length == 0)
+        {
+            throw new JsonParseException("'sha1' is not a string");
         }
     }
 }

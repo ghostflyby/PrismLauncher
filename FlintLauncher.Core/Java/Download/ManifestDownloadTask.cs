@@ -91,6 +91,11 @@ public sealed class ManifestDownloadTask(Uri url, string finalPath, string check
         {
             foreach (var (paths, meta) in list)
             {
+                if (meta is null)
+                {
+                    continue; // toObject() on a non-object yields an empty object with no type
+                }
+
                 var file = FileSystem.PathCombine(finalPath, paths);
 
                 var type = meta.Type ?? "";

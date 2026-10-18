@@ -179,6 +179,11 @@ public static class ModrinthPackIndex
             return new IndexedVersion();
         }
 
+        if (files.Any(file => file is null))
+        {
+            throw new JsonParseException("'files' is not an array of objects");
+        }
+
         // Find correct file (needed in cases where one version may have multiple files)
         // Will default to the last one if there's no primary (though I think Modrinth requires that
         // at least one file is primary, idk)
@@ -211,7 +216,10 @@ public static class ModrinthPackIndex
             file.IsPreferred = ModrinthRequire.Boolean(parent.Primary, "primary") || fileCount == 1;
             var hashList = ModrinthRequire.Object(parent.Hashes, "hashes");
 
-            if (hashList.TryGetValue(preferredHashType, out var preferredHash))
+            // a JSON null hash value counts as absent (the former node model: null is not
+            // { }), so the fallback chain keeps walking
+            if (hashList.TryGetValue(preferredHashType, out var preferredHash) &&
+                preferredHash is not null)
             {
                 file.Hash = ModrinthRequire.String(preferredHash, preferredHashType);
                 file.HashType = preferredHashType;
@@ -221,7 +229,7 @@ public static class ModrinthPackIndex
                 var hashTypes = ProviderCapabilities.HashType(ResourceProvider.Modrinth);
                 foreach (var hashType in hashTypes)
                 {
-                    if (hashList.TryGetValue(hashType, out var hash))
+                    if (hashList.TryGetValue(hashType, out var hash) && hash is not null)
                     {
                         file.Hash = ModrinthRequire.String(hash, hashType);
                         file.HashType = hashType;

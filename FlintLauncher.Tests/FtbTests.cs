@@ -179,6 +179,13 @@ public class FtbTests : IDisposable
                                       """);
         Assert.Equal(10, pack.Updated);
         Assert.Equal(20, pack.Refreshed); // the optional toInt() truncation
+        // a JSON null optional member also falls back to 0 (HandleNull coercion)
+        var nullRefreshed = FtbApi.LoadModpack("""
+                                              {"id":7,"name":"P","synopsis":"s","description":"d","type":"public",
+                                               "featured":false,"installs":1,"plays":2,"updated":10,"refreshed":null,
+                                               "art":[],"authors":[],"versions":[],"tags":[]}
+                                              """);
+        Assert.Equal(0, nullRefreshed.Refreshed);
         Assert.Empty(pack.Art);
         Assert.Empty(pack.Authors);
         Assert.Empty(pack.Versions);

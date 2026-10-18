@@ -165,6 +165,11 @@ public static class MetaJsonFormat
         var lists = new List<VersionList>(packages.Count);
         foreach (var element in packages)
         {
+            if (element is null)
+            {
+                throw new MetaParseException("Document is not an object");
+            }
+
             var list = new VersionList(RequireStringOf(element.Uid, "uid"))
             {
                 Name = element.Name ?? "",
@@ -262,6 +267,11 @@ public static class MetaJsonFormat
         var versions = new List<MetaVersion>(versionsRaw.Count);
         foreach (var entry in versionsRaw)
         {
+            if (entry is null)
+            {
+                throw new MetaParseException("Document is not an object");
+            }
+
             var version = MapCommonVersion(uid, entry);
             version.SetProvidesRecommendations();
             versions.Add(version);

@@ -283,28 +283,29 @@ public static partial class OneSixVersionFormat
             }
         }
 
-        /* removed features that shouldn't be used */
-        if (dto.RemovedTweakers is not null)
+        /* removed features that shouldn't be used (QJsonObject::contains semantics: the
+           member counts even when it holds JSON null, so probe the node, not the DTO) */
+        if (root.Contains("tweakers"))
         {
             outInfo.AddProblem(ProblemSeverity.Error, "Version file contains unsupported element 'tweakers'");
         }
 
-        if (dto.RemovedLibraries is not null)
+        if (root.Contains("-libraries"))
         {
             outInfo.AddProblem(ProblemSeverity.Error, "Version file contains unsupported element '-libraries'");
         }
 
-        if (dto.RemovedTweakersDash is not null)
+        if (root.Contains("-tweakers"))
         {
             outInfo.AddProblem(ProblemSeverity.Error, "Version file contains unsupported element '-tweakers'");
         }
 
-        if (dto.RemovedMinecraftArguments is not null)
+        if (root.Contains("-minecraftArguments"))
         {
             outInfo.AddProblem(ProblemSeverity.Error, "Version file contains unsupported element '-minecraftArguments'");
         }
 
-        if (dto.RemovedPlusMinecraftArguments is not null)
+        if (root.Contains("+minecraftArguments"))
         {
             outInfo.AddProblem(ProblemSeverity.Error, "Version file contains unsupported element '+minecraftArguments'");
         }

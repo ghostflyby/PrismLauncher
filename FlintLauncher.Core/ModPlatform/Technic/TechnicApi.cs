@@ -346,9 +346,25 @@ public sealed class TechnicApi(NetStack? net = null)
     public static SolderPackBuild LoadSolderPackBuild(string response)
     {
         var build = DeserializeDocument<SolderPackBuild>(response, "JSON response from Solder",
-            TechnicJsonContext.Default.SolderPackBuild);
-        return build
-               ?? throw new JsonParseException("JSON response from Solder: Error parsing JSON: document is null");
+            TechnicJsonContext.Default.SolderPackBuild)
+                    ?? throw new JsonParseException("JSON response from Solder: Error parsing JSON: document is null");
+
+        // JSON null members/elements are not enforced by the binding — surface them like the
+        // former Require reads instead of letting them NRE the install task
+        if (build.Minecraft is null)
+        {
+            throw new JsonParseException("'minecraft' is not a string");
+        }
+
+        foreach (var mod in build.Mods)
+        {
+            if (mod?.Url is null)
+            {
+                throw new JsonParseException("Value is not an object");
+            }
+        }
+
+        return build;
     }
 
     /// <summary>QFileInfo(QUrl(url).fileName()).suffix() equivalent: the extension of the

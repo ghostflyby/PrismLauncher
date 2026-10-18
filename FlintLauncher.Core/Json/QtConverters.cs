@@ -15,6 +15,10 @@ namespace FlintLauncher.Core.Json;
 /// the converter — the property default applies.</summary>
 public sealed class QtCoercingIntConverter : JsonConverter<int>
 {
+    /// <summary>null participates in the coercion (the QJsonValue fallback),
+    /// instead of the STJ default of bypassing the converter.</summary>
+    public override bool HandleNull => true;
+
     public override int Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
         reader.TokenType == JsonTokenType.Number && reader.TryGetDouble(out var number)
             ? (int)number
@@ -27,6 +31,10 @@ public sealed class QtCoercingIntConverter : JsonConverter<int>
 /// <summary>EnsureLong(): the 64-bit variant of the toInt() coercion.</summary>
 public sealed class QtCoercingLongConverter : JsonConverter<long>
 {
+    /// <summary>null participates in the coercion (the QJsonValue fallback),
+    /// instead of the STJ default of bypassing the converter.</summary>
+    public override bool HandleNull => true;
+
     public override long Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
         reader.TokenType == JsonTokenType.Number && reader.TryGetDouble(out var number)
             ? (long)number
@@ -39,6 +47,10 @@ public sealed class QtCoercingLongConverter : JsonConverter<long>
 /// <summary>QJsonValue::toString(default ""): any non-string token yields "".</summary>
 public sealed class QtCoercingStringConverter : JsonConverter<string>
 {
+    /// <summary>null participates in the coercion (the QJsonValue fallback),
+    /// instead of the STJ default of bypassing the converter.</summary>
+    public override bool HandleNull => true;
+
     public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
         reader.TokenType == JsonTokenType.String ? reader.GetString() ?? "" : "";
 
@@ -50,6 +62,10 @@ public sealed class QtCoercingStringConverter : JsonConverter<string>
 /// value, every other token (string/number/null) yields false.</summary>
 public sealed class QtCoercingBoolConverter : JsonConverter<bool>
 {
+    /// <summary>null participates in the coercion (the QJsonValue fallback),
+    /// instead of the STJ default of bypassing the converter.</summary>
+    public override bool HandleNull => true;
+
     public override bool Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
         reader.TokenType is JsonTokenType.True;
 
@@ -62,6 +78,8 @@ public sealed class QtCoercingBoolConverter : JsonConverter<bool>
 /// an empty list.</summary>
 public sealed class QtCoercingIntListConverter : JsonConverter<List<int>>
 {
+    public override bool HandleNull => true;
+
     public override List<int> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType is not JsonTokenType.StartArray)

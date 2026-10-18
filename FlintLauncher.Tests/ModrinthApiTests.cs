@@ -519,6 +519,26 @@ public class ModrinthApiTests : IDisposable
         Assert.Equal($"{_server.Url}/mod.bin", entry["downloads"]!.AsArray().Single()!.GetValue<string>());
     }
 
+    [Fact]
+    public void HashLookup_NullPreferredHash_FallsBackToNextAlgorithm()
+    {
+        // a JSON null hash value counts as absent: the sha512 -> sha1 fallback keeps walking
+        var dto = ModrinthJson.VersionFromNode(JsonNode.Parse("""
+            {
+                "project_id": "p", "id": "v1", "date_published": "2024-01-01T00:00:00Z",
+                "game_versions": ["1.20.1"], "loaders": ["fabric"],
+                "name": "V", "version_number": "1.0.0", "version_type": "release",
+                "files": [ { "filename": "a.jar", "primary": true,
+                             "hashes": { "sha512": null, "sha1": "abc" },
+                             "url": "https://cdn.modrinth.com/a.jar" } ]
+            }
+            """));
+        var indexed = ModrinthPackIndex.LoadIndexedPackVersion(dto!);
+
+        Assert.Equal("sha1", indexed.HashType);
+        Assert.Equal("abc", indexed.Hash);
+    }
+
     // ------------------------------------------------------- update check
 
     [Fact]

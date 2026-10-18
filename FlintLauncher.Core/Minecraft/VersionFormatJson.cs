@@ -204,10 +204,23 @@ internal static class VersionFormatMapper
 
     public static int Require(int? value, string key) => value ?? throw MissingInt(key);
 
+    public static JsonParseException MissingArray(string key) => new($"'{key}' is not an array");
+
+    /// <summary>Collection/dictionary elements are not null-checked by STJ (even with
+    /// RespectNullableAnnotations) — a JSON null element is the former "Value is not an
+    /// object" binding failure.</summary>
+    public static T RequireElement<T>(T? element) where T : class =>
+        element ?? throw new JsonParseException("Value is not an object");
+
     // ---------------------------------------------------------------- download info
 
-    public static MojangDownloadInfo MapDownloadInfo(MojangDownloadInfoJson dto)
+    public static MojangDownloadInfo MapDownloadInfo(MojangDownloadInfoJson? dto)
     {
+        if (dto is null)
+        {
+            throw new JsonParseException("Value is not an object");
+        }
+
         var info = new MojangDownloadInfo();
         if (dto.Path is not null)
         {
@@ -292,8 +305,13 @@ internal static class VersionFormatMapper
 
     // --------------------------------------------------------------------- library
 
-    public static Library MapLibrary(LibraryJson dto, ProblemContainer problems, string filename)
+    public static Library MapLibrary(LibraryJson? dto, ProblemContainer problems, string filename)
     {
+        if (dto is null)
+        {
+            throw new JsonParseException("Value is not an object");
+        }
+
         if (dto.Name is null)
         {
             // the upstream typo of the missing space is preserved
@@ -322,7 +340,7 @@ internal static class VersionFormatMapper
             }
             else
             {
-                throw MissingString("exclude");
+                throw MissingArray("exclude");
             }
         }
 
@@ -342,7 +360,7 @@ internal static class VersionFormatMapper
             outLib.ApplyRules = true;
             foreach (var rule in rules)
             {
-                outLib.Rules.Add(MapRule(rule ?? throw new JsonParseException("Value is not an object")));
+                outLib.Rules.Add(MapRule(RequireElement(rule)));
             }
         }
 
@@ -383,8 +401,13 @@ internal static class VersionFormatMapper
         }
     }
 
-    public static PlusJarModParts MapPlusJarMod(PlusJarModJson dto, string filename, string originalName)
+    public static PlusJarModParts MapPlusJarMod(PlusJarModJson? dto, string filename, string originalName)
     {
+        if (dto is null)
+        {
+            throw new JsonParseException("Value is not an object");
+        }
+
         if (dto.Name is null)
         {
             throw new JsonParseException(filename + "contains a jarmod that doesn't have a 'name' field");

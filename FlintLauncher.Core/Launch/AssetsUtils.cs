@@ -128,10 +128,11 @@ public static class AssetsUtils
         {
             foreach (var (key, value) in objects)
             {
+                // a JSON null object entry kept its (empty) AssetObject in the former read
                 index.Objects[key] = new AssetObject
                 {
-                    Hash = value.Hash ?? "",
-                    Size = value.Size ?? 0,
+                    Hash = value?.Hash ?? "",
+                    Size = value?.Size ?? 0,
                 };
             }
         }
