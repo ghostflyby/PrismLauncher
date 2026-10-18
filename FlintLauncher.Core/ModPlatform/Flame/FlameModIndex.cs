@@ -21,59 +21,6 @@ using FlintLauncher.Core.Minecraft;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
-/// <summary>Small QJsonObject-style accessors shared by the Flame loaders (explicit calls,
-/// to stay unambiguous next to the Modrinth extension methods). JsonNode-based — the single
-/// read model; see the JsonUtils node family for the semantics contract.</summary>
-internal static class FlameJson
-{
-    /// <summary>obj["key"] equivalent: null node when missing.</summary>
-    public static JsonNode? Ptr(JsonNode? element, string name) => element is JsonObject obj ? obj[name] : null;
-
-    /// <summary>obj["key"].toString(default) equivalent.</summary>
-    public static string Str(JsonNode? element, string name, string def = "")
-    {
-        return JsonUtils.EnsureString(Ptr(element, name), def);
-    }
-
-    public static int Int(JsonNode? element, string name, int def = 0)
-    {
-        return JsonUtils.EnsureInteger(Ptr(element, name), def);
-    }
-
-    /// <summary>QJsonValue::toInteger() equivalent over a raw node.</summary>
-    public static long Long(JsonNode? node)
-    {
-        return JsonUtils.EnsureLong(node);
-    }
-
-    /// <summary>obj["key"].asString() equivalent for string-typed sub-reads.</summary>
-    public static string? AsString(JsonNode? node)
-    {
-        return node is JsonValue value && value.TryGetValue<string>(out var s) ? s : null;
-    }
-
-    public static JsonObject Obj(JsonNode? element, string name)
-    {
-        return Ptr(element, name) as JsonObject ?? new JsonObject();
-    }
-
-    public static JsonArray Arr(JsonNode? element, string name)
-    {
-        return Ptr(element, name) as JsonArray ?? new JsonArray();
-    }
-
-    public static string RequireString(JsonNode? parent, string key)
-        => JsonUtils.RequireString(Ptr(parent, key), "'" + key + "'");
-
-    public static int RequireInteger(JsonNode? parent, string key)
-        => JsonUtils.RequireInteger(Ptr(parent, key), "'" + key + "'");
-
-    public static JsonObject RequireObject(JsonNode? parent, string key)
-        => JsonUtils.RequireObject(Ptr(parent, key), "'" + key + "'");
-
-    public static JsonArray RequireArray(JsonNode? parent, string key)
-        => JsonUtils.RequireArray(Ptr(parent, key), "'" + key + "'");
-}
 
 // ------------------------------------------------------------------ wire probes
 //
@@ -116,7 +63,9 @@ internal sealed record FlameModFileJson(
     string? FileName,
     int? ReleaseType,
     List<FlameHashJson>? Hashes,
-    List<FlameDependencyJson>? Dependencies);
+    List<FlameDependencyJson>? Dependencies,
+    bool? IsAvailable,
+    long? FileFingerprint);
 
 internal sealed record FlameHashJson(
     int? Algo,
@@ -126,6 +75,14 @@ internal sealed record FlameDependencyJson(
     int? ModId,
     int? RelationType);
 
+/// <summary>The /categories response entry (FlameAPI::loadModCategories).</summary>
+internal sealed record FlameCategoryJson(
+    int? Id,
+    string? Name);
+
+internal sealed record FlameCategoryListJson(
+    List<FlameCategoryJson>? Data);
+
 /// <summary>The fingerprint-match response (EnsureMetadataTask's Flame flow).</summary>
 internal sealed record FlameFingerprintResponseJson(
     FlameFingerprintDataJson? Data);
@@ -133,9 +90,10 @@ internal sealed record FlameFingerprintResponseJson(
 internal sealed record FlameFingerprintDataJson(
     List<FlameFingerprintMatchJson>? ExactMatches);
 
+/// <summary>One fingerprint-search match; the fingerprint itself is the FILE object's
+/// fileFingerprint member (the match level only carries "id", which nobody consumed).</summary>
 internal sealed record FlameFingerprintMatchJson(
-    FlameModFileJson? File,
-    long? FileFingerprint);
+    FlameModFileJson? File);
 
 /// <summary>The {data: [...]} envelope of the files list response.</summary>
 internal sealed record FlameFileListJson(
@@ -156,6 +114,8 @@ internal sealed record FlameProjectEnvelopeJson(
 [JsonSerializable(typeof(FlameFileListJson))]
 [JsonSerializable(typeof(FlameProjectListJson))]
 [JsonSerializable(typeof(FlameProjectEnvelopeJson))]
+[JsonSerializable(typeof(FlameCategoryListJson))]
+[JsonSerializable(typeof(List<FlameModFileJson>))]
 internal sealed partial class FlameModJsonContext : JsonSerializerContext;
 
 // https://docs.curseforge.com/#tocS_Mod
@@ -279,11 +239,27 @@ public static class FlameMod
         _ => "sha1",
     };
 
+    /// <summary>The Web-facing typed version-list load: parses the {"data": [...]} response
+    /// body and fills the pack (validated files, newest first). Returns false when the data
+    /// member is absent (the caller's "no data array" face); JsonParseException on a broken
+    /// body.</summary>
+    public static bool LoadIndexedPackVersionsFromResponse(IndexedPack pack, string responseBody)
+    {
+        var doc = ParseResponse(responseBody, FlameModJsonContext.Default.FlameFileListJson);
+        if (doc.Data is null)
+        {
+            return false;
+        }
+
+        LoadIndexedPackVersions(pack, doc.Data);
+        return true;
+    }
+
     /// <summary>Port of FlameMod::loadIndexedPackVersions (sorts by file date, newest first).</summary>
-    public static void LoadIndexedPackVersions(IndexedPack pack, JsonArray arr)
+    internal static void LoadIndexedPackVersions(IndexedPack pack, List<FlameModFileJson>? files)
     {
         var unsortedVersions = new List<IndexedVersion>();
-        foreach (var versionIter in arr)
+        foreach (var versionIter in files ?? [])
         {
             if (versionIter is null)
             {

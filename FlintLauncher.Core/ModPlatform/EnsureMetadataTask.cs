@@ -257,7 +257,7 @@ public sealed class EnsureMetadataTask(
                     return;
                 }
 
-                var fingerprint = (match.FileFingerprint ?? 0).ToString(CultureInfo.InvariantCulture);
+                var fingerprint = (fileObj.FileFingerprint ?? 0).ToString(CultureInfo.InvariantCulture);
                 if (!resources.TryGetValue(fingerprint, out var resource))
                 {
                     // "Invalid fingerprint from the API response."

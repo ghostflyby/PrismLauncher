@@ -137,10 +137,10 @@ public sealed class FlameCheckUpdate(
         {
             try
             {
-                var obj = JsonUtils.RequireObject(doc);
-                var arr = FlameJson.RequireArray(obj, "data");
+                var versionsDoc = FlameMod.ParseResponse(responseBody,
+                    FlameModJsonContext.Default.FlameFileListJson);
 
-                FlameMod.LoadIndexedPackVersions(pack, arr);
+                FlameMod.LoadIndexedPackVersions(pack, versionsDoc.Data);
             }
             catch (JsonParseException e)
             {
@@ -237,54 +237,46 @@ public sealed class FlameCheckUpdate(
         await projJob.StartAsync(cancellationToken);
         if (projJob.WasSuccessful)
         {
-            JsonNode? doc;
+            // a broken response body only skips the blocked-download recovery lookup (the
+            // task finishes regardless, like the C++)
+            List<FlameProjectJson?>? entries = null;
             try
             {
-                doc = JsonNode.Parse(projRequest.BodyAsString);
+                entries = single
+                    ? [FlameMod.ParseResponse(projRequest.BodyAsString,
+                           FlameModJsonContext.Default.FlameProjectEnvelopeJson).Data
+                       ?? throw new JsonParseException("'data' is not an object")]
+                    : FlameMod.ParseResponse(projRequest.BodyAsString,
+                           FlameModJsonContext.Default.FlameProjectListJson).Data
+                      ?? throw new JsonParseException("'data' is not an array");
             }
-            catch (JsonException)
-            {
-                doc = null;
-            }
+            catch (JsonParseException) { }
 
-            if (doc is not null)
+            if (entries is not null)
             {
+                foreach (var entryObj in entries)
                 {
+                    if (entryObj is null)
+                    {
+                        continue;
+                    }
+
+                    var id = (entryObj.Id ?? 0).ToString(CultureInfo.InvariantCulture);
+                    if (!quickSearch.TryGetValue(id, out var resource))
+                    {
+                        continue;
+                    }
+
                     try
                     {
-                        var rootObj = JsonUtils.RequireObject(doc);
-                        var data = FlameJson.Ptr(rootObj, "data");
-                        List<JsonNode> entries;
-                        if (single)
-                        {
-                            entries = [JsonUtils.RequireObject(data, "'data'")];
-                        }
-                        else
-                        {
-                            entries = JsonUtils.ToNodeList(JsonUtils.RequireArray(data, "'data'"));
-                        }
+                        EmitStatus($"Parsing API response from CurseForge for '{resource.Name}'...");
 
-                        foreach (var entryObj in entries.Where(e => e is not null))
-                        {
-                            var id = FlameJson.RequireInteger(entryObj, "id").ToString(CultureInfo.InvariantCulture);
-                            if (!quickSearch.TryGetValue(id, out var resource))
-                            {
-                                continue;
-                            }
-
-                            try
-                            {
-                                EmitStatus($"Parsing API response from CurseForge for '{resource.Name}'...");
-
-                                var pack = new IndexedPack();
-                                FlameMod.LoadIndexedPack(pack, entryObj);
-                                var recoverUrl = $"{pack.WebsiteUrl}/download/{_blocked[resource]}";
-                                CheckFailed?.Invoke(resource,
-                                    "Resource has a new update available, but is not downloadable using CurseForge.",
-                                    recoverUrl);
-                            }
-                            catch (JsonParseException) { }
-                        }
+                        var pack = new IndexedPack();
+                        FlameMod.LoadIndexedPack(pack, entryObj);
+                        var recoverUrl = $"{pack.WebsiteUrl}/download/{_blocked[resource]}";
+                        CheckFailed?.Invoke(resource,
+                            "Resource has a new update available, but is not downloadable using CurseForge.",
+                            recoverUrl);
                     }
                     catch (JsonParseException) { }
                 }

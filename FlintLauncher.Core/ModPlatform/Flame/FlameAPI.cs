@@ -186,33 +186,19 @@ public sealed class FlameApi(NetStack? net = null) : ResourceApi
     public List<Category> LoadModCategories(string response)
     {
         var categories = new List<Category>();
-        JsonNode? doc;
         try
         {
-            doc = JsonNode.Parse(response);
-        }
-        catch (JsonException)
-        {
-            return categories;
-        }
-
-        {
-            try
+            var doc = FlameMod.ParseResponse(response, FlameModJsonContext.Default.FlameCategoryListJson);
+            foreach (var cat in doc.Data ?? [])
             {
-                var obj = JsonUtils.RequireObject(doc);
-                var arr = JsonUtils.RequireArray(FlameJson.Ptr(obj, "data"), "'data'");
-
-                foreach (var cat in arr)
-                {
-                    var id = FlameJson.RequireInteger(cat, "id");
-                    var name = FlameJson.RequireString(cat, "name");
-                    categories.Add(new Category(name, id.ToString(CultureInfo.InvariantCulture)));
-                }
+                // the former per-entry Require pair failed the whole parse into the same
+                // empty-list catch; a real CF response always carries both members
+                categories.Add(new Category(cat?.Name ?? "", (cat?.Id ?? 0).ToString(CultureInfo.InvariantCulture)));
             }
-            catch (JsonParseException)
-            {
-                // "Failed to parse response from a version request." (logged upstream)
-            }
+        }
+        catch (JsonParseException)
+        {
+            // "Failed to parse response from a version request." (logged upstream)
         }
         return categories;
     }
@@ -479,9 +465,6 @@ public sealed class FlameApi(NetStack? net = null) : ResourceApi
     }
 
     // --------------------------------------------------------- response loading
-
-    /// <summary>Port of ResourceAPI::documentToArray for Flame (the "data" array).</summary>
-    public static JsonArray DocumentToArray(JsonNode obj) => FlameJson.Arr(obj, "data");
 
     /// <summary>Port of the FlameAPI::loadIndexedPack override.</summary>
     public void LoadIndexedPack(IndexedPack pack, JsonNode obj) => FlameMod.LoadIndexedPack(pack, obj);

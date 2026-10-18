@@ -220,68 +220,52 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
 
     private void ParseApiResponse(string responseBody)
     {
-        JsonNode? doc;
+        // the same fingerprint envelope EnsureMetadataTask consumes
+        FlameFingerprintResponseJson? response;
         try
         {
-            doc = JsonNode.Parse(responseBody);
+            response = FlameMod.ParseResponse(responseBody, FlameModJsonContext.Default.FlameFingerprintResponseJson);
         }
-        catch (JsonException)
+        catch (JsonParseException)
         {
             return;
         }
 
         {
-            try
+            var exactMatches = response.Data?.ExactMatches;
+            if (exactMatches is null or { Count: 0 })
             {
-                var docObj = JsonUtils.RequireObject(doc);
-                var dataObj = JsonUtils.RequireObject(FlameJson.Ptr(docObj, "data"), "'data'");
-                var dataArr = JsonUtils.RequireArray(FlameJson.Ptr(dataObj, "exactMatches"), "'exactMatches'");
+                // "No matches found for fingerprint search!"
+                return;
+            }
 
-                if (dataArr.Count == 0)
+            foreach (var match in exactMatches)
+            {
+                if (match?.File is not { } fileObj)
                 {
-                    // "No matches found for fingerprint search!"
+                    // "Fingerprint match is empty!"
                     return;
                 }
 
-                foreach (var matchObj in dataArr)
+                var fingerprint = (fileObj.FileFingerprint ?? 0).ToString(CultureInfo.InvariantCulture);
+                if (!_pendingHashes.TryGetValue(fingerprint, out var mod))
                 {
-                    if (matchObj is not JsonObject)
-                    {
-                        // "Fingerprint match is empty!"
-                        return;
-                    }
+                    // "Invalid fingerprint from the API response."
+                    continue;
+                }
 
-                    var fileObj = FlameJson.Ptr(matchObj, "file");
-                    if (fileObj is not JsonObject)
+                EmitStatus($"Parsing API response from CurseForge for '{mod.Name}'...");
+                if (fileObj.IsAvailable == true)
+                {
+                    _resolvedFiles[mod.Path] = new ResolvedFile
                     {
-                        // "Fingerprint match is empty!"
-                        return;
-                    }
-
-                    var fingerprint = FlameJson.Long(fileObj["fileFingerprint"])
-                        .ToString(CultureInfo.InvariantCulture);
-                    if (!_pendingHashes.TryGetValue(fingerprint, out var mod))
-                    {
-                        // "Invalid fingerprint from the API response."
-                        continue;
-                    }
-
-                    EmitStatus($"Parsing API response from CurseForge for '{mod.Name}'...");
-                    var isAvailable = fileObj["isAvailable"] is JsonValue { } available
-                                      && available.TryGetValue<bool>(out var flag) && flag;
-                    if (isAvailable)
-                    {
-                        _resolvedFiles[mod.Path] = new ResolvedFile
-                        {
-                            AddonId = FlameJson.RequireInteger(fileObj, "modId"),
-                            Version = FlameJson.RequireInteger(fileObj, "id"),
-                            Enabled = mod.Enabled,
-                            IsMod = mod.IsMod,
-                        };
-                    }
+                        AddonId = fileObj.ModId ?? 0,
+                        Version = fileObj.Id ?? 0,
+                        Enabled = mod.Enabled,
+                        IsMod = mod.IsMod,
+                    };
                 }
             }
-            catch (JsonParseException) { }
         }
     }
 
@@ -319,62 +303,57 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
             return;
         }
 
-        JsonNode? doc;
+        // a broken response body only skips the project-info enrichment: the export still
+        // builds its zip (the former kind-failure flow; the syntax EmitFailed face is
+        // retired as the more reasonable failure — the export completes either way)
+        List<FlameProjectJson?>? entries = null;
         try
         {
-            doc = JsonNode.Parse(projRequest.BodyAsString);
+            entries = single
+                ? [FlameMod.ParseResponse(projRequest.BodyAsString,
+                       FlameModJsonContext.Default.FlameProjectEnvelopeJson).Data
+                   ?? throw new JsonParseException("'data' is not an object")]
+                : FlameMod.ParseResponse(projRequest.BodyAsString,
+                       FlameModJsonContext.Default.FlameProjectListJson).Data
+                  ?? throw new JsonParseException("'data' is not an array");
         }
-        catch (JsonException e)
-        {
-            EmitFailed(e.Message);
-            return;
-        }
+        catch (JsonParseException) { }
 
+        if (entries is not null)
         {
-            try
+            foreach (var entryObj in entries)
             {
-                var rootObj = JsonUtils.RequireObject(doc);
-                var data = FlameJson.Ptr(rootObj, "data");
-                List<JsonNode> entries;
-                if (single)
+                try
                 {
-                    entries = [JsonUtils.RequireObject(data, "'data'")];
-                }
-                else
-                {
-                    entries = JsonUtils.ToNodeList(JsonUtils.RequireArray(data, "'data'"));
-                }
-
-                foreach (var entryObj in entries)
-                {
-                    try
+                    if (entryObj is null)
                     {
-                        EmitStatus($"Parsing API response from CurseForge for '{FlameJson.RequireString(entryObj, "name")}'...");
+                        continue;
+                    }
 
-                        var pack = new IndexedPack();
-                        FlameMod.LoadIndexedPack(pack, entryObj);
-                        foreach (var (key, val) in _resolvedFiles)
+                    EmitStatus($"Parsing API response from CurseForge for '{entryObj.Name ?? ""}'...");
+
+                    var pack = new IndexedPack();
+                    FlameMod.LoadIndexedPack(pack, entryObj);
+                    foreach (var (key, val) in _resolvedFiles)
+                    {
+                        if (val.AddonId.ToString(CultureInfo.InvariantCulture) == pack.AddonId)
                         {
-                            if (val.AddonId.ToString(CultureInfo.InvariantCulture) == pack.AddonId)
+                            var authors = string.Join(", ", pack.Authors.Select(a => a.Name));
+                            _resolvedFiles[key] = new ResolvedFile
                             {
-                                var authors = string.Join(", ", pack.Authors.Select(a => a.Name));
-                                _resolvedFiles[key] = new ResolvedFile
-                                {
-                                    AddonId = val.AddonId,
-                                    Version = val.Version,
-                                    Enabled = val.Enabled,
-                                    IsMod = val.IsMod,
-                                    Name = pack.Name,
-                                    Slug = pack.Slug,
-                                    Authors = authors,
-                                };
-                            }
+                                AddonId = val.AddonId,
+                                Version = val.Version,
+                                Enabled = val.Enabled,
+                                IsMod = val.IsMod,
+                                Name = pack.Name,
+                                Slug = pack.Slug,
+                                Authors = authors,
+                            };
                         }
                     }
-                    catch (JsonParseException) { }
                 }
+                catch (JsonParseException) { }
             }
-            catch (JsonParseException) { }
         }
         await BuildZipAsync(cancellationToken);
     }

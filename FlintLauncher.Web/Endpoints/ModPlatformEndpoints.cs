@@ -269,12 +269,9 @@ public static class ModPlatformEndpoints
                 {
                     if (parsedProvider == ResourceProvider.Flame)
                     {
-                        if (bodyRoot is JsonObject flameRoot &&
-                            flameRoot["data"] is JsonArray data)
-                        {
-                            // loads + validates every file, sorted newest first
-                            FlameMod.LoadIndexedPackVersions(pack, data);
-                        }
+                        // loads + validates every file, sorted newest first (a broken body
+                        // surfaces as the invalid-response error below)
+                        FlameMod.LoadIndexedPackVersionsFromResponse(pack, request.BodyAsString);
                     }
                     else if (ModrinthJson.VersionListFromNode(bodyRoot) is { } versionDtos)
                     {

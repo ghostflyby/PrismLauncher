@@ -239,14 +239,12 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         var bodyRoot = ParseBodyNode(request.BodyAsString, $"the version list of {pack.AddonId}");
         if (provider == ResourceProvider.Flame)
         {
-            if (bodyRoot is not JsonObject flameRoot || flameRoot["data"] is not JsonArray data)
-            {
-                throw new ModResolveException($"the CurseForge version list of {pack.AddonId} has no data array");
-            }
-
             try
             {
-                FlameMod.LoadIndexedPackVersions(pack, data);
+                if (!FlameMod.LoadIndexedPackVersionsFromResponse(pack, request.BodyAsString))
+                {
+                    throw new ModResolveException($"the CurseForge version list of {pack.AddonId} has no data array");
+                }
             }
             catch (JsonParseException e)
             {

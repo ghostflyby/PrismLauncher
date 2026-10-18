@@ -291,10 +291,10 @@ public class FlameApiTests : IDisposable
     {
         var older = FlamePayloads.FileJson(_server.Url, fileId: 1, fileDate: "2023-01-01T00:00:00Z");
         var newer = FlamePayloads.FileJson(_server.Url, fileId: 2, fileDate: "2024-01-01T00:00:00Z");
-        var arr = JsonNode.Parse($"[{older},{newer}]");
 
         var pack = new IndexedPack { AddonId = "123" };
-        FlameMod.LoadIndexedPackVersions(pack, Assert.IsType<JsonArray>(arr));
+        Assert.True(FlameMod.LoadIndexedPackVersionsFromResponse(pack,
+            $$"""{"data": [{{older}},{{newer}}]}"""));
 
         Assert.True(pack.VersionsLoaded);
         Assert.Equal(["2", "1"], pack.Versions.Select(v => v.FileId));
