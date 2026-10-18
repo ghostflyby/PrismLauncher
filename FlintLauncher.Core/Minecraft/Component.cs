@@ -104,10 +104,10 @@ public class Component : ProblemProvider
     public string CachedVersion { get; set; } = "";
 
     /// cached set of requirements, taken from the version file (meta or local override)
-    public RequireSet CachedRequires { get; set; } = new();
+    public HashSet<Require> CachedRequires { get; set; } = new();
 
     /// cached set of conflicts, taken from the version file (meta or local override)
-    public RequireSet CachedConflicts { get; set; } = new();
+    public HashSet<Require> CachedConflicts { get; set; } = new();
 
     /// if true, the component is volatile and may be automatically removed when no longer needed
     public bool CachedVolatile { get; set; }
@@ -469,9 +469,9 @@ public class Component : ProblemProvider
     }
 
     /// <summary>deep inspecting compare for requirement sets — compares all fields of the Require structs.</summary>
-    private static bool DeepCompare(RequireSet a, RequireSet b)
+    /// <summary>deep inspecting compare for requirement sets — compares all fields of the Require structs.</summary>
+    private static bool DeepCompare(HashSet<Require> a, HashSet<Require> b)
     {
-        // NOTE: this needs to be rewritten if the type of Meta::RequireSet changes
         if (a.Count != b.Count)
         {
             return false;
@@ -515,13 +515,13 @@ public class Component : ProblemProvider
             if (!DeepCompare(CachedRequires, file.Requires))
             {
                 // the C++ std::set assignment copies; clone so the component does not alias the file
-                CachedRequires = file.Requires.Clone();
+                CachedRequires = [.. file.Requires];
                 changed = true;
             }
 
             if (!DeepCompare(CachedConflicts, file.Conflicts))
             {
-                CachedConflicts = file.Conflicts.Clone();
+                CachedConflicts = [.. file.Conflicts];
                 changed = true;
             }
 

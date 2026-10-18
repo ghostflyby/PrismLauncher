@@ -404,12 +404,12 @@ public static partial class OneSixVersionFormat
             root["mods"] = array;
         }
 
-        if (!patch.Requires.IsEmpty)
+        if (patch.Requires.Count == 0)
         {
             MetaJsonFormat.SerializeRequires(root, patch.Requires);
         }
 
-        if (!patch.Conflicts.IsEmpty)
+        if (patch.Conflicts.Count == 0)
         {
             MetaJsonFormat.SerializeRequires(root, patch.Conflicts, "conflicts");
         }

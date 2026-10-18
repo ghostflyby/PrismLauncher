@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/meta/JsonFormat.{h,cpp}: the shared metadata format version handling and
-// the Require/RequireSet types, plus the index/version/version-list parsers. Reads go through
+// the Require type plus the index/version/version-list parsers. Reads go through
 // the JsonNode model (single-DOM); the Parse(JsonObject) entity entry points keep JsonObject.
 
 using System.Collections;
@@ -20,8 +20,9 @@ public enum MetadataVersion
 /// <summary>Port of Meta::ParseException.</summary>
 public sealed class MetaParseException(string message) : Exception(message) { }
 
-/// <summary>Port of Meta::Require. Set identity is by uid only, like the C++ operator==/operator&lt;.</summary>
-public sealed class Require
+/// <summary>Port of Meta::Require. Set identity is by uid only, like the C++ operator==/operator&lt;.
+/// DeepEquals compares all fields (used by Component's deep-inspect change detection).</summary>
+public sealed class Require: IEquatable<Require>
 {
     public required string Uid { get; init; }
 
@@ -29,54 +30,20 @@ public sealed class Require
 
     public string Suggests { get; init; } = "";
 
+    /// <summary>Uid-only equality — the set identity semantics (C++ operator==).</summary>
+    public bool Equals(Require? other) => other is not null && Uid == other.Uid;
+
+    public override bool Equals(object? obj) => Equals(obj as Require);
+
+    public override int GetHashCode() => Uid.GetHashCode();
+
+    /// <summary>Full-field comparison — detects content changes within the same uid.</summary>
     public bool DeepEquals(Require rhs)
     {
         return Uid == rhs.Uid && EqualsVersion == rhs.EqualsVersion && Suggests == rhs.Suggests;
     }
 
     public override string ToString() => Uid;
-}
-
-/// <summary>
-/// Port of the std::set&lt;Meta::Require&gt;: ordered by uid, elements identified by uid only
-/// (inserting an existing uid is a no-op, mirroring std::set::insert).
-/// </summary>
-public sealed class RequireSet : IEnumerable<Require>
-{
-    private readonly SortedSet<Require> _set = new(Comparer<Require>.Create((a, b) => string.CompareOrdinal(a.Uid, b.Uid)));
-
-    public int Count => _set.Count;
-
-    public bool IsEmpty => _set.Count == 0;
-
-    public bool Add(Require require) => _set.Add(require);
-
-    public bool Contains(Require require) => _set.Contains(require);
-
-    public bool Remove(Require require) => _set.Remove(require);
-
-    public void Clear() => _set.Clear();
-
-    /// <summary>Port of std::set operator== (element equality is uid-only).</summary>
-    public bool SetEquals(RequireSet other)
-    {
-        return _set.SetEquals(other._set);
-    }
-
-    public RequireSet Clone()
-    {
-        var result = new RequireSet();
-        foreach (var require in _set)
-        {
-            result.Add(require);
-        }
-
-        return result;
-    }
-
-    public IEnumerator<Require> GetEnumerator() => _set.GetEnumerator();
-
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
 public static class MetaJsonFormat
@@ -139,8 +106,8 @@ public static class MetaJsonFormat
         version.Type = Str(obj, "type");
         version.IsRecommended = Bool(obj, "recommended");
         version.SetVolatile(Bool(obj, "volatile"));
-        var reqs = new RequireSet();
-        var conflicts = new RequireSet();
+        var reqs = new HashSet<Require>();
+        var conflicts = new HashSet<Require>();
         ParseRequires(obj, reqs);
         ParseRequires(obj, conflicts, "conflicts");
         version.SetRequires(reqs, conflicts);
@@ -269,7 +236,7 @@ public static class MetaJsonFormat
     {"uid":"foo", "equals":"version"}
     ]
     */
-    public static void ParseRequires(JsonNode obj, RequireSet ptr, string keyName = "requires")
+    public static void ParseRequires(JsonNode obj, HashSet<Require> ptr, string keyName = "requires")
     {
         if (Has(obj, keyName))
         {
@@ -285,9 +252,9 @@ public static class MetaJsonFormat
         }
     }
 
-    public static void SerializeRequires(JsonObject obj, RequireSet? ptr, string keyName = "requires")
+    public static void SerializeRequires(JsonObject obj, HashSet<Require>? ptr, string keyName = "requires")
     {
-        if (ptr is null || ptr.IsEmpty)
+        if (ptr is null || ptr.Count == 0)
         {
             return;
         }
