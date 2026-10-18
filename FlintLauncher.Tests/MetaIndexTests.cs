@@ -21,7 +21,7 @@ public class MetaIndexTests
         Assert.True(windex.HasUid("list1"));
         Assert.False(windex.HasUid("asdf"));
         Assert.NotNull(windex.Get("list2"));
-        Assert.Equal("list2", windex.Get("list2").Uid());
+        Assert.Equal("list2", windex.Get("list2").Uid);
         Assert.NotNull(windex.Get("adsf"));
     }
 

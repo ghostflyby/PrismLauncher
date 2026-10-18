@@ -83,15 +83,9 @@ public abstract class Sink
 }
 
 /// <summary>Port of net/ByteArraySink.h: downloads into an in-memory buffer.</summary>
-public sealed class ByteArraySink : Sink
+public sealed class ByteArraySink(string? name = null) : Sink
 {
-    private readonly string? _name;
     private readonly MemoryStream _stream = new();
-
-    public ByteArraySink(string? name = null)
-    {
-        _name = name;
-    }
 
     public byte[] Data => _stream.ToArray();
 
@@ -107,7 +101,7 @@ public sealed class ByteArraySink : Sink
     {
         if (!WriteAllValidators(data))
         {
-            FailReason = "Failed writing into " + (_name ?? "byte array") + ": validators failed";
+            FailReason = "Failed writing into " + (name ?? "byte array") + ": validators failed";
             return false;
         }
 

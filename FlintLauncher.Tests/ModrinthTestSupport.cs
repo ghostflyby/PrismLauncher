@@ -156,7 +156,7 @@ internal sealed class StubModrinthServer : IDisposable
         {
             // GET /version/{id} (a dependency pinned to a specific version)
             var id = path[(path.IndexOf("/version/", StringComparison.Ordinal) + "/version/".Length)..].Split('?')[0];
-            body = Encoding.UTF8.GetBytes(_versionsById.TryGetValue(id, out var version) ? version : "{}");
+            body = Encoding.UTF8.GetBytes(_versionsById.GetValueOrDefault(id, "{}"));
         }
         else if (path.Contains("/project/", StringComparison.Ordinal) && path.Contains("/version", StringComparison.Ordinal))
         {
@@ -164,12 +164,12 @@ internal sealed class StubModrinthServer : IDisposable
             var marker = "/project/";
             var id = path[(path.IndexOf(marker, StringComparison.Ordinal) + marker.Length)..]
                 .Split('/')[0].Split('?')[0];
-            body = Encoding.UTF8.GetBytes(_projectVersions.TryGetValue(id, out var versions) ? versions : "[]");
+            body = Encoding.UTF8.GetBytes(_projectVersions.GetValueOrDefault(id, "[]"));
         }
         else if (path.Contains("/project/", StringComparison.Ordinal))
         {
             var id = path[(path.IndexOf("/project/", StringComparison.Ordinal) + "/project/".Length)..].Split('?')[0];
-            body = Encoding.UTF8.GetBytes(_projects.TryGetValue(id, out var project) ? project : "{}");
+            body = Encoding.UTF8.GetBytes(_projects.GetValueOrDefault(id, "{}"));
         }
         else if (path.Contains("/search", StringComparison.Ordinal))
         {

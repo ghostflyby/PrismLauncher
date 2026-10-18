@@ -20,7 +20,7 @@ public sealed class IniFile
 
     public IniValue? Get(string key)
     {
-        return _map.TryGetValue(key, out var value) ? value : null;
+        return _map.GetValueOrDefault(key);
     }
 
     public IniValue Get(string key, IniValue def) => Get(key) ?? def;
@@ -258,17 +258,18 @@ public sealed class IniFile
             return value;
         }
 
-        if (key == "linkedInstances")
+        switch (key)
         {
-            // Json::fromStringList over the string list (a single string converts to a 1-item list)
-            var items = value.ValueKind switch
+            case "linkedInstances":
             {
-                IniValue.Kind.StringList => value.List,
-                IniValue.Kind.String => [value.String],
-                _ => null,
-            };
-            if (items is not null)
-            {
+                // Json::fromStringList over the string list (a single string converts to a 1-item list)
+                var items = value.ValueKind switch
+                {
+                    IniValue.Kind.StringList => value.List,
+                    IniValue.Kind.String => [value.String],
+                    _ => null,
+                };
+                if (items is null) return value;
                 var array = new JsonArray();
                 foreach (var item in items)
                 {
@@ -280,18 +281,14 @@ public sealed class IniFile
                     WriteIndented = false,
                     Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                 }));
+
             }
-
-            return value;
+            case "Env":
+                // Json::fromMap over QVariantMap; INI-stored maps only come through @Variant blobs,
+                // which we keep verbatim, so the only reachable shape is the empty map.
+                return value.ValueKind == IniValue.Kind.Raw ? value : IniValue.From("{}");
+            default:
+                return value;
         }
-
-        if (key == "Env")
-        {
-            // Json::fromMap over QVariantMap; INI-stored maps only come through @Variant blobs,
-            // which we keep verbatim, so the only reachable shape is the empty map.
-            return value.ValueKind == IniValue.Kind.Raw ? value : IniValue.From("{}");
-        }
-
-        return value;
     }
 }

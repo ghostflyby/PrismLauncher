@@ -3,25 +3,16 @@
 
 namespace FlintLauncher.Core.Settings;
 
-public class Setting
+public class Setting(IReadOnlyList<string> synonyms, object? defVal = null)
 {
-    private readonly IReadOnlyList<string> _synonyms;
-
-    public Setting(IReadOnlyList<string> synonyms, object? defVal = null)
-    {
-        _synonyms = synonyms;
-        Default = defVal;
-        Storage = null;
-    }
-
     /// <summary>All config-file keys this setting answers to, in order of preference.</summary>
-    public IReadOnlyList<string> ConfigKeys => _synonyms;
+    public IReadOnlyList<string> ConfigKeys => synonyms;
 
-    public string Id => _synonyms[0];
+    public string Id => synonyms[0];
 
-    public virtual object? Default { get; }
+    public virtual object? Default { get; } = defVal;
 
-    internal SettingsObject? Storage { get; set; }
+    internal SettingsObject? Storage { get; set; } = null;
 
     internal event Action<Setting, object?>? SettingChangedInternal;
 

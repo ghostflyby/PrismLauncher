@@ -27,7 +27,13 @@ using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.Instances;
 
-public sealed partial class InstanceImportTask : InstanceTask
+public sealed partial class InstanceImportTask(
+    Uri sourceUrl,
+    bool trustedSource,
+    IReadOnlyDictionary<string, string>? extraInfo = null,
+    ModrinthApi? modrinth = null,
+    FlameApi? flame = null)
+    : InstanceTask
 {
     private enum ModpackType : byte
     {
@@ -38,11 +44,9 @@ public sealed partial class InstanceImportTask : InstanceTask
         Modrinth,
     }
 
-    private readonly Uri _sourceUrl;
-    private readonly ModrinthApi _modrinth;
-    private readonly FlameApi _flame;
-    private readonly bool _trustedSource;
-    private readonly IReadOnlyDictionary<string, string> _extraInfo;
+    private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
+    private readonly FlameApi _flame = flame ?? new FlameApi();
+    private readonly IReadOnlyDictionary<string, string> _extraInfo = extraInfo ?? new Dictionary<string, string>();
     private string archivePath = "";
     private ModpackType modpackType = ModpackType.Unknown;
 
@@ -57,27 +61,16 @@ public sealed partial class InstanceImportTask : InstanceTask
     public IReadOnlyDictionary<string, bool> OptionalModsSelection { get; set; } =
         new Dictionary<string, bool>();
 
-    public InstanceImportTask(Uri sourceUrl, bool trustedSource,
-        IReadOnlyDictionary<string, string>? extraInfo = null,
-        ModrinthApi? modrinth = null, FlameApi? flame = null)
-    {
-        _modrinth = modrinth ?? new ModrinthApi();
-        _flame = flame ?? new FlameApi();
-        _sourceUrl = sourceUrl;
-        _trustedSource = trustedSource;
-        _extraInfo = extraInfo ?? new Dictionary<string, string>();
-    }
-
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        if (_sourceUrl.IsFile)
+        if (sourceUrl.IsFile)
         {
-            archivePath = _sourceUrl.LocalPath;
+            archivePath = sourceUrl.LocalPath;
             await ProcessZipPack(cancellationToken);
         }
         else
         {
-            EmitStatus("Downloading modpack:\n" + _sourceUrl);
+            EmitStatus("Downloading modpack:\n" + sourceUrl);
             await DownloadFromUrl(cancellationToken);
         }
     }
@@ -86,14 +79,14 @@ public sealed partial class InstanceImportTask : InstanceTask
     {
         if (MetaCache is not null)
         {
-            var path = _sourceUrl.Host + '/' + _sourceUrl.AbsolutePath.TrimStart('/');
+            var path = sourceUrl.Host + '/' + sourceUrl.AbsolutePath.TrimStart('/');
 
             var entry = MetaCache.ResolveEntry("general", path);
             entry.SetStale(true);
             archivePath = entry.GetFullPath();
 
             var filesNetJob = new NetJob("Modpack download");
-            filesNetJob.AddNetRequest(NetRequest.MakeCached(MetaCache, _sourceUrl, entry));
+            filesNetJob.AddNetRequest(NetRequest.MakeCached(MetaCache, sourceUrl, entry));
             await filesNetJob.StartAsync(cancellationToken);
             if (!filesNetJob.WasSuccessful)
             {
@@ -104,9 +97,9 @@ public sealed partial class InstanceImportTask : InstanceTask
         else
         {
             // headless fallback: plain download into the staging folder
-            archivePath = FileSystem.PathCombine(StagingPath, Path.GetFileName(_sourceUrl.AbsolutePath));
+            archivePath = FileSystem.PathCombine(StagingPath, Path.GetFileName(sourceUrl.AbsolutePath));
             FileSystem.EnsureFilePathExists(archivePath);
-            var request = NetRequest.MakeFile(_sourceUrl, archivePath);
+            var request = NetRequest.MakeFile(sourceUrl, archivePath);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
             {
@@ -220,11 +213,11 @@ public sealed partial class InstanceImportTask : InstanceTask
         string packVersionId = "";
         if (_extraInfo.Count != 0)
         {
-            packId = _extraInfo.TryGetValue("pack_id", out var id) ? id : "";
-            packVersionId = _extraInfo.TryGetValue("pack_version_id", out var versionId) ? versionId : "";
+            packId = _extraInfo.GetValueOrDefault("pack_id", "");
+            packVersionId = _extraInfo.GetValueOrDefault("pack_version_id", "");
         }
 
-        var instCreationTask = new FlameCreationTask(StagingPath, _trustedSource,
+        var instCreationTask = new FlameCreationTask(StagingPath, trustedSource,
             Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution."),
             packId, packVersionId, _modrinth, flame: _flame)
@@ -306,20 +299,20 @@ public sealed partial class InstanceImportTask : InstanceTask
         string packVersionId = "";
         if (_extraInfo.Count != 0)
         {
-            packId = _extraInfo.TryGetValue("pack_id", out var id) ? id : "";
-            packVersionId = _extraInfo.TryGetValue("pack_version_id", out var versionId) ? versionId : "";
+            packId = _extraInfo.GetValueOrDefault("pack_id", "");
+            packVersionId = _extraInfo.GetValueOrDefault("pack_version_id", "");
         }
         else
         {
             // FIXME: Find a way to get the ID in directly imported ZIPs
-            var match = SourceUrlPackIdRegex().Match(_sourceUrl.ToString());
+            var match = SourceUrlPackIdRegex().Match(sourceUrl.ToString());
             if (match.Success)
             {
                 packId = match.Groups[1].Value;
             }
         }
 
-        var instCreationTask = new ModrinthCreationTask(StagingPath, _trustedSource,
+        var instCreationTask = new ModrinthCreationTask(StagingPath, trustedSource,
             Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution."),
             packId, packVersionId, modrinth: _modrinth)

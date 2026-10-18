@@ -9,10 +9,8 @@
 
 namespace FlintLauncher.Core.Auth;
 
-public sealed class GetSkinStep : AuthStep
+public sealed class GetSkinStep(AccountData data) : AuthStep(data)
 {
-    public GetSkinStep(AccountData data) : base(data) { }
-
     public override string Describe() => "Getting skin.";
 
     public override async Task PerformAsync(CancellationToken cancellationToken)

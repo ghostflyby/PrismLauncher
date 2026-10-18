@@ -342,8 +342,10 @@ public static class ModUtils
             return new ModDetails();
         }
 
-        var details = new ModDetails();
-        details.ModId = StringOr(firstObj["modid"]);
+        var details = new ModDetails
+        {
+            ModId = StringOr(firstObj["modid"])
+        };
         var name = StringOr(firstObj["name"]);
         // NOTE: ignore stupid example mods copies where the author didn't even bother to change the name
         if (name != "Example Mod")
@@ -585,10 +587,11 @@ public static class ModUtils
         var object0 = ParseJson(contents) as JsonObject ?? [];
         var schemaVersion = object0.Contains("schemaVersion") ? QJsonValueToInt(object0["schemaVersion"], 0) : 0;
 
-        var details = new ModDetails();
-
-        details.ModId = StringOr(object0["id"]);
-        details.Version = StringOr(object0["version"]);
+        var details = new ModDetails
+        {
+            ModId = StringOr(object0["id"]),
+            Version = StringOr(object0["version"])
+        };
 
         details.Name = object0.Contains("name") ? StringOr(object0["name"]) : details.ModId;
         details.Description = StringOr(object0["description"]);
@@ -850,19 +853,21 @@ public static class ModUtils
 
     public static ModDetails ReadForgeInfo(string contents)
     {
-        var details = new ModDetails();
-        // Read the data
-        details.Name = "Minecraft Forge";
-        details.ModId = "Forge";
-        details.Homeurl = "http://www.minecraftforge.net/forum/";
+        var details = new ModDetails
+        {
+            // Read the data
+            Name = "Minecraft Forge",
+            ModId = "Forge",
+            Homeurl = "http://www.minecraftforge.net/forum/"
+        };
 
         // INIFile (QSettings IniFormat) approximation: flat "key=value" properties lines
         var ini = ParseIni(contents);
 
-        var major = ini.TryGetValue("forge.major.number", out var v) ? v : "0";
-        var minor = ini.TryGetValue("forge.minor.number", out var v2) ? v2 : "0";
-        var revision = ini.TryGetValue("forge.revision.number", out var v3) ? v3 : "0";
-        var build = ini.TryGetValue("forge.build.number", out var v4) ? v4 : "0";
+        var major = ini.GetValueOrDefault("forge.major.number", "0");
+        var minor = ini.GetValueOrDefault("forge.minor.number", "0");
+        var revision = ini.GetValueOrDefault("forge.revision.number", "0");
+        var build = ini.GetValueOrDefault("forge.build.number", "0");
 
         details.Version = major + "." + minor + "." + revision + "." + build;
         return details;

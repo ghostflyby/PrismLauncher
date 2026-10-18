@@ -16,22 +16,16 @@ using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class LegacyFmlLibrariesTask : FlintTask
+public sealed class LegacyFmlLibrariesTask(MinecraftInstance inst) : FlintTask
 {
-    private readonly MinecraftInstance _inst;
     private readonly List<FmlLib> _fmlLibsToProcess = [];
     private NetJob? downloadJob;
-
-    public LegacyFmlLibrariesTask(MinecraftInstance inst)
-    {
-        _inst = inst;
-    }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         // Get the mod list
-        var inst = _inst;
-        var components = inst.GetPackProfile();
+        var inst1 = inst;
+        var components = inst1.GetPackProfile();
         var profile = components.GetProfile();
         if (profile is null)
         {
@@ -64,7 +58,7 @@ public sealed class LegacyFmlLibrariesTask : FlintTask
         // now check the lib folder inside the instance for files.
         foreach (var lib in libList)
         {
-            var libInfo = new FileInfo(FileSystem.PathCombine(inst.LibDir(), lib.Filename));
+            var libInfo = new FileInfo(FileSystem.PathCombine(inst1.LibDir(), lib.Filename));
             if (libInfo.Exists)
             {
                 continue;
@@ -84,8 +78,8 @@ public sealed class LegacyFmlLibrariesTask : FlintTask
         EmitStatus("Downloading FML libraries...");
         // E6: the stamped runtime cache is the only source — the bare-fixture throwaway is
         // gone; an unstamped instance fails the step naming the missing wire
-        var metacache = _inst.MetaCache ?? throw new InvalidOperationException(
-            $"no meta cache stamped on instance '{_inst.Name()}' — the composition root must inject it");
+        var metacache = inst.MetaCache ?? throw new InvalidOperationException(
+            $"no meta cache stamped on instance '{inst.Name()}' — the composition root must inject it");
         var dlJob = new NetJob("FML libraries");
         downloadJob = dlJob;
         foreach (var lib in _fmlLibsToProcess)
@@ -108,7 +102,7 @@ public sealed class LegacyFmlLibrariesTask : FlintTask
 
     /// <summary>Port of baseUrl(): the LegacyFMLLibsURLOverride setting (the instance-stamped
     /// LaunchServices override) or the build default.</summary>
-    private string BaseUrl() => _inst.LaunchServices?.LegacyFmllibsUrlOverride is { Length: > 0 } urlOverride
+    private string BaseUrl() => inst.LaunchServices?.LegacyFmllibsUrlOverride is { Length: > 0 } urlOverride
         ? urlOverride
         : FlintConfig.Default.LegacyFmllibsBaseUrl;
 
@@ -120,15 +114,15 @@ public sealed class LegacyFmlLibrariesTask : FlintTask
         if (_fmlLibsToProcess.Count != 0)
         {
             EmitStatus("Copying FML libraries into the instance...");
-            var inst = _inst;
-            var metacache = _inst.MetaCache ?? throw new InvalidOperationException(
-                $"no meta cache stamped on instance '{_inst.Name()}' — the composition root must inject it");
+            var inst1 = inst;
+            var metacache = inst.MetaCache ?? throw new InvalidOperationException(
+                $"no meta cache stamped on instance '{inst.Name()}' — the composition root must inject it");
             var index = 0;
             foreach (var lib in _fmlLibsToProcess)
             {
                 SetProgress(index, _fmlLibsToProcess.Count);
                 var entry = metacache.ResolveEntry("fmllibs", lib.Filename);
-                var path = FileSystem.PathCombine(inst.LibDir(), lib.Filename);
+                var path = FileSystem.PathCombine(inst1.LibDir(), lib.Filename);
                 if (!FileSystem.EnsureFilePathExists(path))
                 {
                     EmitFailed("Failed creating FML library folder inside the instance.");
@@ -137,7 +131,7 @@ public sealed class LegacyFmlLibrariesTask : FlintTask
 
                 try
                 {
-                    File.Copy(entry.GetFullPath(), FileSystem.PathCombine(inst.LibDir(), lib.Filename), overwrite: true);
+                    File.Copy(entry.GetFullPath(), FileSystem.PathCombine(inst1.LibDir(), lib.Filename), overwrite: true);
                 }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException)
                 {

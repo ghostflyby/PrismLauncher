@@ -12,7 +12,7 @@ using FlintLauncher.Core.Versioning;
 namespace FlintLauncher.Core.Minecraft.Resources;
 
 /// <summary>Port of the DataPack class: a Resource carrying the pack.mcmeta basic info.</summary>
-public class DataPack : Resource
+public class DataPack(FileInfo fileInfo) : Resource(fileInfo)
 {
     /* The 'version' of a data pack, as defined in the pack.mcmeta file.
      * See https://minecraft.wiki/w/Data_pack#pack.mcmeta
@@ -28,8 +28,6 @@ public class DataPack : Resource
     private PngImage image;
 
     public DataPack(string filePath) : this(new FileInfo(filePath)) { }
-
-    public DataPack(FileInfo fileInfo) : base(fileInfo) { }
 
     /// <summary>Gets the numerical ID of the pack format.</summary>
     public int PackFormat => packFormat;

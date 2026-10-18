@@ -17,23 +17,14 @@ using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class MinecraftLoadAndCheck : FlintTask
+public sealed class MinecraftLoadAndCheck(MinecraftInstance inst, NetMode netmode) : FlintTask
 {
-    private readonly MinecraftInstance _inst;
-    private readonly NetMode _netmode;
-
-    public MinecraftLoadAndCheck(MinecraftInstance inst, NetMode netmode)
-    {
-        _inst = inst;
-        _netmode = netmode;
-    }
-
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         // add offline metadata load task
         // (the UseLatestMinecraftVersion/updateLatestMinecraft branch is not ported — see header)
-        var components = _inst.GetPackProfile();
-        var result = await components.ReloadAsync(_netmode, cancellationToken).ConfigureAwait(false);
+        var components = inst.GetPackProfile();
+        var result = await components.ReloadAsync(netmode, cancellationToken).ConfigureAwait(false);
         if (!result)
         {
             EmitFailed(result.ErrorMessage);

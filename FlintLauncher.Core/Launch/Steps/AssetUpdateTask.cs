@@ -14,20 +14,14 @@ using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class AssetUpdateTask : FlintTask
+public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
 {
-    private readonly MinecraftInstance _inst;
     private NetJob? downloadJob;
-
-    public AssetUpdateTask(MinecraftInstance inst)
-    {
-        _inst = inst;
-    }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Updating assets index...");
-        var components = _inst.GetPackProfile();
+        var components = inst.GetPackProfile();
         var profile = components.GetProfile();
         if (profile is null)
         {
@@ -41,11 +35,11 @@ public sealed class AssetUpdateTask : FlintTask
 
         // E6: the stamped runtime cache is the only source — the bare-fixture throwaway is
         // gone; an unstamped instance fails the step naming the missing wire
-        var metacache = _inst.MetaCache ?? throw new InvalidOperationException(
-            $"no meta cache stamped on instance '{_inst.Name()}' — the composition root must inject it");
+        var metacache = inst.MetaCache ?? throw new InvalidOperationException(
+            $"no meta cache stamped on instance '{inst.Name()}' — the composition root must inject it");
         var entry = metacache.ResolveEntry("asset_indexes", localPath);
         entry.SetStale(true);
-        var job = new NetJob($"Asset index for {_inst.Name()}");
+        var job = new NetJob($"Asset index for {inst.Name()}");
 
         // Net::ApiRequest::makeCached(indexUrl, entry) — no extra options upstream
         var dl = NetRequest.MakeCached(metacache, new Uri(indexUrl), entry);
@@ -69,7 +63,7 @@ public sealed class AssetUpdateTask : FlintTask
 
     private async Task AssetIndexFinished(CancellationToken cancellationToken)
     {
-        var components = _inst.GetPackProfile();
+        var components = inst.GetPackProfile();
         var profile = components.GetProfile();
         if (profile is null)
         {
@@ -80,21 +74,21 @@ public sealed class AssetUpdateTask : FlintTask
         var assets = profile.GetMinecraftAssets();
 
         var assetFname = FileSystem.PathCombine(
-            _inst.Paths?.AssetIndexesDir ?? FileSystem.PathCombine("assets", "indexes"),
+            inst.Paths?.AssetIndexesDir ?? FileSystem.PathCombine("assets", "indexes"),
             assets.Id + ".json");
         var index = new AssetsIndex();
         // FIXME: this looks like a job for a generic validator based on json schema?
         if (!AssetsUtils.LoadAssetsIndexJson(assets.Id, assetFname, index))
         {
-            var metacache = _inst.MetaCache ?? throw new InvalidOperationException(
-                $"no meta cache stamped on instance '{_inst.Name()}' — the composition root must inject it");
+            var metacache = inst.MetaCache ?? throw new InvalidOperationException(
+                $"no meta cache stamped on instance '{inst.Name()}' — the composition root must inject it");
             var entry = metacache.ResolveEntry("asset_indexes", assets.Id + ".json");
             metacache.EvictEntry(entry);
             EmitFailed("Failed to read the assets index!");
             return;
         }
 
-        var job = index.GetDownloadJob(ResourceUrl(), _inst.Paths?.AssetsRoot
+        var job = index.GetDownloadJob(ResourceUrl(), inst.Paths?.AssetsRoot
                                                       ?? FileSystem.PathCombine("assets", ""));
         if (job is not null)
         {
@@ -121,7 +115,7 @@ public sealed class AssetUpdateTask : FlintTask
     /// <summary>Port of resourceUrl().</summary>
     private string ResourceUrl()
     {
-        var urlOverride = _inst.LaunchServices?.ResourceUrlOverride;
+        var urlOverride = inst.LaunchServices?.ResourceUrlOverride;
         if (!string.IsNullOrEmpty(urlOverride))
         {
             return urlOverride;

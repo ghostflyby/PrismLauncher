@@ -14,27 +14,20 @@ namespace FlintLauncher.Tests;
 
 public class StepEngineTests
 {
-    private sealed class RecordingStep : LaunchStep
+    private sealed class RecordingStep(
+        LaunchTask parent,
+        string name,
+        List<string>? order = null,
+        bool fail = false,
+        Action? onFinalize = null)
+        : LaunchStep(parent)
     {
-        private readonly List<string>? _order;
-        private readonly bool _fail;
-        private readonly Action? _onFinalize;
-
-        public RecordingStep(LaunchTask parent, string name, List<string>? order = null, bool fail = false,
-            Action? onFinalize = null) : base(parent)
-        {
-            Name = name;
-            _order = order;
-            _fail = fail;
-            _onFinalize = onFinalize;
-        }
-
-        public string Name { get; }
+        public string Name { get; } = name;
 
         protected override Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            _order?.Add(Name);
-            if (_fail)
+            order?.Add(Name);
+            if (fail)
             {
                 EmitFailed("step failed: " + Name);
             }
@@ -46,7 +39,7 @@ public class StepEngineTests
             return Task.CompletedTask;
         }
 
-        public override void FinalizeStep() => _onFinalize?.Invoke();
+        public override void FinalizeStep() => onFinalize?.Invoke();
     }
 
     /// <summary>A step that only finishes when released (or aborted).</summary>
@@ -215,12 +208,10 @@ public class StepEngineTests
         }
     }
 
-    private sealed class GatedStep : LaunchStep
+    private sealed class GatedStep(LaunchTask parent) : LaunchStep(parent)
     {
         public TaskCompletionSource ProceedTask { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool Proceeded;
-
-        public GatedStep(LaunchTask parent) : base(parent) { }
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
@@ -315,7 +306,7 @@ public class StepEngineTests
         Assert.Contains(lines, e => e.Line.Contains("Running Pre-Load command: /bin/echo hello-from-echo"));
         // The game-output pipeline stores plain lines as Unknown after the level-guessing
         // heuristics find no pattern (LogParser::guessLevel) — same as the C++.
-        Assert.Contains(lines, e => e.Level == MessageLevel.Unknown && e.Line == "hello-from-echo");
+        Assert.Contains(lines, e => e is { Level: MessageLevel.Unknown, Line: "hello-from-echo" });
         Assert.Contains(lines, e => e.Line.Contains("Pre-Load command ran successfully"));
     }
 
@@ -337,7 +328,7 @@ public class StepEngineTests
         Assert.Equal(TaskState.Failed, task.State);
         Assert.Contains("Pre-Load command failed with code 3", task.FailReason);
         var lines = task.GetLogModel().Entries;
-        Assert.Contains(lines, e => e.Level == MessageLevel.Unknown && e.Line == "boom");
+        Assert.Contains(lines, e => e is { Level: MessageLevel.Unknown, Line: "boom" });
     }
 
     [Fact]
@@ -365,6 +356,6 @@ public class StepEngineTests
         await task.StartAsync();
 
         var lines = task.GetLogModel().Entries;
-        Assert.Contains(lines, e => e.Level == MessageLevel.Launcher && e.Line == "hello\nworld\n");
+        Assert.Contains(lines, e => e is { Level: MessageLevel.Launcher, Line: "hello\nworld\n" });
     }
 }

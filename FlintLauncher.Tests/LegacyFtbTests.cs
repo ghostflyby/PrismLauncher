@@ -263,9 +263,9 @@ public class LegacyFtbTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(staging, "unzip")));
 
         var components = Components(staging);
-        Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.7.10");
+        Assert.Contains(components, c => c is { Uid: "net.minecraft", Version: "1.7.10" });
         // "1.7.10-10.13.4.1614-1.7.10" minus the mc version and dashes -> the forge build
-        Assert.Contains(components, c => c.Uid == "net.minecraftforge" && c.Version == "10.13.4.1614");
+        Assert.Contains(components, c => c is { Uid: "net.minecraftforge", Version: "10.13.4.1614" });
     }
 
     [Fact]
@@ -296,7 +296,7 @@ public class LegacyFtbTests : IDisposable
             await File.ReadAllTextAsync(Path.Combine(staging, "minecraft", "mods", "oldmod.jar")));
 
         var components = Components(staging);
-        Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.7.10");
+        Assert.Contains(components, c => c is { Uid: "net.minecraft", Version: "1.7.10" });
         Assert.Contains(components, c => c.Uid is not null && c.Uid.StartsWith("custom.jarmod.", StringComparison.Ordinal));
     }
 

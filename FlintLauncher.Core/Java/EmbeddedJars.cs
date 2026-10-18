@@ -58,10 +58,8 @@ public static class EmbeddedJars
         }
 
         FileSystem.EnsureFilePathExists(cached);
-        using (var target = File.Create(cached))
-        {
-            stream.CopyTo(target);
-        }
+        using var target = File.Create(cached);
+        stream.CopyTo(target);
 
         return cached;
     }

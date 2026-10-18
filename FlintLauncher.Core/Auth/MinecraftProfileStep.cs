@@ -3,14 +3,9 @@
 
 namespace FlintLauncher.Core.Auth;
 
-public sealed class MinecraftProfileStep : AuthStep
+public sealed class MinecraftProfileStep(AccountData data, AuthEndpointsOptions? auth = null) : AuthStep(data)
 {
-    private readonly AuthEndpointsOptions _auth;
-
-    public MinecraftProfileStep(AccountData data, AuthEndpointsOptions? auth = null) : base(data)
-    {
-        _auth = auth ?? new AuthEndpointsOptions();
-    }
+    private readonly AuthEndpointsOptions _auth = auth ?? new AuthEndpointsOptions();
 
     public override string Describe() => "Fetching the Minecraft profile.";
 

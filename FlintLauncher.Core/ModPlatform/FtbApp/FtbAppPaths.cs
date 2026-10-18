@@ -15,15 +15,10 @@ using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.ModPlatform.FtbApp;
 
-public sealed class FtbAppPaths
+public sealed class FtbAppPaths(string? rootPath = null)
 {
-    public FtbAppPaths(string? rootPath = null)
-    {
-        RootPath = rootPath ?? DefaultRoot();
-    }
-
     /// <summary>The FTB App root (getFTBRoot()); injected.</summary>
-    public string RootPath { get; set; }
+    public string RootPath { get; set; } = rootPath ?? DefaultRoot();
 
     /// <summary>Port of getFTBRoot: ~/.ftba, under Library/Application Support on macOS.</summary>
     public static string DefaultRoot()

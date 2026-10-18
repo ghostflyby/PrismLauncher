@@ -100,11 +100,11 @@ public class ComponentTests : IDisposable
         Assert.Equal("1.0", component.GetVersion());
         Assert.Equal("Test A", component.GetName());
         Assert.True(component.CachedVolatile);
-        Assert.Contains(component.CachedRequires, r => r.Uid == "net.minecraft" && r.EqualsVersion == "1.12.2");
+        Assert.Contains(component.CachedRequires, r => r is { Uid: "net.minecraft", EqualsVersion: "1.12.2" });
 
         // the component must not alias the version file's set
         file.Requires.Clear();
-        Assert.Contains(component.CachedRequires, r => r.Uid == "net.minecraft" && r.EqualsVersion == "1.12.2");
+        Assert.Contains(component.CachedRequires, r => r is { Uid: "net.minecraft", EqualsVersion: "1.12.2" });
     }
 
     [Fact]
@@ -139,8 +139,10 @@ public class ComponentTests : IDisposable
 
         // meta-backed component: customization materializes the version file into patches/
         var file = MakeVersionFile("net.minecraft", "1.12.2", "Minecraft");
-        var metaVersion = new MetaVersion("net.minecraft", "1.12.2");
-        metaVersion.Data = file;
+        var metaVersion = new MetaVersion("net.minecraft", "1.12.2")
+        {
+            Data = file
+        };
         component.MetaVersion = metaVersion;
         component.Loaded = true;
 

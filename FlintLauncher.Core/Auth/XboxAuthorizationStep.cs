@@ -7,24 +7,17 @@ using System.Text.Json.Nodes;
 
 namespace FlintLauncher.Core.Auth;
 
-public sealed class XboxAuthorizationStep : AuthStep
+public sealed class XboxAuthorizationStep(
+    AccountData data,
+    Action<Token> assignToken,
+    string relyingParty,
+    string authorizationKind,
+    AuthEndpointsOptions? auth = null)
+    : AuthStep(data)
 {
-    private readonly Action<Token> _assignToken;
-    private readonly string _relyingParty;
-    private readonly string _authorizationKind;
-    private readonly AuthEndpointsOptions _auth;
+    private readonly AuthEndpointsOptions _auth = auth ?? new AuthEndpointsOptions();
 
-    public XboxAuthorizationStep(AccountData data, Action<Token> assignToken, string relyingParty,
-        string authorizationKind, AuthEndpointsOptions? auth = null)
-        : base(data)
-    {
-        _assignToken = assignToken;
-        _relyingParty = relyingParty;
-        _authorizationKind = authorizationKind;
-        _auth = auth ?? new AuthEndpointsOptions();
-    }
-
-    public override string Describe() => $"Getting authorization to access {_authorizationKind} services.";
+    public override string Describe() => $"Getting authorization to access {authorizationKind} services.";
 
     private static readonly KeyValuePair<string, string>[] Headers =
     [
@@ -47,7 +40,7 @@ public sealed class XboxAuthorizationStep : AuthStep
                                           "TokenType": "JWT"
                                       }
                                       """ + "\n";
-        var xboxAuthData = xboxAuthTemplate.Replace("%1", Data.UserToken.Value).Replace("%2", _relyingParty);
+        var xboxAuthData = xboxAuthTemplate.Replace("%1", Data.UserToken.Value).Replace("%2", relyingParty);
 
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
         {
@@ -67,23 +60,23 @@ public sealed class XboxAuthorizationStep : AuthStep
                 }
 
                 EmitFinished(AccountTaskState.FailedSoft,
-                    $"Unknown STS error for {_authorizationKind} services: {response.ErrorString}");
+                    $"Unknown STS error for {authorizationKind} services: {response.ErrorString}");
             }
             else
             {
                 Data.NetworkError = response.Error;
                 EmitFinished(AccountTaskState.Offline,
-                    $"Failed to get authorization for {_authorizationKind} services: {response.ErrorString}");
+                    $"Failed to get authorization for {authorizationKind} services: {response.ErrorString}");
             }
 
             return;
         }
 
         var temp = new Token();
-        if (!Parsers.ParseXTokenResponse(response.Body, temp, _authorizationKind))
+        if (!Parsers.ParseXTokenResponse(response.Body, temp, authorizationKind))
         {
             EmitFinished(AccountTaskState.FailedSoft,
-                $"Could not parse authorization response for access to {_authorizationKind} services.");
+                $"Could not parse authorization response for access to {authorizationKind} services.");
             return;
         }
 
@@ -91,18 +84,18 @@ public sealed class XboxAuthorizationStep : AuthStep
             AccountData.GetString(ExtraValue(Data.UserToken.Extra, "uhs")))
         {
             EmitFinished(AccountTaskState.FailedSoft,
-                $"Server has changed {_authorizationKind} authorization user hash in the reply. Something is wrong.");
+                $"Server has changed {authorizationKind} authorization user hash in the reply. Something is wrong.");
             return;
         }
 
-        _assignToken(temp);
+        assignToken(temp);
 
-        EmitFinished(AccountTaskState.Working, $"Got authorization to access {_relyingParty}");
+        EmitFinished(AccountTaskState.Working, $"Got authorization to access {relyingParty}");
     }
 
     private static JsonNode? ExtraValue(Dictionary<string, JsonNode> extra, string key)
     {
-        return extra.TryGetValue(key, out var value) ? value : null;
+        return extra.GetValueOrDefault(key);
     }
 
     /// <summary>Port of processSTSError: true when the XSTS error object was handled.</summary>
@@ -126,14 +119,14 @@ public sealed class XboxAuthorizationStep : AuthStep
         if (obj is null)
         {
             EmitFinished(AccountTaskState.FailedSoft,
-                $"Cannot parse {_authorizationKind} authorization error response as JSON.");
+                $"Cannot parse {authorizationKind} authorization error response as JSON.");
             return true;
         }
 
         if (!Parsers.GetNumber(AccountData.Get(obj, "XErr"), out long errorCode))
         {
             EmitFinished(AccountTaskState.FailedSoft,
-                $"XErr element is missing from {_authorizationKind} authorization error response.");
+                $"XErr element is missing from {authorizationKind} authorization error response.");
             return true;
         }
 

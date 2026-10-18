@@ -4,53 +4,39 @@
 // the change signals are UI-layer plumbing and are not ported; everything metadata-related is.
 
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.Meta;
 
-public sealed class VersionList : MetaEntity
+public sealed class VersionList(string uid) : MetaEntity
 {
     private readonly List<MetaVersion> _versions = [];
     private readonly List<string> _externalRecommendsVersions = [];
     private readonly Dictionary<string, MetaVersion> _lookup = new(StringComparer.Ordinal);
-    private readonly string _uid;
-    private string name = "";
 
     private MetaVersion? recommended;
 
-    public VersionList(string uid)
-    {
-        _uid = uid;
-    }
-
-    public string Uid() => _uid;
+    public string Uid { get; } = uid;
 
     /// <summary>The display name; a settable property for the parsers (setName upstream).</summary>
-    public string Name
-    {
-        get => name;
-        set => name = value;
-    }
+    public string Name { get; set; } = "";
 
-    public override string LocalFilename => _uid + "/index.json";
+    public override string LocalFilename => Uid + "/index.json";
 
-    public string HumanReadable() => name.Length == 0 ? _uid : name;
+    public string HumanReadable() => Name.Length == 0 ? Uid : Name;
 
     public IReadOnlyList<MetaVersion> Versions() => _versions;
 
     public MetaVersion GetVersion(string version)
     {
-        if (!_lookup.TryGetValue(version, out var outVersion) || outVersion is null)
+        if (_lookup.TryGetValue(version, out var outVersion)) return outVersion;
+        outVersion = new MetaVersion(Uid, version);
+        if (Cache is { } cache)
         {
-            outVersion = new MetaVersion(_uid, version);
-            if (Cache is { } cache)
-            {
-                outVersion.Cache = cache;
-            }
-
-            _lookup[version] = outVersion;
-            _versions.Add(outVersion);
+            outVersion.Cache = cache;
         }
+
+        _lookup[version] = outVersion;
+        _versions.Add(outVersion);
 
         return outVersion;
     }
@@ -104,9 +90,9 @@ public sealed class VersionList : MetaEntity
 
     public void MergeFromIndex(VersionList other)
     {
-        if (name != other.name)
+        if (Name != other.Name)
         {
-            Name = other.name;
+            Name = other.Name;
         }
 
         if (other.Sha256.Length != 0)
@@ -117,9 +103,9 @@ public sealed class VersionList : MetaEntity
 
     public void Merge(VersionList other)
     {
-        if (name != other.name)
+        if (Name != other.Name)
         {
-            Name = other.name;
+            Name = other.Name;
         }
 
         if (other.Sha256.Length != 0)

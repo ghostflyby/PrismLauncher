@@ -23,17 +23,10 @@ public interface IStateVersioned
 
 /// <summary>A single strongly-typed JSON file. Not thread-safe: callers own serialization
 /// (the runtime keeps one writer per domain, e.g. LauncherRuntime.InstanceLock).</summary>
-public sealed class TypedJsonFile<T> where T : class
+public sealed class TypedJsonFile<T>(string filePath, JsonTypeInfo<T> typeInfo)
+    where T : class
 {
-    private readonly JsonTypeInfo<T> _typeInfo;
-
-    public TypedJsonFile(string filePath, JsonTypeInfo<T> typeInfo)
-    {
-        FilePath = filePath;
-        _typeInfo = typeInfo;
-    }
-
-    public string FilePath { get; }
+    public string FilePath { get; } = filePath;
 
     /// <summary>load-or-default: a missing (or unreadable/corrupt) file yields the factory
     /// default. A corrupt payload is preserved next to the file as <c>&lt;name&gt;.corrupt</c>
@@ -78,7 +71,7 @@ public sealed class TypedJsonFile<T> where T : class
                     File.SetUnixFileMode(temp, mode);
                 }
 
-                JsonSerializer.Serialize(stream, value, _typeInfo);
+                JsonSerializer.Serialize(stream, value, typeInfo);
             }
 
             File.Move(temp, FilePath, overwrite: true);
@@ -120,7 +113,7 @@ public sealed class TypedJsonFile<T> where T : class
 
         try
         {
-            value = JsonSerializer.Deserialize(json, _typeInfo);
+            value = JsonSerializer.Deserialize(json, typeInfo);
             return value is not null;
         }
         catch (JsonException)

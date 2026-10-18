@@ -22,7 +22,7 @@ using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
-public sealed class FlameApi : ResourceApi
+public sealed class FlameApi(NetStack? net = null) : ResourceApi
 {
     /// <summary>BuildConfig.FLAME_BASE_URL (per-instance; tests construct a client pointed
     /// at their stub).</summary>
@@ -38,12 +38,7 @@ public sealed class FlameApi : ResourceApi
     public Func<string> ApiKeyProvider { get; set; } = static () => FlintConfig.Default.FlameApiKey;
 
     /// <summary>The network stack this client's requests go through.</summary>
-    public NetStack Net { get; }
-
-    public FlameApi(NetStack? net = null)
-    {
-        Net = net ?? NetStack.Default;
-    }
+    public NetStack Net { get; } = net ?? NetStack.Default;
 
     // ------------------------------------------------------------------ requests
 

@@ -734,12 +734,10 @@ public class InstanceListTests : IDisposable
         list.LoadList();
         Assert.NotNull(list.GetInstanceById("Staged Instance"));
         Assert.Equal("StagedGroup", list.GetInstanceGroup("Staged Instance"));
-        using (var doc = JsonDocument.Parse(File.ReadAllText(_groupFile)))
-        {
-            Assert.Equal(["Staged Instance"], doc.RootElement.GetProperty("groups")
-                .GetProperty("StagedGroup").GetProperty("instances").EnumerateArray()
-                .Select(v => v.GetString()).ToList());
-        }
+        using var doc = JsonDocument.Parse(File.ReadAllText(_groupFile));
+        Assert.Equal(["Staged Instance"], doc.RootElement.GetProperty("groups")
+            .GetProperty("StagedGroup").GetProperty("instances").EnumerateArray()
+            .Select(v => v.GetString()).ToList());
     }
 
     [Fact]

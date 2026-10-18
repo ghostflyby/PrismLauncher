@@ -23,25 +23,19 @@ using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform;
 
-public sealed class EnsureMetadataTask : FlintTask
+public sealed class EnsureMetadataTask(
+    Dictionary<string, Resource> resources,
+    string indexDir,
+    ResourceProvider provider,
+    ModrinthApi? modrinth = null,
+    FlameApi? flame = null)
+    : FlintTask
 {
-    private readonly Dictionary<string, Resource> _resources; // hash -> resource
-    private readonly string _indexDir;
-    private readonly ResourceProvider _provider;
-    private readonly ModrinthApi _modrinth;
-    private readonly FlameApi _flame;
+    // hash -> resource
+    private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
+    private readonly FlameApi _flame = flame ?? new FlameApi();
     private readonly Dictionary<string, IndexedVersion> _tempVersions = new(StringComparer.Ordinal);
     public bool LockUpdate { get; set; }
-
-    public EnsureMetadataTask(Dictionary<string, Resource> resources, string indexDir, ResourceProvider provider,
-        ModrinthApi? modrinth = null, FlameApi? flame = null)
-    {
-        _resources = resources;
-        _indexDir = indexDir;
-        _provider = provider;
-        _modrinth = modrinth ?? new ModrinthApi();
-        _flame = flame ?? new FlameApi();
-    }
 
     /// <summary>Port of the metadataReady(resource) signal, carrying the fresh metadata.</summary>
     public event Action<Resource, MetadataHandler.ModStruct>? MetadataReady;
@@ -53,7 +47,7 @@ public sealed class EnsureMetadataTask : FlintTask
     {
         EmitStatus("Checking if resources have metadata...");
 
-        switch (_provider)
+        switch (provider)
         {
             case ResourceProvider.Modrinth:
                 await ModrinthFlow(cancellationToken);
@@ -64,7 +58,7 @@ public sealed class EnsureMetadataTask : FlintTask
         }
 
         // invalidadeLeftover(): everything that made it this far without metadata failed
-        foreach (var (hash, resource) in _resources)
+        foreach (var (hash, resource) in resources)
         {
             EmitMetadataFailed(resource, $"No metadata was generated for hash {hash}");
         }
@@ -77,7 +71,7 @@ public sealed class EnsureMetadataTask : FlintTask
         var hashType = ProviderCapabilities.HashType(ResourceProvider.Modrinth)[0];
 
         // ---------------------------------------------------------- versions task
-        var (versionJob, versionRequest) = _modrinth.CurrentVersions(_resources.Keys.ToList(), hashType);
+        var (versionJob, versionRequest) = _modrinth.CurrentVersions(resources.Keys.ToList(), hashType);
         await versionJob.StartAsync(cancellationToken);
         if (!versionJob.WasSuccessful)
         {
@@ -98,9 +92,9 @@ public sealed class EnsureMetadataTask : FlintTask
         }
 
         {
-            foreach (var hash in _resources.Keys)
+            foreach (var hash in resources.Keys)
             {
-                var resource = _resources[hash];
+                var resource = resources[hash];
                 try
                 {
                     var entry = JsonUtils.RequireObject(entriesObj[hash], hash);
@@ -196,7 +190,7 @@ public sealed class EnsureMetadataTask : FlintTask
                     continue;
                 }
 
-                if (!_resources.TryGetValue(hash, out var resource))
+                if (!resources.TryGetValue(hash, out var resource))
                 {
                     continue;
                 }
@@ -220,7 +214,7 @@ public sealed class EnsureMetadataTask : FlintTask
     {
         // ---------------------------------------------------------- versions task
         var fingerprints = new List<uint>();
-        foreach (var murmur in _resources.Keys)
+        foreach (var murmur in resources.Keys)
         {
             if (uint.TryParse(murmur, NumberStyles.None, CultureInfo.InvariantCulture, out var fp))
             {
@@ -266,7 +260,7 @@ public sealed class EnsureMetadataTask : FlintTask
                 }
 
                 var fingerprint = FlameJson.Long(fileObj["fileFingerprint"]).ToString(CultureInfo.InvariantCulture);
-                if (!_resources.TryGetValue(fingerprint, out var resource))
+                if (!resources.TryGetValue(fingerprint, out var resource))
                 {
                     // "Invalid fingerprint from the API response."
                     continue;
@@ -360,7 +354,7 @@ public sealed class EnsureMetadataTask : FlintTask
                 }
 
                 var id = FlameJson.RequireInteger(entryObj, "id").ToString(CultureInfo.InvariantCulture);
-                if (!addonIds.TryGetValue(id, out var hash) || !_resources.TryGetValue(hash, out var resource)
+                if (!addonIds.TryGetValue(id, out var hash) || !resources.TryGetValue(hash, out var resource)
                                                             || !_tempVersions.TryGetValue(hash, out var version))
                 {
                     continue;
@@ -400,13 +394,13 @@ public sealed class EnsureMetadataTask : FlintTask
         }
 
         // LocalResourceUpdateTask: ensure a '.index' folder exists in the mods folder
-        if (!FileSystem.EnsureFolderPathExists(_indexDir))
+        if (!FileSystem.EnsureFolderPathExists(indexDir))
         {
-            EmitMetadataFailed(resource, $"Unable to create index directory at {_indexDir}!");
+            EmitMetadataFailed(resource, $"Unable to create index directory at {indexDir}!");
             return;
         }
 
-        var oldMetadata = MetadataHandler.Get(_indexDir, pack.AddonId);
+        var oldMetadata = MetadataHandler.Get(indexDir, pack.AddonId);
         if (oldMetadata.IsValid)
         {
             if (pack.Slug.Length == 0)
@@ -415,11 +409,11 @@ public sealed class EnsureMetadataTask : FlintTask
             }
         }
 
-        var pwMod = MetadataHandler.Create(_indexDir, pack, ver);
+        var pwMod = MetadataHandler.Create(indexDir, pack, ver);
         if (pwMod.IsValid)
         {
             pwMod.LockUpdate = LockUpdate;
-            MetadataHandler.Update(_indexDir, pwMod);
+            MetadataHandler.Update(indexDir, pwMod);
             MetadataReady?.Invoke(resource, pwMod);
         }
         else

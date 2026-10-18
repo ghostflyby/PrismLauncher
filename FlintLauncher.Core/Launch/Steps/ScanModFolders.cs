@@ -8,13 +8,11 @@
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class ScanModFolders : LaunchStep
+public sealed class ScanModFolders(LaunchTask parent) : LaunchStep(parent)
 {
     private bool modsDone;
     private bool coreModsDone;
     private bool nilModsDone;
-
-    public ScanModFolders(LaunchTask parent) : base(parent) { }
 
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {

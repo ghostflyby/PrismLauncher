@@ -211,7 +211,7 @@ public class MigrationEngineTests : IDisposable
         Directory.CreateDirectory(Path.Combine(data, "cache", "icons"));
         await File.WriteAllTextAsync(Path.Combine(data, "cache", "icons", "i.png"), "x");
         var planWithCache = engine.Find("flint-legacy")!.Plan(data, paths, ImportMode.Move);
-        Assert.Contains(planWithCache!, item => item.Name == "icons" && item.IsDirectory);
+        Assert.Contains(planWithCache!, item => item is { Name: "icons", IsDirectory: true });
     }
 
     [Fact]

@@ -10,15 +10,8 @@ using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class EnsureAvailableMemory : LaunchStep
+public sealed class EnsureAvailableMemory(LaunchTask parent, MinecraftInstance instance) : LaunchStep(parent)
 {
-    private readonly MinecraftInstance _instance;
-
-    public EnsureAvailableMemory(LaunchTask parent, MinecraftInstance instance) : base(parent)
-    {
-        _instance = instance;
-    }
-
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         if (OperatingSystem.IsMacOS())
@@ -45,7 +38,7 @@ public sealed class EnsureAvailableMemory : LaunchStep
             }
 
             var shouldAbort = false;
-            if (Variant.AsBool(_instance.Settings.Get("LowMemWarning")))
+            if (Variant.AsBool(instance.Settings.Get("LowMemWarning")))
             {
                 shouldAbort = Services.Ui.ConfirmLaunch?.Invoke(text) == false;
             }
@@ -71,15 +64,15 @@ public sealed class EnsureAvailableMemory : LaunchStep
             return Task.CompletedTask;
         }
 
-        var settingMin = (ulong)Variant.AsLong(_instance.Settings.Get("MinMemAlloc"));
-        var settingMax = (ulong)Variant.AsLong(_instance.Settings.Get("MaxMemAlloc"));
+        var settingMin = (ulong)Variant.AsLong(instance.Settings.Get("MinMemAlloc"));
+        var settingMax = (ulong)Variant.AsLong(instance.Settings.Get("MaxMemAlloc"));
         var max = Math.Max(settingMin, settingMax);
 
         if (max * 0.7 > available)
         {
             var shouldAbort = false;
 
-            if (Variant.AsBool(_instance.Settings.Get("LowMemWarning")))
+            if (Variant.AsBool(instance.Settings.Get("LowMemWarning")))
             {
                 var dialogText =
                     "There might not be enough free RAM to launch this instance with the current memory settings.\n\n" +

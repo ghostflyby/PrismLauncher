@@ -228,7 +228,7 @@ public class AtLauncherTests : IDisposable
         var cfg = await File.ReadAllTextAsync(Path.Combine(staging, "instance.json"));
         Assert.Contains("ATL Imported", cfg);
         var components = Components(staging);
-        Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.20.1");
+        Assert.Contains(components, c => c is { Uid: "net.minecraft", Version: "1.20.1" });
         // the jar-mod patch component is registered without a version
         Assert.Contains(components, c => c.Uid is not null && c.Uid.StartsWith("custom.jarmod."));
 
@@ -255,8 +255,8 @@ public class AtLauncherTests : IDisposable
         Assert.True(task.WasSuccessful, task.FailReason);
         var staging = Path.Combine(_root, "instances", "ATL Fabric");
         var components = Components(staging);
-        Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.20.1");
-        Assert.Contains(components, c => c.Uid == "net.fabricmc.fabric-loader" && c.Version == "0.14.21");
+        Assert.Contains(components, c => c is { Uid: "net.minecraft", Version: "1.20.1" });
+        Assert.Contains(components, c => c is { Uid: "net.fabricmc.fabric-loader", Version: "0.14.21" });
     }
 
     [Fact]

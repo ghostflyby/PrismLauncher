@@ -20,28 +20,16 @@ using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Java.Download;
 
-public sealed class ManifestDownloadTask : FlintTask
+public sealed class ManifestDownloadTask(Uri url, string finalPath, string checksumType = "", string checksumHash = "")
+    : FlintTask
 {
-    private readonly Uri _url;
-    private readonly string _finalPath;
-    private readonly string _checksumType;
-    private readonly string _checksumHash;
-
-    public ManifestDownloadTask(Uri url, string finalPath, string checksumType = "", string checksumHash = "")
-    {
-        _url = url;
-        _finalPath = finalPath;
-        _checksumType = checksumType;
-        _checksumHash = checksumHash;
-    }
-
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Downloading Java");
-        var download = NetRequest.MakeByteArray(_url);
-        if (_checksumHash.Length != 0 && _checksumType.Length != 0)
+        var download = NetRequest.MakeByteArray(url);
+        if (checksumHash.Length != 0 && checksumType.Length != 0)
         {
-            download.AddValidator(new ChecksumValidator(HashType(_checksumType), Convert.FromHexString(_checksumHash)));
+            download.AddValidator(new ChecksumValidator(HashType(checksumType), Convert.FromHexString(checksumHash)));
         }
 
         await download.StartAsync(cancellationToken).ConfigureAwait(false);
@@ -70,13 +58,13 @@ public sealed class ManifestDownloadTask : FlintTask
     private async Task DownloadJava(JsonObject doc, CancellationToken cancellationToken)
     {
         // valid json doc, begin making jre spot
-        FileSystem.EnsureFolderPathExists(_finalPath);
+        FileSystem.EnsureFolderPathExists(finalPath);
         var toDownload = new List<ManifestFile>();
         if (doc["files"] is JsonObject list)
         {
             foreach (var (paths, node) in list)
             {
-                var file = FileSystem.PathCombine(_finalPath, paths);
+                var file = FileSystem.PathCombine(finalPath, paths);
 
                 if (node is not JsonObject meta)
                 {

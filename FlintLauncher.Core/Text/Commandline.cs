@@ -19,10 +19,8 @@ public static class Commandline
         var current = new StringBuilder();
         var escape = false;
         char inquotes = '\0';
-        for (var i = 0; i < args.Length; i++)
+        foreach (var cchar in args)
         {
-            var cchar = args[i];
-
             if (escape)
             {
                 // \ escaped
@@ -165,7 +163,7 @@ public static class Commandline
     /// <summary>QProcessEnvironment::value(key, "") equivalent.</summary>
     private static string Lookup(IReadOnlyDictionary<string, string> dict, string key)
     {
-        return dict.TryGetValue(key, out var value) ? value : "";
+        return dict.GetValueOrDefault(key, "");
     }
 
     /// <summary>QString::replace(pos, n, after) equivalent.</summary>

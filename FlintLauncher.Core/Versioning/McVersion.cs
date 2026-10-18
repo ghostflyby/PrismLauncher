@@ -17,16 +17,10 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
         PreRelease,
     }
 
-    private readonly struct Section
+    private readonly struct Section(SectionType type, string value)
     {
-        public Section(SectionType type, string value)
-        {
-            Type = type;
-            Value = value;
-        }
-
-        public SectionType Type { get; }
-        public string Value { get; }
+        public SectionType Type { get; } = type;
+        public string Value { get; } = value;
     }
 
     private readonly string _string;

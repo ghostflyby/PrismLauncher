@@ -166,7 +166,7 @@ public sealed class InstanceGroupModel
     /// were ungrouped.</summary>
     public IReadOnlyList<string> DeleteGroup(string name)
     {
-        var cachedCount = _groupCounts.TryGetValue(name, out var count) ? count : 0;
+        var cachedCount = _groupCounts.GetValueOrDefault(name, 0);
         _groupCounts.Remove(name);
         var collapsedRemoved = _collapsed.Remove(name);
 
@@ -552,8 +552,10 @@ public sealed class InstanceGroupModel
             set.Add(member);
         }
 
-        var toplevel = new JsonObject();
-        toplevel["formatVersion"] = JsonValue.Create("1"); // QJsonValue(QString("1")) — a string!
+        var toplevel = new JsonObject
+        {
+            ["formatVersion"] = JsonValue.Create("1") // QJsonValue(QString("1")) — a string!
+        };
         var groupsArr = new JsonObject();
         foreach (var (name, list) in reverseGroupMap)
         {

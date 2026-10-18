@@ -19,16 +19,12 @@ using FlintLauncher.Web.Models;
 
 namespace FlintLauncher.Web.Services;
 
-public sealed class FlintTaskRegistry
+public sealed class FlintTaskRegistry(ILoggerFactory loggerFactory)
 {
-    private readonly ILogger _log;
+    private readonly ILogger _log = loggerFactory.CreateLogger(LogCategories.Tasks);
 
-    public FlintTaskRegistry(ILoggerFactory loggerFactory)
-    {
-        // the host's factory (DI) — the former FlintLog static facade read the same factory
-        // handed over at startup; task lifecycle events land in the same sinks
-        _log = loggerFactory.CreateLogger(LogCategories.Tasks);
-    }
+    // the host's factory (DI) — the former FlintLog static facade read the same factory
+    // handed over at startup; task lifecycle events land in the same sinks
 
     public sealed class Entry
     {

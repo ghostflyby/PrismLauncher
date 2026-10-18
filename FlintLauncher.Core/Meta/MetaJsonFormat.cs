@@ -3,7 +3,6 @@
 // the Require type plus the index/version/version-list parsers. Reads go through
 // the JsonNode model (single-DOM); the Parse(JsonObject) entity entry points keep JsonObject.
 
-using System.Collections;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Json;
@@ -90,8 +89,8 @@ public static class MetaJsonFormat
             var list = new VersionList(RequireStringOf(element, "uid"))
             {
                 Name = element.StringOr("name"),
+                Sha256 = element.StringOr("sha256")
             };
-            list.Sha256 = element.StringOr("sha256");
             lists.Add(list);
         }
 

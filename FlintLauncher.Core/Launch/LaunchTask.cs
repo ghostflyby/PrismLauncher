@@ -113,9 +113,11 @@ public class LaunchTask : FlintTask
     {
         if (logModel is null)
         {
-            logModel = new LogModel();
-            logModel.MaxLines = BaseInstance.GetConsoleMaxLines(_instance.Settings);
-            logModel.StopOnOverflow = BaseInstance.ShouldStopOnConsoleOverflow(_instance.Settings);
+            logModel = new LogModel
+            {
+                MaxLines = BaseInstance.GetConsoleMaxLines(_instance.Settings),
+                StopOnOverflow = BaseInstance.ShouldStopOnConsoleOverflow(_instance.Settings)
+            };
             // FIXME: should this really be here?
             logModel.OverflowMessage = $"Stopped watching the game log because the log length surpassed {logModel.MaxLines} lines.\n" +
                                        "You may have to fix your mods because the game is still logging to files and" +

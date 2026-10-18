@@ -268,16 +268,16 @@ public static class FlameMod
             var dependency = new Dependency
             {
                 AddonId = FlameJson.RequireInteger(dep, "modId").ToString(CultureInfo.InvariantCulture),
-            };
-            dependency.Type = FlameJson.RequireInteger(dep, "relationType") switch
-            {
-                1 => new DependencyType(DependencyTypeValue.Embedded),     // EmbeddedLibrary
-                2 => new DependencyType(DependencyTypeValue.Optional),     // OptionalDependency
-                3 => new DependencyType(DependencyTypeValue.Required),     // RequiredDependency
-                4 => new DependencyType(DependencyTypeValue.Tool),         // Tool
-                5 => new DependencyType(DependencyTypeValue.Incompatible), // Incompatible
-                6 => new DependencyType(DependencyTypeValue.Include),      // Include
-                _ => DependencyType.Invalid,
+                Type = FlameJson.RequireInteger(dep, "relationType") switch
+                {
+                    1 => new DependencyType(DependencyTypeValue.Embedded),     // EmbeddedLibrary
+                    2 => new DependencyType(DependencyTypeValue.Optional),     // OptionalDependency
+                    3 => new DependencyType(DependencyTypeValue.Required),     // RequiredDependency
+                    4 => new DependencyType(DependencyTypeValue.Tool),         // Tool
+                    5 => new DependencyType(DependencyTypeValue.Incompatible), // Incompatible
+                    6 => new DependencyType(DependencyTypeValue.Include),      // Include
+                    _ => DependencyType.Invalid,
+                }
             };
             file.Dependencies.Add(dependency);
         }

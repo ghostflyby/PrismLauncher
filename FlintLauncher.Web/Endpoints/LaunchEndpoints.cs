@@ -48,7 +48,7 @@ public static class LaunchEndpoints
                     return ApiJson.Error("invalid_request", "'server.address' is required", 400);
                 }
 
-                if (request.Server.Port is { } port && port is < 0 or > 65535)
+                if (request.Server.Port is { } and (< 0 or > 65535))
                 {
                     return ApiJson.Error("invalid_request", "'server.port' must be 0-65535", 400);
                 }

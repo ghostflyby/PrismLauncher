@@ -30,15 +30,18 @@ public enum HttpMethodValue
     Trace,
 }
 
-public sealed class NetRequest : FlintTask
+public sealed class NetRequest(
+    Uri url,
+    RequestOptions options = RequestOptions.NoOptions,
+    HttpMethodValue method = HttpMethodValue.Get,
+    byte[]? postData = null,
+    string? name = null,
+    NetStack? stack = null)
+    : FlintTask
 {
     public const int MaxAutoRetries = 3;
 
-    private readonly HttpMethodValue _method;
-    private readonly Uri _url;
-    private readonly byte[]? _postData;
-    private readonly RequestOptions _options;
-    private readonly NetStack _stack;
+    private readonly NetStack _stack = stack ?? NetStack.Default;
 
     private readonly List<(string name, string value)> _headers = [];
     private Sink? sink;
@@ -49,25 +52,9 @@ public sealed class NetRequest : FlintTask
 
     internal MetaEntry? CachedEntry { get; set; }
 
-    public NetRequest(
-        Uri url,
-        RequestOptions options = RequestOptions.NoOptions,
-        HttpMethodValue method = HttpMethodValue.Get,
-        byte[]? postData = null,
-        string? name = null,
-        NetStack? stack = null)
-    {
-        _url = url;
-        _options = options;
-        _method = method;
-        _postData = postData;
-        _stack = stack ?? NetStack.Default;
-        TaskName = name ?? url.ToString();
-    }
+    public string TaskName { get; } = name ?? url.ToString();
 
-    public string TaskName { get; }
-
-    public Uri Url => _url;
+    public Uri Url => url;
 
     public Sink? RequestSink
     {
@@ -155,7 +142,7 @@ public sealed class NetRequest : FlintTask
 
     private async Task ExecuteOnceAsync(CancellationToken cancellationToken)
     {
-        var spec = new NetRequestSpec { Url = _url };
+        var spec = new NetRequestSpec { Url = url };
         foreach (var (name, value) in _headers)
         {
             spec.Headers[name] = value;
@@ -190,15 +177,15 @@ public sealed class NetRequest : FlintTask
                     return;
                 }
 
-                using var message = new HttpRequestMessage(ToHttpMethod(_method), _url);
+                using var message = new HttpRequestMessage(ToHttpMethod(method), url);
                 foreach (var (name, value) in spec.Headers)
                 {
                     message.Headers.TryAddWithoutValidation(name, value);
                 }
 
-                if (_postData is not null)
+                if (postData is not null)
                 {
-                    message.Content = new ByteArrayContent(_postData);
+                    message.Content = new ByteArrayContent(postData);
                 }
 
                 ArmIdleTimer();
@@ -209,7 +196,7 @@ public sealed class NetRequest : FlintTask
 
                 // automatically handle HTTP 429 Too Many Requests / 503 errors and retry
                 var statusCode = (int)response.StatusCode;
-                if (_options.HasFlag(RequestOptions.AutoRetry) &&
+                if (options.HasFlag(RequestOptions.AutoRetry) &&
                     statusCode is 429 or 503 &&
                     retryCount < MaxAutoRetries)
                 {
@@ -242,7 +229,7 @@ public sealed class NetRequest : FlintTask
             {
                 var responseInfo = new NetResponseInfo
                 {
-                    Url = _url,
+                    Url = url,
                     StatusCode = (int)response.StatusCode,
                 };
                 foreach (var header in response.Headers)
@@ -283,7 +270,7 @@ public sealed class NetRequest : FlintTask
                         body = body[..4096];
                     }
 
-                    EmitFailed($"HTTP status {statusCode} for {_url}\n{body}");
+                    EmitFailed($"HTTP status {statusCode} for {url}\n{body}");
                     return;
                 }
 

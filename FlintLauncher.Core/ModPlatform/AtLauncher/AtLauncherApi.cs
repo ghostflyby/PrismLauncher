@@ -15,7 +15,7 @@ using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.ModPlatform.AtLauncher;
 
-public sealed class AtLauncherApi
+public sealed class AtLauncherApi(NetStack? net = null)
 {
     /// <summary>BuildConfig.ATL_DOWNLOAD_SERVER_URL (per-instance; tests construct a client
     /// pointed at their stub).</summary>
@@ -25,12 +25,7 @@ public sealed class AtLauncherApi
     public string ApiBaseUrl { get; set; } = FlintConfig.Default.AtlApiBaseUrl;
 
     /// <summary>The network stack this client's requests go through.</summary>
-    public NetStack Net { get; }
-
-    public AtLauncherApi(NetStack? net = null)
-    {
-        Net = net ?? NetStack.Default;
-    }
+    public NetStack Net { get; } = net ?? NetStack.Default;
 
     // ------------------------------------------------------------------ URL builders
 

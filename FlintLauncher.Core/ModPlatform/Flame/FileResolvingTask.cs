@@ -34,20 +34,12 @@ public sealed class BlockedMod
     public bool Move { get; set; }
 }
 
-public sealed class FileResolvingTask : FlintTask
+public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi? modrinth = null, FlameApi? flame = null) : FlintTask
 {
-    private readonly FlameManifest _manifest;
-    private readonly ModrinthApi _modrinth;
-    private readonly FlameApi _flame;
+    private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
+    private readonly FlameApi _flame = flame ?? new FlameApi();
 
-    public FileResolvingTask(FlameManifest toProcess, ModrinthApi? modrinth = null, FlameApi? flame = null)
-    {
-        _manifest = toProcess;
-        _modrinth = modrinth ?? new ModrinthApi();
-        _flame = flame ?? new FlameApi();
-    }
-
-    public FlameManifest GetResults() => _manifest;
+    public FlameManifest GetResults() => toProcess;
 
     /// <summary>
     /// APPLICATION->settings()->get("FallbackMRBlockedMods") (upstream default: true): when
@@ -57,7 +49,7 @@ public sealed class FileResolvingTask : FlintTask
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        if (_manifest.Files.Count == 0)
+        if (toProcess.Files.Count == 0)
         {
             // no file to resolve so leave it empty and emit success immediately
             EmitSucceeded();
@@ -67,7 +59,7 @@ public sealed class FileResolvingTask : FlintTask
         EmitStatus("Resolving mod IDs...");
         SetProgress(0, 3);
 
-        var fileIds = _manifest.Files.Values
+        var fileIds = toProcess.Files.Values
             .Select(f => f.FileId.ToString(CultureInfo.InvariantCulture)).ToList();
         var (job, response) = _flame.GetFiles(fileIds);
         await job.StartAsync(cancellationToken);
@@ -109,7 +101,7 @@ public sealed class FileResolvingTask : FlintTask
                     var obj = JsonUtils.RequireObject(file);
                     var version = FlameMod.LoadIndexedPackVersion(obj);
                     var fileid = long.Parse(version.FileId, CultureInfo.InvariantCulture);
-                    if (!_manifest.Files.TryGetValue(fileid, out var manifestFile))
+                    if (!toProcess.Files.TryGetValue(fileid, out var manifestFile))
                     {
                         continue; // upstream asserts this cannot happen
                     }
@@ -169,7 +161,7 @@ public sealed class FileResolvingTask : FlintTask
                         try
                         {
                             var entries = doc;
-                            foreach (var outFile in _manifest.Files.Values)
+                            foreach (var outFile in toProcess.Files.Values)
                             {
                                 var urlValid = Uri.TryCreate(outFile.Version.DownloadUrl, UriKind.Absolute, out _);
                                 if (!urlValid && "sha1" == outFile.Version.HashType
@@ -198,7 +190,7 @@ public sealed class FileResolvingTask : FlintTask
     private async Task GetFlameProjects(CancellationToken cancellationToken)
     {
         SetProgress(2, 3);
-        var addonIds = _manifest.Files.Values
+        var addonIds = toProcess.Files.Values
             .Select(f => f.ProjectId.ToString(CultureInfo.InvariantCulture)).ToList();
 
         var (job, response) = _flame.GetProjects(addonIds);
@@ -232,7 +224,7 @@ public sealed class FileResolvingTask : FlintTask
                         }
 
                         var id = FlameJson.RequireInteger(entryObj, "id");
-                        var file = _manifest.Files.Values.FirstOrDefault(f => f.ProjectId == id);
+                        var file = toProcess.Files.Values.FirstOrDefault(f => f.ProjectId == id);
                         if (file is null)
                         {
                             continue;

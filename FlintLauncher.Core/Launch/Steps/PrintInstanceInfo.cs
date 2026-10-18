@@ -7,17 +7,8 @@ using FlintLauncher.Core.Instances;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class PrintInstanceInfo : LaunchStep
+public sealed class PrintInstanceInfo(LaunchTask parent, AuthSession? session, MinecraftTarget? targetToJoin) : LaunchStep(parent)
 {
-    private readonly AuthSession? _session;
-    private readonly MinecraftTarget? _targetToJoin;
-
-    public PrintInstanceInfo(LaunchTask parent, AuthSession? session, MinecraftTarget? targetToJoin) : base(parent)
-    {
-        _session = session;
-        _targetToJoin = targetToJoin;
-    }
-
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         var instance = Parent.Instance;
@@ -41,7 +32,7 @@ public sealed class PrintInstanceInfo : LaunchStep
         log.Add("");
 
         EmitLogLines(log, MessageLevel.Launcher);
-        EmitLogLines(instance.VerboseDescription(_session, _targetToJoin), MessageLevel.Launcher);
+        EmitLogLines(instance.VerboseDescription(session, targetToJoin), MessageLevel.Launcher);
         EmitSucceeded();
         return Task.CompletedTask;
     }

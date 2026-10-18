@@ -16,33 +16,25 @@ using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.ModPlatform.Technic;
 
-public sealed class SingleZipPackInstallTask : InstanceTask
+public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVersion) : InstanceTask
 {
-    private readonly Uri _sourceUrl;
-    private readonly string _minecraftVersion;
     private string archivePath = "";
 
     /// <summary>APPLICATION->metacache() hook ("general" base); null = plain download.</summary>
     public HttpMetaCache? MetaCache { get; set; }
 
-    public SingleZipPackInstallTask(Uri sourceUrl, string minecraftVersion)
-    {
-        _sourceUrl = sourceUrl;
-        _minecraftVersion = minecraftVersion;
-    }
-
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        EmitStatus("Downloading modpack:\n" + _sourceUrl);
+        EmitStatus("Downloading modpack:\n" + sourceUrl);
 
         if (MetaCache is not null)
         {
-            var path = _sourceUrl.Host + '/' + _sourceUrl.AbsolutePath.TrimStart('/');
+            var path = sourceUrl.Host + '/' + sourceUrl.AbsolutePath.TrimStart('/');
             var entry = MetaCache.ResolveEntry("general", path);
             entry.SetStale(true);
 
             var filesNetJob = new NetJob("Modpack download");
-            var request = NetRequest.MakeCached(MetaCache, _sourceUrl, entry);
+            var request = NetRequest.MakeCached(MetaCache, sourceUrl, entry);
             filesNetJob.AddNetRequest(request);
             archivePath = entry.GetFullPath();
             await filesNetJob.StartAsync(cancellationToken);
@@ -57,9 +49,9 @@ public sealed class SingleZipPackInstallTask : InstanceTask
             // (the C++ downloads through the global cache — outside the instance folder; the
             //  headless fallback mirrors that with a temporary file)
             archivePath = Path.Combine(Path.GetTempPath(), "flint-technic-" + Guid.NewGuid().ToString("N") +
-                                                           Path.GetFileName(_sourceUrl.AbsolutePath));
+                                                           Path.GetFileName(sourceUrl.AbsolutePath));
             FileSystem.EnsureFilePathExists(archivePath);
-            var request = NetRequest.MakeFile(_sourceUrl, archivePath);
+            var request = NetRequest.MakeFile(sourceUrl, archivePath);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
             {
@@ -89,7 +81,7 @@ public sealed class SingleZipPackInstallTask : InstanceTask
         var failure = await TechnicPackProcessor.RunAsync(
             Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution."),
-            Name(), Icon, StagingPath, _minecraftVersion, cancellationToken: cancellationToken);
+            Name(), Icon, StagingPath, minecraftVersion, cancellationToken: cancellationToken);
         if (failure is not null)
         {
             EmitFailed(failure);

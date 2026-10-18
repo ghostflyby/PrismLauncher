@@ -10,17 +10,11 @@ public enum ProblemSeverity
     Error,
 }
 
-public readonly struct PatchProblem
+public readonly struct PatchProblem(ProblemSeverity severity, string description)
 {
-    public PatchProblem(ProblemSeverity severity, string description)
-    {
-        Severity = severity;
-        Description = description;
-    }
+    public ProblemSeverity Severity { get; } = severity;
 
-    public ProblemSeverity Severity { get; }
-
-    public string Description { get; }
+    public string Description { get; } = description;
 }
 
 public abstract class ProblemProvider

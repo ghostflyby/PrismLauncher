@@ -16,31 +16,19 @@ public enum TaskStepState
 }
 
 /// <summary>Port of the C++ TaskStepProgress struct (same fields and semantics).</summary>
-public struct TaskStepProgress
+public struct TaskStepProgress(Guid uid)
 {
     public TaskStepProgress()
         : this(Guid.NewGuid()) { }
 
-    public TaskStepProgress(Guid uid)
-    {
-        Uid = uid;
-        Current = 0;
-        Total = -1;
-        OldCurrent = 0;
-        OldTotal = -1;
-        Status = "";
-        Details = "";
-        State = TaskStepState.Waiting;
-    }
-
-    public Guid Uid { get; set; }
-    public long Current { get; set; }
-    public long Total { get; set; }
-    public long OldCurrent { get; set; }
-    public long OldTotal { get; set; }
-    public string Status { get; set; }
-    public string Details { get; set; }
-    public TaskStepState State { get; set; }
+    public Guid Uid { get; set; } = uid;
+    public long Current { get; set; } = 0;
+    public long Total { get; set; } = -1;
+    public long OldCurrent { get; set; } = 0;
+    public long OldTotal { get; set; } = -1;
+    public string Status { get; set; } = "";
+    public string Details { get; set; } = "";
+    public TaskStepState State { get; set; } = TaskStepState.Waiting;
 
     /// <summary>Port of TaskStepProgress::isDone().</summary>
     public readonly bool IsDone => State is TaskStepState.Failed or TaskStepState.Succeeded;

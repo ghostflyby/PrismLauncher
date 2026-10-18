@@ -3,17 +3,11 @@
 
 namespace FlintLauncher.Core.Minecraft;
 
-public struct Agent
+public struct Agent(Library library, string argument)
 {
-    public Agent(Library library, string argument)
-    {
-        Library = library;
-        Argument = argument;
-    }
-
     /// <summary>The library pointing to the jar this Java agent is contained within</summary>
-    public Library Library;
+    public Library Library = library;
 
     /// <summary>The argument to the Java agent, passed after an = if present</summary>
-    public string Argument;
+    public string Argument = argument;
 }

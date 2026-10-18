@@ -97,28 +97,19 @@ public sealed class JavaInstallList
 /// <see cref="JavaDetection"/> (JdkFind LocateAsync primary + FromExecutable fallback); this
 /// task is the list-model shell around it and maps the candidates onto
 /// <see cref="JavaInstall"/>.</summary>
-public sealed class JavaListLoadTask : FlintTask
+public sealed class JavaListLoadTask(
+    JavaInstallList vlist,
+    bool onlyManagedVersions = false,
+    string? javaRoot = null,
+    IReadOnlyList<IJvmProvider>? providers = null)
+    : FlintTask
 {
-    private readonly JavaInstallList _list;
-    private readonly bool _onlyManagedVersions;
-    private readonly string? _javaRoot;
-    private readonly IReadOnlyList<IJvmProvider>? _providers;
-
-    public JavaListLoadTask(JavaInstallList vlist, bool onlyManagedVersions = false,
-        string? javaRoot = null, IReadOnlyList<IJvmProvider>? providers = null)
-    {
-        _list = vlist;
-        _onlyManagedVersions = onlyManagedVersions;
-        _javaRoot = javaRoot;
-        _providers = providers;
-    }
-
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Detecting Java installations...");
 
-        var candidates = await JavaDetection.DetectAsync(_javaRoot, cancellationToken,
-            providers: _providers, managedOnly: _onlyManagedVersions).ConfigureAwait(false);
+        var candidates = await JavaDetection.DetectAsync(javaRoot, cancellationToken,
+            providers: providers, managedOnly: onlyManagedVersions).ConfigureAwait(false);
 
         var installs = candidates
             .Where(candidate => candidate.Valid)
@@ -128,7 +119,7 @@ public sealed class JavaListLoadTask : FlintTask
             })
             .ToList();
 
-        _list.UpdateListData(installs);
+        vlist.UpdateListData(installs);
         EmitSucceeded();
     }
 }

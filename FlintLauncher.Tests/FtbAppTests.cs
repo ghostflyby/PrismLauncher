@@ -267,8 +267,8 @@ public class FtbAppTests : IDisposable
         Assert.Contains("-Xmx2G -Dtest=1", instanceJson);
 
         var components = Components(staging);
-        Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.18.2");
-        Assert.Contains(components, c => c.Uid == "net.fabricmc.fabric-loader" && c.Version == "0.14.21");
+        Assert.Contains(components, c => c is { Uid: "net.minecraft", Version: "1.18.2" });
+        Assert.Contains(components, c => c is { Uid: "net.fabricmc.fabric-loader", Version: "0.14.21" });
     }
 
     [Fact]
@@ -285,6 +285,6 @@ public class FtbAppTests : IDisposable
 
         Assert.True(task.WasSuccessful, task.FailReason);
         var components = Components(Path.Combine(_root, "instances", "FTB App NeoForge"));
-        Assert.Contains(components, c => c.Uid == "net.neoforged" && c.Version == "20.4.237");
+        Assert.Contains(components, c => c is { Uid: "net.neoforged", Version: "20.4.237" });
     }
 }

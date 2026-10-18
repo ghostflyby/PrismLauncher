@@ -65,7 +65,7 @@ public sealed class MetaEntry
     internal void SetOwner(HttpMetaCache? owner) => this.owner = owner;
 }
 
-public sealed class HttpMetaCache : IDisposable
+public sealed class HttpMetaCache(string? path = null) : IDisposable
 {
     private readonly Lock _lock = new();
 
@@ -73,13 +73,8 @@ public sealed class HttpMetaCache : IDisposable
         new(StringComparer.Ordinal);
 
     private readonly Dictionary<string, string> _basePaths = new(StringComparer.Ordinal);
-    private readonly string? _indexFile;
+    private readonly string? _indexFile = string.IsNullOrEmpty(path) ? null : path;
     private Timer? saveTimer;
-
-    public HttpMetaCache(string? path = null)
-    {
-        _indexFile = string.IsNullOrEmpty(path) ? null : path;
-    }
 
     public void Dispose()
     {

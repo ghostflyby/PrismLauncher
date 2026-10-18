@@ -37,7 +37,7 @@ namespace FlintLauncher.Core.ModPlatform.Flame;
 
 using ResourceFolderType = Minecraft.Resources.ResourceType;
 
-public sealed class FlamePackExportTask : FlintTask
+public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : FlintTask
 {
     private const string Template = "<li><a href=\"{url}\">{name}{authors}</a></li>\n";
     private static readonly string[] FileExtensions = ["jar", "zip"];
@@ -75,20 +75,12 @@ public sealed class FlamePackExportTask : FlintTask
         public bool IsMod { get; init; }
     }
 
-    private readonly Options _options;
-    private readonly string _gameRoot;
-    private readonly FlameApi _flame;
+    private readonly string _gameRoot = options.Instance.GameRoot();
+    private readonly FlameApi _flame = options.Flame ?? new FlameApi();
 
     private readonly List<string> _files = [];
     private readonly Dictionary<string, HashInfo> _pendingHashes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ResolvedFile> _resolvedFiles = new(StringComparer.Ordinal);
-
-    public FlamePackExportTask(Options options)
-    {
-        _options = options;
-        _gameRoot = options.Instance.GameRoot();
-        _flame = options.Flame ?? new FlameApi();
-    }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -107,10 +99,10 @@ public sealed class FlamePackExportTask : FlintTask
     private bool CollectFiles()
     {
         _files.Clear();
-        if (!MmcZip.CollectFileListRecursively(_options.Instance.GameRoot(), null, _files,
-                _options.Filter is null
+        if (!MmcZip.CollectFileListRecursively(options.Instance.GameRoot(), null, _files,
+                options.Filter is null
                     ? null
-                    : (Func<FileSystemInfo, bool>)(f => _options.Filter(GetRelativePath(f.FullName)))))
+                    : (Func<FileSystemInfo, bool>)(f => options.Filter(GetRelativePath(f.FullName)))))
         {
             EmitFailed("Could not search for files");
             return false;
@@ -127,7 +119,7 @@ public sealed class FlamePackExportTask : FlintTask
         SetProgress(1, 5);
 
         // instance->loaderModList()->update()
-        var modList = new ModFolderModel(_options.Instance.ModsRoot());
+        var modList = new ModFolderModel(options.Instance.ModsRoot());
         modList.Update();
         var allMods = modList.AllMods();
 
@@ -395,7 +387,7 @@ public sealed class FlamePackExportTask : FlintTask
 
         try
         {
-            using var stream = File.Create(_options.Output);
+            using var stream = File.Create(options.Output);
             using var zip = new ZipArchive(stream, ZipArchiveMode.Create);
 
             // the ExportToZipTask layout: everything under the game root, prefixed with
@@ -446,15 +438,15 @@ public sealed class FlamePackExportTask : FlintTask
         {
             ["manifestType"] = "minecraftModpack",
             ["manifestVersion"] = 1,
-            ["name"] = _options.Name,
-            ["version"] = _options.Version,
-            ["author"] = _options.Author,
+            ["name"] = options.Name,
+            ["version"] = options.Version,
+            ["author"] = options.Author,
             ["overrides"] = "overrides",
         };
 
         var version = new JsonObject();
 
-        var profile = _options.Instance.GetPackProfile();
+        var profile = options.Instance.GetPackProfile();
         profile.Load(); // (MinecraftInstance loads its profile lazily in the C++; make it explicit here)
 
         // collect all supported components
@@ -507,9 +499,9 @@ public sealed class FlamePackExportTask : FlintTask
 
         version["modLoaders"] = modLoaders;
 
-        if (_options.RecommendedRam > 0)
+        if (options.RecommendedRam > 0)
         {
-            version["recommendedRam"] = _options.RecommendedRam;
+            version["recommendedRam"] = options.RecommendedRam;
         }
 
         obj["minecraft"] = version;
@@ -521,7 +513,7 @@ public sealed class FlamePackExportTask : FlintTask
             {
                 ["projectID"] = mod.AddonId,
                 ["fileID"] = mod.Version,
-                ["required"] = mod.Enabled || !_options.OptionalFiles,
+                ["required"] = mod.Enabled || !options.OptionalFiles,
             };
             files.Add((JsonNode?)file);
         }

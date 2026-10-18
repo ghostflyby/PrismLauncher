@@ -7,15 +7,10 @@ using System.Net;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class PrintServers : LaunchStep
+public sealed class PrintServers(LaunchTask parent, IReadOnlyList<string> servers) : LaunchStep(parent)
 {
-    private readonly List<string> _servers;
+    private readonly List<string> _servers = [.. servers];
     private readonly Dictionary<string, string> _serverToAddress = new(StringComparer.Ordinal);
-
-    public PrintServers(LaunchTask parent, IReadOnlyList<string> servers) : base(parent)
-    {
-        _servers = [.. servers];
-    }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {

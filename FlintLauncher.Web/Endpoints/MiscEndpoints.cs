@@ -83,7 +83,7 @@ public static class MiscEndpoints
             var upload = new PasteUpload(content, runtime.Config.Current.Api.PastebinCustomApiBase ?? "",
                 pasteType, runtime.Net);
             await upload.StartAsync();
-            return upload.WasSuccessful && upload.PasteLink.Length > 0
+            return upload is { WasSuccessful: true, PasteLink.Length: > 0 }
                 ? Results.Created("/api/v1/paste", new PasteCreatedResponse(upload.PasteLink))
                 : ApiJson.Error("paste_failed",
                     upload.WasSuccessful
@@ -107,13 +107,10 @@ public static class MiscEndpoints
 /// legacy/launcher fallback, so the launcher-managed java root — the JavaDir setting under
 /// E2 store semantics — is covered like the system-wide sources. Wire shape unchanged:
 /// invalid fallback candidates list as ("unknown", "unknown").</summary>
-public sealed class JavaScanService
+public sealed class JavaScanService(LauncherRuntime runtime)
 {
-    private readonly LauncherRuntime _runtime;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private volatile IReadOnlyList<JavaView>? cache;
-
-    public JavaScanService(LauncherRuntime runtime) => _runtime = runtime;
 
     public async Task<IReadOnlyList<JavaView>> GetAsync() => cache ??= await ScanAsync();
 
@@ -122,7 +119,7 @@ public sealed class JavaScanService
         await _lock.WaitAsync();
         try
         {
-            var candidates = await JavaDetection.DetectAsync(_runtime.JavaRoot);
+            var candidates = await JavaDetection.DetectAsync(runtime.JavaRoot);
             cache = candidates
                 .Select(candidate => new JavaView(candidate.Path, candidate.Version, candidate.Architecture))
                 .ToArray();

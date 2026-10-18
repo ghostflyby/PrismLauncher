@@ -109,8 +109,8 @@ public class FlameImportTests : IDisposable
             var components = doc.RootElement.GetProperty("components").EnumerateArray()
                 .Select(c => (Uid: c.GetProperty("uid").GetString(), Version: c.GetProperty("version").GetString()))
                 .ToList();
-            Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.18.2");
-            Assert.Contains(components, c => c.Uid == "net.minecraftforge" && c.Version == "40.1.0");
+            Assert.Contains(components, c => c is { Uid: "net.minecraft", Version: "1.18.2" });
+            Assert.Contains(components, c => c is { Uid: "net.minecraftforge", Version: "40.1.0" });
         }
 
         Assert.Contains("Flame Imported", await File.ReadAllTextAsync(Path.Combine(staging, "instance.json")));
@@ -149,8 +149,8 @@ public class FlameImportTests : IDisposable
         var components = doc.RootElement.GetProperty("components").EnumerateArray()
             .Select(c => (Uid: c.GetProperty("uid").GetString(), Version: c.GetProperty("version").GetString()))
             .ToList();
-        Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.20.1");
-        Assert.Contains(components, c => c.Uid == "net.fabricmc.fabric-loader" && c.Version == "0.14.21");
+        Assert.Contains(components, c => c is { Uid: "net.minecraft", Version: "1.20.1" });
+        Assert.Contains(components, c => c is { Uid: "net.fabricmc.fabric-loader", Version: "0.14.21" });
     }
 
     // ---------------------------------------------------------------- blocked mods

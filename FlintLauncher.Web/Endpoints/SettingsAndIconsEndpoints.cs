@@ -183,13 +183,12 @@ public static class SettingsAndIconsEndpoints
 
         api.MapPut("/settings", (LauncherRuntime runtime, GlobalSettingsPutRequest? body) =>
         {
-            if (body is null || body.Group is null || !Groups.ContainsKey(body.Group))
+            if (body is null || !Groups.TryGetValue(body.Group, out var keys))
             {
                 return ApiJson.Error("invalid_request",
                     $"'group' must be one of: {string.Join(", ", Groups.Keys)}", 400);
             }
 
-            var keys = Groups[body.Group];
             foreach (var prop in body.Values.EnumerateObject())
             {
                 if (!keys.Contains(prop.Name))
@@ -289,7 +288,7 @@ public static class SettingsAndIconsEndpoints
             }
 
             string key;
-            if (request.HasFormContentType && request.Form.Files.Count > 0)
+            if (request is { HasFormContentType: true, Form.Files.Count: > 0 })
             {
                 Directory.CreateDirectory(runtime.Icons.IconsDir);
                 var file = request.Form.Files[0];

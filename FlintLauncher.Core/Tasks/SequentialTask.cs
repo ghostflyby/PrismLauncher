@@ -11,11 +11,8 @@ namespace FlintLauncher.Core.Tasks;
 /// the starting of a task is contingent on the success of the previous one.
 /// See <see cref="MultipleOptionsTask"/> if that's not the case.
 /// </summary>
-public class SequentialTask : ConcurrentTask
+public class SequentialTask(string taskName = "") : ConcurrentTask(taskName, 1)
 {
-    public SequentialTask(string taskName = "")
-        : base(taskName, 1) { }
-
     protected override void SubTaskFailed(FlintTask task, string msg)
     {
         // Port of SequentialTask::subTaskFailed(): record the failure like ConcurrentTask does,

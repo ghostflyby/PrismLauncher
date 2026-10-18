@@ -22,24 +22,14 @@ using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Java.Download;
 
-public sealed class ArchiveDownloadTask : FlintTask
+public sealed class ArchiveDownloadTask(
+    Uri url,
+    string finalPath,
+    string checksumType = "",
+    string checksumHash = "",
+    HttpMetaCache? cache = null)
+    : FlintTask
 {
-    private readonly Uri _url;
-    private readonly string _finalPath;
-    private readonly string _checksumType;
-    private readonly string _checksumHash;
-    private readonly HttpMetaCache? _cache;
-
-    public ArchiveDownloadTask(Uri url, string finalPath, string checksumType = "", string checksumHash = "",
-        HttpMetaCache? cache = null)
-    {
-        _url = url;
-        _finalPath = finalPath;
-        _checksumType = checksumType;
-        _checksumHash = checksumHash;
-        _cache = cache;
-    }
-
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         // JRE found ! download the zip
@@ -48,22 +38,22 @@ public sealed class ArchiveDownloadTask : FlintTask
         string fullPath;
         NetRequest action;
         var tempDownload = false;
-        if (_cache is not null)
+        if (cache is not null)
         {
-            var entry = _cache.ResolveEntry("java", FileName());
-            action = NetRequest.MakeCached(_cache, _url, entry);
+            var entry = cache.ResolveEntry("java", FileName());
+            action = NetRequest.MakeCached(cache, url, entry);
             fullPath = entry.GetFullPath();
         }
         else
         {
             fullPath = Path.Combine(Path.GetTempPath(), $"flint-java-{Guid.NewGuid():N}-{FileName()}");
-            action = NetRequest.MakeFile(_url, fullPath);
+            action = NetRequest.MakeFile(url, fullPath);
             tempDownload = true;
         }
 
-        if (_checksumHash.Length != 0 && _checksumType.Length != 0)
+        if (checksumHash.Length != 0 && checksumType.Length != 0)
         {
-            action.AddValidator(new ChecksumValidator(HashType(_checksumType), Convert.FromHexString(_checksumHash)));
+            action.AddValidator(new ChecksumValidator(HashType(checksumType), Convert.FromHexString(checksumHash)));
         }
 
         try
@@ -120,7 +110,7 @@ public sealed class ArchiveDownloadTask : FlintTask
         List<string>? extracted;
         if (IsTarGz(input))
         {
-            extracted = TarArchive.ExtractTarGzFile(input, _finalPath, firstFolder, out var error);
+            extracted = TarArchive.ExtractTarGzFile(input, finalPath, firstFolder, out var error);
             if (extracted is null)
             {
                 EmitFailed(error);
@@ -138,7 +128,7 @@ public sealed class ArchiveDownloadTask : FlintTask
             try
             {
                 using var zip = ZipFile.OpenRead(input);
-                extracted = MmcZip.ExtractSubDir(zip, firstFolder, _finalPath);
+                extracted = MmcZip.ExtractSubDir(zip, firstFolder, finalPath);
             }
             catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
                                           or ArgumentException or NotSupportedException)
@@ -217,7 +207,7 @@ public sealed class ArchiveDownloadTask : FlintTask
     private string FileName()
     {
         // QUrl::fileName() keeps the file name without the query part
-        var path = _url.AbsolutePath;
+        var path = url.AbsolutePath;
         var idx = path.LastIndexOf('/');
         var name = idx >= 0 ? path[(idx + 1)..] : path;
         return name.Length != 0 ? name : "java-archive";

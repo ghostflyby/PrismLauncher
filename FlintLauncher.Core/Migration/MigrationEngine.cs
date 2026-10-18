@@ -597,14 +597,9 @@ public static class FlintLegacyMigration
 
 /// <summary>The engine facade: the registered profiles, lookups by name, and the G2
 /// auto-run predicate (a profile that auto-runs AND has an undecided detected source).</summary>
-public sealed class MigrationEngine
+public sealed class MigrationEngine(IEnumerable<IMigrationSourceProfile> profiles)
 {
-    private readonly IReadOnlyList<IMigrationSourceProfile> _profiles;
-
-    public MigrationEngine(IEnumerable<IMigrationSourceProfile> profiles)
-    {
-        _profiles = [.. profiles];
-    }
+    private readonly IReadOnlyList<IMigrationSourceProfile> _profiles = [.. profiles];
 
     /// <summary>The default engine: both G2 profiles (prism-family, flint-legacy).</summary>
     public static MigrationEngine CreateDefault() =>

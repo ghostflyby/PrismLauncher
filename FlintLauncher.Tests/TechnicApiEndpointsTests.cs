@@ -226,8 +226,8 @@ public class TechnicApiEndpointsTests : IDisposable
                 .Select(c => (Uid: c.GetProperty("uid").GetString(),
                     Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
                 .ToList();
-            Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.20.1");
-            Assert.Contains(components, c => c.Uid == "net.minecraftforge" && c.Version == "42.0.0");
+            Assert.Contains(components, c => c is { Uid: "net.minecraft", Version: "1.20.1" });
+            Assert.Contains(components, c => c is { Uid: "net.minecraftforge", Version: "42.0.0" });
 
             var list = JsonDocument.Parse(
                 await (await host.GetAsync("/api/v1/instances")).Content.ReadAsStringAsync()).RootElement;

@@ -22,22 +22,15 @@ using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Config;
 
-public sealed class InstanceJsonSettingsObject : SettingsObject
+public sealed class InstanceJsonSettingsObject(string instanceRoot, InstanceEnvironment environment) : SettingsObject
 {
-    private readonly FlintConfigStore? _userConfig;
-
-    public InstanceJsonSettingsObject(string instanceRoot, InstanceEnvironment environment)
-    {
-        _userConfig = environment.UserConfig;
-        ConfigStore = new InstanceConfigStore(instanceRoot, environment.ConfigInfo);
-        StateStore = new InstanceStateStore(instanceRoot, environment.StateInfo);
-    }
+    private readonly FlintConfigStore? _userConfig = environment.UserConfig;
 
     /// <summary>The typed instance.json store (dual-track marker + write target).</summary>
-    public InstanceConfigStore ConfigStore { get; }
+    public InstanceConfigStore ConfigStore { get; } = new(instanceRoot, environment.ConfigInfo);
 
     /// <summary>The typed instance-state.json store (the runtime time trio).</summary>
-    public InstanceStateStore StateStore { get; }
+    public InstanceStateStore StateStore { get; } = new(instanceRoot, environment.StateInfo);
 
     /// <summary>The live user-layer store (flint.json) when one is wired, for hosts that
     /// hand the same stack onward (LaunchServices) — null on bare fixtures.</summary>

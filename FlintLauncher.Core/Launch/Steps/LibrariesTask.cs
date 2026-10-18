@@ -9,23 +9,17 @@ using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class LibrariesTask : FlintTask
+public sealed class LibrariesTask(MinecraftInstance inst) : FlintTask
 {
-    private readonly MinecraftInstance _inst;
     private NetJob? downloadJob;
-
-    public LibrariesTask(MinecraftInstance inst)
-    {
-        _inst = inst;
-    }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Downloading required library files...");
-        var inst = _inst;
+        var inst1 = inst;
 
         // Build a list of URLs that will need to be downloaded.
-        var components = inst.GetPackProfile();
+        var components = inst1.GetPackProfile();
         var profile = components.GetProfile();
         if (profile is null)
         {
@@ -33,13 +27,13 @@ public sealed class LibrariesTask : FlintTask
             return;
         }
 
-        var job = new NetJob($"Libraries for instance {inst.Name()}");
+        var job = new NetJob($"Libraries for instance {inst1.Name()}");
         downloadJob = job;
 
         // E6: the stamped runtime cache is the only source — the bare-fixture throwaway is
         // gone; an unstamped instance fails the step naming the missing wire
-        var metacache = inst.MetaCache ?? throw new InvalidOperationException(
-            $"no meta cache stamped on instance '{inst.Name()}' — the composition root must inject it");
+        var metacache = inst1.MetaCache ?? throw new InvalidOperationException(
+            $"no meta cache stamped on instance '{inst1.Name()}' — the composition root must inject it");
 
         var failedLocalLibraries = new List<string>();
         var libArtifactPool = new List<Library?>();
@@ -54,14 +48,14 @@ public sealed class LibrariesTask : FlintTask
         libArtifactPool.Add(profile.GetMainJar());
         // (upstream ignores the processArtifactPool return value; the port stops before
         // starting a NetJob that would be useless after the task already failed)
-        if (!ProcessArtifactPool(libArtifactPool, failedLocalLibraries, inst.GetLocalLibraryPath(), metacache, job))
+        if (!ProcessArtifactPool(libArtifactPool, failedLocalLibraries, inst1.GetLocalLibraryPath(), metacache, job))
         {
             downloadJob = null;
             return;
         }
 
         var failedLocalJarMods = new List<string>();
-        if (!ProcessArtifactPool(profile.GetJarMods().Cast<Library?>(), failedLocalJarMods, inst.JarModsDir(), metacache, job))
+        if (!ProcessArtifactPool(profile.GetJarMods().Cast<Library?>(), failedLocalJarMods, inst1.JarModsDir(), metacache, job))
         {
             downloadJob = null;
             return;
@@ -111,7 +105,7 @@ public sealed class LibrariesTask : FlintTask
                 return false;
             }
 
-            var dls = lib.GetDownloads(_inst.RuntimeContext, metacache, errors, localPath);
+            var dls = lib.GetDownloads(inst.RuntimeContext, metacache, errors, localPath);
             foreach (var dl in dls)
             {
                 job.AddNetRequest(dl);

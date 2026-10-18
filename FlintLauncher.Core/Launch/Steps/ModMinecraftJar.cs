@@ -9,10 +9,8 @@ using FlintLauncher.Core.Minecraft.Resources;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class ModMinecraftJar : LaunchStep
+public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
 {
-    public ModMinecraftJar(LaunchTask parent) : base(parent) { }
-
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         var inst = Parent.Instance;

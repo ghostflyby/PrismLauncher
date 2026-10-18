@@ -28,21 +28,14 @@ using System.Text.Json.Nodes;
 
 namespace FlintLauncher.Core.Auth;
 
-public sealed class MsaInteractiveStep : AuthStep
+public sealed class MsaInteractiveStep(AccountData data, bool silent = false, AuthEndpointsOptions? auth = null) : AuthStep(data)
 {
-    private readonly bool _silent;
-    private readonly AuthEndpointsOptions _auth;
+    private readonly AuthEndpointsOptions _auth = auth ?? new AuthEndpointsOptions();
     private string clientId = "";
     private LoopbackListener? listener;
 
     /// <summary>Port of the authorizeWithBrowser(const QUrl&amp;) signal.</summary>
     public event Action<string>? AuthorizeWithBrowser;
-
-    public MsaInteractiveStep(AccountData data, bool silent = false, AuthEndpointsOptions? auth = null) : base(data)
-    {
-        _silent = silent;
-        _auth = auth ?? new AuthEndpointsOptions();
-    }
 
     public override string Describe() => "Logging in with Microsoft account.";
 
@@ -55,7 +48,7 @@ public sealed class MsaInteractiveStep : AuthStep
     public override async Task PerformAsync(CancellationToken cancellationToken)
     {
         clientId = _auth.MsaClientId;
-        if (_silent)
+        if (silent)
         {
             if (Data.MsaClientId != clientId)
             {

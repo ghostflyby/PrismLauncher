@@ -647,7 +647,7 @@ public static class FileSystem
 
         var isAbsolute = path[0] == '/';
         // Windows drive prefix, e.g. "C:/foo" -> keep "C:" anchored like Qt does.
-        var drivePrefix = path.Length >= 2 && path[1] == ':' ? path[..2] : null;
+        var drivePrefix = path is [_, ':', ..] ? path[..2] : null;
         var remainder = drivePrefix != null ? path[2..] : path;
         var isDriveAbsolute = drivePrefix != null && remainder.Length > 0 && (remainder[0] == '/' || remainder[0] == '\\');
 
@@ -700,7 +700,7 @@ public static class FileSystem
             return CleanPath(Directory.GetCurrentDirectory());
         }
 
-        if (path[0] == '/' || (path.Length >= 2 && path[1] == ':'))
+        if (path[0] == '/' || path is [_, ':', ..])
         {
             return CleanPath(path);
         }
@@ -749,7 +749,7 @@ public static class FileSystem
 
     private static bool IsRoot(string path)
     {
-        return path.Length == 0 || path == "/" || (path.Length == 3 && path[1] == ':' && (path[2] == '/' || path[2] == '\\'));
+        return path.Length == 0 || path == "/" || (path is [_, ':', _] && (path[2] == '/' || path[2] == '\\'));
     }
 
     private static void TryDelete(string path)

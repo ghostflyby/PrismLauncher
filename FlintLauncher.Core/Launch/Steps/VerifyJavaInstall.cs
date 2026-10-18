@@ -8,10 +8,8 @@ using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class VerifyJavaInstall : LaunchStep
+public sealed class VerifyJavaInstall(LaunchTask parent) : LaunchStep(parent)
 {
-    public VerifyJavaInstall(LaunchTask parent) : base(parent) { }
-
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         var instance = Parent.Instance;

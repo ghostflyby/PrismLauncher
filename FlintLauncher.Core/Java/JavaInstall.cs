@@ -9,18 +9,11 @@ using FlintLauncher.Core.Text;
 
 namespace FlintLauncher.Core.Java;
 
-public sealed class JavaInstall : IComparable<JavaInstall>, IEquatable<JavaInstall>
+public sealed class JavaInstall(JavaVersion id, string arch, string path) : IComparable<JavaInstall>, IEquatable<JavaInstall>
 {
     public JavaInstall() : this(new JavaVersion(), "unknown", "") { }
 
     public JavaInstall(string id, string arch, string path) : this(new JavaVersion(id), arch, path) { }
-
-    public JavaInstall(JavaVersion id, string arch, string path)
-    {
-        Id = id;
-        Arch = arch;
-        Path = path;
-    }
 
     /// <summary>Port of BaseVersion::descriptor().</summary>
     public string Descriptor() => Id.ToString();
@@ -31,11 +24,11 @@ public sealed class JavaInstall : IComparable<JavaInstall>, IEquatable<JavaInsta
     /// <summary>Port of BaseVersion::typeString().</summary>
     public string TypeString() => Arch;
 
-    public JavaVersion Id { get; set; }
+    public JavaVersion Id { get; set; } = id;
 
-    public string Arch { get; set; }
+    public string Arch { get; set; } = arch;
 
-    public string Path { get; set; }
+    public string Path { get; set; } = path;
 
     public bool Is64Bit { get; set; }
 

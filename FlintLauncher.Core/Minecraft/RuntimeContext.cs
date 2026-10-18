@@ -40,20 +40,13 @@ public static class SysInfo
     }
 }
 
-public struct RuntimeContext
+public struct RuntimeContext()
 {
-    public string JavaArchitecture;
+    public string JavaArchitecture = "";
 
-    public string JavaRealArchitecture;
+    public string JavaRealArchitecture = "";
 
-    public string System;
-
-    public RuntimeContext()
-    {
-        JavaArchitecture = "";
-        JavaRealArchitecture = "";
-        System = SysInfo.CurrentSystem();
-    }
+    public string System = SysInfo.CurrentSystem();
 
     public readonly string MappedJavaRealArchitecture()
     {

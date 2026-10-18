@@ -64,19 +64,8 @@ public static class Filters
 /// destination files are not overwritten), after a dry run that counts the files for the
 /// progress bar.
 /// </summary>
-public sealed class DataMigrationTask : FlintTask
+public sealed class DataMigrationTask(string sourcePath, string targetPath, Func<string, bool> pathMatcher) : FlintTask
 {
-    private readonly string _sourcePath;
-    private readonly string _targetPath;
-    private readonly Func<string, bool> _pathMatcher;
-
-    public DataMigrationTask(string sourcePath, string targetPath, Func<string, bool> pathMatcher)
-    {
-        _sourcePath = sourcePath;
-        _targetPath = targetPath;
-        _pathMatcher = pathMatcher;
-    }
-
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Scanning files...");
@@ -138,15 +127,15 @@ public sealed class DataMigrationTask : FlintTask
     private bool Walk(out List<string> matched)
     {
         matched = [];
-        if (!Directory.Exists(_sourcePath))
+        if (!Directory.Exists(sourcePath))
         {
             return false;
         }
 
-        foreach (var file in FileTransfer.EnumerateFilesDeep(_sourcePath))
+        foreach (var file in FileTransfer.EnumerateFilesDeep(sourcePath))
         {
-            var relative = Path.GetRelativePath(_sourcePath, file).Replace('\\', '/');
-            if (_pathMatcher(relative))
+            var relative = Path.GetRelativePath(sourcePath, file).Replace('\\', '/');
+            if (pathMatcher(relative))
             {
                 matched.Add(relative);
             }
@@ -157,13 +146,13 @@ public sealed class DataMigrationTask : FlintTask
 
     private bool CopyFile(string relative)
     {
-        var dstPath = FileSystem.PathCombine(_targetPath, relative);
+        var dstPath = FileSystem.PathCombine(targetPath, relative);
         if (!FileSystem.EnsureFilePathExists(dstPath))
         {
             return false;
         }
 
-        var srcPath = FileSystem.PathCombine(_sourcePath, relative);
+        var srcPath = FileSystem.PathCombine(sourcePath, relative);
         try
         {
             File.Copy(srcPath, dstPath, overwrite: false);

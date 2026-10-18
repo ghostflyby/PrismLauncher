@@ -26,15 +26,10 @@ namespace FlintLauncher.Core.Screenshots;
 /// <summary>Port of the ImgurAPI namespace: the two imgur request factories. An instance
 /// rides the injected NetStack (LauncherRuntime.Imgur — same de-singletoning story as the
 /// platform clients); the tasks it builds send through that stack's client.</summary>
-public sealed class ImgurApi
+public sealed class ImgurApi(NetStack? net = null)
 {
     /// <summary>The network stack this client's uploads flow through.</summary>
-    public NetStack Net { get; }
-
-    public ImgurApi(NetStack? net = null)
-    {
-        Net = net ?? NetStack.Default;
-    }
+    public NetStack Net { get; } = net ?? NetStack.Default;
 
     /// <summary>Port of ImgurAPI::AlbumResult.</summary>
     public sealed record AlbumResult
@@ -62,21 +57,16 @@ public sealed class ImgurApi
 
 /// <summary>The upload half of ImgurAPI::makeUpload (the Net::Request + RPC::Sink&lt;QString&gt;
 /// pair): fills the ScreenShot metadata from the response JSON.</summary>
-public sealed class ImgurUpload : FlintTask
+public sealed class ImgurUpload(
+    ScreenShot shot,
+    string? baseUrl = null,
+    string? clientId = null,
+    NetStack? net = null)
+    : FlintTask
 {
-    private readonly ScreenShot _shot;
-    private readonly string _baseUrl;
-    private readonly string _clientId;
-    private readonly NetStack _net;
-
-    public ImgurUpload(ScreenShot shot, string? baseUrl = null, string? clientId = null,
-        NetStack? net = null)
-    {
-        _shot = shot;
-        _baseUrl = baseUrl ?? FlintConfig.Default.ImgurBaseUrl;
-        _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
-        _net = net ?? NetStack.Default;
-    }
+    private readonly string _baseUrl = baseUrl ?? FlintConfig.Default.ImgurBaseUrl;
+    private readonly string _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
+    private readonly NetStack _net = net ?? NetStack.Default;
 
     /// <summary>The imgur endpoint: BuildConfig.IMGUR_BASE_URL + "image".</summary>
     public string EndpointUrl => _baseUrl + "image";
@@ -86,17 +76,17 @@ public sealed class ImgurUpload : FlintTask
         byte[] fileData;
         try
         {
-            fileData = await File.ReadAllBytesAsync(_shot.FilePath, cancellationToken).ConfigureAwait(false);
+            fileData = await File.ReadAllBytesAsync(shot.FilePath, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException
                                       or ArgumentException or SecurityException)
         {
-            EmitFailed($"Could not open file {_shot.FilePath} for reading: {e.Message}");
+            EmitFailed($"Could not open file {shot.FilePath} for reading: {e.Message}");
             return;
         }
 
         var boundary = "flint-" + Guid.NewGuid().ToString("N");
-        var body = BuildMultipartBody(boundary, fileData, _shot.FileName(), _shot.BaseName());
+        var body = BuildMultipartBody(boundary, fileData, shot.FileName(), shot.BaseName());
 
         using var message = new HttpRequestMessage(HttpMethod.Post, EndpointUrl);
         message.Headers.TryAddWithoutValidation("Authorization", $"Client-ID {_clientId}");
@@ -150,13 +140,13 @@ public sealed class ImgurUpload : FlintTask
 
             if (root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object)
             {
-                _shot.ImgurId = data.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String
+                shot.ImgurId = data.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String
                     ? id.GetString() ?? ""
                     : "";
-                _shot.Url = data.TryGetProperty("link", out var link) && link.ValueKind == JsonValueKind.String
+                shot.Url = data.TryGetProperty("link", out var link) && link.ValueKind == JsonValueKind.String
                     ? link.GetString() ?? ""
                     : "";
-                _shot.ImgurDeleteHash =
+                shot.ImgurDeleteHash =
                     data.TryGetProperty("deletehash", out var deleteHash) && deleteHash.ValueKind == JsonValueKind.String
                         ? deleteHash.GetString() ?? ""
                         : "";
@@ -200,23 +190,17 @@ public sealed class ImgurUpload : FlintTask
 
 /// <summary>The album half of ImgurAPI::makeAlbum (the Net::Request + RPC::Sink&lt;AlbumResult&gt;
 /// pair): posts the uploaded screenshots' delete hashes.</summary>
-public sealed class ImgurAlbumCreation : FlintTask
+public sealed class ImgurAlbumCreation(
+    ImgurApi.AlbumResult result,
+    IReadOnlyList<ScreenShot> screenshots,
+    string? baseUrl = null,
+    string? clientId = null,
+    NetStack? net = null)
+    : FlintTask
 {
-    private readonly IReadOnlyList<ScreenShot> _screenshots;
-    private readonly ImgurApi.AlbumResult _result;
-    private readonly string _baseUrl;
-    private readonly string _clientId;
-    private readonly NetStack _net;
-
-    public ImgurAlbumCreation(ImgurApi.AlbumResult result, IReadOnlyList<ScreenShot> screenshots,
-        string? baseUrl = null, string? clientId = null, NetStack? net = null)
-    {
-        _result = result;
-        _screenshots = screenshots;
-        _baseUrl = baseUrl ?? FlintConfig.Default.ImgurBaseUrl;
-        _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
-        _net = net ?? NetStack.Default;
-    }
+    private readonly string _baseUrl = baseUrl ?? FlintConfig.Default.ImgurBaseUrl;
+    private readonly string _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
+    private readonly NetStack _net = net ?? NetStack.Default;
 
     /// <summary>The imgur endpoint: BuildConfig.IMGUR_BASE_URL + "album".</summary>
     public string EndpointUrl => _baseUrl + "album";
@@ -225,7 +209,7 @@ public sealed class ImgurAlbumCreation : FlintTask
     {
         // Port of getPayload(): "deletehashes=" + hashes.join("&deletehashes=")
         //                     + "&title=Minecraft%20Screenshots&privacy=hidden"
-        var hashes = _screenshots.Select(shot => shot.ImgurDeleteHash).ToArray();
+        var hashes = screenshots.Select(shot => shot.ImgurDeleteHash).ToArray();
         var data = "deletehashes=" + string.Join("&deletehashes=", hashes) +
                    "&title=Minecraft%20Screenshots&privacy=hidden";
 
@@ -281,11 +265,11 @@ public sealed class ImgurAlbumCreation : FlintTask
 
             if (root.TryGetProperty("data", out var albumData) && albumData.ValueKind == JsonValueKind.Object)
             {
-                _result.DeleteHash = albumData.TryGetProperty("deletehash", out var deleteHash) &&
+                result.DeleteHash = albumData.TryGetProperty("deletehash", out var deleteHash) &&
                                      deleteHash.ValueKind == JsonValueKind.String
                     ? deleteHash.GetString() ?? ""
                     : "";
-                _result.Id = albumData.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String
+                result.Id = albumData.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String
                     ? id.GetString() ?? ""
                     : "";
             }

@@ -18,23 +18,17 @@ using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform.Dependencies;
 
-public sealed class LocalResourceUpdateTask : FlintTask
+public sealed class LocalResourceUpdateTask(
+    string indexDir,
+    IndexedPack project,
+    IndexedVersion version,
+    bool lockUpdate = false)
+    : FlintTask
 {
-    private readonly string _indexDir;
-    private readonly IndexedPack _project;
-    private readonly IndexedVersion _version;
-    private readonly bool _lockUpdate;
+    private readonly IndexedPack _project = ClonePack(project);
 
-    public LocalResourceUpdateTask(string indexDir, IndexedPack project, IndexedVersion version,
-        bool lockUpdate = false)
-    {
-        _indexDir = indexDir;
-        // The C++ takes the project by value, so the slug rescue below must not leak into
-        // the caller's pack: work on a shallow copy.
-        _project = ClonePack(project);
-        _version = version;
-        _lockUpdate = lockUpdate;
-    }
+    // The C++ takes the project by value, so the slug rescue below must not leak into
+    // the caller's pack: work on a shallow copy.
 
     /// <summary>Port of the hasOldResource(name, filename) signal.</summary>
     public event Action<string, string>? HasOldResource;
@@ -42,9 +36,9 @@ public sealed class LocalResourceUpdateTask : FlintTask
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         // Ensure a '.index' folder exists in the mods folder, and create it if it does not
-        if (!FileSystem.EnsureFolderPathExists(_indexDir))
+        if (!FileSystem.EnsureFolderPathExists(indexDir))
         {
-            EmitFailed($"Unable to create index directory at {_indexDir}!");
+            EmitFailed($"Unable to create index directory at {indexDir}!");
             return Task.CompletedTask;
         }
 
@@ -52,7 +46,7 @@ public sealed class LocalResourceUpdateTask : FlintTask
 
         // C++ Metadata::get(index_dir, addonId): the by-id lookup (cast forces the object
         // overload over the by-slug one, since AddonId is a plain string here)
-        var oldMetadata = MetadataHandler.Get(_indexDir, (object)_project.AddonId);
+        var oldMetadata = MetadataHandler.Get(indexDir, (object)_project.AddonId);
         if (oldMetadata.IsValid)
         {
             HasOldResource?.Invoke(oldMetadata.Name, oldMetadata.Filename);
@@ -62,11 +56,11 @@ public sealed class LocalResourceUpdateTask : FlintTask
             }
         }
 
-        var pwMod = MetadataHandler.Create(_indexDir, _project, _version);
+        var pwMod = MetadataHandler.Create(indexDir, _project, version);
         if (pwMod.IsValid)
         {
-            pwMod.LockUpdate = _lockUpdate;
-            MetadataHandler.Update(_indexDir, pwMod);
+            pwMod.LockUpdate = lockUpdate;
+            MetadataHandler.Update(indexDir, pwMod);
             EmitSucceeded();
         }
         else

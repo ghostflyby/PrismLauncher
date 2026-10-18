@@ -15,26 +15,16 @@ using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.ModPlatform.Technic;
 
-public sealed class SolderPackInstallTask : InstanceTask
+public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string version, string minecraftVersion)
+    : InstanceTask
 {
-    private readonly Uri _solderUrl;
-    private readonly string _pack;
-    private readonly string _version;
-    private string minecraftVersion;
-
-    public SolderPackInstallTask(Uri solderUrl, string pack, string version, string minecraftVersion)
-    {
-        _solderUrl = solderUrl;
-        _pack = pack;
-        _version = version;
-        this.minecraftVersion = minecraftVersion;
-    }
+    private string minecraftVersion = minecraftVersion;
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Resolving modpack files");
 
-        var sourceUrl = TechnicApi.SolderBuildUrl(_solderUrl.ToString(), _pack, _version);
+        var sourceUrl = TechnicApi.SolderBuildUrl(solderUrl.ToString(), pack, version);
         var request = NetRequest.MakeByteArray(new Uri(sourceUrl));
         var resolveJob = new NetJob("Resolving modpack files");
         resolveJob.AddNetRequest(request);

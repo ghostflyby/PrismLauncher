@@ -10,16 +10,11 @@ using FlintLauncher.Core.IO;
 
 namespace FlintLauncher.Core.ModPlatform.LegacyFtb;
 
-public sealed class PrivatePackManager
+public sealed class PrivatePackManager(string? filename = null)
 {
-    private readonly string _filename;
+    private readonly string _filename = filename ?? "private_packs.txt";
     private readonly HashSet<string> _currentPacks = new(StringComparer.Ordinal);
     private bool dirty;
-
-    public PrivatePackManager(string? filename = null)
-    {
-        _filename = filename ?? "private_packs.txt";
-    }
 
     public bool Empty => _currentPacks.Count == 0;
 

@@ -3,14 +3,9 @@
 
 namespace FlintLauncher.Core.Auth;
 
-public sealed class XboxUserStep : AuthStep
+public sealed class XboxUserStep(AccountData data, AuthEndpointsOptions? auth = null) : AuthStep(data)
 {
-    private readonly AuthEndpointsOptions _auth;
-
-    public XboxUserStep(AccountData data, AuthEndpointsOptions? auth = null) : base(data)
-    {
-        _auth = auth ?? new AuthEndpointsOptions();
-    }
+    private readonly AuthEndpointsOptions _auth = auth ?? new AuthEndpointsOptions();
 
     public override string Describe() => "Logging in as an Xbox user.";
 

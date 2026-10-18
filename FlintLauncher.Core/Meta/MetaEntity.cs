@@ -95,15 +95,9 @@ public abstract class MetaEntity
     /// Port of Meta::ParsingValidator: buffers the response body, parses it into the entity and
     /// fails the download when the body is not valid metadata (so it never reaches the cache).
     /// </summary>
-    private sealed class ParsingValidator : Validator
+    private sealed class ParsingValidator(MetaEntity entity) : Validator
     {
-        private readonly MetaEntity _entity;
         private readonly List<byte> _data = [];
-
-        public ParsingValidator(MetaEntity entity)
-        {
-            _entity = entity;
-        }
 
         public override bool Init(NetRequestSpec request)
         {
@@ -125,12 +119,12 @@ public abstract class MetaEntity
 
         public override bool Validate(NetResponseInfo response)
         {
-            var fname = _entity.LocalFilename;
+            var fname = entity.LocalFilename;
             try
             {
                 var obj = JsonUtils.RequireObject(
                     JsonUtils.RequireNode(Encoding.UTF8.GetString([.. _data]), fname), fname);
-                _entity.Parse(obj);
+                entity.Parse(obj);
                 return true;
             }
             catch (Exception e) when (e is JsonParseException or FormatException)
@@ -142,22 +136,11 @@ public abstract class MetaEntity
     }
 
     /// <summary>Port of Meta::BaseEntityLoadTask.</summary>
-    private sealed class MetaEntityLoadTask : FlintTask
+    private sealed class MetaEntityLoadTask(MetaEntity entity, NetMode mode, bool forceReload) : FlintTask
     {
-        private readonly MetaEntity _entity;
-        private readonly NetMode _mode;
-        private readonly bool _forceReload;
-
-        public MetaEntityLoadTask(MetaEntity entity, NetMode mode, bool forceReload)
-        {
-            _entity = entity;
-            _mode = mode;
-            _forceReload = forceReload;
-        }
-
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            var fname = _entity.MetaPath(_entity.LocalFilename);
+            var fname = entity.MetaPath(entity.LocalFilename);
             var hashMatches = false;
             // the file exists on disk try to load it
             if (File.Exists(fname))
@@ -166,30 +149,30 @@ public abstract class MetaEntity
                 try
                 {
                     // read local file if nothing is loaded yet
-                    if (_entity.loadStatus == LoadStatus.NotLoaded || _entity.FileSha256.Length == 0)
+                    if (entity.loadStatus == LoadStatus.NotLoaded || entity.FileSha256.Length == 0)
                     {
                         EmitStatus("Loading local file");
                         fileData = FileSystem.Read(fname);
-                        _entity.FileSha256 = Convert.ToHexStringLower(SHA256.HashData(fileData));
+                        entity.FileSha256 = Convert.ToHexStringLower(SHA256.HashData(fileData));
                     }
 
                     // on online the hash needs to match
-                    var expected = _entity.Sha256;
-                    var actual = _entity.FileSha256;
+                    var expected = entity.Sha256;
+                    var actual = entity.FileSha256;
                     hashMatches = expected == actual;
-                    if (_mode == NetMode.Online && _entity.Sha256.Length != 0 && !hashMatches)
+                    if (mode == NetMode.Online && entity.Sha256.Length != 0 && !hashMatches)
                     {
                         throw new JsonParseException(
                             $"Checksum mismatch, expected sha256: {expected}, got: {actual}");
                     }
 
                     // load local file
-                    if (_entity.loadStatus == LoadStatus.NotLoaded)
+                    if (entity.loadStatus == LoadStatus.NotLoaded)
                     {
                         var obj = JsonUtils.RequireObject(
                             JsonUtils.RequireNode(Encoding.UTF8.GetString(fileData), fname), fname);
-                        _entity.Parse(obj);
-                        _entity.loadStatus = LoadStatus.Local;
+                        entity.Parse(obj);
+                        entity.loadStatus = LoadStatus.Local;
                     }
                 }
                 catch (Exception)
@@ -199,26 +182,26 @@ public abstract class MetaEntity
                     // qCritical() << "Unable to parse file ...";
                     // just make sure it's gone and we never consider it again.
                     FileSystem.DeletePath(fname);
-                    _entity.loadStatus = LoadStatus.NotLoaded;
+                    entity.loadStatus = LoadStatus.NotLoaded;
                 }
             }
 
             // if we need remote update, run the update task
-            var wasLoadedOffline = _entity.loadStatus != LoadStatus.NotLoaded && _mode == NetMode.Offline;
+            var wasLoadedOffline = entity.loadStatus != LoadStatus.NotLoaded && mode == NetMode.Offline;
             // if hash is not present always fetch from remote (e.g. the main index file), else
             // only fetch if the hash doesn't match
-            var wasLoadedRemote = _entity.Sha256.Length == 0
-                ? _entity.loadStatus == LoadStatus.Remote
+            var wasLoadedRemote = entity.Sha256.Length == 0
+                ? entity.loadStatus == LoadStatus.Remote
                 : hashMatches;
-            if (wasLoadedOffline || (wasLoadedRemote && !_forceReload))
+            if (wasLoadedOffline || (wasLoadedRemote && !forceReload))
             {
                 EmitSucceeded();
                 return;
             }
 
-            var cache = _entity.RequireCache();
-            var entry = cache.ResolveEntry("meta", _entity.LocalFilename);
-            if (_forceReload)
+            var cache = entity.RequireCache();
+            var entry = cache.ResolveEntry("meta", entity.LocalFilename);
+            if (forceReload)
             {
                 // clear validators so manual refreshes fetch a fresh body
                 entry.Etag = "";
@@ -227,23 +210,23 @@ public abstract class MetaEntity
 
             entry.SetStale(true);
             // Net::ApiRequest::makeCached == makeCached + AddAPIHeaders
-            var dl = NetRequest.MakeCached(cache, _entity.Url(), entry, RequestOptions.AddApiHeaders);
+            var dl = NetRequest.MakeCached(cache, entity.Url(), entry, RequestOptions.AddApiHeaders);
             /*
              * The validator parses the file and loads it into the object.
              * If that fails, the file is not written to storage.
              */
-            if (_entity.Sha256.Length != 0)
+            if (entity.Sha256.Length != 0)
             {
-                dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA256, _entity.Sha256));
+                dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA256, entity.Sha256));
             }
 
-            dl.AddValidator(new ParsingValidator(_entity));
+            dl.AddValidator(new ParsingValidator(entity));
 
             await dl.StartAsync(cancellationToken).ConfigureAwait(false);
             if (dl.State == TaskState.Succeeded)
             {
-                _entity.loadStatus = LoadStatus.Remote;
-                _entity.FileSha256 = _entity.Sha256;
+                entity.loadStatus = LoadStatus.Remote;
+                entity.FileSha256 = entity.Sha256;
                 EmitSucceeded();
             }
             else

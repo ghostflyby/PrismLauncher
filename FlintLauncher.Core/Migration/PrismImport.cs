@@ -238,7 +238,7 @@ public sealed class PrismImportTask : FlintTask
             var srcItem = Path.Combine(_sourceDir, item.Name);
             var dstItem = Path.Combine(_targetDataDir, item.Name);
 
-            if (item.IsDirectory && item.Method == PlannedMethod.RenameDirectory)
+            if (item is { IsDirectory: true, Method: PlannedMethod.RenameDirectory })
             {
                 EmitStatus($"Moving {item.Name}…");
                 if (FileTransfer.TryMoveDirectory(srcItem, dstItem))

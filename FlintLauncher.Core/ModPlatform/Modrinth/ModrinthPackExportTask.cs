@@ -26,44 +26,26 @@ using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
-public sealed class ModrinthPackExportTask : FlintTask
+public sealed class ModrinthPackExportTask(
+    string name,
+    string version,
+    string summary,
+    bool optionalFiles,
+    MinecraftInstance instance,
+    string output,
+    MmcZip.FilterFunction? filter = null,
+    ModrinthApi? modrinth = null)
+    : FlintTask
 {
     private static readonly string[] Prefixes = ["mods/", "coremods/", "resourcepacks/", "texturepacks/", "shaderpacks/"];
     private static readonly string[] FileExtensions = ["jar", "litemod", "zip"];
 
-    private readonly string _name;
-    private readonly string _version;
-    private readonly string _summary;
-    private readonly bool _optionalFiles;
-    private readonly MinecraftInstance _instance;
-    private readonly string _gameRoot;
-    private readonly string _output;
-    private readonly MmcZip.FilterFunction? _filter;
+    private readonly string _gameRoot = instance.GameRoot();
 
     private readonly List<string> _files = [];
     private readonly Dictionary<string, string> _pendingHashes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ResolvedFile> _resolvedFiles = new(StringComparer.Ordinal);
-    private readonly ModrinthApi _modrinth;
-
-    public ModrinthPackExportTask(string name,
-        string version,
-        string summary,
-        bool optionalFiles,
-        MinecraftInstance instance,
-        string output,
-        MmcZip.FilterFunction? filter = null,
-        ModrinthApi? modrinth = null)
-    {
-        _modrinth = modrinth ?? new ModrinthApi();
-        _name = name;
-        _version = version;
-        _summary = summary;
-        _optionalFiles = optionalFiles;
-        _instance = instance;
-        _gameRoot = instance.GameRoot();
-        _output = output;
-        _filter = filter;
-    }
+    private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
 
     private sealed record ResolvedFile(string Sha1, string Sha512, string Url, long Size, SideType Side);
 
@@ -83,8 +65,8 @@ public sealed class ModrinthPackExportTask : FlintTask
     private bool CollectFiles()
     {
         _files.Clear();
-        if (!MmcZip.CollectFileListRecursively(_instance.GameRoot(), null, _files,
-                _filter != null ? (Func<FileSystemInfo, bool>)(f => _filter(GetRelativePath(f.FullName))) : null))
+        if (!MmcZip.CollectFileListRecursively(instance.GameRoot(), null, _files,
+                filter != null ? (Func<FileSystemInfo, bool>)(f => filter(GetRelativePath(f.FullName))) : null))
         {
             EmitFailed("Could not search for files");
             return false;
@@ -100,7 +82,7 @@ public sealed class ModrinthPackExportTask : FlintTask
         EmitStatus("Finding file hashes...");
 
         // instance->loaderModList()->update()
-        var modList = new ModFolderModel(_instance.ModsRoot());
+        var modList = new ModFolderModel(instance.ModsRoot());
         modList.Update();
 
         foreach (var file in _files)
@@ -233,7 +215,7 @@ public sealed class ModrinthPackExportTask : FlintTask
 
         try
         {
-            using var stream = File.Create(_output);
+            using var stream = File.Create(output);
             using var zip = new ZipArchive(stream, ZipArchiveMode.Create);
 
             // the ExportToZipTask layout: everything under the game root, prefixed with
@@ -253,10 +235,8 @@ public sealed class ModrinthPackExportTask : FlintTask
             }
 
             var indexEntry = zip.CreateEntry("modrinth.index.json", CompressionLevel.Optimal);
-            using (var writer = new StreamWriter(indexEntry.Open(), Encoding.UTF8))
-            {
-                writer.Write(GenerateIndex());
-            }
+            using var writer = new StreamWriter(indexEntry.Open(), Encoding.UTF8);
+            writer.Write(GenerateIndex());
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
                                       or NotSupportedException)
@@ -274,16 +254,16 @@ public sealed class ModrinthPackExportTask : FlintTask
         {
             ["formatVersion"] = 1,
             ["game"] = "minecraft",
-            ["name"] = _name,
-            ["versionId"] = _version,
+            ["name"] = name,
+            ["versionId"] = version,
         };
-        if (!string.IsNullOrEmpty(_summary))
+        if (!string.IsNullOrEmpty(summary))
         {
-            outObj["summary"] = _summary;
+            outObj["summary"] = summary;
         }
 
         // collect all supported components
-        var profile = _instance.GetPackProfile();
+        var profile = instance.GetPackProfile();
         profile.Load(); // (MinecraftInstance loads its profile lazily in the C++; make it explicit here)
         Component? minecraft = profile.GetComponent("net.minecraft");
         Component? quilt = profile.GetComponent("org.quiltmc.quilt-loader");
@@ -331,7 +311,7 @@ public sealed class ModrinthPackExportTask : FlintTask
 
             // detect disabled mod
             var suffix = Path.GetExtension(path).TrimStart('.');
-            if (_optionalFiles && suffix == "disabled")
+            if (optionalFiles && suffix == "disabled")
             {
                 // rename it
                 path = Path.Combine(Path.GetDirectoryName(path) ?? "", Path.GetFileNameWithoutExtension(path))

@@ -23,21 +23,15 @@ using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.ModPlatform.Ftb;
 
-public sealed class FtbPackInstallTask : InstanceTask
+public sealed class FtbPackInstallTask(
+    FtbModpack pack,
+    string versionName,
+    FlameApi? flame = null,
+    FtbApi? ftb = null)
+    : InstanceTask
 {
-    public FtbPackInstallTask(FtbModpack pack, string versionName, FlameApi? flame = null,
-        FtbApi? ftb = null)
-    {
-        _pack = pack;
-        _versionName = versionName;
-        _flame = flame ?? new FlameApi();
-        _ftb = ftb ?? new FtbApi();
-    }
-
-    private readonly FtbModpack _pack;
-    private readonly FlameApi _flame;
-    private readonly FtbApi _ftb;
-    private readonly string _versionName;
+    private readonly FlameApi _flame = flame ?? new FlameApi();
+    private readonly FtbApi _ftb = ftb ?? new FtbApi();
 
     private readonly FtbVersion _version = new();
     private readonly List<long> _fileIds = [];
@@ -56,9 +50,9 @@ public sealed class FtbPackInstallTask : InstanceTask
 
         // Find pack version
         FtbVersionInfo? versionInfo = null;
-        foreach (var candidate in _pack.Versions)
+        foreach (var candidate in pack.Versions)
         {
-            if (candidate.Name == _versionName)
+            if (candidate.Name == versionName)
             {
                 versionInfo = candidate;
                 break;
@@ -67,11 +61,11 @@ public sealed class FtbPackInstallTask : InstanceTask
 
         if (versionInfo is null)
         {
-            EmitFailed($"Failed to find pack version {_versionName}");
+            EmitFailed($"Failed to find pack version {versionName}");
             return;
         }
 
-        var (job, request) = _ftb.FetchVersion(_pack.Id, versionInfo.Id);
+        var (job, request) = _ftb.FetchVersion(pack.Id, versionInfo.Id);
         await job.StartAsync(cancellationToken);
         if (!job.WasSuccessful)
         {
@@ -124,7 +118,7 @@ public sealed class FtbPackInstallTask : InstanceTask
         var manifest = new FlameManifest();
         foreach (var file in _version.Files)
         {
-            if (!file.ServerOnly && file.Url.Length == 0)
+            if (file is { ServerOnly: false, Url.Length: 0 })
             {
                 if (file.Curseforge.FileId <= 0)
                 {
@@ -235,7 +229,7 @@ public sealed class FtbPackInstallTask : InstanceTask
 
         foreach (var target in _version.Targets)
         {
-            if (target.Type == "game" && target.Name == "minecraft")
+            if (target is { Type: "game", Name: "minecraft" })
             {
                 await components.SetComponentVersion("net.minecraft", target.Version, important: true, cancellationToken);
                 break;
@@ -279,7 +273,7 @@ public sealed class FtbPackInstallTask : InstanceTask
 
         instance.SetName(Name());
         instance.SetIconKey(Icon);
-        instance.SetManagedPack("ftb", _pack.Id.ToString(), _pack.Name,
+        instance.SetManagedPack("ftb", pack.Id.ToString(), pack.Name,
             _version.Id.ToString(), _version.Name);
 
         instance.SaveNow();

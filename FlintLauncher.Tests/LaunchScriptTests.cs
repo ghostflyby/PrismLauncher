@@ -190,11 +190,13 @@ public class LaunchScriptTests
         var session = fixture.OfflineSession();
 
         // MinecraftInstance::createCensorFilterFromSession shape
-        var filter = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        filter[session.Session] = "<SESSION ID>"; // "-" is filtered upstream; offline session is "-"
-        filter["0"] = "<ACCESS TOKEN>";           // "0" would be filtered upstream
-        filter[session.Uuid] = "<PROFILE ID>";
-        filter["super-secret-token"] = "<ACCESS TOKEN>";
+        var filter = new SortedDictionary<string, string>(StringComparer.Ordinal)
+        {
+            [session.Session] = "<SESSION ID>", // "-" is filtered upstream; offline session is "-"
+            ["0"] = "<ACCESS TOKEN>",           // "0" would be filtered upstream
+            [session.Uuid] = "<PROFILE ID>",
+            ["super-secret-token"] = "<ACCESS TOKEN>"
+        };
         task.SetCensorFilter(filter);
 
         var line = task.CensorPrivateInfo("logging in with super-secret-token and profile " + session.Uuid);

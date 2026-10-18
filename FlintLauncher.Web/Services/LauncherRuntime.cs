@@ -95,8 +95,7 @@ public sealed class LauncherRuntime
     /// <summary>The C5 INI import outcome (assembly step 6): what the one-shot importer did,
     /// including an unreadable chain INI — the ctor runs before any logger exists, so the
     /// host surfaces this after Build (the flint-legacy result pattern).</summary>
-    public FlintConfigImporter.ImportResult ConfigImport { get; } =
-        FlintConfigImporter.ImportResult.Idle;
+    public FlintConfigImporter.ImportResult ConfigImport { get; }
 
     /// <summary>The launch-pipeline dependencies (paths, logger factory, global settings,
     /// meta cache, install root). Built by the composition root (WebHostBuilder) once the

@@ -84,8 +84,10 @@ public class LibraryTests
     {
         var r = DummyContext();
         var failedFiles = new List<string>();
-        var test = new Library("test.package:testname:testversion");
-        test.RepositoryUrl = "file://foo/bar";
+        var test = new Library("test.package:testname:testversion")
+        {
+            RepositoryUrl = "file://foo/bar"
+        };
         var downloads = test.GetDownloads(r, _cache, failedFiles, "");
         Assert.Single(downloads);
         Assert.Empty(failedFiles);
@@ -131,8 +133,13 @@ public class LibraryTests
     public void Test_Legacy_Native()
     {
         var r = DummyContext();
-        var test = new Library("test.package:testname:testversion");
-        test.NativeClassifiers["linux"] = "linux";
+        var test = new Library("test.package:testname:testversion")
+        {
+            NativeClassifiers =
+            {
+                ["linux"] = "linux"
+            }
+        };
         Assert.True(test.IsNative());
         test.RepositoryUrl = "file://foo/bar";
         {
@@ -154,10 +161,15 @@ public class LibraryTests
     public void Test_Legacy_Native_Arch()
     {
         var r = DummyContext();
-        var test = new Library("test.package:testname:testversion");
-        test.NativeClassifiers["linux"] = "linux-${arch}";
-        test.NativeClassifiers["osx"] = "osx-${arch}";
-        test.NativeClassifiers["windows"] = "windows-${arch}";
+        var test = new Library("test.package:testname:testversion")
+        {
+            NativeClassifiers =
+            {
+                ["linux"] = "linux-${arch}",
+                ["osx"] = "osx-${arch}",
+                ["windows"] = "windows-${arch}"
+            }
+        };
         Assert.True(test.IsNative());
         test.RepositoryUrl = "file://foo/bar";
         {
@@ -207,9 +219,14 @@ public class LibraryTests
     public void Test_Legacy_Native_Arch_Local_Override()
     {
         var r = DummyContext();
-        var test = new Library("test.package:testname:testversion");
-        test.NativeClassifiers["linux"] = "linux-${arch}";
-        test.Hint = "local";
+        var test = new Library("test.package:testname:testversion")
+        {
+            NativeClassifiers =
+            {
+                ["linux"] = "linux-${arch}"
+            },
+            Hint = "local"
+        };
         Assert.True(test.IsNative());
         test.RepositoryUrl = "file://foo/bar";
         {

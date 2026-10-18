@@ -37,7 +37,7 @@ public class InstanceCopyTask : InstanceTask
         _keepPlaytime = prefs.KeepPlaytime;
         _useLinks = prefs.UseSymLinks;
         _linkRecursively = prefs.LinkRecursively;
-        _useHardLinks = prefs.LinkRecursively && prefs.UseHardLinks;
+        _useHardLinks = prefs is { LinkRecursively: true, UseHardLinks: true };
         // NOTE: the C++ also computes m_copySaves = linkRecursively && dontLinkSaves &&
         // copySaves for the separate saves copy of the link path; that path is not ported.
         _useClone = prefs.UseClone;

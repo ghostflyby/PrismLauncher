@@ -307,52 +307,42 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
 /// installed mods, then download a ResourceDownloadTask per resolved entry (each writing its
 /// own packwiz metadata). Fails with the resolution/download reason, like a SequentialTask.
 /// </summary>
-public sealed class ModInstallTask : FlintTask
+public sealed class ModInstallTask(
+    MinecraftInstance instance,
+    ModFolderModel folder,
+    IReadOnlyList<ModInstallRequest> selections,
+    string mcVersion,
+    ModLoaderType loaders,
+    ModrinthApi? modrinth = null,
+    FlameApi? flame = null)
+    : FlintTask
 {
-    private readonly MinecraftInstance _instance;
-    private readonly ModFolderModel _folder;
-    private readonly IReadOnlyList<ModInstallRequest> _selections;
-    private readonly McVersion _mcVersion;
-    private readonly ModLoaderType _loaders;
-    private readonly List<ModLoaderType> _loaderList;
+    private readonly McVersion _mcVersion = new(mcVersion);
+    private readonly List<ModLoaderType> _loaderList = ModIndex.ModLoaderTypesToList(loaders);
     private readonly List<ModInstallEntryView> _installed = [];
-    private readonly ModrinthApi _modrinth;
-    private readonly FlameApi _flame;
+    private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
+    private readonly FlameApi _flame = flame ?? new FlameApi();
 
     /// <summary>The entries for the task view's optional result payload.</summary>
     public TaskResultView BuildResult() => new(null, _installed);
 
-    public ModInstallTask(MinecraftInstance instance, ModFolderModel folder,
-        IReadOnlyList<ModInstallRequest> selections, string mcVersion, ModLoaderType loaders,
-        ModrinthApi? modrinth = null, FlameApi? flame = null)
-    {
-        _modrinth = modrinth ?? new ModrinthApi();
-        _flame = flame ?? new FlameApi();
-        _instance = instance;
-        _folder = folder;
-        _selections = selections;
-        _mcVersion = new McVersion(mcVersion);
-        _loaders = loaders;
-        _loaderList = ModIndex.ModLoaderTypesToList(loaders);
-    }
-
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         // pick up already-installed mods for the dependency resolution
-        _folder.Update();
+        folder.Update();
 
         var selected = new List<GetModDependenciesTask.PackDependency>();
         try
         {
-            var resolver = new ModSelectionResolver(_mcVersion, _loaders, _loaderList, _modrinth, _flame);
+            var resolver = new ModSelectionResolver(_mcVersion, loaders, _loaderList, _modrinth, _flame);
             var current = 0;
-            foreach (var selection in _selections)
+            foreach (var selection in selections)
             {
                 EmitStatus($"Resolving {ModPlatformTasks.ProviderKey(selection.Provider)} project {selection.ProjectId}...");
                 var (pack, version) = await resolver.ResolveAsync(
                     selection.Provider, selection.ProjectId, selection.VersionId, cancellationToken);
                 selected.Add(new GetModDependenciesTask.PackDependency(pack, version));
-                SetProgress(++current, _selections.Count + 2);
+                SetProgress(++current, selections.Count + 2);
             }
         }
         catch (ModResolveException e)
@@ -362,7 +352,7 @@ public sealed class ModInstallTask : FlintTask
         }
 
         EmitStatus("Resolving dependencies...");
-        var dependencyTask = new GetModDependenciesTask(_instance, _folder, selected, _modrinth);
+        var dependencyTask = new GetModDependenciesTask(instance, folder, selected, _modrinth);
         await dependencyTask.StartAsync(cancellationToken);
         if (!dependencyTask.WasSuccessful)
         {
@@ -370,7 +360,7 @@ public sealed class ModInstallTask : FlintTask
             return;
         }
 
-        SetProgress(_selections.Count + 1, _selections.Count + 2);
+        SetProgress(selections.Count + 1, selections.Count + 2);
 
         var dependencies = dependencyTask.GetDependencies();
         var extraInfo = dependencyTask.GetExtraInfo();
@@ -410,11 +400,11 @@ public sealed class ModInstallTask : FlintTask
             downloads.AddTask(new ResourceDownloadTask(
                 entry.Pack,
                 entry.Version,
-                _folder,
+                folder,
                 isIndexed: true,
                 downloadReason: isDependency ? "dependency" : "standalone",
                 dependentOn: requiredBy ?? "",
-                _instance,
+                instance,
                 _modrinth));
         }
 
@@ -431,7 +421,7 @@ public sealed class ModInstallTask : FlintTask
             RecordInstalled(entry, isDependency, requiredBy);
         }
 
-        SetProgress(_selections.Count + 2, _selections.Count + 2);
+        SetProgress(selections.Count + 2, selections.Count + 2);
         EmitSucceeded();
     }
 }
@@ -441,45 +431,36 @@ public sealed class ModInstallTask : FlintTask
 /// check passes, then apply everything found with a ModUpdateTask. The found/applied updates
 /// are exposed for the task view's result payload ({@link BuildResult}).
 /// </summary>
-public sealed class ModsUpdateTask : FlintTask
+public sealed class ModsUpdateTask(
+    MinecraftInstance instance,
+    ModFolderModel folder,
+    IReadOnlyList<string>? filter,
+    IReadOnlyList<IndexedVersionType>? releaseTypes = null,
+    ModrinthApi? modrinth = null,
+    FlameApi? flame = null)
+    : FlintTask
 {
     private sealed record PendingUpdate(ModUpdateEntryView View, IndexedVersion Version, string ProjectId, string Slug, string Name);
 
-    private readonly MinecraftInstance _instance;
-    private readonly ModFolderModel _folder;
-    private readonly IReadOnlyList<string>? _filter;
-    private readonly IReadOnlyList<IndexedVersionType>? _releaseTypes;
     private readonly List<PendingUpdate> _updates = [];
-    private readonly ModrinthApi _modrinth;
-    private readonly FlameApi _flame;
-
-    public ModsUpdateTask(MinecraftInstance instance, ModFolderModel folder, IReadOnlyList<string>? filter,
-        IReadOnlyList<IndexedVersionType>? releaseTypes = null,
-        ModrinthApi? modrinth = null, FlameApi? flame = null)
-    {
-        _modrinth = modrinth ?? new ModrinthApi();
-        _flame = flame ?? new FlameApi();
-        _instance = instance;
-        _folder = folder;
-        _filter = filter;
-        _releaseTypes = releaseTypes;
-    }
+    private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
+    private readonly FlameApi _flame = flame ?? new FlameApi();
 
     /// <summary>The update entries for the task view's optional result payload.</summary>
     public TaskResultView BuildResult() => new(_updates.Select(u => u.View).ToArray(), null);
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        _folder.Update();
+        folder.Update();
 
-        var profile = _instance.GetPackProfile();
+        var profile = instance.GetPackProfile();
         var gameVersions = new List<McVersion> { new(profile.GetComponentVersion("net.minecraft")) };
         var loadersList = profile.GetModLoadersList();
 
-        var candidates = _folder.AllMods().Where(m => !m.Fileinfo.Name.StartsWith('.'));
-        if (_filter is { Count: > 0 })
+        var candidates = folder.AllMods().Where(m => !m.Fileinfo.Name.StartsWith('.'));
+        if (filter is { Count: > 0 })
         {
-            var wanted = _filter.ToHashSet(StringComparer.Ordinal);
+            var wanted = filter.ToHashSet(StringComparer.Ordinal);
             candidates = candidates.Where(m => wanted.Contains(m.Fileinfo.Name) ||
                                                wanted.Contains(m.GetOriginalFileName()));
         }
@@ -491,7 +472,7 @@ public sealed class ModsUpdateTask : FlintTask
         var flame = new List<Resource>();
         foreach (var mod in candidates)
         {
-            var metadata = _folder.GetMetadata(mod);
+            var metadata = folder.GetMetadata(mod);
             if (metadata is null || metadata.LockUpdate)
             {
                 continue;
@@ -511,7 +492,7 @@ public sealed class ModsUpdateTask : FlintTask
         {
             EmitStatus("Checking Modrinth updates...");
             var check = new ModrinthCheckUpdate(modrinth, gameVersions, loadersList,
-                resource => _folder.GetMetadata(resource), _releaseTypes, _modrinth);
+                resource => folder.GetMetadata(resource), releaseTypes, _modrinth);
             await check.StartAsync(cancellationToken);
             if (!check.WasSuccessful)
             {
@@ -533,7 +514,7 @@ public sealed class ModsUpdateTask : FlintTask
         {
             EmitStatus("Checking CurseForge updates...");
             var check = new FlameCheckUpdate(flame, gameVersions, loadersList,
-                resource => _folder.GetMetadata(resource), _releaseTypes);
+                resource => folder.GetMetadata(resource), releaseTypes);
             await check.StartAsync(cancellationToken);
             if (!check.WasSuccessful)
             {
@@ -568,12 +549,12 @@ public sealed class ModsUpdateTask : FlintTask
                 Provider = update.View.Provider == "modrinth" ? ResourceProvider.Modrinth : ResourceProvider.Flame,
             },
             update.Version,
-            _folder,
+            folder,
             isIndexed: true,
             downloadReason: "update",
-            instance: _instance,
+            instance: instance,
             modrinth: _modrinth));
-        var apply = new ModUpdateTask(_folder, downloads);
+        var apply = new ModUpdateTask(folder, downloads);
         await apply.StartAsync(cancellationToken);
         if (!apply.WasSuccessful)
         {
@@ -613,7 +594,7 @@ public sealed class ModsUpdateTask : FlintTask
         var map = new Dictionary<string, MetadataHandler.ModStruct>(StringComparer.Ordinal);
         foreach (var resource in resources)
         {
-            var metadata = _folder.GetMetadata(resource);
+            var metadata = folder.GetMetadata(resource);
             if (metadata is { } value && !map.ContainsKey(value.ProjectId))
             {
                 map[value.ProjectId] = value;

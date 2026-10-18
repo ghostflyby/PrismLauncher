@@ -106,7 +106,7 @@ public static class WebHostBuilder
 
         // S2: a generated token exists only in this process — announce it once at startup
         // (Information, single line) so the host's client can pick it up; nothing is written
-        if (apiAuth.Enabled && apiAuth.TokenGenerated)
+        if (apiAuth is { Enabled: true, TokenGenerated: true })
         {
             loggerFactory.CreateLogger(LogCategories.ApiAuth).LogInformation(
                 "Flint API token (temporary, process-lifetime): {Token}", apiAuth.Token);

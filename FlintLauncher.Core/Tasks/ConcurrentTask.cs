@@ -20,7 +20,7 @@ namespace FlintLauncher.Core.Tasks;
 public class ConcurrentTask : FlintTask
 {
     /// <summary>C++ constructor default: explicit ConcurrentTask(QString task_name = "", int max_concurrent = 6).</summary>
-    public const int DefaultMaxConcurrent = 6;
+    protected const int DefaultMaxConcurrent = 6;
 
     private protected readonly object Gate = new();
     private protected readonly Queue<FlintTask> Queue = new();
@@ -30,9 +30,9 @@ public class ConcurrentTask : FlintTask
 
     // the C++ m_failed/m_succeeded maps — the names hide the FlintTask signal events on purpose
     private protected new readonly Dictionary<FlintTask, FlintTask> Failed = new();
-    private protected new readonly Dictionary<FlintTask, FlintTask> Succeeded = new();
-    private protected readonly Dictionary<Guid, TaskStepProgress> TaskProgress = new();
-    private protected int TotalMaxSize;
+    private new readonly Dictionary<FlintTask, FlintTask> Succeeded = new();
+    private readonly Dictionary<Guid, TaskStepProgress> TaskProgress = new();
+    private readonly int totalMaxSize;
     private CancellationToken runToken;
     private volatile bool aborting;
 
@@ -54,13 +54,13 @@ public class ConcurrentTask : FlintTask
     /// </summary>
     private long stateStamp;
 
-    private readonly object _emitLock = new();
+    private readonly Lock _emitLock = new();
 
     public ConcurrentTask(string taskName = "", int maxConcurrent = DefaultMaxConcurrent)
     {
         // `taskName` mirrors the C++ QObject objectName, which has no equivalent here.
         _ = taskName;
-        TotalMaxSize = maxConcurrent;
+        totalMaxSize = maxConcurrent;
     }
 
     /// <summary>Adds a task to execute in this ConcurrentTask (safe to call before starting).</summary>
@@ -164,7 +164,7 @@ public class ConcurrentTask : FlintTask
 
         // Port of ConcurrentTask::executeTask(): queue one start per concurrency slot.
         // Extra invocations no-op while the running set is full or the queue is empty.
-        for (var i = 0; i < TotalMaxSize; i++)
+        for (var i = 0; i < totalMaxSize; i++)
         {
             ExecuteNextSubTask();
         }
@@ -178,7 +178,7 @@ public class ConcurrentTask : FlintTask
         // bookkeeping is mid-flight on another thread) — waiting is the only correct move while
         // one is visible; the driver must never run its own ExecuteNextSubTask on top of it.
         var cancelled = new TaskCompletionSource();
-        using (cancellationToken.Register(static state => ((TaskCompletionSource)state!).TrySetResult(), cancelled))
+        await using (cancellationToken.Register(static state => (state as TaskCompletionSource)?.TrySetResult(), cancelled))
         {
             while (State == TaskState.Running)
             {
@@ -242,7 +242,7 @@ public class ConcurrentTask : FlintTask
         FlintTask? next = null;
         lock (Gate)
         {
-            if (Doing.Count >= TotalMaxSize)
+            if (Doing.Count >= totalMaxSize)
             {
                 return;
             }

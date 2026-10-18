@@ -49,24 +49,15 @@ public sealed record MigrationDecisionRecord
 
 /// <summary>Reads and writes the per-source decision records under the state root's
 /// migration/ directory (S3). One TypedJsonFile per record file; writes are atomic.</summary>
-public sealed class MigrationDecisionStore
+public sealed class MigrationDecisionStore(string migrationDir, JsonTypeInfo<MigrationDecisionRecord> typeInfo)
 {
-    private readonly string _migrationDir;
-    private readonly JsonTypeInfo<MigrationDecisionRecord> _typeInfo;
-
-    public MigrationDecisionStore(string migrationDir, JsonTypeInfo<MigrationDecisionRecord> typeInfo)
-    {
-        _migrationDir = migrationDir;
-        _typeInfo = typeInfo;
-    }
-
     /// <summary>The directory the per-source record files live in
     /// (&lt;state-root&gt;/migration).</summary>
-    public string MigrationDir => _migrationDir;
+    public string MigrationDir => migrationDir;
 
     /// <summary>The record file for one source (&lt;dir&gt;/&lt;source&gt;.json).</summary>
     public string RecordPath(string source) =>
-        Path.Combine(_migrationDir, SourceFileStem(source) + ".json");
+        Path.Combine(migrationDir, SourceFileStem(source) + ".json");
 
     /// <summary>The stored decision for <paramref name="source"/>, or null when the source is
     /// undecided (a corrupt record counts as undecided — TypedJsonFile keeps the
@@ -80,7 +71,7 @@ public sealed class MigrationDecisionStore
         }
 
         // load-or-default with a null default: exists ⇒ parse, corrupt ⇒ undecided
-        return new TypedJsonFile<MigrationDecisionRecord>(path, _typeInfo).LoadOrDefault(() => null!);
+        return new TypedJsonFile<MigrationDecisionRecord>(path, typeInfo).LoadOrDefault(() => null!);
     }
 
     /// <summary>Write (or replace) the decision record for its source. The source name must
@@ -89,7 +80,7 @@ public sealed class MigrationDecisionStore
     {
         var stem = SourceFileStem(record.Source);
         new TypedJsonFile<MigrationDecisionRecord>(
-            Path.Combine(_migrationDir, stem + ".json"), _typeInfo).Save(record);
+            Path.Combine(migrationDir, stem + ".json"), typeInfo).Save(record);
     }
 
     /// <summary>Guard the record file name: sources are fixed vocabulary ids (prism,

@@ -230,8 +230,10 @@ public static partial class OneSixVersionFormat
         // else reconstruct it from downloads and id ... if that's available
         else if (outInfo.MinecraftVersion.Length != 0)
         {
-            var lib = new Library();
-            lib.Name = new GradleSpecifier($"com.mojang:minecraft:{outInfo.MinecraftVersion}:client");
+            var lib = new Library
+            {
+                Name = new GradleSpecifier($"com.mojang:minecraft:{outInfo.MinecraftVersion}:client")
+            };
             // we have a reliable client download, use it.
             if (outInfo.MojangDownloads.TryGetValue("client", out var clientDownload))
             {

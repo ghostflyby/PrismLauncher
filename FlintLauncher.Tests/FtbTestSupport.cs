@@ -74,11 +74,11 @@ internal sealed class StubFtbServer : IDisposable
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
         byte[] body;
-        if (segments.Length == 2 && segments[0] == "modpack" && segments[1] == "all")
+        if (segments is ["modpack", "all"])
         {
             body = Encoding.UTF8.GetBytes(ModpacksIndexJson);
         }
-        else if (segments.Length == 2 && segments[0] == "modpack")
+        else if (segments is ["modpack", _])
         {
             if (!Modpacks.TryGetValue(segments[1], out var modpackJson))
             {
@@ -88,7 +88,7 @@ internal sealed class StubFtbServer : IDisposable
 
             body = Encoding.UTF8.GetBytes(modpackJson);
         }
-        else if (segments.Length == 3 && segments[0] == "modpack")
+        else if (segments is ["modpack", _, _])
         {
             var key = $"{segments[1]}/{segments[2]}";
             if (!Versions.TryGetValue(key, out var versionJson))

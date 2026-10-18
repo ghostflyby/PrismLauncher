@@ -16,13 +16,11 @@ using JdkFind;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class CheckJava : LaunchStep
+public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
 {
     private string javaPath = "";
     private string javaSignature = "";
     private string detectKey = "";
-
-    public CheckJava(LaunchTask parent) : base(parent) { }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {

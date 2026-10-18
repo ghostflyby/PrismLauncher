@@ -101,22 +101,16 @@ public static class HashUtils
 }
 
 /// <summary>Port of Hashing::Hasher: a Task that computes a file hash off the caller's flow.</summary>
-public sealed class Hasher : FlintTask
+public sealed class Hasher(string filePath, Algorithm alg) : FlintTask
 {
     private string result = "";
-
-    public Hasher(string filePath, Algorithm alg)
-    {
-        Path = filePath;
-        Alg = alg;
-    }
 
     public Hasher(string filePath, string alg)
         : this(filePath, HashUtils.AlgorithmFromString(alg)) { }
 
-    public string Path { get; }
+    public string Path { get; } = filePath;
 
-    public Algorithm Alg { get; }
+    public Algorithm Alg { get; } = alg;
 
     public string GetResult() => result;
 

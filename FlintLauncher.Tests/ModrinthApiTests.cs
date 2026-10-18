@@ -141,8 +141,11 @@ public class ModrinthApiTests : IDisposable
     [Fact]
     public void SearchUrl_RejectsUnsupportedLoaders()
     {
-        var args = new SearchArgs { Type = ResourceType.Mod };
-        args.Loaders = (ModLoaderType)0x8000; // no Modrinth support for unknown loaders
+        var args = new SearchArgs
+        {
+            Type = ResourceType.Mod,
+            Loaders = (ModLoaderType)0x8000 // no Modrinth support for unknown loaders
+        };
         Assert.Null(_api.GetSearchUrl(args));
     }
 

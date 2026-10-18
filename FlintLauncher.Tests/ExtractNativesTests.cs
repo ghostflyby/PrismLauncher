@@ -53,11 +53,9 @@ public class ExtractNativesTests
 
     /// <summary>Keeps the launch "running" so the steps' FinalizeStep can be observed while
     /// the extracted/merged artifacts still exist.</summary>
-    private sealed class GateStep : LaunchStep
+    private sealed class GateStep(LaunchTask parent) : LaunchStep(parent)
     {
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public GateStep(LaunchTask parent) : base(parent) { }
 
         public bool Started { get; private set; }
 

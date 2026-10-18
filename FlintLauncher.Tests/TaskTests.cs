@@ -49,52 +49,34 @@ public class TaskTests
     }
 
     /// <summary>Runs an arbitrary body, for tasks with custom timing.</summary>
-    private sealed class CallbackTestTask : FlintTask
+    private sealed class CallbackTestTask(Func<CallbackTestTask, CancellationToken, Task> body) : FlintTask
     {
-        private readonly Func<CallbackTestTask, CancellationToken, Task> _body;
-
-        public CallbackTestTask(Func<CallbackTestTask, CancellationToken, Task> body)
-        {
-            _body = body;
-        }
-
         // Public shims for the protected Emit* methods, callable from test lambdas.
         public void Succeed() => EmitSucceeded();
 
         public void Fail(string reason) => EmitFailed(reason);
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken) =>
-            await _body(this, cancellationToken).ConfigureAwait(false);
+            await body(this, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Records its start order and succeeds or fails deterministically.</summary>
-    private sealed class NamedTestTask : FlintTask
+    private sealed class NamedTestTask(string name, ICollection<string> startOrder, bool succeeds) : FlintTask
     {
-        private readonly string _name;
-        private readonly ICollection<string> _startOrder;
-        private readonly bool _succeeds;
-
-        public NamedTestTask(string name, ICollection<string> startOrder, bool succeeds)
-        {
-            _name = name;
-            _startOrder = startOrder;
-            _succeeds = succeeds;
-        }
-
         protected override Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            lock (_startOrder)
+            lock (startOrder)
             {
-                _startOrder.Add(_name);
+                startOrder.Add(name);
             }
 
-            if (_succeeds)
+            if (succeeds)
             {
                 EmitSucceeded();
             }
             else
             {
-                EmitFailed($"failure of {_name}");
+                EmitFailed($"failure of {name}");
             }
 
             return Task.CompletedTask;

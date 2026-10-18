@@ -6,18 +6,11 @@ using FlintLauncher.Core.Instances;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class EnsureOfflineLibraries : LaunchStep
+public sealed class EnsureOfflineLibraries(LaunchTask parent, MinecraftInstance instance) : LaunchStep(parent)
 {
-    private readonly MinecraftInstance _instance;
-
-    public EnsureOfflineLibraries(LaunchTask parent, MinecraftInstance instance) : base(parent)
-    {
-        _instance = instance;
-    }
-
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        var profile = _instance.GetPackProfile().GetProfile();
+        var profile = instance.GetPackProfile().GetProfile();
         if (profile is null)
         {
             EmitFailed("The instance profile is missing.");
@@ -25,8 +18,8 @@ public sealed class EnsureOfflineLibraries : LaunchStep
         }
 
         var allJars = new List<string>();
-        profile.GetLibraryFiles(_instance.RuntimeContext, allJars, allJars, _instance.GetLocalLibraryPath(),
-            _instance.BinRoot(), false, storageBase: _instance.LibraryStorageBase());
+        profile.GetLibraryFiles(instance.RuntimeContext, allJars, allJars, instance.GetLocalLibraryPath(),
+            instance.BinRoot(), false, storageBase: instance.LibraryStorageBase());
 
         var missing = new List<string>();
         foreach (var jar in allJars)

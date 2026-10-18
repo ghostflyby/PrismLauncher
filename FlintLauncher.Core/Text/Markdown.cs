@@ -243,7 +243,7 @@ public static partial class Markdown
         }
 
         var rest = line[indent..];
-        if (rest.Length >= 2 && (rest[0] is '*' or '-' or '+') && (rest[1] == ' ' || rest[1] == '\t'))
+        if (rest is ['*' or '-' or '+', _, ..] && (rest[1] == ' ' || rest[1] == '\t'))
         {
             ordered = false;
             contentIndent = indent + 2;
@@ -256,7 +256,7 @@ public static partial class Markdown
             digits++;
         }
 
-        if (digits > 0 && digits <= 9 && digits + 1 < rest.Length && rest[digits] == '.' &&
+        if (digits is > 0 and <= 9 && digits + 1 < rest.Length && rest[digits] == '.' &&
             (rest[digits + 1] == ' ' || rest[digits + 1] == '\t'))
         {
             ordered = true;

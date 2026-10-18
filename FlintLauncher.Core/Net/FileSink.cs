@@ -8,9 +8,8 @@ using FlintLauncher.Core.IO;
 namespace FlintLauncher.Core.Net;
 
 /// <summary>Writes the response body to a file via an atomic temp file + rename (PSaveFile).</summary>
-public class FileSink : Sink
+public class FileSink(string filename) : Sink
 {
-    private readonly string _filename;
     private bool wroteAnyData;
 
     /// <summary>Writable by MetaCacheSink (C++: protected member access).</summary>
@@ -18,12 +17,7 @@ public class FileSink : Sink
 
     private string? tempFile;
 
-    public FileSink(string filename)
-    {
-        _filename = filename;
-    }
-
-    public string Filename => _filename;
+    public string Filename => filename;
 
     public override bool Init(NetRequestSpec request)
     {
@@ -33,21 +27,21 @@ public class FileSink : Sink
             return false;
         }
 
-        if (!FileSystem.EnsureFilePathExists(_filename))
+        if (!FileSystem.EnsureFilePathExists(filename))
         {
-            FailReason = "Could not create folder for " + _filename;
+            FailReason = "Could not create folder for " + filename;
             return false;
         }
 
         wroteAnyData = false;
-        tempFile = _filename + ".flint-tmp";
+        tempFile = filename + ".flint-tmp";
         try
         {
             File.Create(tempFile).Dispose();
         }
         catch (IOException e)
         {
-            FailReason = $"Could not open {_filename} for writing: {e.Message}";
+            FailReason = $"Could not open {filename} for writing: {e.Message}";
             tempFile = null;
             return false;
         }
@@ -76,7 +70,7 @@ public class FileSink : Sink
         }
         catch (IOException e)
         {
-            FailReason = $"Failed writing into {_filename}: {e.Message}";
+            FailReason = $"Failed writing into {filename}: {e.Message}";
             CancelWriting();
             wroteAnyData = false;
             return false;
@@ -84,7 +78,7 @@ public class FileSink : Sink
 
         if (!WriteAllValidators(data))
         {
-            FailReason = $"Failed writing into {_filename}: validators failed";
+            FailReason = $"Failed writing into {filename}: validators failed";
             CancelWriting();
             wroteAnyData = false;
             return false;
@@ -121,11 +115,11 @@ public class FileSink : Sink
             {
                 try
                 {
-                    File.Move(tempFile, _filename, overwrite: true);
+                    File.Move(tempFile, filename, overwrite: true);
                 }
                 catch (IOException e)
                 {
-                    FailReason = $"Failed to commit changes to {_filename}: {e.Message}";
+                    FailReason = $"Failed to commit changes to {filename}: {e.Message}";
                     CancelWriting();
                     return false;
                 }
@@ -140,7 +134,7 @@ public class FileSink : Sink
 
     public override bool HasLocalData()
     {
-        var info = new FileInfo(_filename);
+        var info = new FileInfo(filename);
         return info.Exists && info.Length != 0;
     }
 
@@ -169,46 +163,34 @@ public class FileSink : Sink
 /// Port of net/MetaCacheSink: writes into the HttpMetaCache entry, performs If-None-Match
 /// revalidation and records the new etag/md5 on the entry.
 /// </summary>
-public sealed class MetaCacheSink : FileSink
+public sealed class MetaCacheSink(MetaEntry entry, ChecksumValidator md5Sum, bool isEternal = false) : FileSink(entry.GetFullPath())
 {
     /// <summary>The owning cache; when set, the entry is re-registered after finalize
     /// (C++: APPLICATION->metacache()->updateEntry).</summary>
     public HttpMetaCache? MetaCache { get; init; }
 
-    private readonly MetaEntry _entry;
-    private readonly ChecksumValidator _md5Node;
-    private readonly bool _isEternal;
-
-    public MetaCacheSink(MetaEntry entry, ChecksumValidator md5Sum, bool isEternal = false)
-        : base(entry.GetFullPath())
-    {
-        _entry = entry;
-        _md5Node = md5Sum;
-        _isEternal = isEternal;
-    }
-
     public override bool HasLocalData()
     {
-        var info = new FileInfo(_entry.GetFullPath());
+        var info = new FileInfo(entry.GetFullPath());
         return info.Exists && info.Length != 0;
     }
 
     protected override bool InitCache(NetRequestSpec request)
     {
-        if (_entry.IsStale)
+        if (entry.IsStale)
         {
             return true;
         }
 
-        if (!HasLocalData() && _entry.Md5Sum.Length == 0)
+        if (!HasLocalData() && entry.Md5Sum.Length == 0)
         {
             return true;
         }
 
         // set the etag to revalidate against
-        if (_entry.Etag.Length > 0)
+        if (entry.Etag.Length > 0)
         {
-            request.Headers["If-None-Match"] = _entry.Etag;
+            request.Headers["If-None-Match"] = entry.Etag;
         }
 
         return true;
@@ -220,35 +202,35 @@ public sealed class MetaCacheSink : FileSink
         // data was written, etag/last-modified/max-age/Age bookkeeping, always succeeds.
         if (WroteAnyData)
         {
-            var hash = _md5Node.Hash();
+            var hash = md5Sum.Hash();
             if (hash.Length > 0)
             {
-                _entry.Md5Sum = Convert.ToHexStringLower(hash);
+                entry.Md5Sum = Convert.ToHexStringLower(hash);
             }
         }
 
-        _entry.Etag = response.Headers.GetValueOrDefault("ETag", "");
+        entry.Etag = response.Headers.GetValueOrDefault("ETag", "");
 
         if (response.Headers.TryGetValue("Last-Modified", out var lastModified))
         {
-            _entry.RemoteChangedTimestamp = lastModified;
+            entry.RemoteChangedTimestamp = lastModified;
         }
 
-        var fullPath = _entry.GetFullPath();
-        _entry.LocalChangedTimestamp = File.Exists(fullPath)
+        var fullPath = entry.GetFullPath();
+        entry.LocalChangedTimestamp = File.Exists(fullPath)
             ? new DateTimeOffset(File.GetLastWriteTimeUtc(fullPath)).ToUnixTimeMilliseconds()
             : 0;
 
-        if (_isEternal)
+        if (isEternal)
         {
-            _entry.IsEternal = true;
+            entry.IsEternal = true;
         }
         else if (response.Headers.TryGetValue("Cache-Control", out var cacheControl))
         {
             var match = Regex.Match(cacheControl, "max-age=([0-9]+)");
             if (match.Success)
             {
-                _entry.MaxAge = long.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
+                entry.MaxAge = long.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
             }
         }
         else if (response.Headers.TryGetValue("Expires", out var expiresHeader))
@@ -256,22 +238,22 @@ public sealed class MetaCacheSink : FileSink
             if (DateTimeOffset.TryParse(expiresHeader, CultureInfo.InvariantCulture,
                     DateTimeStyles.AssumeUniversal, out var expires))
             {
-                _entry.MaxAge = expires.ToUnixTimeSeconds() - DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                entry.MaxAge = expires.ToUnixTimeSeconds() - DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             }
         }
         else
         {
             // MetaCacheSink.cpp: #define MAX_TIME_TO_EXPIRE 1 * 7 * 24 * 60 * 60
-            _entry.MaxAge = 7 * 24 * 60 * 60;
+            entry.MaxAge = 7 * 24 * 60 * 60;
         }
 
-        _entry.CurrentAge = response.Headers.TryGetValue("Age", out var ageHeader)
+        entry.CurrentAge = response.Headers.TryGetValue("Age", out var ageHeader)
                             && long.TryParse(ageHeader, out var age)
             ? age
             : 0;
 
-        _entry.SetStale(false);
-        MetaCache?.UpdateEntry(_entry);
+        entry.SetStale(false);
+        MetaCache?.UpdateEntry(entry);
         return true;
     }
 }

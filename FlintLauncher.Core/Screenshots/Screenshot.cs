@@ -7,15 +7,10 @@
 
 namespace FlintLauncher.Core.Screenshots;
 
-public sealed class ScreenShot
+public sealed class ScreenShot(string filePath)
 {
-    public ScreenShot(string filePath)
-    {
-        FilePath = filePath;
-    }
-
     /// <summary>Port of m_file (QFileInfo::absoluteFilePath).</summary>
-    public string FilePath { get; }
+    public string FilePath { get; } = filePath;
 
     /// <summary>Link to the uploaded image (m_url); empty until the upload succeeded.</summary>
     public string Url { get; set; } = "";

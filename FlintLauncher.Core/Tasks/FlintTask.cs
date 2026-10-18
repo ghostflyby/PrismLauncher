@@ -38,11 +38,6 @@ public abstract class FlintTask
     private long progressTotal = 100;
     private string details = "";
 
-    protected FlintTask()
-    {
-        Uid = Guid.NewGuid();
-    }
-
     public TaskState State { get; protected set; } = TaskState.Inactive;
 
     /// <summary>
@@ -55,7 +50,7 @@ public abstract class FlintTask
     public string Status { get; protected set; } = "";
 
     /// <summary>Port of Task::getUid() (QUuid::createUuid()).</summary>
-    public Guid Uid { get; }
+    public Guid Uid { get; } = Guid.NewGuid();
 
     public bool IsRunning => State == TaskState.Running;
 

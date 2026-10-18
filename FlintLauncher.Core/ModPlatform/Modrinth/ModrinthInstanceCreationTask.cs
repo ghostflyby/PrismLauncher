@@ -444,9 +444,11 @@ public sealed class ModrinthCreationTask : InstanceTask
     private async Task EnsureMetaLoop(CancellationToken cancellationToken, MinecraftInstance newInstance)
     {
         var folder = FileSystem.PathCombine(newInstance.ModsRoot(), ".index");
-        var ensureMetadataTask = new EnsureMetadataTask(_resources, folder, ResourceProvider.Modrinth, _modrinth);
-        // setUpdateLock(true): updates for mods coming from an installed modpack are locked
-        ensureMetadataTask.LockUpdate = true;
+        var ensureMetadataTask = new EnsureMetadataTask(_resources, folder, ResourceProvider.Modrinth, _modrinth)
+        {
+            // setUpdateLock(true): updates for mods coming from an installed modpack are locked
+            LockUpdate = true
+        };
         ensureMetadataTask.MetadataFailed += (_, reason) => EmitStatus(reason);
         EmitStatus("Generating metadata for mods...");
         await ensureMetadataTask.StartAsync(cancellationToken);
@@ -574,35 +576,22 @@ public sealed class ModrinthCreationTask : InstanceTask
     /// One indexed file: try every download URL in order, checksum-verified (the per-file
     /// slice of the C++ download NetJob with its failed -> next-URL fallback chain).
     /// </summary>
-    private sealed class ModDownloadTask : FlintTask
+    private sealed class ModDownloadTask(File file, string filePath, ModrinthApi.DownloadMeta meta, ModrinthApi modrinth)
+        : FlintTask
     {
-        private readonly File _file;
-        private readonly string _filePath;
-        private readonly ModrinthApi.DownloadMeta _meta;
-        private readonly ModrinthApi _modrinth;
-
-        public ModDownloadTask(File file, string filePath, ModrinthApi.DownloadMeta meta, ModrinthApi modrinth)
-        {
-            _file = file;
-            _filePath = filePath;
-            _meta = meta;
-            _modrinth = modrinth;
-            TaskName = $"Download {file.Path}";
-        }
-
-        public string TaskName { get; }
+        public string TaskName { get; } = $"Download {file.Path}";
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            FileSystem.EnsureFilePathExists(_filePath);
-            var hashAlgorithm = _file.HashAlgorithm;
+            FileSystem.EnsureFilePathExists(filePath);
+            var hashAlgorithm = file.HashAlgorithm;
 
-            while (_file.Downloads.Count > 0)
+            while (file.Downloads.Count > 0)
             {
-                var url = _file.Downloads.Dequeue();
-                EmitStatus($"Downloading {_file.Path}...");
-                var dl = _modrinth.MakeFileRequest(url, _filePath, _meta);
-                dl.AddValidator(ChecksumValidator.FromHex(hashAlgorithm, _file.Hash));
+                var url = file.Downloads.Dequeue();
+                EmitStatus($"Downloading {file.Path}...");
+                var dl = modrinth.MakeFileRequest(url, filePath, meta);
+                dl.AddValidator(ChecksumValidator.FromHex(hashAlgorithm, file.Hash));
                 await dl.StartAsync(cancellationToken);
                 if (dl.WasSuccessful)
                 {
@@ -617,7 +606,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                 // else: try the next URL
             }
 
-            EmitFailed($"Failed to download {_file.Path}: {_file.Hash}");
+            EmitFailed($"Failed to download {file.Path}: {file.Hash}");
         }
     }
 }

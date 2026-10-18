@@ -6,14 +6,9 @@
 
 namespace FlintLauncher.Core.Auth;
 
-public sealed class EntitlementsStep : AuthStep
+public sealed class EntitlementsStep(AccountData data, AuthEndpointsOptions? auth = null) : AuthStep(data)
 {
-    private readonly AuthEndpointsOptions _auth;
-
-    public EntitlementsStep(AccountData data, AuthEndpointsOptions? auth = null) : base(data)
-    {
-        _auth = auth ?? new AuthEndpointsOptions();
-    }
+    private readonly AuthEndpointsOptions _auth = auth ?? new AuthEndpointsOptions();
 
     public override string Describe() => "Determining game ownership.";
 

@@ -15,15 +15,10 @@ using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Launch;
 
-public sealed class TaskStepWrapper : LaunchStep
+public sealed class TaskStepWrapper(LaunchTask parent, FlintTask task) : LaunchStep(parent)
 {
-    private FlintTask? task;
+    private FlintTask? task = task;
     private TaskCompletionSource? proceedSignal;
-
-    public TaskStepWrapper(LaunchTask parent, FlintTask task) : base(parent)
-    {
-        this.task = task;
-    }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {

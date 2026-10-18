@@ -6,10 +6,8 @@ using FlintLauncher.Core.IO;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class ReconstructAssets : LaunchStep
+public sealed class ReconstructAssets(LaunchTask parent) : LaunchStep(parent)
 {
-    public ReconstructAssets(LaunchTask parent) : base(parent) { }
-
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         var instance = Parent.Instance;

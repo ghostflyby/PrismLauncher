@@ -20,7 +20,7 @@ using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
-public sealed class ModrinthApi : ResourceApi
+public sealed class ModrinthApi(NetStack? net = null) : ResourceApi
 {
     public string BaseUrl { get; set; } = "https://api.modrinth.com/v2";
     public string StagingBaseUrl { get; set; } = "https://staging-api.modrinth.com/v2";
@@ -31,12 +31,7 @@ public sealed class ModrinthApi : ResourceApi
     public string ApiToken { get; set; } = "";
 
     /// <summary>The network stack this client's requests go through.</summary>
-    public NetStack Net { get; }
-
-    public ModrinthApi(NetStack? net = null)
-    {
-        Net = net ?? NetStack.Default;
-    }
+    public NetStack Net { get; } = net ?? NetStack.Default;
 
     /// <summary>Port of ModrinthDownloadMeta (net/ApiHeaderProxy.h).</summary>
     public readonly record struct DownloadMeta(string Reason, string GameVersion, string Loader, string DependentOn)

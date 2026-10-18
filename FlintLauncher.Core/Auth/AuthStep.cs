@@ -33,14 +33,9 @@ public enum AccountTaskState
     Offline,
 }
 
-public abstract class AuthStep
+public abstract class AuthStep(AccountData data)
 {
-    protected AuthStep(AccountData data)
-    {
-        Data = data;
-    }
-
-    protected AccountData Data { get; }
+    protected AccountData Data { get; } = data;
 
     public abstract string Describe();
 

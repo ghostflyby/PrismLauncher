@@ -26,7 +26,7 @@ using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.Minecraft;
 
-public sealed class ComponentUpdateTask : FlintTask
+public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode netmode, PackProfile list) : FlintTask
 {
     public enum Mode
     {
@@ -77,26 +77,13 @@ public sealed class ComponentUpdateTask : FlintTask
     private static readonly Comparer<RequireEx> RequireComparer =
         Comparer<RequireEx>.Create((a, b) => string.CompareOrdinal(a.Uid, b.Uid));
 
-    private readonly PackProfile _profile;
-
-    private readonly Mode _mode;
-
-    private readonly NetMode _netmode;
-
     private readonly List<RemoteLoadStatus> _remoteLoadStatusList = [];
 
     private bool remoteLoadSuccessful = true;
 
     private int remoteTasksInProgress;
 
-    public ComponentUpdateTask(Mode mode, NetMode netmode, PackProfile list)
-    {
-        _profile = list;
-        _mode = mode;
-        _netmode = netmode;
-    }
-
-    public NetMode GetNetMode() => _netmode;
+    public NetMode GetNetMode() => netmode;
 
     public override void Abort()
     {
@@ -153,7 +140,7 @@ public sealed class ComponentUpdateTask : FlintTask
         }
         else
         {
-            var metaVersion = _profile.MetadataIndex.Get(component.Uid, component.Version);
+            var metaVersion = list.MetadataIndex.Get(component.Uid, component.Version);
             component.MetaVersion = metaVersion;
             if (metaVersion.IsLoaded)
             {
@@ -162,7 +149,7 @@ public sealed class ComponentUpdateTask : FlintTask
             }
             else
             {
-                loadTask = _profile.MetadataIndex.LoadVersion(component.Uid, component.Version, netmode);
+                loadTask = list.MetadataIndex.LoadVersion(component.Uid, component.Version, netmode);
                 // the C++ start()s the task here and waits for its signals below
                 _ = loadTask.StartAsync(cancellationToken);
                 if (netmode == NetMode.Online)
@@ -198,13 +185,13 @@ public sealed class ComponentUpdateTask : FlintTask
         var waitTasks = new List<Task>();
 
         // load all the components OR their lists...
-        foreach (var component in _profile.Components)
+        foreach (var component in list.Components)
         {
             component.ResetComponentProblems();
             // FIXME upstream: to do this right, the version lists would be loaded first and the
             // versions decided during dependency resolution; the Launch/Resolution split below
             // is disabled upstream (#if 0) as well.
-            var singleResult = LoadComponent(component, out var loadTask, _netmode, cancellationToken);
+            var singleResult = LoadComponent(component, out var loadTask, netmode, cancellationToken);
             var loadType = RemoteLoadType.Version;
             if (singleResult == LoadResult.LoadedLocal)
             {
@@ -236,7 +223,7 @@ public sealed class ComponentUpdateTask : FlintTask
             {
                 // Everything got loaded. Advance to dependency resolution.
                 await PerformUpdateActionsAsync(cancellationToken);
-                await ResolveDependenciesAsync(_mode == Mode.Launch || _netmode == NetMode.Offline, cancellationToken);
+                await ResolveDependenciesAsync(mode == Mode.Launch || netmode == NetMode.Offline, cancellationToken);
                 return;
             }
             case LoadResult.RequiresRemote:
@@ -304,7 +291,7 @@ public sealed class ComponentUpdateTask : FlintTask
         // update the cached data of the component from the downloaded version file.
         if (loadSucceeded && status.Type == RemoteLoadType.Version)
         {
-            var component = _profile.GetComponent(status.PackProfileIndex);
+            var component = list.GetComponent(status.PackProfileIndex);
             if (component is not null)
             {
                 component.Loaded = true;
@@ -327,7 +314,7 @@ public sealed class ComponentUpdateTask : FlintTask
             // nothing bad happened... clear the temp load status and proceed with looking at dependencies
             _remoteLoadStatusList.Clear();
             await PerformUpdateActionsAsync(cancellationToken);
-            await ResolveDependenciesAsync(_mode == Mode.Launch, cancellationToken);
+            await ResolveDependenciesAsync(mode == Mode.Launch, cancellationToken);
         }
         else
         {
@@ -337,7 +324,7 @@ public sealed class ComponentUpdateTask : FlintTask
             {
                 if (!item.Succeeded)
                 {
-                    var component = _profile.GetComponent(item.PackProfileIndex);
+                    var component = list.GetComponent(item.PackProfileIndex);
                     allErrorsList.Add(
                         $"Could not download metadata for {component?.GetName()} {component?.Version}. Please change the version or try again later.");
                 }
@@ -524,7 +511,7 @@ public sealed class ComponentUpdateTask : FlintTask
     {
         var linked = new List<Component>();
 
-        foreach (var comp in _profile.Components)
+        foreach (var comp in list.Components)
         {
             if (comp.CachedRequires.Any(req => req.Uid == uid))
             {
@@ -532,12 +519,12 @@ public sealed class ComponentUpdateTask : FlintTask
             }
         }
 
-        if (_profile.ComponentIndex.TryGetValue(uid, out var component))
+        if (list.ComponentIndex.TryGetValue(uid, out var component))
         {
             component.UpdateCachedData();
             foreach (var dep in component.CachedRequires)
             {
-                if (_profile.ComponentIndex.TryGetValue(dep.Uid, out var found))
+                if (list.ComponentIndex.TryGetValue(dep.Uid, out var found))
                 {
                     linked.Add(found);
                 }
@@ -564,8 +551,8 @@ public sealed class ComponentUpdateTask : FlintTask
          *
          * NOTE upstream: this is a placeholder and should eventually be replaced with something 'serious'
          */
-        var components = _profile.Components;
-        var componentIndex = _profile.ComponentIndex;
+        var components = list.Components;
+        var componentIndex = list.ComponentIndex;
 
         var allRequires = new SortedSet<RequireEx>(RequireComparer);
         var toRemove = new List<string>();
@@ -585,7 +572,7 @@ public sealed class ComponentUpdateTask : FlintTask
             {
                 foreach (var remove in toRemove)
                 {
-                    _ = _profile.Remove(remove);
+                    _ = list.Remove(remove);
                 }
             }
         } while (toRemove.Count != 0);
@@ -621,7 +608,7 @@ public sealed class ComponentUpdateTask : FlintTask
             // add stuff...
             foreach (var add in toAdd)
             {
-                var component = new Component(_profile, add.Uid);
+                var component = new Component(list, add.Uid);
                 if (add.EqualsVersion.Length != 0)
                 {
                     // exact version
@@ -649,7 +636,7 @@ public sealed class ComponentUpdateTask : FlintTask
                         }
                         else if (add.Uid == "net.fabricmc.intermediary" || add.Uid == "org.quiltmc.hashed")
                         {
-                            var minecraft = _profile.Components.FirstOrDefault(cmp => cmp.GetId() == "net.minecraft");
+                            var minecraft = list.Components.FirstOrDefault(cmp => cmp.GetId() == "net.minecraft");
                             if (minecraft is not null)
                             {
                                 component.Version = minecraft.GetVersion();
@@ -663,7 +650,7 @@ public sealed class ComponentUpdateTask : FlintTask
 
                 component.DependencyOnly = true;
                 // FIXME upstream: this should not work directly with the component list
-                _profile.InsertComponent(add.IndexOfFirstDependee, component);
+                list.InsertComponent(add.IndexOfFirstDependee, component);
                 // (the C++ also re-assigns componentIndex[add.uid]; InsertComponent did that already)
             }
 
@@ -705,7 +692,7 @@ public sealed class ComponentUpdateTask : FlintTask
             addedActions = false;
             toRemove.Clear();
             // the C++ range-for detaches (copies) the QList; iterate a snapshot so Remove() is safe
-            foreach (var component in _profile.Components.ToArray())
+            foreach (var component in list.Components.ToArray())
             {
                 var action = component.GetUpdateAction();
                 switch (action)
@@ -718,18 +705,18 @@ public sealed class ComponentUpdateTask : FlintTask
                     case UpdateAction.ChangeVersion cv:
                     {
                         component.SetVersion(cv.TargetVersion);
-                        await component.WaitLoadMetaAsync(_netmode, cancellationToken);
+                        await component.WaitLoadMetaAsync(netmode, cancellationToken);
                         break;
                     }
                     case UpdateAction.LatestRecommendedCompatible lrc:
                     {
                         // (the C++ "no version list in metadata index" branch is unreachable:
                         // Index::get() creates the list entry)
-                        var versionList = _profile.MetadataIndex.Get(component.GetId());
+                        var versionList = list.MetadataIndex.Get(component.GetId());
                         // port of the blocking VersionList::waitToLoad()
                         if (!versionList.IsLoaded)
                         {
-                            await versionList.LoadTask(_netmode).StartAsync(cancellationToken);
+                            await versionList.LoadTask(netmode).StartAsync(cancellationToken);
                         }
 
                         var recommended = versionList.GetRecommendedForParent(lrc.ParentUid, lrc.Version)
@@ -737,7 +724,7 @@ public sealed class ComponentUpdateTask : FlintTask
                         if (recommended is not null)
                         {
                             component.SetVersion(recommended.Version);
-                            await component.WaitLoadMetaAsync(_netmode, cancellationToken);
+                            await component.WaitLoadMetaAsync(netmode, cancellationToken);
                             break;
                         }
 
@@ -753,13 +740,13 @@ public sealed class ComponentUpdateTask : FlintTask
                     case UpdateAction.ImportantChanged ic:
                     {
                         // port of the blocking Index::getLoadedVersion()
-                        await _profile.MetadataIndex.LoadVersion(component.GetId(), ic.OldVersion, _netmode)
+                        await list.MetadataIndex.LoadVersion(component.GetId(), ic.OldVersion, netmode)
                             .StartAsync(cancellationToken);
-                        var oldVersion = _profile.MetadataIndex.Get(component.GetId(), ic.OldVersion);
+                        var oldVersion = list.MetadataIndex.Get(component.GetId(), ic.OldVersion);
                         foreach (var oldReq in oldVersion.RequiredSet)
                         {
                             if (!component.CachedRequires.Contains(oldReq)
-                                && _profile.ComponentIndex.TryGetValue(oldReq.Uid, out var oldReqComp))
+                                && list.ComponentIndex.TryGetValue(oldReq.Uid, out var oldReqComp))
                             {
                                 oldReqComp.SetUpdateAction(new UpdateAction.Remove());
                                 addedActions = true;
@@ -807,7 +794,7 @@ public sealed class ComponentUpdateTask : FlintTask
                 component.ClearUpdateAction();
                 foreach (var uid in toRemove)
                 {
-                    _ = _profile.Remove(uid);
+                    _ = list.Remove(uid);
                 }
             }
         } while (addedActions);
@@ -815,8 +802,8 @@ public sealed class ComponentUpdateTask : FlintTask
 
     private void FinalizeComponents()
     {
-        var components = _profile.Components;
-        var componentIndex = _profile.ComponentIndex;
+        var components = list.Components;
+        var componentIndex = list.ComponentIndex;
         foreach (var component in components)
         {
             foreach (var req in component.CachedRequires)

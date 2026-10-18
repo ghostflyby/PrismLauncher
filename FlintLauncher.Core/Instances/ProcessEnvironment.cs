@@ -14,7 +14,7 @@ public sealed class ProcessEnvironment
     public void Insert(string key, string value) => _vars[key] = value;
 
     /// <summary>QProcessEnvironment::value (missing keys yield an empty string).</summary>
-    public string Value(string key) => _vars.TryGetValue(key, out var value) ? value : "";
+    public string Value(string key) => _vars.GetValueOrDefault(key, "");
 
     public bool Contains(string key) => _vars.ContainsKey(key);
 

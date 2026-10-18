@@ -16,7 +16,12 @@ using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Web.Services;
 
-public sealed class ModListExportTask : FlintTask
+public sealed class ModListExportTask(
+    MinecraftInstance instance,
+    string outputPath,
+    ModListFormat format,
+    OptionalData extraData)
+    : FlintTask
 {
     private static readonly Dictionary<string, (ModListFormat Format, string Extension)> Formats =
         new(StringComparer.Ordinal)
@@ -28,22 +33,8 @@ public sealed class ModListExportTask : FlintTask
             ["csv"] = (ModListFormat.Csv, "csv"),
         };
 
-    private readonly MinecraftInstance _instance;
-    private readonly string _outputPath;
-    private readonly ModListFormat _format;
-    private readonly OptionalData _extraData;
-
-    public ModListExportTask(MinecraftInstance instance, string outputPath, ModListFormat format,
-        OptionalData extraData)
-    {
-        _instance = instance;
-        _outputPath = outputPath;
-        _format = format;
-        _extraData = extraData;
-    }
-
     /// <summary>The written file (exposed through the task view's result payload).</summary>
-    public string OutputPath => _outputPath;
+    public string OutputPath => outputPath;
 
     /// <summary>Maps the API format2 key ("html"|"markdown"|"plain"|"json"|"csv") to the
     /// core format + file extension; null when the key is unknown.</summary>
@@ -67,7 +58,7 @@ public sealed class ModListExportTask : FlintTask
         EmitStatus("Collecting mods...");
 
         // the same mod list the /instances/{id}/mods endpoint serves (metadata-aware)
-        var folder = _instance.LoaderModList();
+        var folder = instance.LoaderModList();
         folder.Update();
         var mods = new List<ModListMod>();
         foreach (var mod in folder.AllMods())
@@ -93,7 +84,7 @@ public sealed class ModListExportTask : FlintTask
         EmitStatus("Writing the mod list...");
         try
         {
-            File.WriteAllText(_outputPath, ExportToModList.ExportModsToString(mods, _format, _extraData));
+            File.WriteAllText(outputPath, ExportToModList.ExportModsToString(mods, format, extraData));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException
                                       or SecurityException)

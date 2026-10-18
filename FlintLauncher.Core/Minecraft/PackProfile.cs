@@ -51,23 +51,16 @@ public interface IPackProfileEnv
 }
 
 /// <summary>Minimal IPackProfileEnv for standalone/test usage (name empty, default runtime context).</summary>
-public sealed class BasicPackProfileEnv : IPackProfileEnv
+public sealed class BasicPackProfileEnv(string instanceRoot, string instanceName = "", RuntimeContext runtimeContext = default) : IPackProfileEnv
 {
-    public BasicPackProfileEnv(string instanceRoot, string instanceName = "", RuntimeContext runtimeContext = default)
-    {
-        InstanceRoot = instanceRoot;
-        InstanceName = instanceName;
-        RuntimeContext = runtimeContext;
-    }
+    public string InstanceRoot { get; } = instanceRoot;
 
-    public string InstanceRoot { get; }
+    public string InstanceName { get; } = instanceName;
 
-    public string InstanceName { get; }
-
-    public RuntimeContext RuntimeContext { get; }
+    public RuntimeContext RuntimeContext { get; } = runtimeContext;
 }
 
-public sealed class PackProfile : IDisposable
+public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null) : IDisposable
 {
     public enum MoveDirection
     {
@@ -99,8 +92,6 @@ public sealed class PackProfile : IDisposable
 
     private const int CurrentComponentsFileVersion = 1;
 
-    private readonly IPackProfileEnv _env;
-
     /// <summary>the launch profile (volatile, temporary thing created on demand)</summary>
     private LaunchProfile? profile;
 
@@ -112,12 +103,6 @@ public sealed class PackProfile : IDisposable
     private ComponentUpdateTask? updateTask;
 
     private bool loaded;
-
-    public PackProfile(IPackProfileEnv env, Index? metadataIndex = null)
-    {
-        _env = env;
-        MetadataIndex = metadataIndex ?? new Index();
-    }
 
     public PackProfile(string instanceRoot, Index? metadataIndex = null)
         : this(new BasicPackProfileEnv(instanceRoot), metadataIndex) { }
@@ -136,16 +121,16 @@ public sealed class PackProfile : IDisposable
 
     // ---------------------------------------------------------------- environment
 
-    public string InstanceName => _env.InstanceName;
+    public string InstanceName => env.InstanceName;
 
     /// <summary>C++ PackProfile::runtimeContext() (helper method, returns the instance's context).</summary>
-    public RuntimeContext RuntimeContext() => _env.RuntimeContext;
+    public RuntimeContext RuntimeContext() => env.RuntimeContext;
 
     /// <summary>
     /// The metadata index (C++: the APPLICATION->metadataIndex() singleton; shared by all
     /// profiles that are given the same Index instance).
     /// </summary>
-    public Index MetadataIndex { get; }
+    public Index MetadataIndex { get; } = metadataIndex ?? new Index();
 
     /// <summary>Wire the metadata entities to a runtime-owned cache (the composition root
     /// calls this after stamping the instance; entities created later inherit it through the
@@ -160,17 +145,17 @@ public sealed class PackProfile : IDisposable
 
     // ---------------------------------------------------------------- paths
 
-    private string ComponentsFilePath() => FileSystem.PathCombine(_env.InstanceRoot, "mmc-pack.json");
+    private string ComponentsFilePath() => FileSystem.PathCombine(env.InstanceRoot, "mmc-pack.json");
 
-    private string PatchesPattern() => FileSystem.PathCombine(_env.InstanceRoot, "patches", "%1.json");
+    private string PatchesPattern() => FileSystem.PathCombine(env.InstanceRoot, "patches", "%1.json");
 
-    public string PatchFilePathForUid(string uid) => FileSystem.PathCombine(_env.InstanceRoot, "patches", uid + ".json");
+    public string PatchFilePathForUid(string uid) => FileSystem.PathCombine(env.InstanceRoot, "patches", uid + ".json");
 
     /// <summary>C++ MinecraftInstance::jarModsDir() (lives under the instance root, not the game root).</summary>
-    private string JarModsDir() => FileSystem.PathCombine(_env.InstanceRoot, "jarmods");
+    private string JarModsDir() => FileSystem.PathCombine(env.InstanceRoot, "jarmods");
 
     /// <summary>C++ MinecraftInstance::getLocalLibraryPath().</summary>
-    private string LocalLibraryPath() => FileSystem.PathCombine(_env.InstanceRoot, "libraries");
+    private string LocalLibraryPath() => FileSystem.PathCombine(env.InstanceRoot, "libraries");
 
     // ---------------------------------------------------------------- save/load logic
 
@@ -323,9 +308,11 @@ public sealed class PackProfile : IDisposable
 
     private static JsonObject ComponentToJsonV1(Component component)
     {
-        var obj = new JsonObject();
-        // critical
-        obj["uid"] = component.Uid;
+        var obj = new JsonObject
+        {
+            // critical
+            ["uid"] = component.Uid
+        };
         if (component.Version.Length != 0)
         {
             obj["version"] = component.Version;
@@ -371,15 +358,17 @@ public sealed class PackProfile : IDisposable
     {
         // critical
         var uid = JsonUtils.RequireString(obj, "uid");
-        var component = new Component(parent, uid);
-        component.Version = obj.StringOr("version");
-        component.DependencyOnly = obj.BoolOr("dependencyOnly");
-        component.Important = obj.BoolOr("important");
+        var component = new Component(parent, uid)
+        {
+            Version = obj.StringOr("version"),
+            DependencyOnly = obj.BoolOr("dependencyOnly"),
+            Important = obj.BoolOr("important"),
+            // cached
+            // TODO upstream @RESILIENCE: ignore invalid values/structure here?
+            CachedVersion = obj.StringOr("cachedVersion"),
+            CachedName = obj.StringOr("cachedName")
+        };
 
-        // cached
-        // TODO upstream @RESILIENCE: ignore invalid values/structure here?
-        component.CachedVersion = obj.StringOr("cachedVersion");
-        component.CachedName = obj.StringOr("cachedName");
         MetaJsonFormat.ParseRequires(obj, component.CachedRequires, "cachedRequires");
         MetaJsonFormat.ParseRequires(obj, component.CachedConflicts, "cachedConflicts");
         // NOTE upstream bug kept: the loader reads "volatile" while the saver writes "cachedVolatile"
@@ -392,8 +381,10 @@ public sealed class PackProfile : IDisposable
     /// <summary>Save the given component container data to a file.</summary>
     private static bool SavePackProfile(string filename, IReadOnlyList<Component> container)
     {
-        var obj = new JsonObject();
-        obj["formatVersion"] = CurrentComponentsFileVersion;
+        var obj = new JsonObject
+        {
+            ["formatVersion"] = CurrentComponentsFileVersion
+        };
         var orderArray = new JsonArray();
         foreach (var component in container)
         {
@@ -590,7 +581,7 @@ public sealed class PackProfile : IDisposable
     /// <summary>get the profile component by id</summary>
     public Component? GetComponent(string id)
     {
-        return _componentIndex.TryGetValue(id, out var component) ? component : null;
+        return _componentIndex.GetValueOrDefault(id);
     }
 
     /// <summary>get the profile component by index</summary>
@@ -666,7 +657,7 @@ public sealed class PackProfile : IDisposable
     /// <summary>install MMC/Prism component files</summary>
     public bool InstallComponents(IReadOnlyList<string> selectedFiles)
     {
-        var patchDir = FileSystem.PathCombine(_env.InstanceRoot, "patches");
+        var patchDir = FileSystem.PathCombine(env.InstanceRoot, "patches");
         if (!FileSystem.EnsureFolderPathExists(patchDir))
         {
             return false;
@@ -701,16 +692,18 @@ public sealed class PackProfile : IDisposable
 
     public bool InstallEmpty(string uid, string name)
     {
-        var patchDir = FileSystem.PathCombine(_env.InstanceRoot, "patches");
+        var patchDir = FileSystem.PathCombine(env.InstanceRoot, "patches");
         if (!FileSystem.EnsureFolderPathExists(patchDir))
         {
             return false;
         }
 
-        var f = new VersionFile();
-        f.Name = name;
-        f.Uid = uid;
-        f.Version = "1";
+        var f = new VersionFile
+        {
+            Name = name,
+            Uid = uid,
+            Version = "1"
+        };
         var patchFileName = FileSystem.PathCombine(patchDir, uid + ".json");
         try
         {
@@ -771,7 +764,7 @@ public sealed class PackProfile : IDisposable
 
     private bool InstallJarModsInternal(IReadOnlyList<string> filepaths)
     {
-        var patchDir = FileSystem.PathCombine(_env.InstanceRoot, "patches");
+        var patchDir = FileSystem.PathCombine(env.InstanceRoot, "patches");
         if (!FileSystem.EnsureFolderPathExists(patchDir))
         {
             return false;
@@ -798,11 +791,13 @@ public sealed class PackProfile : IDisposable
             }
 
             var f = new VersionFile();
-            var jarMod = new Library();
-            jarMod.Name = new GradleSpecifier("custom.jarmods:" + id + ":1");
-            jarMod.FilenameOverride = targetFilename;
-            jarMod.DisplayNameValue = CompleteBaseName(filepath);
-            jarMod.Hint = "local";
+            var jarMod = new Library
+            {
+                Name = new GradleSpecifier("custom.jarmods:" + id + ":1"),
+                FilenameOverride = targetFilename,
+                DisplayNameValue = CompleteBaseName(filepath),
+                Hint = "local"
+            };
             f.JarMods.Add(jarMod);
             f.Name = targetName;
             f.Uid = targetId;
@@ -828,7 +823,7 @@ public sealed class PackProfile : IDisposable
 
     private bool InstallCustomJarInternal(string filepath)
     {
-        var patchDir = FileSystem.PathCombine(_env.InstanceRoot, "patches");
+        var patchDir = FileSystem.PathCombine(env.InstanceRoot, "patches");
         if (!FileSystem.EnsureFolderPathExists(patchDir))
         {
             return false;
@@ -857,10 +852,12 @@ public sealed class PackProfile : IDisposable
         }
 
         var f = new VersionFile();
-        var jarMod = new Library();
-        jarMod.Name = specifier;
-        jarMod.DisplayNameValue = CompleteBaseName(filepath);
-        jarMod.Hint = "local";
+        var jarMod = new Library
+        {
+            Name = specifier,
+            DisplayNameValue = CompleteBaseName(filepath),
+            Hint = "local"
+        };
         f.MainJar = jarMod;
         f.Name = targetName;
         f.Uid = targetId;
@@ -886,7 +883,7 @@ public sealed class PackProfile : IDisposable
     private bool InstallAgentsInternal(IReadOnlyList<string> filepaths)
     {
         // FIXME upstream: code duplication
-        var patchDir = FileSystem.PathCombine(_env.InstanceRoot, "patches");
+        var patchDir = FileSystem.PathCombine(env.InstanceRoot, "patches");
         if (!FileSystem.EnsureFolderPathExists(patchDir))
         {
             return false;
@@ -913,11 +910,13 @@ public sealed class PackProfile : IDisposable
 
             var versionFile = new VersionFile();
 
-            var agent = new Library();
-            agent.Name = new GradleSpecifier("custom.agents:" + id + ":1");
-            agent.FilenameOverride = targetBaseName;
-            agent.DisplayNameValue = CompleteBaseName(source);
-            agent.Hint = "local";
+            var agent = new Library
+            {
+                Name = new GradleSpecifier("custom.agents:" + id + ":1"),
+                FilenameOverride = targetBaseName,
+                DisplayNameValue = CompleteBaseName(source),
+                Hint = "local"
+            };
 
             versionFile.Agents.Add(new Agent(agent, ""));
             versionFile.Name = targetName;

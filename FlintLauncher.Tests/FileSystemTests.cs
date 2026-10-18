@@ -323,12 +323,7 @@ public class FileSystemTests
     /// <summary>QTemporaryDir replacement with auto-remove.</summary>
     private sealed class TempDirScope : IDisposable
     {
-        public TempDirScope()
-        {
-            Path = TempDir();
-        }
-
-        public string Path { get; }
+        public string Path { get; } = TempDir();
 
         public void Dispose()
         {

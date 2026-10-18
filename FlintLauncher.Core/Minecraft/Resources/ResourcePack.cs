@@ -7,11 +7,9 @@ using FlintLauncher.Core.Versioning;
 namespace FlintLauncher.Core.Minecraft.Resources;
 
 /// <summary>Port of the ResourcePack class.</summary>
-public class ResourcePack : DataPack
+public class ResourcePack(FileInfo fileInfo) : DataPack(fileInfo)
 {
     public ResourcePack(string filePath) : this(new FileInfo(filePath)) { }
-
-    public ResourcePack(FileInfo fileInfo) : base(fileInfo) { }
 
     /// <summary>Port of ResourcePack::mappings: the pack_format → version range table.</summary>
     protected override IReadOnlyList<PackFormatRange> Mappings() => ResourcePackFormatVersions;

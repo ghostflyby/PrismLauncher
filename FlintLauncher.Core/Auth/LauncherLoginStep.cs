@@ -5,14 +5,9 @@ using System.Text.Json.Nodes;
 
 namespace FlintLauncher.Core.Auth;
 
-public sealed class LauncherLoginStep : AuthStep
+public sealed class LauncherLoginStep(AccountData data, AuthEndpointsOptions? auth = null) : AuthStep(data)
 {
-    private readonly AuthEndpointsOptions _auth;
-
-    public LauncherLoginStep(AccountData data, AuthEndpointsOptions? auth = null) : base(data)
-    {
-        _auth = auth ?? new AuthEndpointsOptions();
-    }
+    private readonly AuthEndpointsOptions _auth = auth ?? new AuthEndpointsOptions();
 
     public override string Describe() => "Fetching Minecraft access token";
 
@@ -70,6 +65,6 @@ public sealed class LauncherLoginStep : AuthStep
 
     private JsonNode? ExtraValue(string key)
     {
-        return Data.MojangServicesToken.Extra.TryGetValue(key, out var value) ? value : null;
+        return Data.MojangServicesToken.Extra.GetValueOrDefault(key);
     }
 }

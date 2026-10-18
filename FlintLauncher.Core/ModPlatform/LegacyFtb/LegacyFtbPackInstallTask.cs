@@ -21,16 +21,8 @@ using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.ModPlatform.LegacyFtb;
 
-public sealed class LegacyFtbPackInstallTask : InstanceTask
+public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string version) : InstanceTask
 {
-    public LegacyFtbPackInstallTask(LegacyFtbModpack pack, string version)
-    {
-        _pack = pack;
-        _version = version;
-    }
-
-    private readonly LegacyFtbModpack _pack;
-    private readonly string _version;
     private string archivePath = "";
 
     /// <summary>APPLICATION->metacache() hook ("FTBPacks" base); null = plain downloads.</summary>
@@ -47,14 +39,14 @@ public sealed class LegacyFtbPackInstallTask : InstanceTask
 
     private async Task DownloadPack(CancellationToken cancellationToken)
     {
-        EmitStatus($"Downloading zip for {_pack.Name}");
+        EmitStatus($"Downloading zip for {pack.Name}");
         SetProgress(1, 4);
 
-        var path = $"{_pack.Dir}/{_version.Replace(".", "_")}/{_pack.File}";
+        var path = $"{pack.Dir}/{version.Replace(".", "_")}/{pack.File}";
 
         string url;
         NetRequest request;
-        if (_pack.Type == PackType.Private)
+        if (pack.Type == PackType.Private)
         {
             url = CdnBaseUrl + "privatepacks/" + path;
         }
@@ -135,7 +127,7 @@ public sealed class LegacyFtbPackInstallTask : InstanceTask
         {
             var components = instance.GetPackProfile();
             components.BuildingFromScratch();
-            await components.SetComponentVersion("net.minecraft", _pack.McVersion, important: true, cancellationToken);
+            await components.SetComponentVersion("net.minecraft", pack.McVersion, important: true, cancellationToken);
 
             var fallback = true;
 
@@ -164,9 +156,9 @@ public sealed class LegacyFtbPackInstallTask : InstanceTask
                             }
 
                             var forgeSpecifier = new GradleSpecifier(nameValue);
-                            var forgeVersion = string.IsNullOrEmpty(_pack.McVersion)
+                            var forgeVersion = string.IsNullOrEmpty(pack.McVersion)
                                 ? forgeSpecifier.Version
-                                : forgeSpecifier.Version.Replace(_pack.McVersion, "").Replace("-", "");
+                                : forgeSpecifier.Version.Replace(pack.McVersion, "").Replace("-", "");
                             await components.SetComponentVersion("net.minecraftforge", forgeVersion,
                                 cancellationToken: cancellationToken);
                             FileSystem.DeletePath(packJsonPath);

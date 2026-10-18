@@ -208,7 +208,8 @@ public class StoreStatusApiTests
                 "--urls", "http://127.0.0.1:0",
             ]);
             await app.StartAsync();
-            using var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
+            using var client = new HttpClient();
+            client.BaseAddress = new Uri(app.Urls.First());
             client.DefaultRequestHeaders.Add("X-Api-Token", token);
 
             var libraries = await client.GetFromJsonAsync<JsonElement>("/api/v1/store/status/libraries/1.21.4");

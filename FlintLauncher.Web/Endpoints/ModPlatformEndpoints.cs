@@ -232,10 +232,6 @@ public static class ModPlatformEndpoints
                 {
                     Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.Modrinth },
                 });
-            if (url is null)
-            {
-                return ApiJson.Error("invalid_request", $"cannot build the version-list request for '{projectId}'", 400);
-            }
 
             var request = NetRequest.MakeByteArray(new Uri(url));
             // the provider header hooks (Flame x-api-key / Modrinth PAT) mirror the request
@@ -628,10 +624,6 @@ public static class ModPlatformEndpoints
         };
 
         var url = runtime.Flame.GetSearchUrl(args);
-        if (url is null)
-        {
-            return ApiJson.Error("invalid_loader", $"loader '{loader}' is not supported by CurseForge", 400);
-        }
 
         var request = NetRequest.MakeByteArray(new Uri(url));
         runtime.Flame.AddApiKeyHeader(request);

@@ -275,7 +275,7 @@ public static class MojangVersionFormat
         }
 
         JsonUtils.WriteString(outObj, "assets", inInfo.Assets);
-        if (inInfo.MojangAssetIndex is { } assetIndex && assetIndex.Known)
+        if (inInfo.MojangAssetIndex is { Known: true } assetIndex)
         {
             outObj["assetIndex"] = AssetIndexToJson(assetIndex);
         }

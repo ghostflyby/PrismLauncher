@@ -280,8 +280,8 @@ public class FtbTests : IDisposable
 
         // components: net.minecraft + the forge modloader target
         var components = Components(staging);
-        Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.18.2");
-        Assert.Contains(components, c => c.Uid == "net.minecraftforge" && c.Version == "40.1.0");
+        Assert.Contains(components, c => c is { Uid: "net.minecraft", Version: "1.18.2" });
+        Assert.Contains(components, c => c is { Uid: "net.minecraftforge", Version: "40.1.0" });
         Assert.DoesNotContain(components, c => c.Uid == "net.fabricmc.fabric-loader");
 
         // managed-pack bookkeeping (D4: instance.json, the "managed" domain)

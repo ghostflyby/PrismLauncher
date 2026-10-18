@@ -49,16 +49,30 @@ public sealed class MinecraftAccount
 
     public static MinecraftAccount CreateOffline(string username)
     {
-        var account = new MinecraftAccount();
-        account.Data.Type = AccountType.Offline;
-        account.Data.YggdrasilToken.Value = "0";
-        account.Data.YggdrasilToken.Validity = Validity.Certain;
-        account.Data.YggdrasilToken.IssueInstant = DateTime.UtcNow;
-        account.Data.YggdrasilToken.Extra["userName"] = JsonValue.Create(username);
-        account.Data.YggdrasilToken.Extra["clientToken"] = JsonValue.Create(Guid.NewGuid().ToString("N"));
-        account.Data.MinecraftProfile.Id = UuidFromUsername(username).ToString("N");
-        account.Data.MinecraftProfile.Name = username;
-        account.Data.MinecraftProfile.Validity = Validity.Certain;
+        var account = new MinecraftAccount
+        {
+            Data =
+            {
+                Type = AccountType.Offline,
+                YggdrasilToken =
+                {
+                    Value = "0",
+                    Validity = Validity.Certain,
+                    IssueInstant = DateTime.UtcNow,
+                    Extra =
+                    {
+                        ["userName"] = JsonValue.Create(username),
+                        ["clientToken"] = JsonValue.Create(Guid.NewGuid().ToString("N"))
+                    }
+                },
+                MinecraftProfile =
+                {
+                    Id = UuidFromUsername(username).ToString("N"),
+                    Name = username,
+                    Validity = Validity.Certain
+                }
+            }
+        };
         return account;
     }
 

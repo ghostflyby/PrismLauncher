@@ -25,12 +25,9 @@ using FlintLauncher.Core.ModPlatform;
 namespace FlintLauncher.Core.Minecraft.Resources;
 
 /// <summary>A legacy mod list, backed by a folder.</summary>
-public class ModFolderModel : ResourceFolderModel
+public class ModFolderModel(string dir, bool isIndexed = false, bool createDir = false) : ResourceFolderModel(dir, isIndexed, createDir)
 {
     private readonly Dictionary<string, MetadataHandler.ModStruct> _metadata = new(StringComparer.Ordinal);
-
-    public ModFolderModel(string dir, bool isIndexed = false, bool createDir = false)
-        : base(dir, isIndexed, createDir) { }
 
     public override string Id => "mods";
 
@@ -56,7 +53,7 @@ public class ModFolderModel : ResourceFolderModel
     /// </summary>
     public MetadataHandler.ModStruct? GetMetadata(Resource resource)
     {
-        return _metadata.TryGetValue(resource.InternalId, out var metadata) ? metadata : null;
+        return _metadata.GetValueOrDefault(resource.InternalId);
     }
 
     public override bool Update()

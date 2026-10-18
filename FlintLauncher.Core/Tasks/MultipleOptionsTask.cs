@@ -10,11 +10,8 @@ namespace FlintLauncher.Core.Tasks;
 /// This task type will attempt to do run each of it's subtasks in sequence, until one of them
 /// succeeds. When that happens, the remaining tasks will not run.
 /// </summary>
-public class MultipleOptionsTask : ConcurrentTask
+public class MultipleOptionsTask(string taskName = "") : ConcurrentTask(taskName, 1)
 {
-    public MultipleOptionsTask(string taskName = "")
-        : base(taskName, 1) { }
-
     protected override void ExecuteNextSubTask()
     {
         // Port of MultipleOptionsTask::executeNextSubTask(). Like the C++ original, this has no

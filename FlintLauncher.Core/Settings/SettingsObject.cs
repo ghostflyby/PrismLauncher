@@ -71,9 +71,9 @@ public abstract class SettingsObject
     private void OnSettingRegistered(Setting setting)
     {
         // mirror SettingsObject::connectSignals
-        setting.SettingChangedInternal += (s, v) => ChangeSetting(s, v);
+        setting.SettingChangedInternal += ChangeSetting;
         setting.SettingChangedInternal += (s, v) => SettingChanged?.Invoke(s, v);
-        setting.SettingResetInternal += s => ResetSetting(s);
+        setting.SettingResetInternal += ResetSetting;
         setting.SettingResetInternal += s => SettingReset?.Invoke(s);
     }
 

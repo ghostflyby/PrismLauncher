@@ -24,7 +24,14 @@ using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
-public sealed class FlameCheckUpdate : FlintTask
+public sealed class FlameCheckUpdate(
+    IReadOnlyList<Resource> resources,
+    IReadOnlyList<McVersion> mcVersions,
+    IReadOnlyList<ModLoaderType> loadersList,
+    Func<Resource, MetadataHandler.ModStruct?> metadataLookup,
+    IReadOnlyList<IndexedVersionType>? releaseTypes = null,
+    FlameApi? flame = null)
+    : FlintTask
 {
     /// <summary>Port of CheckUpdateTask::Update (minus the download task, see header note).</summary>
     public sealed class Update
@@ -43,31 +50,13 @@ public sealed class FlameCheckUpdate : FlintTask
     /// <summary>Port of the checkFailed(resource, reason, recoverUrl = "") signal.</summary>
     public event Action<Resource, string, string>? CheckFailed;
 
-    private readonly IReadOnlyList<Resource> _resources;
-    private readonly IReadOnlyList<McVersion> _gameVersions;
-    private readonly List<ModLoaderType> _loadersList;
-    private readonly Func<Resource, MetadataHandler.ModStruct?> _metadataLookup;
-    private readonly IReadOnlyList<IndexedVersionType> _releaseTypes;
-    private readonly FlameApi _flame;
+    private readonly List<ModLoaderType> _loadersList = [.. loadersList];
+    private readonly IReadOnlyList<IndexedVersionType> _releaseTypes = releaseTypes ?? [];
+    private readonly FlameApi _flame = flame ?? new FlameApi();
 
     private readonly Dictionary<Resource, string> _blocked = new();
 
     private readonly List<Update> _updates = [];
-
-    public FlameCheckUpdate(IReadOnlyList<Resource> resources,
-        IReadOnlyList<McVersion> mcVersions,
-        IReadOnlyList<ModLoaderType> loadersList,
-        Func<Resource, MetadataHandler.ModStruct?> metadataLookup,
-        IReadOnlyList<IndexedVersionType>? releaseTypes = null,
-        FlameApi? flame = null)
-    {
-        _flame = flame ?? new FlameApi();
-        _resources = resources;
-        _gameVersions = mcVersions;
-        _loadersList = [.. loadersList];
-        _metadataLookup = metadataLookup;
-        _releaseTypes = releaseTypes ?? [];
-    }
 
     public IReadOnlyList<Update> GetUpdates() => _updates;
 
@@ -80,9 +69,9 @@ public sealed class FlameCheckUpdate : FlintTask
          * - Compare hash of the latest version with the current hash
          * - If equal, no updates, else, there's updates, so add to the list
          * */
-        foreach (var resource in _resources)
+        foreach (var resource in resources)
         {
-            var metadata = _metadataLookup(resource);
+            var metadata = metadataLookup(resource);
             if (metadata is null)
             {
                 EmitFailed($"Resource {resource.Name} has no metadata to check against.");
@@ -118,7 +107,7 @@ public sealed class FlameCheckUpdate : FlintTask
         return _flame.GetVersionsUrl(new VersionSearchArgs
         {
             Pack = project,
-            McVersions = _gameVersions.ToList(),
+            McVersions = mcVersions.ToList(),
         });
     }
 
@@ -216,7 +205,7 @@ public sealed class FlameCheckUpdate : FlintTask
         var quickSearch = new Dictionary<string, Resource>();
         foreach (var (resource, _) in _blocked)
         {
-            var metadata = _metadataLookup(resource);
+            var metadata = metadataLookup(resource);
             if (metadata is null)
             {
                 continue;

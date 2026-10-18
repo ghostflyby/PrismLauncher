@@ -7,10 +7,8 @@ using FlintLauncher.Core.IO;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class ExtractNatives : LaunchStep
+public sealed class ExtractNatives(LaunchTask parent) : LaunchStep(parent)
 {
-    public ExtractNatives(LaunchTask parent) : base(parent) { }
-
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         var instance = Parent.Instance;

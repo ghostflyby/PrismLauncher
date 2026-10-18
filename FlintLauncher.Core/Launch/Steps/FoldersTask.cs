@@ -7,19 +7,12 @@ using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class FoldersTask : FlintTask
+public sealed class FoldersTask(MinecraftInstance inst) : FlintTask
 {
-    private readonly MinecraftInstance _inst;
-
-    public FoldersTask(MinecraftInstance inst)
-    {
-        _inst = inst;
-    }
-
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         // Make directories
-        var mcDir = _inst.GameRoot();
+        var mcDir = inst.GameRoot();
         if (!Directory.Exists(mcDir))
         {
             try

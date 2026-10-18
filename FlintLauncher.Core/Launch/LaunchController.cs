@@ -391,8 +391,10 @@ public class LaunchController : FlintTask
             return;
         }
 
-        session = new AuthSession();
-        session.LaunchMode = actualLaunchMode;
+        session = new AuthSession
+        {
+            LaunchMode = actualLaunchMode
+        };
         if (AccountToUse is null)
         {
             // headless extension: an explicit offline launch without any account builds the

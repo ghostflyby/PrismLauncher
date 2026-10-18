@@ -23,7 +23,7 @@ namespace FlintLauncher.Tests;
 /// </summary>
 internal sealed class StubTechnicServer : IDisposable
 {
-    private readonly HttpListener _listener = new();
+    private readonly HttpListener _listener;
 
     public StubTechnicServer()
     {
@@ -92,7 +92,7 @@ internal sealed class StubTechnicServer : IDisposable
 
         var segments = LastPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
         byte[] body;
-        if (segments.Length == 1 && segments[0] is "trending" or "search")
+        if (segments is ["trending" or "search"])
         {
             body = Encoding.UTF8.GetBytes(SearchListJson);
         }
@@ -225,28 +225,22 @@ internal sealed class TechnicZipPackBuilder
         if (JarEmbedsVersionJson)
         {
             var entry = zip.CreateEntry("version.json");
-            using (var writer = new StreamWriter(entry.Open()))
-            {
-                writer.Write(VersionJson);
-            }
+            using var writer = new StreamWriter(entry.Open());
+            writer.Write(VersionJson);
         }
 
         if (FmlVersionProperties.Length != 0)
         {
             var entry = zip.CreateEntry("fmlversion.properties");
-            using (var writer = new StreamWriter(entry.Open()))
-            {
-                writer.Write(FmlVersionProperties);
-            }
+            using var writer = new StreamWriter(entry.Open());
+            writer.Write(FmlVersionProperties);
         }
 
         if (ForgeVersionProperties.Length != 0)
         {
             var entry = zip.CreateEntry("forgeversion.properties");
-            using (var writer = new StreamWriter(entry.Open()))
-            {
-                writer.Write(ForgeVersionProperties);
-            }
+            using var writer = new StreamWriter(entry.Open());
+            writer.Write(ForgeVersionProperties);
         }
     }
 

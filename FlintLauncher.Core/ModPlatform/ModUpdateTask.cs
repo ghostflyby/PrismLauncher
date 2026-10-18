@@ -36,18 +36,11 @@ public class ModUpdateTask : ConcurrentTask
         AddTask(new RefreshModelTask(model));
     }
 
-    private sealed class RefreshModelTask : FlintTask
+    private sealed class RefreshModelTask(ResourceFolderModel model) : FlintTask
     {
-        private readonly ResourceFolderModel _model;
-
-        public RefreshModelTask(ResourceFolderModel model)
-        {
-            _model = model;
-        }
-
         protected override Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            _model.Update();
+            model.Update();
             EmitSucceeded();
             return Task.CompletedTask;
         }

@@ -11,15 +11,8 @@ using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Java.Download;
 
-public sealed class SymlinkTask : FlintTask
+public sealed class SymlinkTask(string finalPath) : FlintTask
 {
-    private readonly string _path;
-
-    public SymlinkTask(string finalPath)
-    {
-        _path = finalPath;
-    }
-
     /// <summary>Port of the free function findBinPath: first &lt;root&gt;/&lt;pattern&gt;, then one level down.</summary>
     public static string FindBinPath(string root, string pattern)
     {
@@ -48,7 +41,7 @@ public sealed class SymlinkTask : FlintTask
     {
         EmitStatus("Checking for Java binary path");
         var binPath = FileSystem.PathCombine("bin", "java");
-        var wantedPath = FileSystem.PathCombine(_path, binPath);
+        var wantedPath = FileSystem.PathCombine(finalPath, binPath);
         if (File.Exists(wantedPath) || Directory.Exists(wantedPath))
         {
             EmitSucceeded();
@@ -57,7 +50,7 @@ public sealed class SymlinkTask : FlintTask
 
         EmitStatus("Searching for Java binary path");
         var contentsPartialPath = FileSystem.PathCombine("Contents", "Home", binPath);
-        var relativePathToBin = FindBinPath(_path, contentsPartialPath);
+        var relativePathToBin = FindBinPath(finalPath, contentsPartialPath);
         if (relativePathToBin.Length == 0)
         {
             EmitFailed("Failed to find Java binary path");
@@ -76,7 +69,7 @@ public sealed class SymlinkTask : FlintTask
         foreach (var entry in entries)
         {
             var source = Path.GetFullPath(entry);
-            var destination = FileSystem.PathCombine(_path, Path.GetFileName(entry));
+            var destination = FileSystem.PathCombine(finalPath, Path.GetFileName(entry));
             var destinationExists = File.Exists(destination) || Directory.Exists(destination);
             if (!destinationExists)
             {

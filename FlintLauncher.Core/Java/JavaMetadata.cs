@@ -78,15 +78,16 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
 
     public static JavaMetadata ParseJavaMeta(JsonObject obj)
     {
-        var meta = new JavaMetadata();
-
-        meta.name = obj.StringOr("name");
-        meta.Vendor = obj.StringOr("vendor");
-        meta.Url = obj.StringOr("url");
-        meta.ReleaseTime = ParseUtils.TimeFromS3Time(obj.StringOr("releaseTime"));
-        meta.DownloadType = ParseDownloadType(obj.StringOr("downloadType"));
-        meta.PackageType = obj.StringOr("packageType");
-        meta.RuntimeOs = obj.StringOr("runtimeOS", "unknown");
+        var meta = new JavaMetadata
+        {
+            name = obj.StringOr("name"),
+            Vendor = obj.StringOr("vendor"),
+            Url = obj.StringOr("url"),
+            ReleaseTime = ParseUtils.TimeFromS3Time(obj.StringOr("releaseTime")),
+            DownloadType = ParseDownloadType(obj.StringOr("downloadType")),
+            PackageType = obj.StringOr("packageType"),
+            RuntimeOs = obj.StringOr("runtimeOS", "unknown")
+        };
 
         if (obj.Contains("checksum"))
         {

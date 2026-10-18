@@ -35,14 +35,9 @@ public sealed class ClaimAccount : LaunchStep
     public MinecraftAccount? Account { get; set; }
 
     /// <summary>Minimal port of the Usable/UseLock pair of launcher/Usable.h.</summary>
-    public sealed class UseLock : IDisposable
+    public sealed class UseLock(MinecraftAccount? usable) : IDisposable
     {
-        private readonly MinecraftAccount? _usable;
-
-        public UseLock(MinecraftAccount? usable)
-        {
-            _usable = usable;
-        }
+        private readonly MinecraftAccount? _usable = usable;
 
         public void Dispose() { }
     }

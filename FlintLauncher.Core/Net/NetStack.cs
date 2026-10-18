@@ -17,7 +17,7 @@ public sealed class NetStack
     /// isolation construct their own and pass it down the service constructors.</summary>
     public static NetStack Default { get; } = CreateDefault();
 
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
     private (string Type, string Host, int Port, string User, string Pass) proxy = ("None", "", 0, "", "");
     private (string Ua, string Type, string Host, int Port, string User, string Pass)? applied;
     private volatile HttpClient client;

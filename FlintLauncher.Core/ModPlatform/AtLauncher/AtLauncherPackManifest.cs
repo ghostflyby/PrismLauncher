@@ -274,7 +274,7 @@ public static class AtLauncherPackManifest
         // when the mod represents Forge. As there is little difference between "Jar" and "Forge, some
         // packs regretfully use "Jar". This will correct the type to "Forge" in these cases (as best
         // it can).
-        if (p.Name == "Minecraft Forge" && p.Type == ModType.Jar)
+        if (p is { Name: "Minecraft Forge", Type: ModType.Jar })
         {
             p.TypeRaw = "forge";
             p.Type = ModType.Forge;

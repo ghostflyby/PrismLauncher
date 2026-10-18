@@ -375,8 +375,10 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         if (targetToJoin is not null && targetToJoin.Port == 25565)
         {
             // Resolve server address to join on launch
-            var step = new LookupServerAddress(process, targetToJoin);
-            step.LookupAddress = targetToJoin.Address;
+            var step = new LookupServerAddress(process, targetToJoin)
+            {
+                LookupAddress = targetToJoin.Address
+            };
             process.AppendStep(step);
         }
 
@@ -780,14 +782,16 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public override SortedDictionary<string, string> GetVariables()
     {
-        var outVars = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        outVars["INST_NAME"] = Name();
-        outVars["INST_ID"] = Id();
-        outVars["INST_DIR"] = ToNativeSeparators(QDirAbsolutePath(InstanceRoot()));
-        outVars["INST_MC_DIR"] = ToNativeSeparators(QDirAbsolutePath(GameRoot()));
-        outVars["INST_JAVA"] = ToNativeSeparators(QDirAbsolutePath(Variant.AsString(Settings.Get("JavaPath"))));
-        outVars["INST_JAVA_ARGS"] = string.Join(" ", JavaArguments());
-        outVars["NO_COLOR"] = "1";
+        var outVars = new SortedDictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["INST_NAME"] = Name(),
+            ["INST_ID"] = Id(),
+            ["INST_DIR"] = ToNativeSeparators(QDirAbsolutePath(InstanceRoot())),
+            ["INST_MC_DIR"] = ToNativeSeparators(QDirAbsolutePath(GameRoot())),
+            ["INST_JAVA"] = ToNativeSeparators(QDirAbsolutePath(Variant.AsString(Settings.Get("JavaPath")))),
+            ["INST_JAVA_ARGS"] = string.Join(" ", JavaArguments()),
+            ["NO_COLOR"] = "1"
+        };
         if (OperatingSystem.IsMacOS())
         {
             // get library for Steam overlay support
@@ -1148,11 +1152,12 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     protected SortedDictionary<string, string> MakeProfileVarMapping(LaunchProfile profile)
     {
-        var result = new SortedDictionary<string, string>(StringComparer.Ordinal);
-
-        result["profile_name"] = Name();
-        result["version_name"] = profile.GetMinecraftVersion();
-        result["version_type"] = profile.GetMinecraftVersionType();
+        var result = new SortedDictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["profile_name"] = Name(),
+            ["version_name"] = profile.GetMinecraftVersion(),
+            ["version_type"] = profile.GetMinecraftVersionType()
+        };
 
         var absRootDir = QDirAbsolutePath(GameRoot());
         result["game_directory"] = absRootDir;
@@ -1483,7 +1488,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             return FileSystem.PathCombine(Directory.GetCurrentDirectory(), "");
         }
 
-        if (path.StartsWith('/') || (path.Length >= 2 && path[1] == ':'))
+        if (path.StartsWith('/') || path is [_, ':', ..])
         {
             return FileSystem.PathCombine(path, "");
         }

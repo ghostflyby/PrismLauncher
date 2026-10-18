@@ -14,22 +14,15 @@ using FlintLauncher.Core.Minecraft;
 
 namespace FlintLauncher.Core.ModPlatform.FtbApp;
 
-public sealed class FtbAppPackInstallTask : InstanceTask
+public sealed class FtbAppPackInstallTask(FtbAppModpack pack) : InstanceTask
 {
-    public FtbAppPackInstallTask(FtbAppModpack pack)
-    {
-        _pack = pack;
-    }
-
-    private readonly FtbAppModpack _pack;
-
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Copying files...");
         SetProgress(1, 2);
 
         var target = FileSystem.PathCombine(StagingPath, "minecraft");
-        if (!FileSystem.Copy(_pack.Path, target))
+        if (!FileSystem.Copy(pack.Path, target))
         {
             EmitFailed("Failed to copy the FTB App instance folder");
             return;
@@ -49,35 +42,35 @@ public sealed class FtbAppPackInstallTask : InstanceTask
                 "InstanceTask requires SetParentEnvironment before execution.")),
             StagingPath);
 
-        instance.Settings.Set("totalTimePlayed", _pack.TotalPlayTime / 1000);
+        instance.Settings.Set("totalTimePlayed", pack.TotalPlayTime / 1000);
 
-        if (_pack.JvmArgs.Length != 0)
+        if (pack.JvmArgs.Length != 0)
         {
             // C7: writing JvmArgs sets the instance-layer member, which IS the override (the
             // derived OverrideJavaArgs gate reads true; no separate gate write exists)
-            instance.Settings.Set("JvmArgs", _pack.JvmArgs);
+            instance.Settings.Set("JvmArgs", pack.JvmArgs);
         }
 
         var components = instance.GetPackProfile();
         components.BuildingFromScratch();
-        await components.SetComponentVersion("net.minecraft", _pack.McVersion, important: true, cancellationToken);
+        await components.SetComponentVersion("net.minecraft", pack.McVersion, important: true, cancellationToken);
 
-        var modloader = _pack.LoaderType;
+        var modloader = pack.LoaderType;
         if (modloader is not null)
         {
             switch (modloader.Value)
             {
                 case ModLoaderType.NeoForge:
-                    await components.SetComponentVersion("net.neoforged", _pack.LoaderVersion, important: true, cancellationToken);
+                    await components.SetComponentVersion("net.neoforged", pack.LoaderVersion, important: true, cancellationToken);
                     break;
                 case ModLoaderType.Forge:
-                    await components.SetComponentVersion("net.minecraftforge", _pack.LoaderVersion, important: true, cancellationToken);
+                    await components.SetComponentVersion("net.minecraftforge", pack.LoaderVersion, important: true, cancellationToken);
                     break;
                 case ModLoaderType.Fabric:
-                    await components.SetComponentVersion("net.fabricmc.fabric-loader", _pack.LoaderVersion, important: true, cancellationToken);
+                    await components.SetComponentVersion("net.fabricmc.fabric-loader", pack.LoaderVersion, important: true, cancellationToken);
                     break;
                 case ModLoaderType.Quilt:
-                    await components.SetComponentVersion("org.quiltmc.quilt-loader", _pack.LoaderVersion, important: true, cancellationToken);
+                    await components.SetComponentVersion("org.quiltmc.quilt-loader", pack.LoaderVersion, important: true, cancellationToken);
                     break;
             }
         }

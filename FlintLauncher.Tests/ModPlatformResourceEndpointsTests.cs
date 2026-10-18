@@ -167,7 +167,7 @@ public class FlintApiFlameResourceTests : IDisposable
 /// </summary>
 internal sealed class StubModrinthResourceServer : IDisposable
 {
-    private readonly HttpListener _listener = new();
+    private readonly HttpListener _listener;
 
     public StubModrinthResourceServer()
     {

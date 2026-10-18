@@ -43,7 +43,12 @@ using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.ModPlatform.AtLauncher;
 
-public sealed partial class AtLauncherPackInstallTask : InstanceTask
+public sealed partial class AtLauncherPackInstallTask(
+    string packName,
+    string version,
+    AtLauncherPackInstallTask.InstallMode installMode = AtLauncherPackInstallTask.InstallMode.Install,
+    AtLauncherApi? api = null)
+    : InstanceTask
 {
     /// <summary>Port of ATLauncher::InstallMode.</summary>
     public enum InstallMode : byte
@@ -53,24 +58,14 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
         Update,
     }
 
-    public AtLauncherPackInstallTask(string packName, string version,
-        InstallMode installMode = InstallMode.Install, AtLauncherApi? api = null)
-    {
-        PackName = packName;
-        PackSafeName = AtLauncherPackIndex.SafePackName(packName);
-        VersionName = version;
-        InstallModeValue = installMode;
-        _api = api ?? new AtLauncherApi();
-    }
-
-    public string PackName { get; }
-    public string PackSafeName { get; }
-    public string VersionName { get; }
-    public InstallMode InstallModeValue { get; }
+    public string PackName { get; } = packName;
+    public string PackSafeName { get; } = AtLauncherPackIndex.SafePackName(packName);
+    public string VersionName { get; } = version;
+    public InstallMode InstallModeValue { get; } = installMode;
 
     /// <summary>The injected ATLauncher client (URL builders + the net stack the pack's
     /// requests ride; per-instance since the DownloadServerUrl de-singletoning).</summary>
-    private readonly AtLauncherApi _api;
+    private readonly AtLauncherApi _api = api ?? new AtLauncherApi();
 
     /// <summary>APPLICATION->metacache() hook ("ATLauncherPacks" base); null = plain downloads.</summary>
     public HttpMetaCache? MetaCache { get; set; }
@@ -511,8 +506,10 @@ public sealed partial class AtLauncherPackInstallTask : InstanceTask
                 continue;
             }
 
-            var library = new Library();
-            library.Name = new GradleSpecifier(libName);
+            var library = new Library
+            {
+                Name = new GradleSpecifier(libName)
+            };
 
             switch (lib.Download)
             {

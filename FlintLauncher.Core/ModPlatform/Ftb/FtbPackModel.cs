@@ -8,14 +8,9 @@ using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.ModPlatform.Ftb;
 
-public sealed class FtbPackModel
+public sealed class FtbPackModel(FtbApi? ftb = null)
 {
-    public FtbPackModel(FtbApi? ftb = null)
-    {
-        _ftb = ftb ?? new FtbApi();
-    }
-
-    private readonly FtbApi _ftb;
+    private readonly FtbApi _ftb = ftb ?? new FtbApi();
     private readonly List<FtbModpack> _modpacks = [];
 
     public IReadOnlyList<FtbModpack> Packs => _modpacks;

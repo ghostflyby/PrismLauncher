@@ -15,15 +15,11 @@ using System.Text.Json.Nodes;
 
 namespace FlintLauncher.Core.Auth;
 
-public sealed class MsaDeviceCodeStep : AuthStep
+public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? auth = null) : AuthStep(data)
 {
-    private readonly AuthEndpointsOptions _auth;
+    private readonly AuthEndpointsOptions _auth = auth ?? new AuthEndpointsOptions();
 
     // https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-device-code
-    public MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? auth = null) : base(data)
-    {
-        _auth = auth ?? new AuthEndpointsOptions();
-    }
 
     public override string Describe() => "Logging in with Microsoft account(device code).";
 

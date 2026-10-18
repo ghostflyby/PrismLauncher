@@ -295,7 +295,7 @@ internal static class QSettingsIniCodec
             return i;
         }
 
-        if (c >= '0' && c <= '7')
+        if (c is >= '0' and <= '7')
         {
             var val = 0;
             var digits = 0;

@@ -50,12 +50,8 @@ public enum DependencyTypeValue : byte
 }
 
 /// <summary>Port of the DependencyType EnumWrapper.</summary>
-public readonly record struct DependencyType
+public readonly record struct DependencyType(DependencyTypeValue Value)
 {
-    public DependencyType(DependencyTypeValue value) => Value = value;
-
-    public DependencyTypeValue Value { get; }
-
     public static DependencyType Invalid => new(DependencyTypeValue.Unknown);
 
     public bool IsValid => Value != DependencyTypeValue.Unknown;
@@ -99,12 +95,8 @@ public enum SideTypeValue : byte
 }
 
 /// <summary>Port of the SideType EnumWrapper.</summary>
-public readonly record struct SideType
+public readonly record struct SideType(SideTypeValue Value)
 {
-    public SideType(SideTypeValue value) => Value = value;
-
-    public SideTypeValue Value { get; }
-
     public static SideType Invalid => new(SideTypeValue.NoSide);
 
     public bool IsValid => Value != SideTypeValue.NoSide;
@@ -143,12 +135,8 @@ public enum IndexedVersionTypeValue : byte
 }
 
 /// <summary>Port of the IndexedVersionType EnumWrapper.</summary>
-public readonly record struct IndexedVersionType
+public readonly record struct IndexedVersionType(IndexedVersionTypeValue Value)
 {
-    public IndexedVersionType(IndexedVersionTypeValue value) => Value = value;
-
-    public IndexedVersionTypeValue Value { get; }
-
     public static IndexedVersionType Invalid => new(IndexedVersionTypeValue.Unknown);
 
     public bool IsValid => Value != IndexedVersionTypeValue.Unknown;

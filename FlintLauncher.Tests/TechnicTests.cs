@@ -232,8 +232,8 @@ public class TechnicTests : IDisposable
         var components = doc.RootElement.GetProperty("components").EnumerateArray()
             .Select(c => (Uid: c.GetProperty("uid").GetString(), Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
             .ToList();
-        Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.20.1");
-        Assert.Contains(components, c => c.Uid == "net.minecraftforge" && c.Version == "42.0.0");
+        Assert.Contains(components, c => c is { Uid: "net.minecraft", Version: "1.20.1" });
+        Assert.Contains(components, c => c is { Uid: "net.minecraftforge", Version: "42.0.0" });
     }
 
     [Fact]
@@ -304,8 +304,8 @@ public class TechnicTests : IDisposable
         var components = doc.RootElement.GetProperty("components").EnumerateArray()
             .Select(c => (Uid: c.GetProperty("uid").GetString(), Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
             .ToList();
-        Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.4.7");
-        Assert.Contains(components, c => c.Uid == "net.minecraftforge" && c.Version == "1.4.7.5");
+        Assert.Contains(components, c => c is { Uid: "net.minecraft", Version: "1.4.7" });
+        Assert.Contains(components, c => c is { Uid: "net.minecraftforge", Version: "1.4.7.5" });
     }
 
     [Fact]
@@ -333,8 +333,8 @@ public class TechnicTests : IDisposable
         var components = doc.RootElement.GetProperty("components").EnumerateArray()
             .Select(c => (Uid: c.GetProperty("uid").GetString(), Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
             .ToList();
-        Assert.Contains(components, c => c.Uid == "net.minecraft" && c.Version == "1.6.4");
-        Assert.Contains(components, c => c.Uid == "net.minecraftforge" && c.Version == "9.11.1.964");
+        Assert.Contains(components, c => c is { Uid: "net.minecraft", Version: "1.6.4" });
+        Assert.Contains(components, c => c is { Uid: "net.minecraftforge", Version: "9.11.1.964" });
     }
 
     [Fact]

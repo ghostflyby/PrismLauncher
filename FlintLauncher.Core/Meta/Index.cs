@@ -19,9 +19,9 @@ public sealed class Index : MetaEntity
     public Index(IReadOnlyList<VersionList> lists)
     {
         _lists.AddRange(lists);
-        for (var i = 0; i < _lists.Count; ++i)
+        foreach (var t in _lists)
         {
-            _uids[_lists[i].Uid()] = _lists[i];
+            _uids[t.Uid] = t;
         }
     }
 
@@ -68,7 +68,7 @@ public sealed class Index : MetaEntity
             _lists.AddRange(lists);
             foreach (var list in lists)
             {
-                _uids[list.Uid()] = list;
+                _uids[list.Uid] = list;
             }
         }
         else
@@ -80,14 +80,14 @@ public sealed class Index : MetaEntity
                     list.Cache = cache;
                 }
 
-                if (_uids.TryGetValue(list.Uid(), out var existing))
+                if (_uids.TryGetValue(list.Uid, out var existing))
                 {
                     existing.MergeFromIndex(list);
                 }
                 else
                 {
                     _lists.Add(list);
-                    _uids[list.Uid()] = list;
+                    _uids[list.Uid] = list;
                 }
             }
         }
