@@ -391,12 +391,12 @@ public class TechnicTests : IDisposable
     [Fact]
     public async Task SingleZip_MalformedVersionJson_FailsWithParseMessage()
     {
-        // the surfaced parse error keeps the requireDocument wrapping around the node parse
+        // the surfaced parse error keeps the wrapper prefix; the STJ detail text follows it
+        // (the former requireDocument "Error parsing JSON" wording is not the contract)
         var task = await RunZipInstall(new TechnicZipPackBuilder { VersionJson = """{"inheritsFrom":}""" },
             name: "Technic BadVersionJson");
         Assert.Equal(TaskState.Failed, task.State);
         Assert.Contains("Could not understand \"version.json\":", task.FailReason);
-        Assert.Contains("Error parsing JSON", task.FailReason);
     }
 
     // --------------------------------------------------------------- Solder install

@@ -65,6 +65,7 @@ public sealed record TechnicMetadataJson(
 [JsonSerializable(typeof(TechnicSearchListJson))]
 [JsonSerializable(typeof(TechnicSinglePackJson))]
 [JsonSerializable(typeof(TechnicMetadataJson))]
+[JsonSerializable(typeof(TechnicPackProcessor.TechnicVersionJson))]
 [JsonSerializable(typeof(SolderPack))]
 [JsonSerializable(typeof(SolderPackBuild))]
 internal sealed partial class TechnicJsonContext : JsonSerializerContext;

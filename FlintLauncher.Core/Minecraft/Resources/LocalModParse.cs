@@ -22,11 +22,9 @@
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Java;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.ModPlatform.Packwiz;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
@@ -300,61 +298,37 @@ public static class ModUtils
     // https://github.com/MinecraftForge/FML/wiki/FML-mod-information-file/5bf6a2d05145ec79387acc0d45c958642fb049fc
     public static ModDetails ReadMcModInfo(string contents)
     {
-        var root = ParseJson(contents);
-
-        if (root is JsonArray array)
+        // the typed root converter accepts the object form and the very old bare-array form
+        McModInfoDocument? document;
+        try
         {
-            // this is the very old format that had just the array
-            return GetInfoFromArray(array);
+            document = JsonSerializer.Deserialize(
+                contents.TrimStart('\uFEFF'), ModMetadataJsonContext.Default.McModInfoDocument);
         }
-
-        if (root is JsonObject obj)
+        catch (JsonException)
         {
-            var versionNode = obj.Contains("modinfoversion") ? obj["modinfoversion"] : obj["modinfoversion"].NullOr(obj["modListVersion"]);
-
-            var version = QJsonValueToInt(versionNode, -1);
-
-            // Some mods set the number with "", so it's a String instead
-            if (version < 0)
-            {
-                version = ParseInt(StringOr(versionNode));
-            }
-
-            if (version != 2)
-            {
-                // qWarning() << "The value of 'modListVersion' is ... (expected "2")! The file may be corrupted.";
-            }
-
-            var arrayVal = obj.Contains("modlist") ? obj["modlist"] : obj["modlist"].NullOr(obj["modList"]);
-            if (arrayVal is JsonArray modList)
-            {
-                return GetInfoFromArray(modList);
-            }
-        }
-
-        return new ModDetails();
-    }
-
-    private static ModDetails GetInfoFromArray(JsonArray array)
-    {
-        if (array.Count == 0 || array[0] is not JsonObject firstObj)
-        {
+            // the former ParseJson null path: garbage leaves filename-only details
             return new ModDetails();
         }
 
+        return document?.Entries is { Count: > 0 } entries ? InfoFromEntry(entries[0]) : new ModDetails();
+    }
+
+    private static ModDetails InfoFromEntry(McModEntryJson firstObj)
+    {
         var details = new ModDetails
         {
-            ModId = StringOr(firstObj["modid"])
+            ModId = firstObj.ModId
         };
-        var name = StringOr(firstObj["name"]);
+        var name = firstObj.Name;
         // NOTE: ignore stupid example mods copies where the author didn't even bother to change the name
         if (name != "Example Mod")
         {
             details.Name = name;
         }
 
-        details.Version = StringOr(firstObj["version"]);
-        var homeurl = StringOr(firstObj["url"]).Trim();
+        details.Version = firstObj.Version;
+        var homeurl = firstObj.Url.Trim();
         if (homeurl.Length != 0)
         {
             // fix up url.
@@ -367,25 +341,16 @@ public static class ModUtils
         }
 
         details.Homeurl = homeurl;
-        details.Description = StringOr(firstObj["description"]);
-        var authors = firstObj["authorList"] as JsonArray;
-        if (authors is not { Count: > 0 })
+        details.Description = firstObj.Description;
+        var authors = firstObj.AuthorList is { Count: > 0 } authorList ? authorList : firstObj.Authors;
+        if (firstObj.LogoFile is not null)
         {
-            // FIXME: what is the format of this? is there any?
-            authors = firstObj["authors"] as JsonArray;
-        }
-
-        if (firstObj.ContainsKey("logoFile"))
-        {
-            details.IconFile = StringOr(firstObj["logoFile"]);
+            details.IconFile = firstObj.LogoFile;
         }
 
         if (authors is not null)
         {
-            foreach (var author in authors)
-            {
-                details.Authors.Add(StringOr(author));
-            }
+            details.Authors.AddRange(authors);
         }
 
         if (details.ModId.StartsWith("mod_", StringComparison.Ordinal))
@@ -418,24 +383,18 @@ public static class ModUtils
             details.Dependencies.Add(dep);
         }
 
-        if (firstObj.ContainsKey("requiredMods"))
+        if (firstObj.RequiredMods is not null)
         {
-            if (firstObj["requiredMods"] is JsonArray requiredMods)
+            foreach (var dep in firstObj.RequiredMods)
             {
-                foreach (var dep in requiredMods)
-                {
-                    AddDep(StringOr(dep));
-                }
+                AddDep(dep);
             }
         }
-        else if (firstObj.ContainsKey("dependencies"))
+        else if (firstObj.Dependencies is not null)
         {
-            if (firstObj["dependencies"] is JsonArray dependencies)
+            foreach (var dep in firstObj.Dependencies)
             {
-                foreach (var dep in dependencies)
-                {
-                    AddDep(StringOr(dep));
-                }
+                AddDep(dep);
             }
         }
 
@@ -583,115 +542,49 @@ public static class ModUtils
     // https://fabricmc.net/wiki/documentation:fabric_mod_json
     public static ModDetails ReadFabricModInfo(string contents)
     {
-        // QJsonDocument::fromJson on garbage yields an empty object; every lookup defaults.
-        var object0 = ParseJson(contents) as JsonObject ?? [];
-        var schemaVersion = object0.Contains("schemaVersion") ? QJsonValueToInt(object0["schemaVersion"], 0) : 0;
+        // a token-stream-level broken document yields empty details (the former
+        // QJsonDocument::fromJson garbage path); wrong-kind members degrade per member
+        // through the coercing converters
+        FabricModJson? wire;
+        try
+        {
+            wire = JsonSerializer.Deserialize(
+                contents.TrimStart('\uFEFF'), ModMetadataJsonContext.Default.FabricModJson);
+        }
+        catch (JsonException)
+        {
+            wire = null;
+        }
 
+        var fabric = wire ?? new FabricModJson();
         var details = new ModDetails
         {
-            ModId = StringOr(object0["id"]),
-            Version = StringOr(object0["version"])
+            ModId = fabric.Id,
+            Version = fabric.Version
         };
 
-        details.Name = object0.Contains("name") ? StringOr(object0["name"]) : details.ModId;
-        details.Description = StringOr(object0["description"]);
+        details.Name = fabric.Name ?? details.ModId;
+        details.Description = fabric.Description;
 
-        if (schemaVersion >= 1)
+        if (fabric.SchemaVersion >= 1)
         {
-            if (object0["authors"] is JsonArray authors)
+            if (fabric.Authors is { } authors)
             {
-                foreach (var author in authors)
-                {
-                    if (author is JsonObject authorObj)
-                    {
-                        details.Authors.Add(StringOr(authorObj["name"]));
-                    }
-                    else
-                    {
-                        details.Authors.Add(StringOr(author));
-                    }
-                }
+                details.Authors.AddRange(authors);
             }
 
-            if (object0["contact"] is JsonObject contact)
+            if (fabric.Contact is { } contact)
             {
-                if (contact.ContainsKey("homepage"))
-                {
-                    details.Homeurl = StringOr(contact["homepage"]);
-                }
-
-                if (contact.ContainsKey("issues"))
-                {
-                    details.IssueTracker = StringOr(contact["issues"]);
-                }
+                details.Homeurl = contact.Homepage ?? "";
+                details.IssueTracker = contact.Issues ?? "";
             }
 
-            if (object0["license"] is { } license)
+            AddLicenses(fabric.License, details);
+            AddFabricIcon(fabric.Icon, details);
+
+            if (fabric.Depends is { } depends)
             {
-                switch (license)
-                {
-                    case JsonArray licenseArray:
-                        foreach (var l in licenseArray)
-                        {
-                            if (l is JsonValue)
-                            {
-                                details.Licenses.Add(new ModLicense(StringOr(l)));
-                            }
-                            else if (l is JsonObject licenseObj)
-                            {
-                                details.Licenses.Add(new ModLicense(StringOr(licenseObj["name"]),
-                                    StringOr(licenseObj["id"]), StringOr(licenseObj["url"]),
-                                    StringOr(licenseObj["description"])));
-                            }
-                        }
-
-                        break;
-                    case JsonValue:
-                        details.Licenses.Add(new ModLicense(StringOr(license)));
-                        break;
-                    case JsonObject licenseObj:
-                        details.Licenses.Add(new ModLicense(StringOr(licenseObj["name"]), StringOr(licenseObj["id"]),
-                            StringOr(licenseObj["url"]), StringOr(licenseObj["description"])));
-                        break;
-                }
-            }
-
-            if (object0["icon"] is { } icon)
-            {
-                if (icon is JsonObject iconObj)
-                {
-                    // take the largest icon
-                    var largest = 0;
-                    var bestIcon = "";
-                    foreach (var (key, value) in iconObj)
-                    {
-                        var size = ParseInt(key.Split('x')[0]);
-                        if (size > largest)
-                        {
-                            largest = size;
-                            bestIcon = StringOr(value);
-                        }
-                    }
-
-                    if (bestIcon.Length != 0)
-                    {
-                        details.IconFile = bestIcon;
-                    }
-                    else if (!iconObj.IsEmpty())
-                    {
-                        // take the first
-                        details.IconFile = StringOr(iconObj.First().Value);
-                    }
-                }
-                else if (icon is JsonValue)
-                {
-                    details.IconFile = StringOr(icon);
-                }
-            }
-
-            if (object0["depends"] is JsonObject depends)
-            {
-                foreach (var (key, _) in depends)
+                foreach (var key in depends.Keys)
                 {
                     if (key != "fabricloader" && key != "minecraft" && !key.StartsWith("fabric-", StringComparison.Ordinal))
                     {
@@ -704,148 +597,155 @@ public static class ModUtils
         return details;
     }
 
+    /// <summary>The largest-size resolution over the icon map (the fabric form: best entry
+    /// by size, else the first; the bare-string form passes through).</summary>
+    private static void AddFabricIcon(FabricIconJson? icon, ModDetails details)
+    {
+        if (icon is null)
+        {
+            return;
+        }
+
+        if (icon.Sizes is { Count: > 0 } sizes)
+        {
+            // take the largest icon
+            var largest = 0;
+            var bestIcon = "";
+            foreach (var (key, value) in sizes)
+            {
+                var size = ParseInt(key.Split('x')[0]);
+                if (size > largest)
+                {
+                    largest = size;
+                    bestIcon = value;
+                }
+            }
+
+            if (bestIcon.Length != 0)
+            {
+                details.IconFile = bestIcon;
+            }
+            else
+            {
+                // take the first
+                details.IconFile = sizes.First().Value;
+            }
+        }
+        else
+        {
+            details.IconFile = icon.Single ?? "";
+        }
+    }
+
+    /// <summary>The shared license mapping: the string form runs the parsing constructor
+    /// (URL extraction), the object form takes the members verbatim.</summary>
+    private static void AddLicenses(List<FabricLicenseJson>? licenses, ModDetails details)
+    {
+        foreach (var license in licenses ?? [])
+        {
+            details.Licenses.Add(license.IsObjectForm
+                ? new ModLicense(license.Name, license.Id ?? "", license.Url ?? "", license.Description ?? "")
+                : new ModLicense(license.Name));
+        }
+    }
+
     // https://github.com/QuiltMC/rfcs/blob/master/specification/0002-quilt.mod.json.md
     public static ModDetails ReadQuiltModInfo(string contents)
     {
-        var details = new ModDetails();
+        QuiltModJson? wire;
         try
         {
-            var object0 = ParseJsonOrThrow(contents) as JsonObject
-                          ?? throw new JsonParseException("quilt.mod.jsons parent does not contain 'quilt.mod.json'");
-            var schemaVersion = QJsonValueToInt(object0["schema_version"], 0);
+            wire = JsonSerializer.Deserialize(
+                contents.TrimStart('\uFEFF'), ModMetadataJsonContext.Default.QuiltModJson);
+        }
+        catch (JsonException)
+        {
+            // the former ParseJsonOrThrow → catch(JsonParseException) path: garbage leaves
+            // filename-only details
+            return new ModDetails();
+        }
 
-            // https://github.com/QuiltMC/rfcs/blob/be6ba280d785395fefa90a43db48e5bfc1d15eb4/specification/0002-quilt.mod.json.md
-            if (schemaVersion == 1)
+        var loader = wire?.QuiltLoader;
+        if (wire is null || loader is null)
+        {
+            // the former RequireJsonObject("quilt_loader") throw, caught to empty details
+            return new ModDetails();
+        }
+
+        // https://github.com/QuiltMC/rfcs/blob/be6ba280d785395fefa90a43db48e5bfc1d15eb4/specification/0002-quilt.mod.json.md
+        // (the required id/version trio keeps its empty-details degradation)
+        if (wire.SchemaVersion != 1 || loader.Id.Length == 0 || loader.Version.Length == 0)
+        {
+            return new ModDetails();
+        }
+
+        var details = new ModDetails
+        {
+            ModId = loader.Id,
+            Version = loader.Version
+        };
+
+        var modMetadata = loader.Metadata;
+        details.Name = modMetadata?.Name ?? details.ModId;
+        details.Description = modMetadata?.Description ?? "";
+
+        if (modMetadata?.Contributors is { } contributors)
+        {
+            // We don't really care about the role of a contributor here
+            details.Authors.AddRange(contributors.Keys);
+        }
+
+        if (modMetadata?.Contact is { } contact)
+        {
+            details.Homeurl = contact.Homepage ?? "";
+            details.IssueTracker = contact.Issues ?? "";
+        }
+
+        AddLicenses(modMetadata?.License, details);
+
+        if (modMetadata?.Icon is { } icon)
+        {
+            if (icon.Sizes is { Count: > 0 } sizes)
             {
-                var modInfo = RequireJsonObject(object0, "quilt_loader", "Quilt mod info");
-
-                details.ModId = RequireString(modInfo, "id", "Mod ID");
-                details.Version = RequireString(modInfo, "version", "Mod version");
-
-                var modMetadata = modInfo["metadata"] as JsonObject ?? [];
-
-                details.Name = modMetadata.Contains("name") ? StringOr(modMetadata["name"]) : details.ModId;
-                details.Description = StringOr(modMetadata["description"]);
-
-                if (modMetadata["contributors"] is JsonObject modContributors)
+                // take the largest icon
+                var largest = 0;
+                foreach (var key in sizes.Keys)
                 {
-                    // We don't really care about the role of a contributor here
-                    details.Authors.AddRange(modContributors.Select(entry => entry.Key));
-                }
-
-                if (modMetadata["contact"] is JsonObject modContact)
-                {
-                    if (modContact.ContainsKey("homepage"))
+                    var size = ParseInt(key.Split('x')[0]);
+                    if (size > largest)
                     {
-                        details.Homeurl = RequireString(modContact, "homepage", "'homepage'");
-                    }
-
-                    if (modContact.ContainsKey("issues"))
-                    {
-                        details.IssueTracker = RequireString(modContact, "issues", "'issues'");
+                        largest = size;
                     }
                 }
 
-                if (modMetadata["license"] is { } license)
+                if (largest > 0)
                 {
-                    switch (license)
-                    {
-                        case JsonArray licenseArray:
-                            foreach (var l in licenseArray)
-                            {
-                                if (l is JsonValue)
-                                {
-                                    details.Licenses.Add(new ModLicense(StringOr(l)));
-                                }
-                                else if (l is JsonObject licenseObj)
-                                {
-                                    details.Licenses.Add(new ModLicense(StringOr(licenseObj["name"]),
-                                        StringOr(licenseObj["id"]), StringOr(licenseObj["url"]),
-                                        StringOr(licenseObj["description"])));
-                                }
-                            }
-
-                            break;
-                        case JsonValue:
-                            details.Licenses.Add(new ModLicense(StringOr(license)));
-                            break;
-                        case JsonObject licenseObj:
-                            details.Licenses.Add(new ModLicense(StringOr(licenseObj["name"]), StringOr(licenseObj["id"]),
-                                StringOr(licenseObj["url"]), StringOr(licenseObj["description"])));
-                            break;
-                    }
+                    var key = largest + "x" + largest;
+                    details.IconFile = sizes.TryGetValue(key, out var value) ? value : "";
                 }
-
-                if (modMetadata["icon"] is { } icon)
+                else
                 {
-                    if (icon is JsonObject iconObj)
-                    {
-                        // take the largest icon
-                        var largest = 0;
-                        foreach (var (key, _) in iconObj)
-                        {
-                            var size = ParseInt(key.Split('x')[0]);
-                            if (size > largest)
-                            {
-                                largest = size;
-                            }
-                        }
-
-                        if (largest > 0)
-                        {
-                            var key = largest + "x" + largest;
-                            details.IconFile = iconObj.Contains(key) ? StringOr(iconObj[key]) : "";
-                        }
-                        else
-                        {
-                            // parsing the sizes failed
-                            // take the first
-                            if (!iconObj.IsEmpty())
-                            {
-                                details.IconFile = StringOr(iconObj.First().Value);
-                            }
-                        }
-                    }
-                    else if (icon is JsonValue)
-                    {
-                        details.IconFile = StringOr(icon);
-                    }
-                }
-
-                if (object0["depends"] is JsonArray depends)
-                {
-                    foreach (var entry in depends)
-                    {
-                        string modId;
-                        if (entry is JsonValue)
-                        {
-                            modId = StringOr(entry);
-                        }
-                        else if (entry is JsonObject entryObj)
-                        {
-                            modId = StringOr(entryObj["id"]);
-                            if (entryObj.Contains("optional") && entryObj["optional"] is JsonValue optional
-                                                              && optional.TryGetValue<bool>(out var optionalValue) && optionalValue)
-                            {
-                                continue;
-                            }
-                        }
-                        else
-                        {
-                            continue;
-                        }
-
-                        if (modId != "minecraft" && !modId.StartsWith("quilt_", StringComparison.Ordinal))
-                        {
-                            details.Dependencies.Add(modId);
-                        }
-                    }
+                    // parsing the sizes failed: take the first
+                    details.IconFile = sizes.First().Value;
                 }
             }
+            else
+            {
+                details.IconFile = icon.Single ?? "";
+            }
         }
-        catch (JsonParseException)
+
+        foreach (var depend in wire.Depends ?? [])
         {
-            // qWarning() << "Unable to parse mod info:" << e.cause();
+            if (depend.Optional == true || depend.Id is not { } modId)
+            {
+                continue;
+            }
+
+            if (modId != "minecraft" && !modId.StartsWith("quilt_", StringComparison.Ordinal))
+            {
+                details.Dependencies.Add(modId);
+            }
         }
 
         return details;
@@ -875,31 +775,33 @@ public static class ModUtils
 
     public static ModDetails ReadLiteModInfo(string contents)
     {
+        LiteModJson? wire;
+        try
+        {
+            wire = JsonSerializer.Deserialize(
+                contents.TrimStart('\uFEFF'), ModMetadataJsonContext.Default.LiteModJson);
+        }
+        catch (JsonException)
+        {
+            wire = null; // the former ParseJson null path
+        }
+
+        var litemod = wire ?? new LiteModJson();
         var details = new ModDetails();
-        var object0 = ParseJson(contents) as JsonObject ?? [];
-        if (object0.Contains("name"))
+        if (litemod.Name.Length != 0)
         {
-            details.ModId = details.Name = StringOr(object0["name"]);
+            details.ModId = details.Name = litemod.Name;
         }
 
-        if (object0.Contains("version"))
+        details.Version = litemod.Version.Length != 0 ? litemod.Version : litemod.Revision;
+        details.McVersion = litemod.McVersion;
+        if (litemod.Author.Length != 0)
         {
-            details.Version = StringOr(object0["version"]);
-        }
-        else
-        {
-            details.Version = StringOr(object0["revision"]);
+            details.Authors.Add(litemod.Author);
         }
 
-        details.McVersion = StringOr(object0["mcversion"]);
-        var author = StringOr(object0["author"]);
-        if (author.Length != 0)
-        {
-            details.Authors.Add(author);
-        }
-
-        details.Description = StringOr(object0["description"]);
-        details.Homeurl = StringOr(object0["url"]);
+        details.Description = litemod.Description;
+        details.Homeurl = litemod.Url;
         return details;
     }
 
@@ -993,71 +895,6 @@ public static class ModUtils
 
     // ------------------------------------------------------------------ helpers
 
-    private static JsonNode? ParseJson(string contents)
-    {
-        // Qt's QJsonDocument::fromJson skips a leading UTF-8 BOM; mirror that
-        var trimmed = contents.TrimStart('\uFEFF');
-        try
-        {
-            return JsonNode.Parse(trimmed);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    private static JsonNode ParseJsonOrThrow(string contents)
-    {
-        return JsonNode.Parse(contents.TrimStart('\uFEFF')) ?? throw new JsonParseException("the document is a JSON null");
-    }
-
-    private static JsonObject RequireJsonObject(JsonObject parent, string key, string what)
-    {
-        if (!parent.TryGetPropertyValue(key, out var node) || node is not JsonObject obj)
-        {
-            throw new JsonParseException(what + " is not an object");
-        }
-
-        return obj;
-    }
-
-    private static string RequireString(JsonObject parent, string key, string what)
-    {
-        if (!parent.TryGetPropertyValue(key, out var node) || node is not JsonValue value
-                                                           || !value.TryGetValue<string>(out var result))
-        {
-            throw new JsonParseException(what + " is not a string");
-        }
-
-        return result;
-    }
-
-    /// <summary>QJsonValue::toString(): the string value, or "" for missing/non-string nodes.</summary>
-    private static string StringOr(JsonNode? node)
-    {
-        return node is JsonValue value && value.TryGetValue<string>(out var s) ? s : "";
-    }
-
-    /// <summary>QJsonValue::toInt(defaultValue): numbers truncate, everything else defaults.</summary>
-    private static int QJsonValueToInt(JsonNode? node, int defaultValue)
-    {
-        if (node is JsonValue value)
-        {
-            if (value.TryGetValue<int>(out var i))
-            {
-                return i;
-            }
-
-            if (value.TryGetValue<double>(out var d))
-            {
-                return (int)d;
-            }
-        }
-
-        return defaultValue;
-    }
-
     private static int ParseInt(string s)
     {
         return int.TryParse(s, out var value) ? value : 0;
@@ -1103,22 +940,9 @@ public static class ModUtils
     }
 }
 
-/// <summary>Small helpers for the JsonNode/TomlTable lookups of the readers.</summary>
+/// <summary>Small helpers for the TomlTable lookups of the readers.</summary>
 internal static class LocalModParseExtensions
 {
-    /// <summary>The first node, or the fallback when the receiver is null (the
-    /// "obj.contains(a) ? obj[a] : obj[b]" C++ lookup pattern).</summary>
-    public static JsonNode? NullOr(this JsonNode? node, JsonNode? fallback)
-    {
-        return node ?? fallback;
-    }
-
-    /// <summary>QJsonObject::isEmpty().</summary>
-    public static bool IsEmpty(this JsonObject obj)
-    {
-        return obj.Count == 0;
-    }
-
     /// <summary>The first key of the table (toml++ table iteration), or null when empty.</summary>
     public static string? FirstKey(this TomlTable table)
     {

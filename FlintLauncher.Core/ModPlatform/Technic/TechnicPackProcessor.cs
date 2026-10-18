@@ -13,11 +13,14 @@
 
 using System.IO.Compression;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
+using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.ModPlatform.Technic;
@@ -163,9 +166,11 @@ public static class TechnicPackProcessor
 
         try
         {
-            var root = TechnicJson.RequireDocument(data, "version.json");
-            JsonUtils.RequireObject(root, "version.json");
-            var packMinecraftVersion = StringOrEmpty(root, "inheritsFrom");
+            // the Mojang-shaped version.json: a non-object root or wrong-kind structure
+            // fails the deserialization into the same "Could not understand" message
+            var wire = JsonSerializer.Deserialize(data, TechnicJsonContext.Default.TechnicVersionJson)
+                       ?? throw new JsonException("the document is null");
+            var packMinecraftVersion = wire.InheritsFrom;
             if (packMinecraftVersion.Length == 0)
             {
                 if (fmlMinecraftVersion.Length == 0)
@@ -178,82 +183,72 @@ public static class TechnicPackProcessor
 
             _ = await components.SetComponentVersion("net.minecraft", packMinecraftVersion, important: true,
                 cancellationToken: cancellationToken);
-            if (root["libraries"] is JsonArray libraries)
+            foreach (var library in wire.Libraries ?? [])
             {
-                foreach (var library in libraries)
+                var libraryName = library.Name;
+
+                if (libraryName.StartsWith("net.neoforged.fancymodloader:", StringComparison.Ordinal))
                 {
-                    if (library is not JsonObject libraryObject)
+                    // it is neoforge
+                    // no easy way to get the version from the libs so use the arguments
+                    var neoforgeVersion = "";
+                    if (wire.Arguments?.Game is { } game)
                     {
-                        continue;
-                    }
-
-                    var libraryName = StringOrEmpty(libraryObject, "name");
-
-                    if (libraryName.StartsWith("net.neoforged.fancymodloader:", StringComparison.Ordinal))
-                    {
-                        // it is neoforge
-                        // no easy way to get the version from the libs so use the arguments
-                        var neoforgeVersion = "";
-                        if (root["arguments"] is JsonObject arguments
-                            && arguments["game"] is JsonArray game)
+                        var isVersionArg = false;
+                        foreach (var argument in game)
                         {
-                            var isVersionArg = false;
-                            foreach (var arg in game)
+                            if (isVersionArg)
                             {
-                                var argument = arg is JsonValue value ? StringValue(value) : "";
-                                if (isVersionArg)
-                                {
-                                    neoforgeVersion = argument;
-                                    break;
-                                }
-
-                                isVersionArg = "--fml.neoForgeVersion" == argument || "--fml.forgeVersion" == argument;
+                                neoforgeVersion = argument;
+                                break;
                             }
-                        }
 
-                        if (neoforgeVersion.Length != 0)
-                        {
-                            _ = await components.SetComponentVersion("net.neoforged", neoforgeVersion,
-                                cancellationToken: cancellationToken);
+                            isVersionArg = "--fml.neoForgeVersion" == argument || "--fml.forgeVersion" == argument;
                         }
-
-                        break;
                     }
 
-                    if ((libraryName.StartsWith("net.minecraftforge:forge:", StringComparison.Ordinal)
-                         || libraryName.StartsWith("net.minecraftforge:fmlloader:", StringComparison.Ordinal))
-                        && libraryName.Contains('-'))
+                    if (neoforgeVersion.Length != 0)
                     {
-                        var libraryVersion = Section(libraryName, ':', 2);
-                        if (!libraryVersion.StartsWith("1.7.10-", StringComparison.Ordinal))
-                        {
-                            _ = await components.SetComponentVersion("net.minecraftforge", Section(libraryName, '-', 1),
-                                cancellationToken: cancellationToken);
-                        }
-                        else
-                        {
-                            // 1.7.10 versions sometimes look like 1.7.10-10.13.4.1614-1.7.10, this filters out the 10.13.4.1614 part
-                            _ = await components.SetComponentVersion("net.minecraftforge", Section(libraryName, '-', 1, 1),
-                                cancellationToken: cancellationToken);
-                        }
-
-                        break;
+                        _ = await components.SetComponentVersion("net.neoforged", neoforgeVersion,
+                            cancellationToken: cancellationToken);
                     }
 
-                    // <Technic library name prefix> -> <our component name>
-                    foreach (var (loaderPrefix, componentUid) in LoaderMap)
+                    break;
+                }
+
+                if ((libraryName.StartsWith("net.minecraftforge:forge:", StringComparison.Ordinal)
+                     || libraryName.StartsWith("net.minecraftforge:fmlloader:", StringComparison.Ordinal))
+                    && libraryName.Contains('-'))
+                {
+                    var libraryVersion = Section(libraryName, ':', 2);
+                    if (!libraryVersion.StartsWith("1.7.10-", StringComparison.Ordinal))
                     {
-                        if (libraryName.StartsWith(loaderPrefix, StringComparison.Ordinal))
-                        {
-                            _ = await components.SetComponentVersion(componentUid, Section(libraryName, ':', 2),
-                                cancellationToken: cancellationToken);
-                            break;
-                        }
+                        _ = await components.SetComponentVersion("net.minecraftforge", Section(libraryName, '-', 1),
+                            cancellationToken: cancellationToken);
+                    }
+                    else
+                    {
+                        // 1.7.10 versions sometimes look like 1.7.10-10.13.4.1614-1.7.10, this filters out the 10.13.4.1614 part
+                        _ = await components.SetComponentVersion("net.minecraftforge", Section(libraryName, '-', 1, 1),
+                            cancellationToken: cancellationToken);
+                    }
+
+                    break;
+                }
+
+                // <Technic library name prefix> -> <our component name>
+                foreach (var (loaderPrefix, componentUid) in LoaderMap)
+                {
+                    if (libraryName.StartsWith(loaderPrefix, StringComparison.Ordinal))
+                    {
+                        _ = await components.SetComponentVersion(componentUid, Section(libraryName, ':', 2),
+                            cancellationToken: cancellationToken);
+                        break;
                     }
                 }
             }
         }
-        catch (JsonParseException e)
+        catch (JsonException e)
         {
             return "Could not understand \"version.json\":\n" + e.Message;
         }
@@ -262,22 +257,74 @@ public static class TechnicPackProcessor
         return null;
     }
 
+    /// <summary>The Technic bin/version.json shape (the Mojang document subset the
+    /// processor consumes; read-only — nothing here is ever written).</summary>
+    internal sealed record TechnicVersionJson
+    {
+        [JsonPropertyName("inheritsFrom")]
+        [JsonConverter(typeof(QtCoercingStringConverter))]
+        public string InheritsFrom { get; set; } = "";
+
+        /// <summary>Junk entries drop (the former `is not JsonObject → continue`).</summary>
+        [JsonConverter(typeof(TechnicLibrariesConverter))]
+        public List<TechnicLibraryJson>? Libraries { get; set; }
+
+        public TechnicArgumentsJson? Arguments { get; set; }
+    }
+
+    internal sealed record TechnicLibraryJson
+    {
+        [JsonConverter(typeof(QtCoercingStringConverter))]
+        public string Name { get; set; } = "";
+    }
+
+    internal sealed record TechnicArgumentsJson
+    {
+        /// <summary>Junk values coerce to "" (the former StringValue probing).</summary>
+        [JsonConverter(typeof(CoercingStringListConverter))]
+        public List<string>? Game { get; set; }
+    }
+
+    /// <summary>A non-array libraries member reads null; non-object entries are skipped.</summary>
+    internal sealed class TechnicLibrariesConverter : JsonConverter<List<TechnicLibraryJson>?>
+    {
+        public override List<TechnicLibraryJson>? Read(ref Utf8JsonReader reader, Type typeToConvert,
+            JsonSerializerOptions options)
+        {
+            if (reader.TokenType is not JsonTokenType.StartArray)
+            {
+                return null;
+            }
+
+            var node = JsonNode.Parse(ref reader) as JsonArray;
+            var result = new List<TechnicLibraryJson>();
+            foreach (var entry in node ?? [])
+            {
+                if (entry is JsonObject)
+                {
+                    result.Add(new TechnicLibraryJson
+                    {
+                        Name = entry is JsonObject map && map["name"] is JsonValue value &&
+                               value.TryGetValue<string>(out var name)
+                            ? name
+                            : "",
+                    });
+                }
+            }
+
+            return result;
+        }
+
+        public override void Write(Utf8JsonWriter writer, List<TechnicLibraryJson>? value, JsonSerializerOptions options) =>
+            throw new NotSupportedException("the Technic wire records are read-only");
+    }
+
     private static readonly IReadOnlyList<(string Prefix, string Uid)> LoaderMap =
     [
         ("net.minecraftforge:minecraftforge:", "net.minecraftforge"),
         ("net.fabricmc:fabric-loader:", "net.fabricmc.fabric-loader"),
         ("org.quiltmc:quilt-loader:", "org.quiltmc.quilt-loader"),
     ];
-
-    private static string StringOrEmpty(JsonNode? obj, string key)
-    {
-        return obj is JsonObject map && map[key] is JsonValue value ? StringValue(value) : "";
-    }
-
-    private static string StringValue(JsonValue value)
-    {
-        return value.TryGetValue<string>(out var str) ? str : "";
-    }
 
     /// <summary>QString::section(sep, start, end) for the non-negative ranges used here.</summary>
     private static string Section(string value, char separator, int start, int? end = null)

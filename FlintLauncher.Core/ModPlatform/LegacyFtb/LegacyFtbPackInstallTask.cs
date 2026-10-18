@@ -13,9 +13,11 @@
 //    fetching game files, like the other creation tasks.
 
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 
@@ -138,33 +140,28 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
             {
                 try
                 {
-                    using var doc = JsonDocument.Parse(FileSystem.Read(packJsonPath));
+                    // the typed pack.json read (we only care about the libs); a malformed
+                    // document fails into the same keep-the-file/fall-through path
+                    var packJson = JsonSerializer.Deserialize(FileSystem.Read(packJsonPath),
+                        LegacyFtbJsonContext.Default.LegacyFtbPackJson);
 
-                    // we only care about the libs
-                    if (doc.RootElement.TryGetProperty("libraries", out var libs)
-                        && libs.ValueKind == JsonValueKind.Array)
+                    foreach (var library in packJson?.Libraries ?? [])
                     {
-                        foreach (var value in libs.EnumerateArray())
+                        var nameValue = library.Name;
+                        if (!nameValue.StartsWith("net.minecraftforge", StringComparison.Ordinal))
                         {
-                            var nameValue = value.TryGetProperty("name", out var nameNode)
-                                            && nameNode.ValueKind == JsonValueKind.String
-                                ? nameNode.GetString() ?? ""
-                                : "";
-                            if (!nameValue.StartsWith("net.minecraftforge", StringComparison.Ordinal))
-                            {
-                                continue;
-                            }
-
-                            var forgeSpecifier = new GradleSpecifier(nameValue);
-                            var forgeVersion = string.IsNullOrEmpty(pack.McVersion)
-                                ? forgeSpecifier.Version
-                                : forgeSpecifier.Version.Replace(pack.McVersion, "").Replace("-", "");
-                            await components.SetComponentVersion("net.minecraftforge", forgeVersion,
-                                cancellationToken: cancellationToken);
-                            FileSystem.DeletePath(packJsonPath);
-                            fallback = false;
-                            break;
+                            continue;
                         }
+
+                        var forgeSpecifier = new GradleSpecifier(nameValue);
+                        var forgeVersion = string.IsNullOrEmpty(pack.McVersion)
+                            ? forgeSpecifier.Version
+                            : forgeSpecifier.Version.Replace(pack.McVersion, "").Replace("-", "");
+                        await components.SetComponentVersion("net.minecraftforge", forgeVersion,
+                            cancellationToken: cancellationToken);
+                        FileSystem.DeletePath(packJsonPath);
+                        fallback = false;
+                        break;
                     }
                 }
                 catch (JsonException e)
@@ -205,3 +202,20 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
         EmitSucceeded();
     }
 }
+
+/// <summary>The minecraft/pack.json wire (read-only; only the libraries are consumed —
+/// the first net.minecraftforge entry determines the loader version).</summary>
+internal sealed record LegacyFtbPackJson
+{
+    public List<LegacyFtbLibJson>? Libraries { get; set; }
+}
+
+internal sealed record LegacyFtbLibJson
+{
+    [JsonConverter(typeof(QtCoercingStringConverter))]
+    public string Name { get; set; } = "";
+}
+
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(LegacyFtbPackJson))]
+internal sealed partial class LegacyFtbJsonContext : JsonSerializerContext;

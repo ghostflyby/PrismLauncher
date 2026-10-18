@@ -58,6 +58,20 @@ public sealed class QtCoercingStringConverter : JsonConverter<string>
         writer.WriteStringValue(value);
 }
 
+/// <summary>The optional-member variant: a string token yields its value, every other
+/// token (number/bool/null) yields null — for "use the fallback when absent-or-junk"
+/// members (the mod-metadata contact/license strings).</summary>
+public sealed class QtCoercingNullableStringConverter : JsonConverter<string?>
+{
+    public override bool HandleNull => true;
+
+    public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.TokenType == JsonTokenType.String ? reader.GetString() : null;
+
+    public override void Write(Utf8JsonWriter writer, string? value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value);
+}
+
 /// <summary>QJsonValue::toBool(default false) for OPTIONAL members: a bool token yields its
 /// value, every other token (string/number/null) yields false.</summary>
 public sealed class QtCoercingBoolConverter : JsonConverter<bool>
@@ -71,6 +85,25 @@ public sealed class QtCoercingBoolConverter : JsonConverter<bool>
 
     public override void Write(Utf8JsonWriter writer, bool value, JsonSerializerOptions options) =>
         writer.WriteBooleanValue(value);
+}
+
+/// <summary>The tri-state variant: a bool token yields its value, every other token
+/// (string/number/null) yields null — for presence-checked flags where junk must not
+/// masquerade as false.</summary>
+public sealed class QtCoercingNullableBoolConverter : JsonConverter<bool?>
+{
+    public override bool HandleNull => true;
+
+    public override bool? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.TokenType switch
+        {
+            JsonTokenType.True => true,
+            JsonTokenType.False => false,
+            _ => null,
+        };
+
+    public override void Write(Utf8JsonWriter writer, bool? value, JsonSerializerOptions options) =>
+        writer.WriteBooleanValue(value ?? false);
 }
 
 /// <summary>The {"packs":[id,...]} index arrays: QJsonValue::toInt() per element (doubles

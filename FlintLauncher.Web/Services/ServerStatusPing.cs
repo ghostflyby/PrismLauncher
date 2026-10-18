@@ -16,13 +16,14 @@
 using System.Buffers.Binary;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Launch;
 
 namespace FlintLauncher.Web.Services;
@@ -162,47 +163,22 @@ public static class ServerStatusPing
     /// extracts players.online/max, version.name and the motd text when present.</summary>
     private static ServerPingResult ParseStatus(string ip, int port, string json, long latencyMs)
     {
-        JsonNode? root;
+        ServerStatusJson? status;
         try
         {
-            root = JsonNode.Parse(json);
+            status = JsonSerializer.Deserialize(json, ServerPingJsonContext.Default.ServerStatusJson);
         }
         catch (JsonException e)
         {
             throw new InvalidOperationException("server sent an invalid status reply", e);
         }
 
-        int online = 0, max = 0;
-        if (root?["players"] is JsonObject players)
-        {
-            online = players["online"] is JsonValue o &&
-                     int.TryParse(o.ToJsonString(), CultureInfo.InvariantCulture, out var onlineNumber)
-                ? onlineNumber
-                : 0;
-            max = players["max"] is JsonValue m &&
-                  int.TryParse(m.ToJsonString(), CultureInfo.InvariantCulture, out var maxNumber)
-                ? maxNumber
-                : 0;
-        }
-
-        string? version = null;
-        if (root?["version"] is JsonObject v && v["name"] is JsonValue vn &&
-            vn.TryGetValue<string>(out var versionName))
-        {
-            version = versionName;
-        }
-
-        string? motd = null;
-        if (root?["description"] is { } d)
-        {
-            motd = d is JsonValue dv && dv.TryGetValue<string>(out var motdText)
-                ? motdText
-                : d is JsonObject @do && @do["text"] is JsonValue dt && dt.TryGetValue<string>(out var text)
-                    ? text
-                    : d.ToJsonString();
-        }
-
-        return new ServerPingResult(ip, port, online, max, version, motd, latencyMs);
+        return new ServerPingResult(ip, port,
+            status?.Players?.Online ?? 0,
+            status?.Players?.Max ?? 0,
+            status?.Version?.Name,
+            status?.Description,
+            latencyMs);
     }
 
     // ------------------------------------------------------------------- varInt framing
@@ -315,3 +291,60 @@ public static class ServerStatusPing
         throw new InvalidOperationException("varint is too big");
     }
 }
+
+// ----------------------------------------------------------------------------------------
+// The status-reply wire (read-only). The description member is the raw-JSON text component:
+// a string reads verbatim, an object reads its string "text" member, anything else keeps
+// its raw JSON text (the former d.ToJsonString() fallback).
+
+internal sealed record ServerStatusJson
+{
+    public ServerStatusPlayersJson? Players { get; set; }
+
+    public ServerStatusVersionJson? Version { get; set; }
+
+    [JsonConverter(typeof(MotdConverter))]
+    public string? Description { get; set; }
+}
+
+internal sealed record ServerStatusPlayersJson
+{
+    [JsonConverter(typeof(QtCoercingIntConverter))]
+    public int Online { get; set; }
+
+    [JsonConverter(typeof(QtCoercingIntConverter))]
+    public int Max { get; set; }
+}
+
+internal sealed record ServerStatusVersionJson
+{
+    [JsonConverter(typeof(QtCoercingNullableStringConverter))]
+    public string? Name { get; set; }
+}
+
+internal sealed class MotdConverter : JsonConverter<string?>
+{
+    public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.String)
+        {
+            return reader.GetString();
+        }
+
+        var node = JsonNode.Parse(ref reader);
+        if (node is JsonObject motd && motd["text"] is JsonValue text &&
+            text.TryGetValue<string>(out var motdText))
+        {
+            return motdText;
+        }
+
+        return node?.ToJsonString();
+    }
+
+    public override void Write(Utf8JsonWriter writer, string? value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value);
+}
+
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(ServerStatusJson))]
+internal sealed partial class ServerPingJsonContext : JsonSerializerContext;

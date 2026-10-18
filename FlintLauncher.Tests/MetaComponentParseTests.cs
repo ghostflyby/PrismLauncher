@@ -4,8 +4,10 @@
 // tests/testdata/MetaComponentParse — the ported renderer lives in
 // FlintLauncher.Core/Minecraft/Resources (moved there from Minecraft/ in P3-b).
 
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Java;
+using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft.Resources;
 using Xunit;
 
@@ -28,7 +30,10 @@ public class MetaComponentParseTests
 
         var expected = obj.StringOr("expected_output");
 
-        var processed = DataPackUtils.ProcessComponent(obj["description"]);
+        // the renderer consumes the typed ChatComponentJson wire now
+        var component = JsonSerializer.Deserialize(
+            obj["description"]!.ToJsonString(), DataPackJsonContext.Default.ChatComponentJson);
+        var processed = DataPackUtils.ProcessComponent(component);
 
         Assert.Equal(expected, processed);
     }

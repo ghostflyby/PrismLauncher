@@ -17,7 +17,9 @@
 
 using System.IO.Compression;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Json;
@@ -201,108 +203,59 @@ public static class DataPackUtils
         }
     }
 
-    /// <summary>Port of DataPackUtils::parseVersion: a number, or a [major, minor] array.</summary>
-    public static (int Major, int Minor) ParseVersion(JsonNode? value)
-    {
-        if (value is JsonValue numberValue && numberValue.TryGetValue<double>(out var d))
-        {
-            // Single integer -> [major, 0]
-            return ((int)d, 0);
-        }
-
-        (int Major, int Minor) version = default;
-        if (value is JsonArray arr)
-        {
-            if (arr.Count >= 1)
-            {
-                version.Major = QJsonValueToInt(arr[0]);
-            }
-
-            if (arr.Count >= 2)
-            {
-                version.Minor = QJsonValueToInt(arr[1]);
-            }
-        }
-
-        return version;
-    }
-
     // https://minecraft.wiki/w/Data_pack#pack.mcmeta
     // https://minecraft.wiki/w/Raw_JSON_text_format
     // https://minecraft.wiki/w/Tutorials/Creating_a_resource_pack#Formatting_pack.mcmeta
     public static bool ProcessMcMeta(DataPack pack, string rawData)
     {
-        var jsonRoot = JsonUtils.ParseNodeUntilGarbage(rawData, out _);
-        if (jsonRoot is null)
-        {
-            // qWarning() << "Failed to parse JSON:" << parse_error.errorString();
-            return false;
-        }
-
+        PackMcmetaJson? mcmeta;
         try
         {
-            // The C++ calls Json::requireObject(json_doc.object(), "pack", {}): the
-            // parent+key overload. QJsonDocument::object() yields an empty object for
-            // non-object roots, and the "pack" member is then required to be an
-            // object — otherwise a JsonException (→ false below).
-            var root = jsonRoot as JsonObject ?? new JsonObject();
-            var packObj = JsonUtils.RequireObject(root, "pack", "");
-
-            var packFormat = 0;
-            (int Major, int Minor) minFormat = default;
-            (int Major, int Minor) maxFormat = default;
-            if (packObj.Contains("pack_format"))
-            {
-                packFormat = QJsonValueToInt(packObj["pack_format"]);
-            }
-
-            if (packObj.Contains("min_format"))
-            {
-                minFormat = ParseVersion(packObj["min_format"]);
-            }
-
-            if (packObj.Contains("max_format"))
-            {
-                maxFormat = ParseVersion(packObj["max_format"]);
-            }
-
-            pack.SetPackFormat(packFormat, minFormat, maxFormat);
-            pack.SetDescription(ProcessComponent(packObj["description"]));
+            mcmeta = JsonSerializer.Deserialize(rawData, DataPackJsonContext.Default.PackMcmetaJson);
         }
-        catch (JsonParseException)
+        catch (JsonException)
         {
-            // qWarning() << "JsonException:" << e.what() << e.cause();
+            // qWarning() << "Failed to parse JSON" / the former RequireObject throw path
             return false;
         }
 
+        var section = mcmeta?.Pack;
+        if (section is null)
+        {
+            // the former Json::requireObject(root, "pack") throw (a missing pack member
+            // required an object) — invalid mcmeta
+            return false;
+        }
+
+        pack.SetPackFormat(section.PackFormat,
+            section.MinFormat is { } min ? (min.Major, min.Minor) : default,
+            section.MaxFormat is { } max ? (max.Major, max.Minor) : default);
+        pack.SetDescription(ProcessComponent(section.Description));
         return true;
     }
 
-    private static string BuildStyle(JsonObject obj)
+    private static string BuildStyle(ComponentObjectJson obj)
     {
         var styles = new List<string>();
-        var color = obj.StringOr("color");
-        if (color.Length != 0)
+        if (obj.Color.Length != 0)
         {
-            styles.Add($"color: {color};");
+            styles.Add($"color: {obj.Color};");
         }
 
-        if (obj.Contains("bold"))
+        if (obj.Bold is { } bold)
         {
-            var weight = obj.BoolOr("bold") ? "bold" : "normal";
-            styles.Add($"font-weight: {weight};");
+            styles.Add($"font-weight: {(bold ? "bold" : "normal")};");
         }
 
-        if (obj.Contains("italic"))
+        if (obj.Italic is { } italic)
         {
-            var style = obj.BoolOr("italic") ? "italic" : "normal";
-            styles.Add($"font-style: {style};");
+            styles.Add($"font-style: {(italic ? "italic" : "normal")};");
         }
 
         return styles.Count == 0 ? "" : $"style=\"{string.Join(" ", styles)}\"";
     }
 
-    private static string ProcessComponent(JsonArray value, bool strikethrough, bool underline)
+    private static string ProcessComponent(List<ChatComponentJson> value, bool strikethrough, bool underline)
     {
         var result = "";
         foreach (var current in value)
@@ -313,12 +266,12 @@ public static class DataPackUtils
         return result;
     }
 
-    private static string ProcessComponent(JsonObject obj, bool strikethrough, bool underline)
+    private static string ProcessComponent(ComponentObjectJson obj, bool strikethrough, bool underline)
     {
-        underline = obj.BoolOr("underlined", underline);
-        strikethrough = obj.BoolOr("strikethrough", strikethrough);
+        underline = obj.Underlined ?? underline;
+        strikethrough = obj.Strikethrough ?? strikethrough;
 
-        var result = obj.StringOr("text");
+        var result = obj.Text;
         if (underline)
         {
             result = $"<u>{result}</u>";
@@ -330,9 +283,9 @@ public static class DataPackUtils
         }
 
         // the extra needs to be an array
-        if (obj.TryGetPropertyValue("extra", out var extra) && extra is JsonArray extraArray)
+        if (obj.Extra is { } extra)
         {
-            result += ProcessComponent(extraArray, strikethrough, underline);
+            result += ProcessComponent(extra, strikethrough, underline);
         }
 
         var style = BuildStyle(obj);
@@ -341,37 +294,26 @@ public static class DataPackUtils
             result = $"<span {style}>{result}</span>";
         }
 
-        if (obj.TryGetPropertyValue("clickEvent", out var clickEvent) && clickEvent is JsonObject clickEventObj)
+        if (obj.ClickEvent is { } clickEvent && clickEvent.Action == "open_url"
+            && clickEvent.Value is { Length: > 0 } value)
         {
-            var action = clickEventObj.StringOr("action");
-            var value = clickEventObj.StringOr("value");
-            if (action == "open_url" && value.Length != 0)
-            {
-                result = $"<a href=\"{value}\">{result}</a>";
-            }
+            result = $"<a href=\"{value}\">{result}</a>";
         }
 
         return result;
     }
 
-    public static string ProcessComponent(JsonNode? value, bool strikethrough = false, bool underline = false)
+    internal static string ProcessComponent(ChatComponentJson? value, bool strikethrough = false, bool underline = false)
     {
-        switch (value)
+        return value switch
         {
-            case JsonValue stringValue when stringValue.TryGetValue<string>(out _):
-                return JsonObjectExtensions.StringOr(stringValue);
-            case JsonValue boolValue when boolValue.TryGetValue<bool>(out var b):
-                return b ? "true" : "false";
-            case JsonValue numberValue when numberValue.TryGetValue<double>(out var d):
-                return QtJson.NumberToString(d);
-            case JsonArray array:
-                return ProcessComponent(array, strikethrough, underline);
-            case JsonObject obj:
-                return ProcessComponent(obj, strikethrough, underline);
-            default:
-                // qWarning() << "Invalid component type!";
-                return "";
-        }
+            { Text: { } text } => text,
+            { BoolValue: { } b } => b ? "true" : "false",
+            { NumberValue: { } number } => QtJson.NumberToString(number),
+            { Array: { } array } => ProcessComponent(array, strikethrough, underline),
+            { Object: { } obj } => ProcessComponent(obj, strikethrough, underline),
+            _ => "", // qWarning() << "Invalid component type!";
+        };
     }
 
     /// <summary>Port of DataPackUtils::processPackPNG(pack, data).</summary>
@@ -474,12 +416,6 @@ public static class DataPackUtils
 
     // ------------------------------------------------------------------ helpers
 
-    /// <summary>QJsonValue::toInt() (default 0, C-cast truncation of doubles).</summary>
-    private static int QJsonValueToInt(JsonNode? node)
-    {
-        return node is JsonValue value && value.TryGetValue<double>(out var d) ? (int)d : 0;
-    }
-
     private static byte[] ReadEntry(ZipArchiveEntry entry)
     {
         using var stream = entry.Open();
@@ -488,3 +424,199 @@ public static class DataPackUtils
         return output.ToArray();
     }
 }
+
+// ----------------------------------------------------------------------------------------
+// The pack.mcmeta wire (typed reads; nothing here is ever written). The description member
+// is the Minecraft raw-JSON text component (string | bool | number | array | object tree) —
+// the ChatComponentConverter unifies those forms and the coercing converters keep the
+// per-member junk degradation of the former StringOr/BoolOr probes.
+
+internal sealed record PackMcmetaJson
+{
+    public PackMetaSectionJson? Pack { get; set; }
+}
+
+internal sealed record PackMetaSectionJson
+{
+    [JsonPropertyName("pack_format")]
+    [JsonConverter(typeof(QtCoercingIntConverter))]
+    public int PackFormat { get; set; }
+
+    [JsonPropertyName("min_format")]
+    [JsonConverter(typeof(PackVersionConverter))]
+    public PackVersionJson? MinFormat { get; set; }
+
+    [JsonPropertyName("max_format")]
+    [JsonConverter(typeof(PackVersionConverter))]
+    public PackVersionJson? MaxFormat { get; set; }
+
+    [JsonConverter(typeof(ChatComponentConverter))]
+    public ChatComponentJson? Description { get; set; }
+}
+
+/// <summary>The [major, minor] pack-format pair (a bare number reads [major, 0]).</summary>
+internal sealed record PackVersionJson
+{
+    public int Major { get; set; }
+
+    public int Minor { get; set; }
+}
+
+internal sealed class PackVersionConverter : JsonConverter<PackVersionJson?>
+{
+    public override PackVersionJson? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Number && reader.TryGetDouble(out var single))
+        {
+            return new PackVersionJson { Major = (int)single };
+        }
+
+        if (reader.TokenType == JsonTokenType.StartArray)
+        {
+            var node = JsonNode.Parse(ref reader) as JsonArray;
+            var version = new PackVersionJson();
+            if (node is { Count: >= 1 } array)
+            {
+                version.Major = array[0] is JsonValue first && first.TryGetValue<double>(out var major)
+                    ? (int)major
+                    : 0;
+            }
+
+            if (node is { Count: >= 2 } arr2)
+            {
+                version.Minor = arr2[1] is JsonValue second && second.TryGetValue<double>(out var minor)
+                    ? (int)minor
+                    : 0;
+            }
+
+            return version;
+        }
+
+        return null; // a wrong-kind member is no version (the former Contains-guard skip)
+    }
+
+    public override void Write(Utf8JsonWriter writer, PackVersionJson? value, JsonSerializerOptions options) =>
+        throw new NotSupportedException("the pack.mcmeta records are read-only");
+}
+
+/// <summary>The unified raw-JSON text component value: exactly one form is set.</summary>
+[JsonConverter(typeof(ChatComponentConverter))]
+internal sealed record ChatComponentJson
+{
+    public string? Text { get; set; }
+
+    public bool? BoolValue { get; set; }
+
+    public double? NumberValue { get; set; }
+
+    public List<ChatComponentJson>? Array { get; set; }
+
+    public ComponentObjectJson? Object { get; set; }
+}
+
+internal sealed class ChatComponentConverter : JsonConverter<ChatComponentJson?>
+{
+    public override ChatComponentJson? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        switch (reader.TokenType)
+        {
+            case JsonTokenType.String:
+                return new ChatComponentJson { Text = reader.GetString() ?? "" };
+            case JsonTokenType.True:
+            case JsonTokenType.False:
+                return new ChatComponentJson { BoolValue = reader.TokenType == JsonTokenType.True };
+            case JsonTokenType.Number:
+                return new ChatComponentJson { NumberValue = reader.TryGetDouble(out var d) ? d : 0 };
+            case JsonTokenType.StartArray:
+                return new ChatComponentJson
+                {
+                    Array = JsonSerializer.Deserialize(ref reader, DataPackJsonContext.Default.ListChatComponentJson),
+                };
+            case JsonTokenType.StartObject:
+                return new ChatComponentJson
+                {
+                    Object = JsonSerializer.Deserialize(ref reader, DataPackJsonContext.Default.ComponentObjectJson),
+                };
+            default:
+                return null; // qWarning() << "Invalid component type!";
+        }
+    }
+
+    public override void Write(Utf8JsonWriter writer, ChatComponentJson? value, JsonSerializerOptions options) =>
+        throw new NotSupportedException("the pack.mcmeta records are read-only");
+}
+
+internal sealed record ComponentObjectJson
+{
+    [JsonConverter(typeof(QtCoercingStringConverter))]
+    public string Text { get; set; } = "";
+
+    [JsonConverter(typeof(QtCoercingNullableBoolConverter))]
+    public bool? Underlined { get; set; }
+
+    [JsonConverter(typeof(QtCoercingNullableBoolConverter))]
+    public bool? Strikethrough { get; set; }
+
+    [JsonConverter(typeof(QtCoercingNullableBoolConverter))]
+    public bool? Bold { get; set; }
+
+    [JsonConverter(typeof(QtCoercingNullableBoolConverter))]
+    public bool? Italic { get; set; }
+
+    [JsonConverter(typeof(QtCoercingStringConverter))]
+    public string Color { get; set; } = "";
+
+    /// <summary>Only an array counts (the former `is JsonArray` probe); junk reads null.</summary>
+    [JsonConverter(typeof(ChatExtraConverter))]
+    public List<ChatComponentJson>? Extra { get; set; }
+
+    [JsonConverter(typeof(ClickEventConverter))]
+    public ClickEventJson? ClickEvent { get; set; }
+}
+
+internal sealed record ClickEventJson
+{
+    [JsonConverter(typeof(QtCoercingStringConverter))]
+    public string Action { get; set; } = "";
+
+    [JsonConverter(typeof(QtCoercingStringConverter))]
+    public string Value { get; set; } = "";
+}
+
+/// <summary>A non-array extra reads null (skipped), like the former probe.</summary>
+internal sealed class ChatExtraConverter : JsonConverter<List<ChatComponentJson>?>
+{
+    public override List<ChatComponentJson>? Read(ref Utf8JsonReader reader, Type typeToConvert,
+        JsonSerializerOptions options)
+    {
+        return reader.TokenType == JsonTokenType.StartArray
+            ? JsonSerializer.Deserialize(ref reader, DataPackJsonContext.Default.ListChatComponentJson)
+            : null;
+    }
+
+    public override void Write(Utf8JsonWriter writer, List<ChatComponentJson>? value, JsonSerializerOptions options) =>
+        throw new NotSupportedException("the pack.mcmeta records are read-only");
+}
+
+/// <summary>A non-object clickEvent reads null (skipped), like the former probe.</summary>
+internal sealed class ClickEventConverter : JsonConverter<ClickEventJson?>
+{
+    public override ClickEventJson? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        return reader.TokenType == JsonTokenType.StartObject
+            ? JsonSerializer.Deserialize(ref reader, DataPackJsonContext.Default.ClickEventJson)
+            : null;
+    }
+
+    public override void Write(Utf8JsonWriter writer, ClickEventJson? value, JsonSerializerOptions options) =>
+        throw new NotSupportedException("the pack.mcmeta records are read-only");
+}
+
+[JsonSourceGenerationOptions(RespectNullableAnnotations = true,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(PackMcmetaJson))]
+[JsonSerializable(typeof(ChatComponentJson))]
+[JsonSerializable(typeof(List<ChatComponentJson>))]
+[JsonSerializable(typeof(ComponentObjectJson))]
+[JsonSerializable(typeof(ClickEventJson))]
+internal sealed partial class DataPackJsonContext : JsonSerializerContext;
