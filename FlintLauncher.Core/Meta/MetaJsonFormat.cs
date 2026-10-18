@@ -1,16 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/meta/JsonFormat.{h,cpp}: the shared metadata format version handling and
-// the Require type plus the index/version/version-list parsers. Reads go through
-// the JsonNode model (single-DOM); the Parse(JsonObject) entity entry points keep JsonObject.
+// the Require type plus the index/version/version-list parsers.
 //
-// Serialization note (the meta-format decision): the index/version-list readers stay
-// node-based ON PURPOSE — MetaJsonFormatTests.ParseIndex_ErrorAndQuirkParity pins the exact
-// requireIsArrayOf quirks as features (a NON-ARRAY packages/versions member parses to an
-// empty list, a non-object element throws the "Document is not an object" label, and the
-// per-key require messages are exact). Typed binding collapses those into whole-document
-// failures with STJ texts; like accounts.json, quirk parity wins over typing here.
+// Serialization decision (revised): the index and version-list readers deserialize typed
+// probes through the MetaJsonContext and fail the DOCUMENT on malformed members — the
+// former requireIsArrayOf quirks (a non-array packages/versions member parsing to an EMPTY
+// list, per-key require texts) were internal failure-path behavior with no external
+// consumer: meta documents come from the metadata server, fail the sha256 gate on any
+// deviation, and a failed parse just refetches. Input compatibility is kept where it is
+// external: formatVersion accepts any JSON number token with value 0/1 (raw element gate),
+// and the optional members keep their QJsonValue fallbacks. The version DOCUMENT reader
+// stays node-based (shares the Require reads with OneSixVersionFormat, own batch); the
+// requires (de)serialization helpers are shared with PackProfile and stay node-based too.
 
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
@@ -23,7 +29,10 @@ public enum MetadataVersion
     InitialRelease = 1,
 }
 
-/// <summary>Port of Meta::ParseException.</summary>
+/// <summary>Port of Meta::ParseException. Routed to the same refetch path as
+/// JsonParseException by the metadata-document consumers (see MetaEntity.ParsingValidator,
+/// whose filter used to miss this type); derives directly from Exception like the upstream
+/// ::Exception root.</summary>
 public sealed class MetaParseException(string message) : Exception(message) { }
 
 /// <summary>Port of Meta::Require. Set identity is by uid only, like the C++ operator==/operator&lt;.
@@ -56,10 +65,73 @@ public sealed class Require: IEquatable<Require>, IComparable<Require>
     public override string ToString() => Uid;
 }
 
+/// <summary>The index/version-list shapes as parsed DTOs. formatVersion stays a raw element
+/// so the "any JSON number token" input compatibility of the former EnsureDouble read is
+/// preserved (a quoted "1" is NOT a format version); the required strings are validated by
+/// the mappers with document-level failures.</summary>
+internal sealed record MetaIndexJson(
+    [property: JsonPropertyName("formatVersion")] JsonElement? FormatVersion,
+    [property: JsonPropertyName("packages")] List<MetaPackageJson>? Packages);
+
+internal sealed record MetaPackageJson(
+    [property: JsonPropertyName("uid")] string? Uid,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("sha256")] string? Sha256);
+
+internal sealed record MetaVersionListJson(
+    [property: JsonPropertyName("formatVersion")] JsonElement? FormatVersion,
+    [property: JsonPropertyName("uid")] string? Uid,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("versions")] List<MetaVersionEntryJson>? Versions);
+
+internal sealed record MetaVersionEntryJson(
+    [property: JsonPropertyName("version")] string? Version,
+    [property: JsonPropertyName("releaseTime")] string? ReleaseTime,
+    [property: JsonPropertyName("type")] string? Type,
+    [property: JsonPropertyName("recommended")] bool? Recommended,
+    [property: JsonPropertyName("volatile")] bool? Volatile,
+    [property: JsonPropertyName("requires")] List<MetaRequireJson>? Requires,
+    [property: JsonPropertyName("conflicts")] List<MetaRequireJson>? Conflicts,
+    [property: JsonPropertyName("sha256")] string? Sha256);
+
+internal sealed record MetaRequireJson(
+    [property: JsonPropertyName("uid")] string? Uid,
+    [property: JsonPropertyName("equals")] string? EqualsVersion,
+    [property: JsonPropertyName("suggests")] string? Suggests);
+
+[JsonSerializable(typeof(MetaIndexJson))]
+[JsonSerializable(typeof(MetaVersionListJson))]
+internal sealed partial class MetaJsonContext : JsonSerializerContext;
+
 public static class MetaJsonFormat
 {
     /// <summary>Port of Meta::currentFormatVersion().</summary>
     public static MetadataVersion CurrentFormatVersion() => MetadataVersion.InitialRelease;
+
+    /// <summary>The formatVersion gate over the raw member: a JSON number of 0 or 1 is the
+    /// InitialRelease, everything else (missing, null, non-number, any other value) fails
+    /// the document — the EnsureDouble(raw token) input compatibility of the former read.</summary>
+    private static MetadataVersion FormatVersionOf(JsonElement? formatVersion)
+    {
+        if (formatVersion is { ValueKind: JsonValueKind.Number } raw)
+        {
+            var value = raw.GetDouble();
+            if (value == 0 || value == 1)
+            {
+                return MetadataVersion.InitialRelease;
+            }
+        }
+
+        return MetadataVersion.Invalid;
+    }
+
+    private static string RequireStringOf(string? value, string key) =>
+        value ?? throw new MetaParseException("'" + key + "' is not a string");
+
+    /// <summary>A member the document schema requires (absent or explicit null fails the
+    /// document — the reasonable failure behavior of the typed readers).</summary>
+    private static MetaParseException MissingMember(string key) =>
+        new($"The metadata document has no '{key}' member.");
 
     // ------------------------------------------------- node-side member readers
     //
@@ -87,16 +159,16 @@ public static class MetaJsonFormat
 
     // ------------------------------------------------------------------ Index
 
-    private static Index ParseIndexInternal(JsonNode obj)
+    private static Index ParseIndexInternal(MetaIndexJson dto)
     {
-        var objects = RequireArrayOfObjects(obj, "packages");
-        var lists = new List<VersionList>(objects.Count);
-        foreach (var element in objects)
+        var packages = dto.Packages ?? throw MissingMember("packages");
+        var lists = new List<VersionList>(packages.Count);
+        foreach (var element in packages)
         {
-            var list = new VersionList(RequireStringOf(element, "uid"))
+            var list = new VersionList(RequireStringOf(element.Uid, "uid"))
             {
-                Name = element.StringOr("name"),
-                Sha256 = element.StringOr("sha256")
+                Name = element.Name ?? "",
+                Sha256 = element.Sha256 ?? "",
             };
             lists.Add(list);
         }
@@ -104,11 +176,14 @@ public static class MetaJsonFormat
         return new Index(lists);
     }
 
-    // ------------------------------------------------------------------ Version
+    // ------------------------------------------------------------------ Version document
+    //
+    // The version DOCUMENT parse stays node-based: it shares the Require reads with the
+    // OneSix version format and hands the whole object to OneSixVersionFormat (own batch).
 
-    private static MetaVersion ParseCommonVersion(string uid, JsonNode obj)
+    private static MetaVersion ParseVersionInternal(JsonNode obj)
     {
-        var version = new MetaVersion(uid, RequireStringOf(obj, "version"));
+        var version = new MetaVersion(RequireStringOf(obj, "uid"), RequireStringOf(obj, "version"));
         // QDateTime::fromString(..., Qt::ISODate).toMSecsSinceEpoch() / 1000; an invalid
         // QDateTime contributes 0
         var releaseTime = ParseUtils.TimeFromS3Time(RequireStringOf(obj, "releaseTime"));
@@ -124,18 +199,9 @@ public static class MetaJsonFormat
         var sha256 = Str(obj, "sha256");
         if (sha256.Length != 0)
         {
-            version.Sha256  = sha256;
+            version.Sha256 = sha256;
         }
 
-        return version;
-    }
-
-    private static MetaVersion ParseVersionInternal(JsonNode obj)
-    {
-        var version = ParseCommonVersion(RequireStringOf(obj, "uid"), obj);
-
-        // OneSixVersionFormat (own migration batch) still exposes the JsonObject entry; the
-        // meta version document is an object by construction (ParseVersion takes JsonObject).
         version.Data = OneSixVersionFormat.VersionFileFromJson(
             (JsonObject)obj,
             $"{version.Uid}/{version.Version}.json",
@@ -145,22 +211,65 @@ public static class MetaJsonFormat
 
     // ------------------------------------------------------- Version list / package
 
-    private static VersionList ParseVersionListInternal(JsonNode obj)
+    private static MetaVersion MapCommonVersion(string uid, MetaVersionEntryJson dto)
     {
-        var uid = RequireStringOf(obj, "uid");
-
-        var versionsRaw = RequireArrayOfObjects(obj, "versions");
-        var versions = new List<MetaVersion>(versionsRaw.Count);
-        foreach (var vObj in versionsRaw)
+        var version = new MetaVersion(uid, RequireStringOf(dto.Version, "version"));
+        // QDateTime::fromString(..., Qt::ISODate).toMSecsSinceEpoch() / 1000; an invalid
+        // QDateTime contributes 0
+        var releaseTime = ParseUtils.TimeFromS3Time(RequireStringOf(dto.ReleaseTime, "releaseTime"));
+        version.RawTime = releaseTime?.ToUnixTimeMilliseconds() / 1000 ?? 0;
+        version.Type = dto.Type ?? "";
+        version.IsRecommended = dto.Recommended ?? false;
+        version.SetVolatile(dto.Volatile ?? false);
+        var reqs = new SortedSet<Require>();
+        var conflicts = new SortedSet<Require>();
+        MapRequires(dto.Requires, reqs);
+        MapRequires(dto.Conflicts, conflicts);
+        version.SetRequires(reqs, conflicts);
+        var sha256 = dto.Sha256 ?? "";
+        if (sha256.Length != 0)
         {
-            var version = ParseCommonVersion(uid, vObj);
+            version.Sha256 = sha256;
+        }
+
+        return version;
+    }
+
+    /// <summary>The requires/conflicts arrays of a parsed member (absent member -> empty).</summary>
+    private static void MapRequires(List<MetaRequireJson>? raw, SortedSet<Require> ptr)
+    {
+        if (raw is null)
+        {
+            return;
+        }
+
+        foreach (var req in raw)
+        {
+            ptr.Add(new Require
+            {
+                Uid = RequireStringOf(req.Uid, "uid"),
+                EqualsVersion = req.EqualsVersion ?? "",
+                Suggests = req.Suggests ?? "",
+            });
+        }
+    }
+
+    private static VersionList ParseVersionListInternal(MetaVersionListJson dto)
+    {
+        var uid = RequireStringOf(dto.Uid, "uid");
+
+        var versionsRaw = dto.Versions ?? throw MissingMember("versions");
+        var versions = new List<MetaVersion>(versionsRaw.Count);
+        foreach (var entry in versionsRaw)
+        {
+            var version = MapCommonVersion(uid, entry);
             version.SetProvidesRecommendations();
             versions.Add(version);
         }
 
         var list = new VersionList(uid)
         {
-            Name = Str(obj, "name"),
+            Name = dto.Name ?? "",
         };
         list.SetVersions(versions);
         return list;
@@ -204,11 +313,11 @@ public static class MetaJsonFormat
 
     public static void ParseIndex(JsonObject obj, Index ptr)
     {
-        var version = ParseFormatVersion(obj);
-        switch (version)
+        var dto = DeserializeDocument(obj, "index", MetaJsonContext.Default.MetaIndexJson);
+        switch (FormatVersionOf(dto.FormatVersion))
         {
             case MetadataVersion.InitialRelease:
-                ptr.Merge(ParseIndexInternal(obj));
+                ptr.Merge(ParseIndexInternal(dto));
                 break;
             case MetadataVersion.Invalid:
                 throw new MetaParseException("Unknown format version!");
@@ -217,11 +326,11 @@ public static class MetaJsonFormat
 
     public static void ParseVersionList(JsonObject obj, VersionList ptr)
     {
-        var version = ParseFormatVersion(obj);
-        switch (version)
+        var dto = DeserializeDocument(obj, "version list", MetaJsonContext.Default.MetaVersionListJson);
+        switch (FormatVersionOf(dto.FormatVersion))
         {
             case MetadataVersion.InitialRelease:
-                ptr.Merge(ParseVersionListInternal(obj));
+                ptr.Merge(ParseVersionListInternal(dto));
                 break;
             case MetadataVersion.Invalid:
                 throw new MetaParseException("Unknown format version!");
@@ -238,6 +347,22 @@ public static class MetaJsonFormat
                 break;
             case MetadataVersion.Invalid:
                 throw new MetaParseException("Unknown format version!");
+        }
+    }
+
+    /// <summary>The typed document read over the entity JsonObject contract: a malformed
+    /// document (bad shape, wrong member kinds) fails as a MetaParseException, which every
+    /// metadata-document consumer already routes to a refetch.</summary>
+    private static T DeserializeDocument<T>(JsonObject obj, string what, JsonTypeInfo<T> typeInfo) where T : class
+    {
+        try
+        {
+            return JsonSerializer.Deserialize(obj, typeInfo)
+                   ?? throw new MetaParseException($"The metadata {what} document is null.");
+        }
+        catch (JsonException e)
+        {
+            throw new MetaParseException($"The metadata {what} document is malformed: {e.Message}");
         }
     }
 
@@ -292,35 +417,4 @@ public static class MetaJsonFormat
         obj[keyName] = arrOut;
     }
 
-    /// <summary>
-    /// Port of requireIsArrayOf&lt;QJsonObject&gt;(parent, key): a missing key throws, a
-    /// non-array value yields an empty list (parent[key].toArray() cast upstream), and
-    /// non-object elements throw with the "Document" label.
-    /// </summary>
-    private static List<JsonObject> RequireArrayOfObjects(JsonNode? parent, string key)
-    {
-        if (parent is not JsonObject map || !map.Contains(key))
-        {
-            throw new JsonParseException("'" + key + "'s parent does not contain '" + key + "'");
-        }
-
-        var result = new List<JsonObject>();
-        var node = map[key];
-        if (node is not JsonArray array)
-        {
-            return result;
-        }
-
-        foreach (var val in array)
-        {
-            if (val is not JsonObject obj)
-            {
-                throw new JsonParseException("Document is not an object");
-            }
-
-            result.Add(obj);
-        }
-
-        return result;
-    }
 }

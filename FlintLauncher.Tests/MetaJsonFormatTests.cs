@@ -213,29 +213,31 @@ public class MetaJsonFormatTests
     }
 
     [Fact]
-    public void ParseIndex_ErrorAndQuirkParity()
+    public void ParseIndex_DocumentFailures_FailTheDocument()
     {
+        // the typed readers fail the DOCUMENT on malformed members (the empty-list and
+        // per-key quirks of the node readers are gone — a malformed meta payload fails the
+        // entity, which just refetches)
         var index = new FluentIndex();
 
-        // missing key throws with the requireIsArrayOf message
+        // missing member
         var noPackages = (JsonObject)Parse("""{"formatVersion":1}""");
-        Assert.Equal("'packages's parent does not contain 'packages'",
-            Assert.Throws<JsonParseException>(() => MetaJsonFormat.ParseIndex(noPackages, index)).Message);
+        Assert.Equal("The metadata document has no 'packages' member.",
+            Assert.Throws<MetaParseException>(() => MetaJsonFormat.ParseIndex(noPackages, index)).Message);
 
-        // non-array value yields an empty list (upstream parent[key].toArray() cast)
+        // a non-array / wrong-kind member fails the binding
         var scalarPackages = (JsonObject)Parse("""{"formatVersion":1,"packages":3}""");
-        MetaJsonFormat.ParseIndex(scalarPackages, index);
-        Assert.Empty(index.Lists());
+        var malformed = Assert.Throws<MetaParseException>(() => MetaJsonFormat.ParseIndex(scalarPackages, index));
+        Assert.StartsWith("The metadata index document is malformed:", malformed.Message);
 
-        // non-object elements throw with the "Document" label
+        // so does a non-object element
         var nonObjectEntry = (JsonObject)Parse("""{"formatVersion":1,"packages":[1]}""");
-        Assert.Equal("Document is not an object",
-            Assert.Throws<JsonParseException>(() => MetaJsonFormat.ParseIndex(nonObjectEntry, index)).Message);
+        Assert.Throws<MetaParseException>(() => MetaJsonFormat.ParseIndex(nonObjectEntry, index));
 
-        // entry uid is required
+        // an entry without its required uid fails the entry
         var missingUid = (JsonObject)Parse("""{"formatVersion":1,"packages":[{}]}""");
-        Assert.Equal("'uid's parent does not contain 'uid'",
-            Assert.Throws<JsonParseException>(() => MetaJsonFormat.ParseIndex(missingUid, index)).Message);
+        Assert.Equal("'uid' is not a string",
+            Assert.Throws<MetaParseException>(() => MetaJsonFormat.ParseIndex(missingUid, index)).Message);
 
         // unknown format version is a MetaParseException
         var badFormat = (JsonObject)Parse("""{"formatVersion":2,"packages":[]}""");
@@ -272,11 +274,11 @@ public class MetaJsonFormatTests
     }
 
     [Fact]
-    public void ParseVersionList_MissingVersions_ThrowsWithFamilyMessage()
+    public void ParseVersionList_MissingVersions_FailsTheDocument()
     {
         var list = new VersionList("net.minecraft");
         var obj = (JsonObject)Parse("""{"formatVersion":1,"uid":"net.minecraft"}""");
-        Assert.Equal("'versions's parent does not contain 'versions'",
-            Assert.Throws<JsonParseException>(() => MetaJsonFormat.ParseVersionList(obj, list)).Message);
+        Assert.Equal("The metadata document has no 'versions' member.",
+            Assert.Throws<MetaParseException>(() => MetaJsonFormat.ParseVersionList(obj, list)).Message);
     }
 }

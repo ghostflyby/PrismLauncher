@@ -127,7 +127,7 @@ public abstract class MetaEntity
                 entity.Parse(obj);
                 return true;
             }
-            catch (Exception e) when (e is JsonParseException or FormatException)
+            catch (Exception e) when (e is JsonParseException or MetaParseException or FormatException)
             {
                 // qWarning() << "Unable to parse response:" << e.cause();
                 return false;
