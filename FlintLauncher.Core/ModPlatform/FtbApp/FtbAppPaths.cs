@@ -9,11 +9,23 @@
 // construct an FtbAppPaths pointed at their tree); DefaultRoot stays a pure static helper.
 
 using System.Text.Json;
-using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.ModPlatform.FtbApp;
+
+/// <summary>The FTB App settings.json wire: only instanceLocation is consumed; unknown
+/// members of the third-party document are skipped.</summary>
+internal sealed record FtbAppSettingsJson
+{
+    [JsonConverter(typeof(QtCoercingNullableStringConverter))]
+    public string? InstanceLocation { get; set; }
+}
+
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(FtbAppSettingsJson))]
+internal sealed partial class FtbAppSettingsJsonContext : JsonSerializerContext;
 
 public sealed class FtbAppPaths(string? rootPath = null)
 {
@@ -50,10 +62,9 @@ public sealed class FtbAppPaths(string? rootPath = null)
 
         try
         {
-            var root = JsonUtils.RequireNodeFromFile(settingsPath, "FTB App settings file");
-            return root["instanceLocation"] is JsonValue value && value.TryGetValue<string>(out var location)
-                ? location
-                : "";
+            var settings = JsonSerializer.Deserialize(FileSystem.Read(settingsPath),
+                FtbAppSettingsJsonContext.Default.FtbAppSettingsJson);
+            return settings?.InstanceLocation ?? "";
         }
         catch (Exception e) when (e is JsonParseException or JsonException)
         {

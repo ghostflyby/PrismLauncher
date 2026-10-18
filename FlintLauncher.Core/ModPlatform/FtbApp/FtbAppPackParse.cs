@@ -11,12 +11,57 @@
 //  - getFTBRoot()/getDynamicPath() move to FtbAppPaths with an injected RootPath.
 
 using System.Text.Json;
-using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 
 namespace FlintLauncher.Core.ModPlatform.FtbApp;
+
+/// <summary>The FTB App instance.json wire. The members the C++ require&lt;T&gt;'d carry the
+/// C# `required` modifier — a missing or wrong-kind member fails the deserialization into
+/// the same empty-modpack catch.</summary>
+internal sealed record FtbAppInstanceJson
+{
+    public required string Uuid { get; set; }
+
+    public required int Id { get; set; }
+
+    public required int VersionId { get; set; }
+
+    public required string Name { get; set; }
+
+    public required string Version { get; set; }
+
+    public required string McVersion { get; set; }
+
+    /// <summary>root["jvmArgs"].toVariant().toString(): the string when jvmArgs is a JSON
+    /// string, otherwise "" (a non-string QVariant stringifies to empty).</summary>
+    [JsonConverter(typeof(QtCoercingNullableStringConverter))]
+    public string? JvmArgs { get; set; }
+
+    public required int TotalPlayTime { get; set; }
+
+    public required string ModLoader { get; set; }
+}
+
+/// <summary>The legacy .ftbapp/version.json (fallback version.json) wire.</summary>
+internal sealed record FtbAppVersionJson
+{
+    public required List<FtbAppTargetJson> Targets { get; set; }
+}
+
+internal sealed record FtbAppTargetJson
+{
+    public required string Name { get; set; }
+
+    public required string Version { get; set; }
+}
+
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(FtbAppInstanceJson))]
+[JsonSerializable(typeof(FtbAppVersionJson))]
+internal sealed partial class FtbAppJsonContext : JsonSerializerContext;
 
 /// <summary>Port of FTBImportAPP::Modpack (data only). An invalid parse keeps Path empty
 /// (the C++ returns a default-constructed Modpack whose path is empty).</summary>
@@ -93,21 +138,20 @@ public static class FtbAppPackParse
 
         try
         {
-            var root = RequireObject(JsonUtils.RequireNodeFromFile(instanceFile, "FTB_APP instance JSON file"));
-            modpack.Uuid = JsonUtils.RequireString(root, "uuid", "uuid");
-            modpack.Id = JsonUtils.RequireInteger(root, "id", "id");
-            modpack.VersionId = JsonUtils.RequireInteger(root, "versionId", "versionId");
-            modpack.Name = JsonUtils.RequireString(root, "name", "name");
-            modpack.Version = JsonUtils.RequireString(root, "version", "version");
-            modpack.McVersion = JsonUtils.RequireString(root, "mcVersion", "mcVersion");
-            modpack.JvmArgs = root.TryGetPropertyValue("jvmArgs", out var jvmArgs)
-                              && jvmArgs is JsonValue jvmValue
-                              && jvmValue.TryGetValue<string>(out var jvmString)
-                ? jvmString
-                : "";
-            modpack.TotalPlayTime = JsonUtils.RequireInteger(root, "totalPlayTime", "totalPlayTime");
+            var wire = JsonSerializer.Deserialize(FileSystem.Read(instanceFile),
+                FtbAppJsonContext.Default.FtbAppInstanceJson)
+                       ?? throw new JsonException("the document is null");
 
-            var modLoader = JsonUtils.RequireString(root, "modLoader", "modLoader");
+            modpack.Uuid = wire.Uuid;
+            modpack.Id = wire.Id;
+            modpack.VersionId = wire.VersionId;
+            modpack.Name = wire.Name;
+            modpack.Version = wire.Version;
+            modpack.McVersion = wire.McVersion;
+            modpack.JvmArgs = wire.JvmArgs ?? "";
+            modpack.TotalPlayTime = wire.TotalPlayTime;
+
+            var modLoader = wire.ModLoader;
             if (modLoader.Length != 0)
             {
                 // Qt split('-', KeepEmptyParts): "forge-" yields ["forge", ""]
@@ -166,27 +210,25 @@ public static class FtbAppPackParse
 
         try
         {
-            var root = RequireObject(JsonUtils.RequireNodeFromFile(versionsFile, "FTB_APP version JSON file"));
-            var targets = JsonUtils.RequireArray(root, "targets", "targets");
+            var wire = JsonSerializer.Deserialize(FileSystem.Read(versionsFile),
+                FtbAppJsonContext.Default.FtbAppVersionJson)
+                       ?? throw new JsonException("the document is null");
 
-            foreach (var target in targets)
+            foreach (var target in wire.Targets)
             {
-                var obj = RequireObject(JsonUtils.RequireObject(target, "target"));
-                var name = JsonUtils.RequireString(obj, "name", "name");
-                var version = JsonUtils.RequireString(obj, "version", "version");
-                switch (name)
+                switch (target?.Name)
                 {
                     case "neoforge":
-                        loaderVersion = version;
+                        loaderVersion = target.Version;
                         return ModLoaderType.NeoForge;
                     case "forge":
-                        loaderVersion = version;
+                        loaderVersion = target.Version;
                         return ModLoaderType.Forge;
                     case "fabric":
-                        loaderVersion = version;
+                        loaderVersion = target.Version;
                         return ModLoaderType.Fabric;
                     case "quilt":
-                        loaderVersion = version;
+                        loaderVersion = target.Version;
                         return ModLoaderType.Quilt;
                 }
             }
@@ -257,11 +299,5 @@ public static class FtbAppPackParse
         }
 
         return modpacks;
-    }
-
-    private static JsonObject RequireObject(JsonNode? node)
-    {
-        return node as JsonObject
-               ?? throw new JsonParseException("Value is not an object");
     }
 }
