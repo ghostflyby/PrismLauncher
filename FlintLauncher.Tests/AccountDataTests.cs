@@ -6,6 +6,7 @@
 using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Auth;
+using FlintLauncher.Core.Minecraft;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -127,6 +128,21 @@ public class AccountDataTests
         AssertKeySet(saved["profile"]!.AsObject(), "id", "name", "cape", "skin", "capes");
         AssertKeySet(saved["profile"]!["skin"]!.AsObject(), "id", "url", "variant", "data");
         AssertKeySet(saved["entitlement"]!.AsObject(), "ownsMinecraft", "canPlayMinecraft");
+    }
+
+    [Fact]
+    public void SaveState_Byte_Matches_The_Upstream_Layout()
+    {
+        // the byte gate for every future accounts.json change: resume the fixture (the exact
+        // upstream saveState layout) and re-save — the production Qt write shape of the two
+        // must be byte-identical (the textures http->https rewrite applies on resume)
+        var data = ResumedMsaAccount();
+        var saved = data.SaveState();
+
+        var expectedJson = MsaAccountJson.Replace(
+            "http://textures.minecraft.net", "https://textures.minecraft.net");
+        var expected = QtJson.ToIndentedString(JsonNode.Parse(expectedJson)!.AsObject());
+        Assert.Equal(expected, QtJson.ToIndentedString(saved));
     }
 
     [Fact]

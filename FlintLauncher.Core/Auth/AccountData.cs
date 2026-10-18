@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/auth/AccountData.{h,cpp}.
 //
+// Serialization note (the accounts.json decision): SaveState/ResumeStateFromV3 stay
+// node-based on purpose. The wire is the QJsonValue type-probing kind — every member is
+// read leniently (a wrong-kind token/iat/extra degrades that FIELD, not the account), and
+// the write tail is the Qt sorted-keys + 4-space-indent shape of AccountList. A typed DTO
+// would turn those per-field degradations into whole-document failures and need a custom
+// key-sorting writer; the data types here ARE the ledger (Token/Skin/Cape/MinecraftProfile)
+// and the extra bag is already an immutable JsonElement value bag. The byte shape is pinned
+// by AccountDataTests.SaveState_Byte_Matches_The_Upstream_Layout.
+//
 // Deviations from the C++ original:
 //  - Token::extra is a QVariantMap upstream; it stores the Xbox display claims (strings) and,
 //    for the MSA token, the whole token-endpoint response flattened to a variant map (which
