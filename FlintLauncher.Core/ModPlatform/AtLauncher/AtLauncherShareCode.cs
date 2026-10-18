@@ -1,13 +1,36 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of modplatform/atlauncher/ATLShareCode.{h,cpp}: the {AtlApiBaseUrl}share-codes/{code}
-// response model (the optional-mod selection encoded by the ATLauncher website). Reads go
-// through the JsonNode model (single-DOM, the JsonUtils node-side family).
+// response model (the optional-mod selection encoded by the ATLauncher website). The wire
+// shape arrives as the AtlShareCodeResponseJson probe records (source-generated context in
+// this file); the loader validates the required members with the Json::require* messages.
 
 using System.Text.Json;
-using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.ModPlatform.AtLauncher;
+
+/// <summary>The share-codes/{code} wire shape; `message` may be a JSON null.</summary>
+public sealed record AtlShareCodeResponseJson(
+    [property: JsonPropertyName("error")] bool? Error,
+    [property: JsonPropertyName("code")] int? Code,
+    [property: JsonPropertyName("message")] string? Message,
+    [property: JsonPropertyName("data")] AtlShareCodeJson? Data);
+
+public sealed record AtlShareCodeJson(
+    [property: JsonPropertyName("pack")] string? Pack,
+    [property: JsonPropertyName("version")] string? Version,
+    [property: JsonPropertyName("mods")] AtlShareCodeModsJson? Mods);
+
+public sealed record AtlShareCodeModsJson(
+    [property: JsonPropertyName("optional")] List<AtlShareCodeModJson>? Optional);
+
+public sealed record AtlShareCodeModJson(
+    [property: JsonPropertyName("selected")] bool? Selected,
+    [property: JsonPropertyName("name")] string? Name);
+
+[JsonSerializable(typeof(AtlShareCodeResponseJson))]
+internal sealed partial class AtLauncherJsonContext : JsonSerializerContext;
 
 public sealed class ShareCodeMod
 {
@@ -32,43 +55,36 @@ public sealed class ShareCodeResponse
 
 public static class AtLauncherShareCode
 {
-    private static void LoadShareCodeMod(ShareCodeMod m, JsonNode obj)
-    {
-        m.Selected = JsonUtils.RequireBoolean(obj, "selected", "'selected'");
-        m.Name = JsonUtils.RequireString(obj, "name", "'name'");
-    }
-
-    private static void LoadShareCode(ShareCode c, JsonNode obj)
-    {
-        c.Pack = JsonUtils.RequireString(obj, "pack", "'pack'");
-        c.Version = JsonUtils.RequireString(obj, "version", "'version'");
-
-        var mods = (JsonNode)JsonUtils.RequireObject(obj, "mods", "'mods'");
-        var optional = JsonUtils.RequireArray(mods, "optional", "'optional'");
-        foreach (var modRaw in optional)
-        {
-            var mod = new ShareCodeMod();
-            LoadShareCodeMod(mod, AtLauncherJson.Object(modRaw));
-            c.Mods.Add(mod);
-        }
-    }
-
     /// <summary>Port of ATLauncher::loadShareCodeResponse.</summary>
-    public static void LoadShareCodeResponse(ShareCodeResponse r, JsonNode obj)
+    public static void LoadShareCodeResponse(ShareCodeResponse r, AtlShareCodeResponseJson obj)
     {
-        r.Error = JsonUtils.RequireBoolean(obj, "error", "'error'");
-        r.Code = JsonUtils.RequireInteger(obj, "code", "'code'");
-
-        if (obj["message"] is JsonValue messageValue
-            && messageValue.GetValueKind() != JsonValueKind.Null)
-        {
-            r.Message = JsonUtils.RequireString(obj, "message", "'message'");
-        }
+        r.Error = Require(obj.Error, "error");
+        r.Code = Require(obj.Code, "code");
+        r.Message = obj.Message ?? "";
 
         if (!r.Error)
         {
-            var dataRaw = JsonUtils.RequireObject(obj, "data", "'data'");
-            LoadShareCode(r.Data, dataRaw);
+            var data = obj.Data ?? throw new JsonParseException("'data' is not an object");
+            r.Data.Pack = Require(data.Pack, "pack");
+            r.Data.Version = Require(data.Version, "version");
+
+            var mods = data.Mods ?? throw new JsonParseException("'mods' is not an object");
+            var optional = mods.Optional ?? throw new JsonParseException("'optional' is not an array");
+            foreach (var mod in optional)
+            {
+                r.Data.Mods.Add(new ShareCodeMod
+                {
+                    Selected = Require(mod.Selected, "selected"),
+                    Name = Require(mod.Name, "name"),
+                });
+            }
         }
     }
+
+    private static string Require(string? value, string key) =>
+        value ?? throw new JsonParseException("'" + key + "' is not a string");
+
+    private static T Require<T>(T? value, string key) where T : struct =>
+        value ?? throw new JsonParseException(
+            "'" + key + "' is not a " + (typeof(T) == typeof(int) ? "integer" : typeof(T).Name.ToLowerInvariant()));
 }

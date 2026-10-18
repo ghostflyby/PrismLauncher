@@ -10,6 +10,7 @@
 // Modrinth/Flame/Technic de-singletoning for the same story). The parsers are pure helpers
 // and stay static; reads go through the JsonNode model (see AtLauncherJson/JsonUtils).
 
+using System.Text.Json;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Net;
 
@@ -91,16 +92,27 @@ public sealed class AtLauncherApi(NetStack? net = null)
     public static ShareCode? LoadShareCode(string response, out string? errorMessage)
     {
         errorMessage = null;
-        var root = AtLauncherJson.RequireDocument(response, "JSON response from ATLauncher");
-        var parsed = new ShareCodeResponse();
-        AtLauncherShareCode.LoadShareCodeResponse(parsed, AtLauncherJson.Object(root));
-        if (parsed.Error)
+        AtlShareCodeResponseJson parsed;
+        try
         {
-            errorMessage = parsed.Message;
+            parsed = JsonSerializer.Deserialize(response, AtLauncherJsonContext.Default.AtlShareCodeResponseJson)
+                     ?? throw new JsonParseException(
+                         "JSON response from ATLauncher: Error parsing JSON: document is null");
+        }
+        catch (JsonException e)
+        {
+            throw new JsonParseException("JSON response from ATLauncher: Error parsing JSON: " + e.Message);
+        }
+
+        var shareCodeResponse = new ShareCodeResponse();
+        AtLauncherShareCode.LoadShareCodeResponse(shareCodeResponse, parsed);
+        if (shareCodeResponse.Error)
+        {
+            errorMessage = shareCodeResponse.Message;
             return null;
         }
 
-        return parsed.Data;
+        return shareCodeResponse.Data;
     }
 
     /// <summary>Parses Configs.json into a PackVersion (PackInstallTask::onDownloadSucceeded).</summary>

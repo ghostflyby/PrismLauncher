@@ -2,11 +2,51 @@
 // Port of modplatform/flame/PackManifest.{h,cpp}: the CurseForge modpack manifest.json
 // model (manifestType "minecraftModpack", manifestVersion 1) and its loader. The C++
 // QMap<int, File> (key-sorted) becomes a SortedDictionary keyed by file id.
+//
+// The wire shape arrives as the FlameManifestJson probe records (deserialized through the
+// FlameJsonContext partial that lives in this file); the loader validates the required
+// members with the Json::require* messages and maps into the domain model, keeping the
+// QJsonValue optional defaults (name "Unnamed", author "Anonymous", overrides "overrides",
+// required true, primary false).
 
-using System.Text.Json.Nodes;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
+
+/// <summary>The manifest.json wire shape (the load-side probe; optional members carry the
+/// QJsonValue defaults, required ones are validated by the loader).</summary>
+internal sealed record FlameManifestJson(
+    [property: JsonPropertyName("manifestType")] string? ManifestType,
+    [property: JsonPropertyName("manifestVersion")] int? ManifestVersion,
+    [property: JsonPropertyName("minecraft")] FlameMinecraftJson? Minecraft,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("version")] string? Version,
+    [property: JsonPropertyName("author")] string? Author,
+    [property: JsonPropertyName("files")] List<FlameFileJson>? Files,
+    [property: JsonPropertyName("overrides")] string? Overrides);
+
+internal sealed record FlameMinecraftJson(
+    [property: JsonPropertyName("version")] string? Version,
+    [property: JsonPropertyName("libraries")] string? Libraries,
+    [property: JsonPropertyName("modLoaders")] List<FlameModloaderJson>? ModLoaders,
+    [property: JsonPropertyName("recommendedRam")] int? RecommendedRam);
+
+internal sealed record FlameModloaderJson(
+    [property: JsonPropertyName("id")] string? Id,
+    [property: JsonPropertyName("primary")] bool? Primary);
+
+internal sealed record FlameFileJson(
+    [property: JsonPropertyName("projectID")] long? ProjectId,
+    [property: JsonPropertyName("fileID")] long? FileId,
+    [property: JsonPropertyName("required")] bool? Required);
+
+[JsonSerializable(typeof(FlameManifestJson))]
+// a JsonSerializerContext of its own: the STJ source generator emits per-primitive helper
+// files named "<Context>.<Type>.g.cs", so one context class cannot be declared across two
+// files (the second partial would collide on the hint names and abort the whole generator)
+internal sealed partial class FlameManifestJsonContext : JsonSerializerContext;
 
 /// <summary>Port of Flame::File.</summary>
 public sealed class FlameFile
@@ -61,125 +101,88 @@ public sealed class FlameManifest
     /// Throws <see cref="JsonParseException"/> for non-modpack manifests and unknown versions.</summary>
     public static void LoadManifest(FlameManifest m, string filepath)
     {
-        if (JsonUtils.RequireNodeFromFile(filepath, "manifest.json") is not JsonObject obj)
+        FlameManifestJson? dto;
+        try
+        {
+            dto = JsonSerializer.Deserialize(File.ReadAllText(filepath),
+                FlameManifestJsonContext.Default.FlameManifestJson);
+        }
+        catch (JsonException e)
+        {
+            throw new JsonParseException("manifest.json: Error parsing JSON: " + e.Message);
+        }
+
+        if (dto is null)
         {
             throw new JsonParseException("manifest.json is not an object");
         }
 
-        m.ManifestType = RequireString(obj, "manifestType");
-        if (m.ManifestType != "minecraftModpack")
+        LoadManifestV1(m, dto);
+    }
+
+    private static void LoadManifestV1(FlameManifest pack, FlameManifestJson manifest)
+    {
+        pack.ManifestType = Require(manifest.ManifestType, "manifestType");
+        if (pack.ManifestType != "minecraftModpack")
         {
             throw new JsonParseException("Not a modpack manifest!");
         }
 
-        m.ManifestVersion = RequireInteger(obj, "manifestVersion");
-        if (m.ManifestVersion != 1)
+        pack.ManifestVersion = Require(manifest.ManifestVersion, "manifestVersion");
+        if (pack.ManifestVersion != 1)
         {
-            throw new JsonParseException($"Unknown manifest version ({m.ManifestVersion})");
+            throw new JsonParseException($"Unknown manifest version ({pack.ManifestVersion})");
         }
 
-        LoadManifestV1(m, obj);
-    }
-
-    private static void LoadFileV1(FlameFile f, JsonObject file)
-    {
-        f.ProjectId = RequireInteger(file, "projectID");
-        f.FileId = RequireInteger(file, "fileID");
-        f.Required = OptBoolean(file, "required", defaultValue: true);
-    }
-
-    private static void LoadModloaderV1(FlameModloader m, JsonObject modLoader)
-    {
-        m.Id = RequireString(modLoader, "id");
-        m.Primary = OptBoolean(modLoader, "primary");
-    }
-
-    private static void LoadMinecraftV1(FlameMinecraft m, JsonObject minecraft)
-    {
-        m.Version = RequireString(minecraft, "version");
+        var mc = manifest.Minecraft ?? throw new JsonParseException("'minecraft' is not an object");
+        pack.Minecraft.Version = Require(mc.Version, "version");
         // extra libraries... apparently only used for a custom Minecraft launcher in the
         // 1.2.5 FTB retro pack; intended use is likely hardcoded in the 'Flame' client,
         // the manifest says nothing
-        m.Libraries = OptString(minecraft, "libraries");
-        if (minecraft["modLoaders"] is JsonArray arr)
+        pack.Minecraft.Libraries = mc.Libraries ?? "";
+        if (mc.ModLoaders is { } loaders)
         {
-            foreach (var item in arr)
+            foreach (var loader in loaders)
             {
-                var loader = new FlameModloader();
-                LoadModloaderV1(loader, RequireObject(item!));
-                m.ModLoaders.Add(loader);
+                pack.Minecraft.ModLoaders.Add(new FlameModloader
+                {
+                    Id = Require(loader.Id, "id"),
+                    Primary = loader.Primary ?? false,
+                });
             }
         }
 
-        m.RecommendedRam = OptInteger(minecraft, "recommendedRam");
-    }
+        pack.Minecraft.RecommendedRam = mc.RecommendedRam ?? 0;
 
-    private static void LoadManifestV1(FlameManifest pack, JsonObject manifest)
-    {
-        var mc = JsonUtils.RequireObject(manifest, "minecraft");
-        LoadMinecraftV1(pack.Minecraft, mc);
+        pack.Name = manifest.Name ?? "Unnamed";
+        pack.Version = manifest.Version ?? "";
+        pack.Author = manifest.Author ?? "Anonymous";
 
-        pack.Name = OptString(manifest, "name", "Unnamed");
-        pack.Version = OptString(manifest, "version");
-        pack.Author = OptString(manifest, "author", "Anonymous");
-
-        if (manifest["files"] is JsonArray files)
+        if (manifest.Files is { } files)
         {
-            foreach (var item in files)
+            foreach (var file in files)
             {
-                var file = new FlameFile();
-                LoadFileV1(file, RequireObject(item!));
-                pack.Files[file.FileId] = file;
+                var flameFile = new FlameFile
+                {
+                    ProjectId = Require(file.ProjectId, "projectID"),
+                    FileId = Require(file.FileId, "fileID"),
+                    Required = file.Required ?? true,
+                };
+                pack.Files[flameFile.FileId] = flameFile;
             }
         }
 
-        pack.Overrides = OptString(manifest, "overrides", "overrides");
+        pack.Overrides = manifest.Overrides ?? "overrides";
 
         pack.IsLoaded = true;
     }
 
-    // ------------------------------------------------- QJsonObject-style helpers
+    // ------------------------------------------------- required-member checks
 
-    private static JsonNode? Opt(JsonObject obj, string key)
-    {
-        return obj.TryGetPropertyValue(key, out var node) ? node : null;
-    }
+    private static string Require(string? value, string key) =>
+        value ?? throw new JsonParseException("'" + key + "' is not a string");
 
-    private static string OptString(JsonObject obj, string key, string def = "")
-    {
-        return Opt(obj, key) is JsonValue value && value.TryGetValue<string>(out var s) ? s : def;
-    }
-
-    private static bool OptBoolean(JsonObject obj, string key, bool defaultValue = false)
-    {
-        return Opt(obj, key) is JsonValue value && value.TryGetValue<bool>(out var b) ? b : defaultValue;
-    }
-
-    private static int OptInteger(JsonObject obj, string key)
-    {
-        if (Opt(obj, key) is not JsonValue value)
-        {
-            return 0;
-        }
-
-        // JSON numbers are doubles; mirror the QJsonValue::toInt truncation
-        return value.TryGetValue<double>(out var d) ? (int)d : 0;
-    }
-
-    private static string RequireString(JsonObject parent, string key)
-    {
-        return JsonUtils.RequireString(parent, key);
-    }
-
-    private static int RequireInteger(JsonObject parent, string key)
-    {
-        return JsonUtils.RequireInteger(parent, key);
-    }
-
-    private static JsonObject RequireObject(JsonNode node)
-    {
-        return node is JsonObject obj
-            ? obj
-            : throw new JsonParseException("Value is not an object");
-    }
+    private static T Require<T>(T? value, string key) where T : struct =>
+        value ?? throw new JsonParseException(
+            "'" + key + "' is not a " + (typeof(T) == typeof(int) ? "integer" : typeof(T).Name.ToLowerInvariant()));
 }
