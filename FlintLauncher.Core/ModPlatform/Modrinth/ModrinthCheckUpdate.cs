@@ -11,8 +11,6 @@
 //    not ported yet (P6-c); the update record carries the resolved IndexedVersion instead.
 //  - The dependency list (m_deps) is not ported.
 
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Hashing;
@@ -166,14 +164,10 @@ public sealed class ModrinthCheckUpdate : FlintTask
     {
         EmitStatus("Parsing the API response from Modrinth...");
 
-        JsonNode entries;
-        try
+        var entries = ModrinthJson.ParseVersionLookup(response);
+        if (entries is null)
         {
-            entries = JsonNode.Parse(response) ?? throw new JsonException("empty response");
-        }
-        catch (JsonException e)
-        {
-            EmitFailed(e.Message);
+            EmitFailed("empty response");
             return;
         }
 
@@ -185,7 +179,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
                 // it means this specific version is not available
                 // doc.value()[hash] on a non-object document is undefined upstream: every
                 // mapping just stays unprocessed
-                if (entries is not JsonObject || entries[hash] is not { } projectNode)
+                if (!entries.TryGetValue(hash, out var projectVersion))
                 {
                     // stays in the mappings for the next loader pass
                     continue;
@@ -211,7 +205,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
                 //   (explicit) usage of the loader_filter
                 // - The version reported by the JAR is different from the version reported by the
                 //   indexed version (it's usually the case)
-                var projectVer = ModrinthPackIndex.LoadIndexedPackVersion(projectNode, _hashType, loaderFilter);
+                var projectVer = ModrinthPackIndex.LoadIndexedPackVersion(projectVersion, _hashType, loaderFilter);
                 if (projectVer.DownloadUrl.Length == 0)
                 {
                     // "Modrinth mod without download url!"

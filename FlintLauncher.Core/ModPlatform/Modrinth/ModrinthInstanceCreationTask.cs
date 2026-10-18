@@ -24,7 +24,7 @@
 //    from the failed signal).
 
 using System.Security.Cryptography;
-using System.Text.Json.Nodes;
+using System.Text.Json;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
@@ -275,14 +275,24 @@ public sealed class ModrinthCreationTask : InstanceTask
     {
         try
         {
-            // JsonNode-typed on purpose: the JsonObject-keyed overloads would otherwise win
-            // the overload resolution and drag the parse back onto the element bridge
-            JsonNode obj = JsonUtils.RequireObject(
-                JsonUtils.RequireNodeFromFile(indexPath, "modrinth.index.json"), "modrinth.index.json");
-            var formatVersion = JsonUtils.RequireInteger(obj, "formatVersion", "modrinth.index.json");
+            MrPackIndexJson? parsed;
+            try
+            {
+                parsed = JsonSerializer.Deserialize(System.IO.File.ReadAllText(indexPath),
+                    ModrinthJsonContext.Default.MrPackIndexJson);
+            }
+            catch (JsonException e)
+            {
+                throw new JsonParseException("modrinth.index.json: Error parsing JSON: " + e.Message);
+            }
+
+            var obj = parsed
+                      ?? throw new JsonParseException("modrinth.index.json: Error parsing JSON: document is null");
+            var formatVersion = obj.FormatVersion
+                                ?? throw new JsonParseException("modrinth.index.json is not an integer");
             if (formatVersion == 1)
             {
-                var game = JsonUtils.RequireString(obj, "game", "modrinth.index.json");
+                var game = obj.Game ?? throw new JsonParseException("modrinth.index.json is not a string");
                 if (game != "minecraft")
                 {
                     throw new JsonParseException("Unknown game: " + game);
@@ -292,30 +302,25 @@ public sealed class ModrinthCreationTask : InstanceTask
                 {
                     if (managedVersionId.Length == 0)
                     {
-                        managedVersionId = ObjString(obj, "versionId");
+                        managedVersionId = obj.VersionId ?? "";
                     }
 
-                    managedName = ObjString(obj, "name");
+                    managedName = obj.Name ?? "";
                 }
 
-                var jsonFiles = JsonUtils.RequireArray(obj, "files", "modrinth.index.json");
+                var jsonFiles = obj.Files ?? throw new JsonParseException("'files' is not an array");
                 var optionalFiles = new List<File>();
-                foreach (var modInfoNode in jsonFiles)
+                foreach (var modInfo in jsonFiles)
                 {
-                    if (modInfoNode is not JsonObject modInfo)
-                    {
-                        throw new JsonParseException("modrinth.index.json: files entry is not an object");
-                    }
-
                     var file = new File
                     {
-                        Path = modInfo.RequireString("path").Replace("\\", "/"),
+                        Path = ModrinthRequire.String(modInfo.Path, "path").Replace("\\", "/"),
                     };
 
-                    // 'env' field is optional
-                    if (modInfo.GetPropertySafe("env") is JsonObject { Count: > 0 } env)
+                    // 'env' field is optional (an object with no members behaves like an absent one)
+                    if (modInfo.Env is { } env && (env.Client is not null || env.Server is not null))
                     {
-                        var support = JsonUtils.EnsureString(env.GetPropertySafe("client"), "unsupported");
+                        var support = env.Client ?? "unsupported";
                         if (support == "unsupported")
                         {
                             continue;
@@ -327,16 +332,16 @@ public sealed class ModrinthCreationTask : InstanceTask
                         }
                     }
 
-                    var hashes = modInfo.RequireObject("hashes");
-                    file.Hash = hashes.RequireString("sha512");
+                    var hashes = ModrinthRequire.Object(modInfo.Hashes, "hashes");
+                    file.Hash = hashes.TryGetValue("sha512", out var sha512) && sha512 is not null
+                        ? sha512
+                        : throw new JsonParseException("'sha512' is not a string");
                     file.HashAlgorithm = HashAlgorithmName.SHA512;
 
                     // Do not use a strict URL parser (the C++ uses QUrl's default TolerantMode,
                     // as Modrinth seems to incorrectly handle spaces)
-                    var downloadArr = modInfo.GetPropertySafe("downloads");
-                    if (downloadArr is JsonArray)
+                    if (modInfo.Downloads is { } downloadList)
                     {
-                        var downloadList = ((JsonArray)downloadArr).Select(d => d.AsString() ?? "").ToList();
                         for (var i = 0; i < downloadList.Count; i++)
                         {
                             var isLast = i == downloadList.Count - 1;
@@ -388,28 +393,34 @@ public sealed class ModrinthCreationTask : InstanceTask
 
                 if (setInternalData)
                 {
-                    var dependencies = JsonUtils.RequireObject(obj, "dependencies", "modrinth.index.json");
+                    var dependencies = obj.Dependencies
+                                       ?? throw new JsonParseException("'dependencies' is not an object");
                     foreach (var (name, dependency) in dependencies)
                     {
                         if (name == "minecraft")
                         {
-                            minecraftVersion = JsonUtils.RequireString(dependency, "Minecraft version");
+                            minecraftVersion = dependency
+                                ?? throw new JsonParseException("Minecraft version is not a string");
                         }
                         else if (name == "fabric-loader")
                         {
-                            fabricVersion = JsonUtils.RequireString(dependency, "Fabric Loader version");
+                            fabricVersion = dependency
+                                ?? throw new JsonParseException("Fabric Loader version is not a string");
                         }
                         else if (name == "quilt-loader")
                         {
-                            quiltVersion = JsonUtils.RequireString(dependency, "Quilt Loader version");
+                            quiltVersion = dependency
+                                ?? throw new JsonParseException("Quilt Loader version is not a string");
                         }
                         else if (name == "forge")
                         {
-                            forgeVersion = JsonUtils.RequireString(dependency, "Forge version");
+                            forgeVersion = dependency
+                                ?? throw new JsonParseException("Forge version is not a string");
                         }
                         else if (name == "neoforge")
                         {
-                            neoForgeVersion = JsonUtils.RequireString(dependency, "NeoForge version");
+                            neoForgeVersion = dependency
+                                ?? throw new JsonParseException("NeoForge version is not a string");
                         }
                         else
                         {
@@ -430,15 +441,6 @@ public sealed class ModrinthCreationTask : InstanceTask
         }
 
         return true;
-    }
-
-    /// <summary>ObjString over the node read model (ParseManifest works on JsonNode).</summary>
-    private static string ObjString(JsonNode? obj, string key)
-    {
-        return obj is JsonObject o && o.TryGetPropertyValue(key, out var node) && node is JsonValue value
-               && value.TryGetValue<string>(out var s)
-            ? s
-            : "";
     }
 
     private async Task EnsureMetaLoop(CancellationToken cancellationToken, MinecraftInstance newInstance)

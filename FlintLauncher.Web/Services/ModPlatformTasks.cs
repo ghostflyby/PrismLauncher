@@ -19,6 +19,7 @@
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization.Metadata;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
@@ -137,9 +138,11 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
 
             try
             {
-                ModrinthPackIndex.LoadIndexedPack(pack,
-                    ParseBodyNode(request.BodyAsString, $"the Modrinth project {projectId}")
-                    ?? throw new ModResolveException($"the Modrinth project {projectId} is not a JSON object"));
+                var dto = ParseModrinthBody<ModrinthProjectJson>(request.BodyAsString,
+                              $"the Modrinth project {projectId}",
+                              ModrinthJsonContext.Default.ModrinthProjectJson)
+                          ?? throw new ModResolveException($"the Modrinth project {projectId} is not a JSON object");
+                ModrinthPackIndex.LoadIndexedPack(pack, dto);
             }
             catch (JsonParseException e)
             {
@@ -194,7 +197,8 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             }
 
             return ModrinthPackIndex.LoadIndexedPackVersion(
-                ParseBodyNode(pinnedRequest.BodyAsString, $"the Modrinth version {versionId}")
+                ParseModrinthBody<ModrinthVersionJson>(pinnedRequest.BodyAsString,
+                    $"the Modrinth version {versionId}", ModrinthJsonContext.Default.ModrinthVersionJson)
                 ?? throw new ModResolveException($"the Modrinth version {versionId} is not a JSON object"));
         }
         catch (JsonParseException e)
@@ -256,35 +260,42 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         // Modrinth: an array of versions; keep the valid ones for the instance's loader
         // (the getDependencyVersion heuristic) and take the newest by published date
         var versions = new List<IndexedVersion>();
-        if (bodyRoot is JsonArray array)
+        foreach (var dto in ModrinthJson.VersionListFromNode(bodyRoot) ?? [])
         {
-            foreach (var entry in array)
+            IndexedVersion file;
+            try
             {
-                if (entry is not JsonObject entryObj)
-                {
-                    continue;
-                }
+                file = ModrinthPackIndex.LoadIndexedPackVersion(dto);
+            }
+            catch (JsonParseException)
+            {
+                continue;
+            }
 
-                IndexedVersion file;
-                try
-                {
-                    file = ModrinthPackIndex.LoadIndexedPackVersion(entryObj);
-                }
-                catch (JsonParseException)
-                {
-                    continue;
-                }
-
-                if (file.FileId.Length != 0 &&
-                    (file.Loaders == ModLoaderType.None || (loaders & file.Loaders) != 0))
-                {
-                    versions.Add(file);
-                }
+            if (file.FileId.Length != 0 &&
+                (file.Loaders == ModLoaderType.None || (loaders & file.Loaders) != 0))
+            {
+                versions.Add(file);
             }
         }
 
         versions.Sort((a, b) => string.CompareOrdinal(b.Date, a.Date));
         return versions.Count != 0 ? versions[0] : null;
+    }
+
+    /// <summary>Strict Modrinth DTO parse: a syntax error becomes "{what} is invalid: ...",
+    /// JSON null (or nothing at all) becomes null so callers keep their "not a JSON object"
+    /// branch (the former ParseBodyNode + loader contract).</summary>
+    private static T? ParseModrinthBody<T>(string body, string what, JsonTypeInfo<T> typeInfo) where T : class
+    {
+        try
+        {
+            return JsonSerializer.Deserialize(body, typeInfo);
+        }
+        catch (JsonException e)
+        {
+            throw new ModResolveException($"{what} is invalid: {e.Message}");
+        }
     }
 
     /// <summary>Node-side parse for the modplatform flows (single-DOM read model).</summary>

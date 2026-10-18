@@ -8,11 +8,25 @@
 
 using System.Security.Cryptography;
 using System.Text.Json;
-using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.Launch;
+
+/// <summary>The on-disk assets index shape (assets/indexes/&lt;id&gt;.json): Mojang's
+/// virtual/map_to_resources flags and the object map keyed by resource path.</summary>
+public sealed record AssetsIndexFileJson(
+    [property: JsonPropertyName("virtual")] bool? Virtual,
+    [property: JsonPropertyName("map_to_resources")] bool? MapToResources,
+    [property: JsonPropertyName("objects")] Dictionary<string, AssetObjectJson>? Objects);
+
+public sealed record AssetObjectJson(
+    [property: JsonPropertyName("hash")] string? Hash,
+    [property: JsonPropertyName("size")] long? Size);
+
+[JsonSerializable(typeof(AssetsIndexFileJson))]
+internal sealed partial class AssetsJsonContext : JsonSerializerContext;
 
 /// <summary>Port of AssetObject.</summary>
 public sealed class AssetObject
@@ -82,66 +96,47 @@ public static class AssetsUtils
     /// <summary>Port of AssetsUtils::loadAssetsIndexJson.</summary>
     public static bool LoadAssetsIndexJson(string assetsId, string path, AssetsIndex index)
     {
-        JsonDocument document;
+        AssetsIndexFileJson? document;
         try
         {
-            document = JsonDocument.Parse(File.ReadAllText(path));
+            document = JsonSerializer.Deserialize(File.ReadAllText(path),
+                AssetsJsonContext.Default.AssetsIndexFileJson);
         }
         catch (Exception e) when (e is JsonException or IOException)
         {
             return false;
         }
 
-        using (document)
+        if (document is null)
         {
-            if (document.RootElement.ValueKind != JsonValueKind.Object)
-            {
-                return false;
-            }
-
-            index.Id = assetsId;
-            var root = JsonNode.Parse(document.RootElement.GetRawText()) as JsonObject ?? [];
-
-            if (root.TryGetPropertyValue("virtual", out var isVirtual) && isVirtual is JsonValue virtualValue &&
-                virtualValue.TryGetValue<bool>(out var virtualFlag))
-            {
-                index.IsVirtual = virtualFlag;
-            }
-
-            if (root.TryGetPropertyValue("map_to_resources", out var mapToResources) && mapToResources is JsonValue mapValue &&
-                mapValue.TryGetValue<bool>(out var mapFlag))
-            {
-                index.MapToResources = mapFlag;
-            }
-
-            if (root.TryGetPropertyValue("objects", out var objects) && objects is JsonObject objectsMap)
-            {
-                foreach (var (key, value) in objectsMap)
-                {
-                    var assetObject = new AssetObject();
-                    if (value is JsonObject nested)
-                    {
-                        foreach (var (nestedKey, nestedValue) in nested)
-                        {
-                            if (nestedKey == "hash" && nestedValue is JsonValue hashValue &&
-                                hashValue.TryGetValue<string>(out var hash))
-                            {
-                                assetObject.Hash = hash;
-                            }
-                            else if (nestedKey == "size" && nestedValue is JsonValue number &&
-                                     number.TryGetValue<long>(out var size))
-                            {
-                                assetObject.Size = size;
-                            }
-                        }
-                    }
-
-                    index.Objects[key] = assetObject;
-                }
-            }
-
-            return true;
+            return false;
         }
+
+        index.Id = assetsId;
+
+        if (document.Virtual is { } virtualFlag)
+        {
+            index.IsVirtual = virtualFlag;
+        }
+
+        if (document.MapToResources is { } mapFlag)
+        {
+            index.MapToResources = mapFlag;
+        }
+
+        if (document.Objects is { } objects)
+        {
+            foreach (var (key, value) in objects)
+            {
+                index.Objects[key] = new AssetObject
+                {
+                    Hash = value.Hash ?? "",
+                    Size = value.Size ?? 0,
+                };
+            }
+        }
+
+        return true;
     }
 
     /// <summary>Port of AssetsUtils::reconstructAssets: rebuild a virtual assets folder (or the

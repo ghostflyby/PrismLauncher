@@ -238,8 +238,4 @@ public static class ApiJson
     public static IResult NotFound(string code, string message) => Error(code, message, 404);
 
     public static IResult Conflict(string code, string message) => Error(code, message, 409);
-
-    /// <summary>Serialize a manually-built JSON node (settings map, search results).</summary>
-    public static IResult Node(JsonObject node) =>
-        Results.Content(node.ToJsonString(), "application/json");
 }

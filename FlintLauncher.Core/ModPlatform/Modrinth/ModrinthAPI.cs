@@ -12,8 +12,6 @@
 
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Versioning;
@@ -41,28 +39,12 @@ public sealed class ModrinthApi(NetStack? net = null) : ResourceApi
 
         public string ToJson()
         {
-            var obj = new JsonObject();
-            if (!string.IsNullOrEmpty(Reason))
-            {
-                obj["reason"] = JsonValue.Create(Reason);
-            }
-
-            if (!string.IsNullOrEmpty(GameVersion))
-            {
-                obj["game_version"] = JsonValue.Create(GameVersion);
-            }
-
-            if (!string.IsNullOrEmpty(Loader))
-            {
-                obj["loader"] = JsonValue.Create(Loader);
-            }
-
-            if (!string.IsNullOrEmpty(DependentOn))
-            {
-                obj["dependent_on"] = JsonValue.Create(DependentOn);
-            }
-
-            return obj.ToJsonString();
+            var dto = new ModrinthDownloadMetaJson(
+                Reason: string.IsNullOrEmpty(Reason) ? null : Reason,
+                GameVersion: string.IsNullOrEmpty(GameVersion) ? null : GameVersion,
+                Loader: string.IsNullOrEmpty(Loader) ? null : Loader,
+                DependentOn: string.IsNullOrEmpty(DependentOn) ? null : DependentOn);
+            return JsonSerializer.Serialize(dto, ModrinthJsonContext.Default.ModrinthDownloadMetaJson);
         }
     }
 
@@ -136,10 +118,10 @@ public sealed class ModrinthApi(NetStack? net = null) : ResourceApi
     {
         var netJob = new NetJob("Modrinth::GetCurrentVersions");
 
-        var bodyObj = new JsonObject();
-        JsonUtils.WriteStringList(bodyObj, "hashes", hashes);
-        JsonUtils.WriteString(bodyObj, "algorithm", hashFormat);
-        var bodyRaw = Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
+        var body = new ModrinthHashLookupRequest(
+            Hashes: hashes.Count != 0 ? [.. hashes] : null,
+            Algorithm: hashFormat.Length != 0 ? hashFormat : null);
+        var bodyRaw = JsonSerializer.SerializeToUtf8Bytes(body, ModrinthJsonContext.Default.ModrinthHashLookupRequest);
 
         var request = MakeByteArrayRequest($"{BaseUrl}/version_files", bodyRaw);
         netJob.AddNetRequest(request);
@@ -156,21 +138,14 @@ public sealed class ModrinthApi(NetStack? net = null) : ResourceApi
     {
         var netJob = new NetJob("Modrinth::GetLatestVersion");
 
-        var bodyObj = new JsonObject();
-        if (loaders is { } loaderValue)
-        {
-            JsonUtils.WriteStringList(bodyObj, "loaders", GetModLoaderStrings(loaderValue));
-        }
+        var body = new ModrinthVersionUpdateRequest(
+            Hashes: null,
+            Algorithm: null,
+            Loaders: NonEmptyOrNull(loaders is { } loaderValue ? GetModLoaderStrings(loaderValue) : null),
+            GameVersions: mcVersions is null ? null : NonEmptyOrNull(mcVersions.Select(MapMcVersionToModrinth).ToList()),
+            VersionTypes: VersionTypesOrNull(releaseTypes));
 
-        if (mcVersions is not null)
-        {
-            JsonUtils.WriteStringList(bodyObj, "game_versions",
-                mcVersions.Select(MapMcVersionToModrinth).ToList());
-        }
-
-        AddVersionTypes(bodyObj, releaseTypes);
-
-        var bodyRaw = Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
+        var bodyRaw = JsonSerializer.SerializeToUtf8Bytes(body, ModrinthJsonContext.Default.ModrinthVersionUpdateRequest);
 
         var request = MakeByteArrayRequest($"{BaseUrl}/version_file/{hash}/update?algorithm={hashFormat}", bodyRaw);
         netJob.AddNetRequest(request);
@@ -187,43 +162,34 @@ public sealed class ModrinthApi(NetStack? net = null) : ResourceApi
     {
         var netJob = new NetJob("Modrinth::GetLatestVersions");
 
-        var bodyObj = new JsonObject();
-        JsonUtils.WriteStringList(bodyObj, "hashes", hashes);
-        JsonUtils.WriteString(bodyObj, "algorithm", hashFormat);
-        if (loaders is { } loaderValue)
-        {
-            JsonUtils.WriteStringList(bodyObj, "loaders", GetModLoaderStrings(loaderValue));
-        }
+        var body = new ModrinthVersionUpdateRequest(
+            Hashes: hashes.Count != 0 ? [.. hashes] : null,
+            Algorithm: hashFormat.Length != 0 ? hashFormat : null,
+            Loaders: NonEmptyOrNull(loaders is { } loaderValue ? GetModLoaderStrings(loaderValue) : null),
+            GameVersions: mcVersions is null ? null : NonEmptyOrNull(mcVersions.Select(MapMcVersionToModrinth).ToList()),
+            VersionTypes: VersionTypesOrNull(releaseTypes));
 
-        if (mcVersions is not null)
-        {
-            JsonUtils.WriteStringList(bodyObj, "game_versions",
-                mcVersions.Select(MapMcVersionToModrinth).ToList());
-        }
-
-        AddVersionTypes(bodyObj, releaseTypes);
-
-        var bodyRaw = Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
+        var bodyRaw = JsonSerializer.SerializeToUtf8Bytes(body, ModrinthJsonContext.Default.ModrinthVersionUpdateRequest);
 
         var request = MakeByteArrayRequest($"{BaseUrl}/version_files/update", bodyRaw);
         netJob.AddNetRequest(request);
         return (netJob, request);
     }
 
-    /// <summary>Port of the addVersionTypes helper: write "version_types" when the release
-    /// types carry at least one valid entry.</summary>
-    private static void AddVersionTypes(JsonObject bodyObj, IReadOnlyList<IndexedVersionType>? releaseTypes)
+    /// <summary>WriteStringList semantics: an empty list is omitted.</summary>
+    private static List<string>? NonEmptyOrNull(List<string>? values) =>
+        values is { Count: > 0 } ? values : null;
+
+    /// <summary>Port of the addVersionTypes helper: "version_types" is only written when the
+    /// release types carry at least one valid entry.</summary>
+    private static List<string>? VersionTypesOrNull(IReadOnlyList<IndexedVersionType>? releaseTypes)
     {
         if (releaseTypes is not { Count: > 0 })
         {
-            return;
+            return null;
         }
 
-        var versionTypes = IndexedVersionType.ToModrinthList(releaseTypes);
-        if (versionTypes.Count != 0)
-        {
-            JsonUtils.WriteStringList(bodyObj, "version_types", versionTypes);
-        }
+        return NonEmptyOrNull(IndexedVersionType.ToModrinthList(releaseTypes));
     }
 
     /// <summary>Port of ModrinthAPI::getProjects (GET /projects?ids=[...]).</summary>
@@ -264,31 +230,17 @@ public sealed class ModrinthApi(NetStack? net = null) : ResourceApi
     public static List<Category> LoadCategories(string response, string projectType)
     {
         var categories = new List<Category>();
-        JsonArray? arr;
-        try
-        {
-            arr = JsonNode.Parse(response) as JsonArray;
-        }
-        catch (JsonException)
+        var entries = ModrinthJson.ParseCategories(response);
+        if (entries is null)
         {
             return categories;
         }
 
-        if (arr is null)
+        foreach (var cat in entries)
         {
-            return categories;
-        }
-
-        foreach (var cat in arr)
-        {
-            if (cat is not JsonObject)
+            if (cat.ProjectType == projectType)
             {
-                continue;
-            }
-
-            var name = JsonUtils.EnsureString(cat.GetPropertySafe("name"));
-            if (cat.GetPropertySafe("project_type").AsString() == projectType)
-            {
+                var name = cat.Name ?? "";
                 categories.Add(new Category(name, name));
             }
         }
@@ -575,46 +527,4 @@ public sealed class ModrinthApi(NetStack? net = null) : ResourceApi
         AddApiHeaders(request, meta);
         return request;
     }
-}
-
-/// <summary>Small QJsonObject-style accessor helpers shared by the Modrinth loaders
-/// (JsonNode-based: the read side of the single-DOM model — see JsonUtils node family).</summary>
-internal static class ModrinthJsonExtensions
-{
-    public static JsonNode? GetPropertySafe(this JsonNode? node, string name) => node is JsonObject obj ? obj[name] : null;
-
-    public static string? AsString(this JsonNode? node) =>
-        node is JsonValue value && value.TryGetValue<string>(out var s) ? s : null;
-
-    public static string RequireString(this JsonNode? parent, string key)
-        => JsonUtils.RequireString(parent, key, "'" + key + "'");
-
-    public static bool RequireBoolean(this JsonNode? parent, string key)
-        => JsonUtils.RequireBoolean(parent, key, "'" + key + "'");
-
-    public static int RequireInteger(this JsonNode? parent, string key)
-        => JsonUtils.RequireInteger(parent, key, "'" + key + "'");
-
-    public static JsonObject RequireObject(this JsonNode? parent, string key)
-        => JsonUtils.RequireObject(parent, key, "'" + key + "'");
-
-    public static JsonArray RequireArray(this JsonNode? parent, string key)
-        => JsonUtils.RequireArray(parent, key, "'" + key + "'");
-
-    // key + explicit what variants (the index parser labels every requirement with the file)
-
-    public static string RequireString(this JsonNode? parent, string key, string what)
-        => JsonUtils.RequireString(parent?[key], what);
-
-    public static bool RequireBoolean(this JsonNode? parent, string key, string what)
-        => JsonUtils.RequireBoolean(parent?[key], what);
-
-    public static int RequireInteger(this JsonNode? parent, string key, string what)
-        => JsonUtils.RequireInteger(parent?[key], what);
-
-    public static JsonObject RequireObject(this JsonNode? parent, string key, string what)
-        => JsonUtils.RequireObject(parent?[key], what);
-
-    public static JsonArray RequireArray(this JsonNode? parent, string key, string what)
-        => JsonUtils.RequireArray(parent?[key], what);
 }

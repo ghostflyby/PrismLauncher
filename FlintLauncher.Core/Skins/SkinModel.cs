@@ -83,23 +83,15 @@ public static class SkinListStore
 
         try
         {
-            using var doc = JsonDocument.Parse(FileSystem.Read(manifestPath));
-            if (doc.RootElement.ValueKind != JsonValueKind.Object ||
-                !doc.RootElement.TryGetProperty("skins", out var skins) ||
-                skins.ValueKind != JsonValueKind.Array)
+            var root = JsonNode.Parse(FileSystem.Read(manifestPath));
+            if (root is not JsonObject rootObj || rootObj["skins"] is not JsonArray skins)
             {
                 return newSkins;
             }
 
-            foreach (var skin in skins.EnumerateArray())
+            foreach (var skinNode in skins)
             {
-                if (skin.ValueKind != JsonValueKind.Object)
-                {
-                    continue;
-                }
-
-                var node = JsonNode.Parse(skin.GetRawText());
-                if (node is JsonObject obj)
+                if (skinNode is JsonObject obj)
                 {
                     var model = new SkinModel(skinsDir, obj);
                     if (IsValid(model))

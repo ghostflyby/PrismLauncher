@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of modplatform/modrinth/ModrinthPackIndex.{h,cpp}: load Modrinth project/version
-// JSON documents into the provider-neutral ModIndex models. The .mrpack (modrinth.index.json)
-// parsing lives in ModrinthInstanceCreationTask.ParseManifest, like upstream.
+// payloads into the provider-neutral ModIndex models. The wire shapes arrive as the
+// source-generated DTOs in ModrinthJson (ModrinthProjectJson / ModrinthVersionJson); these
+// loaders are the DTO -> model mapping, keeping the require/fallback semantics of the
+// former node readers. The .mrpack (modrinth.index.json) parsing lives in
+// ModrinthInstanceCreationTask.ParseManifest, like upstream.
 
-using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
@@ -16,43 +18,43 @@ public static class ModrinthPackIndex
     private static bool ShouldDownloadOnSide(string side) => side is "required" or "optional";
 
     /// <summary>Port of Modrinth::loadIndexedPack.</summary>
-    public static void LoadIndexedPack(IndexedPack pack, JsonNode obj)
+    public static void LoadIndexedPack(IndexedPack pack, ModrinthProjectJson dto)
     {
-        pack.AddonId = obj.GetPropertySafe("project_id").AsString() ?? "";
+        pack.AddonId = dto.ProjectId ?? "";
         if (pack.AddonId.Length == 0)
         {
-            pack.AddonId = obj.RequireString("id");
+            pack.AddonId = ModrinthRequire.String(dto.Id, "id");
         }
 
         pack.Provider = ResourceProvider.Modrinth;
-        pack.Name = obj.RequireString("title");
-        pack.ResourceType = ModrinthApi.GetResourceType(obj.GetPropertySafe("project_type").AsString() ?? "");
-        if ((obj.TryGetArrayContains("loaders", "datapack")) ||
-            (obj.TryGetArrayContains("all_project_types", "datapack")))
+        pack.Name = ModrinthRequire.String(dto.Title, "title");
+        pack.ResourceType = ModrinthApi.GetResourceType(dto.ProjectType ?? "");
+        if ((dto.Loaders?.Contains("datapack") ?? false) ||
+            (dto.AllProjectTypes?.Contains("datapack") ?? false))
         {
             pack.ResourceType = ResourceType.DataPack;
         }
 
-        pack.Slug = obj.GetPropertySafe("slug").AsString() ?? "";
+        pack.Slug = dto.Slug ?? "";
         pack.WebsiteUrl = pack.Slug.Length != 0 ? "https://modrinth.com/mod/" + pack.Slug : "";
 
-        pack.Description = obj.GetPropertySafe("description").AsString() ?? "";
+        pack.Description = dto.Description ?? "";
 
-        pack.LogoUrl = obj.GetPropertySafe("icon_url").AsString() ?? "";
-        pack.LogoName = $"{obj.GetPropertySafe("slug").AsString() ?? ""}.{UrlPathSuffix(pack.LogoUrl)}";
+        pack.LogoUrl = dto.IconUrl ?? "";
+        pack.LogoName = $"{dto.Slug ?? ""}.{UrlPathSuffix(pack.LogoUrl)}";
 
-        if (obj.GetPropertySafe("author") is { } author)
+        if (dto.Author is { } author)
         {
             var modAuthor = new ModpackAuthor
             {
-                Name = author.AsString() ?? "",
-                Url = ModrinthApi.GetAuthorUrl(author.AsString() ?? ""),
+                Name = author,
+                Url = ModrinthApi.GetAuthorUrl(author),
             };
             pack.Authors = [modAuthor];
         }
 
-        var client = ShouldDownloadOnSide(obj.GetPropertySafe("client_side").AsString() ?? "");
-        var server = ShouldDownloadOnSide(obj.GetPropertySafe("server_side").AsString() ?? "");
+        var client = ShouldDownloadOnSide(dto.ClientSide ?? "");
+        var server = ShouldDownloadOnSide(dto.ServerSide ?? "");
 
         if (server && client)
         {
@@ -72,62 +74,60 @@ public static class ModrinthPackIndex
     }
 
     /// <summary>Port of Modrinth::loadExtraPackData.</summary>
-    public static void LoadExtraPackData(IndexedPack pack, JsonNode obj)
+    public static void LoadExtraPackData(IndexedPack pack, ModrinthProjectJson dto)
     {
-        pack.ExtraData.IssuesUrl = ChopTrailingSlash(obj.GetPropertySafe("issues_url").AsString() ?? "");
-        pack.ExtraData.SourceUrl = ChopTrailingSlash(obj.GetPropertySafe("source_url").AsString() ?? "");
-        pack.ExtraData.WikiUrl = ChopTrailingSlash(obj.GetPropertySafe("wiki_url").AsString() ?? "");
-        pack.ExtraData.DiscordUrl = ChopTrailingSlash(obj.GetPropertySafe("discord_url").AsString() ?? "");
+        pack.ExtraData.IssuesUrl = ChopTrailingSlash(dto.IssuesUrl ?? "");
+        pack.ExtraData.SourceUrl = ChopTrailingSlash(dto.SourceUrl ?? "");
+        pack.ExtraData.WikiUrl = ChopTrailingSlash(dto.WikiUrl ?? "");
+        pack.ExtraData.DiscordUrl = ChopTrailingSlash(dto.DiscordUrl ?? "");
 
-        if (obj.GetPropertySafe("donation_urls") is JsonArray donateArr)
+        if (dto.DonationUrls is { } donations)
         {
-            foreach (var d in donateArr)
+            foreach (var d in donations)
             {
                 var donate = new DonationData
                 {
-                    Id = d.GetPropertySafe("id").AsString() ?? "",
-                    Platform = d.GetPropertySafe("platform").AsString() ?? "",
-                    Url = d.GetPropertySafe("url").AsString() ?? "",
+                    Id = d.Id ?? "",
+                    Platform = d.Platform ?? "",
+                    Url = d.Url ?? "",
                 };
                 pack.ExtraData.Donate.Add(donate);
             }
         }
 
-        pack.ExtraData.Status = obj.GetPropertySafe("status").AsString() ?? "";
+        pack.ExtraData.Status = dto.Status ?? "";
 
-        pack.ExtraData.Body = (obj.GetPropertySafe("body").AsString() ?? "").Replace("<br>", "");
+        pack.ExtraData.Body = (dto.Body ?? "").Replace("<br>", "");
 
         pack.ExtraDataLoaded = true;
     }
 
     /// <summary>Port of Modrinth::loadIndexedPackVersion.</summary>
-    public static IndexedVersion LoadIndexedPackVersion(JsonNode obj, string preferredHashType = "sha512",
+    public static IndexedVersion LoadIndexedPackVersion(ModrinthVersionJson dto, string preferredHashType = "sha512",
         string preferredFileName = "")
     {
         var file = new IndexedVersion
         {
-            AddonId = obj.RequireString("project_id"),
-            FileId = obj.RequireString("id"),
-            Date = obj.RequireString("date_published"),
+            AddonId = ModrinthRequire.String(dto.ProjectId, "project_id"),
+            FileId = ModrinthRequire.String(dto.Id, "id"),
+            Date = ModrinthRequire.String(dto.DatePublished, "date_published"),
         };
-        var versionArray = obj.RequireArray("game_versions");
+        var versionArray = ModrinthRequire.Array(dto.GameVersions, "game_versions");
         if (versionArray.Count == 0)
         {
             return new IndexedVersion();
         }
 
-        foreach (var mcVer in versionArray)
+        foreach (var raw in versionArray)
         {
-            var raw = mcVer.AsString() ?? "";
             // double this so we can check both strings when filtering
             file.McVersion.Add(ModrinthApi.MapMcVersionFromModrinth(raw));
             file.McVersion.Add(raw);
         }
 
-        var loaders = obj.RequireArray("loaders");
-        foreach (var loader in loaders)
+        foreach (var loader in ModrinthRequire.Array(dto.Loaders, "loaders"))
         {
-            switch (loader.AsString())
+            switch (loader)
             {
                 case "neoforge": file.Loaders |= ModLoaderType.NeoForge; break;
                 case "forge": file.Loaders |= ModLoaderType.Forge; break;
@@ -138,28 +138,26 @@ public static class ModrinthPackIndex
             }
         }
 
-        file.Version = obj.RequireString("name");
-        file.VersionNumber = obj.RequireString("version_number");
-        file.VersionType = IndexedVersionType.FromString(obj.RequireString("version_type"));
+        file.Version = ModrinthRequire.String(dto.Name, "name");
+        file.VersionNumber = ModrinthRequire.String(dto.VersionNumber, "version_number");
+        file.VersionType = IndexedVersionType.FromString(ModrinthRequire.String(dto.VersionType, "version_type"));
 
-        if (obj.GetPropertySafe("changelog") is { } changelog)
+        if (dto.Changelog is { } changelog)
         {
-            file.Changelog = JsonUtils.RequireString(changelog);
+            file.Changelog = ModrinthRequire.String(changelog, "changelog");
         }
 
-        var dependencies = obj.GetPropertySafe("dependencies");
-        if (dependencies is JsonArray)
+        if (dto.Dependencies is { } dependencies)
         {
-            foreach (var d in (JsonArray)dependencies)
+            foreach (var d in dependencies)
             {
                 var dependency = new Dependency
                 {
-                    AddonId = d.GetPropertySafe("project_id").AsString() ?? "",
-                    Version = d.GetPropertySafe("version_id").AsString() ?? "",
+                    AddonId = d.ProjectId ?? "",
+                    Version = d.VersionId ?? "",
                 };
-                var depType = d.RequireString("dependency_type");
 
-                dependency.Type = depType switch
+                dependency.Type = ModrinthRequire.String(d.DependencyType, "dependency_type") switch
                 {
                     "required" => new DependencyType(DependencyTypeValue.Required),
                     "optional" => new DependencyType(DependencyTypeValue.Optional),
@@ -172,7 +170,7 @@ public static class ModrinthPackIndex
             }
         }
 
-        var files = obj.RequireArray("files");
+        var files = ModrinthRequire.Array(dto.Files, "files");
         var fileCount = files.Count;
 
         if (fileCount == 0)
@@ -188,7 +186,7 @@ public static class ModrinthPackIndex
         for (var i = 0; i < fileCount - 1; i++)
         {
             var candidate = files[i];
-            var fileName = candidate.RequireString("filename");
+            var fileName = ModrinthRequire.String(candidate.Filename, "filename");
 
             if (preferredFileName.Length != 0 && fileName.Contains(preferredFileName, StringComparison.Ordinal))
             {
@@ -198,24 +196,24 @@ public static class ModrinthPackIndex
             }
 
             // Grab the primary file, if available
-            if (candidate.RequireBoolean("primary"))
+            if (ModrinthRequire.Boolean(candidate.Primary, "primary"))
             {
                 parent = candidate;
                 break;
             }
         }
 
-        if (parent.GetPropertySafe("url") is not null)
+        if (parent.Url is not null)
         {
-            file.DownloadUrl = parent.RequireString("url");
-            file.FileName = parent.RequireString("filename");
-            file.FileName = FileSystem.RemoveInvalidPathChars(file.FileName);
-            file.IsPreferred = parent.RequireBoolean("primary") || fileCount == 1;
-            var hashList = parent.RequireObject("hashes");
+            file.DownloadUrl = ModrinthRequire.String(parent.Url, "url");
+            var fileName = ModrinthRequire.String(parent.Filename, "filename");
+            file.FileName = FileSystem.RemoveInvalidPathChars(fileName);
+            file.IsPreferred = ModrinthRequire.Boolean(parent.Primary, "primary") || fileCount == 1;
+            var hashList = ModrinthRequire.Object(parent.Hashes, "hashes");
 
-            if (hashList.GetPropertySafe(preferredHashType) is { } preferred)
+            if (hashList.TryGetValue(preferredHashType, out var preferredHash))
             {
-                file.Hash = JsonUtils.RequireString(preferred);
+                file.Hash = ModrinthRequire.String(preferredHash, preferredHashType);
                 file.HashType = preferredHashType;
             }
             else
@@ -223,9 +221,9 @@ public static class ModrinthPackIndex
                 var hashTypes = ProviderCapabilities.HashType(ResourceProvider.Modrinth);
                 foreach (var hashType in hashTypes)
                 {
-                    if (hashList.GetPropertySafe(hashType) is { } hash)
+                    if (hashList.TryGetValue(hashType, out var hash))
                     {
-                        file.Hash = JsonUtils.RequireString(hash);
+                        file.Hash = ModrinthRequire.String(hash, hashType);
                         file.HashType = hashType;
                         break;
                     }
@@ -255,24 +253,5 @@ public static class ModrinthPackIndex
 
         var dot = fileName.LastIndexOf('.');
         return dot >= 0 ? fileName[(dot + 1)..] : "";
-    }
-
-    private static bool TryGetArrayContains(this JsonNode obj, string arrayKey, string value)
-    {
-        if (obj.GetPropertySafe(arrayKey) is not JsonArray arr)
-        {
-            // obj.value(key).toArray({}) semantics: missing/other -> empty
-            return false;
-        }
-
-        foreach (var item in arr)
-        {
-            if (item.AsString() == value)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

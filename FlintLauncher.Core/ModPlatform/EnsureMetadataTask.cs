@@ -79,13 +79,8 @@ public sealed class EnsureMetadataTask(
             return;
         }
 
-        JsonObject entriesObj;
-        try
-        {
-            entriesObj = JsonUtils.RequireObject(
-                JsonNode.Parse(versionRequest.BodyAsString), "version response");
-        }
-        catch (Exception e) when (e is JsonException or JsonParseException)
+        var versionEntries = ModrinthJson.ParseVersionLookup(versionRequest.BodyAsString);
+        if (versionEntries is null)
         {
             EmitFailed("Version response is not a JSON object");
             return;
@@ -97,7 +92,10 @@ public sealed class EnsureMetadataTask(
                 var resource = resources[hash];
                 try
                 {
-                    var entry = JsonUtils.RequireObject(entriesObj[hash], hash);
+                    if (!versionEntries.TryGetValue(hash, out var entry))
+                    {
+                        throw new JsonParseException(hash + " is not an object");
+                    }
 
                     EmitStatus($"Parsing API response from Modrinth for '{resource.Name}'...");
                     _tempVersions[hash] = ModrinthPackIndex.LoadIndexedPackVersion(entry);
@@ -164,19 +162,19 @@ public sealed class EnsureMetadataTask(
         }
 
         {
-            var entries = multiple
-                ? JsonUtils.RequireArray(projectDoc).ToList()
-                : [projectDoc];
+            List<ModrinthProjectJson> projectEntries = multiple
+                ? ModrinthJson.ProjectListFromNode(projectDoc) ?? []
+                : ModrinthJson.ProjectFromNode(projectDoc) is { } single
+                    ? [single]
+                    : [];
 
-            foreach (var entry in entries)
+            foreach (var dto in projectEntries)
             {
                 IndexedPack pack;
-                JsonNode entryObj;
                 try
                 {
-                    entryObj = JsonUtils.RequireObject(entry);
                     pack = new IndexedPack();
-                    ModrinthPackIndex.LoadIndexedPack(pack, entryObj);
+                    ModrinthPackIndex.LoadIndexedPack(pack, dto);
                 }
                 catch (JsonParseException)
                 {

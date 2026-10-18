@@ -276,18 +276,13 @@ public static class ModPlatformEndpoints
                             FlameMod.LoadIndexedPackVersions(pack, data);
                         }
                     }
-                    else if (bodyRoot is JsonArray array)
+                    else if (ModrinthJson.VersionListFromNode(bodyRoot) is { } versionDtos)
                     {
-                        foreach (var entry in array)
+                        foreach (var dto in versionDtos)
                         {
-                            if (entry is not JsonObject entryObj)
-                            {
-                                continue;
-                            }
-
                             try
                             {
-                                var version = ModrinthPackIndex.LoadIndexedPackVersion(entryObj);
+                                var version = ModrinthPackIndex.LoadIndexedPackVersion(dto);
                                 if (version.FileId.Length != 0)
                                 {
                                     pack.Versions.Add(version);
@@ -571,28 +566,21 @@ public static class ModPlatformEndpoints
     private static List<ProviderCategoryView> ParseModrinthCategories(string response, string projectType)
     {
         var result = new List<ProviderCategoryView>();
-        JsonNode? root;
-        try
-        {
-            root = JsonNode.Parse(response);
-        }
-        catch (JsonException)
+        var entries = ModrinthJson.ParseCategories(response);
+        if (entries is null)
         {
             return result;
         }
 
-        if (root is JsonArray array)
+        foreach (var entry in entries)
         {
-            foreach (var entry in array)
+            if (entry.ProjectType != projectType)
             {
-                if (entry is not JsonObject entryObj || Str(entryObj, "project_type") != projectType)
-                {
-                    continue;
-                }
-
-                var name = Str(entryObj, "name");
-                result.Add(new ProviderCategoryView(name, name, Str(entryObj, "icon")));
+                continue;
             }
+
+            var name = entry.Name ?? "";
+            result.Add(new ProviderCategoryView(name, name, entry.Icon ?? ""));
         }
 
         return result;
@@ -716,10 +704,11 @@ public static class ModPlatformEndpoints
                 $"modrinth search failed: {request.FailReason}", 502);
         }
 
-        JsonNode? bodyRoot;
+        ModrinthSearchResponseJson? search;
         try
         {
-            bodyRoot = JsonNode.Parse(request.BodyAsString);
+            search = JsonSerializer.Deserialize(request.BodyAsString,
+                ModrinthJsonContext.Default.ModrinthSearchResponseJson);
         }
         catch (JsonException)
         {
@@ -728,25 +717,19 @@ public static class ModPlatformEndpoints
 
         {
             var results = new List<ModrinthSearchResult>();
-            if (bodyRoot is JsonObject obj && obj["hits"] is JsonArray hits)
+            if (search?.Hits is { } hits)
             {
                 foreach (var hit in hits)
                 {
-                    if (hit is not JsonObject hitObj)
-                    {
-                        continue;
-                    }
-
                     results.Add(new ModrinthSearchResult(
-                        Str(hitObj, "project_id"),
-                        Str(hitObj, "slug"),
-                        Str(hitObj, "title"),
-                        Str(hitObj, "icon_url"),
-                        Str(hitObj, "author"),
-                        hitObj["downloads"] is JsonValue downloads &&
-                        downloads.ToJsonString() is var dlRaw &&
-                        dlRaw.Length != 0 && dlRaw[0] != '"' && // numbers only (GetInt64 upstream)
-                        long.TryParse(dlRaw, CultureInfo.InvariantCulture, out var downloadCount)
+                        hit.ProjectId ?? "",
+                        hit.Slug ?? "",
+                        hit.Title ?? "",
+                        hit.IconUrl ?? "",
+                        hit.Author ?? "",
+                        hit.Downloads is { } downloads &&
+                        downloads.ValueKind == JsonValueKind.Number &&
+                        downloads.TryGetInt64(out var downloadCount)
                             ? downloadCount
                             : 0));
                 }

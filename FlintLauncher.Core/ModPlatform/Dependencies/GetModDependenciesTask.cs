@@ -204,7 +204,9 @@ public class GetModDependenciesTask : SequentialTask
         }
         else
         {
-            ModrinthPackIndex.LoadIndexedPack(pack, obj);
+            var dto = ModrinthJson.ProjectFromNode(obj)
+                      ?? throw new JsonParseException("project is not a JSON object");
+            ModrinthPackIndex.LoadIndexedPack(pack, dto);
         }
     }
 
@@ -213,7 +215,8 @@ public class GetModDependenciesTask : SequentialTask
     {
         return provider == ResourceProvider.Flame
             ? FlameMod.LoadIndexedPackVersion(obj)
-            : ModrinthPackIndex.LoadIndexedPackVersion(obj);
+            : ModrinthPackIndex.LoadIndexedPackVersion(ModrinthJson.VersionFromNode(obj)
+                ?? throw new JsonParseException("version is not a JSON object"));
     }
 
     private FlintTask GetProjectInfoTask(PackDependency pDep)

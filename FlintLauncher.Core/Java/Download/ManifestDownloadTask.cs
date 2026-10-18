@@ -12,13 +12,34 @@
 
 using System.Security.Cryptography;
 using System.Text.Json;
-using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Java.Download;
+
+/// <summary>The Mojang java runtime manifest: a "files" object of directory/link/file
+/// entries keyed by their relative path under the install root.</summary>
+public sealed record JavaRuntimeManifestJson(
+    [property: JsonPropertyName("files")] Dictionary<string, JavaRuntimeFileJson>? Files);
+
+public sealed record JavaRuntimeFileJson(
+    [property: JsonPropertyName("type")] string? Type,
+    [property: JsonPropertyName("target")] string? Target,
+    [property: JsonPropertyName("executable")] bool? Executable,
+    [property: JsonPropertyName("downloads")] JavaRuntimeDownloadsJson? Downloads);
+
+public sealed record JavaRuntimeDownloadsJson(
+    [property: JsonPropertyName("raw")] JavaRuntimeRawJson? Raw);
+
+public sealed record JavaRuntimeRawJson(
+    [property: JsonPropertyName("url")] string? Url,
+    [property: JsonPropertyName("sha1")] string? Sha1);
+
+[JsonSerializable(typeof(JavaRuntimeManifestJson))]
+internal sealed partial class JavaManifestJsonContext : JsonSerializerContext;
 
 public sealed class ManifestDownloadTask(Uri url, string finalPath, string checksumType = "", string checksumHash = "")
     : FlintTask
@@ -39,11 +60,11 @@ public sealed class ManifestDownloadTask(Uri url, string finalPath, string check
             return;
         }
 
-        JsonObject doc;
+        JavaRuntimeManifestJson? manifest;
         try
         {
-            doc = JsonNode.Parse(download.BodyAsString) as JsonObject
-                  ?? throw new JsonParseException("Manifest root is not a JSON object");
+            manifest = JsonSerializer.Deserialize(download.BodyAsString,
+                JavaManifestJsonContext.Default.JavaRuntimeManifestJson);
         }
         catch (Exception e) when (e is JsonParseException or JsonException)
         {
@@ -52,26 +73,27 @@ public sealed class ManifestDownloadTask(Uri url, string finalPath, string check
             return;
         }
 
-        await DownloadJava(doc, cancellationToken).ConfigureAwait(false);
+        if (manifest is null)
+        {
+            EmitFailed("Manifest root is not a JSON object");
+            return;
+        }
+
+        await DownloadJava(manifest, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task DownloadJava(JsonObject doc, CancellationToken cancellationToken)
+    private async Task DownloadJava(JavaRuntimeManifestJson manifest, CancellationToken cancellationToken)
     {
         // valid json doc, begin making jre spot
         FileSystem.EnsureFolderPathExists(finalPath);
         var toDownload = new List<ManifestFile>();
-        if (doc["files"] is JsonObject list)
+        if (manifest.Files is { } list)
         {
-            foreach (var (paths, node) in list)
+            foreach (var (paths, meta) in list)
             {
                 var file = FileSystem.PathCombine(finalPath, paths);
 
-                if (node is not JsonObject meta)
-                {
-                    continue; // toObject() on a non-object yields an empty object with no type
-                }
-
-                var type = meta.StringOr("type");
+                var type = meta.Type ?? "";
                 if (type == "directory")
                 {
                     FileSystem.EnsureFolderPathExists(file);
@@ -79,7 +101,7 @@ public sealed class ManifestDownloadTask(Uri url, string finalPath, string check
                 else if (type == "link")
                 {
                     // this is *nix only !
-                    var path = meta.StringOr("target");
+                    var path = meta.Target ?? "";
                     if (path.Length != 0)
                     {
                         CreateLink(path, file);
@@ -88,16 +110,16 @@ public sealed class ManifestDownloadTask(Uri url, string finalPath, string check
                 else if (type == "file")
                 {
                     // TODO download compressed version if it exists ?
-                    var raw = (meta["downloads"] as JsonObject)?["raw"] as JsonObject;
-                    var isExec = meta.BoolOr("executable");
-                    var url = raw?.StringOr("url") ?? "";
+                    var raw = meta.Downloads?.Raw;
+                    var isExec = meta.Executable ?? false;
+                    var url = raw?.Url ?? "";
                     if (url.Length != 0 && Uri.TryCreate(url, UriKind.Absolute, out var parsedUrl))
                     {
                         toDownload.Add(new ManifestFile
                         {
                             Path = file,
                             Url = parsedUrl,
-                            Hash = raw?.StringOr("sha1") is { Length: > 0 } sha1 ? Convert.FromHexString(sha1) : [],
+                            Hash = raw?.Sha1 is { Length: > 0 } sha1 ? Convert.FromHexString(sha1) : [],
                             IsExec = isExec,
                         });
                     }

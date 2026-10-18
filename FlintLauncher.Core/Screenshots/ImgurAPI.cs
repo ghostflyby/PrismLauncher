@@ -18,10 +18,25 @@
 using System.Security;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Screenshots;
+
+/// <summary>The imgur response envelope {"success": true, "data": {...}} — shared by the
+/// image upload and album creation parse functions (the RPC::Sink payloads).</summary>
+public sealed record ImgurResponseJson(
+    [property: JsonPropertyName("success")] bool? Success,
+    [property: JsonPropertyName("data")] ImgurDataJson? Data);
+
+public sealed record ImgurDataJson(
+    [property: JsonPropertyName("id")] string? Id,
+    [property: JsonPropertyName("link")] string? Link,
+    [property: JsonPropertyName("deletehash")] string? DeleteHash);
+
+[JsonSerializable(typeof(ImgurResponseJson))]
+internal sealed partial class ImgurJsonContext : JsonSerializerContext;
 
 /// <summary>Port of the ImgurAPI namespace: the two imgur request factories. An instance
 /// rides the injected NetStack (LauncherRuntime.Imgur — same de-singletoning story as the
@@ -114,10 +129,10 @@ public sealed class ImgurUpload(
         }
 
         // Port of the RPC::Sink<QString> parse function.
-        JsonDocument? doc;
+        ImgurResponseJson? reply;
         try
         {
-            doc = JsonDocument.Parse(responseBody);
+            reply = JsonSerializer.Deserialize(responseBody, ImgurJsonContext.Default.ImgurResponseJson);
         }
         catch (JsonException)
         {
@@ -126,31 +141,17 @@ public sealed class ImgurUpload(
             return;
         }
 
-        using (doc)
+        if (reply?.Success != true)
         {
-            var root = doc.RootElement;
-            var success = root.ValueKind == JsonValueKind.Object &&
-                          root.TryGetProperty("success", out var successValue) &&
-                          successValue.ValueKind == JsonValueKind.True;
-            if (!success)
-            {
-                EmitFailed("Screenshot was not uploaded successfully");
-                return;
-            }
+            EmitFailed("Screenshot was not uploaded successfully");
+            return;
+        }
 
-            if (root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object)
-            {
-                shot.ImgurId = data.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String
-                    ? id.GetString() ?? ""
-                    : "";
-                shot.Url = data.TryGetProperty("link", out var link) && link.ValueKind == JsonValueKind.String
-                    ? link.GetString() ?? ""
-                    : "";
-                shot.ImgurDeleteHash =
-                    data.TryGetProperty("deletehash", out var deleteHash) && deleteHash.ValueKind == JsonValueKind.String
-                        ? deleteHash.GetString() ?? ""
-                        : "";
-            }
+        if (reply.Data is { } data)
+        {
+            shot.ImgurId = data.Id ?? "";
+            shot.Url = data.Link ?? "";
+            shot.ImgurDeleteHash = data.DeleteHash ?? "";
         }
 
         EmitSucceeded();
@@ -240,10 +241,10 @@ public sealed class ImgurAlbumCreation(
         }
 
         // Port of the RPC::Sink<AlbumResult> parse function.
-        JsonDocument doc;
+        ImgurResponseJson? reply;
         try
         {
-            doc = JsonDocument.Parse(responseBody);
+            reply = JsonSerializer.Deserialize(responseBody, ImgurJsonContext.Default.ImgurResponseJson);
         }
         catch (JsonException)
         {
@@ -251,28 +252,16 @@ public sealed class ImgurAlbumCreation(
             return;
         }
 
-        using (doc)
+        if (reply?.Success != true)
         {
-            var root = doc.RootElement;
-            var success = root.ValueKind == JsonValueKind.Object &&
-                          root.TryGetProperty("success", out var successValue) &&
-                          successValue.ValueKind == JsonValueKind.True;
-            if (!success)
-            {
-                EmitFailed("Failed to create album");
-                return;
-            }
+            EmitFailed("Failed to create album");
+            return;
+        }
 
-            if (root.TryGetProperty("data", out var albumData) && albumData.ValueKind == JsonValueKind.Object)
-            {
-                result.DeleteHash = albumData.TryGetProperty("deletehash", out var deleteHash) &&
-                                     deleteHash.ValueKind == JsonValueKind.String
-                    ? deleteHash.GetString() ?? ""
-                    : "";
-                result.Id = albumData.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String
-                    ? id.GetString() ?? ""
-                    : "";
-            }
+        if (reply.Data is { } albumData)
+        {
+            result.DeleteHash = albumData.DeleteHash ?? "";
+            result.Id = albumData.Id ?? "";
         }
 
         EmitSucceeded();

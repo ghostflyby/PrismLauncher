@@ -141,43 +141,26 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi? modr
     {
         var (modrinthJob, modrinthResponse) = _modrinth.CurrentVersions(hashes, "sha1");
         await modrinthJob.StartAsync(cancellationToken);
-        if (modrinthJob.WasSuccessful)
+        if (modrinthJob.WasSuccessful && FallbackMrBlockedMods)
         {
-            JsonNode? doc = null;
-            try
+            // a non-object (or invalid) body parses to no entries: every lookup just misses,
+            // like the C++ parse-error path
+            var entries = ModrinthJson.ParseVersionLookup(modrinthResponse.BodyAsString);
+            if (entries is not null)
             {
-                doc = JsonNode.Parse(modrinthResponse.BodyAsString);
-            }
-            catch (JsonException)
-            {
-                // fall through to the Flame projects step, like the C++ parse-error path
-            }
-
-            if (doc is not null)
-            {
+                foreach (var outFile in toProcess.Files.Values)
                 {
-                    if (FallbackMrBlockedMods)
+                    var urlValid = Uri.TryCreate(outFile.Version.DownloadUrl, UriKind.Absolute, out _);
+                    if (!urlValid && "sha1" == outFile.Version.HashType
+                                  && outFile.Version.Hash.Length != 0
+                                  && entries.TryGetValue(outFile.Version.Hash, out var entry))
                     {
                         try
                         {
-                            var entries = doc;
-                            foreach (var outFile in toProcess.Files.Values)
-                            {
-                                var urlValid = Uri.TryCreate(outFile.Version.DownloadUrl, UriKind.Absolute, out _);
-                                if (!urlValid && "sha1" == outFile.Version.HashType
-                                              && outFile.Version.Hash.Length != 0
-                                              && entries[outFile.Version.Hash] is { } entryNode)
-                                {
-                                    try
-                                    {
-                                        var file = ModrinthPackIndex.LoadIndexedPackVersion(entryNode);
-                                        outFile.Version.DownloadUrl = file.DownloadUrl;
-                                    }
-                                    catch (JsonParseException) { }
-                                }
-                            }
+                            var file = ModrinthPackIndex.LoadIndexedPackVersion(entry);
+                            outFile.Version.DownloadUrl = file.DownloadUrl;
                         }
-                        catch (JsonException) { }
+                        catch (JsonParseException) { }
                     }
                 }
             }

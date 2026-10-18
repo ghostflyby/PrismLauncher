@@ -15,10 +15,8 @@
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Hashing;
@@ -164,43 +162,33 @@ public sealed class ModrinthPackExportTask(
 
     private void ParseApiResponse(string response)
     {
-        JsonNode entries;
-        try
+        var entries = ModrinthJson.ParseVersionLookup(response);
+        if (entries is null)
         {
-            entries = JsonNode.Parse(response) ?? throw new JsonException("empty response");
-        }
-        catch (JsonException e)
-        {
-            EmitFailed($"Failed to parse versions response: {e.Message}");
+            EmitFailed("Failed to parse versions response: empty response");
             return;
         }
 
         foreach (var (relative, sha512) in _pendingHashes)
         {
-            if (entries[sha512] is not { } obj)
-            {
-                continue;
-            }
-
-            if (obj.GetPropertySafe("files") is not JsonArray filesArray)
+            if (!entries.TryGetValue(sha512, out var version) || version.Files is not { } filesArray)
             {
                 continue;
             }
 
             foreach (var file in filesArray)
             {
-                var hash = file.GetPropertySafe("hashes").GetPropertySafe("sha512").AsString();
-                if (hash != sha512)
+                if (file.Hashes?.TryGetValue("sha512", out var hash) != true || hash != sha512)
                 {
                     continue;
                 }
 
                 // map the file to the url
                 _resolvedFiles[relative] = new ResolvedFile(
-                    Sha1: file.GetPropertySafe("hashes").GetPropertySafe("sha1").AsString() ?? "",
+                    Sha1: file.Hashes.TryGetValue("sha1", out var sha1) ? sha1 : "",
                     Sha512: sha512,
-                    Url: file.GetPropertySafe("url").AsString() ?? "",
-                    Size: JsonUtils.EnsureLong(file.GetPropertySafe("size")),
+                    Url: file.Url ?? "",
+                    Size: file.Size ?? 0,
                     Side: SideType.Invalid);
                 break;
             }
@@ -250,18 +238,6 @@ public sealed class ModrinthPackExportTask(
 
     private string GenerateIndex()
     {
-        var outObj = new JsonObject
-        {
-            ["formatVersion"] = 1,
-            ["game"] = "minecraft",
-            ["name"] = name,
-            ["versionId"] = version,
-        };
-        if (!string.IsNullOrEmpty(summary))
-        {
-            outObj["summary"] = summary;
-        }
-
         // collect all supported components
         var profile = instance.GetPackProfile();
         profile.Load(); // (MinecraftInstance loads its profile lazily in the C++; make it explicit here)
@@ -273,7 +249,7 @@ public sealed class ModrinthPackExportTask(
 
         // convert all available components to mrpack dependencies (the C++ reads the raw
         // m_version of each component)
-        var dependencies = new JsonObject();
+        var dependencies = new Dictionary<string, string?>(StringComparer.Ordinal);
         if (minecraft is not null)
         {
             dependencies["minecraft"] = minecraft.Version;
@@ -299,15 +275,12 @@ public sealed class ModrinthPackExportTask(
             dependencies["neoforge"] = neoForge.Version;
         }
 
-        outObj["dependencies"] = dependencies;
-
-        var filesOut = new JsonArray();
+        var filesOut = new List<MrPackFileJson>();
         foreach (var (pathIn, value) in _resolvedFiles)
         {
-            var fileOut = new JsonObject();
-
             var path = pathIn;
-            var env = new JsonObject();
+            var client = "required";
+            var server = "required";
 
             // detect disabled mod
             var suffix = Path.GetExtension(path).TrimStart('.');
@@ -316,40 +289,41 @@ public sealed class ModrinthPackExportTask(
                 // rename it
                 path = Path.Combine(Path.GetDirectoryName(path) ?? "", Path.GetFileNameWithoutExtension(path))
                     .Replace('\\', '/');
-                env["client"] = "optional";
-                env["server"] = "optional";
-            }
-            else
-            {
-                env["client"] = "required";
-                env["server"] = "required";
+                client = "optional";
+                server = "optional";
             }
 
             // a server side mod does not imply that the mod does not work on the client
             // however, if a mrpack mod is marked as server-only it will not install on the client
             if (value.Side.Value == SideTypeValue.ClientSide)
             {
-                env["server"] = "unsupported";
+                server = "unsupported";
             }
 
-            fileOut["env"] = env;
-            fileOut["path"] = path;
-            fileOut["downloads"] = new JsonArray(JsonValue.Create(value.Url));
-
-            var hashes = new JsonObject
-            {
-                ["sha1"] = value.Sha1,
-                ["sha512"] = value.Sha512,
-            };
-            fileOut["hashes"] = hashes;
-
-            fileOut["fileSize"] = value.Size;
-            filesOut.Add((JsonNode?)fileOut);
+            filesOut.Add(new MrPackFileJson(
+                Env: new MrPackEnvJson(Client: client, Server: server),
+                Path: path,
+                Downloads: [value.Url],
+                Hashes: new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["sha1"] = value.Sha1,
+                    ["sha512"] = value.Sha512,
+                },
+                FileSize: value.Size));
         }
 
-        outObj["files"] = filesOut;
+        var index = new MrPackIndexJson
+        {
+            FormatVersion = 1,
+            Game = "minecraft",
+            Name = name,
+            VersionId = version,
+            Summary = string.IsNullOrEmpty(summary) ? null : summary,
+            Dependencies = dependencies,
+            Files = filesOut,
+        };
 
-        return outObj.ToJsonString();
+        return JsonSerializer.Serialize(index, ModrinthJsonContext.Default.MrPackIndexJson);
     }
 
     private string GetRelativePath(string file)

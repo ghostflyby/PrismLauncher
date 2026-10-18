@@ -15,12 +15,34 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
+
+/// <summary>The CurseForge batch request bodies — the id lists are strings of decimal
+/// numbers, the C++ compatibility quirk kept verbatim.</summary>
+public sealed record FlameFingerprintsRequest(
+    [property: JsonPropertyName("fingerprints")] List<string> Fingerprints);
+
+public sealed record FlameModsRequest(
+    [property: JsonPropertyName("modIds")] List<string> ModIds);
+
+public sealed record FlameFilesRequest(
+    [property: JsonPropertyName("fileIds")] List<string> FileIds);
+
+/// <summary>The {"data": "&lt;string&gt;"} envelope of the changelog/description endpoints.</summary>
+public sealed record FlameStringEnvelopeJson(
+    [property: JsonPropertyName("data")] string? Data);
+
+[JsonSerializable(typeof(FlameFingerprintsRequest))]
+[JsonSerializable(typeof(FlameModsRequest))]
+[JsonSerializable(typeof(FlameFilesRequest))]
+[JsonSerializable(typeof(FlameStringEnvelopeJson))]
+internal sealed partial class FlameJsonContext : JsonSerializerContext;
 
 public sealed class FlameApi(NetStack? net = null) : ResourceApi
 {
@@ -47,16 +69,9 @@ public sealed class FlameApi(NetStack? net = null) : ResourceApi
     {
         var netJob = new NetJob("Flame::MatchFingerprints");
 
-        var bodyObj = new JsonObject();
-        var fingerprintsArr = new JsonArray();
-        foreach (var fp in fingerprints)
-        {
-            fingerprintsArr.Add((JsonNode?)JsonValue.Create(fp.ToString(CultureInfo.InvariantCulture)));
-        }
-
-        bodyObj["fingerprints"] = fingerprintsArr;
-
-        var bodyRaw = Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
+        var body = new FlameFingerprintsRequest(
+            [.. fingerprints.Select(fp => fp.ToString(CultureInfo.InvariantCulture))]);
+        var bodyRaw = JsonSerializer.SerializeToUtf8Bytes(body, FlameJsonContext.Default.FlameFingerprintsRequest);
         var request = MakeByteArrayRequest($"{BaseUrl}/fingerprints", bodyRaw);
         netJob.AddNetRequest(request);
         return (netJob, request);
@@ -76,7 +91,8 @@ public sealed class FlameApi(NetStack? net = null) : ResourceApi
 
         try
         {
-            return JsonNode.Parse(request.BodyAsString)?["data"]?.GetValue<string>() ?? "";
+            return JsonSerializer.Deserialize(request.BodyAsString,
+                FlameJsonContext.Default.FlameStringEnvelopeJson)?.Data ?? "";
         }
         catch (JsonException)
         {
@@ -96,7 +112,8 @@ public sealed class FlameApi(NetStack? net = null) : ResourceApi
 
         try
         {
-            return JsonNode.Parse(request.BodyAsString)?["data"]?.GetValue<string>() ?? "";
+            return JsonSerializer.Deserialize(request.BodyAsString,
+                FlameJsonContext.Default.FlameStringEnvelopeJson)?.Data ?? "";
         }
         catch (JsonException)
         {
@@ -109,16 +126,8 @@ public sealed class FlameApi(NetStack? net = null) : ResourceApi
     {
         var netJob = new NetJob("Flame::GetProjects");
 
-        var bodyObj = new JsonObject();
-        var addonsArr = new JsonArray();
-        foreach (var addonId in addonIds)
-        {
-            addonsArr.Add((JsonNode?)JsonValue.Create(addonId));
-        }
-
-        bodyObj["modIds"] = addonsArr;
-
-        var bodyRaw = Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
+        var body = new FlameModsRequest([.. addonIds]);
+        var bodyRaw = JsonSerializer.SerializeToUtf8Bytes(body, FlameJsonContext.Default.FlameModsRequest);
         var request = MakeByteArrayRequest($"{BaseUrl}/mods", bodyRaw);
         netJob.AddNetRequest(request);
         return (netJob, request);
@@ -139,16 +148,8 @@ public sealed class FlameApi(NetStack? net = null) : ResourceApi
     {
         var netJob = new NetJob("Flame::GetFiles");
 
-        var bodyObj = new JsonObject();
-        var filesArr = new JsonArray();
-        foreach (var fileId in fileIds)
-        {
-            filesArr.Add((JsonNode?)JsonValue.Create(fileId));
-        }
-
-        bodyObj["fileIds"] = filesArr;
-
-        var bodyRaw = Encoding.UTF8.GetBytes(bodyObj.ToJsonString());
+        var body = new FlameFilesRequest([.. fileIds]);
+        var bodyRaw = JsonSerializer.SerializeToUtf8Bytes(body, FlameJsonContext.Default.FlameFilesRequest);
         var request = MakeByteArrayRequest($"{BaseUrl}/mods/files", bodyRaw);
         netJob.AddNetRequest(request);
         return (netJob, request);
