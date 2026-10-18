@@ -1,16 +1,60 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/net/HttpMetaCache.{h,cpp}: on-disk download cache index. The index file
-// format is kept byte-compatible with PrismLauncher's "metacache" JSON (version "1").
+// format is kept byte-compatible with PrismLauncher's "metacache" JSON (version "1"): the
+// MetaCacheFileJson shape deserializes/serializes through the MetaCacheJsonContext, and the
+// writer clones the context options with Qt's relaxed encoder (QJsonDocument leaves unicode
+// alone and only escapes what it must) so the bytes stay identical.
 
 using System.Security;
 using System.Security.Cryptography;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.Net;
+
+/// <summary>The metacache wire shape: {"version":"1","entries":[...]} — the coercing
+/// converters keep the QJsonValue fallbacks of the former readers (junk timestamps/ages
+/// truncate to 0, junk strings become "").</summary>
+public sealed record MetaCacheFileJson(
+    [property: JsonPropertyName("version")] string? Version,
+    [property: JsonPropertyName("entries")] List<MetaCacheEntryJson>? Entries);
+
+public sealed record MetaCacheEntryJson(
+    [property: JsonPropertyName("base")]
+    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Base,
+    [property: JsonPropertyName("path")]
+    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Path,
+    [property: JsonPropertyName("md5sum")]
+    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Md5Sum,
+    [property: JsonPropertyName("etag")]
+    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Etag,
+    [property: JsonPropertyName("last_changed_timestamp")]
+    [property: JsonConverter(typeof(QtCoercingLongConverter))] long LastChangedTimestamp,
+    [property: JsonPropertyName("remote_changed_timestamp")]
+    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? RemoteChangedTimestamp,
+    [property: JsonPropertyName("eternal")] bool? Eternal,
+    [property: JsonPropertyName("current_age")]
+    [property: JsonConverter(typeof(QtCoercingLongConverter))] long? CurrentAge,
+    [property: JsonPropertyName("max_age")]
+    [property: JsonConverter(typeof(QtCoercingLongConverter))] long? MaxAge);
+
+[JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+[JsonSerializable(typeof(MetaCacheFileJson))]
+internal sealed partial class MetaCacheJsonContext : JsonSerializerContext;
+
+/// <summary>The writer options: the context's own, cloned with Qt's relaxed JSON escaping
+/// (the metacache must stay byte-compatible with PrismLauncher's ledger).</summary>
+internal static class MetaCacheJson
+{
+    public static JsonSerializerOptions WriterOptions { get; } =
+        new(MetaCacheJsonContext.Default.Options)
+        {
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        };
+}
 
 public sealed class MetaEntry
 {
@@ -298,10 +342,11 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
             return;
         }
 
-        JsonNode? root;
+        MetaCacheFileJson? root;
         try
         {
-            root = JsonNode.Parse(File.ReadAllText(_indexFile));
+            root = JsonSerializer.Deserialize(File.ReadAllText(_indexFile),
+                MetaCacheJsonContext.Default.MetaCacheFileJson);
         }
         catch (JsonException)
         {
@@ -316,31 +361,16 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
             return;
         }
 
-        if (root is not JsonObject rootObj)
-        {
-            return;
-        }
-
-        if (GetStr(rootObj, "version") != "1")
-        {
-            return;
-        }
-
-        if (rootObj["entries"] is not JsonArray array)
+        if (root?.Version != "1" || root.Entries is not { } array)
         {
             return;
         }
 
         lock (_lock)
         {
-            foreach (var elementObj in array)
+            foreach (var raw in array)
             {
-                if (elementObj is not JsonObject entryObj)
-                {
-                    continue;
-                }
-
-                var baseId = GetStr(entryObj, "base");
+                var baseId = raw.Base ?? "";
                 if (!_basePaths.ContainsKey(baseId))
                 {
                     continue;
@@ -349,17 +379,17 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
                 var entry = new MetaEntry
                 {
                     BaseId = baseId,
-                    RelativePath = GetStr(entryObj, "path"),
-                    Md5Sum = GetStr(entryObj, "md5sum"),
-                    Etag = GetStr(entryObj, "etag"),
-                    LocalChangedTimestamp = (long)GetDouble(entryObj, "last_changed_timestamp"),
-                    RemoteChangedTimestamp = GetStr(entryObj, "remote_changed_timestamp"),
-                    IsEternal = GetBool(entryObj, "eternal"),
+                    RelativePath = raw.Path ?? "",
+                    Md5Sum = raw.Md5Sum ?? "",
+                    Etag = raw.Etag ?? "",
+                    LocalChangedTimestamp = raw.LastChangedTimestamp,
+                    RemoteChangedTimestamp = raw.RemoteChangedTimestamp ?? "",
+                    IsEternal = raw.Eternal ?? false,
                 };
                 if (!entry.IsEternal)
                 {
-                    entry.CurrentAge = (long)GetDouble(entryObj, "current_age");
-                    entry.MaxAge = (long)GetDouble(entryObj, "max_age");
+                    entry.CurrentAge = raw.CurrentAge ?? 0;
+                    entry.MaxAge = raw.MaxAge ?? 0;
                 }
 
                 // presumed innocent until closer examination
@@ -369,15 +399,6 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
             }
         }
     }
-
-    private static string GetStr(JsonObject obj, string key, string def = "") =>
-        JsonUtils.EnsureString(obj[key], def);
-
-    private static bool GetBool(JsonObject obj, string key, bool def = false) =>
-        JsonUtils.EnsureBoolean(obj[key], def);
-
-    private static double GetDouble(JsonObject obj, string key, double def = 0) =>
-        JsonUtils.EnsureDouble(obj[key], def);
 
     public void SaveEventually()
     {
@@ -396,14 +417,10 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
             return;
         }
 
-        JsonObject entriesRoot;
+        MetaCacheFileJson entriesRoot;
         lock (_lock)
         {
-            entriesRoot = new JsonObject
-            {
-                ["version"] = "1",
-            };
-            var entriesArr = new JsonArray();
+            var entriesArr = new List<MetaCacheEntryJson>();
             foreach (var map in _entries.Values)
             {
                 foreach (var entry in map.Values)
@@ -414,34 +431,24 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
                         continue;
                     }
 
-                    var entryObj = new JsonObject
-                    {
-                        ["base"] = entry.BaseId,
-                        ["path"] = entry.RelativePath,
-                        ["md5sum"] = entry.Md5Sum,
-                        ["etag"] = entry.Etag,
-                        ["last_changed_timestamp"] = entry.LocalChangedTimestamp,
-                    };
-                    if (entry.RemoteChangedTimestamp.Length > 0)
-                    {
-                        entryObj["remote_changed_timestamp"] = entry.RemoteChangedTimestamp;
-                    }
-
-                    if (entry.IsEternal)
-                    {
-                        entryObj["eternal"] = true;
-                    }
-                    else
-                    {
-                        entryObj["current_age"] = entry.CurrentAge;
-                        entryObj["max_age"] = entry.MaxAge;
-                    }
-
-                    entriesArr.Add((JsonNode)entryObj);
+                    entriesArr.Add(new MetaCacheEntryJson(
+                        Base: entry.BaseId,
+                        Path: entry.RelativePath,
+                        Md5Sum: entry.Md5Sum,
+                        Etag: entry.Etag,
+                        LastChangedTimestamp: entry.LocalChangedTimestamp,
+                        // absent when empty; the eternal/age pair is one-or-the-other
+                        // (WhenWritingNull drops the unused halves, like the former
+                        // conditional writes)
+                        RemoteChangedTimestamp:
+                            entry.RemoteChangedTimestamp.Length > 0 ? entry.RemoteChangedTimestamp : null,
+                        Eternal: entry.IsEternal ? true : null,
+                        CurrentAge: entry.IsEternal ? null : entry.CurrentAge,
+                        MaxAge: entry.IsEternal ? null : entry.MaxAge));
                 }
             }
 
-            entriesRoot["entries"] = entriesArr;
+            entriesRoot = new MetaCacheFileJson(Version: "1", Entries: entriesArr);
         }
 
         try
@@ -456,11 +463,7 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
             // metacache files stay byte-compatible with PrismLauncher's.
             File.WriteAllText(
                 _indexFile,
-                entriesRoot.ToJsonString(new JsonSerializerOptions
-                {
-                    WriteIndented = false,
-                    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-                }));
+                JsonSerializer.Serialize(entriesRoot, MetaCacheJson.WriterOptions));
         }
         catch (IOException) { }
     }
