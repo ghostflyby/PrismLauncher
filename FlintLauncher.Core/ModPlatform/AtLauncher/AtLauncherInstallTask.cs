@@ -652,8 +652,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
     private static void WritePatchFile(string patchFileName, VersionFile f)
     {
-        FileSystem.Write(patchFileName,
-            Encoding.UTF8.GetBytes(QtJson.ToIndentedString(OneSixVersionFormat.VersionFileToJson(f)) + "\n"));
+        FileSystem.Write(patchFileName, Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(f)));
     }
 
     private async Task InstallConfigs(CancellationToken cancellationToken)

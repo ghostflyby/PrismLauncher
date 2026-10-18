@@ -3,6 +3,7 @@
 // mmc-pack.json round trips, the byte-exact Qt-style save format, patches/*.json handling and
 // the jar mod / custom jar / agent installers.
 
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Minecraft;
@@ -135,31 +136,30 @@ public class PackProfileTests : IDisposable
         profile.SaveNow();
         Assert.False(profile.SaveIsScheduled());
 
-        var expected = """
-                       {
-                           "components": [
-                               {
-                                   "important": true,
-                                   "uid": "net.minecraft",
-                                   "version": "1.20.1"
-                               },
-                               {
-                                   "cachedName": "Fabric Loader",
-                                   "cachedRequires": [
-                                       {
-                                           "equals": "1.20.1",
-                                           "uid": "net.minecraft"
-                                       }
-                                   ],
-                                   "cachedVersion": "0.14.21",
-                                   "uid": "net.fabricmc.fabric-loader",
-                                   "version": "0.14.21"
-                               }
-                           ],
-                           "formatVersion": 1
-                       }
-                       """ + "\n"; // QJsonDocument::toJson() ends with a newline
-        Assert.Equal(expected, File.ReadAllText(Path.Combine(_root, "mmc-pack.json")));
+        // the typed mmc-pack write keeps the values, not the Qt byte shape — parse the
+        // written file and assert the member values (then load it back identically)
+        using (var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(_root, "mmc-pack.json"))))
+        {
+            var root = doc.RootElement;
+            Assert.Equal(1, root.GetProperty("formatVersion").GetInt32());
+            var components = root.GetProperty("components");
+            Assert.Equal(2, components.GetArrayLength());
+
+            var minecraftWire = components[0];
+            Assert.Equal("net.minecraft", minecraftWire.GetProperty("uid").GetString());
+            Assert.Equal("1.20.1", minecraftWire.GetProperty("version").GetString());
+            Assert.True(minecraftWire.GetProperty("important").GetBoolean());
+
+            var loaderWire = components[1];
+            Assert.Equal("net.fabricmc.fabric-loader", loaderWire.GetProperty("uid").GetString());
+            Assert.Equal("Fabric Loader", loaderWire.GetProperty("cachedName").GetString());
+            Assert.Equal("0.14.21", loaderWire.GetProperty("cachedVersion").GetString());
+            Assert.Equal("0.14.21", loaderWire.GetProperty("version").GetString());
+            var cachedRequires = loaderWire.GetProperty("cachedRequires");
+            Assert.Equal(1, cachedRequires.GetArrayLength());
+            Assert.Equal("net.minecraft", cachedRequires[0].GetProperty("uid").GetString());
+            Assert.Equal("1.20.1", cachedRequires[0].GetProperty("equals").GetString());
+        }
 
         // and the written file loads back identically
         var result = profile.Load();

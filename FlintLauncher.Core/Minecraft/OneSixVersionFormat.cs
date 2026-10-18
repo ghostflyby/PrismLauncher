@@ -46,30 +46,22 @@ public static partial class OneSixVersionFormat
         return outLib;
     }
 
-    public static JsonObject LibraryToJson(Library library)
+    internal static LibraryOutJson LibraryToJson(Library library)
     {
-        var libRoot = MojangVersionFormat.LibraryToJson(library);
-        if (library.AbsoluteUrl.Length != 0)
+        var wire = MojangVersionFormat.LibraryToJson(library);
+        if (library.AbsoluteUrl.Length != 0 || library.Hint.Length != 0 ||
+            library.FilenameOverride.Length != 0 || library.DisplayNameValue.Length != 0)
         {
-            libRoot["MMC-absoluteUrl"] = library.AbsoluteUrl;
+            wire = wire with
+            {
+                MmcAbsoluteUrl = library.AbsoluteUrl.Length != 0 ? library.AbsoluteUrl : null,
+                MmcHint = library.Hint.Length != 0 ? library.Hint : null,
+                MmcFilename = library.FilenameOverride.Length != 0 ? library.FilenameOverride : null,
+                MmcDisplayname = library.DisplayNameValue.Length != 0 ? library.DisplayNameValue : null,
+            };
         }
 
-        if (library.Hint.Length != 0)
-        {
-            libRoot["MMC-hint"] = library.Hint;
-        }
-
-        if (library.FilenameOverride.Length != 0)
-        {
-            libRoot["MMC-filename"] = library.FilenameOverride;
-        }
-
-        if (library.DisplayNameValue.Length != 0)
-        {
-            libRoot["MMC-displayname"] = library.DisplayNameValue;
-        }
-
-        return libRoot;
+        return wire;
     }
 
     [GeneratedRegex(@"\A(?:[a-zA-Z0-9\-_]+(?:\.[a-zA-Z0-9\-_]+)*)\z")]
@@ -313,108 +305,66 @@ public static partial class OneSixVersionFormat
         return outInfo;
     }
 
-    /// <summary>Port of OneSixVersionFormat::versionFileToJson (QJsonDocument -> JsonObject).</summary>
-    public static JsonObject VersionFileToJson(VersionFile patch)
+    /// <summary>Port of OneSixVersionFormat::versionFileToJson, as the typed write wire.
+    /// NOTE preserved upstream quirk: the "mods" array iterates the JARMODS (an obvious
+    /// upstream bug), and requires/conflicts are never written (the former node write's
+    /// inverted emptiness check made SerializeRequires a no-op in every case).</summary>
+    internal static VersionFileOutJson VersionFileToJson(VersionFile patch)
     {
-        var root = new JsonObject();
-        JsonUtils.WriteString(root, "name", patch.Name);
-
-        JsonUtils.WriteString(root, "uid", patch.Uid);
-
-        JsonUtils.WriteString(root, "version", patch.Version);
-
-        MetaJsonFormat.SerializeFormatVersion(root, MetadataVersion.InitialRelease);
-
-        MojangVersionFormat.WriteVersionProperties(patch, root);
-
-        if (patch.MainJar is not null)
+        var wire = new VersionFileOutJson
         {
-            root["mainJar"] = LibraryToJson(patch.MainJar);
-        }
-
-        JsonUtils.WriteString(root, "appletClass", patch.AppletClass);
-        JsonUtils.WriteStringList(root, "+tweakers", patch.AddTweakers);
-        // QSet iteration order is unspecified upstream; a sorted list keeps the output deterministic
-        JsonUtils.WriteStringList(root, "+traits", [.. patch.Traits.OrderBy(t => t, StringComparer.Ordinal)]);
-        JsonUtils.WriteStringList(root, "+jvmArgs", patch.AddnJvmArguments);
-        if (patch.Agents.Count != 0)
-        {
-            var array = new JsonArray();
-            foreach (var value in patch.Agents)
-            {
-                var agentOut = LibraryToJson(value.Library);
-                if (value.Argument.Length != 0)
-                {
-                    agentOut["argument"] = value.Argument;
-                }
-
-                array.Add((JsonNode)agentOut);
-            }
-
-            root["+agents"] = array;
-        }
-
-        if (patch.Libraries.Count != 0)
-        {
-            var array = new JsonArray();
-            foreach (var value in patch.Libraries)
-            {
-                array.Add((JsonNode)LibraryToJson(value));
-            }
-
-            root["libraries"] = array;
-        }
-
-        if (patch.MavenFiles.Count != 0)
-        {
-            var array = new JsonArray();
-            foreach (var value in patch.MavenFiles)
-            {
-                array.Add((JsonNode)LibraryToJson(value));
-            }
-
-            root["mavenFiles"] = array;
-        }
-
-        if (patch.JarMods.Count != 0)
-        {
-            var array = new JsonArray();
-            foreach (var value in patch.JarMods)
-            {
-                array.Add((JsonNode)JarModToJson(value));
-            }
-
-            root["jarMods"] = array;
-        }
-
-        if (patch.Mods.Count != 0)
-        {
-            var array = new JsonArray();
+            Name = patch.Name.Length != 0 ? patch.Name : null,
+            Uid = patch.Uid.Length != 0 ? patch.Uid : null,
+            Version = patch.Version.Length != 0 ? patch.Version : null,
+            FormatVersion = (int)MetadataVersion.InitialRelease,
+            MainJar = patch.MainJar is { } mainJar ? LibraryToJson(mainJar) : null,
+            AppletClass = patch.AppletClass.Length != 0 ? patch.AppletClass : null,
+            AddTweakers = patch.AddTweakers.Count != 0 ? [.. patch.AddTweakers] : null,
+            // QSet iteration order is unspecified upstream; a sorted list keeps the output deterministic
+            AddTraits = patch.Traits.Count != 0
+                ? [.. patch.Traits.OrderBy(t => t, StringComparer.Ordinal)]
+                : null,
+            AddJvmArgs = patch.AddnJvmArguments.Count != 0 ? [.. patch.AddnJvmArguments] : null,
+            Agents = patch.Agents.Count != 0
+                ? patch.Agents.Select(agent => agent.Argument.Length != 0
+                    ? LibraryToJson(agent.Library) with { Argument = agent.Argument }
+                    : LibraryToJson(agent.Library)).ToList()
+                : null,
+            Libraries = patch.Libraries.Count != 0 ? patch.Libraries.Select(LibraryToJson).ToList() : null,
+            MavenFiles = patch.MavenFiles.Count != 0 ? patch.MavenFiles.Select(LibraryToJson).ToList() : null,
+            JarMods = patch.JarMods.Count != 0 ? patch.JarMods.Select(JarModToJson).ToList() : null,
             // NOTE: upstream iterates patch->jarMods here — an obvious bug, kept for fidelity
-            foreach (var value in patch.JarMods)
-            {
-                array.Add((JsonNode)ModToJson(value));
-            }
+            Mods = patch.JarMods.Count != 0 ? patch.JarMods.Select(ModToJson).ToList() : null,
+            Volatile = patch.Volatile ? true : null,
+        };
+        return MergeMojangHalf(wire, MojangVersionFormat.WriteVersionProperties(patch));
+    }
 
-            root["mods"] = array;
-        }
-
-        if (patch.Requires.Count == 0)
+    /// <summary>Folds the Mojang member half into the OneSix wire (the former single
+    /// WriteVersionProperties pass over the same JsonObject).</summary>
+    private static VersionFileOutJson MergeMojangHalf(VersionFileOutJson wire, VersionFileOutJson mojangHalf) =>
+        wire with
         {
-            MetaJsonFormat.SerializeRequires(root, patch.Requires);
-        }
+            Id = mojangHalf.Id,
+            MainClass = mojangHalf.MainClass,
+            MinecraftArguments = mojangHalf.MinecraftArguments,
+            Type = mojangHalf.Type,
+            ReleaseTime = mojangHalf.ReleaseTime,
+            Time = mojangHalf.Time,
+            MinimumLauncherVersion = mojangHalf.MinimumLauncherVersion,
+            Assets = mojangHalf.Assets,
+            AssetIndex = mojangHalf.AssetIndex,
+            Downloads = mojangHalf.Downloads,
+            CompatibleJavaMajors = mojangHalf.CompatibleJavaMajors,
+            CompatibleJavaName = mojangHalf.CompatibleJavaName,
+        };
 
-        if (patch.Conflicts.Count == 0)
-        {
-            MetaJsonFormat.SerializeRequires(root, patch.Conflicts, "conflicts");
-        }
-
-        if (patch.Volatile)
-        {
-            root["volatile"] = true;
-        }
-
-        return root;
+    /// <summary>The serialized patch text for the FileSystem.Write call sites (the former
+    /// QtJson.ToIndentedString(VersionFileToJson(...)) + "\n"; the typed write shape is
+    /// standard indented JSON).</summary>
+    internal static string SerializeVersionFile(VersionFile patch)
+    {
+        return JsonSerializer.Serialize(VersionFileToJson(patch), VersionFormatJsonContext.Default.VersionFileOutJson);
     }
 
     public static Library PlusJarModFromJson(
@@ -444,7 +394,7 @@ public static partial class OneSixVersionFormat
         return LibraryFromJson(problems, libObj, filename);
     }
 
-    public static JsonObject JarModToJson(Library jarmod)
+    internal static LibraryOutJson JarModToJson(Library jarmod)
     {
         return LibraryToJson(jarmod);
     }
@@ -454,7 +404,7 @@ public static partial class OneSixVersionFormat
         return LibraryFromJson(problems, libObj, filename);
     }
 
-    public static JsonObject ModToJson(Library jarmod)
+    internal static LibraryOutJson ModToJson(Library jarmod)
     {
         return LibraryToJson(jarmod);
     }

@@ -23,7 +23,9 @@
 //    upstream), updateLatestMinecraft() (instance update flow, P3) and the model roles.
 
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Json;
@@ -306,52 +308,83 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
     // BEGIN: component file format
 
-    private static JsonObject ComponentToJsonV1(Component component)
+    // The mmc-pack write wire (docs/JSON-MIGRATION.md, the Qt write-tail batch): the typed
+    // records through the source-generated context; the member conditions of the former
+    // JsonObject inserts become null members (WhenWritingNull skips them).
+
+    internal sealed record RequireOutJson
     {
-        var obj = new JsonObject
+        public string Uid { get; init; } = "";
+
+        [JsonPropertyName("equals")] public string? EqualsVersion { get; init; }
+
+        public string? Suggests { get; init; }
+    }
+
+    internal sealed record ComponentOutJson
+    {
+        public string Uid { get; init; } = "";
+
+        public string? Version { get; init; }
+
+        public bool? DependencyOnly { get; init; }
+
+        public bool? Important { get; init; }
+
+        public bool? Disabled { get; init; }
+
+        public string? CachedVersion { get; init; }
+
+        public string? CachedName { get; init; }
+
+        public List<RequireOutJson>? CachedRequires { get; init; }
+
+        public List<RequireOutJson>? CachedConflicts { get; init; }
+
+        public bool? CachedVolatile { get; init; }
+    }
+
+    internal sealed record PackConfigOutJson
+    {
+        [JsonPropertyName("formatVersion")] public int FormatVersion { get; init; }
+
+        public List<ComponentOutJson>? Components { get; init; }
+    }
+
+    /// <summary>Require list → wire (the former MetaJsonFormat.SerializeRequires shape:
+    /// uid always, equals/suggests when non-empty).</summary>
+    private static List<RequireOutJson>? RequiresToWire(SortedSet<Require> requires)
+    {
+        if (requires.Count == 0)
+        {
+            return null;
+        }
+
+        return requires.Select(require => new RequireOutJson
+        {
+            Uid = require.Uid,
+            EqualsVersion = require.EqualsVersion.Length != 0 ? require.EqualsVersion : null,
+            Suggests = require.Suggests.Length != 0 ? require.Suggests : null,
+        }).ToList();
+    }
+
+    private static ComponentOutJson ComponentToJsonV1(Component component)
+    {
+        return new ComponentOutJson
         {
             // critical
-            ["uid"] = component.Uid
+            Uid = component.Uid,
+            Version = component.Version.Length != 0 ? component.Version : null,
+            DependencyOnly = component.DependencyOnly ? true : null,
+            Important = component.Important ? true : null,
+            Disabled = component.Disabled ? true : null,
+            // cached
+            CachedVersion = component.CachedVersion.Length != 0 ? component.CachedVersion : null,
+            CachedName = component.CachedName.Length != 0 ? component.CachedName : null,
+            CachedRequires = RequiresToWire(component.CachedRequires),
+            CachedConflicts = RequiresToWire(component.CachedConflicts),
+            CachedVolatile = component.CachedVolatile ? true : null,
         };
-        if (component.Version.Length != 0)
-        {
-            obj["version"] = component.Version;
-        }
-
-        if (component.DependencyOnly)
-        {
-            obj["dependencyOnly"] = true;
-        }
-
-        if (component.Important)
-        {
-            obj["important"] = true;
-        }
-
-        if (component.Disabled)
-        {
-            obj["disabled"] = true;
-        }
-
-        // cached
-        if (component.CachedVersion.Length != 0)
-        {
-            obj["cachedVersion"] = component.CachedVersion;
-        }
-
-        if (component.CachedName.Length != 0)
-        {
-            obj["cachedName"] = component.CachedName;
-        }
-
-        MetaJsonFormat.SerializeRequires(obj, component.CachedRequires, "cachedRequires");
-        MetaJsonFormat.SerializeRequires(obj, component.CachedConflicts, "cachedConflicts");
-        if (component.CachedVolatile)
-        {
-            obj["cachedVolatile"] = true;
-        }
-
-        return obj;
     }
 
     private static Component ComponentFromJsonV1(PackProfile parent, JsonObject obj)
@@ -381,21 +414,15 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     /// <summary>Save the given component container data to a file.</summary>
     private static bool SavePackProfile(string filename, IReadOnlyList<Component> container)
     {
-        var obj = new JsonObject
+        var doc = new PackConfigOutJson
         {
-            ["formatVersion"] = CurrentComponentsFileVersion
+            FormatVersion = CurrentComponentsFileVersion,
+            Components = container.Select(ComponentToJsonV1).ToList(),
         };
-        var orderArray = new JsonArray();
-        foreach (var component in container)
-        {
-            orderArray.Add((JsonNode)ComponentToJsonV1(component));
-        }
-
-        obj["components"] = orderArray;
         try
         {
-            // QJsonDocument(obj).toJson(QJsonDocument::Indented), which ends with a newline
-            FileSystem.Write(filename, Encoding.UTF8.GetBytes(QtJson.ToIndentedString(obj) + "\n"));
+            FileSystem.Write(filename,
+                JsonSerializer.SerializeToUtf8Bytes(doc, PackConfigJsonContext.Default.PackConfigOutJson));
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
                                       or NotSupportedException)
@@ -707,7 +734,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         var patchFileName = FileSystem.PathCombine(patchDir, uid + ".json");
         try
         {
-            FileSystem.Write(patchFileName, Encoding.UTF8.GetBytes(QtJson.ToIndentedString(OneSixVersionFormat.VersionFileToJson(f)) + "\n"));
+            FileSystem.Write(patchFileName, Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(f)));
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
                                       or NotSupportedException)
@@ -805,7 +832,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
             try
             {
-                FileSystem.Write(patchFileName, Encoding.UTF8.GetBytes(QtJson.ToIndentedString(OneSixVersionFormat.VersionFileToJson(f)) + "\n"));
+                FileSystem.Write(patchFileName, Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(f)));
             }
             catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
                                           or NotSupportedException)
@@ -865,7 +892,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
         try
         {
-            FileSystem.Write(patchFileName, Encoding.UTF8.GetBytes(QtJson.ToIndentedString(OneSixVersionFormat.VersionFileToJson(f)) + "\n"));
+            FileSystem.Write(patchFileName, Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(f)));
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
                                       or NotSupportedException)
@@ -925,7 +952,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
             try
             {
                 FileSystem.Write(FileSystem.PathCombine(patchDir, targetId + ".json"),
-                    Encoding.UTF8.GetBytes(QtJson.ToIndentedString(OneSixVersionFormat.VersionFileToJson(versionFile)) + "\n"));
+                    Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(versionFile)));
             }
             catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
                                           or NotSupportedException)
@@ -1092,3 +1119,9 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         return result;
     }
 }
+
+[JsonSourceGenerationOptions(WriteIndented = true,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+[JsonSerializable(typeof(PackProfile.PackConfigOutJson))]
+internal sealed partial class PackConfigJsonContext : JsonSerializerContext;

@@ -411,8 +411,7 @@ public class Component : ProblemProvider
                 return false;
             }
 
-            var document = OneSixVersionFormat.VersionFileToJson(vfile);
-            FileSystem.Write(filename, Encoding.UTF8.GetBytes(QtJson.ToIndentedString(document) + "\n"));
+            FileSystem.Write(filename, Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(vfile)));
             File = vfile;
             MetaVersion = null;
             EmitDataChanged();

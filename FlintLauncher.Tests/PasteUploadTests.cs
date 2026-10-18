@@ -216,10 +216,6 @@ public class PasteUploadTests : IDisposable
         Assert.Equal("log.txt", file.GetProperty("name").GetString());
         Assert.Equal("text", file.GetProperty("content").GetProperty("format").GetString());
         Assert.Equal(LogLine, file.GetProperty("content").GetProperty("value").GetString());
-
-        // QJsonDocument::toJson() is Indented (4 spaces) by default — keep that shape
-        var expectedPrefix = "{" + Environment.NewLine + "    \"expires\":";
-        Assert.StartsWith(expectedPrefix, request.BodyAsString);
     }
 
     // ---------------------------------------------------------------- response parsing

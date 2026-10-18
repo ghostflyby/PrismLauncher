@@ -88,13 +88,7 @@ public sealed class SkinsLibrary
 
         var skins = SkinListStore.Load(dir);
         skins.RemoveAll(skin => skin.Name() == name);
-        skins.Add(new SkinModel(dir, new JsonObject
-        {
-            ["name"] = name,
-            ["capeId"] = "",
-            ["url"] = "",
-            ["model"] = model == SkinModelKind.Slim ? "SLIM" : "CLASSIC",
-        }));
+        skins.Add(new SkinModel(dir, name, model: model));
         SkinListStore.Save(dir, skins);
         return true;
     }

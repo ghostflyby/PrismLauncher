@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Port of tests/MojangVersionFormat_test.cpp: byte-level JSON round trips. The C++ test
-// compares QJsonDocument::toJson() of the parsed fixture against toJson() of the re-serialized
-// model; here both sides go through QtJson.ToIndentedString (QJsonObject sorts keys, Qt writes
-// 4-space indentation). Fixtures parse straight onto the JsonNode read model.
+// Port of tests/MojangVersionFormat_test.cpp: JSON round trips. The C++ test compares
+// QJsonDocument::toJson() of the parsed fixture against toJson() of the re-serialized model
+// byte-wise; the typed write keeps the VALUES but not the Qt byte shape (member order is
+// the record order now), so the round-trip gate is value-based: the re-serialized wire
+// must deep-equal the fixture as JSON.
 
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
@@ -15,18 +17,18 @@ public class MojangVersionFormatTests
 {
     private static string TestData(string name) => Path.Combine(AppContext.BaseDirectory, "TestData", "Libraries", name);
 
-    private static string ToQtJson(JsonNode node)
-    {
-        return QtJson.ToIndentedString(node);
-    }
-
     private static void RoundTrip(string fixture)
     {
         var root = JsonNode.Parse(File.ReadAllText(TestData(fixture)));
         var vfile = MojangVersionFormat.VersionFileFromJson(root, fixture);
-        var doc2 = MojangVersionFormat.VersionFileToJson(vfile);
+        var wire = MojangVersionFormat.VersionFileToJson(vfile);
+        var written = JsonNode.Parse(
+            JsonSerializer.Serialize(wire, VersionFormatJsonContext.Default.VersionFileOutJson))!;
 
-        Assert.Equal(ToQtJson(root!), ToQtJson(doc2));
+        // value gate: every member/value of the fixture survives the typed round trip
+        // (DeepEquals compares objects by name, not by member order)
+        Assert.True(JsonNode.DeepEquals(written, root),
+            $"the typed round trip of {fixture} changed the document:\n{written.ToJsonString()}");
     }
 
     [Fact]

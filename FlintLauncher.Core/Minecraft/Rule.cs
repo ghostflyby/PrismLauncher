@@ -64,34 +64,30 @@ public class Rule
         return result;
     }
 
-    public JsonObject ToJson()
+    /// <summary>The typed write wire (the former ToJson node): the action string — a Defer
+    /// rule writes nothing — and the os object when present.</summary>
+    internal RuleOutJson ToWire()
     {
-        var result = new JsonObject();
-
-        if (action == Action.Allow)
+        RuleOsOutJson? osWire = null;
+        if (os is { } ruleOs)
         {
-            result["action"] = JsonValue.Create("allow");
-        }
-        else if (action == Action.Disallow)
-        {
-            result["action"] = JsonValue.Create("disallow");
-        }
-
-        if (this.os is { } os)
-        {
-            var osObj = new JsonObject
+            osWire = new RuleOsOutJson
             {
-                ["name"] = JsonValue.Create(os.Name),
+                Name = ruleOs.Name,
+                Version = ruleOs.Version.Length != 0 ? ruleOs.Version : null,
             };
-            if (os.Version.Length != 0)
-            {
-                osObj["version"] = JsonValue.Create(os.Version);
-            }
-
-            result["os"] = osObj;
         }
 
-        return result;
+        return new RuleOutJson
+        {
+            Action = action switch
+            {
+                Action.Allow => "allow",
+                Action.Disallow => "disallow",
+                _ => null,
+            },
+            Os = osWire,
+        };
     }
 
     public Action Apply(RuntimeContext runtimeContext)

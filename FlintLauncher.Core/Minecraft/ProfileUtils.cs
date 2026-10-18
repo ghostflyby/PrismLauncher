@@ -141,13 +141,15 @@ public static class ProfileUtils
         return GuardedParseJson(root, CompleteBaseName(filePath), filePath, requireOrder);
     }
 
-    /// <summary>Port of ProfileUtils::saveJsonFile (indented, Qt-style JSON like QJsonDocument::toJson).</summary>
-    public static bool SaveJsonFile(JsonObject doc, string filename)
+    /// <summary>Port of ProfileUtils::saveJsonFile — the typed patch wire (the former
+    /// QtJson.ToIndentedString over the node document).</summary>
+    internal static bool SaveJsonFile(VersionFileOutJson doc, string filename)
     {
         try
         {
-            // QJsonDocument::toJson() always appends a trailing newline
-            FileSystem.Write(filename, Encoding.UTF8.GetBytes(QtJson.ToIndentedString(doc) + "\n"));
+            FileSystem.Write(filename,
+                Encoding.UTF8.GetBytes(
+                    JsonSerializer.Serialize(doc, VersionFormatJsonContext.Default.VersionFileOutJson)));
             return true;
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException

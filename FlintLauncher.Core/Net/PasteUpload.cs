@@ -12,19 +12,30 @@
 //  - mclo.gs bodies: QUrlQuery percent-encoding is reproduced with Uri.EscapeDataString. Qt
 //    leaves a few extra sub-delims unencoded ('!', '(', ')' ...) but the decoded values are
 //    identical, and spaces are %20 (never '+') in both.
-//  - paste.gg bodies: QJsonDocument::toJson() defaults to Indented output, so the port writes
-//    4-space-indented JSON with raw UTF-8 (UnsafeRelaxedJsonEscaping), byte-compatible with Qt.
+//  - paste.gg bodies: the typed PasteGgBody record through its source-generated context —
+//    the JSON semantics are the third-party contract, the byte shape is not.
 //  - The base URL / client id are constructor parameters (like upstream's url argument); tests
 //    stub them, there is no static endpoint override.
 
 using System.Globalization;
 using System.Text;
-using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Net;
+
+/// <summary>The paste.gg create-paste request body (a third-party protocol shape).</summary>
+internal sealed record PasteGgBody(string Expires, PasteGgFile[] Files);
+
+internal sealed record PasteGgFile(string Name, PasteGgContent Content);
+
+internal sealed record PasteGgContent(string Format, string Value);
+
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(PasteGgBody))]
+internal sealed partial class PasteGgJsonContext : JsonSerializerContext;
 
 public sealed class PasteUpload : FlintTask
 {
@@ -323,36 +334,14 @@ public sealed class PasteUpload : FlintTask
         return stream.ToArray();
     }
 
-    /// <summary>The paste.gg JSON document, in the key order and Indented (4-space) shape of
-    /// QJsonDocument::toJson(): {"expires": &lt;utc+100d ISO&gt;, "files": [{"name": "log.txt",
-    /// "content": {"format": "text", "value": &lt;log&gt;}}]}</summary>
+    /// <summary>The paste.gg JSON document: {"expires": &lt;utc+100d ISO&gt;, "files":
+    /// [{"name": "log.txt", "content": {"format": "text", "value": &lt;log&gt;}}]}</summary>
     public static byte[] BuildPasteGgBody(string log)
     {
         var expires = DateTime.UtcNow.AddDays(100).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
-        using var stream = new MemoryStream();
-        var options = new JsonWriterOptions
-        {
-            Indented = true,
-            IndentSize = 4, // QJsonDocument::Indented
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        };
-        using (var writer = new Utf8JsonWriter(stream, options))
-        {
-            writer.WriteStartObject();
-            writer.WriteString("expires", expires);
-            writer.WriteStartArray("files");
-            writer.WriteStartObject();
-            writer.WriteString("name", "log.txt");
-            writer.WriteStartObject("content");
-            writer.WriteString("format", "text");
-            writer.WriteString("value", log);
-            writer.WriteEndObject();
-            writer.WriteEndObject();
-            writer.WriteEndArray();
-            writer.WriteEndObject();
-        }
-
-        return stream.ToArray();
+        return JsonSerializer.SerializeToUtf8Bytes(
+            new PasteGgBody(expires, [new PasteGgFile("log.txt", new PasteGgContent("text", log))]),
+            PasteGgJsonContext.Default.PasteGgBody);
     }
 
     // ------------------------------------------------------------- AnonymizeLog.cpp

@@ -244,7 +244,9 @@ public class InstanceListTests : IDisposable
         using (var doc = JsonDocument.Parse(File.ReadAllText(_groupFile)))
         {
             var root = doc.RootElement;
-            Assert.Equal("1", root.GetProperty("formatVersion").GetString());
+            // the typed write emits the formatVersion as a number (the read converter keeps
+            // accepting the legacy string "1")
+            Assert.Equal(1, root.GetProperty("formatVersion").GetInt32());
             var groups = root.GetProperty("groups");
             Assert.Equal(2, groups.EnumerateObject().Count());
 

@@ -41,66 +41,58 @@ public static class MojangVersionFormat
 
     // ------------------------------------------------------------------ download info
 
+    // ------------------------------------------------------------------ download info
+
     public static MojangDownloadInfo DownloadInfoFromJson(JsonNode obj) =>
         VersionFormatMapper.MapDownloadInfo(Probe(obj, "download info", VersionFormatJsonContext.Default.MojangDownloadInfoJson));
 
     public static MojangAssetIndexInfo AssetIndexFromJson(JsonNode obj) =>
         VersionFormatMapper.MapAssetIndex(Probe(obj, "asset index", VersionFormatJsonContext.Default.MojangAssetIndexJson));
 
-    public static JsonObject DownloadInfoToJson(MojangDownloadInfo info)
-    {
-        var outObj = new JsonObject();
-        if (info.Path is not null)
-        {
-            outObj["path"] = info.Path;
-        }
-
-        outObj["sha1"] = info.Sha1;
-        outObj["size"] = info.Size;
-        outObj["url"] = info.Url;
-        return outObj;
-    }
-
     public static MojangLibraryDownloadInfo LibDownloadInfoFromJson(JsonNode libObj) =>
         VersionFormatMapper.MapLibDownloads(
             Probe(libObj, "library downloads", VersionFormatJsonContext.Default.MojangLibraryDownloadsJson));
 
-    public static JsonObject LibDownloadInfoToJson(MojangLibraryDownloadInfo libinfo)
+    // ------------------------------------------------------------------ write side
+    //
+    // The write side maps the domain objects onto the *OutJson records (the typed wire) and
+    // serializes them through the shared context — the member conditions of the former
+    // node writes become null members (WhenWritingNull skips them).
+
+    internal static DownloadInfoOutJson DownloadInfoToJson(MojangDownloadInfo info)
     {
-        var outObj = new JsonObject();
-        if (libinfo.Artifact is not null)
+        return new DownloadInfoOutJson
         {
-            outObj["artifact"] = DownloadInfoToJson(libinfo.Artifact);
-        }
-
-        if (libinfo.Classifiers.Count != 0)
-        {
-            var classifiersOut = new JsonObject();
-            foreach (var (classifier, info) in libinfo.Classifiers)
-            {
-                classifiersOut[classifier] = DownloadInfoToJson(info);
-            }
-
-            outObj["classifiers"] = classifiersOut;
-        }
-
-        return outObj;
+            Path = info.Path,
+            Sha1 = info.Sha1,
+            Size = info.Size,
+            Url = info.Url,
+        };
     }
 
-    public static JsonObject AssetIndexToJson(MojangAssetIndexInfo info)
+    internal static LibDownloadsOutJson LibDownloadInfoToJson(MojangLibraryDownloadInfo libinfo)
     {
-        var outObj = new JsonObject();
-        if (info.Path is not null)
+        var classifiers = libinfo.Classifiers.Count != 0
+            ? libinfo.Classifiers.ToDictionary(pair => pair.Key, pair => DownloadInfoToJson(pair.Value))
+            : null;
+        return new LibDownloadsOutJson
         {
-            outObj["path"] = info.Path;
-        }
+            Artifact = libinfo.Artifact is { } artifact ? DownloadInfoToJson(artifact) : null,
+            Classifiers = classifiers,
+        };
+    }
 
-        outObj["sha1"] = info.Sha1;
-        outObj["size"] = info.Size;
-        outObj["url"] = info.Url;
-        outObj["totalSize"] = info.TotalSize;
-        outObj["id"] = info.Id;
-        return outObj;
+    internal static AssetIndexOutJson AssetIndexToJson(MojangAssetIndexInfo info)
+    {
+        return new AssetIndexOutJson
+        {
+            Path = info.Path,
+            Sha1 = info.Sha1,
+            Size = info.Size,
+            Url = info.Url,
+            TotalSize = info.TotalSize,
+            Id = info.Id,
+        };
     }
 
     // ------------------------------------------------------------------ version file
@@ -150,79 +142,46 @@ public static class MojangVersionFormat
         return outInfo;
     }
 
-    /// <summary>does not include libraries</summary>
-    public static void WriteVersionProperties(VersionFile inInfo, JsonObject outObj)
+    /// <summary>does not include libraries — the Mojang half of the write wire.</summary>
+    internal static VersionFileOutJson WriteVersionProperties(VersionFile inInfo)
     {
-        JsonUtils.WriteString(outObj, "id", inInfo.MinecraftVersion);
-        JsonUtils.WriteString(outObj, "mainClass", inInfo.MainClass);
-        JsonUtils.WriteString(outObj, "minecraftArguments", inInfo.MinecraftArguments);
-        JsonUtils.WriteString(outObj, "type", inInfo.Type);
-        if (inInfo.ReleaseTime is not null)
+        var wire = new VersionFileOutJson
         {
-            JsonUtils.WriteString(outObj, "releaseTime", ParseUtils.TimeToS3Time(inInfo.ReleaseTime.Value));
-        }
-
-        if (inInfo.UpdateTime is not null)
-        {
-            JsonUtils.WriteString(outObj, "time", ParseUtils.TimeToS3Time(inInfo.UpdateTime.Value));
-        }
-
-        if (inInfo.MinimumLauncherVersion != -1)
-        {
-            outObj["minimumLauncherVersion"] = inInfo.MinimumLauncherVersion;
-        }
-
-        JsonUtils.WriteString(outObj, "assets", inInfo.Assets);
-        if (inInfo.MojangAssetIndex is { Known: true } assetIndex)
-        {
-            outObj["assetIndex"] = AssetIndexToJson(assetIndex);
-        }
-
+            Id = inInfo.MinecraftVersion.Length != 0 ? inInfo.MinecraftVersion : null,
+            MainClass = inInfo.MainClass.Length != 0 ? inInfo.MainClass : null,
+            MinecraftArguments = inInfo.MinecraftArguments.Length != 0 ? inInfo.MinecraftArguments : null,
+            Type = inInfo.Type.Length != 0 ? inInfo.Type : null,
+            ReleaseTime = inInfo.ReleaseTime is { } releaseTime ? ParseUtils.TimeToS3Time(releaseTime) : null,
+            Time = inInfo.UpdateTime is { } updateTime ? ParseUtils.TimeToS3Time(updateTime) : null,
+            MinimumLauncherVersion = inInfo.MinimumLauncherVersion != -1 ? inInfo.MinimumLauncherVersion : null,
+            Assets = inInfo.Assets.Length != 0 ? inInfo.Assets : null,
+            AssetIndex = inInfo.MojangAssetIndex is { Known: true } assetIndex ? AssetIndexToJson(assetIndex) : null,
+            CompatibleJavaMajors = inInfo.CompatibleJavaMajors.Count != 0 ? [.. inInfo.CompatibleJavaMajors] : null,
+            CompatibleJavaName = inInfo.CompatibleJavaName.Length != 0 ? inInfo.CompatibleJavaName : null,
+        };
         if (inInfo.MojangDownloads.Count != 0)
         {
-            var downloadsOut = new JsonObject();
-            foreach (var (classifier, info) in inInfo.MojangDownloads)
+            wire = wire with
             {
-                downloadsOut[classifier] = DownloadInfoToJson(info);
-            }
-
-            outObj["downloads"] = downloadsOut;
+                Downloads = inInfo.MojangDownloads.ToDictionary(
+                    pair => pair.Key, pair => DownloadInfoToJson(pair.Value)),
+            };
         }
 
-        if (inInfo.CompatibleJavaMajors.Count != 0)
-        {
-            var compatibleJavaMajorsOut = new JsonArray();
-            foreach (var compatibleJavaMajor in inInfo.CompatibleJavaMajors)
-            {
-                compatibleJavaMajorsOut.Add((JsonNode)JsonValue.Create(compatibleJavaMajor));
-            }
-
-            outObj["compatibleJavaMajors"] = compatibleJavaMajorsOut;
-        }
-
-        if (inInfo.CompatibleJavaName.Length != 0)
-        {
-            JsonUtils.WriteString(outObj, "compatibleJavaName", inInfo.CompatibleJavaName);
-        }
+        return wire;
     }
 
-    /// <summary>Port of MojangVersionFormat::versionFileToJson (QJsonDocument -> JsonObject).</summary>
-    public static JsonObject VersionFileToJson(VersionFile patch)
+    /// <summary>Port of MojangVersionFormat::versionFileToJson: the Mojang member half plus
+    /// the libraries, as the typed write wire.</summary>
+    internal static VersionFileOutJson VersionFileToJson(VersionFile patch)
     {
-        var root = new JsonObject();
-        WriteVersionProperties(patch, root);
+        var wire = WriteVersionProperties(patch);
         if (patch.Libraries.Count != 0)
         {
-            var array = new JsonArray();
-            foreach (var value in patch.Libraries)
-            {
-                array.Add((JsonNode)LibraryToJson(value));
-            }
-
-            root["libraries"] = array;
+            wire = wire with { Libraries = patch.Libraries.Select(LibraryToJson).ToList() };
         }
 
-        return root;
+        return wire;
     }
 
     // ------------------------------------------------------------------ libraries
@@ -231,57 +190,23 @@ public static class MojangVersionFormat
         VersionFormatMapper.MapLibrary(
             Probe(libObj, filename, VersionFormatJsonContext.Default.LibraryJson), problems, filename);
 
-    public static JsonObject LibraryToJson(Library library)
+    internal static LibraryOutJson LibraryToJson(Library library)
     {
-        var libRoot = new JsonObject
+        return new LibraryOutJson
         {
-            ["name"] = library.Name.Serialize(),
+            Name = library.Name.Serialize(),
+            Url = library.RepositoryUrl.Length != 0 ? library.RepositoryUrl : null,
+            Natives = library.IsNative()
+                ? new Dictionary<string, string>(library.NativeClassifiers, StringComparer.Ordinal)
+                : null,
+            Extract = library.IsNative() && library.ExtractExcludes.Count != 0
+                ? new LibraryExtractJson([.. library.ExtractExcludes])
+                : null,
+            Rules = library.Rules.Count != 0 ? library.Rules.Select(RuleToJson).ToList() : null,
+            Downloads = library.MojangDownloads is { } downloads ? LibDownloadInfoToJson(downloads) : null,
         };
-        if (library.RepositoryUrl.Length != 0)
-        {
-            libRoot["url"] = library.RepositoryUrl;
-        }
-
-        if (library.IsNative())
-        {
-            var nativeList = new JsonObject();
-            foreach (var (os, classifier) in library.NativeClassifiers)
-            {
-                nativeList[os] = classifier;
-            }
-
-            libRoot["natives"] = nativeList;
-            if (library.ExtractExcludes.Count != 0)
-            {
-                var excludes = new JsonArray();
-                foreach (var exclude in library.ExtractExcludes)
-                {
-                    excludes.Add((JsonNode)JsonValue.Create(exclude));
-                }
-
-                libRoot["extract"] = new JsonObject
-                {
-                    ["exclude"] = excludes,
-                };
-            }
-        }
-
-        if (library.Rules.Count != 0)
-        {
-            var allRules = new JsonArray();
-            foreach (var rule in library.Rules)
-            {
-                allRules.Add((JsonNode)rule.ToJson());
-            }
-
-            libRoot["rules"] = allRules;
-        }
-
-        if (library.MojangDownloads is not null)
-        {
-            libRoot["downloads"] = LibDownloadInfoToJson(library.MojangDownloads);
-        }
-
-        return libRoot;
     }
+
+    /// <summary>The C++ Rule::ToJson shape as the typed wire.</summary>
+    internal static RuleOutJson RuleToJson(Rule rule) => rule.ToWire();
 }

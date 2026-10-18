@@ -3,6 +3,7 @@
 // HTML/Markdown/plain-text/JSON/CSV formats (with every OptionalData flag) and the custom
 // line-template format, including the metadata-version fallback and the escaping rules.
 
+using System.Text.Json;
 using FlintLauncher.Core.ModPlatform.Helpers;
 using Xunit;
 
@@ -86,51 +87,44 @@ public class ExportToModListTests
     // ----------------------------------------------------------------------- JSON
 
     [Fact]
-    public void Json_AllFlags_QtIndentedShape()
+    public void Json_AllFlags_Value_Shape()
     {
-        var expected =
-            """
-            [
-                {
-                    "authors": [
-                        "mezz"
-                    ],
-                    "filename": "jei-1.20.1-forge-11.6.0.1016.jar",
-                    "name": "jei",
-                    "url": "https://modrinth.com/mod/jei",
-                    "version": "11.6.0.1016"
-                },
-                {
-                    "authors": [
-                        "author one",
-                        "author two"
-                    ],
-                    "filename": "addons.jar",
-                    "name": "JEI <addons> & \"stuff\"",
-                    "version": "1.2.3"
-                }
-            ]
-            """ + "\n";
+        // the Qt byte shape (sorted keys, 4-space indent) is retired; the member set and
+        // values of the shared export are the contract (the empty-url second mod carries no
+        // url member even with the flag on)
+        using var doc = JsonDocument.Parse(ExportToModList.ToJson(Mods, All));
+        var array = doc.RootElement;
+        Assert.Equal(JsonValueKind.Array, array.ValueKind);
 
-        Assert.Equal(expected, ExportToModList.ToJson(Mods, All));
+        var first = array[0];
+        Assert.Equal("jei", first.GetProperty("name").GetString());
+        Assert.Equal("https://modrinth.com/mod/jei", first.GetProperty("url").GetString());
+        Assert.Equal("11.6.0.1016", first.GetProperty("version").GetString());
+        Assert.Equal("jei-1.20.1-forge-11.6.0.1016.jar", first.GetProperty("filename").GetString());
+        Assert.Equal(["mezz"], first.GetProperty("authors").EnumerateArray()
+            .Select(a => a.GetString()).ToArray());
+
+        var second = array[1];
+        Assert.Equal("JEI <addons> & \"stuff\"", second.GetProperty("name").GetString());
+        Assert.False(second.TryGetProperty("url", out _));
+        Assert.Equal("1.2.3", second.GetProperty("version").GetString());
+        Assert.Equal(["author one", "author two"], second.GetProperty("authors").EnumerateArray()
+            .Select(a => a.GetString()).ToArray());
+        Assert.Equal("addons.jar", second.GetProperty("filename").GetString());
     }
 
     [Fact]
     public void Json_NameOnly()
     {
-        var expected =
-            """
-            [
-                {
-                    "name": "jei"
-                },
-                {
-                    "name": "JEI <addons> & \"stuff\""
-                }
-            ]
-            """ + "\n";
+        using var doc = JsonDocument.Parse(ExportToModList.ToJson(Mods, OptionalData.None));
+        foreach (var entry in doc.RootElement.EnumerateArray())
+        {
+            var members = entry.EnumerateObject().Select(p => p.Name).ToArray();
+            Assert.Equal(["name"], members);
+        }
 
-        Assert.Equal(expected, ExportToModList.ToJson(Mods, OptionalData.None));
+        Assert.Equal("jei", doc.RootElement[0].GetProperty("name").GetString());
+        Assert.Equal("JEI <addons> & \"stuff\"", doc.RootElement[1].GetProperty("name").GetString());
     }
 
     [Fact]

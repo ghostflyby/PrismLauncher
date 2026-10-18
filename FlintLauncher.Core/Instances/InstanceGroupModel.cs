@@ -18,10 +18,8 @@
 // m_instanceGroupIndex / on_GroupStateChanged), extracted once the C8/S5 split made the two
 // halves heterogeneous (config syncs, state does not).
 
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.State;
@@ -66,7 +64,8 @@ internal sealed class GroupFormatVersionConverter : JsonConverter<int>
         writer.WriteNumberValue(value);
 }
 
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(GroupFileJson))]
 internal sealed partial class GroupJsonContext : JsonSerializerContext;
 
@@ -542,8 +541,10 @@ public sealed class InstanceGroupModel
         var groupFileName = _canonicalFile();
 
         // C++ QMap<QString, QSet<QString>> reverseGroupMap; sorted containers for
-        // deterministic output. Members are uuid references (D3) — unresolvable legacy
-        // members (dirnames kept verbatim at load) round-trip as they are.
+        // deterministic QMap-ordered output. The write side maps onto the same GroupFileJson
+        // wire the read side probes (the formatVersion writes as a number now — the read
+        // converter accepts both shapes). Members are uuid references (D3) — unresolvable
+        // legacy members (dirnames kept verbatim at load) round-trip as they are.
         var reverseGroupMap = new SortedDictionary<string, SortedSet<string>>(StringComparer.Ordinal);
         foreach (var (member, group) in _memberGroups)
         {
@@ -561,32 +562,20 @@ public sealed class InstanceGroupModel
             set.Add(member);
         }
 
-        var toplevel = new JsonObject
-        {
-            ["formatVersion"] = JsonValue.Create("1") // QJsonValue(QString("1")) — a string!
-        };
-        var groupsArr = new JsonObject();
+        var groups = new Dictionary<string, GroupBodyJson>(reverseGroupMap.Count, StringComparer.Ordinal);
         foreach (var (name, list) in reverseGroupMap)
         {
-            var groupObj = new JsonObject();
-            var instanceArr = new JsonArray();
             // NOTE: the collapse state ("hidden") is NOT written here — it lives in
             // launcher-state.json (CONFIG C8 split / STATE S5); the group file carries the
             // group definitions only
-            foreach (var item in list)
-            {
-                instanceArr.Add((JsonNode)JsonValue.Create(item)); // non-generic Add: AOT/trimming clean
-            }
-
-            groupObj["instances"] = instanceArr;
-            groupsArr[name] = groupObj;
+            groups[name] = new GroupBodyJson([.. list], null);
         }
 
-        toplevel["groups"] = groupsArr;
+        var toplevel = new GroupFileJson(GroupFormatVersion, groups, null);
         try
         {
             FileSystem.Write(groupFileName,
-                Encoding.UTF8.GetBytes(QtJson.ToIndentedString(toplevel) + "\n"));
+                JsonSerializer.SerializeToUtf8Bytes(toplevel, GroupJsonContext.Default.GroupFileJson));
             return true;
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
@@ -605,30 +594,33 @@ public sealed class InstanceGroupModel
     {
         try
         {
-            if (JsonNode.Parse(File.ReadAllText(groupFileName)) is not JsonObject topLevel)
+            var file = JsonSerializer.Deserialize(
+                File.ReadAllText(groupFileName), GroupJsonContext.Default.GroupFileJson);
+            if (file is null)
             {
                 return;
             }
 
-            if (topLevel["groups"] is JsonObject groups)
+            GroupBodyJson? ungrouped = null;
+            if (file.Ungrouped is { } body)
             {
-                foreach (var group in groups)
+                body = body with { Hidden = null };
+                if (body.Instances is { Count: > 0 })
                 {
-                    (group.Value as JsonObject)?.Remove("hidden");
+                    ungrouped = body;
                 }
+                // else: the stripped body is empty — dropped from the file (the former DOM
+                // strip removed the empty "ungrouped" object)
             }
 
-            if (topLevel["ungrouped"] is JsonObject ungrouped)
-            {
-                ungrouped.Remove("hidden");
-                if (ungrouped.Count == 0)
-                {
-                    topLevel.Remove("ungrouped");
-                }
-            }
-
+            var stripped = new GroupFileJson(
+                file.Version,
+                file.Groups?.ToDictionary(
+                    group => group.Key,
+                    group => group.Value with { Hidden = null }, StringComparer.Ordinal),
+                ungrouped);
             FileSystem.Write(groupFileName,
-                Encoding.UTF8.GetBytes(QtJson.ToIndentedString(topLevel) + "\n"));
+                JsonSerializer.SerializeToUtf8Bytes(stripped, GroupJsonContext.Default.GroupFileJson));
         }
         catch (Exception e) when (e is JsonException or FileSystemException or IOException
                                       or UnauthorizedAccessException or NotSupportedException)

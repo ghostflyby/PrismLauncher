@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Typed wire probes + mappers for the Mojang/OneSix version format read side. The format
-// classes keep their public node-based entry points (the tests and callers pin them); each
-// entry deserializes the probe for the whole document once and maps it onto the existing
-// VersionFile/Library/Rule/JavaMetadata domain objects. The write side stays node-based —
-// it is the byte-tested Qt tail (sorted keys, 4-space indent).
+// Typed wire probes + mappers for the Mojang/OneSix version format, both directions. The
+// format classes keep their public node-based READ entry points (the tests and callers pin
+// them); each entry deserializes the probe for the whole document once and maps it onto the
+// existing VersionFile/Library/Rule/JavaMetadata domain objects. The WRITE side maps the
+// domain objects back onto the *OutJson records and serializes them through the same
+// context — the byte-tested Qt tail (sorted keys, 4-space indent) is retired
+// (docs/JSON-MIGRATION.md, the Qt write-tail batch: patches and mmc-pack have no external
+// write consumer; the values are the contract).
 //
 // Failure behavior: the former Require* reads become document-level JsonParseException
 // failures with the collapsed kind texts ("'sha1' is not a string"); per-field quirks with
@@ -118,13 +121,162 @@ internal sealed record VersionFileJson
     [JsonPropertyName("+minecraftArguments")] public JsonElement? RemovedPlusMinecraftArguments { get; init; }
 }
 
+// ---------------------------------------------------------------------------
+// the WRITE records (model → wire). Separate from the read probes: the write side is
+// strongly typed (non-null members are the always-written ones), a null member is simply
+// not written (WhenWritingNull), matching the former conditional JsonObject inserts.
+
+internal sealed record DownloadInfoOutJson
+{
+    public string? Path { get; init; }
+
+    public string Sha1 { get; init; } = "";
+
+    public int Size { get; init; }
+
+    public string Url { get; init; } = "";
+}
+
+internal sealed record AssetIndexOutJson
+{
+    public string? Path { get; init; }
+
+    public string Sha1 { get; init; } = "";
+
+    public int Size { get; init; }
+
+    public string Url { get; init; } = "";
+
+    public int TotalSize { get; init; }
+
+    public string Id { get; init; } = "";
+}
+
+internal sealed record LibDownloadsOutJson
+{
+    public DownloadInfoOutJson? Artifact { get; init; }
+
+    public Dictionary<string, DownloadInfoOutJson>? Classifiers { get; init; }
+}
+
+internal sealed record RuleOsOutJson
+{
+    public string Name { get; init; } = "";
+
+    public string? Version { get; init; }
+}
+
+internal sealed record RuleOutJson
+{
+    /// <summary>"allow"/"disallow"; a Defer rule writes nothing (the C++ ToJson).</summary>
+    public string? Action { get; init; }
+
+    public RuleOsOutJson? Os { get; init; }
+}
+
+internal sealed record LibraryOutJson
+{
+    public string Name { get; init; } = "";
+
+    public string? Url { get; init; }
+
+    public LibraryExtractJson? Extract { get; init; }
+
+    public Dictionary<string, string>? Natives { get; init; }
+
+    public List<RuleOutJson>? Rules { get; init; }
+
+    public LibDownloadsOutJson? Downloads { get; init; }
+
+    // OneSix MMC extensions (+ the +agents argument member)
+    [JsonPropertyName("MMC-hint")] public string? MmcHint { get; init; }
+
+    [JsonPropertyName("MMC-absoluteUrl")] public string? MmcAbsoluteUrl { get; init; }
+
+    [JsonPropertyName("MMC-filename")] public string? MmcFilename { get; init; }
+
+    [JsonPropertyName("MMC-displayname")] public string? MmcDisplayname { get; init; }
+
+    public string? Argument { get; init; }
+}
+
+/// <summary>
+/// The version file write wire — a superset of the Mojang and OneSix member sets;
+/// the Mojang entry leaves the OneSix members null (unwritten) and vice versa. NOTE: the
+/// requires/conflicts members are deliberately absent — the former node write's inverted
+/// emptiness check made SerializeRequires a no-op in every case, so they were never written.
+/// </summary>
+internal sealed record VersionFileOutJson
+{
+    // OneSix
+    public int? Order { get; init; }
+
+    public string? Name { get; init; }
+
+    public string? Uid { get; init; }
+
+    public string? Version { get; init; }
+
+    [JsonPropertyName("formatVersion")] public int? FormatVersion { get; init; }
+
+    public string? AppletClass { get; init; }
+
+    [JsonPropertyName("+tweakers")] public List<string>? AddTweakers { get; init; }
+
+    [JsonPropertyName("+traits")] public List<string>? AddTraits { get; init; }
+
+    [JsonPropertyName("+jvmArgs")] public List<string>? AddJvmArgs { get; init; }
+
+    [JsonPropertyName("+agents")] public List<LibraryOutJson>? Agents { get; init; }
+
+    public List<LibraryOutJson>? JarMods { get; init; }
+
+    public List<LibraryOutJson>? Mods { get; init; }
+
+    public List<LibraryOutJson>? Libraries { get; init; }
+
+    public List<LibraryOutJson>? MavenFiles { get; init; }
+
+    public LibraryOutJson? MainJar { get; init; }
+
+    public bool? Volatile { get; init; }
+
+    // Mojang
+    public string? Id { get; init; }
+
+    public string? MainClass { get; init; }
+
+    public string? MinecraftArguments { get; init; }
+
+    public string? Type { get; init; }
+
+    public string? ReleaseTime { get; init; }
+
+    public string? Time { get; init; }
+
+    public int? MinimumLauncherVersion { get; init; }
+
+    public string? Assets { get; init; }
+
+    public AssetIndexOutJson? AssetIndex { get; init; }
+
+    public Dictionary<string, DownloadInfoOutJson>? Downloads { get; init; }
+
+    public List<int>? CompatibleJavaMajors { get; init; }
+
+    public string? CompatibleJavaName { get; init; }
+}
+
 [JsonSourceGenerationOptions(RespectNullableAnnotations = true,
-    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(VersionFileJson))]
 [JsonSerializable(typeof(LibraryJson))]
 [JsonSerializable(typeof(RuleJson))]
-// (the remaining probe shapes are reachable through the two roots; only standalone
-// deserialize roots need explicit registration)
+[JsonSerializable(typeof(VersionFileOutJson))]
+[JsonSerializable(typeof(LibraryOutJson))]
+// (the remaining probe shapes are reachable through the roots; only standalone
+// deserialize/serialize roots need explicit registration)
 internal sealed partial class VersionFormatJsonContext : JsonSerializerContext;
 
 /// <summary>The mappers from the version-format probes onto the domain objects. All shared

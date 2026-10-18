@@ -6,14 +6,38 @@
 // pure functions over a mod list model.
 //
 // The exact templates of the C++ are kept, including Qt specifics: toHtmlEscaped (only
-// & < > "), the QJsonDocument::toJson() indented shape (sorted keys, 4-space indent,
-// trailing newline) and the CSV quoting rule for multi-author entries.
+// & < > ") and the CSV quoting rule for multi-author entries. The JSON export is the typed
+// ModListEntryJson wire (docs/JSON-MIGRATION.md, the Qt write-tail batch): the member set
+// and values are the shared-file contract, the Qt byte shape (sorted keys, indentation) is
+// not — the source-generated context writes standard indented JSON.
 
-using System.Text.Json.Nodes;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 
 namespace FlintLauncher.Core.ModPlatform.Helpers;
+
+/// <summary>The per-mod JSON export entry (ExportToModList::toJSON): members appear only
+/// when their OptionalData flag is on AND the value is non-empty, like the C++ conditions.</summary>
+internal sealed record ModListEntryJson
+{
+    public string Name { get; init; } = "";
+
+    public string? Url { get; init; }
+
+    public string? Version { get; init; }
+
+    public string[]? Authors { get; init; }
+
+    public string? Filename { get; init; }
+}
+
+[JsonSourceGenerationOptions(WriteIndented = true,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+[JsonSerializable(typeof(List<ModListEntryJson>))]
+internal sealed partial class ModListJsonContext : JsonSerializerContext;
 
 /// <summary>Port of the Formats enum (CUSTOM is served by the line-template overload).</summary>
 public enum ModListFormat : byte
@@ -228,61 +252,38 @@ public static class ExportToModList
         return string.Join("\n", lines);
     }
 
-    /// <summary>Port of ExportToModList::toJSON: a QJsonDocument over the array of per-mod
-    /// objects written with toJson() (sorted keys, 4-space indent, trailing newline).</summary>
+    /// <summary>Port of ExportToModList::toJSON: the per-mod typed entries serialized as an
+    /// indented array with the trailing newline.</summary>
     public static string ToJson(IReadOnlyList<ModListMod> mods, OptionalData extraData)
     {
-        var lines = new JsonArray();
+        var entries = new List<ModListEntryJson>();
         foreach (var mod in mods)
         {
-            var line = new JsonObject
+            var entry = new ModListEntryJson { Name = mod.Name };
+            if ((extraData & OptionalData.Url) != 0 && mod.Url.Length != 0)
             {
-                ["name"] = mod.Name,
-            };
-            if ((extraData & OptionalData.Url) != 0)
-            {
-                var url = mod.Url;
-                if (url.Length != 0)
-                {
-                    line["url"] = url;
-                }
+                entry = entry with { Url = mod.Url };
             }
 
-            if ((extraData & OptionalData.Version) != 0)
+            if ((extraData & OptionalData.Version) != 0 && mod.EffectiveVersion.Length != 0)
             {
-                var ver = mod.EffectiveVersion;
-                if (ver.Length != 0)
-                {
-                    line["version"] = ver;
-                }
+                entry = entry with { Version = mod.EffectiveVersion };
             }
 
             if ((extraData & OptionalData.Authors) != 0 && mod.Authors.Count != 0)
             {
-                var authors = new JsonArray();
-                foreach (var author in mod.Authors)
-                {
-                    authors.Add((JsonNode?)JsonValue.Create(author)); // non-generic Add: AOT/trimming clean
-                }
-
-                line["authors"] = authors;
+                entry = entry with { Authors = [.. mod.Authors] };
             }
 
             if ((extraData & OptionalData.FileName) != 0)
             {
-                line["filename"] = mod.FileName;
+                entry = entry with { Filename = mod.FileName };
             }
 
-            lines.Add((JsonNode?)line); // non-generic Add: AOT/trimming clean
+            entries.Add(entry);
         }
 
-        return ToIndentedStringWithTrailingNewline(lines);
-    }
-
-    /// <summary>QJsonDocument::toJson(): QtJson's indented writer plus the trailing "\n".</summary>
-    private static string ToIndentedStringWithTrailingNewline(JsonNode node)
-    {
-        return QtJson.ToIndentedString(node) + "\n";
+        return JsonSerializer.Serialize(entries, ModListJsonContext.Default.ListModListEntryJson) + "\n";
     }
 
     /// <summary>Port of ExportToModList::toCSV.</summary>
