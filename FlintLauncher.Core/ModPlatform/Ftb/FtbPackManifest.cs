@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of modplatform/ftb/FTBPackManifest.{h,cpp}: the modpacks.ch-style JSON models of the
 // FTB App API — the pack description (Modpack with art/authors/versions/tags) and the
-// version payload (Version with targets[] and files[]). Reads go through the JsonNode
-// model (single-DOM, the JsonUtils node-side family).
+// version payload (Version with targets[] and files[]). The wire shape is annotated directly
+// on the model properties ([JsonPropertyName] + the QJsonValue-semantics converters of
+// QtConverters); required members use the C# `required` modifier so a missing key fails
+// deserialization, and FtbJsonContext (FtbApi.cs) turns them into source-generated
+// deserialization metadata with RespectNullableAnnotations (a JSON null for a required
+// member is an error, like the former requireIsType reads).
 //
-// Deviations: the Json::require* calls throw JsonParseException (the C++ JSONValidationError);
-// optional fields keep the QJsonValue coercion defaults (toInt() of a missing value -> 0,
-// toString() -> ""); Modpack.safeName is a computed property instead of a parsed field.
+// Deviations: optional fields keep the QJsonValue coercion defaults through the coercing
+// converters (toInt() of a missing value -> 0, toString() -> ""); Modpack.safeName is a
+// computed property instead of a parsed field.
 
-using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Json;
 
@@ -17,69 +21,143 @@ namespace FlintLauncher.Core.ModPlatform.Ftb;
 /// <summary>Port of FTB::Specs.</summary>
 public sealed class FtbSpecs
 {
-    public int Id { get; set; }
-    public int Minimum { get; set; }
-    public int Recommended { get; set; }
+    [JsonPropertyName("id")]
+    public required int Id { get; set; }
+
+    [JsonPropertyName("minimum")]
+    public required int Minimum { get; set; }
+
+    [JsonPropertyName("recommended")]
+    public required int Recommended { get; set; }
 }
 
 /// <summary>Port of FTB::Tag.</summary>
 public sealed class FtbTag
 {
-    public int Id { get; set; }
-    public string Name { get; set; } = "";
+    [JsonPropertyName("id")]
+    public required int Id { get; set; }
+
+    [JsonPropertyName("name")]
+    public required string Name { get; set; }
 }
 
 /// <summary>Port of FTB::Art.</summary>
 public sealed class FtbArt
 {
-    public int Id { get; set; }
-    public string Url { get; set; } = "";
-    public string Type { get; set; } = "";
-    public int Width { get; set; }
-    public int Height { get; set; }
-    public bool Compressed { get; set; }
-    public string Sha1 { get; set; } = "";
+    [JsonPropertyName("id")]
+    public required int Id { get; set; }
+
+    [JsonPropertyName("url")]
+    public required string Url { get; set; }
+
+    [JsonPropertyName("type")]
+    public required string Type { get; set; }
+
+    [JsonPropertyName("width")]
+    public required int Width { get; set; }
+
+    [JsonPropertyName("height")]
+    public required int Height { get; set; }
+
+    [JsonPropertyName("compressed")]
+    public required bool Compressed { get; set; }
+
+    [JsonPropertyName("sha1")]
+    public required string Sha1 { get; set; }
+
+    // optional: toInt() of a missing/junk value -> 0
+    [JsonPropertyName("size")]
+    [JsonConverter(typeof(QtCoercingIntConverter))]
     public int Size { get; set; }
-    public long Updated { get; set; }
+
+    [JsonPropertyName("updated")]
+    public required long Updated { get; set; }
 }
 
 /// <summary>Port of FTB::Author.</summary>
 public sealed class FtbAuthor
 {
-    public int Id { get; set; }
-    public string Name { get; set; } = "";
-    public string Type { get; set; } = "";
-    public string Website { get; set; } = "";
-    public long Updated { get; set; }
+    [JsonPropertyName("id")]
+    public required int Id { get; set; }
+
+    [JsonPropertyName("name")]
+    public required string Name { get; set; }
+
+    [JsonPropertyName("type")]
+    public required string Type { get; set; }
+
+    [JsonPropertyName("website")]
+    public required string Website { get; set; }
+
+    [JsonPropertyName("updated")]
+    public required long Updated { get; set; }
 }
 
 /// <summary>Port of FTB::VersionInfo.</summary>
 public sealed class FtbVersionInfo
 {
-    public int Id { get; set; }
-    public string Name { get; set; } = "";
-    public string Type { get; set; } = "";
-    public long Updated { get; set; }
-    public FtbSpecs Specs { get; } = new();
+    [JsonPropertyName("id")]
+    public required int Id { get; set; }
+
+    [JsonPropertyName("name")]
+    public required string Name { get; set; }
+
+    [JsonPropertyName("type")]
+    public required string Type { get; set; }
+
+    [JsonPropertyName("updated")]
+    public required long Updated { get; set; }
+
+    [JsonPropertyName("specs")]
+    public required FtbSpecs Specs { get; init; }
 }
 
 /// <summary>Port of FTB::Modpack.</summary>
 public sealed partial class FtbModpack
 {
-    public int Id { get; set; }
-    public string Name { get; set; } = "";
-    public string Synopsis { get; set; } = "";
-    public string Description { get; set; } = "";
-    public string Type { get; set; } = "";
-    public bool Featured { get; set; }
-    public int Installs { get; set; }
-    public int Plays { get; set; }
-    public long Updated { get; set; }
+    [JsonPropertyName("id")]
+    public required int Id { get; set; }
+
+    [JsonPropertyName("name")]
+    public required string Name { get; set; }
+
+    [JsonPropertyName("synopsis")]
+    public required string Synopsis { get; set; }
+
+    [JsonPropertyName("description")]
+    public required string Description { get; set; }
+
+    [JsonPropertyName("type")]
+    public required string Type { get; set; }
+
+    [JsonPropertyName("featured")]
+    public required bool Featured { get; set; }
+
+    [JsonPropertyName("installs")]
+    public required int Installs { get; set; }
+
+    [JsonPropertyName("plays")]
+    public required int Plays { get; set; }
+
+    [JsonPropertyName("updated")]
+    public required long Updated { get; set; }
+
+    // optional: toInt() truncates a fractional double (20.7 -> 20)
+    [JsonPropertyName("refreshed")]
+    [JsonConverter(typeof(QtCoercingLongConverter))]
     public long Refreshed { get; set; }
-    public List<FtbArt> Art { get; } = [];
-    public List<FtbAuthor> Authors { get; } = [];
-    public List<FtbVersionInfo> Versions { get; } = [];
-    public List<FtbTag> Tags { get; } = [];
+
+    [JsonPropertyName("art")]
+    public required List<FtbArt> Art { get; init; }
+
+    [JsonPropertyName("authors")]
+    public required List<FtbAuthor> Authors { get; init; }
+
+    [JsonPropertyName("versions")]
+    public required List<FtbVersionInfo> Versions { get; init; }
+
+    [JsonPropertyName("tags")]
+    public required List<FtbTag> Tags { get; init; }
 
     /// <summary>Port of the safeName computed at parse time:
     /// name with every non-alphanumeric removed, lowercased + ".png".</summary>
@@ -95,231 +173,120 @@ public sealed partial class FtbModpack
 /// <summary>Port of FTB::VersionTarget.</summary>
 public sealed class FtbVersionTarget
 {
-    public int Id { get; set; }
-    public string Type { get; set; } = "";
-    public string Name { get; set; } = "";
-    public string Version { get; set; } = "";
-    public long Updated { get; set; }
+    [JsonPropertyName("id")]
+    public required int Id { get; set; }
+
+    [JsonPropertyName("type")]
+    public required string Type { get; set; }
+
+    [JsonPropertyName("name")]
+    public required string Name { get; set; }
+
+    [JsonPropertyName("version")]
+    public required string Version { get; set; }
+
+    [JsonPropertyName("updated")]
+    public required long Updated { get; set; }
 }
 
 /// <summary>Port of FTB::VersionFileCurseForge.</summary>
 public sealed class FtbVersionFileCurseForge
 {
+    // optional members of an already-optional object: toInt() of a missing/junk value -> 0
+    [JsonPropertyName("project")]
+    [JsonConverter(typeof(QtCoercingIntConverter))]
     public int ProjectId { get; set; }
+
+    [JsonPropertyName("file")]
+    [JsonConverter(typeof(QtCoercingIntConverter))]
     public int FileId { get; set; }
 }
 
 /// <summary>Port of FTB::VersionFile.</summary>
 public sealed class FtbVersionFile
 {
-    public int Id { get; set; }
-    public string Type { get; set; } = "";
-    public string Path { get; set; } = "";
-    public string Name { get; set; } = "";
-    public string Version { get; set; } = "";
+    [JsonPropertyName("id")]
+    public required int Id { get; set; }
+
+    [JsonPropertyName("type")]
+    public required string Type { get; set; }
+
+    [JsonPropertyName("path")]
+    public required string Path { get; set; }
+
+    [JsonPropertyName("name")]
+    public required string Name { get; set; }
+
+    [JsonPropertyName("version")]
+    public required string Version { get; set; }
+
+    // optional: toString() of a missing/junk value -> ""
+    [JsonPropertyName("url")]
+    [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Url { get; set; } = "";
-    public string Sha1 { get; set; } = "";
+
+    [JsonPropertyName("sha1")]
+    public required string Sha1 { get; set; }
+
+    // optional: toInt() of a missing/junk value -> 0
+    [JsonPropertyName("size")]
+    [JsonConverter(typeof(QtCoercingIntConverter))]
     public int Size { get; set; }
-    public bool ClientOnly { get; set; }
-    public bool ServerOnly { get; set; }
-    public bool Optional { get; set; }
-    public long Updated { get; set; }
-    public FtbVersionFileCurseForge Curseforge { get; } = new();
+
+    [JsonPropertyName("clientonly")]
+    public required bool ClientOnly { get; set; }
+
+    [JsonPropertyName("serveronly")]
+    public required bool ServerOnly { get; set; }
+
+    [JsonPropertyName("optional")]
+    public required bool Optional { get; set; }
+
+    [JsonPropertyName("updated")]
+    public required long Updated { get; set; }
+
+    // the optional curseforge object: a missing (or JSON null) member keeps the zero default
+    [JsonPropertyName("curseforge")]
+    public FtbVersionFileCurseForge? CurseforgeRaw { get; init; }
+
+    public FtbVersionFileCurseForge Curseforge => CurseforgeRaw ?? new();
 }
 
 /// <summary>Port of FTB::Version.</summary>
 public sealed class FtbVersion
 {
-    public int Id { get; set; }
-    public int Parent { get; set; }
-    public string Name { get; set; } = "";
-    public string Type { get; set; } = "";
-    public int Installs { get; set; }
-    public int Plays { get; set; }
-    public long Updated { get; set; }
+    [JsonPropertyName("id")]
+    public required int Id { get; set; }
+
+    [JsonPropertyName("parent")]
+    public required int Parent { get; set; }
+
+    [JsonPropertyName("name")]
+    public required string Name { get; set; }
+
+    [JsonPropertyName("type")]
+    public required string Type { get; set; }
+
+    [JsonPropertyName("installs")]
+    public required int Installs { get; set; }
+
+    [JsonPropertyName("plays")]
+    public required int Plays { get; set; }
+
+    [JsonPropertyName("updated")]
+    public required long Updated { get; set; }
+
+    // optional: toInt() truncates a fractional double (20.7 -> 20)
+    [JsonPropertyName("refreshed")]
+    [JsonConverter(typeof(QtCoercingLongConverter))]
     public long Refreshed { get; set; }
-    public FtbSpecs Specs { get; } = new();
-    public List<FtbVersionTarget> Targets { get; } = [];
-    public List<FtbVersionFile> Files { get; } = [];
-}
 
-public static class FtbPackManifest
-{
-    // ------------------------------------------------- node-model helpers
-    //
-    // JsonNode-typed receivers so the reads hit the JsonUtils node family (a JsonObject-typed
-    // receiver would silently resolve to the (JsonObject, key, what) element bridges).
+    [JsonPropertyName("specs")]
+    public required FtbSpecs Specs { get; init; }
 
-    /// <summary>QJsonValue cast to QJsonObject: "Value is not an object" for both a missing
-    /// value and a non-object (the array-entry paths).</summary>
-    private static JsonObject RequireObject(JsonNode? node)
-    {
-        return node as JsonObject ?? throw new JsonParseException("Value is not an object");
-    }
+    [JsonPropertyName("targets")]
+    public required List<FtbVersionTarget> Targets { get; init; }
 
-    /// <summary>Json::requireArray(parent, key) whose entries are objects.</summary>
-    private static List<JsonObject> RequireObjectArray(JsonNode parent, string key)
-    {
-        var result = new List<JsonObject>();
-        foreach (var item in JsonUtils.RequireArray(parent, key, "'" + key + "'"))
-        {
-            result.Add(RequireObject(item));
-        }
-
-        return result;
-    }
-
-    // ------------------------------------------------------------------- loaders
-
-    private static void LoadSpecs(FtbSpecs s, JsonNode obj)
-    {
-        s.Id = JsonUtils.RequireInteger(obj, "id", "'id'");
-        s.Minimum = JsonUtils.RequireInteger(obj, "minimum", "'minimum'");
-        s.Recommended = JsonUtils.RequireInteger(obj, "recommended", "'recommended'");
-    }
-
-    private static void LoadTag(FtbTag t, JsonNode obj)
-    {
-        t.Id = JsonUtils.RequireInteger(obj, "id", "'id'");
-        t.Name = JsonUtils.RequireString(obj, "name", "'name'");
-    }
-
-    private static void LoadArt(FtbArt a, JsonNode obj)
-    {
-        a.Id = JsonUtils.RequireInteger(obj, "id", "'id'");
-        a.Url = JsonUtils.RequireString(obj, "url", "'url'");
-        a.Type = JsonUtils.RequireString(obj, "type", "'type'");
-        a.Width = JsonUtils.RequireInteger(obj, "width", "'width'");
-        a.Height = JsonUtils.RequireInteger(obj, "height", "'height'");
-        a.Compressed = JsonUtils.RequireBoolean(obj, "compressed", "'compressed'");
-        a.Sha1 = JsonUtils.RequireString(obj, "sha1", "'sha1'");
-        a.Size = JsonUtils.EnsureInteger(obj["size"]); // optional
-        a.Updated = JsonUtils.RequireInteger(obj, "updated", "'updated'");
-    }
-
-    private static void LoadAuthor(FtbAuthor a, JsonNode obj)
-    {
-        a.Id = JsonUtils.RequireInteger(obj, "id", "'id'");
-        a.Name = JsonUtils.RequireString(obj, "name", "'name'");
-        a.Type = JsonUtils.RequireString(obj, "type", "'type'");
-        a.Website = JsonUtils.RequireString(obj, "website", "'website'");
-        a.Updated = JsonUtils.RequireInteger(obj, "updated", "'updated'");
-    }
-
-    private static void LoadVersionInfo(FtbVersionInfo v, JsonNode obj)
-    {
-        v.Id = JsonUtils.RequireInteger(obj, "id", "'id'");
-        v.Name = JsonUtils.RequireString(obj, "name", "'name'");
-        v.Type = JsonUtils.RequireString(obj, "type", "'type'");
-        v.Updated = JsonUtils.RequireInteger(obj, "updated", "'updated'");
-        LoadSpecs(v.Specs, JsonUtils.RequireObject(obj, "specs", "'specs'"));
-    }
-
-    /// <summary>Port of FTB::loadModpack.</summary>
-    public static void LoadModpack(FtbModpack m, JsonNode obj)
-    {
-        m.Id = JsonUtils.RequireInteger(obj, "id", "'id'");
-        m.Name = JsonUtils.RequireString(obj, "name", "'name'");
-        m.Synopsis = JsonUtils.RequireString(obj, "synopsis", "'synopsis'");
-        m.Description = JsonUtils.RequireString(obj, "description", "'description'");
-        m.Type = JsonUtils.RequireString(obj, "type", "'type'");
-        m.Featured = JsonUtils.RequireBoolean(obj, "featured", "'featured'");
-        m.Installs = JsonUtils.RequireInteger(obj, "installs", "'installs'");
-        m.Plays = JsonUtils.RequireInteger(obj, "plays", "'plays'");
-        m.Updated = JsonUtils.RequireInteger(obj, "updated", "'updated'");
-        m.Refreshed = JsonUtils.EnsureInteger(obj["refreshed"]); // optional
-
-        var artArr = RequireObjectArray(obj, "art");
-        foreach (var artObj in artArr)
-        {
-            var art = new FtbArt();
-            LoadArt(art, artObj);
-            m.Art.Add(art);
-        }
-
-        var authorArr = RequireObjectArray(obj, "authors");
-        foreach (var authorObj in authorArr)
-        {
-            var author = new FtbAuthor();
-            LoadAuthor(author, authorObj);
-            m.Authors.Add(author);
-        }
-
-        var versionArr = RequireObjectArray(obj, "versions");
-        foreach (var versionObj in versionArr)
-        {
-            var version = new FtbVersionInfo();
-            LoadVersionInfo(version, versionObj);
-            m.Versions.Add(version);
-        }
-
-        var tagArr = RequireObjectArray(obj, "tags");
-        foreach (var tagObj in tagArr)
-        {
-            var tag = new FtbTag();
-            LoadTag(tag, tagObj);
-            m.Tags.Add(tag);
-        }
-
-        m.Updated = JsonUtils.RequireInteger(obj, "updated", "'updated'");
-    }
-
-    private static void LoadVersionTarget(FtbVersionTarget a, JsonNode obj)
-    {
-        a.Id = JsonUtils.RequireInteger(obj, "id", "'id'");
-        a.Name = JsonUtils.RequireString(obj, "name", "'name'");
-        a.Type = JsonUtils.RequireString(obj, "type", "'type'");
-        a.Version = JsonUtils.RequireString(obj, "version", "'version'");
-        a.Updated = JsonUtils.RequireInteger(obj, "updated", "'updated'");
-    }
-
-    private static void LoadVersionFile(FtbVersionFile a, JsonNode obj)
-    {
-        a.Id = JsonUtils.RequireInteger(obj, "id", "'id'");
-        a.Type = JsonUtils.RequireString(obj, "type", "'type'");
-        a.Path = JsonUtils.RequireString(obj, "path", "'path'");
-        a.Name = JsonUtils.RequireString(obj, "name", "'name'");
-        a.Version = JsonUtils.RequireString(obj, "version", "'version'");
-        a.Url = JsonUtils.EnsureString(obj["url"]); // optional
-        a.Sha1 = JsonUtils.RequireString(obj, "sha1", "'sha1'");
-        a.Size = JsonUtils.EnsureInteger(obj["size"]); // optional
-        a.ClientOnly = JsonUtils.RequireBoolean(obj, "clientonly", "'clientonly'");
-        a.ServerOnly = JsonUtils.RequireBoolean(obj, "serveronly", "'serveronly'");
-        a.Optional = JsonUtils.RequireBoolean(obj, "optional", "'optional'");
-        a.Updated = JsonUtils.RequireInteger(obj, "updated", "'updated'");
-
-        var curseforgeObj = obj["curseforge"] as JsonObject; // optional
-        a.Curseforge.ProjectId = curseforgeObj is null ? 0 : JsonUtils.EnsureInteger(curseforgeObj["project"]);
-        a.Curseforge.FileId = curseforgeObj is null ? 0 : JsonUtils.EnsureInteger(curseforgeObj["file"]);
-    }
-
-    /// <summary>Port of FTB::loadVersion.</summary>
-    public static void LoadVersion(FtbVersion m, JsonNode obj)
-    {
-        m.Id = JsonUtils.RequireInteger(obj, "id", "'id'");
-        m.Parent = JsonUtils.RequireInteger(obj, "parent", "'parent'");
-        m.Name = JsonUtils.RequireString(obj, "name", "'name'");
-        m.Type = JsonUtils.RequireString(obj, "type", "'type'");
-        m.Installs = JsonUtils.RequireInteger(obj, "installs", "'installs'");
-        m.Plays = JsonUtils.RequireInteger(obj, "plays", "'plays'");
-        m.Updated = JsonUtils.RequireInteger(obj, "updated", "'updated'");
-        m.Refreshed = JsonUtils.EnsureInteger(obj["refreshed"]); // optional
-        LoadSpecs(m.Specs, JsonUtils.RequireObject(obj, "specs", "'specs'"));
-
-        var targetArr = RequireObjectArray(obj, "targets");
-        foreach (var targetObj in targetArr)
-        {
-            var target = new FtbVersionTarget();
-            LoadVersionTarget(target, targetObj);
-            m.Targets.Add(target);
-        }
-
-        var fileArr = RequireObjectArray(obj, "files");
-        foreach (var fileObj in fileArr)
-        {
-            var file = new FtbVersionFile();
-            LoadVersionFile(file, fileObj);
-            m.Files.Add(file);
-        }
-    }
+    [JsonPropertyName("files")]
+    public required List<FtbVersionFile> Files { get; init; }
 }

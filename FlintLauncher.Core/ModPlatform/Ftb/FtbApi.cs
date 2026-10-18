@@ -7,14 +7,32 @@
 // (tests construct their own client pointed at a stub; the install endpoint derives one
 // for its serverUrl override — see FtbEndpoints); the client rides the injected NetStack
 // (LauncherRuntime.Ftb — see the Modrinth/Flame de-singletoning for the same story). The
-// parsers are pure helpers and stay static; reads go through the JsonNode model.
+// parsers are pure helpers and stay static; the wire shapes deserialize through the
+// source-generated FtbJsonContext (the FTB models carry their annotations themselves).
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.ModPlatform.Ftb;
+
+/// <summary>The /modpack/all wire root; the pack ids coerce like QJsonValue::toInt()
+/// (fractional doubles truncate, junk zeroes) through the packs list converter.</summary>
+public sealed class FtbPackIndexFile
+{
+    [JsonPropertyName("packs")]
+    [JsonConverter(typeof(QtCoercingIntListConverter))]
+    public List<int> Packs { get; init; } = [];
+}
+
+[JsonSourceGenerationOptions(RespectNullableAnnotations = true)]
+[JsonSerializable(typeof(FtbPackIndexFile))]
+[JsonSerializable(typeof(FtbModpack))]
+[JsonSerializable(typeof(FtbVersion))]
+internal sealed partial class FtbJsonContext : JsonSerializerContext;
 
 public sealed class FtbApi(NetStack? net = null)
 {
@@ -83,49 +101,49 @@ public sealed class FtbApi(NetStack? net = null)
         }
     }
 
-    /// <summary>Parses the /modpack/all index (FtbListModel::requestFinished):
-    /// {"packs":[id,...]} -> the list of pack ids.</summary>
-    public static List<int> LoadModpackIndex(string response)
+    /// <summary>The shared document root: parse (with the "{what}: Error parsing JSON: ..."
+    /// wrapper), guard the object root kind, then deserialize the annotated model. Binding
+    /// failures (a missing required key, a malformed member, a JSON null for a required
+    /// member) ride the same parse wrapper.</summary>
+    private static T LoadRootDocument<T>(string json, JsonTypeInfo<T> typeInfo) where T : class
     {
-        var root = RequireDocument(response, "JSON response from FTB");
-        var packs = new List<int>();
-        if (root is JsonObject map && map["packs"] is JsonArray packsRaw)
+        var root = RequireDocument(json, "JSON response from FTB");
+        if (root is not JsonObject)
         {
-            foreach (var pack in packsRaw)
-            {
-                // QJsonValue::toInt() coercion: doubles truncate, junk becomes 0
-                packs.Add(JsonUtils.EnsureInteger(pack));
-            }
+            throw new JsonParseException("Document is not an object");
         }
 
-        return packs;
+        try
+        {
+            return JsonSerializer.Deserialize(root, typeInfo)
+                   ?? throw new JsonParseException("Document is not an object");
+        }
+        catch (JsonException e)
+        {
+            throw new JsonParseException("JSON response from FTB: Error parsing JSON: " + e.Message);
+        }
+    }
+
+    /// <summary>Parses the /modpack/all index (FtbListModel::requestFinished):
+    /// {"packs":[id,...]} -> the list of pack ids. A missing/invalid payload yields an
+    /// empty list — the dud-index tolerance of the C++ model.</summary>
+    public static List<int> LoadModpackIndex(string response)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize(response, FtbJsonContext.Default.FtbPackIndexFile)?.Packs ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     /// <summary>Parses a /modpack/{id} response (FtbListModel::packRequestFinished).</summary>
-    public static FtbModpack LoadModpack(string response)
-    {
-        var root = RequireDocument(response, "JSON response from FTB");
-        if (root is not JsonObject)
-        {
-            throw new JsonParseException("Document is not an object");
-        }
-
-        var pack = new FtbModpack();
-        FtbPackManifest.LoadModpack(pack, root);
-        return pack;
-    }
+    public static FtbModpack LoadModpack(string response) =>
+        LoadRootDocument(response, FtbJsonContext.Default.FtbModpack);
 
     /// <summary>Parses a /modpack/{id}/{versionId} response (PackInstallTask).</summary>
-    public static FtbVersion LoadVersion(string response)
-    {
-        var root = RequireDocument(response, "JSON response from FTB");
-        if (root is not JsonObject)
-        {
-            throw new JsonParseException("Document is not an object");
-        }
-
-        var version = new FtbVersion();
-        FtbPackManifest.LoadVersion(version, root);
-        return version;
-    }
+    public static FtbVersion LoadVersion(string response) =>
+        LoadRootDocument(response, FtbJsonContext.Default.FtbVersion);
 }

@@ -196,16 +196,20 @@ public class FtbTests : IDisposable
         var kindError = Assert.Throws<JsonParseException>(() => FtbApi.LoadModpack("[1,2]"));
         Assert.Equal("Document is not an object", kindError.Message);
 
-        // a missing required key keeps the "'key's parent does not contain 'key'" message
+        // a missing required key fails through the model's `required` members and rides the
+        // same parse wrapper (deviation: the STJ "missing required properties" text replaced
+        // the C++ "'key's parent does not contain 'key'" shape)
         var missing = Assert.Throws<JsonParseException>(() => FtbApi.LoadModpack("""{"id":1}"""));
-        Assert.Equal("'name's parent does not contain 'name'", missing.Message);
+        Assert.StartsWith("JSON response from FTB: Error parsing JSON: ", missing.Message);
+        Assert.Contains("name", missing.Message);
 
-        // a non-integer for a required int keeps the fmod check
+        // a non-integer for a required int fails the strict int binding the same way
         var notInt = Assert.Throws<JsonParseException>(() => FtbApi.LoadVersion("""
                                                                                 {"id":1.5,"parent":0,"name":"n","type":"t",
                                                                                  "installs":0,"plays":0,"updated":0,"specs":{"id":1,"minimum":1,"recommended":1}}
                                                                                 """));
-        Assert.Equal("'id' is not an integer", notInt.Message);
+        Assert.StartsWith("JSON response from FTB: Error parsing JSON: ", notInt.Message);
+        Assert.Contains("id", notInt.Message);
     }
 
     // ----------------------------------------------------------------------- model

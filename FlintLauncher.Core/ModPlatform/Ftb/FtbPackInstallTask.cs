@@ -33,7 +33,9 @@ public sealed class FtbPackInstallTask(
     private readonly FlameApi _flame = flame ?? new FlameApi();
     private readonly FtbApi _ftb = ftb ?? new FtbApi();
 
-    private readonly FtbVersion _version = new();
+    // assigned by OnManifestDownloadSucceeded before any read (required members make the
+    // model constructible only through deserialization)
+    private FtbVersion _version = null!;
     private readonly List<long> _fileIds = [];
     private readonly List<BlockedMod> _blockedMods = [];
 
@@ -80,8 +82,9 @@ public sealed class FtbPackInstallTask(
     {
         try
         {
-            var loaded = FtbApi.LoadVersion(response);
-            CopyInto(_version, loaded);
+            // the deserialized payload replaces the (not yet populated) version wholesale;
+            // reads below only run after this assignment
+            _version = FtbApi.LoadVersion(response);
         }
         catch (JsonParseException e)
         {
@@ -90,22 +93,6 @@ public sealed class FtbPackInstallTask(
         }
 
         await ResolveMods(cancellationToken);
-    }
-
-    private static void CopyInto(FtbVersion target, FtbVersion source)
-    {
-        target.Id = source.Id;
-        target.Parent = source.Parent;
-        target.Name = source.Name;
-        target.Type = source.Type;
-        target.Installs = source.Installs;
-        target.Plays = source.Plays;
-        target.Updated = source.Updated;
-        target.Refreshed = source.Refreshed;
-        (target.Specs.Id, target.Specs.Minimum, target.Specs.Recommended) =
-            (source.Specs.Id, source.Specs.Minimum, source.Specs.Recommended);
-        target.Targets.AddRange(source.Targets);
-        target.Files.AddRange(source.Files);
     }
 
     private async Task ResolveMods(CancellationToken cancellationToken)
