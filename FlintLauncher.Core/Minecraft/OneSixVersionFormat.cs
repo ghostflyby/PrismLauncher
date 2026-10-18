@@ -5,7 +5,9 @@
 // "document is empty or null" branch cannot trigger for an object); the upstream bug where
 // versionFileToJson serializes jarMods into the "mods" array is preserved and marked.
 
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization.Metadata;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Json;
@@ -15,25 +17,32 @@ namespace FlintLauncher.Core.Minecraft;
 
 public static partial class OneSixVersionFormat
 {
-    private static string ReadString(JsonObject root, string key, string current)
+    /// <summary>The probe read over a JsonObject: shape failures keep the "{what}: Error
+    /// parsing JSON: ..." wrapper family.</summary>
+    private static T Probe<T>(JsonNode node, string what, JsonTypeInfo<T> typeInfo) where T : class
     {
-        return root.Contains(key) ? JsonUtils.RequireString(root, key, "Value") : current;
-    }
-
-    /// <summary>root.value(key) as a node (for the require*(JsonNode) overload shape).</summary>
-    private static JsonNode? ValueOf(JsonObject root, string key)
-    {
-        return root[key];
+        try
+        {
+            return JsonSerializer.Deserialize(node, typeInfo)
+                   ?? throw new JsonParseException(what + ": Error parsing JSON: document is null");
+        }
+        catch (JsonException e)
+        {
+            throw new JsonParseException(what + ": Error parsing JSON: " + e.Message);
+        }
     }
 
     public static Library LibraryFromJson(ProblemContainer problems, JsonObject libObj, string filename)
     {
-        var outLib = MojangVersionFormat.LibraryFromJson(problems, libObj, filename);
-        outLib.Hint = ReadString(libObj, "MMC-hint", outLib.Hint);
-        outLib.AbsoluteUrl = ReadString(libObj, "MMC-absulute_url", outLib.AbsoluteUrl);
-        outLib.AbsoluteUrl = ReadString(libObj, "MMC-absoluteUrl", outLib.AbsoluteUrl);
-        outLib.FilenameOverride = ReadString(libObj, "MMC-filename", outLib.FilenameOverride);
-        outLib.DisplayNameValue = ReadString(libObj, "MMC-displayname", outLib.DisplayNameValue);
+        var dto = Probe(libObj, filename, VersionFormatJsonContext.Default.LibraryJson);
+        return MapLib(dto, problems, filename);
+    }
+
+    /// <summary>The OneSix library mapping: the Mojang half plus the MMC extension keys.</summary>
+    private static Library MapLib(LibraryJson dto, ProblemContainer problems, string filename)
+    {
+        var outLib = VersionFormatMapper.MapLibrary(dto, problems, filename);
+        VersionFormatMapper.MapMmcLibrary(dto, outLib);
         return outLib;
     }
 
@@ -79,26 +88,21 @@ public static partial class OneSixVersionFormat
                 throw new JsonParseException(filename + " does not contain a recognizable version of the metadata format.");
         }
 
+        var dto = Probe(root, filename, VersionFormatJsonContext.Default.VersionFileJson);
+
         if (requireOrder)
         {
-            if (root.Contains("order"))
+            if (dto.Order is { } order)
             {
-                outInfo.Order = JsonUtils.RequireInteger(root, "order", "Value");
+                outInfo.Order = order;
             }
             // FIXME upstream: evaluate if we don't want to throw exceptions here instead
             // qCritical() << filename << "doesn't contain an order field";
         }
 
-        outInfo.Name = root.StringOr("name");
+        outInfo.Name = dto.Name ?? "";
 
-        if (root.Contains("uid"))
-        {
-            outInfo.Uid = root.StringOr("uid");
-        }
-        else
-        {
-            outInfo.Uid = root.StringOr("fileId");
-        }
+        outInfo.Uid = dto.Uid ?? dto.FileId ?? "";
 
         if (!ValidUidRegex().IsMatch(outInfo.Uid))
         {
@@ -107,125 +111,114 @@ public static partial class OneSixVersionFormat
                 "The component's 'uid' contains illegal characters! This can cause security issues.");
         }
 
-        outInfo.Version = root.StringOr("version");
+        outInfo.Version = dto.Version ?? "";
 
-        MojangVersionFormat.ReadVersionProperties(root, outInfo);
+        VersionFormatMapper.MapVersionProperties(dto, outInfo);
 
         // added for legacy Minecraft window embedding, TODO: remove
-        outInfo.AppletClass = ReadString(root, "appletClass", outInfo.AppletClass);
-
-        if (root.Contains("+tweakers"))
+        if (dto.AppletClass is not null)
         {
-            foreach (var tweakerVal in JsonUtils.RequireArray(ValueOf(root, "+tweakers")))
+            outInfo.AppletClass = dto.AppletClass;
+        }
+
+        if (dto.AddTweakers is { } tweakers)
+        {
+            outInfo.AddTweakers.AddRange(tweakers);
+        }
+
+        if (dto.AddTraits is { } traits)
+        {
+            foreach (var trait in traits)
             {
-                outInfo.AddTweakers.Add(JsonUtils.RequireString(tweakerVal));
+                outInfo.Traits.Add(trait);
             }
         }
 
-        if (root.Contains("+traits"))
+        if (dto.AddJvmArgs is { } jvmArgs)
         {
-            foreach (var traitVal in JsonUtils.RequireArray(ValueOf(root, "+traits")))
-            {
-                outInfo.Traits.Add(JsonUtils.RequireString(traitVal));
-            }
+            outInfo.AddnJvmArguments.AddRange(jvmArgs);
         }
 
-        if (root.Contains("+jvmArgs"))
+        if (dto.JarMods is { } jarMods)
         {
-            foreach (var arg in JsonUtils.RequireArray(ValueOf(root, "+jvmArgs")))
+            foreach (var libDto in jarMods)
             {
-                outInfo.AddnJvmArguments.Add(JsonUtils.RequireString(arg));
+                // parse the jarmod and add to jar mods
+                outInfo.JarMods.Add(MapLib(libDto, outInfo, filename));
             }
         }
-
-        if (root.Contains("jarMods"))
+        else if (dto.PlusJarMods is { } plusJarMods) // DEPRECATED: old style, backwards compatibility only
         {
-            foreach (var libVal in JsonUtils.RequireArray(ValueOf(root, "jarMods")))
+            foreach (var entry in plusJarMods)
             {
-                var libObj = JsonUtils.RequireObject(libVal);
-                // parse the jarmod
-                var lib = JarModFromJson(outInfo, libObj, filename);
-                // and add to jar mods
+                var parts = VersionFormatMapper.MapPlusJarMod(entry, filename, outInfo.Name);
+                // just make up something unique on the spot for the library name.
+                var lib = new Library
+                {
+                    Name = new GradleSpecifier("org.multimc.jarmods:" + Guid.NewGuid().ToString() + ":1"),
+                    // the filename override is the old name; it needs to be local, it is
+                    // stored in the instance jarmods folder
+                    FilenameOverride = parts.FilenameOverride,
+                    Hint = "local",
+                    DisplayNameValue = parts.DisplayName,
+                };
                 outInfo.JarMods.Add(lib);
             }
         }
-        else if (root.Contains("+jarMods")) // DEPRECATED: old style '+jarMods' are only here for backwards compatibility
+
+        if (dto.Mods is { } mods)
         {
-            foreach (var libVal in JsonUtils.RequireArray(ValueOf(root, "+jarMods")))
+            foreach (var libDto in mods)
             {
-                var libObj = JsonUtils.RequireObject(libVal);
-                // parse the jarmod
-                var lib = PlusJarModFromJson(outInfo, libObj, filename, outInfo.Name);
-                // and add to jar mods
-                outInfo.JarMods.Add(lib);
+                outInfo.Mods.Add(MapLib(libDto, outInfo, filename));
             }
         }
 
-        if (root.Contains("mods"))
-        {
-            foreach (var libVal in JsonUtils.RequireArray(ValueOf(root, "mods")))
-            {
-                var libObj = JsonUtils.RequireObject(libVal);
-                // parse the mod
-                var lib = ModFromJson(outInfo, libObj, filename);
-                // and add to mods
-                outInfo.Mods.Add(lib);
-            }
-        }
-
-        void ReadLibs(string which, List<Library> outList)
-        {
-            foreach (var libVal in JsonUtils.RequireArray(ValueOf(root, which)))
-            {
-                var libObj = JsonUtils.RequireObject(libVal);
-                // parse the library
-                var lib = LibraryFromJson(outInfo, libObj, filename);
-                outList.Add(lib);
-            }
-        }
-
-        var hasPlusLibs = root.Contains("+libraries");
-        var hasLibs = root.Contains("libraries");
+        var hasPlusLibs = dto.PlusLibraries is not null;
+        var hasLibs = dto.Libraries is not null;
         if (hasPlusLibs && hasLibs)
         {
             outInfo.AddProblem(ProblemSeverity.Warning,
                 "Version file has both '+libraries' and 'libraries'. This is no longer supported.");
-            ReadLibs("libraries", outInfo.Libraries);
-            ReadLibs("+libraries", outInfo.Libraries);
-        }
-        else if (hasLibs)
-        {
-            ReadLibs("libraries", outInfo.Libraries);
-        }
-        else if (hasPlusLibs)
-        {
-            ReadLibs("+libraries", outInfo.Libraries);
         }
 
-        if (root.Contains("mavenFiles"))
+        if (hasLibs)
         {
-            ReadLibs("mavenFiles", outInfo.MavenFiles);
-        }
-
-        if (root.Contains("+agents"))
-        {
-            foreach (var agentVal in JsonUtils.RequireArray(ValueOf(root, "+agents")))
+            foreach (var libDto in dto.Libraries!)
             {
-                var agentObj = JsonUtils.RequireObject(agentVal);
-                var lib = LibraryFromJson(outInfo, agentObj, filename);
+                outInfo.Libraries.Add(MapLib(libDto, outInfo, filename));
+            }
+        }
 
-                var arg = "";
-                arg = ReadString(agentObj, "argument", arg);
+        if (hasPlusLibs)
+        {
+            foreach (var libDto in dto.PlusLibraries!)
+            {
+                outInfo.Libraries.Add(MapLib(libDto, outInfo, filename));
+            }
+        }
 
-                outInfo.Agents.Add(new Agent(lib, arg));
+        if (dto.MavenFiles is { } mavenFiles)
+        {
+            foreach (var libDto in mavenFiles)
+            {
+                outInfo.MavenFiles.Add(MapLib(libDto, outInfo, filename));
+            }
+        }
+
+        if (dto.Agents is { } agents)
+        {
+            foreach (var agentDto in agents)
+            {
+                var lib = MapLib(agentDto, outInfo, filename);
+                outInfo.Agents.Add(new Agent(lib, agentDto.Argument ?? ""));
             }
         }
 
         // if we have mainJar, just use it
-        if (root.Contains("mainJar"))
+        if (dto.MainJar is { } mainJarDto)
         {
-            var libObj = JsonUtils.RequireObject(root, "mainJar");
-            outInfo.MainJar = LibraryFromJson(outInfo, libObj, filename);
+            outInfo.MainJar = MapLib(mainJarDto, outInfo, filename);
         }
         // else reconstruct it from downloads and id ... if that's available
         else if (outInfo.MinecraftVersion.Length != 0)
@@ -258,8 +251,7 @@ public static partial class OneSixVersionFormat
             MetaJsonFormat.ParseRequires(root, outInfo.Requires);
         }
 
-        var dependsOnMinecraftVersion = root.StringOr("mcVersion");
-        if (dependsOnMinecraftVersion.Length != 0)
+        if (dto.McVersion is { Length: > 0 } dependsOnMinecraftVersion)
         {
             var mcReq = new Require
             {
@@ -277,42 +269,42 @@ public static partial class OneSixVersionFormat
             MetaJsonFormat.ParseRequires(root, outInfo.Conflicts, "conflicts");
         }
 
-        if (root.Contains("volatile"))
+        if (dto.Volatile is { } volatileFlag)
         {
-            outInfo.Volatile = JsonUtils.RequireBoolean(root, "volatile", "Value");
+            outInfo.Volatile = volatileFlag;
         }
 
-        if (root.Contains("runtimes"))
+        if (dto.Runtimes is { } runtimes)
         {
             outInfo.Runtimes = [];
-            foreach (var runtime in JsonUtils.RequireArray(ValueOf(root, "runtimes")))
+            foreach (var runtime in runtimes)
             {
-                outInfo.Runtimes.Add(JavaMetadata.ParseJavaMeta(JsonUtils.RequireObject(runtime)));
+                outInfo.Runtimes.Add(VersionFormatMapper.MapJavaRuntime(runtime));
             }
         }
 
         /* removed features that shouldn't be used */
-        if (root.Contains("tweakers"))
+        if (dto.RemovedTweakers is not null)
         {
             outInfo.AddProblem(ProblemSeverity.Error, "Version file contains unsupported element 'tweakers'");
         }
 
-        if (root.Contains("-libraries"))
+        if (dto.RemovedLibraries is not null)
         {
             outInfo.AddProblem(ProblemSeverity.Error, "Version file contains unsupported element '-libraries'");
         }
 
-        if (root.Contains("-tweakers"))
+        if (dto.RemovedTweakersDash is not null)
         {
             outInfo.AddProblem(ProblemSeverity.Error, "Version file contains unsupported element '-tweakers'");
         }
 
-        if (root.Contains("-minecraftArguments"))
+        if (dto.RemovedMinecraftArguments is not null)
         {
             outInfo.AddProblem(ProblemSeverity.Error, "Version file contains unsupported element '-minecraftArguments'");
         }
 
-        if (root.Contains("+minecraftArguments"))
+        if (dto.RemovedPlusMinecraftArguments is not null)
         {
             outInfo.AddProblem(ProblemSeverity.Error, "Version file contains unsupported element '+minecraftArguments'");
         }
@@ -430,35 +422,19 @@ public static partial class OneSixVersionFormat
         string filename,
         string originalName)
     {
-        var outLib = new Library();
-        if (!libObj.Contains("name"))
-        {
-            throw new JsonParseException(filename + "contains a jarmod that doesn't have a 'name' field");
-        }
+        var dto = Probe(libObj, filename, VersionFormatJsonContext.Default.PlusJarModJson);
+        var parts = VersionFormatMapper.MapPlusJarMod(dto, filename, originalName);
 
         // just make up something unique on the spot for the library name.
-        var id = Guid.NewGuid().ToString(); // QUuid::createUuid().toString(QUuid::WithoutBraces)
-        outLib.Name = new GradleSpecifier("org.multimc.jarmods:" + id + ":1");
-
-        // filename override is the old name
-        outLib.FilenameOverride = libObj.StringOr("name");
-
-        // it needs to be local, it is stored in the instance jarmods folder
-        outLib.Hint = "local";
-
-        // read the original name if present - some versions did not set it
-        // it is the original jar mod filename before it got renamed at the point of addition
-        var displayName = libObj.StringOr("originalName");
-        if (displayName.Length == 0)
+        var outLib = new Library
         {
-            var fixedName = originalName.Replace(" (jar mod)", "");
-            outLib.DisplayNameValue = fixedName;
-        }
-        else
-        {
-            outLib.DisplayNameValue = displayName;
-        }
-
+            Name = new GradleSpecifier("org.multimc.jarmods:" + Guid.NewGuid().ToString() + ":1"),
+            // the filename override is the old name; it needs to be local, it is stored in
+            // the instance jarmods folder
+            FilenameOverride = parts.FilenameOverride,
+            Hint = "local",
+            DisplayNameValue = parts.DisplayName,
+        };
         return outLib;
     }
 

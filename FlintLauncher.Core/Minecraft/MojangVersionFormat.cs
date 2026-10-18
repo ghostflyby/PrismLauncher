@@ -6,7 +6,9 @@
 // of a missing space in "<filename>contains a library that doesn't have a 'name' field" is
 // preserved.
 
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization.Metadata;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Json;
 
@@ -14,66 +16,36 @@ namespace FlintLauncher.Core.Minecraft;
 
 public static class MojangVersionFormat
 {
-    private const int CurrentMinimumLauncherVersion = 18;
+    internal const int CurrentMinimumLauncherVersion = 18;
 
-    // ------------------------------------------------------------------ Bits namespace
+    // ------------------------------------------------------------------ read side
     //
-    // Node-side member readers (FlameJson convention): the helper parameters are JsonNode? so
-    // JsonObject arguments upcast at the call site instead of re-binding the (JsonObject, key,
-    // what) element-bridge overloads — see the JsonUtils node-family migration rule.
+    // The read side deserializes the VersionFormatJson probes (VersionFormatJson.cs) and maps
+    // them onto the domain objects; a malformed document fails whole with the collapsed kind
+    // texts. The write side below is the byte-tested Qt tail (sorted keys, 4-space indent).
 
-    /// <summary>obj["key"] equivalent: null node when missing or not an object.</summary>
-    private static JsonNode? Ptr(JsonNode? node, string key) => node is JsonObject obj ? obj[key] : null;
-
-    /// <summary>QJsonObject::contains(key) equivalent: true even when the member holds JSON null.</summary>
-    private static bool Has(JsonNode? node, string key) => node is JsonObject obj && obj.Contains(key);
-
-    /// <summary>root.value(key).toString(default) equivalent.</summary>
-    private static string Str(JsonNode? node, string key, string def = "") =>
-        JsonObjectExtensions.StringOr(Ptr(node, key), def);
-
-    private static string ReadString(JsonNode root, string key, string current)
+    /// <summary>The probe read over a node: shape failures keep the "{what}: Error parsing
+    /// JSON: ..." wrapper family of the former RequireDocument reads.</summary>
+    private static T Probe<T>(JsonNode node, string what, JsonTypeInfo<T> typeInfo) where T : class
     {
-        return Has(root, key) ? JsonUtils.RequireString(Ptr(root, key)) : current;
-    }
-
-    private static void ReadDownloadInfo(MojangDownloadInfo outInfo, JsonNode obj)
-    {
-        // optional, not used
-        if (Has(obj, "path"))
+        try
         {
-            outInfo.Path = JsonUtils.RequireString(Ptr(obj, "path"));
+            return JsonSerializer.Deserialize(node, typeInfo)
+                   ?? throw new JsonParseException(what + ": Error parsing JSON: document is null");
         }
-
-        // required!
-        outInfo.Sha1 = JsonUtils.RequireString(obj, "sha1", "'sha1'");
-        outInfo.Url = JsonUtils.RequireString(obj, "url", "'url'");
-        outInfo.Size = JsonUtils.RequireInteger(obj, "size", "'size'");
-    }
-
-    private static void ReadAssetIndex(MojangAssetIndexInfo outInfo, JsonNode obj)
-    {
-        outInfo.TotalSize = JsonUtils.RequireInteger(obj, "totalSize", "'totalSize'");
-        outInfo.Id = JsonUtils.RequireString(obj, "id", "'id'");
-        // outInfo.Known = true;
+        catch (JsonException e)
+        {
+            throw new JsonParseException(what + ": Error parsing JSON: " + e.Message);
+        }
     }
 
     // ------------------------------------------------------------------ download info
 
-    public static MojangDownloadInfo DownloadInfoFromJson(JsonNode obj)
-    {
-        var outInfo = new MojangDownloadInfo();
-        ReadDownloadInfo(outInfo, obj);
-        return outInfo;
-    }
+    public static MojangDownloadInfo DownloadInfoFromJson(JsonNode obj) =>
+        VersionFormatMapper.MapDownloadInfo(Probe(obj, "download info", VersionFormatJsonContext.Default.MojangDownloadInfoJson));
 
-    public static MojangAssetIndexInfo AssetIndexFromJson(JsonNode obj)
-    {
-        var outInfo = new MojangAssetIndexInfo();
-        ReadDownloadInfo(outInfo, obj);
-        ReadAssetIndex(outInfo, obj);
-        return outInfo;
-    }
+    public static MojangAssetIndexInfo AssetIndexFromJson(JsonNode obj) =>
+        VersionFormatMapper.MapAssetIndex(Probe(obj, "asset index", VersionFormatJsonContext.Default.MojangAssetIndexJson));
 
     public static JsonObject DownloadInfoToJson(MojangDownloadInfo info)
     {
@@ -89,28 +61,9 @@ public static class MojangVersionFormat
         return outObj;
     }
 
-    public static MojangLibraryDownloadInfo LibDownloadInfoFromJson(JsonNode libObj)
-    {
-        var outInfo = new MojangLibraryDownloadInfo();
-        JsonNode dlObj = JsonUtils.RequireObject(Ptr(libObj, "downloads"));
-        if (Has(dlObj, "artifact"))
-        {
-            outInfo.Artifact = DownloadInfoFromJson(JsonUtils.RequireObject(dlObj, "artifact", "'artifact'"));
-        }
-
-        if (Has(dlObj, "classifiers"))
-        {
-            var classifiersObj = JsonUtils.RequireObject(dlObj, "classifiers", "'classifiers'");
-            foreach (var iter in classifiersObj)
-            {
-                var classifierObj = iter.Value as JsonObject
-                                    ?? throw new JsonParseException("Value is not an object");
-                outInfo.Classifiers[iter.Key] = DownloadInfoFromJson(classifierObj);
-            }
-        }
-
-        return outInfo;
-    }
+    public static MojangLibraryDownloadInfo LibDownloadInfoFromJson(JsonNode libObj) =>
+        VersionFormatMapper.MapLibDownloads(
+            Probe(libObj, "library downloads", VersionFormatJsonContext.Default.MojangLibraryDownloadsJson));
 
     public static JsonObject LibDownloadInfoToJson(MojangLibraryDownloadInfo libinfo)
     {
@@ -153,61 +106,8 @@ public static class MojangVersionFormat
     // ------------------------------------------------------------------ version file
 
     /// <summary>does not include libraries</summary>
-    public static void ReadVersionProperties(JsonNode inObj, VersionFile outInfo)
-    {
-        outInfo.MinecraftVersion = ReadString(inObj, "id", outInfo.MinecraftVersion);
-        outInfo.MainClass = ReadString(inObj, "mainClass", outInfo.MainClass);
-        outInfo.MinecraftArguments = ReadString(inObj, "minecraftArguments", outInfo.MinecraftArguments);
-        outInfo.Type = ReadString(inObj, "type", outInfo.Type);
-
-        outInfo.Assets = ReadString(inObj, "assets", outInfo.Assets);
-        if (Has(inObj, "assetIndex"))
-        {
-            outInfo.MojangAssetIndex = AssetIndexFromJson(JsonUtils.RequireObject(inObj, "assetIndex", "'assetIndex'"));
-        }
-        else if (outInfo.Assets.Length != 0)
-        {
-            outInfo.MojangAssetIndex = new MojangAssetIndexInfo(outInfo.Assets);
-        }
-
-        outInfo.ReleaseTime = ParseUtils.TimeFromS3Time(Str(inObj, "releaseTime"));
-        outInfo.UpdateTime = ParseUtils.TimeFromS3Time(Str(inObj, "time"));
-
-        if (Has(inObj, "minimumLauncherVersion"))
-        {
-            outInfo.MinimumLauncherVersion = JsonUtils.RequireInteger(Ptr(inObj, "minimumLauncherVersion"));
-            if (outInfo.MinimumLauncherVersion > CurrentMinimumLauncherVersion)
-            {
-                outInfo.AddProblem(ProblemSeverity.Warning,
-                    $"The 'minimumLauncherVersion' value of this version ({outInfo.MinimumLauncherVersion}) is higher than " +
-                    $"supported by {FlintConfig.Default.LauncherDisplayName} ({CurrentMinimumLauncherVersion}). It might not work properly!");
-            }
-        }
-
-        if (Has(inObj, "compatibleJavaMajors"))
-        {
-            foreach (var compatible in JsonUtils.RequireArray(Ptr(inObj, "compatibleJavaMajors")))
-            {
-                outInfo.CompatibleJavaMajors.Add(JsonUtils.RequireInteger(compatible));
-            }
-        }
-
-        if (Has(inObj, "compatibleJavaName"))
-        {
-            outInfo.CompatibleJavaName = JsonUtils.RequireString(Ptr(inObj, "compatibleJavaName"));
-        }
-
-        if (Has(inObj, "downloads"))
-        {
-            var downloadsObj = JsonUtils.RequireObject(inObj, "downloads", "'downloads'");
-            foreach (var iter in downloadsObj)
-            {
-                var classifierObj = iter.Value as JsonObject
-                                    ?? throw new JsonParseException("Value is not an object");
-                outInfo.MojangDownloads[iter.Key] = DownloadInfoFromJson(classifierObj);
-            }
-        }
-    }
+    public static void ReadVersionProperties(JsonNode inObj, VersionFile outInfo) =>
+        VersionFormatMapper.MapVersionProperties(Probe(inObj, "version file", VersionFormatJsonContext.Default.VersionFileJson), outInfo);
 
     public static VersionFile VersionFileFromJson(JsonNode? root, string filename)
     {
@@ -230,22 +130,20 @@ public static class MojangVersionFormat
     /// </summary>
     public static VersionFile VersionFileFromJsonObject(JsonObject root, string filename)
     {
+        var dto = Probe(root, filename, VersionFormatJsonContext.Default.VersionFileJson);
         var outInfo = new VersionFile();
 
-        ReadVersionProperties(root, outInfo);
+        VersionFormatMapper.MapVersionProperties(dto, outInfo);
 
         outInfo.Name = "Minecraft";
         outInfo.Uid = "net.minecraft";
         outInfo.Version = outInfo.MinecraftVersion;
 
-        if (root.Contains("libraries"))
+        if (dto.Libraries is { } libraries)
         {
-            foreach (var libVal in JsonUtils.RequireArray(Ptr(root, "libraries")))
+            foreach (var libDto in libraries)
             {
-                var libObj = JsonUtils.RequireObject(libVal);
-
-                var lib = LibraryFromJson(outInfo, libObj, filename);
-                outInfo.Libraries.Add(lib);
+                outInfo.Libraries.Add(VersionFormatMapper.MapLibrary(libDto, outInfo, filename));
             }
         }
 
@@ -329,68 +227,9 @@ public static class MojangVersionFormat
 
     // ------------------------------------------------------------------ libraries
 
-    public static Library LibraryFromJson(ProblemContainer problems, JsonNode libObj, string filename)
-    {
-        var outLib = new Library();
-        if (!Has(libObj, "name"))
-        {
-            throw new JsonParseException(filename + "contains a library that doesn't have a 'name' field");
-        }
-
-        var rawName = Str(libObj, "name");
-        outLib.Name = new GradleSpecifier(rawName);
-        if (!outLib.Name.IsValid)
-        {
-            problems.AddProblem(ProblemSeverity.Error, $"Library {rawName} name is broken and cannot be processed.");
-        }
-
-        outLib.RepositoryUrl = ReadString(libObj, "url", outLib.RepositoryUrl);
-        if (Has(libObj, "extract"))
-        {
-            outLib.HasExcludes = true;
-            var extractObj = JsonUtils.RequireObject(Ptr(libObj, "extract"));
-            extractObj.TryGetPropertyValue("exclude", out var excludeNode);
-            foreach (var excludeVal in JsonUtils.RequireArray(excludeNode))
-            {
-                outLib.ExtractExcludes.Add(JsonUtils.RequireString(excludeVal));
-            }
-        }
-
-        if (Has(libObj, "natives"))
-        {
-            var nativesObj = JsonUtils.RequireObject(Ptr(libObj, "natives"));
-            foreach (var it in nativesObj)
-            {
-                if (it.Value is not JsonValue nativeValue || !nativeValue.TryGetValue<string>(out _))
-                {
-                    // qWarning() << filename << "contains an invalid native (skipping)";
-                }
-
-                // FIXME upstream: Skip unknown platforms
-                outLib.NativeClassifiers[it.Key] = JsonUtils.EnsureString(it.Value);
-            }
-        }
-
-        if (Has(libObj, "rules"))
-        {
-            outLib.ApplyRules = true;
-
-            var rulesArray = JsonUtils.RequireArray(Ptr(libObj, "rules"));
-            foreach (var rule in rulesArray)
-            {
-                var ruleObj = rule as JsonObject
-                              ?? throw new JsonParseException("Value is not an object");
-                outLib.Rules.Add(Rule.FromJson(ruleObj));
-            }
-        }
-
-        if (Has(libObj, "downloads"))
-        {
-            outLib.MojangDownloads = LibDownloadInfoFromJson(libObj);
-        }
-
-        return outLib;
-    }
+    public static Library LibraryFromJson(ProblemContainer problems, JsonNode libObj, string filename) =>
+        VersionFormatMapper.MapLibrary(
+            Probe(libObj, filename, VersionFormatJsonContext.Default.LibraryJson), problems, filename);
 
     public static JsonObject LibraryToJson(Library library)
     {

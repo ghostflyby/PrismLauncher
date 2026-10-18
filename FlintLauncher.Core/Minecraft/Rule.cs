@@ -2,8 +2,11 @@
 // Port of launcher/minecraft/Rule.{h,cpp} (allow/disallow rules with an optional OS
 // condition; the OS check delegates to RuntimeContext::classifierMatches).
 
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization.Metadata;
 using FlintLauncher.Core.Java;
+using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.Minecraft;
 
@@ -29,37 +32,33 @@ public class Rule
 
     private Os? os;
 
-    /// <summary>true when the JSON string member equals the given text (QJsonValue == QString).</summary>
-    private static bool StringIs(JsonObject obj, string key, string value)
-    {
-        return obj.TryGetPropertyValue(key, out var node) && JsonObjectExtensions.StringOr(node) == value;
-    }
-
     public static Rule FromJson(JsonObject obj)
     {
-        var result = new Rule();
-
-        if (StringIs(obj, "action", "allow"))
+        RuleJson? dto;
+        try
         {
-            result.action = Action.Allow;
+            dto = JsonSerializer.Deserialize(obj, VersionFormatJsonContext.Default.RuleJson)
+                  ?? throw new JsonParseException("Rule: Error parsing JSON: document is null");
         }
-        else if (StringIs(obj, "action", "disallow"))
+        catch (JsonException e)
         {
-            result.action = Action.Disallow;
+            throw new JsonParseException("Rule: Error parsing JSON: " + e.Message);
         }
 
-        if (obj.TryGetPropertyValue("os", out var os) && os is JsonObject osObj)
+        return VersionFormatMapper.MapRule(dto);
+    }
+
+    /// <summary>The typed-probe seam (RuleJson arrives from the version format readers).</summary>
+    internal static Rule FromWire(Action action, string? osName, string osVersion)
+    {
+        var result = new Rule { action = action };
+        if (osName is not null)
         {
-            if (osObj.TryGetPropertyValue("name", out var name) &&
-                name is JsonValue nameValue &&
-                nameValue.TryGetValue<string>(out var nameStr))
+            result.os = new Os
             {
-                result.os = new Os
-                {
-                    Name = nameStr,
-                    Version = osObj.StringOr("version"),
-                };
-            }
+                Name = osName,
+                Version = osVersion,
+            };
         }
 
         return result;

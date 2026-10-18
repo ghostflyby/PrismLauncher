@@ -11,12 +11,17 @@
 // FlintLauncher.Core.Minecraft namespace so its many consumers keep compiling; that is also
 // why this file uses classic block-scoped namespaces instead of the file-scoped form.
 
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Text;
 
 namespace FlintLauncher.Core.Java;
+
+[JsonSerializable(typeof(JavaRuntimeJson))]
+internal sealed partial class JavaJsonContext : JsonSerializerContext;
 
 public enum JavaDownloadType
 {
@@ -36,7 +41,7 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
     /// <summary>Port of BaseVersion::typeString().</summary>
     public string TypeString() => Vendor;
 
-    private string name = "";
+    internal string name = "";
 
     public string Vendor { get; set; } = "";
 
@@ -78,43 +83,49 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
 
     public static JavaMetadata ParseJavaMeta(JsonObject obj)
     {
+        var meta = MapJavaMeta(obj);
+        return meta;
+    }
+
+    /// <summary>The typed read over the runtime entry: the members keep their
+    /// QJsonValue fallbacks (toString(default "") / toInteger(0)).</summary>
+    internal static JavaMetadata MapJavaMeta(JavaRuntimeJson dto)
+    {
         var meta = new JavaMetadata
         {
-            name = obj.StringOr("name"),
-            Vendor = obj.StringOr("vendor"),
-            Url = obj.StringOr("url"),
-            ReleaseTime = ParseUtils.TimeFromS3Time(obj.StringOr("releaseTime")),
-            DownloadType = ParseDownloadType(obj.StringOr("downloadType")),
-            PackageType = obj.StringOr("packageType"),
-            RuntimeOs = obj.StringOr("runtimeOS", "unknown")
+            name = dto.Name ?? "",
+            Vendor = dto.Vendor ?? "",
+            Url = dto.Url ?? "",
+            ReleaseTime = ParseUtils.TimeFromS3Time(dto.ReleaseTime ?? ""),
+            DownloadType = ParseDownloadType(dto.DownloadType ?? ""),
+            PackageType = dto.PackageType ?? "",
+            RuntimeOs = dto.RuntimeOs ?? "unknown",
         };
 
-        if (obj.Contains("checksum"))
+        if (dto.Checksum is { } checksum)
         {
-            var checksumObj = JsonUtils.RequireObject(obj, "checksum");
-            meta.ChecksumHash = JsonUtils.EnsureString(checksumObj["hash"]);
-            meta.ChecksumType = JsonUtils.EnsureString(checksumObj["type"]);
+            meta.ChecksumHash = checksum.Hash ?? "";
+            meta.ChecksumType = checksum.Type ?? "";
         }
 
-        if (obj.Contains("version"))
+        if (dto.Version is { } version)
         {
-            var versionObj = JsonUtils.RequireObject(obj, "version");
-            var name = JsonUtils.EnsureString(versionObj["name"]);
-            // QJsonValue::toInteger() yields 0 for missing/non-numeric members
-            var major = IntegerOr(versionObj, "major");
-            var minor = IntegerOr(versionObj, "minor");
-            var security = IntegerOr(versionObj, "security");
-            var build = IntegerOr(versionObj, "build");
-            meta.Version = new JavaVersion(major, minor, security, build, name);
+            meta.Version = new JavaVersion(
+                version.Major ?? 0,
+                version.Minor ?? 0,
+                version.Security ?? 0,
+                version.Build ?? 0,
+                version.Name ?? "");
         }
 
         return meta;
     }
 
-    /// <summary>QJsonValue::toInteger(default) on an object member (0 for missing/non-numbers).</summary>
-    private static int IntegerOr(JsonObject obj, string key)
+    private static JavaMetadata MapJavaMeta(JsonObject obj)
     {
-        return JsonUtils.EnsureInteger(obj[key]);
+        var dto = JsonSerializer.Deserialize(obj, JavaJsonContext.Default.JavaRuntimeJson)
+                  ?? throw new JsonParseException("java runtime: Error parsing JSON: document is null");
+        return MapJavaMeta(dto);
     }
 
     // ------------------------------------------------------------- comparators

@@ -118,21 +118,19 @@ public class MojangVersionFormatTests
     }
 
     [Fact]
-    public void ReadVersionProperties_ErrorMessages_MatchTheFamily()
+    public void ReadVersionProperties_ErrorMessages_FailTheDocument()
     {
-        // non-object assetIndex -> the "'key' is not an object" parent+key label
-        Assert.Equal("'assetIndex' is not an object", ReadError("""{"assetIndex": 3}"""));
-        // required download fields keep the placeholder labels
-        Assert.Equal("'sha1's parent does not contain 'sha1'", ReadError("""{"downloads": {"client": {"url": "u"}}}"""));
-        Assert.Equal("'size' is not an integer", ReadError("""{"downloads": {"client": {"sha1": "s", "size": 1.5, "url": "u"}}}"""));
-        // classifier values must be objects (verbatim "Value" label)
-        Assert.Equal("Value is not an object", ReadError("""{"downloads": {"client": 3}}"""));
-        // parent+key reads with the verbatim "Value" label
-        Assert.Equal("Value is not an integer", ReadError("""{"minimumLauncherVersion": 1.5}"""));
-        Assert.Equal("Value is not a string", ReadError("""{"id": 3}"""));
-        // compatibleJavaMajors array + element checks ("Value" label)
-        Assert.Equal("Value is not an array", ReadError("""{"compatibleJavaMajors": 8}"""));
-        Assert.Equal("Value is not a double", ReadError("""{"compatibleJavaMajors": ["8"]}"""));
+        // the typed readers fail the whole document on malformed members, wrapped in the
+        // "{what}: Error parsing JSON: ..." family like the former RequireDocument reads;
+        // a MISSING required member keeps the require-check collapse ("'key' is not a ...")
+        Assert.StartsWith("version file: Error parsing JSON: ", ReadError("""{"assetIndex": 3}"""));
+        Assert.Equal("'sha1' is not a string", ReadError("""{"downloads": {"client": {"url": "u"}}}"""));
+        Assert.StartsWith("version file: Error parsing JSON: ", ReadError("""{"downloads": {"client": {"sha1": "s", "size": 1.5, "url": "u"}}}"""));
+        Assert.StartsWith("version file: Error parsing JSON: ", ReadError("""{"downloads": {"client": 3}}"""));
+        Assert.StartsWith("version file: Error parsing JSON: ", ReadError("""{"minimumLauncherVersion": 1.5}"""));
+        Assert.StartsWith("version file: Error parsing JSON: ", ReadError("""{"id": 3}"""));
+        Assert.StartsWith("version file: Error parsing JSON: ", ReadError("""{"compatibleJavaMajors": 8}"""));
+        Assert.StartsWith("version file: Error parsing JSON: ", ReadError("""{"compatibleJavaMajors": ["8"]}"""));
     }
 
     private static string ReadError(string json)
@@ -199,18 +197,18 @@ public class MojangVersionFormatTests
     }
 
     [Fact]
-    public void LibraryFromJson_RulesErrors_MatchTheFamily()
+    public void LibraryFromJson_RulesErrors_FailTheDocument()
     {
-        Assert.Equal("Value is not an array", LibraryError("""{"name": "a:b:c", "rules": 3}"""));
-        Assert.Equal("Value is not an object", LibraryError("""{"name": "a:b:c", "rules": [1]}"""));
+        Assert.StartsWith("lib.json: Error parsing JSON: ", LibraryError("""{"name": "a:b:c", "rules": 3}"""));
+        Assert.StartsWith("lib.json: Error parsing JSON: ", LibraryError("""{"name": "a:b:c", "rules": [1]}"""));
         Assert.Equal("Value is not an object", LibraryError("""{"name": "a:b:c", "rules": [null]}"""));
     }
 
     [Fact]
-    public void LibraryFromJson_ExtractExcludeErrors_MatchTheFamily()
+    public void LibraryFromJson_ExtractExcludeErrors_FailTheDocument()
     {
-        Assert.Equal("Value is not an array", LibraryError("""{"name": "a:b:c", "extract": {"exclude": 3}}"""));
-        Assert.Equal("Value is not a string", LibraryError("""{"name": "a:b:c", "extract": {"exclude": [1]}}"""));
+        Assert.StartsWith("lib.json: Error parsing JSON: ", LibraryError("""{"name": "a:b:c", "extract": {"exclude": 3}}"""));
+        Assert.StartsWith("lib.json: Error parsing JSON: ", LibraryError("""{"name": "a:b:c", "extract": {"exclude": [1]}}"""));
     }
 
     private static string LibraryError(string json)
