@@ -228,36 +228,36 @@ public sealed class EnsureMetadataTask(
             return;
         }
 
-        JsonObject entriesObj;
+        FlameFingerprintResponseJson? response;
         try
         {
-            entriesObj = JsonUtils.RequireObject(
-                JsonNode.Parse(request.BodyAsString), "fingerprint response");
+            response = FlameMod.ParseResponse(request.BodyAsString,
+                FlameModJsonContext.Default.FlameFingerprintResponseJson);
         }
-        catch (Exception e) when (e is JsonException or JsonParseException)
+        catch (JsonParseException)
         {
             EmitFailed("Fingerprint response is not a JSON object");
             return;
         }
 
         {
-            var exactMatches = (entriesObj["data"] as JsonObject)?["exactMatches"] as JsonArray;
-            if (exactMatches is null || exactMatches.Count == 0)
+            var exactMatches = response.Data?.ExactMatches;
+            if (exactMatches is null or { Count: 0 })
             {
                 // "No matches found for fingerprint search!" — the leftover invalidation in
                 // ExecuteAsync reports the failures
                 return;
             }
 
-            foreach (var matchNode in exactMatches)
+            foreach (var match in exactMatches)
             {
-                if (matchNode is not JsonObject matchObj || matchObj["file"] is not JsonObject fileObj)
+                if (match?.File is not { } fileObj)
                 {
                     // "Fingerprint match is empty!"
                     return;
                 }
 
-                var fingerprint = FlameJson.Long(fileObj["fileFingerprint"]).ToString(CultureInfo.InvariantCulture);
+                var fingerprint = (match.FileFingerprint ?? 0).ToString(CultureInfo.InvariantCulture);
                 if (!resources.TryGetValue(fingerprint, out var resource))
                 {
                     // "Invalid fingerprint from the API response."
@@ -313,26 +313,17 @@ public sealed class EnsureMetadataTask(
             return;
         }
 
-        JsonNode? projectDoc;
-        try
         {
-            projectDoc = JsonNode.Parse(projectRequest.BodyAsString);
-        }
-        catch (JsonException e)
-        {
-            EmitFailed(e.Message);
-            return;
-        }
-
-        {
-            List<JsonNode> entries;
+            List<FlameProjectJson?> entries;
             try
             {
-                var rootObj = JsonUtils.RequireObject(projectDoc);
-                var data = FlameJson.Ptr(rootObj, "data");
                 entries = multiple
-                    ? JsonUtils.ToNodeList(JsonUtils.RequireArray(data, "'data'"))
-                    : [JsonUtils.RequireObject(data, "'data'")];
+                    ? FlameMod.ParseResponse(projectRequest.BodyAsString,
+                            FlameModJsonContext.Default.FlameProjectListJson).Data
+                      ?? throw new JsonParseException("'data' is not an array")
+                    : [FlameMod.ParseResponse(projectRequest.BodyAsString,
+                            FlameModJsonContext.Default.FlameProjectEnvelopeJson).Data
+                       ?? throw new JsonParseException("'data' is not an object")];
             }
             catch (JsonParseException)
             {
@@ -341,17 +332,12 @@ public sealed class EnsureMetadataTask(
 
             foreach (var entry in entries)
             {
-                JsonNode entryObj;
-                try
-                {
-                    entryObj = JsonUtils.RequireObject(entry);
-                }
-                catch (JsonParseException)
+                if (entry is null)
                 {
                     continue;
                 }
 
-                var id = FlameJson.RequireInteger(entryObj, "id").ToString(CultureInfo.InvariantCulture);
+                var id = (entry.Id ?? 0).ToString(CultureInfo.InvariantCulture);
                 if (!addonIds.TryGetValue(id, out var hash) || !resources.TryGetValue(hash, out var resource)
                                                             || !_tempVersions.TryGetValue(hash, out var version))
                 {
@@ -362,7 +348,7 @@ public sealed class EnsureMetadataTask(
                 try
                 {
                     EmitStatus($"Parsing API response from CurseForge for '{resource.Name}'...");
-                    FlameMod.LoadIndexedPack(pack, entryObj);
+                    FlameMod.LoadIndexedPack(pack, entry);
                 }
                 catch (JsonParseException)
                 {

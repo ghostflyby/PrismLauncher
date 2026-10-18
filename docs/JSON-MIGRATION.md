@@ -28,13 +28,17 @@
 |---|---|
 | Modrinth 全链（snake 拆分）、Flame index、ATL/Technic/FTB、metacache、版本格式读侧、命名策略批量、审查修复、instgroups、meta 三层、blob 升型 | `344727916`…`e91f667cf`、`79af88df8`、`85e448388`、`6a13cf659` |
 | ProfileUtils override-order | `54d56b032` |
+| blob converter 双形态读专项测试 | `21695cd95` |
+| 批次1 accounts.json 读写类型化（AccountWire + 字节门退役） | `a82e3859f` |
+| 批次2 Qt 写尾迁移（版本格式 *OutJson、mmc-pack、instgroups Save、皮肤 index、mod-list 导出、paste.gg） | `191fef389` |
+| 批次3 mod 信息读取类型化（ModMetadataWire、pack.mcmeta/ChatComponentJson、Technic version.json、LegacyFtb pack.json、status ping） | `9fd411303` |
+| 批次4 Flame 指纹流类型化 + ParseRequires/SerializeRequires 收敛（单一 MetaRequireJson wire） | （本提交） |
 
-## 4. 剩余批次（按修正后原则执行）
+## 4. 剩余批次
 
-1. **accounts.json 读写类型化**（原"保留"判定作废）：读侧 Converter 保持输入兼容（Prism 形状：epoch 秒、extra 混合类型、`"offline"` legacy 值、宽松 Base64）；写形状自由——**退役** `SaveState_Byte_Matches_The_Upstream_Layout` 字节门（写形状无外部消费者），改为值断言。
-2. **Qt 写尾迁移**：OneSix/Mojang `VersionFileToJson/LibraryToJson`、`PackProfile`/`Component` 写、instgroups `Save`、skin index、`ExportToModList`、accounts save、PasteUpload paste.gg 请求体——全部改 typed 序列化；对应**字节 round-trip 断言退役或改值断言**（patches/mmc-pack 无外部写消费者；instgroups 读兼容已由读侧 Converter 承担）。
-3. **mod 信息读取类型化**（"启发式"豁免不成立——这些是固定结构化格式）：`LocalModParse`（fabric.mod.json / quilt.mod.json / mcmod.info / litemod 四 schema：icon 多态 string|map、authorList|authors、modListVersion number|string 用 Converter）；`DataPackUtils` pack.mcmeta 文本组件（string|object 用 Converter）；`TechnicPackProcessor` version.json；`LegacyFtb` pack.json；`ServerStatusPing` description（string|object）。
-4. **Flame 指纹流**：EnsureMetadataTask/FileResolvingTask/GetModDependenciesTask 的 Flame 分支 + `ParseRequires/SerializeRequires` 收敛（模式照 FlameModIndex 批次）。
+（全部完成。后续新格式按 §1 原则直接走类型化。）
+
+判定**保留**的有据清单：settings 动态形状、`QtJson/JsonUtils` 基础设施（含 FlameJson 剩余用户：categories、导出指纹流）、auth 协议响应探测助手（`AccountData.GetString(JsonNode)` 家族——服务 MSA/XSTS 步骤，非 accounts.json）。
 
 ## 5. 验证
 

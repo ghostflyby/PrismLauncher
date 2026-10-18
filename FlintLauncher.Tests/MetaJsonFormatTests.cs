@@ -135,59 +135,38 @@ public class MetaJsonFormatTests
     [Fact]
     public void ParseRequires_SerializeParseRoundTrip()
     {
-        var original = new SortedSet<Require>
+        // the typed wire is the one requires shape (the MetaRequireJson records); the
+        // former SerializeRequires node helper is gone with the node reads
+        var original = new List<MetaRequireJson>
+        {
+            new("org.lwjgl3", "3.2.2", null),
+            new("net.fabricmc.intermediary", null, "1.18"),
+        };
+        var parsed = new SortedSet<Require>();
+        MetaJsonFormat.ParseRequires(original, parsed);
+
+        Assert.Equal(2, parsed.Count);
+        Assert.True(parsed.SetEquals(new SortedSet<Require>
         {
             new Require { Uid = "org.lwjgl3", EqualsVersion = "3.2.2" },
             new Require { Uid = "net.fabricmc.intermediary", Suggests = "1.18" },
-        };
-        var obj = new JsonObject();
-        MetaJsonFormat.SerializeRequires(obj, original);
-        var parsed = new SortedSet<Require>();
-        MetaJsonFormat.ParseRequires(obj, parsed);
-
-        Assert.Equal(2, parsed.Count);
-        Assert.True(parsed.SetEquals(original));
-        Assert.True(original.Single(r => r.Uid == "org.lwjgl3").DeepEquals(
-            parsed.Single(r => r.Uid == "org.lwjgl3")));
+        }));
     }
 
     [Fact]
-    public void ParseRequires_CustomKeyName_MatchesSerialize()
+    public void ParseRequires_Absent_And_Junk_Entries()
     {
-        // the PackProfile cachedRequires/cachedConflicts path
-        var original = new SortedSet<Require> { new Require { Uid = "a.b.c" } };
-        var obj = new JsonObject();
-        MetaJsonFormat.SerializeRequires(obj, original, "cachedRequires");
+        // an absent member reads as empty; a null or uid-less entry fails the parse
         var parsed = new SortedSet<Require>();
-        MetaJsonFormat.ParseRequires(obj, parsed, "cachedRequires");
-        Assert.True(parsed.SetEquals(original));
+        MetaJsonFormat.ParseRequires(null, parsed);
+        Assert.Empty(parsed);
 
-        // a different key name finds nothing
-        var other = new SortedSet<Require>();
-        MetaJsonFormat.ParseRequires(obj, other);
-        Assert.Empty(other);
-    }
-
-    [Fact]
-    public void ParseRequires_ErrorMessages_MatchTheFamily()
-    {
-        var ptr = new SortedSet<Require>();
-
-        var nonArray = (JsonObject)Parse("""{"requires":"nope"}""");
-        Assert.Equal("'requires' is not an array",
-            Assert.Throws<JsonParseException>(() => MetaJsonFormat.ParseRequires(nonArray, ptr)).Message);
-
-        var nonObjectEntry = (JsonObject)Parse("""{"requires":[1]}""");
-        Assert.Equal("Value is not an object",
-            Assert.Throws<JsonParseException>(() => MetaJsonFormat.ParseRequires(nonObjectEntry, ptr)).Message);
-
-        var missingUid = (JsonObject)Parse("""{"requires":[{}]}""");
-        Assert.Equal("'uid's parent does not contain 'uid'",
-            Assert.Throws<JsonParseException>(() => MetaJsonFormat.ParseRequires(missingUid, ptr)).Message);
-
-        var nullEntry = (JsonObject)Parse("""{"requires":[null]}""");
-        Assert.Equal("Value is not an object",
-            Assert.Throws<JsonParseException>(() => MetaJsonFormat.ParseRequires(nullEntry, ptr)).Message);
+        Assert.Equal("'requires' entry has no 'uid' string",
+            Assert.Throws<JsonParseException>(() =>
+                MetaJsonFormat.ParseRequires([new MetaRequireJson(null, null, null)], parsed)).Message);
+        Assert.Equal("'conflicts' entry has no 'uid' string",
+            Assert.Throws<JsonParseException>(() =>
+                MetaJsonFormat.ParseRequires([null], parsed, "conflicts")).Message);
     }
 
     // ------------------------------------------------------------------ index

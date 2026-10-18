@@ -387,27 +387,69 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         };
     }
 
-    private static Component ComponentFromJsonV1(PackProfile parent, JsonObject obj)
+    /// <summary>The mmc-pack READ wire (the mirror of the write records above; the same
+    /// shared MetaRequireJson carries the cachedRequires/cachedConflicts entries as every
+    /// other requires array). Read-only — the write side is the *OutJson set.</summary>
+    internal sealed record PackConfigJson
     {
-        // critical
-        var uid = JsonUtils.RequireString(obj, "uid");
-        var component = new Component(parent, uid)
+        [JsonPropertyName("formatVersion")]
+        [JsonConverter(typeof(QtCoercingIntConverter))]
+        public int FormatVersion { get; set; }
+
+        public List<PackComponentJson>? Components { get; set; }
+    }
+
+    internal sealed record PackComponentJson
+    {
+        /// <summary>Required — a missing member fails the file (the former RequireString).</summary>
+        public string? Uid { get; set; }
+
+        [JsonConverter(typeof(QtCoercingStringConverter))]
+        public string Version { get; set; } = "";
+
+        [JsonConverter(typeof(QtCoercingBoolConverter))]
+        public bool DependencyOnly { get; set; }
+
+        [JsonConverter(typeof(QtCoercingBoolConverter))]
+        public bool Important { get; set; }
+
+        [JsonConverter(typeof(QtCoercingBoolConverter))]
+        public bool Disabled { get; set; }
+
+        [JsonConverter(typeof(QtCoercingStringConverter))]
+        public string CachedVersion { get; set; } = "";
+
+        [JsonConverter(typeof(QtCoercingStringConverter))]
+        public string CachedName { get; set; } = "";
+
+        public List<MetaRequireJson>? CachedRequires { get; set; }
+
+        public List<MetaRequireJson>? CachedConflicts { get; set; }
+
+        [JsonConverter(typeof(QtCoercingBoolConverter))]
+        public bool Volatile { get; set; }
+    }
+
+    private static Component ComponentFromJsonV1(PackProfile parent, PackComponentJson wire)
+    {
+        // critical — the uid member is required (the former RequireString throw)
+        var component = new Component(parent,
+            wire.Uid ?? throw new JsonParseException("'uid' is not a string"))
         {
-            Version = obj.StringOr("version"),
-            DependencyOnly = obj.BoolOr("dependencyOnly"),
-            Important = obj.BoolOr("important"),
+            Version = wire.Version,
+            DependencyOnly = wire.DependencyOnly,
+            Important = wire.Important,
             // cached
             // TODO upstream @RESILIENCE: ignore invalid values/structure here?
-            CachedVersion = obj.StringOr("cachedVersion"),
-            CachedName = obj.StringOr("cachedName")
+            CachedVersion = wire.CachedVersion,
+            CachedName = wire.CachedName
         };
 
-        MetaJsonFormat.ParseRequires(obj, component.CachedRequires, "cachedRequires");
-        MetaJsonFormat.ParseRequires(obj, component.CachedConflicts, "cachedConflicts");
+        MetaJsonFormat.ParseRequires(wire.CachedRequires, component.CachedRequires, "cachedRequires");
+        MetaJsonFormat.ParseRequires(wire.CachedConflicts, component.CachedConflicts, "cachedConflicts");
         // NOTE upstream bug kept: the loader reads "volatile" while the saver writes "cachedVolatile"
-        component.CachedVolatile = obj.BoolOr("volatile");
-        var disabled = obj.BoolOr("disabled");
-        component.SetEnabled(!disabled);
+        component.CachedVolatile = wire.Volatile;
+        component.SetEnabled(!wire.Disabled);
         return component;
     }
 
@@ -452,11 +494,11 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
             return Result.Error($"Couldn't open {filename} for reading: {e.Message}");
         }
 
-        // and it's valid JSON
-        JsonNode root;
+        // and it's valid JSON (the syntax gate keeps its distinct error message; the typed
+        // read below reports the kind/shape failures as "bad file format")
         try
         {
-            root = JsonUtils.RequireNode(data, filename);
+            JsonUtils.RequireNode(data, filename);
         }
         catch (JsonParseException e)
         {
@@ -466,22 +508,24 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         // and then read it and process it if all above is true.
         try
         {
-            var obj = JsonUtils.RequireObject(root);
+            var doc = JsonSerializer.Deserialize(data, PackConfigJsonContext.Default.PackConfigJson);
+            if (doc is null)
+            {
+                throw new JsonParseException("the document is null");
+            }
+
             // check order file version.
-            var version = JsonUtils.RequireInteger(obj, "formatVersion");
-            if (version != CurrentComponentsFileVersion)
+            if (doc.FormatVersion != CurrentComponentsFileVersion)
             {
                 throw new JsonParseException($"Invalid component file version, expected {CurrentComponentsFileVersion}");
             }
 
-            var orderArray = JsonUtils.RequireArray(obj, "components");
-            foreach (var item in orderArray)
+            foreach (var componentWire in doc.Components ?? [])
             {
-                var compObj = JsonUtils.RequireObject(item, "Component must be an object.");
-                container.Add(ComponentFromJsonV1(parent, compObj));
+                container.Add(ComponentFromJsonV1(parent, componentWire));
             }
         }
-        catch (JsonParseException)
+        catch (Exception e) when (e is JsonParseException or JsonException)
         {
             container.Clear();
             return Result.Error($"Couldn't parse {filename} : bad file format");
@@ -1124,4 +1168,5 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(PackProfile.PackConfigOutJson))]
+[JsonSerializable(typeof(PackProfile.PackConfigJson))]
 internal sealed partial class PackConfigJsonContext : JsonSerializerContext;

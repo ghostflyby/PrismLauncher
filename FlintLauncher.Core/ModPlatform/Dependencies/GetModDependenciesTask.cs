@@ -195,30 +195,6 @@ public class GetModDependenciesTask : SequentialTask
         return _modrinth.GetProject(addonId);
     }
 
-    /// <summary>Port of the per-provider loadIndexedPack virtual.</summary>
-    private static void LoadIndexedPack(ResourceProvider provider, IndexedPack pack, JsonNode obj)
-    {
-        if (provider == ResourceProvider.Flame)
-        {
-            FlameMod.LoadIndexedPack(pack, obj);
-        }
-        else
-        {
-            var dto = ModrinthJson.ProjectFromNode(obj)
-                      ?? throw new JsonParseException("project is not a JSON object");
-            ModrinthPackIndex.LoadIndexedPack(pack, dto);
-        }
-    }
-
-    /// <summary>Port of the per-provider loadIndexedPackVersion virtual (Mod resource type).</summary>
-    private static IndexedVersion LoadIndexedPackVersion(ResourceProvider provider, JsonNode obj)
-    {
-        return provider == ResourceProvider.Flame
-            ? FlameMod.LoadIndexedPackVersion(obj)
-            : ModrinthPackIndex.LoadIndexedPackVersion(ModrinthJson.VersionFromNode(obj)
-                ?? throw new JsonParseException("version is not a JSON object"));
-    }
-
     private FlintTask GetProjectInfoTask(PackDependency pDep)
     {
         var provider = pDep.Pack.Provider;
@@ -233,36 +209,36 @@ public class GetModDependenciesTask : SequentialTask
 
         job.Succeeded += _ =>
         {
-            JsonNode root;
             try
             {
-                root = JsonNode.Parse(request.BodyAsString)
-                       ?? throw new JsonException("empty response");
-            }
-            catch (JsonException)
-            {
-                // (upstream logs the parse error) — qWarning() branch
-                RemovePack(pDep.Pack.AddonId);
-                return;
-            }
-
-            {
-                try
+                if (provider == ResourceProvider.Flame)
                 {
                     // Flame nests the project under "data" (the C++
-                    // Json::requireObject(Json::requireObject(doc), "data") form; the string
-                    // argument is a KEY there, which FlameJson.RequireObject mirrors)
-                    JsonNode obj = provider == ResourceProvider.Flame
-                        ? FlameJson.RequireObject(root, "data")
-                        : root;
-
-                    LoadIndexedPack(provider, pDep.Pack, obj);
+                    // Json::requireObject(Json::requireObject(doc), "data") form)
+                    var envelope = FlameMod.ParseResponse(request.BodyAsString,
+                        FlameModJsonContext.Default.FlameProjectEnvelopeJson);
+                    if (envelope.Data is { } project)
+                    {
+                        FlameMod.LoadIndexedPack(pDep.Pack, project);
+                    }
+                    else
+                    {
+                        throw new JsonParseException("'data' is not an object");
+                    }
                 }
-                catch (JsonParseException)
+                else
                 {
-                    // (upstream logs the error cause)
-                    RemovePack(pDep.Pack.AddonId);
+                    var root = JsonNode.Parse(request.BodyAsString)
+                               ?? throw new JsonParseException("empty response");
+                    var dto = ModrinthJson.ProjectFromNode(root)
+                              ?? throw new JsonParseException("project is not a JSON object");
+                    ModrinthPackIndex.LoadIndexedPack(pDep.Pack, dto);
                 }
+            }
+            catch (Exception e) when (e is JsonException or JsonParseException)
+            {
+                // (upstream logs the parse error / the error cause)
+                RemovePack(pDep.Pack.AddonId);
             }
         };
         job.Failed += (_, _) => RemovePack(pDep.Pack.AddonId);
@@ -311,41 +287,88 @@ public class GetModDependenciesTask : SequentialTask
 
         job.Succeeded += _ =>
         {
-            IndexedVersion bestMatch;
-            JsonNode root;
-            try
+            // the per-provider candidate lists: the Flame branch is the typed wire (the
+            // document IS the version when a file id is pinned, else the {"data": [...]}
+            // envelope); Modrinth answers a bare array of version documents
+            var versions = new List<IndexedVersion>();
+
+            void Consider(IndexedVersion file)
             {
-                root = JsonNode.Parse(request.BodyAsString) ?? throw new JsonException("empty response");
-            }
-            catch (JsonException)
-            {
-                // like the C++: warn (upstream logs) and leave the version unset (the
-                // netJob still succeeds)
-                return;
+                if (file.AddonId.Length == 0)
+                {
+                    file.AddonId = dep.AddonId;
+                }
+
+                // Heuristic to check if the returned value is valid
+                if (file.FileId.Length != 0 && (file.Loaders == ModLoaderType.None || (args.Loader & file.Loaders) != 0))
+                {
+                    versions.Add(file);
+                }
             }
 
+            if (provider == ResourceProvider.Flame)
             {
-                List<JsonNode> arr;
-                if (dep.Version.Length != 0 && root is JsonObject)
+                try
                 {
-                    arr = [root];
+                    var entries = dep.Version.Length != 0
+                        ? [FlameMod.ParseResponse(request.BodyAsString,
+                              FlameModJsonContext.Default.FlameModFileJson)]
+                        : FlameMod.ParseResponse(request.BodyAsString,
+                              FlameModJsonContext.Default.FlameFileListJson).Data ?? [];
+
+                    foreach (var fileDto in entries)
+                    {
+                        if (fileDto is null)
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            Consider(FlameMod.LoadIndexedPackVersion(fileDto));
+                        }
+                        catch (JsonParseException)
+                        {
+                            continue;
+                        }
+                    }
                 }
-                else if (root is JsonObject)
+                catch (JsonParseException)
                 {
-                    // the Flame {"data": [...]} shape; anything else parses to an empty list
-                    var data = root["data"];
-                    arr = data is JsonArray dataArray ? JsonUtils.ToNodeList(dataArray) : [];
+                    // like the C++: warn (upstream logs) and leave the version unset (the
+                    // netJob still succeeds)
+                    return;
+                }
+            }
+            else
+            {
+                JsonNode root;
+                try
+                {
+                    root = JsonNode.Parse(request.BodyAsString) ?? throw new JsonException("empty response");
+                }
+                catch (JsonException)
+                {
+                    // like the C++: warn (upstream logs) and leave the version unset (the
+                    // netJob still succeeds)
+                    return;
+                }
+
+                List<JsonNode> arr;
+                if (dep.Version.Length != 0 && root is JsonObject pinned)
+                {
+                    // a version-pinned dependency answers the single version document
+                    arr = [pinned];
                 }
                 else if (root is JsonArray rootArray)
                 {
-                    arr = JsonUtils.ToNodeList(rootArray);
+                    arr = [.. rootArray];
                 }
                 else
                 {
                     arr = [];
                 }
 
-                var versions = new List<IndexedVersion>();
                 foreach (var entry in arr)
                 {
                     if (entry is not JsonObject)
@@ -356,30 +379,21 @@ public class GetModDependenciesTask : SequentialTask
                     IndexedVersion file;
                     try
                     {
-                        file = LoadIndexedPackVersion(provider, entry);
+                        file = ModrinthPackIndex.LoadIndexedPackVersion(ModrinthJson.VersionFromNode(entry)
+                            ?? throw new JsonParseException("version is not a JSON object"));
                     }
                     catch (JsonParseException)
                     {
                         continue;
                     }
 
-                    if (file.AddonId.Length == 0)
-                    {
-                        file.AddonId = dep.AddonId;
-                    }
-
-                    // Heuristic to check if the returned value is valid
-                    if (file.FileId.Length != 0 && (file.Loaders == ModLoaderType.None || (args.Loader & file.Loaders) != 0))
-                    {
-                        versions.Add(file);
-                    }
+                    Consider(file);
                 }
-
-                // dates are in RFC 3339 format
-                versions.Sort((a, b) => string.CompareOrdinal(b.Date, a.Date));
-                bestMatch = versions.Count != 0 ? versions[0] : new IndexedVersion();
             }
 
+            // dates are in RFC 3339 format
+            versions.Sort((a, b) => string.CompareOrdinal(b.Date, a.Date));
+            var bestMatch = versions.Count != 0 ? versions[0] : new IndexedVersion();
             OnDependencyVersionResolved(dep, provider, pDep, level, bestMatch);
         };
 

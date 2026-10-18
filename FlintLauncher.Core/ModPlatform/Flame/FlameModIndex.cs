@@ -126,9 +126,36 @@ internal sealed record FlameDependencyJson(
     int? ModId,
     int? RelationType);
 
+/// <summary>The fingerprint-match response (EnsureMetadataTask's Flame flow).</summary>
+internal sealed record FlameFingerprintResponseJson(
+    FlameFingerprintDataJson? Data);
+
+internal sealed record FlameFingerprintDataJson(
+    List<FlameFingerprintMatchJson>? ExactMatches);
+
+internal sealed record FlameFingerprintMatchJson(
+    FlameModFileJson? File,
+    long? FileFingerprint);
+
+/// <summary>The {data: [...]} envelope of the files list response.</summary>
+internal sealed record FlameFileListJson(
+    List<FlameModFileJson>? Data);
+
+/// <summary>The {data: [...]} envelope of the projects list response.</summary>
+internal sealed record FlameProjectListJson(
+    List<FlameProjectJson>? Data);
+
+/// <summary>The {data: {...}} envelope of the single-project response.</summary>
+internal sealed record FlameProjectEnvelopeJson(
+    FlameProjectJson? Data);
+
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(FlameProjectJson))]
 [JsonSerializable(typeof(FlameModFileJson))]
+[JsonSerializable(typeof(FlameFingerprintResponseJson))]
+[JsonSerializable(typeof(FlameFileListJson))]
+[JsonSerializable(typeof(FlameProjectListJson))]
+[JsonSerializable(typeof(FlameProjectEnvelopeJson))]
 internal sealed partial class FlameModJsonContext : JsonSerializerContext;
 
 // https://docs.curseforge.com/#tocS_Mod
@@ -149,17 +176,34 @@ public static class FlameMod
         }
     }
 
+    /// <summary>The response-body parse for the typed flow entries (the same
+    /// JsonParseException wrapper family).</summary>
+    internal static T ParseResponse<T>(string body, JsonTypeInfo<T> typeInfo) where T : class
+    {
+        try
+        {
+            return JsonSerializer.Deserialize(body, typeInfo)
+                   ?? throw new JsonParseException("the document is null");
+        }
+        catch (JsonException e)
+        {
+            throw new JsonParseException(e.Message);
+        }
+    }
+
     private static string Require(string? value, string key) =>
         value ?? throw new JsonParseException("'" + key + "' is not a string");
 
     private static int Require(int? value, string key) =>
         value ?? throw new JsonParseException("'" + key + "' is not an integer");
 
-    /// <summary>Port of FlameMod::loadIndexedPack.</summary>
-    public static void LoadIndexedPack(IndexedPack pack, JsonNode obj)
-    {
-        var dto = Probe(obj, FlameModJsonContext.Default.FlameProjectJson);
+    /// <summary>Port of FlameMod::loadIndexedPack (node entry).</summary>
+    public static void LoadIndexedPack(IndexedPack pack, JsonNode obj) =>
+        LoadIndexedPack(pack, Probe(obj, FlameModJsonContext.Default.FlameProjectJson));
 
+    /// <summary>Port of FlameMod::loadIndexedPack (typed entry).</summary>
+    internal static void LoadIndexedPack(IndexedPack pack, FlameProjectJson dto)
+    {
         pack.AddonId = Require(dto.Id, "id").ToString(CultureInfo.InvariantCulture);
         pack.Provider = ResourceProvider.Flame;
         pack.Name = Require(dto.Name, "name");
@@ -183,8 +227,8 @@ public static class FlameMod
             {
                 pack.Authors.Add(new ModpackAuthor
                 {
-                    Name = Require(author.Name, "name"),
-                    Url = Require(author.Url, "url"),
+                    Name = Require(author?.Name, "name"),
+                    Url = Require(author?.Url, "url"),
                 });
             }
         }
@@ -266,11 +310,13 @@ public static class FlameMod
         pack.VersionsLoaded = true;
     }
 
-    /// <summary>Port of FlameMod::loadIndexedPackVersion.</summary>
-    public static IndexedVersion LoadIndexedPackVersion(JsonNode obj)
-    {
-        var dto = Probe(obj, FlameModJsonContext.Default.FlameModFileJson);
+    /// <summary>Port of FlameMod::loadIndexedPackVersion (node entry).</summary>
+    public static IndexedVersion LoadIndexedPackVersion(JsonNode obj) =>
+        LoadIndexedPackVersion(Probe(obj, FlameModJsonContext.Default.FlameModFileJson));
 
+    /// <summary>Port of FlameMod::loadIndexedPackVersion (typed entry).</summary>
+    internal static IndexedVersion LoadIndexedPackVersion(FlameModFileJson dto)
+    {
         // a missing gameVersions member is a require failure; a non-string element reads as
         // "" like the former AsString fallback (and simply misses every branch below)
         if (dto.GameVersions is not { ValueKind: JsonValueKind.Array } gameVersionsNode)

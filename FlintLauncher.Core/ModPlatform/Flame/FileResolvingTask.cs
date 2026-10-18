@@ -76,30 +76,26 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi? modr
     {
         SetProgress(1, 3);
         // job to check modrinth for blocked projects
-        JsonNode doc;
-        JsonArray array;
+        FlameFileListJson doc;
         try
         {
-            doc = JsonUtils.RequireObject(JsonNode.Parse(responseBody)
-                                          ?? throw new JsonParseException("Document: empty response"), "Document");
-            array = FlameJson.RequireArray(doc, "data");
+            doc = FlameMod.ParseResponse(responseBody, FlameModJsonContext.Default.FlameFileListJson);
         }
-        catch (Exception e) when (e is JsonException or JsonParseException)
+        catch (JsonParseException)
         {
-            // "Non-JSON data returned from the CF API" (covers both the syntax error from
-            // JsonNode.Parse and the kind error from RequireObject)
+            // "Non-JSON data returned from the CF API" (syntax and kind errors alike)
             EmitFailed("Invalid data returned from the API.");
             return;
         }
 
         {
             var hashes = new List<string>();
-            foreach (var file in array)
+            foreach (var fileDto in doc.Data ?? [])
             {
                 try
                 {
-                    var obj = JsonUtils.RequireObject(file);
-                    var version = FlameMod.LoadIndexedPackVersion(obj);
+                    var version = FlameMod.LoadIndexedPackVersion(fileDto
+                                      ?? throw new JsonParseException("Value is not an object"));
                     var fileid = long.Parse(version.FileId, CultureInfo.InvariantCulture);
                     if (!toProcess.Files.TryGetValue(fileid, out var manifestFile))
                     {
@@ -185,44 +181,41 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi? modr
         }
 
         // (the C++ only logs parse problems in this step and still succeeds)
-        JsonNode? doc = null;
+        FlameProjectListJson? doc = null;
         try
         {
-            doc = JsonNode.Parse(response.BodyAsString);
+            doc = FlameMod.ParseResponse(response.BodyAsString,
+                FlameModJsonContext.Default.FlameProjectListJson);
         }
-        catch (JsonException) { }
+        catch (JsonParseException) { }
 
         if (doc is not null)
         {
+            try
             {
-                try
+                foreach (var entry in doc.Data ?? [])
                 {
-                    var entries = FlameJson.RequireArray(doc, "data");
-
-                    foreach (var entry in entries)
+                    if (entry is not { } projectDto)
                     {
-                        if (entry is not JsonObject entryObj)
-                        {
-                            continue;
-                        }
+                        continue;
+                    }
 
-                        var id = FlameJson.RequireInteger(entryObj, "id");
-                        var file = toProcess.Files.Values.FirstOrDefault(f => f.ProjectId == id);
-                        if (file is null)
-                        {
-                            continue;
-                        }
+                    var id = projectDto.Id ?? 0;
+                    var file = toProcess.Files.Values.FirstOrDefault(f => f.ProjectId == id);
+                    if (file is null)
+                    {
+                        continue;
+                    }
 
-                        EmitStatus($"Parsing API response from CurseForge for '{file.Version.FileName}'...");
-                        FlameMod.LoadIndexedPack(file.Pack, entryObj);
-                        if (file.Pack.ResourceType == ResourceType.World)
-                        {
-                            file.TargetFolder = "saves";
-                        }
+                    EmitStatus($"Parsing API response from CurseForge for '{file.Version.FileName}'...");
+                    FlameMod.LoadIndexedPack(file.Pack, projectDto);
+                    if (file.Pack.ResourceType == ResourceType.World)
+                    {
+                        file.TargetFolder = "saves";
                     }
                 }
-                catch (JsonParseException) { }
             }
+            catch (JsonParseException) { }
         }
 
         EmitSucceeded();

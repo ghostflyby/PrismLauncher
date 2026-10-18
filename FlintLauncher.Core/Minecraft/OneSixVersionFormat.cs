@@ -238,10 +238,7 @@ public static partial class OneSixVersionFormat
             outInfo.MainJar = lib;
         }
 
-        if (root.Contains("requires"))
-        {
-            MetaJsonFormat.ParseRequires(root, outInfo.Requires);
-        }
+        MetaJsonFormat.ParseRequires(dto.Requires, outInfo.Requires);
 
         if (dto.McVersion is { Length: > 0 } dependsOnMinecraftVersion)
         {
@@ -256,10 +253,7 @@ public static partial class OneSixVersionFormat
             }
         }
 
-        if (root.Contains("conflicts"))
-        {
-            MetaJsonFormat.ParseRequires(root, outInfo.Conflicts, "conflicts");
-        }
+        MetaJsonFormat.ParseRequires(dto.Conflicts, outInfo.Conflicts, "conflicts");
 
         if (dto.Volatile is { } volatileFlag)
         {

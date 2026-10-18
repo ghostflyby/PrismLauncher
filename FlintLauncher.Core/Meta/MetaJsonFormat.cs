@@ -359,50 +359,22 @@ public static class MetaJsonFormat
     {"uid":"foo", "equals":"version"}
     ]
     */
-    public static void ParseRequires(JsonNode obj, SortedSet<Require> ptr, string keyName = "requires")
+
+    /// <summary>The typed requires/conflicts arrays over the shared MetaRequireJson wire
+    /// (absent member reads as empty; a null or uid-less entry fails with the collapsed
+    /// kind text). This is the ONE requires wire — the meta documents, the OneSix version
+    /// format and the mmc-pack components all flow through it.</summary>
+    internal static void ParseRequires(List<MetaRequireJson>? raw, SortedSet<Require> ptr, string keyName = "requires")
     {
-        if (Has(obj, keyName))
+        foreach (var req in raw ?? [])
         {
-            var reqArray = JsonUtils.RequireArray(obj, keyName, "'" + keyName + "'");
-            foreach (var iter in reqArray)
+            ptr.Add(new Require
             {
-                var reqObject = JsonUtils.RequireObject(iter);
-                var uid = RequireStringOf(reqObject, "uid");
-                var equals = Str(reqObject, "equals");
-                var suggests = Str(reqObject, "suggests");
-                ptr.Add(new Require { Uid = uid, EqualsVersion = equals, Suggests = suggests });
-            }
+                Uid = req?.Uid ?? throw new JsonParseException("'" + keyName + "' entry has no 'uid' string"),
+                EqualsVersion = req.EqualsVersion ?? "",
+                Suggests = req.Suggests ?? "",
+            });
         }
-    }
-
-    public static void SerializeRequires(JsonObject obj, SortedSet<Require>? ptr, string keyName = "requires")
-    {
-        if (ptr is null || ptr.Count == 0)
-        {
-            return;
-        }
-
-        var arrOut = new JsonArray();
-        foreach (var iter in ptr)
-        {
-            var reqOut = new JsonObject
-            {
-                ["uid"] = iter.Uid,
-            };
-            if (iter.EqualsVersion.Length != 0)
-            {
-                reqOut["equals"] = iter.EqualsVersion;
-            }
-
-            if (iter.Suggests.Length != 0)
-            {
-                reqOut["suggests"] = iter.Suggests;
-            }
-
-            arrOut.Add((JsonNode)reqOut);
-        }
-
-        obj[keyName] = arrOut;
     }
 
 }
