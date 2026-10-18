@@ -13,11 +13,20 @@
 
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.Minecraft;
+
+/// <summary>The dt-order/override order file shape ({"version":N,"order":[uid,...]}).</summary>
+internal sealed record OverrideOrderFileJson(
+    [property: JsonPropertyName("version")] int? Version,
+    [property: JsonPropertyName("order")] List<string>? Order);
+
+[JsonSerializable(typeof(OverrideOrderFileJson))]
+internal sealed partial class ProfileUtilsJsonContext : JsonSerializerContext;
 
 public static class ProfileUtils
 {
@@ -43,28 +52,28 @@ public static class ProfileUtils
             return false;
         }
 
-        // and it's valid JSON
+        // and it's valid JSON (typed: a malformed file fails whole, like the require* reads)
+        OverrideOrderFileJson? file;
         try
         {
-            var obj = JsonUtils.RequireObject(JsonUtils.RequireNode(data, path));
-            // check order file version.
-            var version = JsonUtils.RequireInteger(obj, "version");
-            if (version != CurrentOrderFileVersion)
-            {
-                throw new JsonParseException($"Invalid order file version, expected {CurrentOrderFileVersion}");
-            }
-
-            var orderArray = JsonUtils.RequireArray(obj, "order");
-            foreach (var item in orderArray)
-            {
-                order.Add(JsonUtils.RequireString(item));
-            }
+            file = JsonSerializer.Deserialize(data, ProfileUtilsJsonContext.Default.OverrideOrderFileJson);
         }
-        catch (JsonParseException)
+        catch (JsonException)
+        {
+            file = null;
+        }
+
+        // check order file version.
+        if (file?.Version is not { } version || version != CurrentOrderFileVersion)
         {
             // qCritical() << "Couldn't parse" << ... << ": bad file format"
             order.Clear();
             return false;
+        }
+
+        if (file.Order is { } entries)
+        {
+            order.AddRange(entries);
         }
 
         return true;
