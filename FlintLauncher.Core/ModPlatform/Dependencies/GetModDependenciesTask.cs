@@ -335,8 +335,10 @@ public class GetModDependenciesTask : SequentialTask
                 }
                 catch (JsonParseException)
                 {
-                    // like the C++: warn (upstream logs) and leave the version unset (the
-                    // netJob still succeeds)
+                    // like the C++ kind-failure path: degrade to an empty best match, which
+                    // the resolution step turns into an explicit missing-dependency
+                    // (RemovePack) instead of leaving a version-less pack dangling
+                    OnDependencyVersionResolved(dep, provider, pDep, level, new IndexedVersion());
                     return;
                 }
             }

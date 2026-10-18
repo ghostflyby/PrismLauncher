@@ -311,7 +311,10 @@ public static class ModUtils
             return new ModDetails();
         }
 
-        return document?.Entries is { Count: > 0 } entries ? InfoFromEntry(entries[0]) : new ModDetails();
+        // a null first entry is the old "array[0] is not an object" empty-details path
+        return document?.Entries is { Count: > 0 } entries && entries[0] is not null
+            ? InfoFromEntry(entries[0])
+            : new ModDetails();
     }
 
     private static ModDetails InfoFromEntry(McModEntryJson firstObj)

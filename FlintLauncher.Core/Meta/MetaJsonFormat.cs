@@ -77,9 +77,14 @@ internal sealed record MetaVersionListJson(
     JsonElement? FormatVersion,    string? Uid,    string? Name,    List<MetaVersionEntryJson>? Versions);
 internal sealed record MetaVersionEntryJson(
     string? Version,    string? ReleaseTime,    string? Type,    bool? Recommended,    bool? Volatile,    List<MetaRequireJson>? Requires,    List<MetaRequireJson>? Conflicts,    string? Sha256);
+
+/// <summary>The ONE requires wire — shared by the meta documents, the OneSix version
+/// format and the mmc-pack components. equals/suggests coerce (a junk member reads as
+/// absent, like the former Str read); uid is enforced by the parsers.</summary>
 internal sealed record MetaRequireJson(
-    string? Uid,    [property: JsonPropertyName("equals")] string? EqualsVersion,
-    string? Suggests);
+    string? Uid,
+    [property: JsonPropertyName("equals"), JsonConverter(typeof(QtCoercingNullableStringConverter))] string? EqualsVersion,
+    [property: JsonConverter(typeof(QtCoercingNullableStringConverter))] string? Suggests);
 
 /// <summary>The version DOCUMENT header (uid + the common version members); the OneSix
 /// body keys are read by OneSixVersionFormat over the same node.</summary>
@@ -218,7 +223,9 @@ public static class MetaJsonFormat
         return version;
     }
 
-    /// <summary>The requires/conflicts arrays of a parsed member (absent member -> empty).</summary>
+    /// <summary>The requires/conflicts arrays of a parsed member (absent member -> empty).
+    /// The meta documents flow through here (not the JsonParseException ParseRequires);
+    /// a null entry fails as a MetaParseException like the former node read.</summary>
     private static void MapRequires(List<MetaRequireJson>? raw, SortedSet<Require> ptr)
     {
         if (raw is null)
@@ -230,9 +237,9 @@ public static class MetaJsonFormat
         {
             ptr.Add(new Require
             {
-                Uid = RequireStringOf(req.Uid, "uid"),
-                EqualsVersion = req.EqualsVersion ?? "",
-                Suggests = req.Suggests ?? "",
+                Uid = RequireStringOf(req?.Uid, "uid"),
+                EqualsVersion = req?.EqualsVersion ?? "",
+                Suggests = req?.Suggests ?? "",
             });
         }
     }
@@ -362,8 +369,8 @@ public static class MetaJsonFormat
 
     /// <summary>The typed requires/conflicts arrays over the shared MetaRequireJson wire
     /// (absent member reads as empty; a null or uid-less entry fails with the collapsed
-    /// kind text). This is the ONE requires wire — the meta documents, the OneSix version
-    /// format and the mmc-pack components all flow through it.</summary>
+    /// kind text). Serves the version format and the mmc-pack components — the meta
+    /// documents route through MapRequires (MetaParseException semantics).</summary>
     internal static void ParseRequires(List<MetaRequireJson>? raw, SortedSet<Require> ptr, string keyName = "requires")
     {
         foreach (var req in raw ?? [])

@@ -187,6 +187,61 @@ public class AccountListTests : IDisposable
     }
 
     [Fact]
+    public void FormatVersion_Digit_String_Still_Loads()
+    {
+        // the QVariant::toInt read accepted digit strings; the converter keeps that input
+        var path = TempPath("accounts.json");
+        File.WriteAllText(path, """{"accounts": [], "formatVersion": "3"}""");
+        var list = new AccountList();
+        list.SetListFilePath(path);
+        Assert.True(list.LoadList());
+    }
+
+    [Fact]
+    public void Structurally_Broken_Account_Is_Skipped_Good_One_Loads()
+    {
+        // the deliberate failure-behavior migration: a wrong-kind member fails THAT
+        // account's deserialization and the account is skipped, while the rest of the
+        // file loads (the old probing half-loaded such accounts with empty members)
+        var path = TempPath("accounts.json");
+        File.WriteAllText(path, """
+                                {
+                                    "accounts": [
+                                        { "type": "Offline", "profile": "not-an-object" },
+                                        { "type": "Offline", "profile": { "id": "ok", "name": "Fine", "skin": { "id": "", "url": "", "variant": "" }, "capes": [] } }
+                                    ],
+                                    "formatVersion": 3
+                                }
+                                """);
+        var list = new AccountList();
+        list.SetListFilePath(path);
+        Assert.True(list.LoadList());
+        Assert.Equal(1, list.Count);
+        Assert.Equal("Fine", list.At(0).ProfileName());
+    }
+
+    [Fact]
+    public void Non_Boolean_Active_Flag_Does_Not_Skip_The_Account()
+    {
+        // the flag is read leniently (QJsonValue::toBool): a junk value is no flag, the
+        // account itself still loads
+        var path = TempPath("accounts.json");
+        File.WriteAllText(path, """
+                                {
+                                    "accounts": [
+                                        { "type": "Offline", "active": "yes", "profile": { "id": "a1", "name": "Flagged", "skin": { "id": "", "url": "", "variant": "" }, "capes": [] } }
+                                    ],
+                                    "formatVersion": 3
+                                }
+                                """);
+        var list = new AccountList();
+        list.SetListFilePath(path);
+        Assert.True(list.LoadList());
+        Assert.Equal(1, list.Count);
+        Assert.Null(list.DefaultAccount); // junk flag is simply not the default marker
+    }
+
+    [Fact]
     public void Missing_File_Fails()
     {
         var list = new AccountList();

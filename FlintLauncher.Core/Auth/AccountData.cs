@@ -12,9 +12,9 @@
 // Deviations from the C++ original:
 //  - Token::extra is a QVariantMap upstream; it stores the Xbox display claims (strings) and,
 //    for the MSA token, the whole token-endpoint response flattened to a variant map (which
-//    mixes strings and the numeric expires_in). To keep the JSON byte shape on saveState()
-//    the port stores <see cref="Token.Extra"/> as Dictionary{string,JsonNode} and re-sorts the
-//    keys on save, reproducing the QVariantMap (QMap = sorted) -> QJsonObject ordering.
+//    mixes strings and the numeric expires_in). The port stores <see cref="Token.Extra"/> as
+//    Dictionary{string,JsonElement} — an owned value bag; the key order on disk is insertion
+//    order (the write shape is ours, the QMap sorted-keys note is retired with the byte gate).
 //  - QDateTime validity is expressed through nullable DateTimes (Qt uses an invalid QDateTime).
 //  - QNetworkReply::NetworkError is ported as the int code of the mirrored QtNetworkError enum
 //    (see AuthNetUtils); 0 == NoError.

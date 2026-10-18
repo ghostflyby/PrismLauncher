@@ -43,6 +43,20 @@ public class MojangVersionFormatTests
         RoundTrip("1.9.json");
     }
 
+    [Fact]
+    public void JarModOnly_Patch_Writes_No_Mods_Member()
+    {
+        // the upstream iteration bug (the mods array reads jarMods) is kept WITH its gate:
+        // a jar-mod-only patch writes no "mods" member, so a save/reload cycle does not
+        // turn jar mods into mods (ApplyMods would double-register them)
+        var patch = new VersionFile { Uid = "custom.jarmod", Name = "Jar Mod", Version = "1" };
+        patch.JarMods.Add(new Library { Name = new GradleSpecifier("org.multimc.jarmods:some:1") });
+
+        var wire = OneSixVersionFormat.VersionFileToJson(patch);
+        Assert.NotNull(wire.JarMods);
+        Assert.Null(wire.Mods);
+    }
+
     // ----------------------------------------------------- document entry guards
 
     [Theory]

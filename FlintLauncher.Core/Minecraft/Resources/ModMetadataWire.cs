@@ -48,8 +48,9 @@ internal sealed record McModEntryJson
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Description { get; set; } = "";
 
-    /// <summary>Presence-checked upstream (a present-but-junk logoFile sets IconFile ""):
-    /// the coercing converter makes a wrong-kind value "" instead of null.</summary>
+    /// <summary>Presence-checked upstream (a present-but-junk logoFile sets IconFile "");
+    /// the nullable-coercing read makes a wrong-kind value null and the mapper leaves the
+    /// default "" IconFile — the same observable outcome.</summary>
     [JsonConverter(typeof(QtCoercingNullableStringConverter))]
     public string? LogoFile { get; set; }
 
@@ -326,6 +327,9 @@ internal sealed record FabricModJson
     [JsonConverter(typeof(FabricAuthorsConverter))]
     public List<string>? Authors { get; set; }
 
+    /// <summary>Only an object counts (the former `is JsonObject` probe); a wrong-kind
+    /// member reads null and the rest of the document survives.</summary>
+    [JsonConverter(typeof(FabricContactConverter))]
     public FabricContactJson? Contact { get; set; }
 
     [JsonConverter(typeof(FabricLicenseListConverter))]
@@ -388,6 +392,21 @@ internal sealed record FabricContactJson
     public string? Issues { get; set; }
 }
 
+/// <summary>A non-object contact member reads null (the former `is JsonObject` probe) so
+/// the rest of the document survives.</summary>
+internal sealed class FabricContactConverter : JsonConverter<FabricContactJson?>
+{
+    public override FabricContactJson? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        return reader.TokenType == JsonTokenType.StartObject
+            ? JsonSerializer.Deserialize(ref reader, ModMetadataJsonContext.Default.FabricContactJson)
+            : null;
+    }
+
+    public override void Write(Utf8JsonWriter writer, FabricContactJson? value, JsonSerializerOptions options) =>
+        throw new NotSupportedException("the mod metadata records are read-only");
+}
+
 // ---------------------------------------------------------------------- quilt.mod.json
 
 internal sealed record QuiltModJson
@@ -411,6 +430,9 @@ internal sealed record QuiltLoaderJson
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Version { get; set; } = "";
 
+    /// <summary>A non-object metadata member reads null (the former `as JsonObject ?? []`
+    /// probe) so a broken member cannot empty the whole mod.</summary>
+    [JsonConverter(typeof(QuiltMetadataConverter))]
     public QuiltMetadataJson? Metadata { get; set; }
 }
 
@@ -426,6 +448,7 @@ internal sealed record QuiltMetadataJson
     [JsonConverter(typeof(CoercingObjectElementDictionaryConverter))]
     public Dictionary<string, JsonElement>? Contributors { get; set; }
 
+    [JsonConverter(typeof(FabricContactConverter))]
     public FabricContactJson? Contact { get; set; }
 
     [JsonConverter(typeof(FabricLicenseListConverter))]
@@ -433,6 +456,19 @@ internal sealed record QuiltMetadataJson
 
     [JsonConverter(typeof(FabricIconConverter))]
     public FabricIconJson? Icon { get; set; }
+}
+
+internal sealed class QuiltMetadataConverter : JsonConverter<QuiltMetadataJson?>
+{
+    public override QuiltMetadataJson? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        return reader.TokenType == JsonTokenType.StartObject
+            ? JsonSerializer.Deserialize(ref reader, ModMetadataJsonContext.Default.QuiltMetadataJson)
+            : null;
+    }
+
+    public override void Write(Utf8JsonWriter writer, QuiltMetadataJson? value, JsonSerializerOptions options) =>
+        throw new NotSupportedException("the mod metadata records are read-only");
 }
 
 internal sealed record QuiltDependJson

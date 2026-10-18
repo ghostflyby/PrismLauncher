@@ -106,6 +106,26 @@ public sealed class QtCoercingNullableBoolConverter : JsonConverter<bool?>
         writer.WriteBooleanValue(value ?? false);
 }
 
+/// <summary>The presence-sensitive style-flag variant: an absent member stays null (the
+/// caller emits nothing), but a PRESENT member of any kind reads its bool (junk and JSON
+/// null read false) — the old Contains(key) + BoolOr() pair of the chat-component style
+/// builder, where a present "bold": "yes" still emitted the font-weight span.</summary>
+public sealed class QtPresenceBoolConverter : JsonConverter<bool?>
+{
+    public override bool HandleNull => true;
+
+    public override bool? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.TokenType switch
+        {
+            JsonTokenType.True => true,
+            JsonTokenType.False => false,
+            _ => false,
+        };
+
+    public override void Write(Utf8JsonWriter writer, bool? value, JsonSerializerOptions options) =>
+        writer.WriteBooleanValue(value ?? false);
+}
+
 /// <summary>The {"packs":[id,...]} index arrays: QJsonValue::toInt() per element (doubles
 /// truncate, junk zeroes); a missing member keeps the property default, a JSON null yields
 /// an empty list.</summary>

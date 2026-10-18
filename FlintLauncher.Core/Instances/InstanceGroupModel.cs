@@ -521,8 +521,9 @@ public sealed class InstanceGroupModel
         return changed;
     }
 
-    /// <summary>The group file format version (g_GROUP_FILE_FORMAT_VERSION — the STRING
-    /// "1" on disk, like upstream).</summary>
+    /// <summary>The group file format version (g_GROUP_FILE_FORMAT_VERSION). Upstream
+    /// literally wrote the STRING "1"; the typed write emits the number 1 — the read
+    /// converter accepts both shapes.</summary>
     public const int GroupFormatVersion = 1;
 
     /// <summary>Write the group-definition file (config side). Returns false when a write

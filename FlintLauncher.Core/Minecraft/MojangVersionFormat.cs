@@ -22,7 +22,7 @@ public static class MojangVersionFormat
     //
     // The read side deserializes the VersionFormatJson probes (VersionFormatJson.cs) and maps
     // them onto the domain objects; a malformed document fails whole with the collapsed kind
-    // texts. The write side below is the byte-tested Qt tail (sorted keys, 4-space indent).
+    // texts.
 
     /// <summary>The probe read over a node: shape failures keep the "{what}: Error parsing
     /// JSON: ..." wrapper family of the former RequireDocument reads.</summary>
@@ -38,8 +38,6 @@ public static class MojangVersionFormat
             throw new JsonParseException(what + ": Error parsing JSON: " + e.Message);
         }
     }
-
-    // ------------------------------------------------------------------ download info
 
     // ------------------------------------------------------------------ download info
 

@@ -19,6 +19,7 @@
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.Auth;
 
@@ -53,7 +54,9 @@ public sealed record AccountJson
     public ProfileJson? Profile { get; init; }
     public EntitlementJson? Entitlement { get; init; }
 
-    /// <summary>The list layer's default-account flag (read leniently: a non-bool is no flag).</summary>
+    /// <summary>The list layer's default-account flag: only a real JSON true counts (the
+    /// QJsonValue::toBool read — a wrong-kind value is no flag, never an account skipper).</summary>
+    [JsonConverter(typeof(QtCoercingNullableBoolConverter))]
     public bool? Active { get; init; }
 }
 

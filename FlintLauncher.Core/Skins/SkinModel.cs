@@ -4,10 +4,12 @@
 //
 // The index is the typed SkinIndexJson wire (docs/JSON-MIGRATION.md, the Qt write-tail
 // batch): written through the source-generated context, read back through it. The C++
-// per-key probing degenerated to "the whole list is empty" on any wrong-kind value (the
+// per-key probing degenerated to "the whole list is empty" on any wrong-kind VALUE (the
 // GetValue<string> throw inside the constructor hit the outer catch) — the typed read
-// keeps exactly that whole-file failure behavior, and the mapper keeps the "SLIM or
-// nothing is CLASSIC" model read.
+// keeps that whole-file failure behavior for wrong-kind members; the one tightened edge
+// is a non-object ARRAY ENTRY (the C++ skipped it, the typed read fails the file — no
+// upstream-written index ever contains one), and the mapper keeps the "SLIM or nothing
+// is CLASSIC" model read.
 //
 // Deviations:
 //  - SkinList is a QAbstractListModel tied to QImage previews and the watched skins directory;

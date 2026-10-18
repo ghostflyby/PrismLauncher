@@ -32,7 +32,17 @@
 | 批次1 accounts.json 读写类型化（AccountWire + 字节门退役） | `a82e3859f` |
 | 批次2 Qt 写尾迁移（版本格式 *OutJson、mmc-pack、instgroups Save、皮肤 index、mod-list 导出、paste.gg） | `191fef389` |
 | 批次3 mod 信息读取类型化（ModMetadataWire、pack.mcmeta/ChatComponentJson、Technic version.json、LegacyFtb pack.json、status ping） | `9fd411303` |
-| 批次4 Flame 指纹流类型化 + ParseRequires/SerializeRequires 收敛（单一 MetaRequireJson wire） | （本提交） |
+| 批次4 Flame 指纹流类型化 + ParseRequires/SerializeRequires 收敛（单一 MetaRequireJson wire） | `dfd41baf6` |
+| 审查修复轮：mmc-pack/mcmod null 元素 NRE、mods 门保真、active/contact/metadata/arguments/players 逐字段退化、MapRequires/equals 守卫 | （本提交） |
+
+### 4.1 审查轮接受并记录的偏差（均为垃圾/手改文件才触发的形状，真实上游文件不受影响）
+
+- fabric/quilt `name` 出现但类型错误 → 取 mod id（旧读为 ""）；符合 spec 默认，注释与 wire record 已载。
+- litemod `version` 存在但类型错误 → 回落 `revision`（旧读保留 ""）。
+- mcmod `requiredMods` 存在但类型错误/JSON null → 回落 `dependencies`（旧 Contains 阻断回落）。
+- Flame 指纹/文件响应中 `data`/`exactMatches`/`file` 类型错误、`fileFingerprint` 垃圾 → 整个响应 EmitFailed（旧为静默跳过或 "0" 未命中继续）；Projects 步骤语法垃圾静默返回（旧为 EmitFailed(e.Message)，依赖 ExecuteAsync 的残留失效上报）。
+- 版本格式/instgroups/皮肤 index 写侧从 Qt 4-space 排序字节形改为 context 标准缩进（写形状自由）。
+- `"requires": null`（字面 null 成员）在 OneSix 版本格式读为空集（旧整档失败）。
 
 ## 4. 剩余批次
 

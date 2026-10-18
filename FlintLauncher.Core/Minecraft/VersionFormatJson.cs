@@ -273,7 +273,8 @@ internal sealed record VersionFileOutJson
 
 [JsonSourceGenerationOptions(RespectNullableAnnotations = true,
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
-    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    WriteIndented = true)]
 [JsonSerializable(typeof(VersionFileJson))]
 [JsonSerializable(typeof(LibraryJson))]
 [JsonSerializable(typeof(RuleJson))]

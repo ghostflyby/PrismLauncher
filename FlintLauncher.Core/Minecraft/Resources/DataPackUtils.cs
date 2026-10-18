@@ -551,16 +551,21 @@ internal sealed record ComponentObjectJson
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Text { get; set; } = "";
 
+    /// <summary>The inherit-chain flags: junk reads null and inherits (the old
+    /// BoolOr(key, fallback)).</summary>
     [JsonConverter(typeof(QtCoercingNullableBoolConverter))]
     public bool? Underlined { get; set; }
 
     [JsonConverter(typeof(QtCoercingNullableBoolConverter))]
     public bool? Strikethrough { get; set; }
 
-    [JsonConverter(typeof(QtCoercingNullableBoolConverter))]
+    /// <summary>The style flags are PRESENCE-checked (the old Contains+BoolOr pair): a
+    /// present member of any kind reads its bool (junk → false), only absence stays null
+    /// and emits no span.</summary>
+    [JsonConverter(typeof(QtPresenceBoolConverter))]
     public bool? Bold { get; set; }
 
-    [JsonConverter(typeof(QtCoercingNullableBoolConverter))]
+    [JsonConverter(typeof(QtPresenceBoolConverter))]
     public bool? Italic { get; set; }
 
     [JsonConverter(typeof(QtCoercingStringConverter))]

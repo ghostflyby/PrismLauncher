@@ -147,6 +147,11 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
 
                     foreach (var library in packJson?.Libraries ?? [])
                     {
+                        if (library is null)
+                        {
+                            continue; // a null array entry carries no name (the old probe skipped it too)
+                        }
+
                         var nameValue = library.Name;
                         if (!nameValue.StartsWith("net.minecraftforge", StringComparison.Ordinal))
                         {

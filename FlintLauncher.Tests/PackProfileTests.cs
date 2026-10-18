@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // New tests locking the persistence behavior ported from launcher/minecraft/PackProfile.{h,cpp}:
-// mmc-pack.json round trips, the byte-exact Qt-style save format, patches/*.json handling and
-// the jar mod / custom jar / agent installers.
+// mmc-pack.json round trips (the typed write; values are the gate — docs/JSON-MIGRATION.md),
+// patches/*.json handling and the jar mod / custom jar / agent installers.
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -110,6 +110,17 @@ public class PackProfileTests : IDisposable
         Assert.Equal("org.quiltmc.hashed", hashed.GetId());
         Assert.True(hashed.DependencyOnly);
         Assert.Equal("1.12.2", hashed.Version);
+    }
+
+    [Fact]
+    public void MmcPack_Null_Component_Entry_Is_Bad_File_Format()
+    {
+        // a JSON null where a component object belongs fails the whole file (the former
+        // "Component must be an object." throw), never a silently-shortened list
+        WriteFile("mmc-pack.json", """{"formatVersion": 1, "components": [null, {"uid": "net.minecraft"}]}""");
+        using var profile = new PackProfile(_root);
+        var result = profile.Load();
+        Assert.False(result.Ok);
     }
 
     [Fact]

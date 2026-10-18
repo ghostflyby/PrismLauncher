@@ -88,9 +88,17 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi? modr
             return;
         }
 
+        if (doc.Data is null)
+        {
+            // the former RequireArray throw: an absent/null data member is a broken reply,
+            // not an empty resolution
+            EmitFailed("Invalid data returned from the API.");
+            return;
+        }
+
         {
             var hashes = new List<string>();
-            foreach (var fileDto in doc.Data ?? [])
+            foreach (var fileDto in doc.Data)
             {
                 try
                 {

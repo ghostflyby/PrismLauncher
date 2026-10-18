@@ -432,9 +432,11 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
     private static Component ComponentFromJsonV1(PackProfile parent, PackComponentJson wire)
     {
-        // critical — the uid member is required (the former RequireString throw)
+        // critical — the uid member is required (the former RequireString throw), and a
+        // null list entry is the former "Component must be an object." throw
         var component = new Component(parent,
-            wire.Uid ?? throw new JsonParseException("'uid' is not a string"))
+            (wire ?? throw new JsonParseException("Component must be an object.")).Uid
+            ?? throw new JsonParseException("'uid' is not a string"))
         {
             Version = wire.Version,
             DependencyOnly = wire.DependencyOnly,

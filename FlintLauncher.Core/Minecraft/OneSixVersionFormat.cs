@@ -327,8 +327,11 @@ public static partial class OneSixVersionFormat
             Libraries = patch.Libraries.Count != 0 ? patch.Libraries.Select(LibraryToJson).ToList() : null,
             MavenFiles = patch.MavenFiles.Count != 0 ? patch.MavenFiles.Select(LibraryToJson).ToList() : null,
             JarMods = patch.JarMods.Count != 0 ? patch.JarMods.Select(JarModToJson).ToList() : null,
-            // NOTE: upstream iterates patch->jarMods here — an obvious bug, kept for fidelity
-            Mods = patch.JarMods.Count != 0 ? patch.JarMods.Select(ModToJson).ToList() : null,
+            // NOTE: upstream iterates patch->jarMods here — an obvious bug, kept for
+            // fidelity INCLUDING its gate: the array exists only when the MODS list is
+            // non-empty, so a jar-mod-only patch writes no "mods" member (and a save/reload
+            // cycle does not turn jar mods into mods)
+            Mods = patch.Mods.Count != 0 ? patch.JarMods.Select(ModToJson).ToList() : null,
             Volatile = patch.Volatile ? true : null,
         };
         return MergeMojangHalf(wire, MojangVersionFormat.WriteVersionProperties(patch));

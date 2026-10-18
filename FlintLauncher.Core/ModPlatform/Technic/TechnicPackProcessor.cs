@@ -269,6 +269,7 @@ public static class TechnicPackProcessor
         [JsonConverter(typeof(TechnicLibrariesConverter))]
         public List<TechnicLibraryJson>? Libraries { get; set; }
 
+        [JsonConverter(typeof(TechnicArgumentsConverter))]
         public TechnicArgumentsJson? Arguments { get; set; }
     }
 
@@ -283,6 +284,21 @@ public static class TechnicPackProcessor
         /// <summary>Junk values coerce to "" (the former StringValue probing).</summary>
         [JsonConverter(typeof(CoercingStringListConverter))]
         public List<string>? Game { get; set; }
+    }
+
+    /// <summary>A non-object arguments member reads null (the former `is JsonObject` probe)
+    /// so the library walk continues.</summary>
+    internal sealed class TechnicArgumentsConverter : JsonConverter<TechnicArgumentsJson?>
+    {
+        public override TechnicArgumentsJson? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            return reader.TokenType == JsonTokenType.StartObject
+                ? JsonSerializer.Deserialize(ref reader, TechnicJsonContext.Default.TechnicArgumentsJson)
+                : null;
+        }
+
+        public override void Write(Utf8JsonWriter writer, TechnicArgumentsJson? value, JsonSerializerOptions options) =>
+            throw new NotSupportedException("the Technic wire records are read-only");
     }
 
     /// <summary>A non-array libraries member reads null; non-object entries are skipped.</summary>

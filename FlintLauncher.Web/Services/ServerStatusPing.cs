@@ -299,8 +299,12 @@ public static class ServerStatusPing
 
 internal sealed record ServerStatusJson
 {
+    /// <summary>Non-object members read null (the former `is JsonObject` probes) so a
+    /// broken section degrades to its defaults instead of failing the whole reply.</summary>
+    [JsonConverter(typeof(ServerStatusPlayersConverter))]
     public ServerStatusPlayersJson? Players { get; set; }
 
+    [JsonConverter(typeof(ServerStatusVersionConverter))]
     public ServerStatusVersionJson? Version { get; set; }
 
     [JsonConverter(typeof(MotdConverter))]
@@ -320,6 +324,32 @@ internal sealed record ServerStatusVersionJson
 {
     [JsonConverter(typeof(QtCoercingNullableStringConverter))]
     public string? Name { get; set; }
+}
+
+internal sealed class ServerStatusPlayersConverter : JsonConverter<ServerStatusPlayersJson?>
+{
+    public override ServerStatusPlayersJson? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        return reader.TokenType == JsonTokenType.StartObject
+            ? JsonSerializer.Deserialize(ref reader, ServerPingJsonContext.Default.ServerStatusPlayersJson)
+            : null;
+    }
+
+    public override void Write(Utf8JsonWriter writer, ServerStatusPlayersJson? value, JsonSerializerOptions options) =>
+        writer.WriteStartObject();
+}
+
+internal sealed class ServerStatusVersionConverter : JsonConverter<ServerStatusVersionJson?>
+{
+    public override ServerStatusVersionJson? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        return reader.TokenType == JsonTokenType.StartObject
+            ? JsonSerializer.Deserialize(ref reader, ServerPingJsonContext.Default.ServerStatusVersionJson)
+            : null;
+    }
+
+    public override void Write(Utf8JsonWriter writer, ServerStatusVersionJson? value, JsonSerializerOptions options) =>
+        writer.WriteStartObject();
 }
 
 internal sealed class MotdConverter : JsonConverter<string?>
@@ -347,4 +377,6 @@ internal sealed class MotdConverter : JsonConverter<string?>
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(ServerStatusJson))]
+[JsonSerializable(typeof(ServerStatusPlayersJson))]
+[JsonSerializable(typeof(ServerStatusVersionJson))]
 internal sealed partial class ServerPingJsonContext : JsonSerializerContext;
