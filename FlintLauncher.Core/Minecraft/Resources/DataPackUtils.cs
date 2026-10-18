@@ -13,8 +13,9 @@
 //  - pack.png validation reads the PNG header (PngImage.cs) where the C++ decodes any
 //    QImage-supported format.
 //  - QJsonValue::isDouble()/QString::number(double) formats numbers like Qt's 'g' with 6
-//    significant digits (lowercase exponent); QtJson.NumberToString mirrors that.
+//    significant digits (lowercase exponent); NumberToString below mirrors that.
 
+using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
@@ -309,11 +310,19 @@ public static class DataPackUtils
         {
             { Text: { } text } => text,
             { BoolValue: { } b } => b ? "true" : "false",
-            { NumberValue: { } number } => QtJson.NumberToString(number),
+            { NumberValue: { } number } => NumberToString(number),
             { Array: { } array } => ProcessComponent(array, strikethrough, underline),
             { Object: { } obj } => ProcessComponent(obj, strikethrough, underline),
             _ => "", // qWarning() << "Invalid component type!";
         };
+    }
+
+    /// <summary>QJsonValue::toDouble() as written by QString::number(double) ('g', 6 digits,
+    /// lowercase exponent) — the Qt number rendering the C++ component walker used.</summary>
+    private static string NumberToString(double value)
+    {
+        var text = value.ToString("G6", CultureInfo.InvariantCulture);
+        return text.Replace('E', 'e');
     }
 
     /// <summary>Port of DataPackUtils::processPackPNG(pack, data).</summary>
