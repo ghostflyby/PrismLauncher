@@ -11,7 +11,10 @@
 //    kept verbatim (the "both sides" branch is unreachable, exactly like the C++).
 
 using System.Globalization;
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
@@ -72,54 +75,137 @@ internal static class FlameJson
         => JsonUtils.RequireArray(Ptr(parent, key), "'" + key + "'");
 }
 
+// ------------------------------------------------------------------ wire probes
+//
+// The CurseForge project/file shapes as parsed DTOs; every member is camel-conforming
+// (id/name/slug/links/logo/authors/classId/gameVersions/fileDate/downloadUrl/...), so the
+// context-wide policy carries the naming with zero explicit annotations.
+
+internal sealed record FlameProjectJson(
+    int? Id,
+    string? Name,
+    string? Slug,
+    FlameLinksJson? Links,
+    string? Summary,
+    FlameLogoJson? Logo,
+    List<FlameAuthorJson>? Authors,
+    int? ClassId);
+
+internal sealed record FlameLinksJson(
+    string? WebsiteUrl,
+    string? IssuesUrl,
+    string? SourceUrl,
+    string? WikiUrl);
+
+internal sealed record FlameLogoJson(
+    string? Title,
+    string? ThumbnailUrl,
+    string? Url);
+
+internal sealed record FlameAuthorJson(
+    string? Name,
+    string? Url);
+
+internal sealed record FlameModFileJson(
+    JsonElement? GameVersions,
+    int? ModId,
+    int? Id,
+    string? FileDate,
+    string? DisplayName,
+    string? DownloadUrl,
+    string? FileName,
+    int? ReleaseType,
+    List<FlameHashJson>? Hashes,
+    List<FlameDependencyJson>? Dependencies);
+
+internal sealed record FlameHashJson(
+    int? Algo,
+    string? Value);
+
+internal sealed record FlameDependencyJson(
+    int? ModId,
+    int? RelationType);
+
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(FlameProjectJson))]
+[JsonSerializable(typeof(FlameModFileJson))]
+internal sealed partial class FlameModJsonContext : JsonSerializerContext;
+
 // https://docs.curseforge.com/#tocS_Mod
 public static class FlameMod
 {
+    /// <summary>The probe read over a node: shape failures become JsonParseException like
+    /// the former Require* reads.</summary>
+    private static T Probe<T>(JsonNode node, JsonTypeInfo<T> typeInfo) where T : class
+    {
+        try
+        {
+            return JsonSerializer.Deserialize(node, typeInfo)
+                   ?? throw new JsonParseException("Value is not an object");
+        }
+        catch (JsonException e)
+        {
+            throw new JsonParseException(e.Message);
+        }
+    }
+
+    private static string Require(string? value, string key) =>
+        value ?? throw new JsonParseException("'" + key + "' is not a string");
+
+    private static int Require(int? value, string key) =>
+        value ?? throw new JsonParseException("'" + key + "' is not an integer");
+
     /// <summary>Port of FlameMod::loadIndexedPack.</summary>
     public static void LoadIndexedPack(IndexedPack pack, JsonNode obj)
     {
-        pack.AddonId = FlameJson.RequireInteger(obj, "id").ToString(CultureInfo.InvariantCulture);
-        pack.Provider = ResourceProvider.Flame;
-        pack.Name = FlameJson.RequireString(obj, "name");
-        pack.Slug = FlameJson.RequireString(obj, "slug");
-        pack.WebsiteUrl = FlameJson.Str(FlameJson.Obj(obj, "links"), "websiteUrl");
-        pack.Description = FlameJson.Str(obj, "summary");
+        var dto = Probe(obj, FlameModJsonContext.Default.FlameProjectJson);
 
-        var logo = FlameJson.Obj(obj, "logo");
-        pack.LogoName = FlameJson.Str(logo, "title");
-        pack.LogoUrl = FlameJson.Str(logo, "thumbnailUrl");
+        pack.AddonId = Require(dto.Id, "id").ToString(CultureInfo.InvariantCulture);
+        pack.Provider = ResourceProvider.Flame;
+        pack.Name = Require(dto.Name, "name");
+        pack.Slug = Require(dto.Slug, "slug");
+        pack.WebsiteUrl = dto.Links?.WebsiteUrl ?? "";
+        pack.Description = dto.Summary ?? "";
+
+        // a missing/junk logo reads as the empty-logo fallback chain (title/thumbnail/url)
+        var logo = dto.Logo;
+        pack.LogoName = logo?.Title ?? "";
+        pack.LogoUrl = logo?.ThumbnailUrl ?? "";
         if (pack.LogoUrl.Length == 0)
         {
-            pack.LogoUrl = FlameJson.Str(logo, "url");
+            pack.LogoUrl = logo?.Url ?? "";
         }
 
-        var authors = FlameJson.Arr(obj, "authors");
-        if (authors.Count != 0)
+        if (dto.Authors is { Count: > 0 } authors)
         {
             pack.Authors.Clear();
             foreach (var author in authors)
             {
                 pack.Authors.Add(new ModpackAuthor
                 {
-                    Name = FlameJson.RequireString(author, "name"),
-                    Url = FlameJson.RequireString(author, "url"),
+                    Name = Require(author.Name, "name"),
+                    Url = Require(author.Url, "url"),
                 });
             }
         }
 
-        pack.ResourceType = FlameApi.GetResourceType(FlameJson.Int(obj, "classId"));
+        pack.ResourceType = FlameApi.GetResourceType(dto.ClassId ?? 0);
         pack.ExtraDataLoaded = false;
-        LoadUrLs(pack, obj);
+        MapUrls(dto.Links, pack);
     }
 
     /// <summary>Port of FlameMod::loadURLs.</summary>
     public static void LoadUrLs(IndexedPack pack, JsonNode obj)
     {
-        var linksObj = FlameJson.Obj(obj, "links");
+        var dto = Probe(obj, FlameModJsonContext.Default.FlameProjectJson);
+        MapUrls(dto.Links, pack);
+    }
 
-        pack.ExtraData.IssuesUrl = ChopTrailingSlash(FlameJson.Str(linksObj, "issuesUrl"));
-        pack.ExtraData.SourceUrl = ChopTrailingSlash(FlameJson.Str(linksObj, "sourceUrl"));
-        pack.ExtraData.WikiUrl = ChopTrailingSlash(FlameJson.Str(linksObj, "wikiUrl"));
+    private static void MapUrls(FlameLinksJson? links, IndexedPack pack)
+    {
+        pack.ExtraData.IssuesUrl = ChopTrailingSlash(links?.IssuesUrl ?? "");
+        pack.ExtraData.SourceUrl = ChopTrailingSlash(links?.SourceUrl ?? "");
+        pack.ExtraData.WikiUrl = ChopTrailingSlash(links?.WikiUrl ?? "");
 
         if (pack.ExtraData.Body.Length != 0)
         {
@@ -155,10 +241,12 @@ public static class FlameMod
         var unsortedVersions = new List<IndexedVersion>();
         foreach (var versionIter in arr)
         {
-            var obj = versionIter as JsonObject
-                      ?? throw new JsonParseException("file entry is not an object");
+            if (versionIter is null)
+            {
+                throw new JsonParseException("file entry is not an object");
+            }
 
-            var file = LoadIndexedPackVersion(obj);
+            var file = LoadIndexedPackVersion(versionIter);
             if (file.AddonId.Length == 0)
             {
                 file.AddonId = pack.AddonId;
@@ -181,12 +269,19 @@ public static class FlameMod
     /// <summary>Port of FlameMod::loadIndexedPackVersion.</summary>
     public static IndexedVersion LoadIndexedPackVersion(JsonNode obj)
     {
-        var versionArray = FlameJson.RequireArray(obj, "gameVersions");
+        var dto = Probe(obj, FlameModJsonContext.Default.FlameModFileJson);
+
+        // a missing gameVersions member is a require failure; a non-string element reads as
+        // "" like the former AsString fallback (and simply misses every branch below)
+        if (dto.GameVersions is not { ValueKind: JsonValueKind.Array } gameVersionsNode)
+        {
+            throw new JsonParseException("'gameVersions' is not an array");
+        }
 
         var file = new IndexedVersion();
-        foreach (var mcVer in versionArray)
+        foreach (var mcVer in gameVersionsNode.EnumerateArray())
         {
-            var str = FlameJson.AsString(mcVer) ?? "";
+            var str = mcVer.ValueKind == JsonValueKind.String ? mcVer.GetString() ?? "" : "";
 
             if (str.Contains('.'))
             {
@@ -234,14 +329,14 @@ public static class FlameMod
             }
         }
 
-        file.AddonId = FlameJson.RequireInteger(obj, "modId").ToString(CultureInfo.InvariantCulture);
-        file.FileId = FlameJson.RequireInteger(obj, "id").ToString(CultureInfo.InvariantCulture);
-        file.Date = FlameJson.RequireString(obj, "fileDate");
-        file.Version = FlameJson.RequireString(obj, "displayName");
-        file.DownloadUrl = FlameJson.Str(obj, "downloadUrl");
-        file.FileName = FileSystem.RemoveInvalidPathChars(FlameJson.RequireString(obj, "fileName"));
+        file.AddonId = Require(dto.ModId, "modId").ToString(CultureInfo.InvariantCulture);
+        file.FileId = Require(dto.Id, "id").ToString(CultureInfo.InvariantCulture);
+        file.Date = Require(dto.FileDate, "fileDate");
+        file.Version = Require(dto.DisplayName, "displayName");
+        file.DownloadUrl = dto.DownloadUrl ?? "";
+        file.FileName = FileSystem.RemoveInvalidPathChars(Require(dto.FileName, "fileName"));
 
-        file.VersionType = FlameJson.RequireInteger(obj, "releaseType") switch
+        file.VersionType = Require(dto.ReleaseType, "releaseType") switch
         {
             1 => new IndexedVersionType(IndexedVersionTypeValue.Release),
             2 => new IndexedVersionType(IndexedVersionTypeValue.Beta),
@@ -249,26 +344,25 @@ public static class FlameMod
             _ => IndexedVersionType.Invalid,
         };
 
-        var hashList = FlameJson.Arr(obj, "hashes");
-        foreach (var hashEntry in hashList)
+        foreach (var hashEntry in dto.Hashes ?? [])
         {
             var hashTypes = ProviderCapabilities.HashType(ResourceProvider.Flame);
-            var hashAlgo = EnumToString(FlameJson.Int(hashEntry, "algo", 1));
+            // a missing/junk algo member defaults to sha1 (1), like the former Int read
+            var hashAlgo = EnumToString(hashEntry?.Algo ?? 1);
             if (hashTypes.Contains(hashAlgo))
             {
-                file.Hash = FlameJson.RequireString(hashEntry, "value");
+                file.Hash = Require(hashEntry?.Value, "value");
                 file.HashType = hashAlgo;
                 break;
             }
         }
 
-        var dependencies = FlameJson.Arr(obj, "dependencies");
-        foreach (var dep in dependencies)
+        foreach (var dep in dto.Dependencies ?? [])
         {
             var dependency = new Dependency
             {
-                AddonId = FlameJson.RequireInteger(dep, "modId").ToString(CultureInfo.InvariantCulture),
-                Type = FlameJson.RequireInteger(dep, "relationType") switch
+                AddonId = Require(dep?.ModId, "modId").ToString(CultureInfo.InvariantCulture),
+                Type = Require(dep?.RelationType, "relationType") switch
                 {
                     1 => new DependencyType(DependencyTypeValue.Embedded),     // EmbeddedLibrary
                     2 => new DependencyType(DependencyTypeValue.Optional),     // OptionalDependency
