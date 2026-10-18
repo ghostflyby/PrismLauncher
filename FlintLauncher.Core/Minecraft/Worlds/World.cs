@@ -109,6 +109,7 @@ public sealed class World
     public DateTimeOffset LastPlayed { get; private set; }
 
     /// <summary>Size in bytes; set externally via SetSize (WorldList::calculateWorldSize).</summary>
+    public void SetSize(long size) => Size = size;
     public long Size { get; private set; }
 
     public long Seed { get; private set; }
@@ -349,11 +350,6 @@ public sealed class World
     }
 
     /// <summary>Port of World::setSize.</summary>
-    public void SetSize(long size)
-    {
-        Size = size;
-    }
-
     /// <summary>Port of World::operator== — deliberately weak (validity + folder name).</summary>
     public override bool Equals(object? obj)
     {

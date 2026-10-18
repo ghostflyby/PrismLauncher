@@ -235,8 +235,8 @@ public sealed partial class InstanceImportTask : InstanceTask
         instCreationTask.SetName(ModifiedName());
         instCreationTask.SetOriginalName(OriginalName(), Version());
         // (the icon import from the pack is not ported — see the header note)
-        instCreationTask.SetIcon(Icon);
-        instCreationTask.SetGroup(Group);
+        instCreationTask.Icon = Icon;
+        instCreationTask.Group = Group;
         instCreationTask.SetConfirmUpdate(ShouldConfirmUpdate());
 
         await instCreationTask.StartAsync(cancellationToken);
@@ -330,8 +330,8 @@ public sealed partial class InstanceImportTask : InstanceTask
         instCreationTask.SetName(ModifiedName());
         instCreationTask.SetOriginalName(OriginalName(), Version());
         // (the icon import from the pack is not ported — see the header note)
-        instCreationTask.SetIcon(Icon);
-        instCreationTask.SetGroup(Group);
+        instCreationTask.Icon = Icon;
+        instCreationTask.Group = Group;
         instCreationTask.SetConfirmUpdate(ShouldConfirmUpdate());
 
         await instCreationTask.StartAsync(cancellationToken);

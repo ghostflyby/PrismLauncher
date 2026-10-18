@@ -55,7 +55,7 @@ public abstract class MetaEntity
         FileSystem.PathCombine(RequireCache().GetBasePath("meta"), localFile);
 
     /// <summary>the expected sha256</summary>
-    protected string Sha256 = "";
+    public string Sha256 = "";
 
     /// <summary>the file sha256</summary>
     protected string FileSha256 = "";
@@ -77,8 +77,6 @@ public abstract class MetaEntity
     public LoadStatus Status() => loadStatus;
 
     /// <summary>for parsers</summary>
-    public void SetSha256(string sha256) => Sha256 = sha256;
-
     public abstract void Parse(JsonObject obj);
 
     /// <summary>Port of BaseEntity::loadTask().</summary>

@@ -211,7 +211,7 @@ public static class TechnicEndpoints
                 // (or the request's) is the instance name, the icon follows the vanilla
                 // endpoint's "default" fallback
                 task.SetName(taskName!);
-                task.SetIcon(request.IconKey ?? "default");
+                task.Icon = request.IconKey ?? "default";
 
                 // staged-commit path: the task runs inside an InstanceList staging folder
                 // that InstanceStaging commits into instances/ on success (WrapInstanceTask)

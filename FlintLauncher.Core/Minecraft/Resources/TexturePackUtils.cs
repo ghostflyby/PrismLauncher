@@ -171,7 +171,7 @@ public static class TexturePackUtils
     /// <summary>Port of TexturePackUtils::processPackTXT: the description is the raw file content.</summary>
     public static bool ProcessPackTxt(TexturePack pack, string rawData)
     {
-        pack.SetDescription(rawData);
+        pack.Description = rawData;
         return true;
     }
 

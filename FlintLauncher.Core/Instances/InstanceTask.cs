@@ -86,12 +86,6 @@ public abstract class InstanceTask : FlintTask
 
     public void SetParentEnvironment(InstanceEnvironment environment) => Environment = environment;
 
-    /// <summary>C++ setIcon().</summary>
-    public void SetIcon(string icon) => Icon = icon;
-
-    /// <summary>C++ setGroup().</summary>
-    public void SetGroup(string group) => Group = group;
-
     public bool ShouldConfirmUpdate() => confirmUpdate;
 
     public void SetConfirmUpdate(bool confirm) => confirmUpdate = confirm;

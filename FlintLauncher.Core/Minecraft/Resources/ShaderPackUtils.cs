@@ -47,7 +47,7 @@ public static class ShaderPackUtils
             return false; // assets dir does not exists or isn't valid
         }
 
-        pack.SetPackFormat(ShaderPackFormat.Valid);
+        pack.PackFormat = ShaderPackFormat.Valid;
 
         if (level == ShaderPackProcessingLevel.BasicInfoOnly)
         {
@@ -94,7 +94,7 @@ public static class ShaderPackUtils
             }
         }
 
-        pack.SetPackFormat(ShaderPackFormat.Valid);
+        pack.PackFormat = ShaderPackFormat.Valid;
 
         if (level == ShaderPackProcessingLevel.BasicInfoOnly)
         {

@@ -139,7 +139,7 @@ public class ComponentUpdateTaskTests : IDisposable
         Directory.CreateDirectory(metaDir);
         await File.WriteAllTextAsync(metaFile, json);
         var metaVersion = index.Get(uid, version);
-        metaVersion.SetSha256(Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(metaFile))).ToLowerInvariant());
+        metaVersion.Sha256 = Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(metaFile))).ToLowerInvariant();
         await metaVersion.LoadTask(NetMode.Offline).StartAsync();
         Assert.True(metaVersion.IsLoaded, "seeded meta version should be loaded");
     }

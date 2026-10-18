@@ -126,8 +126,8 @@ public class InstanceCopyTests : IDisposable
         var task = new InstanceCopyTask(source, prefs);
         // what CopyInstanceDialog submits: the chosen name/group/icon
         task.SetName("Source Copy");
-        task.SetGroup("Copied");
-        task.SetIcon("flint-icon");
+        task.Group = "Copied";
+        task.Icon = "flint-icon";
         task.SetParentEnvironment(_global.Environment);
 
         await list.WrapInstanceTask(task).StartAsync();

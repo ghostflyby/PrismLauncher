@@ -133,7 +133,7 @@ public static class FtbEndpoints
                 task.SetName(string.IsNullOrWhiteSpace(request.Name)
                     ? pack.Name
                     : request.Name.Trim());
-                task.SetIcon(request.IconKey ?? "default");
+                task.Icon = request.IconKey ?? "default";
 
                 // staged-commit path: the task runs inside an InstanceList staging folder
                 // that InstanceStaging commits into instances/ on success

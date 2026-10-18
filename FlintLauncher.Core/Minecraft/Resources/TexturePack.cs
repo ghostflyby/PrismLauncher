@@ -22,17 +22,13 @@ public class TexturePack : Resource
     public TexturePack(FileInfo fileInfo) : base(fileInfo) { }
 
     /// <summary>Gets the description of the texture pack.</summary>
-    public string Description => description ?? "";
+    public string Description { get => description ?? ""; set => description = value; }
 
     /// <summary>The pack image header info, when a valid pack.png has been processed.</summary>
     public PngImage Image => image;
 
     public bool HasImage => !image.IsNull;
 
-    public void SetDescription(string newDescription)
-    {
-        description = newDescription;
-    }
 
     public void SetImage(PngImage newImage)
     {

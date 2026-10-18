@@ -43,8 +43,8 @@ public class VanillaCreationTests : IDisposable
         var task = new VanillaCreationTask(version);
         // what NewInstanceDialog submits
         task.SetName(name);
-        task.SetIcon("flint-icon");
-        task.SetGroup("Vanilla");
+        task.Icon = "flint-icon";
+        task.Group = "Vanilla";
         task.SetParentEnvironment(_global.Environment);
         return task;
     }
@@ -108,7 +108,7 @@ public class VanillaCreationTests : IDisposable
         var list = CreateList();
         var task = new VanillaCreationTask("1.20.1", "net.fabricmc.fabric-loader", "0.15.0");
         task.SetName("Fab");
-        task.SetIcon("default");
+        task.Icon = "default";
         task.SetParentEnvironment(_global.Environment);
 
         await list.WrapInstanceTask(task).StartAsync();

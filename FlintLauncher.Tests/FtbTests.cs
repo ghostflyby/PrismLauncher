@@ -260,7 +260,7 @@ public class FtbTests : IDisposable
         var list = CreateList();
         var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _flameApi, _ftbApi);
         task.SetName("FTB Imported");
-        task.SetIcon("ftb_logo");
+        task.Icon = "ftb_logo";
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
 

@@ -81,7 +81,7 @@ public static class AtLauncherEndpoints
                 // the instance name (like the C++ ATL import dialog's default), the icon
                 // follows the vanilla endpoint's "default" fallback
                 task.SetName(request.Name);
-                task.SetIcon(request.IconKey ?? "default");
+                task.Icon = request.IconKey ?? "default";
                 if (!string.IsNullOrWhiteSpace(request.ChooseLoaderVersion))
                 {
                     // the loader "choose" mode's pre-set answer

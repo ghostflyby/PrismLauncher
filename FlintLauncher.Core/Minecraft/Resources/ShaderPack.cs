@@ -28,12 +28,8 @@ public class ShaderPack : Resource
 
     public ShaderPack(FileInfo fileInfo) : base(fileInfo) { }
 
-    public ShaderPackFormat PackFormat => packFormat;
+    public ShaderPackFormat PackFormat { get => packFormat; set => packFormat = value; }
 
-    public void SetPackFormat(ShaderPackFormat newFormat)
-    {
-        packFormat = newFormat;
-    }
 
     public override bool Valid => packFormat != ShaderPackFormat.Invalid;
 }

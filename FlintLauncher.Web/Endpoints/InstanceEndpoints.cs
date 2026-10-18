@@ -119,7 +119,7 @@ public static class InstanceEndpoints
                     Group = request.Group ?? "",
                 };
                 task.SetName(request.Name);
-                task.SetIcon(request.IconKey ?? "default");
+                task.Icon = request.IconKey ?? "default";
 
                 var wrapped = runtime.Instances.WrapInstanceTask(task);
                 // the commit derives the folder from the display name: compute the expected

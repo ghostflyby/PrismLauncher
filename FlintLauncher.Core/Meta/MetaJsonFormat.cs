@@ -91,7 +91,7 @@ public static class MetaJsonFormat
             {
                 Name = element.StringOr("name"),
             };
-            list.SetSha256(element.StringOr("sha256"));
+            list.Sha256 = element.StringOr("sha256");
             lists.Add(list);
         }
 
@@ -118,7 +118,7 @@ public static class MetaJsonFormat
         var sha256 = Str(obj, "sha256");
         if (sha256.Length != 0)
         {
-            version.SetSha256(sha256);
+            version.Sha256  = sha256;
         }
 
         return version;
