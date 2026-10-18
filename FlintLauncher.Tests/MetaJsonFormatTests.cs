@@ -92,32 +92,33 @@ public class MetaJsonFormatTests
     }
 
     [Fact]
-    public void ParseVersion_RequiredFieldErrors_KeepTheFamilyMessages()
+    public void ParseVersion_RequiredFieldErrors_FailTheDocument()
     {
+        // the typed header reader collapses a missing required member onto the require text
         var missingUid = (JsonObject)Parse("""{"formatVersion":1,"releaseTime":"2017-06-02T09:59:14+00:00"}""");
-        Assert.Equal("'uid's parent does not contain 'uid'",
-            Assert.Throws<JsonParseException>(() => MetaJsonFormat.ParseVersion(missingUid, new MetaVersion("x", "y"))).Message);
+        Assert.Equal("'uid' is not a string",
+            Assert.Throws<MetaParseException>(() => MetaJsonFormat.ParseVersion(missingUid, new MetaVersion("x", "y"))).Message);
 
         var missingVersion = (JsonObject)Parse("""{"formatVersion":1,"uid":"net.minecraft"}""");
-        Assert.Equal("'version's parent does not contain 'version'",
-            Assert.Throws<JsonParseException>(() => MetaJsonFormat.ParseVersion(missingVersion, new MetaVersion("x", "y"))).Message);
+        Assert.Equal("'version' is not a string",
+            Assert.Throws<MetaParseException>(() => MetaJsonFormat.ParseVersion(missingVersion, new MetaVersion("x", "y"))).Message);
 
         var missingReleaseTime = (JsonObject)Parse("""{"formatVersion":1,"uid":"net.minecraft","version":"1.12.2"}""");
-        Assert.Equal("'releaseTime's parent does not contain 'releaseTime'",
-            Assert.Throws<JsonParseException>(() => MetaJsonFormat.ParseVersion(missingReleaseTime, new MetaVersion("x", "y"))).Message);
+        Assert.Equal("'releaseTime' is not a string",
+            Assert.Throws<MetaParseException>(() => MetaJsonFormat.ParseVersion(missingReleaseTime, new MetaVersion("x", "y"))).Message);
     }
 
     [Fact]
-    public void ParseVersion_KindErrors_KeepTheRequireMessages()
+    public void ParseVersion_KindErrors_FailTheDocument()
     {
         var badUid = (JsonObject)Parse("""{"formatVersion":1,"uid":3}""");
-        Assert.Equal("'uid' is not a string",
-            Assert.Throws<JsonParseException>(() => MetaJsonFormat.ParseVersion(badUid, new MetaVersion("x", "y"))).Message);
+        var e = Assert.Throws<MetaParseException>(() => MetaJsonFormat.ParseVersion(badUid, new MetaVersion("x", "y")));
+        Assert.StartsWith("The metadata version document is malformed:", e.Message);
 
         var badVersion = (JsonObject)Parse("""{"formatVersion":1,"uid":"u","releaseTime":"2017-06-02T09:59:14+00:00"}""");
         badVersion["version"] = 3;
-        Assert.Equal("'version' is not a string",
-            Assert.Throws<JsonParseException>(() => MetaJsonFormat.ParseVersion(badVersion, new MetaVersion("x", "y"))).Message);
+        Assert.StartsWith("The metadata version document is malformed:",
+            Assert.Throws<MetaParseException>(() => MetaJsonFormat.ParseVersion(badVersion, new MetaVersion("x", "y"))).Message);
     }
 
     [Theory]

@@ -80,9 +80,23 @@ internal sealed record MetaVersionEntryJson(
 internal sealed record MetaRequireJson(
     string? Uid,    [property: JsonPropertyName("equals")] string? EqualsVersion,
     string? Suggests);
+
+/// <summary>The version DOCUMENT header (uid + the common version members); the OneSix
+/// body keys are read by OneSixVersionFormat over the same node.</summary>
+internal sealed record MetaVersionDocumentJson(
+    string? Uid,
+    string? Version,
+    string? ReleaseTime,
+    string? Type,
+    bool? Recommended,
+    bool? Volatile,
+    List<MetaRequireJson>? Requires,
+    List<MetaRequireJson>? Conflicts,
+    string? Sha256);
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(MetaIndexJson))]
 [JsonSerializable(typeof(MetaVersionListJson))]
+[JsonSerializable(typeof(MetaVersionDocumentJson))]
 internal sealed partial class MetaJsonContext : JsonSerializerContext;
 
 public static class MetaJsonFormat
@@ -135,10 +149,6 @@ public static class MetaJsonFormat
     private static string Str(JsonNode? node, string key, string def = "") =>
         JsonObjectExtensions.StringOr(Ptr(node, key), def);
 
-    /// <summary>parent.value(key).toBool(default) equivalent.</summary>
-    private static bool Bool(JsonNode? node, string key, bool def = false) =>
-        JsonObjectExtensions.BoolOr(Ptr(node, key), def);
-
     // ------------------------------------------------------------------ Index
 
     private static Index ParseIndexInternal(MetaIndexJson dto)
@@ -170,24 +180,10 @@ public static class MetaJsonFormat
 
     private static MetaVersion ParseVersionInternal(JsonNode obj)
     {
-        var version = new MetaVersion(RequireStringOf(obj, "uid"), RequireStringOf(obj, "version"));
-        // QDateTime::fromString(..., Qt::ISODate).toMSecsSinceEpoch() / 1000; an invalid
-        // QDateTime contributes 0
-        var releaseTime = ParseUtils.TimeFromS3Time(RequireStringOf(obj, "releaseTime"));
-        version.RawTime = releaseTime?.ToUnixTimeMilliseconds() / 1000 ?? 0;
-        version.Type = Str(obj, "type");
-        version.IsRecommended = Bool(obj, "recommended");
-        version.SetVolatile(Bool(obj, "volatile"));
-        var reqs = new SortedSet<Require>();
-        var conflicts = new SortedSet<Require>();
-        ParseRequires(obj, reqs);
-        ParseRequires(obj, conflicts, "conflicts");
-        version.SetRequires(reqs, conflicts);
-        var sha256 = Str(obj, "sha256");
-        if (sha256.Length != 0)
-        {
-            version.Sha256 = sha256;
-        }
+        var dto = DeserializeDocument((JsonObject)obj, "version", MetaJsonContext.Default.MetaVersionDocumentJson);
+        var version = MapCommonVersion(RequireStringOf(dto.Uid, "uid"), new MetaVersionEntryJson(
+            dto.Version, dto.ReleaseTime, dto.Type, dto.Recommended, dto.Volatile,
+            dto.Requires, dto.Conflicts, dto.Sha256));
 
         version.Data = OneSixVersionFormat.VersionFileFromJson(
             (JsonObject)obj,
