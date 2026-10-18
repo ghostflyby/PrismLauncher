@@ -23,6 +23,8 @@
 
 using System.Text.Json.Serialization;
 
+using FlintLauncher.Core.Instances;
+
 namespace FlintLauncher.Core.Config;
 
 /// <summary>The instance.json root (D4). One object with a camelCase member per domain;
@@ -66,9 +68,11 @@ public sealed record InstanceIdentityConfig
     public string? IconKey { get; init; }
     public string? Notes { get; init; }
 
-    /// <summary>The registered shortcuts array as its compact JSON text (the C++ stored the
-    /// QJsonDocument payload verbatim; kept opaque — the shape is BaseInstance's domain).</summary>
-    public string? Shortcuts { get; init; }
+    /// <summary>The registered shortcuts (the C++ stored the QJsonDocument payload as an
+    /// opaque string; read compat accepts that legacy form, writes are the native array —
+    /// the launcher config write shape is not guaranteed).</summary>
+    [JsonConverter(typeof(ShortcutListJsonConverter))]
+    public List<ShortcutData>? Shortcuts { get; init; }
 }
 
 /// <summary>The layered launch settings (the C7 override families): java / memory / window /
@@ -81,7 +85,7 @@ public sealed record InstanceLaunchConfig
     [JsonConstructor]
     public InstanceLaunchConfig(InstanceJavaConfig? java = null, InstanceMemoryConfig? memory = null,
         InstanceWindowConfig? window = null, InstanceCommandsConfig? commands = null,
-        string? env = null, InstancePerformanceConfig? performance = null,
+        EnvMap? env = null, InstancePerformanceConfig? performance = null,
         InstanceNativeLibConfig? nativeLib = null)
     {
         Java = java ?? new InstanceJavaConfig();
@@ -98,9 +102,11 @@ public sealed record InstanceLaunchConfig
     public InstanceWindowConfig Window { get; init; }
     public InstanceCommandsConfig Commands { get; init; }
 
-    /// <summary>The custom environment map as its JSON object text (same shape as the C++
-    /// "Env" value; gated by OverrideEnv on import).</summary>
-    public string? Env { get; init; }
+    /// <summary>The custom environment map (the C++ "Env" value; gated by OverrideEnv on
+    /// import). Read compat accepts the legacy embedded-JSON string form; writes are the
+    /// native object — the launcher config write shape is not guaranteed.</summary>
+    [JsonConverter(typeof(EnvMapJsonConverter))]
+    public EnvMap? Env { get; init; }
 
     public InstancePerformanceConfig Performance { get; init; }
     public InstanceNativeLibConfig NativeLib { get; init; }
@@ -207,7 +213,7 @@ public sealed record InstanceMiscConfig
     public InstanceMiscConfig(InstanceConsoleConfig? console = null,
         InstanceGameTimeConfig? gameTime = null, bool? closeAfterLaunch = null,
         bool? quitAfterGameStop = null, bool? onlineFixes = null,
-        string? modDownloadLoaders = null, bool? joinServerOnLaunch = null,
+        List<string>? modDownloadLoaders = null, bool? joinServerOnLaunch = null,
         string? joinServerOnLaunchAddress = null, string? joinWorldOnLaunch = null,
         bool? useAccountForInstance = null, string? instanceAccountId = null,
         bool? countGameTime = null, IReadOnlyList<string>? linkedInstances = null,
@@ -248,8 +254,10 @@ public sealed record InstanceMiscConfig
     /// <summary>OverrideLegacySettings family.</summary>
     public bool? OnlineFixes { get; init; }
 
-    /// <summary>OverrideModDownloadLoaders family: the loader list as its JSON array text.</summary>
-    public string? ModDownloadLoaders { get; init; }
+    /// <summary>OverrideModDownloadLoaders family: the loader list. Read compat accepts the
+    /// legacy embedded-JSON string form; writes are the native array.</summary>
+    [JsonConverter(typeof(StringListJsonConverter))]
+    public List<string>? ModDownloadLoaders { get; init; }
 
     // ---- instance-only keys (no global layer)
 

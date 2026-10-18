@@ -234,7 +234,7 @@ public static class FlintConfigKeys
                 (f, v) => f with { MinecraftMisc = f.MinecraftMisc with { OnlineFixes = Variant.AsBool(v) } }),
             Entry("Env",
                 f => f.MinecraftMisc.Env,
-                (f, v) => f with { MinecraftMisc = f.MinecraftMisc with { Env = Variant.AsString(v) } }),
+                (f, v) => f with { MinecraftMisc = f.MinecraftMisc with { Env = EnvMapJsonConverter.FromObject(v) } }),
 
             // ---- mod download
             Entry("ModMetadataDisabled",

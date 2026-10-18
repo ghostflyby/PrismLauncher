@@ -45,6 +45,17 @@ using FlintLauncher.Core.Text;
 
 namespace FlintLauncher.Core.Instances;
 
+/// <summary>Port of ShortcutTarget.</summary>
+public enum ShortcutTarget : byte
+{
+    Desktop,
+    Applications,
+    Other,
+}
+
+/// <summary>Port of ShortcutData.</summary>
+public readonly record struct ShortcutData(string Name, string FilePath, ShortcutTarget Target = ShortcutTarget.Other);
+
 /// <summary>
 /// Base class for instances. Implements many functions that are common between instances and
 /// provides a standard interface for all instances.
@@ -57,17 +68,6 @@ public abstract class BaseInstance
         Present,
         Gone, // either nuked or invalidated
     }
-
-    /// <summary>Port of ShortcutTarget.</summary>
-    public enum ShortcutTarget : byte
-    {
-        Desktop,
-        Applications,
-        Other,
-    }
-
-    /// <summary>Port of ShortcutData.</summary>
-    public readonly record struct ShortcutData(string Name, string FilePath, ShortcutTarget Target = ShortcutTarget.Other);
 
     protected BaseInstance(SettingsObject settings, string rootDir)
     {

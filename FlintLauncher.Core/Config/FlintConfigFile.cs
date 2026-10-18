@@ -99,7 +99,7 @@ public sealed record FlintConfigFile
         MinecraftMisc = new MinecraftMiscConfig
         {
             OnlineFixes = false,
-            Env = "{}",
+            Env = new EnvMap(),
         },
         ModDownload = new ModDownloadConfig
         {
@@ -321,11 +321,14 @@ public sealed record CommandsConfig
 }
 
 /// <summary>Minecraft-miscellaneous: the legacy-services OnlineFixes gate and the custom
-/// environment map (stored as its JSON object text, like the C++ Json value).</summary>
+/// environment map. Read compat accepts the legacy embedded-JSON string form (the C++
+/// stored it as its JSON object text); writes are the native object.</summary>
 public sealed record MinecraftMiscConfig
 {
     public bool? OnlineFixes { get; init; }
-    public string? Env { get; init; }
+
+    [JsonConverter(typeof(EnvMapJsonConverter))]
+    public EnvMap? Env { get; init; }
 }
 
 /// <summary>Mod-download behavior (the ModDownloadLoaders gate family; #3404 release

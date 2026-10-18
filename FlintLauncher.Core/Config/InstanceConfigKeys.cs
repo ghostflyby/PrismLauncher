@@ -19,6 +19,9 @@
 // The C7 passthrough pair (ConsoleMaxLines/ConsoleOverflowStop) is deliberately global-only:
 // reads come from the user layer, instance-side writes are dropped (non-layered per C7).
 
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Settings;
 
@@ -96,6 +99,14 @@ public static class InstanceConfigKeys
     private static bool? BoolOf(object? v) => v is null ? null : Variant.AsBool(v);
 
     private static string? StringOf(object? v) => v is null ? null : Variant.AsString(v);
+
+    // the three former blob members: the settings value arrives as the native collection
+    // (runtime Set / Web PUT array-object) or as a legacy JSON-text string — both accepted
+    private static List<ShortcutData>? ShortcutListOf(object? v) => ShortcutListJsonConverter.FromObject(v);
+
+    private static EnvMap? EnvMapOf(object? v) => EnvMapJsonConverter.FromObject(v);
+
+    private static List<string>? StringListOf(object? v) => StringListJsonConverter.FromObject(v);
 
     /// <summary>
     ///     Boxed-member set probe: a member counts as set when its (boxed) value is
@@ -268,7 +279,7 @@ public static class InstanceConfigKeys
             E("shortcuts", null,
                 (_, i) => i.Identity.Shortcuts,
                 i => i.Identity.Shortcuts is not null,
-                (i, v) => i with { Identity = i.Identity with { Shortcuts = StringOf(v) } }),
+                (i, v) => i with { Identity = i.Identity with { Shortcuts = ShortcutListOf(v) } }),
 
             // ---- java (OverrideJavaLocation: path + compatibility; OverrideJavaArgs: args)
             E("JavaPath", "OverrideJavaLocation",
@@ -424,7 +435,7 @@ public static class InstanceConfigKeys
             E("Env", "OverrideEnv",
                 (u, i) => i.Launch.Env ?? u.MinecraftMisc.Env,
                 i => i.Launch.Env is not null,
-                (i, v) => i with { Launch = i.Launch with { Env = StringOf(v) } }),
+                (i, v) => i with { Launch = i.Launch with { Env = EnvMapOf(v) } }),
 
             // ---- performance (OverridePerformance)
             E("EnableFeralGamemode", "OverridePerformance",
@@ -646,7 +657,7 @@ public static class InstanceConfigKeys
                 i => i.Misc.ModDownloadLoaders is not null,
                 (i, v) => i with
                 {
-                    Misc = i.Misc with { ModDownloadLoaders = StringOf(v) }
+                    Misc = i.Misc with { ModDownloadLoaders = StringListOf(v) }
                 }),
 
             // ---- instance-only misc keys

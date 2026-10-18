@@ -59,7 +59,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Equal("127.0.0.1", resolved.Proxy.ProxyAddr);
         Assert.Equal(8080, resolved.Proxy.ProxyPort);
         Assert.Equal((int)PasteUpload.PasteType.Mclogs, resolved.Api.PastebinType);
-        Assert.Equal("{}", resolved.MinecraftMisc.Env);
+        Assert.Empty(resolved.MinecraftMisc.Env);
         Assert.Equal("[]", resolved.ModDownload.ModUpdateReleaseTypes);
     }
 
