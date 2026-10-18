@@ -175,7 +175,7 @@ public sealed class AutoInstallJava : LaunchStep
 
     private async Task DownloadJava(MetaVersion version, string javaName, CancellationToken cancellationToken)
     {
-        var runtimes = version.Data()?.Runtimes ?? [];
+        var runtimes = version.Data?.Runtimes ?? [];
         foreach (var java in runtimes)
         {
             if (java.RuntimeOs == _supportedArch && java.Name() == javaName)
@@ -256,13 +256,13 @@ public sealed class AutoInstallJava : LaunchStep
         var versionList = MetadataIndex().Get("net.minecraft.java");
         var javaMajor = versionList.GetVersion($"java{majorJavaVersion}");
 
-        if (javaMajor.IsLoaded())
+        if (javaMajor.IsLoaded)
         {
             await DownloadJava(javaMajor, wantedJavaName, cancellationToken).ConfigureAwait(false);
         }
         else
         {
-            currentTask = MetadataIndex().LoadVersion("net.minecraft.java", javaMajor.Version());
+            currentTask = MetadataIndex().LoadVersion("net.minecraft.java", javaMajor.Version);
             await currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
             if (currentTask.WasSuccessful)
             {

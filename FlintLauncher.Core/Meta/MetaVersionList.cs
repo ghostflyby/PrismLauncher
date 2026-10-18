@@ -4,6 +4,7 @@
 // the change signals are UI-layer plumbing and are not ported; everything metadata-related is.
 
 using System.Text.Json.Nodes;
+using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.Meta;
 
@@ -31,7 +32,7 @@ public sealed class VersionList : MetaEntity
         set => name = value;
     }
 
-    public override string LocalFilename() => _uid + "/index.json";
+    public override string LocalFilename => _uid + "/index.json";
 
     public string HumanReadable() => name.Length == 0 ? _uid : name;
 
@@ -44,7 +45,7 @@ public sealed class VersionList : MetaEntity
             outVersion = new MetaVersion(_uid, version);
             if (Cache is { } cache)
             {
-                outVersion.SetMetaCache(cache);
+                outVersion.Cache = cache;
             }
 
             _lookup[version] = outVersion;
@@ -56,7 +57,7 @@ public sealed class VersionList : MetaEntity
 
     public bool HasVersion(string version)
     {
-        return _versions.Exists(a => a.Version() == version);
+        return _versions.Exists(a => a.Version == version);
     }
 
     /// <summary>
@@ -65,7 +66,7 @@ public sealed class VersionList : MetaEntity
     /// </summary>
     public void SortVersions()
     {
-        _versions.Sort((a, b) => string.CompareOrdinal(a.Name(), b.Name()));
+        _versions.Sort((a, b) => string.CompareOrdinal(a.Name, b.Name));
     }
 
     public override void Parse(JsonObject obj)
@@ -84,21 +85,21 @@ public sealed class VersionList : MetaEntity
         {
             if (Cache is { } cache)
             {
-                version.SetMetaCache(cache);
+                version.Cache = cache;
             }
         }
 
         _versions.AddRange(versions);
         // newest first by raw time (std::sort upstream, so ties may reorder either way)
-        _versions.Sort((a, b) => b.RawTime().CompareTo(a.RawTime()));
+        _versions.Sort((a, b) => b.RawTime.CompareTo(a.RawTime));
         _lookup.Clear();
         foreach (var version in _versions)
         {
-            _lookup[version.Version()] = version;
+            _lookup[version.Version] = version;
         }
 
         // FIXME upstream: this is dumb, we have 'recommended' as part of the metadata already...
-        recommended = _versions.Find(ptr => ptr.Type() == "release");
+        recommended = _versions.Find(ptr => ptr.Type == "release");
     }
 
     public void MergeFromIndex(VersionList other)
@@ -135,7 +136,7 @@ public sealed class VersionList : MetaEntity
         {
             MetaVersion version;
             // we already have the version. merge the contents
-            if (_lookup.TryGetValue(otherVersion.Version(), out var existing) && existing is not null)
+            if (_lookup.TryGetValue(otherVersion.Version, out var existing) && existing is not null)
             {
                 existing.MergeFromList(otherVersion);
                 version = existing;
@@ -144,10 +145,10 @@ public sealed class VersionList : MetaEntity
             {
                 if (Cache is { } cache)
                 {
-                    otherVersion.SetMetaCache(cache);
+                    otherVersion.Cache = cache;
                 }
 
-                _lookup[otherVersion.Version()] = otherVersion;
+                _lookup[otherVersion.Version] = otherVersion;
                 _versions.Add(otherVersion);
                 version = otherVersion;
             }
@@ -169,14 +170,14 @@ public sealed class VersionList : MetaEntity
             return a;
         }
 
-        if (a.Type() == b.Type())
+        if (a.Type == b.Type)
         {
             // newer of same type wins
-            return a.RawTime() > b.RawTime() ? a : b;
+            return a.RawTime > b.RawTime ? a : b;
         }
 
         // 'release' type wins
-        return a.Type() == "release" ? a : b;
+        return a.Type == "release" ? a : b;
     }
 
     public MetaVersion? GetRecommended() => recommended;
@@ -185,11 +186,11 @@ public sealed class VersionList : MetaEntity
     {
         var foundExplicit = _versions.Find(ver =>
         {
-            foreach (var req in ver.RequiredSet())
+            foreach (var req in ver.RequiredSet)
             {
                 if (req.Uid == uid && req.EqualsVersion == version)
                 {
-                    return ver.IsRecommended();
+                    return ver.IsRecommended;
                 }
             }
 
@@ -203,7 +204,7 @@ public sealed class VersionList : MetaEntity
         MetaVersion? latestCompat = null;
         foreach (var ver in _versions)
         {
-            foreach (var req in ver.RequiredSet())
+            foreach (var req in ver.RequiredSet)
             {
                 if (req.Uid == uid && req.EqualsVersion == version)
                 {
@@ -221,7 +222,7 @@ public sealed class VersionList : MetaEntity
         MetaVersion? latestCompat = null;
         foreach (var ver in _versions)
         {
-            if (!onlyRelease || ver.Type() == "release")
+            if (!onlyRelease || ver.Type == "release")
             {
                 latestCompat = GetLatestVersion(latestCompat, ver);
             }
@@ -242,12 +243,7 @@ public sealed class VersionList : MetaEntity
             return a;
         }
 
-        return a.RawTime() > b.RawTime() ? a : b;
+        return a.RawTime > b.RawTime ? a : b;
     }
 
-    /// <summary>
-    /// Port of VersionList::isLoaded() (a plain override returning BaseEntity::isLoaded()).
-    /// The VersionList-specific data is loaded when the metadata file is.
-    /// </summary>
-    public new bool IsLoaded() => base.IsLoaded();
 }

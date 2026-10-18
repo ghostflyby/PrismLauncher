@@ -43,11 +43,7 @@ public abstract class MetaEntity
     /// GONE — the composition root's cache is stamped down the Index/VersionList/entity
     /// chain at adoption (SetMetaCache), so a load without a stamp fails fast naming the
     /// missing wire instead of silently re-downloading into the process working directory.</summary>
-    public HttpMetaCache? Cache { get; private set; }
-
-    /// <summary>Wire this entity (and its future children, via the adoption points) to a
-    /// runtime-owned cache.</summary>
-    public void SetMetaCache(HttpMetaCache cache) => Cache = cache;
+    public HttpMetaCache? Cache { get; set; }
 
     /// <summary>The stamped runtime cache (naming the missing wire when unset — the E6
     /// bare-fixture fallback must not come back).</summary>
@@ -64,21 +60,19 @@ public abstract class MetaEntity
     /// <summary>the file sha256</summary>
     protected string FileSha256 = "";
 
-    public abstract string LocalFilename();
+    public abstract string LocalFilename { get; }
 
     public virtual Uri Url()
     {
-        return new Uri(new Uri(FlintConfig.Default.MetaUrl), LocalFilename());
+        return new Uri(new Uri(FlintConfig.Default.MetaUrl), LocalFilename);
     }
 
-    public bool IsLoaded()
-    {
+    public virtual bool IsLoaded =>
         // consider it loaded only if the main hash is either empty and was remote loaded or the
         // hashes match and was loaded
-        return Sha256.Length == 0
+        Sha256.Length == 0
             ? loadStatus == LoadStatus.Remote
             : loadStatus != LoadStatus.NotLoaded && Sha256 == FileSha256;
-    }
 
     public LoadStatus Status() => loadStatus;
 
@@ -133,7 +127,7 @@ public abstract class MetaEntity
 
         public override bool Validate(NetResponseInfo response)
         {
-            var fname = _entity.LocalFilename();
+            var fname = _entity.LocalFilename;
             try
             {
                 var obj = JsonUtils.RequireObject(
@@ -165,7 +159,7 @@ public abstract class MetaEntity
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            var fname = _entity.MetaPath(_entity.LocalFilename());
+            var fname = _entity.MetaPath(_entity.LocalFilename);
             var hashMatches = false;
             // the file exists on disk try to load it
             if (File.Exists(fname))
@@ -225,7 +219,7 @@ public abstract class MetaEntity
             }
 
             var cache = _entity.RequireCache();
-            var entry = cache.ResolveEntry("meta", _entity.LocalFilename());
+            var entry = cache.ResolveEntry("meta", _entity.LocalFilename);
             if (_forceReload)
             {
                 // clear validators so manual refreshes fetch a fresh body

@@ -53,7 +53,7 @@ public static class StoreCompleteness
         MetaJsonFormat.ParseVersion(
             JsonUtils.RequireObject(JsonUtils.RequireNodeFromFile(manifestPath, manifestPath)),
             metaVersion);
-        var manifest = metaVersion.Data() ?? throw new MetaParseException(
+        var manifest = metaVersion.Data ?? throw new MetaParseException(
             $"the version manifest '{manifestPath}' parsed without a version file");
 
         // the manifest's library set: the same pool LibrariesTask downloads (Libraries +

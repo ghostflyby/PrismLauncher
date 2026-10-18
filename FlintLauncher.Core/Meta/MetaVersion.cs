@@ -9,79 +9,45 @@ using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.Meta;
 
-public sealed class MetaVersion : MetaEntity
+public sealed class MetaVersion(string uid, string version) : MetaEntity
 {
     private bool providesRecommendations;
 
-    private bool recommended;
-
     // NOTE: the C++ m_name member is dead there as well (never written); dropped to keep
     // the port warning-clean
-    private readonly string _uid;
-
-    private readonly string _version;
-
-    private string type = "";
-
-    private long time;
-
-    private RequireSet requires = new();
 
     private RequireSet conflicts = new();
 
     private bool @volatile;
 
-    private VersionFile? data;
-
-    public MetaVersion(string uid, string version)
-    {
-        _uid = uid;
-        _version = version;
-    }
-
-    /// <summary>Port of BaseVersion::descriptor().</summary>
-    public string Descriptor() => _version;
-
     /// <summary>Port of BaseVersion::name().</summary>
-    public string Name()
-    {
-        if (data is not null)
-        {
-            return data.Name;
-        }
+    public string Name => Data is not null ? Data.Name : Uid;
 
-        return _uid;
-    }
+    public string Uid { get; } = uid;
 
-    /// <summary>Port of BaseVersion::typeString().</summary>
-    public string TypeString() => type;
+    public string Version { get; } = version;
 
-    public string Uid() => _uid;
-
-    public string Version() => _version;
-
-    public string Type() => type;
+    public string Type { get; set; } = "";
 
     /// <summary>QDateTime::fromMSecsSinceEpoch(m_time * 1000, Qt::UTC).</summary>
-    public DateTimeOffset Time() => DateTimeOffset.FromUnixTimeMilliseconds(time * 1000);
+    public DateTimeOffset Time() => DateTimeOffset.FromUnixTimeMilliseconds(RawTime * 1000);
 
-    public long RawTime() => time;
+    public long RawTime { get; set; }
 
-    public RequireSet RequiredSet() => requires;
+    public RequireSet RequiredSet { get; private set; } = [];
 
-    public VersionFile? Data() => data;
+    public VersionFile? Data { get; set; }
 
-    public bool IsRecommended() => recommended;
+    public bool IsRecommended { get; set;  }
 
-    /// <summary>Hides BaseEntity::isLoaded() like the C++ shadowing declaration.</summary>
-    public new bool IsLoaded() => data is not null && base.IsLoaded();
+    public override bool IsLoaded => Data is not null && base.IsLoaded;
 
     public void Merge(MetaVersion other)
     {
         MergeFromList(other);
-        if (other.data is not null)
+        if (other.Data is not null)
         {
-            SetData(other.data);
+            Data = other.Data;
         }
     }
 
@@ -89,25 +55,25 @@ public sealed class MetaVersion : MetaEntity
     {
         if (other.providesRecommendations)
         {
-            if (recommended != other.recommended)
+            if (IsRecommended != other.IsRecommended)
             {
-                SetRecommended(other.recommended);
+                IsRecommended = other.IsRecommended;
             }
         }
 
-        if (type != other.type)
+        if (Type != other.Type)
         {
-            SetType(other.type);
+            Type = other.Type;
         }
 
-        if (time != other.time)
+        if (RawTime != other.RawTime)
         {
-            SetTime(other.time);
+            RawTime = other.RawTime;
         }
 
-        if (!requires.SetEquals(other.requires))
+        if (!RequiredSet.SetEquals(other.RequiredSet))
         {
-            requires = other.requires.Clone();
+            RequiredSet = other.RequiredSet.Clone();
         }
 
         if (!conflicts.SetEquals(other.conflicts))
@@ -131,31 +97,23 @@ public sealed class MetaVersion : MetaEntity
         MetaJsonFormat.ParseVersion(obj, this);
     }
 
-    public override string LocalFilename() => _uid + '/' + _version + ".json";
+    public override string LocalFilename => Uid + '/' + Version + ".json";
 
     /// <summary>Port of toComparableVersion(): a FlexVer comparable version of the descriptor.</summary>
     public McVersion ToComparableVersion()
     {
-        return new McVersion(Descriptor());
+        return new McVersion(Version);
     }
 
     // ------------------------------------------------- for usage by format parsers only
 
-    public void SetType(string type) => this.type = type;
-
-    public void SetTime(long time) => this.time = time;
-
     public void SetRequires(RequireSet reqs, RequireSet conflicts)
     {
-        requires = reqs;
+        RequiredSet = reqs;
         this.conflicts = conflicts;
     }
 
     public void SetVolatile(bool volatileValue) => @volatile = volatileValue;
 
-    public void SetRecommended(bool recommended) => this.recommended = recommended;
-
     public void SetProvidesRecommendations() => providesRecommendations = true;
-
-    public void SetData(VersionFile data) => this.data = data;
 }

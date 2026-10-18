@@ -150,7 +150,7 @@ public sealed class PackProfile : IDisposable
     /// <summary>Wire the metadata entities to a runtime-owned cache (the composition root
     /// calls this after stamping the instance; entities created later inherit it through the
     /// Index/VersionList adoption points).</summary>
-    public void SetMetadataCache(HttpMetaCache cache) => MetadataIndex.SetMetaCache(cache);
+    public void SetMetadataCache(HttpMetaCache cache) => MetadataIndex.Cache = cache;
 
     /// <summary>The component list in profile order (C++ d->components; the update task reads it).</summary>
     public IReadOnlyList<Component> Components => _components;

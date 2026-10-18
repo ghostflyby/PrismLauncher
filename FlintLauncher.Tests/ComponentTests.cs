@@ -140,7 +140,7 @@ public class ComponentTests : IDisposable
         // meta-backed component: customization materializes the version file into patches/
         var file = MakeVersionFile("net.minecraft", "1.12.2", "Minecraft");
         var metaVersion = new MetaVersion("net.minecraft", "1.12.2");
-        metaVersion.SetData(file);
+        metaVersion.Data = file;
         component.MetaVersion = metaVersion;
         component.Loaded = true;
 

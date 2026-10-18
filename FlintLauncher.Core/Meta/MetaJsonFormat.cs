@@ -135,9 +135,9 @@ public static class MetaJsonFormat
         // QDateTime::fromString(..., Qt::ISODate).toMSecsSinceEpoch() / 1000; an invalid
         // QDateTime contributes 0
         var releaseTime = ParseUtils.TimeFromS3Time(RequireStringOf(obj, "releaseTime"));
-        version.SetTime(releaseTime?.ToUnixTimeMilliseconds() / 1000 ?? 0);
-        version.SetType(Str(obj, "type"));
-        version.SetRecommended(Bool(obj, "recommended"));
+        version.RawTime = releaseTime?.ToUnixTimeMilliseconds() / 1000 ?? 0;
+        version.Type = Str(obj, "type");
+        version.IsRecommended = Bool(obj, "recommended");
         version.SetVolatile(Bool(obj, "volatile"));
         var reqs = new RequireSet();
         var conflicts = new RequireSet();
@@ -159,10 +159,10 @@ public static class MetaJsonFormat
 
         // OneSixVersionFormat (own migration batch) still exposes the JsonObject entry; the
         // meta version document is an object by construction (ParseVersion takes JsonObject).
-        version.SetData(OneSixVersionFormat.VersionFileFromJson(
+        version.Data = OneSixVersionFormat.VersionFileFromJson(
             (JsonObject)obj,
             $"{version.Uid}/{version.Version}.json",
-            Has(obj, "order")));
+            Has(obj, "order"));
         return version;
     }
 

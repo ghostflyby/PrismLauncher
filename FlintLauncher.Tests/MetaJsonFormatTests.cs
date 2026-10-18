@@ -76,19 +76,19 @@ public class MetaJsonFormatTests
         var metaVersion = new MetaVersion("net.minecraft", "1.12.2");
         MetaJsonFormat.ParseVersion(obj, metaVersion);
 
-        Assert.Equal("net.minecraft", metaVersion.Uid());
-        Assert.Equal("1.12.2", metaVersion.Version());
-        Assert.Equal("release", metaVersion.Type());
-        Assert.Equal(new DateTimeOffset(2017, 6, 2, 9, 59, 14, TimeSpan.Zero).ToUnixTimeSeconds(), metaVersion.RawTime());
+        Assert.Equal("net.minecraft", metaVersion.Uid);
+        Assert.Equal("1.12.2", metaVersion.Version);
+        Assert.Equal("release", metaVersion.Type);
+        Assert.Equal(new DateTimeOffset(2017, 6, 2, 9, 59, 14, TimeSpan.Zero).ToUnixTimeSeconds(), metaVersion.RawTime);
         // "recommended" is only applied for versions parsed through a version list
         // (MetaVersion.MergeFromList gates on providesRecommendations) — not via ParseVersion
-        Assert.False(metaVersion.IsRecommended());
+        Assert.False(metaVersion.IsRecommended);
 
-        var requires = metaVersion.RequiredSet();
+        var requires = metaVersion.RequiredSet;
         var lwjgl = requires.Single(r => r.Uid == "org.lwjgl3");
         Assert.Equal("3.2.2", lwjgl.EqualsVersion);
         // the version file body (OneSixVersionFormat, own batch) is parsed through as data
-        Assert.NotNull(metaVersion.Data());
+        Assert.NotNull(metaVersion.Data);
     }
 
     [Fact]
@@ -265,10 +265,10 @@ public class MetaJsonFormatTests
         Assert.Equal("Minecraft", list.Name);
         Assert.Equal(2, list.Versions().Count);
         var recommended = list.GetVersion("1.12.2");
-        Assert.Equal("release", recommended.Type());
+        Assert.Equal("release", recommended.Type);
         // versions coming from a list provide recommendations (SetProvidesRecommendations)
-        Assert.True(recommended.IsRecommended());
-        Assert.False(list.GetVersion("1.13").IsRecommended());
+        Assert.True(recommended.IsRecommended);
+        Assert.False(list.GetVersion("1.13").IsRecommended);
     }
 
     [Fact]

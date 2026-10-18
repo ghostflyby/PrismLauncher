@@ -155,7 +155,7 @@ public sealed class ComponentUpdateTask : FlintTask
         {
             var metaVersion = _profile.MetadataIndex.Get(component.Uid, component.Version);
             component.MetaVersion = metaVersion;
-            if (metaVersion.IsLoaded())
+            if (metaVersion.IsLoaded)
             {
                 component.Loaded = true;
                 result = LoadResult.LoadedLocal;
@@ -169,7 +169,7 @@ public sealed class ComponentUpdateTask : FlintTask
                 {
                     result = LoadResult.RequiresRemote;
                 }
-                else if (metaVersion.IsLoaded())
+                else if (metaVersion.IsLoaded)
                 {
                     result = LoadResult.LoadedLocal;
                 }
@@ -727,7 +727,7 @@ public sealed class ComponentUpdateTask : FlintTask
                         // Index::get() creates the list entry)
                         var versionList = _profile.MetadataIndex.Get(component.GetId());
                         // port of the blocking VersionList::waitToLoad()
-                        if (!versionList.IsLoaded())
+                        if (!versionList.IsLoaded)
                         {
                             await versionList.LoadTask(_netmode).StartAsync(cancellationToken);
                         }
@@ -736,7 +736,7 @@ public sealed class ComponentUpdateTask : FlintTask
                                           ?? versionList.GetLatestForParent(lrc.ParentUid, lrc.Version);
                         if (recommended is not null)
                         {
-                            component.SetVersion(recommended.Version());
+                            component.SetVersion(recommended.Version);
                             await component.WaitLoadMetaAsync(_netmode, cancellationToken);
                             break;
                         }
@@ -756,7 +756,7 @@ public sealed class ComponentUpdateTask : FlintTask
                         await _profile.MetadataIndex.LoadVersion(component.GetId(), ic.OldVersion, _netmode)
                             .StartAsync(cancellationToken);
                         var oldVersion = _profile.MetadataIndex.Get(component.GetId(), ic.OldVersion);
-                        foreach (var oldReq in oldVersion.RequiredSet())
+                        foreach (var oldReq in oldVersion.RequiredSet)
                         {
                             if (!component.CachedRequires.Contains(oldReq)
                                 && _profile.ComponentIndex.TryGetValue(oldReq.Uid, out var oldReqComp))

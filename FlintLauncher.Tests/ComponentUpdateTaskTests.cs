@@ -141,7 +141,7 @@ public class ComponentUpdateTaskTests : IDisposable
         var metaVersion = index.Get(uid, version);
         metaVersion.SetSha256(Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(metaFile))).ToLowerInvariant());
         await metaVersion.LoadTask(NetMode.Offline).StartAsync();
-        Assert.True(metaVersion.IsLoaded(), "seeded meta version should be loaded");
+        Assert.True(metaVersion.IsLoaded, "seeded meta version should be loaded");
     }
 
     /// <summary>The fixture meta cache folder for one uid (the stamped "meta" base, E6).</summary>

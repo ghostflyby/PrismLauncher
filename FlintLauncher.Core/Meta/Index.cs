@@ -25,7 +25,7 @@ public sealed class Index : MetaEntity
         }
     }
 
-    public override string LocalFilename() => "index.json";
+    public override string LocalFilename => "index.json";
 
     // ------------------------------------------------------------------ queries
 
@@ -33,12 +33,12 @@ public sealed class Index : MetaEntity
 
     public VersionList Get(string uid)
     {
-        if (!_uids.TryGetValue(uid, out var outList) || outList is null)
+        if (!_uids.TryGetValue(uid, out var outList))
         {
             outList = new VersionList(uid);
             if (Cache is { } cache)
             {
-                outList.SetMetaCache(cache);
+                outList.Cache = cache;
             }
 
             _uids[uid] = outList;
@@ -77,10 +77,10 @@ public sealed class Index : MetaEntity
             {
                 if (Cache is { } cache)
                 {
-                    list.SetMetaCache(cache);
+                    list.Cache = cache;
                 }
 
-                if (_uids.TryGetValue(list.Uid(), out var existing) && existing is not null)
+                if (_uids.TryGetValue(list.Uid(), out var existing))
                 {
                     existing.MergeFromIndex(list);
                 }

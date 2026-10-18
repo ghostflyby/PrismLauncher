@@ -153,7 +153,7 @@ public class Component : ProblemProvider
         }
     }
 
-    public VersionFile? GetVersionFile() => MetaVersion is not null ? MetaVersion.Data() : File;
+    public VersionFile? GetVersionFile() => MetaVersion is not null ? MetaVersion.Data : File;
 
     public VersionList? GetVersionList()
     {
@@ -369,7 +369,7 @@ public class Component : ProblemProvider
                 CachedVersion = version;
                 // see if the meta version is loaded
                 var metaVersion = Parent.MetadataIndex.Get(Uid, version);
-                if (metaVersion.IsLoaded())
+                if (metaVersion.IsLoaded)
                 {
                     // if yes, we can continue with that.
                     MetaVersion = metaVersion;
@@ -451,7 +451,7 @@ public class Component : ProblemProvider
             if (Parent is not null)
             {
                 var version = Parent.MetadataIndex.Get(Uid, Version);
-                if (version.IsLoaded())
+                if (version.IsLoaded)
                 {
                     MetaVersion = version;
                 }
@@ -547,7 +547,7 @@ public class Component : ProblemProvider
     {
         if (!Loaded)
         {
-            if (Parent is not null && (MetaVersion is null || !MetaVersion.IsLoaded()))
+            if (Parent is not null && (MetaVersion is null || !MetaVersion.IsLoaded))
             {
                 // wait for the loaded version from meta
                 await Parent.MetadataIndex.LoadVersion(Uid, Version, mode).StartAsync(cancellationToken);
