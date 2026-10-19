@@ -12,7 +12,6 @@
 // Not ported from the C++ SkinList: the QAbstractListModel surface, the QImage preview
 // generation and the file watching — the API serves the stored data and the texture files.
 
-using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 
 namespace FlintLauncher.Core.Skins;

@@ -30,7 +30,7 @@ public readonly struct GradleSpecifier : IEquatable<GradleSpecifier>
         // default constructed: not valid, everything empty
     }
 
-    public GradleSpecifier(string value)
+    public GradleSpecifier(string? value)
     {
         var match = Matcher.Match(value ?? "");
         IsValid = match.Success;

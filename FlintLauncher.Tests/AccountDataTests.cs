@@ -8,7 +8,6 @@
 using System.Text;
 using System.Text.Json;
 using FlintLauncher.Core.Auth;
-using FlintLauncher.Core.Minecraft;
 using Xunit;
 
 namespace FlintLauncher.Tests;

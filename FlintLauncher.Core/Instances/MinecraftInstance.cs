@@ -43,7 +43,6 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Java;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Minecraft;

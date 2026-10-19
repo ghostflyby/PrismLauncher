@@ -19,7 +19,7 @@
 1. 嵌套 `JsonSerializerContext` 无生成元数据（CS0534）——context 必须命名空间层级、一文件一声明。
 2. `[JsonExtensionData]` 属性不能 init-only（报误导性的 ctor 绑定错误）。
 3. **init 属性 + 命名策略/参数化 creator 的真正坑是命名碰撞**：getter-only 计算属性按策略取名，与显式 wire 名相撞时 Configure 抛 InvalidOperationException。计算视图一律 `[JsonIgnore]`；**与 init-only 无关**（init 全保留）。
-4. 集合/字典的**元素** null 不被 `RespectNullableAnnotations` 覆盖——mapper 入口需 `?? throw` 守卫。
+4. **集合/字典的元素** null 不被 `RespectNullableAnnotations` 覆盖（绑定层在任何选项下都放行元素 null，已实验确认）。处理只有两种，**没有第三种**：要么给成员挂"丢弃 null 元素"的 Converter 并**标注非空**（标签由 wire 层成立，消费者零判空，如 `ModrinthVersionFileListConverter`）；要么**标注可空**保留 null 由消费者处理。禁止在 mapper/消费者里散布 `?? throw`/`is null` 守卫来冒充标签。
 5. `JsonConverter` 类定义不生效——必须 `[JsonConverter]` 挂到属性；**ctor 参数绑定路径用类型级 converter（Dictionary 子类）最稳**。
 
 ## 3. 已完成批次

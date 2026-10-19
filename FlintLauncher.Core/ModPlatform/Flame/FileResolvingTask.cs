@@ -12,8 +12,6 @@
 // match-a-local-file step (see FlameCreationTask).
 
 using System.Globalization;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Tasks;

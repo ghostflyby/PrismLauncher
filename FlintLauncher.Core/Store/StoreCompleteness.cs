@@ -9,7 +9,6 @@
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Minecraft;

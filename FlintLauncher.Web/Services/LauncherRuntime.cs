@@ -3,7 +3,6 @@
 // once by WebHostBuilder against the resolved data dir. All paths come from the injected
 // FlintPaths — the process working directory is not load-bearing.
 
-using System.Text.Json.Nodes;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Config;

@@ -206,10 +206,6 @@ public sealed class ModrinthApi(NetStack? net = null) : ResourceApi
     public (NetJob? Job, NetRequest? Request) GetProject(string addonId)
     {
         var url = GetInfoUrl(addonId);
-        if (url is null)
-        {
-            return (null, null);
-        }
 
         var netJob = new NetJob("Modrinth::GetProject");
         var request = MakeByteArrayRequest(url);

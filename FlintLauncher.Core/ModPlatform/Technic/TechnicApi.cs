@@ -345,6 +345,7 @@ public sealed class TechnicApi(NetStack? net = null)
 
         foreach (var mod in build.Mods)
         {
+            // a null ELEMENT or a null url both surface as the former RequireObject check
             if (mod?.Url is null)
             {
                 throw new JsonParseException("Value is not an object");

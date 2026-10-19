@@ -13,9 +13,7 @@
 // each entry keeps the "{what}: Error parsing JSON: ..." wrapper via AtLauncherJson).
 
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using System.Text.Json.Serialization.Metadata;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Net;
 

@@ -178,14 +178,14 @@ public sealed class ModrinthPackExportTask(
 
             foreach (var file in filesArray)
             {
-                if (file is null || file.Hashes?.TryGetValue("sha512", out var hash) != true || hash != sha512)
+                if (file.Hashes?.TryGetValue("sha512", out var hash) != true || hash != sha512)
                 {
                     continue;
                 }
 
                 // map the file to the url
                 _resolvedFiles[relative] = new ResolvedFile(
-                    Sha1: file.Hashes.TryGetValue("sha1", out var sha1) ? sha1 ?? "" : "",
+                    Sha1: file.Hashes.GetValueOrDefault("sha1", ""),
                     Sha512: sha512,
                     Url: file.Url ?? "",
                     Size: file.Size ?? 0,

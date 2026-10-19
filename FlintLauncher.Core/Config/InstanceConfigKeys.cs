@@ -19,10 +19,7 @@
 // The C7 passthrough pair (ConsoleMaxLines/ConsoleOverflowStop) is deliberately global-only:
 // reads come from the user layer, instance-side writes are dropped (non-layered per C7).
 
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Config;

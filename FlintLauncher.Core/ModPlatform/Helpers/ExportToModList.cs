@@ -13,7 +13,6 @@
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 
 namespace FlintLauncher.Core.ModPlatform.Helpers;

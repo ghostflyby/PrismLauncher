@@ -21,7 +21,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.State;
 
 namespace FlintLauncher.Core.Instances;

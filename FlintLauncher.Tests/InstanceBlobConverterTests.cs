@@ -12,7 +12,6 @@
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Web;

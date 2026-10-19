@@ -97,6 +97,10 @@ public sealed record ModrinthVersionJson
     public string? VersionType { get; init; }
     public string? Changelog { get; init; }
     public List<ModrinthDependencyJson>? Dependencies { get; init; }
+
+    /// <summary>JSON null elements drop at binding (ModrinthVersionFileListConverter), so
+    /// the non-nullable element label holds — docs/JSON-MIGRATION.md §2.4.</summary>
+    [property: JsonConverter(typeof(ModrinthVersionFileListConverter))]
     public List<ModrinthVersionFileJson>? Files { get; init; }}
 
 public sealed record ModrinthDependencyJson(
@@ -104,11 +108,14 @@ public sealed record ModrinthDependencyJson(
     string? VersionId,
     string? DependencyType);
 
-/// <summary>One downloadable file of a version; hashes is keyed by algorithm name.</summary>
+/// <summary>One downloadable file of a version; hashes is keyed by algorithm name. A JSON
+/// null hash VALUE counts as absent (ModrinthHashMapConverter drops the entry, so the
+/// fallback chain keeps walking) — docs/JSON-MIGRATION.md §2.4.</summary>
 public sealed record ModrinthVersionFileJson(
     string? Filename,
     bool? Primary,
     string? Url,    long? Size,
+    [property: JsonConverter(typeof(ModrinthHashMapConverter))]
     Dictionary<string, string>? Hashes);
 
 // ------------------------------------------------------------------------- .mrpack format
@@ -151,6 +158,87 @@ public sealed record MrPackEnvJson(
 [JsonSerializable(typeof(List<ModrinthVersionJson>))]
 [JsonSerializable(typeof(Dictionary<string, ModrinthVersionJson>))]
 public sealed partial class ModrinthJsonContext : JsonSerializerContext;
+
+/// <summary>The version files array: JSON null elements are dropped at binding (the
+/// non-nullable element label is enforced HERE, in the wire layer — between "non-null +
+/// ignore" and "nullable + keep" there is no third option). A wrong-kind member reads
+/// null so ModrinthRequire.Array surfaces "'files' is not an array"; junk element kinds
+/// still fail the document like a binding error.</summary>
+public sealed class ModrinthVersionFileListConverter : JsonConverter<List<ModrinthVersionFileJson>?>
+{
+    public override List<ModrinthVersionFileJson>? Read(ref Utf8JsonReader reader, Type typeToConvert,
+        JsonSerializerOptions options)
+    {
+        if (reader.TokenType is not JsonTokenType.StartArray)
+        {
+            return null;
+        }
+
+        var files = new List<ModrinthVersionFileJson>();
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.EndArray)
+            {
+                return files;
+            }
+
+            if (reader.TokenType == JsonTokenType.Null)
+            {
+                continue;
+            }
+
+            files.Add(JsonSerializer.Deserialize(ref reader, ModrinthJsonContext.Default.ModrinthVersionFileJson)
+                      ?? throw new JsonException("'files' entry is null"));
+        }
+
+        throw new JsonException("unterminated array");
+    }
+
+    public override void Write(Utf8JsonWriter writer, List<ModrinthVersionFileJson>? value,
+        JsonSerializerOptions options) =>
+        throw new NotSupportedException("the Modrinth wire records are read-only");
+}
+
+/// <summary>The hash map: entries whose JSON value is null drop at binding (treated as
+/// absent, so the hash-fallback chain keeps walking — docs/JSON-MIGRATION.md §2.4). A
+/// non-string value still fails the document like a binding error.</summary>
+public sealed class ModrinthHashMapConverter : JsonConverter<Dictionary<string, string>?>
+{
+    public override Dictionary<string, string>? Read(ref Utf8JsonReader reader, Type typeToConvert,
+        JsonSerializerOptions options)
+    {
+        if (reader.TokenType is not JsonTokenType.StartObject)
+        {
+            return null;
+        }
+
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.EndObject)
+            {
+                return map;
+            }
+
+            var key = reader.GetString() ?? "";
+            reader.Read();
+            if (reader.TokenType == JsonTokenType.Null)
+            {
+                continue;
+            }
+
+            map[key] = reader.TokenType == JsonTokenType.String
+                ? reader.GetString() ?? ""
+                : throw new JsonException($"'{key}' is not a string");
+        }
+
+        throw new JsonException("unterminated object");
+    }
+
+    public override void Write(Utf8JsonWriter writer, Dictionary<string, string>? value,
+        JsonSerializerOptions options) =>
+        throw new NotSupportedException("the Modrinth wire records are read-only");
+}
 
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]

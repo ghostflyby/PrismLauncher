@@ -37,13 +37,13 @@ public sealed class IniValue
 
     public static readonly IniValue Invalid = new(Kind.Invalid, "", [], []);
 
-    public static IniValue From(string value) => new(Kind.String, value ?? "", [], []);
+    public static IniValue From(string? value) => new(Kind.String, value ?? "", [], []);
 
     public static IniValue From(IReadOnlyList<string> value) => new(Kind.StringList, "", value, []);
 
     public static IniValue From(byte[] value) => new(Kind.ByteArray, "", [], value);
 
-    public static IniValue Raw(string verbatim) => new(Kind.Raw, verbatim ?? "", [], []);
+    public static IniValue Raw(string? verbatim) => new(Kind.Raw, verbatim ?? "", [], []);
 
     public override string ToString() => ValueKind switch
     {

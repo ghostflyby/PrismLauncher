@@ -35,7 +35,6 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Config;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Settings;

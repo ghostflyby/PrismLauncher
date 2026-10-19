@@ -12,7 +12,6 @@
 // passes over the archive: a listing pass to find the first top-level folder and the
 // extraction pass.
 
-using System.Formats.Tar;
 using System.IO.Compression;
 using System.Text;
 using FlintLauncher.Core.IO;

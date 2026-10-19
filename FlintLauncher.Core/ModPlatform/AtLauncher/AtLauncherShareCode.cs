@@ -4,8 +4,6 @@
 // shape arrives as the AtlShareCodeResponseJson probe records (source-generated context in
 // this file); the loader validates the required members with the Json::require* messages.
 
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.ModPlatform.AtLauncher;

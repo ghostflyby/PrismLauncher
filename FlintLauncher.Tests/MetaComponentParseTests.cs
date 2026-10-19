@@ -7,7 +7,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Java;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft.Resources;
 using Xunit;
 

@@ -50,7 +50,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
 
     private readonly List<Update> _updates = [];
     private int loaderIdx;
-    private int initialSize;
+    private readonly int initialSize;
 
     public ModrinthCheckUpdate(IReadOnlyList<Resource> resources,
         IReadOnlyList<McVersion> mcVersions,

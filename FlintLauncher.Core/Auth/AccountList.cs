@@ -18,7 +18,6 @@
 
 using System.Text.Json;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Minecraft;
 
 namespace FlintLauncher.Core.Auth;
 

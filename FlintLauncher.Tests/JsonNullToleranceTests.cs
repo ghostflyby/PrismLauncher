@@ -13,10 +13,8 @@
 //  - the OneSix removed-feature problems probe QJsonObject::contains semantics, so a
 //    JSON null member still counts as present (S5).
 
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using Xunit;
-using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Meta;

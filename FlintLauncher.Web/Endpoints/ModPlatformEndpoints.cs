@@ -715,22 +715,20 @@ public static class ModPlatformEndpoints
 
         {
             var results = new List<ModrinthSearchResult>();
-            if (search?.Hits is { } hits)
+            if (search?.Hits is not { } hits) return Results.Ok(results.ToArray());
+            foreach (var hit in hits)
             {
-                foreach (var hit in hits)
-                {
-                    results.Add(new ModrinthSearchResult(
-                        hit.ProjectId ?? "",
-                        hit.Slug ?? "",
-                        hit.Title ?? "",
-                        hit.IconUrl ?? "",
-                        hit.Author ?? "",
-                        hit.Downloads is { } downloads &&
-                        downloads.ValueKind == JsonValueKind.Number &&
-                        downloads.TryGetInt64(out var downloadCount)
-                            ? downloadCount
-                            : 0));
-                }
+                results.Add(new ModrinthSearchResult(
+                    hit.ProjectId ?? "",
+                    hit.Slug ?? "",
+                    hit.Title ?? "",
+                    hit.IconUrl ?? "",
+                    hit.Author ?? "",
+                    hit.Downloads is { } downloads &&
+                    downloads.ValueKind == JsonValueKind.Number &&
+                    downloads.TryGetInt64(out var downloadCount)
+                        ? downloadCount
+                        : 0));
             }
 
             return Results.Ok(results.ToArray());

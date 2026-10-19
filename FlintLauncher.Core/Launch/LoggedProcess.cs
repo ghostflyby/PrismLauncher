@@ -55,8 +55,8 @@ public sealed class LoggedProcess : IDisposable
 {
     private readonly Process _process = new();
     private readonly object _lock = new();
-    private Decoder? errDecoder;
-    private Decoder? outDecoder;
+    private readonly Decoder? errDecoder;
+    private readonly Decoder? outDecoder;
     private string leftoverLine = "";
     private string errLeftoverLine = "";
     private bool isAborting;

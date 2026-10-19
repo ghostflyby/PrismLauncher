@@ -35,7 +35,7 @@ public class ResourceDownloadTask : SequentialTask
     private readonly ModrinthApi _modrinth;
 
     private NetJob? filesNetJob;
-    private LocalResourceUpdateTask? updateTask;
+    private readonly LocalResourceUpdateTask? updateTask;
 
     // Port of the to_delete tuple: (old metadata name, old file name)
     private (string Name, string Filename) toDelete = ("", "");

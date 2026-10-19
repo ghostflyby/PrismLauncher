@@ -76,14 +76,14 @@ public sealed class ModrinthCreationTask : InstanceTask
     private string quiltVersion = "";
     private string forgeVersion = "";
     private string neoForgeVersion = "";
-    private string managedId = "";
-    private string managedVersionId = "";
+    private readonly string managedId;
+    private string managedVersionId;
     private string managedName = "";
 
     private readonly List<File> _files = [];
     private readonly Dictionary<string, Resource> _resources = new(StringComparer.Ordinal);
 
-    private string rootPath = "minecraft";
+    private readonly string rootPath = "minecraft";
 
     /// <summary>The untrusted files reported when TrustedSource is false (see header note).</summary>
     public IReadOnlyList<string> UntrustedMods { get; private set; } = [];
@@ -333,7 +333,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                     }
 
                     var hashes = ModrinthRequire.Object(modInfo.Hashes, "hashes");
-                    file.Hash = hashes.TryGetValue("sha512", out var sha512) && sha512 is not null
+                    file.Hash = hashes.TryGetValue("sha512", out var sha512)
                         ? sha512
                         : throw new JsonParseException("'sha512' is not a string");
                     file.HashAlgorithm = HashAlgorithmName.SHA512;

@@ -55,27 +55,19 @@ public sealed class LauncherStateStore
         return merged with
         {
             Java = NormalizeJava(merged.Java),
-            Ui = NormalizeUi(merged.Ui),
         };
     }
 
     private static JavaDetectState NormalizeJava(JavaDetectState java) => java with
     {
-        LastHostname = java.LastHostname ?? "",
-        Detections = java.Detections is null
-            ? new Dictionary<string, JavaDetectEntry>(StringComparer.Ordinal)
-            : new Dictionary<string, JavaDetectEntry>(
-                java.Detections.ToDictionary(
-                    pair => pair.Key,
-                    pair => pair.Value is null
-                        ? new JavaDetectEntry("", "", "", "", "")
-                        : new JavaDetectEntry(Signature: pair.Value.Signature ?? "", Architecture: pair.Value.Architecture ?? "", RealArchitecture: pair.Value.RealArchitecture ?? "", Version: pair.Value.Version ?? "", Vendor: pair.Value.Vendor ?? "")),
-                StringComparer.Ordinal),
-    };
-
-    private static UiState NormalizeUi(UiState ui) => ui with
-    {
-        HiddenGroups = ui.HiddenGroups ?? [],
+        LastHostname = java.LastHostname,
+        Detections = new Dictionary<string, JavaDetectEntry>(
+            java.Detections.ToDictionary(
+                pair => pair.Key,
+                pair => pair.Value is null
+                    ? new JavaDetectEntry("", "", "", "", "")
+                    : new JavaDetectEntry(Signature: pair.Value.Signature ?? "", Architecture: pair.Value.Architecture ?? "", RealArchitecture: pair.Value.RealArchitecture ?? "", Version: pair.Value.Version ?? "", Vendor: pair.Value.Vendor ?? "")),
+            StringComparer.Ordinal),
     };
 
     /// <summary>Apply <paramref name="mutate"/> to the snapshot and persist immediately

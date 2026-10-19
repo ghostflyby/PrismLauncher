@@ -35,5 +35,7 @@ public sealed class SolderPackBuild
 {
     public required string Minecraft { get; set; }
 
-    public required List<SolderPackBuildMod> Mods { get; init; }
+    /// <summary>Elements are nullable on the wire (a JSON null mod element is surfaced by
+    /// the loader's "Value is not an object" check — the pinned Solder behavior).</summary>
+    public required List<SolderPackBuildMod?> Mods { get; init; }
 }
