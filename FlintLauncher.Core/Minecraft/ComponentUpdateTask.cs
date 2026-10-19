@@ -90,7 +90,7 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
         // the C++ canAbort()/abort() forward to the in-flight remote load tasks
         foreach (var status in _remoteLoadStatusList)
         {
-            status.Task?.Abort();
+            status.Task.Abort();
         }
 
         base.Abort();

@@ -311,7 +311,7 @@ public static class ModUtils
         }
 
         // a null first entry is the old "array[0] is not an object" empty-details path
-        return document?.Entries is { Count: > 0 } entries && entries[0] is not null
+        return document?.Entries is { Count: > 0 } entries
             ? InfoFromEntry(entries[0])
             : new ModDetails();
     }

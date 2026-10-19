@@ -43,11 +43,9 @@ public class StepEngineTests
     }
 
     /// <summary>A step that only finishes when released (or aborted).</summary>
-    private sealed class WaitingStep(LaunchTask parent, string name) : LaunchStep(parent)
+    private sealed class WaitingStep(LaunchTask parent) : LaunchStep(parent)
     {
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public string Name { get; } = name;
 
         public bool Started { get; private set; }
 
@@ -128,7 +126,7 @@ public class StepEngineTests
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
         var task = LaunchTask.Create(instance, fixture.CreateServices());
-        var waiting = new WaitingStep(task, "waiting");
+        var waiting = new WaitingStep(task);
         task.AppendStep(waiting);
 
         var run = task.StartAsync();

@@ -384,7 +384,7 @@ public class CoverageFixLaunchJoinApiTests
         return path;
     }
 
-    private static async Task<JsonElement> PollTaskState(HttpClient client, string taskId,
+    private static async Task PollTaskState(HttpClient client, string taskId,
         string expected, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
@@ -396,7 +396,7 @@ public class CoverageFixLaunchJoinApiTests
             var state = task.GetProperty("state").GetString();
             if (state == expected)
             {
-                return task;
+                return;
             }
 
             if (state is "failed" or "aborted")

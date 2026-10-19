@@ -89,7 +89,7 @@ public class InstanceBlobConverterTests : IDisposable
         var node = JsonNode.Parse("""{"JAVA_HOME":"/opt/jdk21"}""");
         Assert.NotNull(node);
         var config = Parse(NativeDoc("launch", "env", node));
-        var env = Assert.IsType<EnvMap>(config.Launch?.Env);
+        var env = Assert.IsType<EnvMap>(config.Launch.Env);
         Assert.Equal("/opt/jdk21", env["JAVA_HOME"]);
     }
 
@@ -219,7 +219,7 @@ public class InstanceBlobConverterTests : IDisposable
         {
             Identity = new InstanceIdentityConfig
             {
-                Shortcuts = [new ShortcutData("Game", RealFilePath(), ShortcutTarget.Other)],
+                Shortcuts = [new ShortcutData("Game", RealFilePath())],
             },
         };
         var written = JsonSerializer.Serialize(config, FlintJsonContext.Default.InstanceConfigFile);

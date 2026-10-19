@@ -352,7 +352,7 @@ public class LegacyFtbTests : IDisposable
 /// </summary>
 internal sealed class StubLegacyFtbServer : IDisposable
 {
-    private readonly HttpListener _listener = new();
+    private readonly HttpListener _listener;
 
     public StubLegacyFtbServer()
     {

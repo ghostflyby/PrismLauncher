@@ -118,7 +118,6 @@ public sealed class QtPresenceBoolConverter : JsonConverter<bool?>
         reader.TokenType switch
         {
             JsonTokenType.True => true,
-            JsonTokenType.False => false,
             _ => false,
         };
 

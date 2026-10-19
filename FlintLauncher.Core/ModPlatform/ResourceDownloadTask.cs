@@ -32,7 +32,6 @@ public class ResourceDownloadTask : SequentialTask
     private readonly IndexedPack _pack;
     private readonly IndexedVersion _packVersion;
     private readonly ResourceFolderModel _packModel;
-    private readonly ModrinthApi _modrinth;
 
     private NetJob? filesNetJob;
     private readonly LocalResourceUpdateTask? updateTask;
@@ -52,7 +51,7 @@ public class ResourceDownloadTask : SequentialTask
         _pack = pack;
         _packVersion = version;
         _packModel = packs;
-        _modrinth = modrinth ?? new ModrinthApi();
+        var modrinth1 = modrinth ?? new ModrinthApi();
 
         if (isIndexed)
         {
@@ -65,7 +64,7 @@ public class ResourceDownloadTask : SequentialTask
         filesNetJob = new NetJob("Resource download");
         EmitStatus($"Downloading resource:\n{_packVersion.DownloadUrl}");
 
-        var action = _modrinth.MakeFileRequest(_packVersion.DownloadUrl,
+        var action = modrinth1.MakeFileRequest(_packVersion.DownloadUrl,
             FileSystem.PathCombine(_packModel.Dir, GetFilename()),
             CreateModrinthMeta(instance, downloadReason, dependentOn));
         if (_packVersion.HashType.Length != 0 && _packVersion.Hash.Length != 0)
@@ -108,10 +107,6 @@ public class ResourceDownloadTask : SequentialTask
         }
 
         var profile = instance.GetPackProfile();
-        if (profile is null)
-        {
-            return default;
-        }
 
         var loaders = profile.GetModLoadersList();
 

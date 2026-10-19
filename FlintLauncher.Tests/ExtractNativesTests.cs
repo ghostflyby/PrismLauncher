@@ -466,7 +466,7 @@ internal sealed class AssetsRootRedirect : IDisposable
 /// <summary>Free-port HTTP stub (the NetStackTests pattern).</summary>
 internal sealed class TestHttpServer : IDisposable
 {
-    private readonly HttpListener _listener = new();
+    private readonly HttpListener _listener;
 
     public TestHttpServer(Action<HttpListenerContext> handler)
     {

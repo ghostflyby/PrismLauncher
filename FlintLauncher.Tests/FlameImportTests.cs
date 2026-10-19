@@ -282,7 +282,7 @@ public class FlameImportTests : IDisposable
         // root must abort the import, not move arbitrary directories
         var pack = FlamePackBuilder.Create();
         RegisterResolvedMod();
-        var manifestNode = JsonObject.Parse(pack.ManifestJson);
+        var manifestNode = JsonNode.Parse(pack.ManifestJson);
         var manifestObj = manifestNode?.AsObject();
         Assert.NotNull(manifestObj);
         manifestObj["overrides"] = "../outside";
@@ -312,7 +312,7 @@ public class FlameImportTests : IDisposable
         var pack = FlamePackBuilder.Create(loader: "forge-recommended");
         RegisterResolvedMod();
         // rebuild the manifest with the "recommended" loader version
-        var manifestNode = JsonObject.Parse(pack.ManifestJson);
+        var manifestNode = JsonNode.Parse(pack.ManifestJson);
         var manifestObj = manifestNode?.AsObject();
         Assert.NotNull(manifestObj);
         var minecraft = manifestObj["minecraft"]?.AsObject();
@@ -397,7 +397,7 @@ public class FlameImportTests : IDisposable
         // list -> installs with the ".disabled" suffix (headless equivalent of the dialog)
         var pack = FlamePackBuilder.Create();
         // rewrite the manifest so the file is optional
-        var manifestNode = JsonObject.Parse(pack.ManifestJson);
+        var manifestNode = JsonNode.Parse(pack.ManifestJson);
         var manifestObj = manifestNode?.AsObject();
         Assert.NotNull(manifestObj);
         var files = manifestObj["files"]?.AsArray();

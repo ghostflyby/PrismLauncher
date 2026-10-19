@@ -7,7 +7,6 @@
 // ModrinthInstanceCreationTask.ParseManifest, like upstream.
 
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;

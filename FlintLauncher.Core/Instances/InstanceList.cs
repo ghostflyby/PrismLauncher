@@ -194,10 +194,7 @@ public class InstanceList
             else
             {
                 var inst = LoadInstance(id);
-                if (inst is not null)
-                {
-                    newList.Add(inst);
-                }
+                newList.Add(inst);
             }
         }
 

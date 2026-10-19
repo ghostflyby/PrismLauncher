@@ -63,13 +63,12 @@ public class StoreCompletenessTests : IDisposable
                                                                                        """);
     }
 
-    private static string WriteFile(string path, string content)
+    private static void WriteFile(string path, string content)
     {
         var dir = Path.GetDirectoryName(path);
         Assert.NotNull(dir);
         Directory.CreateDirectory(dir);
         File.WriteAllText(path, content);
-        return path;
     }
 
     private static RuntimeContext Context() => new();

@@ -37,14 +37,13 @@ public class PackProfileTests : IDisposable
         return node;
     }
 
-    private string WriteFile(string relativePath, string content)
+    private void WriteFile(string relativePath, string content)
     {
         var path = Path.Combine(_root, relativePath);
         var dir = Path.GetDirectoryName(path);
         Assert.NotNull(dir);
         Directory.CreateDirectory(dir);
         File.WriteAllText(path, content);
-        return path;
     }
 
     private static string VersionFileJson(string uid, string version, string name, string? mainClass = null)

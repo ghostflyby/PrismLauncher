@@ -27,14 +27,12 @@ public class GlobalLaunchSettingsStub
     /// <summary>The fixture's typed user-layer store (flint.json under the fixture config root).</summary>
     public FlintConfigStore Store { get; }
 
-    private readonly string _configDir;
-
     public GlobalLaunchSettingsStub()
     {
-        _configDir = Path.Combine(Path.GetTempPath(), $"flint-user-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(_configDir);
+        var configDir = Path.Combine(Path.GetTempPath(), $"flint-user-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(configDir);
         Store = new FlintConfigStore(
-            Path.Combine(_configDir, "flint.json"), FlintJsonContext.Default.FlintConfigFile);
+            Path.Combine(configDir, "flint.json"), FlintJsonContext.Default.FlintConfigFile);
 
         StubSet("ShowGameTime", true);
         StubSet("ShowGameTimeWithoutDays", false);

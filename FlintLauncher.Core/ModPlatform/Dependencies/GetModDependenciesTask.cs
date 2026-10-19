@@ -311,26 +311,21 @@ public class GetModDependenciesTask : SequentialTask
                 try
                 {
                     var entries = dep.Version.Length != 0
-                        ? [FlameMod.ParseResponse(request.BodyAsString,
-                              FlameModJsonContext.Default.FlameModFileJson)]
+                        ?
+                        [
+                            FlameMod.ParseResponse(request.BodyAsString,
+                                FlameModJsonContext.Default.FlameModFileJson)
+                        ]
                         : FlameMod.ParseResponse(request.BodyAsString,
-                              FlameModJsonContext.Default.FlameFileListJson).Data ?? [];
+                            FlameModJsonContext.Default.FlameFileListJson).Data ?? [];
 
                     foreach (var fileDto in entries)
                     {
-                        if (fileDto is null)
-                        {
-                            continue;
-                        }
-
                         try
                         {
                             Consider(FlameMod.LoadIndexedPackVersion(fileDto));
                         }
-                        catch (JsonParseException)
-                        {
-                            continue;
-                        }
+                        catch (JsonParseException) { }
                     }
                 }
                 catch (JsonParseException)
@@ -382,7 +377,7 @@ public class GetModDependenciesTask : SequentialTask
                     try
                     {
                         file = ModrinthPackIndex.LoadIndexedPackVersion(ModrinthJson.VersionFromNode(entry)
-                            ?? throw new JsonParseException("version is not a JSON object"));
+                                                                        ?? throw new JsonParseException("version is not a JSON object"));
                     }
                     catch (JsonParseException)
                     {

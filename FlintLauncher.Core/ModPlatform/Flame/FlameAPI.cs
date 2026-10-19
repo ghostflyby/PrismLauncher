@@ -192,7 +192,7 @@ public sealed class FlameApi(NetStack? net = null) : ResourceApi
             {
                 // the former per-entry Require pair failed the whole parse into the same
                 // empty-list catch; a real CF response always carries both members
-                categories.Add(new Category(cat?.Name ?? "", (cat?.Id ?? 0).ToString(CultureInfo.InvariantCulture)));
+                categories.Add(new Category(cat.Name ?? "", (cat.Id ?? 0).ToString(CultureInfo.InvariantCulture)));
             }
         }
         catch (JsonParseException)

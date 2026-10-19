@@ -392,7 +392,7 @@ public class JavaDownloadTests : IDisposable
 
     private sealed class TestHttpServer : IDisposable
     {
-        private readonly HttpListener _listener = new();
+        private readonly HttpListener _listener;
 
         public TestHttpServer(Action<HttpListenerContext> handler)
         {

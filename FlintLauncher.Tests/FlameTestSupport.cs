@@ -29,7 +29,7 @@ namespace FlintLauncher.Tests;
 /// </summary>
 internal sealed class StubFlameServer : IDisposable
 {
-    private readonly HttpListener _listener = new();
+    private readonly HttpListener _listener;
 
     public StubFlameServer()
     {
@@ -230,7 +230,7 @@ internal static class FlamePayloads
         bool isAvailable = true)
     {
         var versions = new JsonArray();
-        var versionNodes = JsonObject.Parse(gameVersions ?? """["1.18.2", "forge"]""")?.AsArray();
+        var versionNodes = JsonNode.Parse(gameVersions ?? """["1.18.2", "forge"]""")?.AsArray();
         Assert.NotNull(versionNodes);
         foreach (var v in versionNodes)
         {
@@ -254,7 +254,7 @@ internal static class FlamePayloads
             ["gameVersions"] = versions,
             ["downloadUrl"] = downloadUrlPath is null ? null : $"{baseUrl}/{downloadUrlPath}",
             ["hashes"] = hashes,
-            ["dependencies"] = JsonObject.Parse(dependencies ?? "[]")?.DeepClone(),
+            ["dependencies"] = JsonNode.Parse(dependencies ?? "[]")?.DeepClone(),
             ["fileFingerprint"] = fileFingerprint ?? fileId,
             ["isAvailable"] = isAvailable,
         };
@@ -271,7 +271,7 @@ internal static class FlamePayloads
             arr.Add((JsonNode?)new JsonObject
             {
                 ["id"] = long.TryParse(fingerprint, out var fp) ? fp : 0,
-                ["file"] = JsonObject.Parse(fileJson),
+                ["file"] = JsonNode.Parse(fileJson),
             });
         }
 

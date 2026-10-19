@@ -8,7 +8,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
-using Xunit;
 
 namespace FlintLauncher.Tests;
 
@@ -25,7 +24,7 @@ namespace FlintLauncher.Tests;
 /// </summary>
 internal sealed class StubModrinthServer : IDisposable
 {
-    private readonly HttpListener _listener = new();
+    private readonly HttpListener _listener;
     private readonly Dictionary<string, string> _versionFiles = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _projects = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _projectVersions = new(StringComparer.Ordinal);

@@ -255,17 +255,14 @@ public class Library
         var stale = IsAlwaysStale();
         var local = IsLocal();
 
-        bool CheckLocalFile(string storage)
+        void CheckLocalFile(string storage)
         {
             var fileName = Path.GetFileName(storage);
             var fullPath = FileSystem.PathCombine(overridePath, fileName);
             if (!File.Exists(fullPath))
             {
                 failedLocalFiles.Add(fullPath);
-                return false;
             }
-
-            return true;
         }
 
         void AddDownload(string storage, string url, string sha1)

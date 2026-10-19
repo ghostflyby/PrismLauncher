@@ -191,12 +191,13 @@ public static class MetaJsonFormat
         version.RawTime = releaseTime?.ToUnixTimeMilliseconds() / 1000 ?? 0;
         version.Type = dto.Type ?? "";
         version.IsRecommended = dto.Recommended ?? false;
-        version.SetVolatile(dto.Volatile ?? false);
+        version.Volatile = dto.Volatile ?? false;
         var reqs = new SortedSet<Require>();
         var conflicts = new SortedSet<Require>();
         MapRequires(dto.Requires, reqs);
         MapRequires(dto.Conflicts, conflicts);
-        version.SetRequires(reqs, conflicts);
+        version.RequiredSet = reqs;
+        version.Conflicts = conflicts;
         var sha256 = dto.Sha256 ?? "";
         if (sha256.Length != 0)
         {
@@ -241,7 +242,7 @@ public static class MetaJsonFormat
             }
 
             var version = MapCommonVersion(uid, entry);
-            version.SetProvidesRecommendations();
+            version.ProvidesRecommendations = true;
             versions.Add(version);
         }
 

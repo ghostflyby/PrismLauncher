@@ -216,7 +216,7 @@ public static class FtbAppPackParse
 
             foreach (var target in wire.Targets)
             {
-                switch (target?.Name)
+                switch (target.Name)
                 {
                     case "neoforge":
                         loaderVersion = target.Version;

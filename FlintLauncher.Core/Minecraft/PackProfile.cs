@@ -192,16 +192,13 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         dirty = true;
     }
 
-    private bool SaveInternal()
+    private void SaveInternal()
     {
         var filename = ComponentsFilePath();
         if (SavePackProfile(filename, _components))
         {
             dirty = false;
-            return true;
         }
-
-        return false;
     }
 
     // internal instead of private (C++ keeps it private) so the test project can exercise the

@@ -7,7 +7,6 @@
 
 using System.Net;
 using System.Text;
-using Xunit;
 
 namespace FlintLauncher.Tests;
 

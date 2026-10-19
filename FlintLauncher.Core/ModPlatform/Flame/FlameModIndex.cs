@@ -188,8 +188,8 @@ public static class FlameMod
             {
                 pack.Authors.Add(new ModpackAuthor
                 {
-                    Name = Require(author?.Name, "name"),
-                    Url = Require(author?.Url, "url"),
+                    Name = Require(author.Name, "name"),
+                    Url = Require(author.Url, "url"),
                 });
             }
         }
@@ -371,10 +371,10 @@ public static class FlameMod
         {
             var hashTypes = ProviderCapabilities.HashType(ResourceProvider.Flame);
             // a missing/junk algo member defaults to sha1 (1), like the former Int read
-            var hashAlgo = EnumToString(hashEntry?.Algo ?? 1);
+            var hashAlgo = EnumToString(hashEntry.Algo ?? 1);
             if (hashTypes.Contains(hashAlgo))
             {
-                file.Hash = Require(hashEntry?.Value, "value");
+                file.Hash = Require(hashEntry.Value, "value");
                 file.HashType = hashAlgo;
                 break;
             }
@@ -384,8 +384,8 @@ public static class FlameMod
         {
             var dependency = new Dependency
             {
-                AddonId = Require(dep?.ModId, "modId").ToString(CultureInfo.InvariantCulture),
-                Type = Require(dep?.RelationType, "relationType") switch
+                AddonId = Require(dep.ModId, "modId").ToString(CultureInfo.InvariantCulture),
+                Type = Require(dep.RelationType, "relationType") switch
                 {
                     1 => new DependencyType(DependencyTypeValue.Embedded),     // EmbeddedLibrary
                     2 => new DependencyType(DependencyTypeValue.Optional),     // OptionalDependency

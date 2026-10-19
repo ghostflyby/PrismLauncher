@@ -74,7 +74,7 @@ internal static class ApiOpenApi
 
         options.AddOperationTransformer((operation, context, _) =>
         {
-            var relative = context.Description?.RelativePath ?? string.Empty;
+            var relative = context.Description.RelativePath ?? string.Empty;
             var authenticated = relative != "healthz" && relative != "api/v1/info";
 
             operation.Responses ??= new OpenApiResponses();
@@ -98,8 +98,8 @@ internal static class ApiOpenApi
             operation.Responses.TryAdd("404", ErrorResponse("not_found"));
             operation.Responses.TryAdd("409", ErrorResponse("conflict"));
 
-            var metadata = context.Description?.ActionDescriptor?.EndpointMetadata;
-            if (metadata?.OfType<SseMarker>().Any() == true)
+            var metadata = context.Description.ActionDescriptor.EndpointMetadata;
+            if (metadata.OfType<SseMarker>().Any())
             {
                 operation.Responses["200"] = new OpenApiResponse
                 {
@@ -111,7 +111,7 @@ internal static class ApiOpenApi
                 };
             }
 
-            if (metadata?.OfType<PlainTextMarker>().Any() == true)
+            if (metadata.OfType<PlainTextMarker>().Any())
             {
                 operation.Responses["200"] = new OpenApiResponse
                 {
@@ -126,7 +126,7 @@ internal static class ApiOpenApi
                 };
             }
 
-            if (metadata?.OfType<FormUploadMarker>().FirstOrDefault() is { } form)
+            if (metadata.OfType<FormUploadMarker>().FirstOrDefault() is { } form)
             {
                 operation.RequestBody = new OpenApiRequestBody
                 {

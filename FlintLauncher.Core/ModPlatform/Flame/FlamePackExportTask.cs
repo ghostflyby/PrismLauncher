@@ -240,7 +240,7 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
 
             foreach (var match in exactMatches)
             {
-                if (match?.File is not { } fileObj)
+                if (match.File is not { } fileObj)
                 {
                     // "Fingerprint match is empty!"
                     return;

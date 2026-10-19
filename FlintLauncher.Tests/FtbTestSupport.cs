@@ -8,7 +8,6 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
-using Xunit;
 
 namespace FlintLauncher.Tests;
 
@@ -21,7 +20,7 @@ namespace FlintLauncher.Tests;
 /// </summary>
 internal sealed class StubFtbServer : IDisposable
 {
-    private readonly HttpListener _listener = new();
+    private readonly HttpListener _listener;
 
     public StubFtbServer()
     {

@@ -12,7 +12,7 @@ namespace FlintLauncher.Tests;
 
 internal sealed class PeripheralStubServer : IDisposable
 {
-    private readonly HttpListener _listener = new();
+    private readonly HttpListener _listener;
 
     public PeripheralStubServer()
     {

@@ -581,8 +581,6 @@ public sealed class ModrinthCreationTask : InstanceTask
     private sealed class ModDownloadTask(File file, string filePath, ModrinthApi.DownloadMeta meta, ModrinthApi modrinth)
         : FlintTask
     {
-        public string TaskName { get; } = $"Download {file.Path}";
-
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
             FileSystem.EnsureFilePathExists(filePath);

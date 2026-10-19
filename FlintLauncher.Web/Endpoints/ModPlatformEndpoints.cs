@@ -422,7 +422,7 @@ public static class ModPlatformEndpoints
                         : IndexedVersionType.FromStringList(SettingsJson.ToStringList(
                             runtime.Config.Current.ModDownload.ModUpdateReleaseTypes ?? "[]"));
 
-                var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, releaseTypes, runtime.Modrinth, runtime.Flame);
+                var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, releaseTypes, runtime.Modrinth);
                 var entry = registry.Register("mods-update", task, instanceId: instance.Id());
                 // the result payload carries the found/applied updates; it is published once
                 // the task reaches a terminal state (the check pass fills it before applying)

@@ -445,15 +445,13 @@ public sealed class ModsUpdateTask(
     ModFolderModel folder,
     IReadOnlyList<string>? filter,
     IReadOnlyList<IndexedVersionType>? releaseTypes = null,
-    ModrinthApi? modrinth = null,
-    FlameApi? flame = null)
+    ModrinthApi? modrinth = null)
     : FlintTask
 {
     private sealed record PendingUpdate(ModUpdateEntryView View, IndexedVersion Version, string ProjectId, string Slug, string Name);
 
     private readonly List<PendingUpdate> _updates = [];
     private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
-    private readonly FlameApi _flame = flame ?? new FlameApi();
 
     /// <summary>The update entries for the task view's optional result payload.</summary>
     public TaskResultView BuildResult() => new(_updates.Select(u => u.View).ToArray(), null);

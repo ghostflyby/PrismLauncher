@@ -151,7 +151,7 @@ public sealed class NetRequest(
         // RequestTimeout port (QNetworkReply::setTransferTimeout): a one-shot inactivity timer
         // cancelling the linked token; rearmed before every await that can transfer data.
         using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        using var idleTimer = new Timer(_ => timeoutSource.Cancel());
+        await using var idleTimer = new Timer(_ => timeoutSource.Cancel());
 
         void ArmIdleTimer()
         {

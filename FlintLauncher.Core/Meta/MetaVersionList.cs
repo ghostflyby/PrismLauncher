@@ -122,7 +122,7 @@ public sealed class VersionList(string uid) : MetaEntity
         {
             MetaVersion version;
             // we already have the version. merge the contents
-            if (_lookup.TryGetValue(otherVersion.Version, out var existing) && existing is not null)
+            if (_lookup.TryGetValue(otherVersion.Version, out var existing))
             {
                 existing.MergeFromList(otherVersion);
                 version = existing;

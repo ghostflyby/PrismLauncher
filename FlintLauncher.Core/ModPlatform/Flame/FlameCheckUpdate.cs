@@ -84,10 +84,6 @@ public sealed class FlameCheckUpdate(
                 AddonId = metadata.ProjectId,
             };
             var versionsUrl = GetVersionsUrl(project);
-            if (versionsUrl is null)
-            {
-                continue;
-            }
 
             var request = NetRequest.MakeByteArray(new Uri(versionsUrl));
             await request.StartAsync(cancellationToken);

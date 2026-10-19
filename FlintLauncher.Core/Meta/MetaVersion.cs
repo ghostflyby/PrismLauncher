@@ -11,14 +11,11 @@ namespace FlintLauncher.Core.Meta;
 
 public sealed class MetaVersion(string uid, string version) : MetaEntity
 {
-    private bool providesRecommendations;
+    public bool ProvidesRecommendations { get; set; }
 
-    // NOTE: the C++ m_name member is dead there as well (never written); dropped to keep
-    // the port warning-clean
+    public SortedSet<Require> Conflicts { get; set; } = [];
 
-    private SortedSet<Require> conflicts = new();
-
-    private bool @volatile;
+    public bool Volatile { get; set; }
 
     /// <summary>Port of BaseVersion::name().</summary>
     public string Name => Data is not null ? Data.Name : Uid;
@@ -34,7 +31,7 @@ public sealed class MetaVersion(string uid, string version) : MetaEntity
 
     public long RawTime { get; set; }
 
-    public SortedSet<Require> RequiredSet { get; private set; } = [];
+    public SortedSet<Require> RequiredSet { get; set; } = [];
 
     public VersionFile? Data { get; set; }
 
@@ -53,7 +50,7 @@ public sealed class MetaVersion(string uid, string version) : MetaEntity
 
     public void MergeFromList(MetaVersion other)
     {
-        if (other.providesRecommendations)
+        if (other.ProvidesRecommendations)
         {
             if (IsRecommended != other.IsRecommended)
             {
@@ -76,14 +73,14 @@ public sealed class MetaVersion(string uid, string version) : MetaEntity
             RequiredSet = [.. other.RequiredSet];
         }
 
-        if (!conflicts.SetEquals(other.conflicts))
+        if (!Conflicts.SetEquals(other.Conflicts))
         {
-            conflicts = [.. other.conflicts];
+            Conflicts = [.. other.Conflicts];
         }
 
-        if (@volatile != other.@volatile)
+        if (Volatile != other.Volatile)
         {
-            SetVolatile(other.@volatile);
+            Volatile = other.Volatile;
         }
 
         if (other.Sha256.Length != 0)
@@ -105,15 +102,4 @@ public sealed class MetaVersion(string uid, string version) : MetaEntity
         return new McVersion(Version);
     }
 
-    // ------------------------------------------------- for usage by format parsers only
-
-    public void SetRequires(SortedSet<Require> reqs, SortedSet<Require> conflicts)
-    {
-        RequiredSet = reqs;
-        this.conflicts = conflicts;
-    }
-
-    public void SetVolatile(bool volatileValue) => @volatile = volatileValue;
-
-    public void SetProvidesRecommendations() => providesRecommendations = true;
 }

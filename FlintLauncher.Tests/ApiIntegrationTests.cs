@@ -94,7 +94,7 @@ internal sealed class FlintApiHost : IAsyncDisposable
         return new HttpClient { BaseAddress = new Uri(baseAddress.ToString()) };
     }
 
-    public string Token { get; } = "";
+    public string Token { get; }
 
     public async Task<HttpResponseMessage> GetAsync(string path) => await Client.GetAsync(path);
 
@@ -165,7 +165,7 @@ internal sealed class FlintApiHost : IAsyncDisposable
 /// <summary>Minimal stub JSON server (device-code endpoints, modrinth search).</summary>
 internal sealed class ApiStubServer : IDisposable
 {
-    private readonly HttpListener _listener = new();
+    private readonly HttpListener _listener;
     private readonly Task _loop;
     private bool disposed;
 
