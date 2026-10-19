@@ -120,25 +120,25 @@ public class LaunchController : FlintTask
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        if (Instance is null)
+        if (Instance is not { } instance)
         {
             EmitFailed("No instance specified!");
             return;
         }
 
-        if (!JavaCommon.CheckJvmArgs(Variant.AsString(Instance.Settings.Get("JvmArgs"))))
+        if (!JavaCommon.CheckJvmArgs(Variant.AsString(instance.Settings.Get("JvmArgs"))))
         {
             EmitFailed("Invalid Java arguments specified. Please fix this first.");
             return;
         }
 
-        await Login(cancellationToken).ConfigureAwait(false);
+        await Login(instance, cancellationToken).ConfigureAwait(false);
     }
 
     // ----------------------------------------------------------------------- account/login
 
     /// <summary>Port of decideAccount(): pick the account for the launch.</summary>
-    private void DecideAccount()
+    private void DecideAccount(MinecraftInstance instance)
     {
         if (AccountToUse is not null)
         {
@@ -153,7 +153,7 @@ public class LaunchController : FlintTask
             return;
         }
 
-        var instanceAccountId = Variant.AsString(Instance!.Settings.Get("InstanceAccountId"));
+        var instanceAccountId = Variant.AsString(instance.Settings.Get("InstanceAccountId"));
         var instanceAccountIndex = accounts.FindAccountByProfileId(instanceAccountId);
         if (instanceAccountIndex == -1 || instanceAccountId.Length == 0)
         {
@@ -350,9 +350,9 @@ public class LaunchController : FlintTask
     }
 
     /// <summary>Port of login(): decide the account/mode, fill the session, launch.</summary>
-    private async Task Login(CancellationToken cancellationToken)
+    private async Task Login(MinecraftInstance instance, CancellationToken cancellationToken)
     {
-        DecideAccount();
+        DecideAccount(instance);
 
         LaunchDecision decision;
         do
@@ -382,7 +382,7 @@ public class LaunchController : FlintTask
                 {
                     session = new AuthSession();
                     session.MakeDemo(name, MinecraftAccount.UuidFromUsername(name).ToString("D"));
-                    LaunchInstance();
+                    LaunchInstance(instance);
                     return;
                 }
             }
@@ -409,7 +409,7 @@ public class LaunchController : FlintTask
             }
 
             session.MakeOffline(name);
-            LaunchInstance();
+            LaunchInstance(instance);
             return;
         }
 
@@ -442,15 +442,15 @@ public class LaunchController : FlintTask
             }
         }
 
-        LaunchInstance();
+        LaunchInstance(instance);
     }
 
     // ---------------------------------------------------------------------- launchInstance
 
     /// <summary>Port of launchInstance(): build the LaunchTask, prepend the banner steps, run.</summary>
-    private void LaunchInstance()
+    private void LaunchInstance(MinecraftInstance instance)
     {
-        launcher = Instance!.CreateLaunchTask(session, TargetToJoin, Services);
+        launcher = instance.CreateLaunchTask(session, TargetToJoin, Services);
         if (launcher is null)
         {
             EmitFailed("Couldn't instantiate a launcher.");
@@ -458,7 +458,7 @@ public class LaunchController : FlintTask
         }
 
         Log.LaunchStarted(
-            Instance.Id(),
+            instance.Id(),
             actualLaunchMode.ToString(),
             session?.PlayerName ?? "(none)",
             TargetToJoin?.ToString() ?? "(instance default)");

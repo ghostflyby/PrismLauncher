@@ -90,47 +90,57 @@ public class AuthFlowTests : IDisposable
         Assert.Equal(900, browser.expiresIn);
 
         // ---- request shape assertions ----
-        var device = _server.Request("POST", "/devicecode")!;
+        var device = _server.Request("POST", "/devicecode");
+        Assert.NotNull(device);
         Assert.Equal("application/x-www-form-urlencoded", device.Headers["Content-Type"]);
         Assert.Equal("application/json", device.Headers["Accept"]);
         Assert.Contains("client_id=c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb", device.Body);
         Assert.Contains("scope=XboxLive.SignIn%20XboxLive.offline_access", device.Body);
 
-        var poll = _server.Request("POST", "/token")!;
+        var poll = _server.Request("POST", "/token");
+        Assert.NotNull(poll);
         Assert.Contains("grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code", poll.Body);
         Assert.Contains("device_code=DEV_CODE_STUB", poll.Body);
         Assert.Contains("client_id=c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb", poll.Body);
 
-        var xbox = _server.Request("POST", "/user/authenticate")!;
+        var xbox = _server.Request("POST", "/user/authenticate");
+        Assert.NotNull(xbox);
         Assert.Equal("application/json", xbox.Headers["Content-Type"]);
         Assert.Equal("application/json", xbox.Headers["Accept"]);
         Assert.Equal("1", xbox.Headers["x-xbl-contract-version"]);
-        var xboxBody = JsonNode.Parse(xbox.Body)!.AsObject();
-        Assert.Equal("RPS", xboxBody["Properties"]!["AuthMethod"]!.GetValue<string>());
-        Assert.Equal("user.auth.xboxlive.com", xboxBody["Properties"]!["SiteName"]!.GetValue<string>());
-        Assert.Equal("d=MSA_ACCESS", xboxBody["Properties"]!["RpsTicket"]!.GetValue<string>()); // "d=" prefix
-        Assert.Equal("http://auth.xboxlive.com", xboxBody["RelyingParty"]!.GetValue<string>());
-        Assert.Equal("JWT", xboxBody["TokenType"]!.GetValue<string>());
+        var xboxBody = JsonNode.Parse(xbox.Body)?.AsObject();
+        Assert.NotNull(xboxBody);
+        Assert.Equal("RPS", xboxBody["Properties"]?["AuthMethod"]?.GetValue<string>());
+        Assert.Equal("user.auth.xboxlive.com", xboxBody["Properties"]?["SiteName"]?.GetValue<string>());
+        Assert.Equal("d=MSA_ACCESS", xboxBody["Properties"]?["RpsTicket"]?.GetValue<string>()); // "d=" prefix
+        Assert.Equal("http://auth.xboxlive.com", xboxBody["RelyingParty"]?.GetValue<string>());
+        Assert.Equal("JWT", xboxBody["TokenType"]?.GetValue<string>());
 
-        var xsts = _server.Request("POST", "/xsts/authorize")!;
-        var xstsBody = JsonNode.Parse(xsts.Body)!.AsObject();
-        Assert.Equal("RETAIL", xstsBody["Properties"]!["SandboxId"]!.GetValue<string>());
-        Assert.Equal("USER_TOKEN_STUB", xstsBody["Properties"]!["UserTokens"]![0]!.GetValue<string>());
-        Assert.Equal("rp://api.minecraftservices.com/", xstsBody["RelyingParty"]!.GetValue<string>());
-        Assert.Equal("JWT", xstsBody["TokenType"]!.GetValue<string>());
+        var xsts = _server.Request("POST", "/xsts/authorize");
+        Assert.NotNull(xsts);
+        var xstsBody = JsonNode.Parse(xsts.Body)?.AsObject();
+        Assert.NotNull(xstsBody);
+        Assert.Equal("RETAIL", xstsBody["Properties"]?["SandboxId"]?.GetValue<string>());
+        Assert.Equal("USER_TOKEN_STUB", xstsBody["Properties"]?["UserTokens"]?[0]?.GetValue<string>());
+        Assert.Equal("rp://api.minecraftservices.com/", xstsBody["RelyingParty"]?.GetValue<string>());
+        Assert.Equal("JWT", xstsBody["TokenType"]?.GetValue<string>());
 
-        var login = _server.Request("POST", "/launcher/login")!;
-        var loginBody = JsonNode.Parse(login.Body)!.AsObject();
-        Assert.Equal("XBL3.0 x=UHS_STUB;XSTS_TOKEN_STUB", loginBody["xtoken"]!.GetValue<string>());
-        Assert.Equal("PC_LAUNCHER", loginBody["platform"]!.GetValue<string>());
+        var login = _server.Request("POST", "/launcher/login");
+        Assert.NotNull(login);
+        var loginBody = JsonNode.Parse(login.Body)?.AsObject();
+        Assert.NotNull(loginBody);
+        Assert.Equal("XBL3.0 x=UHS_STUB;XSTS_TOKEN_STUB", loginBody["xtoken"]?.GetValue<string>());
+        Assert.Equal("PC_LAUNCHER", loginBody["platform"]?.GetValue<string>());
 
-        var entitlements = _server.Request("GET", "/entitlements/license")!;
+        var entitlements = _server.Request("GET", "/entitlements/license");
+        Assert.NotNull(entitlements);
         Assert.Equal("Bearer MC_ACCESS_TOKEN_STUB", entitlements.Headers["Authorization"]);
         var query = entitlements.Query.TrimStart('?').Split('=');
         Assert.Equal("requestId", query[0]);
         Assert.True(Guid.TryParseExact(query[1], "D", out _), "requestId must be a uuid without braces");
 
-        var profile = _server.Request("GET", "/minecraft/profile")!;
+        var profile = _server.Request("GET", "/minecraft/profile");
+        Assert.NotNull(profile);
         Assert.Equal("Bearer MC_ACCESS_TOKEN_STUB", profile.Headers["Authorization"]);
 
         Assert.NotNull(_server.Request("GET", "/skin.png"));
@@ -309,7 +319,8 @@ public class AuthFlowTests : IDisposable
         Assert.Equal("c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb", account.AccountData.MsaClientId);
 
         // the code was exchanged at the token endpoint
-        var tokenReq = _server.Request("POST", "/token")!;
+        var tokenReq = _server.Request("POST", "/token");
+        Assert.NotNull(tokenReq);
         Assert.Contains("grant_type=authorization_code", tokenReq.Body);
         Assert.Contains("code=INTERACTIVE_CODE", tokenReq.Body);
         Assert.Contains("redirect_uri=" + Uri.EscapeDataString(redirectUri), tokenReq.Body);
@@ -354,7 +365,8 @@ public class AuthFlowTests : IDisposable
         await flow.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, flow.State);
-        var tokenReq = _server.Request("POST", "/token")!;
+        var tokenReq = _server.Request("POST", "/token");
+        Assert.NotNull(tokenReq);
         Assert.Contains("grant_type=refresh_token", tokenReq.Body);
         Assert.Contains("refresh_token=EXISTING_REFRESH", tokenReq.Body);
         Assert.Equal("MSA_ACCESS", account.AccountData.MsaToken.Value);
@@ -422,7 +434,8 @@ public class AuthFlowTests : IDisposable
         var account = MinecraftAccount.CreateOffline("Notch");
         // offline accounts have no steps: the flow completes immediately
         var flow = account.Refresh(_auth);
-        await flow!.StartAsync();
+        Assert.NotNull(flow);
+        await flow.StartAsync();
         Assert.Equal(TaskState.Succeeded, flow.State);
         Assert.Null(account.CurrentTask);
         Assert.False(account.IsActive);

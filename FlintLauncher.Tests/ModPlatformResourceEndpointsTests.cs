@@ -212,7 +212,8 @@ internal sealed class StubModrinthResourceServer : IDisposable
 
     private void Handle(HttpListenerContext ctx)
     {
-        var path = ctx.Request.Url!.PathAndQuery;
+        var url = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
+        var path = url.PathAndQuery;
         LastPath = path;
 
         byte[] body;

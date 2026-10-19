@@ -8,6 +8,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
+using Xunit;
 
 namespace FlintLauncher.Tests;
 
@@ -70,7 +71,8 @@ internal sealed class StubFtbServer : IDisposable
 
     private void Handle(HttpListenerContext ctx)
     {
-        var path = ctx.Request.Url!.AbsolutePath;
+        var url = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
+        var path = url.AbsolutePath;
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
         byte[] body;

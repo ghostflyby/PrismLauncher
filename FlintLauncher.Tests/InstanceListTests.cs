@@ -68,19 +68,22 @@ public class InstanceListTests : IDisposable
         Assert.Equal(InstListError.NoError, list.LoadList());
 
         Assert.Equal(3, list.Count);
-        Assert.NotNull(list.GetInstanceById("aaa"));
-        Assert.NotNull(list.GetInstanceById("bbb"));
-        Assert.NotNull(list.GetInstanceById("ccc"));
+        var aaa = list.GetInstanceById("aaa");
+        var bbb = list.GetInstanceById("bbb");
+        var ccc = list.GetInstanceById("ccc");
+        Assert.NotNull(aaa);
+        Assert.NotNull(bbb);
+        Assert.NotNull(ccc);
         Assert.Null(list.GetInstanceById("junk"));
         Assert.Null(list.GetInstanceById(""));
 
-        Assert.Equal("A", list.GetInstanceById("aaa")!.Name());
-        Assert.Equal("B", list.GetInstanceById("bbb")!.Name());
+        Assert.Equal("A", aaa.Name());
+        Assert.Equal("B", bbb.Name());
         // id = folder name
-        Assert.Equal("aaa", list.GetInstanceById("aaa")!.Id());
-        Assert.Equal(Path.Combine(_instancesDir, "aaa"), list.GetInstanceById("aaa")!.InstanceRoot());
-        Assert.Equal(Path.Combine(_instancesDir, "bbb"), list.GetInstanceById("bbb")!.InstanceRoot());
-        Assert.Equal(Path.Combine(_instancesDir, "ccc"), list.GetInstanceById("ccc")!.InstanceRoot());
+        Assert.Equal("aaa", aaa.Id());
+        Assert.Equal(Path.Combine(_instancesDir, "aaa"), aaa.InstanceRoot());
+        Assert.Equal(Path.Combine(_instancesDir, "bbb"), bbb.InstanceRoot());
+        Assert.Equal(Path.Combine(_instancesDir, "ccc"), ccc.InstanceRoot());
     }
 
     [Fact]
@@ -110,7 +113,8 @@ public class InstanceListTests : IDisposable
         var list = CreateList();
         list.LoadList();
 
-        var inst = list.GetInstanceById("byid")!;
+        var inst = list.GetInstanceById("byid");
+        Assert.NotNull(inst);
         Assert.Same(inst, list.GetInstanceById(inst.Uuid));
     }
 
@@ -122,8 +126,9 @@ public class InstanceListTests : IDisposable
         var list = CreateList();
         list.LoadList();
 
-        var inst = list.ResolveInstance("alpha")!;
-        Assert.Same(inst, list.ResolveInstance(inst.Uuid)!);
+        var inst = list.ResolveInstance("alpha");
+        Assert.NotNull(inst);
+        Assert.Same(inst, list.ResolveInstance(inst.Uuid));
         Assert.Null(list.ResolveInstance("missing"));
         Assert.Null(list.ResolveInstance(""));
     }
@@ -135,7 +140,8 @@ public class InstanceListTests : IDisposable
         var list = CreateList();
         list.LoadList();
 
-        var inst = list.GetInstanceById("statted")!;
+        var inst = list.GetInstanceById("statted");
+        Assert.NotNull(inst);
         if (OperatingSystem.IsWindows())
         {
             // D2: no inode support on Windows — the chain skips the link (InodeOf = 0)
@@ -145,7 +151,7 @@ public class InstanceListTests : IDisposable
 
         var inode = list.InodeOf(inst);
         Assert.NotEqual(0, inode);
-        Assert.Same(inst, list.ResolveInstance(inode.ToString(CultureInfo.InvariantCulture))!);
+        Assert.Same(inst, list.ResolveInstance(inode.ToString(CultureInfo.InvariantCulture)));
 
         // a numeric reference that is NOT a live inode falls through to uuid/dirname
         Assert.Null(list.ResolveInstance(long.MaxValue.ToString(CultureInfo.InvariantCulture)));
@@ -241,6 +247,12 @@ public class InstanceListTests : IDisposable
         list.SetInstanceGroup("c", "Other");
         Assert.Equal("Other", list.GetInstanceGroup("c"));
 
+        var a = list.GetInstanceById("a");
+        var b = list.GetInstanceById("b");
+        var c = list.GetInstanceById("c");
+        Assert.NotNull(a);
+        Assert.NotNull(b);
+        Assert.NotNull(c);
         using (var doc = JsonDocument.Parse(File.ReadAllText(_groupFile)))
         {
             var root = doc.RootElement;
@@ -254,14 +266,14 @@ public class InstanceListTests : IDisposable
             // DATA D3: members are uuid references now (the legacy dirnames converted at
             // load); "id" on the wire keeps serving the dirname
             Assert.Equal(
-                new[] { list.GetInstanceById("a")!.Uuid, list.GetInstanceById("b")!.Uuid }.Order(),
+                new[] { a.Uuid, b.Uuid }.Order(),
                 group.GetProperty("instances").EnumerateArray()
                     .Select(v => v.GetString()).ToList().Order());
             // the collapse state is NOT written into the group file anymore — launcher-state
             // owns it (C8 split); the Flint-side file only carries group definitions
             Assert.False(group.TryGetProperty("hidden", out _));
 
-            Assert.Equal([list.GetInstanceById("c")!.Uuid], groups.GetProperty("Other")
+            Assert.Equal([c.Uuid], groups.GetProperty("Other")
                 .GetProperty("instances").EnumerateArray().Select(v => v.GetString()).ToList());
         }
 
@@ -374,8 +386,10 @@ public class InstanceListTests : IDisposable
         Assert.Equal(InstListError.NoError, list.LoadList());
 
         Assert.Equal("Group", list.GetInstanceGroup("late"));
+        var late = list.GetInstanceById("late");
+        Assert.NotNull(late);
         using var doc = JsonDocument.Parse(File.ReadAllText(_groupFile));
-        Assert.Equal([list.GetInstanceById("late")!.Uuid], doc.RootElement.GetProperty("groups")
+        Assert.Equal([late.Uuid], doc.RootElement.GetProperty("groups")
             .GetProperty("Group").GetProperty("instances").EnumerateArray()
             .Select(v => v.GetString()).ToList());
     }
@@ -631,8 +645,10 @@ public class InstanceListTests : IDisposable
         // migrated to the primary group file location, with the dirname member converted
         // to the instance's uuid (DATA D3)
         Assert.True(File.Exists(_groupFile));
+        var m = list.GetInstanceById("m");
+        Assert.NotNull(m);
         using var doc = JsonDocument.Parse(File.ReadAllText(_groupFile));
-        Assert.Equal([list.GetInstanceById("m")!.Uuid], doc.RootElement.GetProperty("groups")
+        Assert.Equal([m.Uuid], doc.RootElement.GetProperty("groups")
             .GetProperty("Old").GetProperty("instances").EnumerateArray()
             .Select(v => v.GetString()).ToList());
     }
@@ -670,8 +686,8 @@ public class InstanceListTests : IDisposable
 
         var list = CreateList();
         list.LoadList();
-        Assert.IsType<MinecraftInstance>(list.GetInstanceById("notype"));
-        Assert.Equal("NoType", list.GetInstanceById("notype")!.Name());
+        var notype = Assert.IsType<MinecraftInstance>(list.GetInstanceById("notype"));
+        Assert.Equal("NoType", notype.Name());
     }
 
     // ----------------------------------------------------------- total playtime migration
@@ -855,7 +871,8 @@ public class InstanceListTests : IDisposable
         var list = CreateList();
         list.LoadList();
 
-        var link = list.GetInstanceById("link")!;
+        var link = list.GetInstanceById("link");
+        Assert.NotNull(link);
         link.SetLinkedInstances(["base"]);
 
         Assert.Equal(["link"], list.GetLinkedInstancesById("base"));
@@ -878,8 +895,10 @@ public class InstanceListTests : IDisposable
         var list = CreateList();
         list.LoadList();
 
-        var baseInst = list.GetInstanceById("base")!;
-        var link = list.GetInstanceById("link")!;
+        var baseInst = list.GetInstanceById("base");
+        var link = list.GetInstanceById("link");
+        Assert.NotNull(baseInst);
+        Assert.NotNull(link);
         // the imported dirname became the target's uuid (D3 import conversion)
         Assert.Equal([baseInst.Uuid], link.GetLinkedInstances());
         // ...and the conversion persisted (the dual-track write landed the uuid form)
@@ -906,7 +925,8 @@ public class InstanceListTests : IDisposable
         var list = CreateList();
         list.LoadList();
 
-        var late = list.GetInstanceById("late-link")!;
+        var late = list.GetInstanceById("late-link");
+        Assert.NotNull(late);
         // unresolvable: kept verbatim — the persisted payload still carries the raw dirname
         // (only the uuid identity write of the fresh construction touched the file)
         Assert.Equal(["ghost"], late.GetLinkedInstances());
@@ -922,7 +942,9 @@ public class InstanceListTests : IDisposable
         // the target appears; the next discovery round converts
         MakeInstanceDir("ghost", name: "Ghost");
         list.LoadList();
-        Assert.Equal([list.GetInstanceById("ghost")!.Uuid], late.GetLinkedInstances());
+        var ghost = list.GetInstanceById("ghost");
+        Assert.NotNull(ghost);
+        Assert.Equal([ghost.Uuid], late.GetLinkedInstances());
         Assert.Equal(["late-link"], list.GetLinkedInstancesById("ghost"));
     }
 
@@ -944,8 +966,9 @@ public class InstanceListTests : IDisposable
         list.LoadList();
 
         // both entries named the same target — one uuid entry survives
-        Assert.Equal(["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
-            list.GetInstanceById("link")!.GetLinkedInstances());
+        var link = list.GetInstanceById("link");
+        Assert.NotNull(link);
+        Assert.Equal(["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"], link.GetLinkedInstances());
     }
 
     [Fact]
@@ -956,16 +979,18 @@ public class InstanceListTests : IDisposable
         var list = CreateList();
         list.LoadList();
 
-        var link = list.GetInstanceById("link")!;
+        var link = list.GetInstanceById("link");
+        Assert.NotNull(link);
         // the native write path (the C++ lineage passed id(), the dirname — BaseInstance.Id)
         // stores the uuid form: the list stamps the resolver onto discovered instances
+        var baseInst = list.GetInstanceById("base");
+        Assert.NotNull(baseInst);
         link.AddLinkedInstanceId("base");
-        Assert.Equal([list.GetInstanceById("base")!.Uuid], link.GetLinkedInstances());
+        Assert.Equal([baseInst.Uuid], link.GetLinkedInstances());
 
         // an unknown reference appends verbatim (a not-yet-discovered target converts at
         // the next LoadList round)
         link.AddLinkedInstanceId("not-there-yet");
-        Assert.Equal([list.GetInstanceById("base")!.Uuid, "not-there-yet"],
-            link.GetLinkedInstances());
+        Assert.Equal([baseInst.Uuid, "not-there-yet"], link.GetLinkedInstances());
     }
 }

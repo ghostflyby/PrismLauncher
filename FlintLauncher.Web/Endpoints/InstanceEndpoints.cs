@@ -514,7 +514,7 @@ public static class InstanceEndpoints
         IReadOnlyList<string> => value.ValueKind == JsonValueKind.Array
             ? value.EnumerateArray()
                 .Where(e => e.ValueKind == JsonValueKind.String)
-                .Select(e => e.GetString()!)
+                .Select(e => e.ToString())
                 .ToList()
             : [],
         _ => value.ToString(),

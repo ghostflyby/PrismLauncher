@@ -7,6 +7,7 @@
 
 using System.Net;
 using System.Text;
+using Xunit;
 
 namespace FlintLauncher.Tests;
 
@@ -164,10 +165,11 @@ internal sealed class AuthStubServer : IDisposable
             body = reader.ReadToEnd();
         }
 
+        var requestUrl = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
         var recorded = new RecordedRequest(
             ctx.Request.HttpMethod,
-            ctx.Request.Url!.AbsolutePath,
-            ctx.Request.Url!.Query,
+            requestUrl.AbsolutePath,
+            requestUrl.Query,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             body);
         foreach (var key in ctx.Request.Headers.AllKeys)

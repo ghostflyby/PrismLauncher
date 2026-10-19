@@ -63,7 +63,7 @@ public class FlintApiFlameSearchTests : IDisposable
         // G4: the Flame key is a store secret — the host startup apply derives the provider
         // from the ISecretStore, so the key goes in through PUT /settings (the former direct
         // ApiKeyProvider override no longer survives host startup)
-        _server.SearchJson = new JsonObject { ["data"] = new JsonArray(JsonNode.Parse(SearchHitJson)!) }.ToJsonString();
+        _server.SearchJson = new JsonObject { ["data"] = new JsonArray(JsonNode.Parse(SearchHitJson)) }.ToJsonString();
 
         await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
         var keyPut = await host.PutAsync("/api/v1/settings", new
@@ -178,8 +178,8 @@ public class FlintApiVersionsTests : IDisposable
         Assert.Equal("2023-05-01T00:00:00Z", version.GetProperty("date").GetString());
         Assert.Equal("test.jar", version.GetProperty("filename").GetString());
         Assert.Equal($"{_modrinth.Url}/mod.bin", version.GetProperty("downloadUrl").GetString());
-        Assert.Equal(["fabric"], version.GetProperty("loaders").EnumerateArray().Select(l => l.GetString()!).ToArray());
-        Assert.Equal(["1.20.1"], version.GetProperty("mcVersions").EnumerateArray().Select(v => v.GetString()!).ToArray());
+        Assert.Equal(["fabric"], version.GetProperty("loaders").EnumerateArray().Select(l => l.GetString()).ToArray());
+        Assert.Equal(["1.20.1"], version.GetProperty("mcVersions").EnumerateArray().Select(v => v.GetString()).ToArray());
     }
 
     [Fact]
@@ -189,7 +189,7 @@ public class FlintApiVersionsTests : IDisposable
         {
             ["data"] = new JsonArray(JsonNode.Parse(FlamePayloads.FileJson(_flame.Url, modId: 123, fileId: 456,
                 displayName: "Test Mod 1.0", fileName: "test.jar", fileDate: "2023-01-01T00:00:00Z",
-                gameVersions: """["1.18.2", "forge"]"""))!),
+                gameVersions: """["1.18.2", "forge"]"""))),
         }.ToJsonString();
 
         await using var host = await FlintApiHost.StartAsync(_modrinthApi, _flameApi);
@@ -203,8 +203,8 @@ public class FlintApiVersionsTests : IDisposable
         Assert.Equal("Test Mod 1.0", version.GetProperty("versionNumber").GetString());
         Assert.Equal("2023-01-01T00:00:00Z", version.GetProperty("date").GetString());
         Assert.Equal("test.jar", version.GetProperty("filename").GetString());
-        Assert.Equal(["forge"], version.GetProperty("loaders").EnumerateArray().Select(l => l.GetString()!).ToArray());
-        Assert.Equal(["1.18.2"], version.GetProperty("mcVersions").EnumerateArray().Select(v => v.GetString()!).ToArray());
+        Assert.Equal(["forge"], version.GetProperty("loaders").EnumerateArray().Select(l => l.GetString()).ToArray());
+        Assert.Equal(["1.18.2"], version.GetProperty("mcVersions").EnumerateArray().Select(v => v.GetString()).ToArray());
     }
 
     [Fact]
@@ -273,7 +273,7 @@ public class FlintApiModsTests : IDisposable
             }),
             ["dependencies"] = dependenciesJson is null
                 ? new JsonArray()
-                : JsonNode.Parse(dependenciesJson)!.DeepClone(),
+                : JsonNode.Parse(dependenciesJson)?.DeepClone(),
         }.ToJsonString();
 
     private static string ProjectJson(string id, string slug, string title) =>
@@ -297,7 +297,8 @@ public class FlintApiModsTests : IDisposable
         var create = await host.PostAsync("/api/v1/instances/vanilla", new { name, mcVersion = "1.20.1" });
         Assert.Equal(HttpStatusCode.Created, create.StatusCode);
         var id = JsonDocument.Parse(await create.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("id").GetString()!;
+            .RootElement.GetProperty("id").GetString();
+        Assert.NotNull(id);
 
         var instanceDir = Path.Combine(host.DataDir, "instances", id);
         var pack =
@@ -356,9 +357,9 @@ public class FlintApiModsTests : IDisposable
         // the latest-version lookup: the selected version requires depProj
         _modrinth.ProjectVersions["projId1"] = new JsonArray(JsonNode.Parse(VersionJson(_modrinth.Url,
             "projId1", "verId1", "1.0.0", "test.jar", "mod.bin", jarBytes,
-            dependenciesJson: """[{"project_id":"depProj","dependency_type":"required"}]"""))!).ToJsonString();
+            dependenciesJson: """[{"project_id":"depProj","dependency_type":"required"}]"""))).ToJsonString();
         _modrinth.ProjectVersions["depProj"] = new JsonArray(JsonNode.Parse(VersionJson(_modrinth.Url,
-            "depProj", "depVerId", "0.1.0", "dep.jar", "dep.bin", depBytes))!).ToJsonString();
+            "depProj", "depVerId", "0.1.0", "dep.jar", "dep.bin", depBytes))).ToJsonString();
 
         await using var host = await FlintApiHost.StartAsync(_modrinthApi);
         var id = await CreateSeededInstanceAsync(host, "Install Target");
@@ -367,7 +368,8 @@ public class FlintApiModsTests : IDisposable
             new[] { new { provider = "modrinth", projectId = "projId1" } });
         Assert.Equal(HttpStatusCode.Accepted, post.StatusCode);
         var taskId = JsonDocument.Parse(await post.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("taskId").GetString()!;
+            .RootElement.GetProperty("taskId").GetString();
+        Assert.NotNull(taskId);
 
         var task = await host.WaitForTaskStateAsync(taskId, "succeeded", TimeSpan.FromSeconds(30));
         Assert.Equal("mods-install", task.GetProperty("kind").GetString());
@@ -411,7 +413,8 @@ public class FlintApiModsTests : IDisposable
             new[] { new { provider = "modrinth", projectId = "ghost" } });
         Assert.Equal(HttpStatusCode.Accepted, post.StatusCode);
         var taskId = JsonDocument.Parse(await post.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("taskId").GetString()!;
+            .RootElement.GetProperty("taskId").GetString();
+        Assert.NotNull(taskId);
 
         var task = await host.WaitForTaskStateAsync(taskId, "failed", TimeSpan.FromSeconds(30));
         Assert.Contains("ghost", task.GetProperty("failReason").GetString());
@@ -450,7 +453,8 @@ public class FlintApiModsTests : IDisposable
             new[] { new { provider = "modrinth", projectId = "projId1", versionId = "verOld" } });
         Assert.Equal(HttpStatusCode.Accepted, install.StatusCode);
         var installTaskId = JsonDocument.Parse(await install.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("taskId").GetString()!;
+            .RootElement.GetProperty("taskId").GetString();
+        Assert.NotNull(installTaskId);
         await host.WaitForTaskStateAsync(installTaskId, "succeeded", TimeSpan.FromSeconds(30));
         Assert.Equal(oldBytes, await File.ReadAllBytesAsync(Path.Combine(ModsDir(host, id), "test.jar")));
 
@@ -461,7 +465,8 @@ public class FlintApiModsTests : IDisposable
         var update = await host.PostAsync($"/api/v1/instances/{Uri.EscapeDataString(id)}/mods/update", new { });
         Assert.Equal(HttpStatusCode.Accepted, update.StatusCode);
         var updateTaskId = JsonDocument.Parse(await update.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("taskId").GetString()!;
+            .RootElement.GetProperty("taskId").GetString();
+        Assert.NotNull(updateTaskId);
 
         var task = await host.WaitForTaskStateAsync(updateTaskId, "succeeded", TimeSpan.FromSeconds(30));
 
@@ -501,7 +506,8 @@ public class FlintApiModsTests : IDisposable
         var update = await host.PostAsync($"/api/v1/instances/{Uri.EscapeDataString(id)}/mods/update", new { });
         Assert.Equal(HttpStatusCode.Accepted, update.StatusCode);
         var taskId = JsonDocument.Parse(await update.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("taskId").GetString()!;
+            .RootElement.GetProperty("taskId").GetString();
+        Assert.NotNull(taskId);
 
         var task = await host.WaitForTaskStateAsync(taskId, "succeeded", TimeSpan.FromSeconds(30));
         Assert.Equal(0, task.GetProperty("result").GetProperty("updates").GetArrayLength());

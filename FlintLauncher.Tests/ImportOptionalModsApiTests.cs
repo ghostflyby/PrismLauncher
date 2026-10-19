@@ -46,7 +46,9 @@ public class ImportOptionalModsApiTests : IDisposable
     {
         var pack = MrPackBuilder.Create(_server.Url, withOptionalMod: true);
         _server.Downloads["mod.bin"] = pack.ModBytes;
-        _server.Downloads["optional.bin"] = pack.OptionalBytes!;
+        var optionalBytes = pack.OptionalBytes;
+        Assert.NotNull(optionalBytes);
+        _server.Downloads["optional.bin"] = optionalBytes;
         _server.VersionFiles[pack.ModSha512] = MrPackBuilder.VersionJson(_server.Url, pack);
         _server.Projects["projId1"] = MrPackBuilder.ProjectJson();
 
@@ -62,7 +64,8 @@ public class ImportOptionalModsApiTests : IDisposable
             new { url, name, optionalMods });
         Assert.Equal(HttpStatusCode.Accepted, post.StatusCode);
         var taskId = JsonDocument.Parse(await post.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("taskId").GetString()!;
+            .RootElement.GetProperty("taskId").GetString();
+        Assert.NotNull(taskId);
         await host.WaitForTaskStateAsync(taskId, "succeeded", TimeSpan.FromSeconds(30));
         return Path.Combine(host.DataDir, "instances", name);
     }

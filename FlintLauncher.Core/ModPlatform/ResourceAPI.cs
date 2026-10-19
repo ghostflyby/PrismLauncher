@@ -80,7 +80,7 @@ public abstract class ResourceApi
 
     public abstract string? GetVersionsUrl(VersionSearchArgs args);
 
-    public abstract string? GetDependencyUrl(DependencySearchArgs args);
+    public abstract string GetDependencyUrl(DependencySearchArgs args);
 
     // ------------------------------------------------------------------ helpers
 

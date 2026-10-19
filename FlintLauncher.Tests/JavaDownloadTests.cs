@@ -150,8 +150,9 @@ public class JavaDownloadTests : IDisposable
         byte[] manifestBody = [];
         using var server = new TestHttpServer(ctx =>
         {
+            var requestUrl = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
             byte[] body;
-            switch (ctx.Request.Url!.AbsolutePath)
+            switch (requestUrl.AbsolutePath)
             {
                 case "/manifest":
                     body = manifestBody;
@@ -253,7 +254,8 @@ public class JavaDownloadTests : IDisposable
         using var server = new TestHttpServer(ctx =>
         {
             ctx.Response.StatusCode = 200;
-            var body = ctx.Request.Url!.AbsolutePath == "/manifest" ? manifestBody : "wrong-bytes"u8.ToArray();
+            var requestUrl = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
+            var body = requestUrl.AbsolutePath == "/manifest" ? manifestBody : "wrong-bytes"u8.ToArray();
             ctx.Response.ContentLength64 = body.Length;
             ctx.Response.OutputStream.Write(body);
         });

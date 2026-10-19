@@ -43,6 +43,11 @@ public sealed class TypedJsonFile<T>(string filePath, JsonTypeInfo<T> typeInfo)
         return mergeWithDefault is null ? value : mergeWithDefault(value);
     }
 
+    /// <summary>Load, or null when the file is missing/unreadable/corrupt. The corrupt-file
+    /// evidence handling matches <see cref="LoadOrDefault"/>; callers that model "absent"
+    /// as null (the migration decision store) use this instead of a null-returning factory.</summary>
+    public T? LoadOrNull() => TryLoad(out var loaded) ? loaded : null;
+
     /// <summary>Atomic write: serialize to a temp file in the target directory, then rename
     /// over the target (rename-within-directory is atomic on all supported filesystems).
     /// Missing parent directories are created. On unix, <paramref name="unixFileMode"/> is

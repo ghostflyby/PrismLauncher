@@ -15,6 +15,16 @@ public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
     {
         var inst = Parent.Instance;
 
+        // checked before GetJarMods: that accessor treats a missing profile as a broken
+        // launch invariant, while this step reports it with the launch-specific message
+        var components = inst.GetPackProfile();
+        var profile = components.GetProfile();
+        if (profile is null)
+        {
+            EmitFailed("The instance profile is missing.");
+            return Task.CompletedTask;
+        }
+
         if (inst.GetJarMods().Count == 0)
         {
             EmitSucceeded();
@@ -36,14 +46,6 @@ public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
         }
 
         // create temporary modded jar, if needed
-        var components = inst.GetPackProfile();
-        var profile = components.GetProfile();
-        if (profile is null)
-        {
-            EmitFailed("The instance profile is missing.");
-            return Task.CompletedTask;
-        }
-
         var jarMods = inst.GetJarMods();
         if (jarMods.Count != 0)
         {

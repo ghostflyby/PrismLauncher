@@ -282,7 +282,7 @@ public class GetModDependenciesTask : SequentialTask
         };
 
         var job = new NetJob($"{dep.AddonId}::Dependency");
-        var request = NetRequest.MakeByteArray(new Uri(GetApi(provider).GetDependencyUrl(args)!));
+        var request = NetRequest.MakeByteArray(new Uri(GetApi(provider).GetDependencyUrl(args)));
         job.AddNetRequest(request);
 
         job.Succeeded += _ =>
@@ -356,7 +356,7 @@ public class GetModDependenciesTask : SequentialTask
                     return;
                 }
 
-                List<JsonNode> arr;
+                List<JsonNode?> arr;
                 if (dep.Version.Length != 0 && root is JsonObject pinned)
                 {
                     // a version-pinned dependency answers the single version document
@@ -441,10 +441,10 @@ public class GetModDependenciesTask : SequentialTask
             return;
         }
 
-        if (dep.AddonId.Length == 0 && pDep.Version.AddonId.Length != 0)
+        if (dep.AddonId.Length == 0 && pDep.Version.AddonId.Length != 0 && pDep.Dependency is { } discovered)
         {
             pDep.Pack.AddonId = pDep.Version.AddonId;
-            var overrideDep = GetOverride(new Dependency { AddonId = pDep.Version.AddonId, Type = pDep.Dependency!.Type, Version = "" },
+            var overrideDep = GetOverride(new Dependency { AddonId = pDep.Version.AddonId, Type = discovered.Type, Version = "" },
                 provider);
             if (overrideDep.AddonId != pDep.Version.AddonId)
             {

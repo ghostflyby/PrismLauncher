@@ -132,7 +132,8 @@ public class AtLauncherApiEndpointsTests : IDisposable
         });
         Assert.Equal(HttpStatusCode.Created, post.StatusCode);
         var created = JsonDocument.Parse(await post.Content.ReadAsStringAsync()).RootElement;
-        var id = created.GetProperty("id").GetString()!;
+        var id = created.GetProperty("id").GetString();
+        Assert.NotNull(id);
         Assert.False(string.IsNullOrEmpty(id));
         Assert.Equal("Test Pack", created.GetProperty("name").GetString());
 
@@ -176,7 +177,8 @@ public class AtLauncherApiEndpointsTests : IDisposable
         });
         Assert.Equal(HttpStatusCode.Created, post.StatusCode);
         var id = JsonDocument.Parse(await post.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("id").GetString()!;
+            .RootElement.GetProperty("id").GetString();
+        Assert.NotNull(id);
 
         using var doc = JsonDocument.Parse(
             await File.ReadAllTextAsync(Path.Combine(host.DataDir, "instances", id, "mmc-pack.json")));

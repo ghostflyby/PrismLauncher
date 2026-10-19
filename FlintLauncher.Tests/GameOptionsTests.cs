@@ -151,7 +151,9 @@ public class GameOptionsTests : IDisposable
     {
         Directory.CreateDirectory(_dir);
         var path = Path.Combine(_dir, "new", "options.txt");
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var pathDir = Path.GetDirectoryName(path);
+        Assert.NotNull(pathDir);
+        Directory.CreateDirectory(pathDir);
         var options = new GameOptions(path);
         Assert.False(options.IsLoaded);
         Assert.True(options.Save());
@@ -177,7 +179,9 @@ public class GameOptionsTests : IDisposable
         var options = new GameOptions(path);
 
         options.Set("lang", "de_de");
-        Assert.Equal("de_de", options.Find("lang")!.Value);
+        var lang = options.Find("lang");
+        Assert.NotNull(lang);
+        Assert.Equal("de_de", lang.Value);
         Assert.Single(options.Contents);
 
         options.Set("fov", "0.75");

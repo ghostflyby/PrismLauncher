@@ -30,6 +30,13 @@ public class ProfilerTests
 
     // ---------------------------------------------------------------- registry
 
+    private static T Factory<T>(string key) where T : ProfilerFactory
+    {
+        var factory = Profilers.Value(key)
+            ?? throw new Xunit.Sdk.XunitException($"the profiler registry has no '{key}' entry");
+        return Assert.IsType<T>(factory);
+    }
+
     [Fact]
     public void Registry_Has_The_Application_Keys()
     {
@@ -61,7 +68,7 @@ public class ProfilerTests
     public void JProfiler_Builds_The_Jpenable_Command()
     {
         var settings = new TestSettings();
-        var factory = (JProfilerFactory)Profilers.Value("jprofiler")!;
+        var factory = Factory<JProfilerFactory>("jprofiler");
         factory.RegisterSettings(settings);
         settings.Set("JProfilerPath", "/opt/jprofiler");
         settings.Set("JProfilerPort", 51515);
@@ -79,7 +86,7 @@ public class ProfilerTests
     public void JProfiler_Default_Port_Is_42042()
     {
         var settings = new TestSettings();
-        var factory = (JProfilerFactory)Profilers.Value("jprofiler")!;
+        var factory = Factory<JProfilerFactory>("jprofiler");
         factory.RegisterSettings(settings);
 
         settings.Set("JProfilerPath", "/opt/jprofiler");
@@ -92,7 +99,7 @@ public class ProfilerTests
     [Fact]
     public void JProfiler_Check_Messages()
     {
-        var factory = (JProfilerFactory)Profilers.Value("jprofiler")!;
+        var factory = Factory<JProfilerFactory>("jprofiler");
 
         Assert.False(factory.Check("", out var emptyError));
         Assert.Equal("Empty path", emptyError);
@@ -133,7 +140,7 @@ public class ProfilerTests
     public void JVisualVM_Builds_The_Openpid_Command()
     {
         var settings = new TestSettings();
-        var factory = (JVisualVmFactory)Profilers.Value("jvisualvm")!;
+        var factory = Factory<JVisualVmFactory>("jvisualvm");
         factory.RegisterSettings(settings);
         settings.Set("JVisualVMPath", "/usr/bin/visualvm");
 
@@ -147,7 +154,7 @@ public class ProfilerTests
     [Fact]
     public void JVisualVM_Check_Messages()
     {
-        var factory = (JVisualVmFactory)Profilers.Value("jvisualvm")!;
+        var factory = Factory<JVisualVmFactory>("jvisualvm");
 
         Assert.False(factory.Check("", out var emptyError));
         Assert.Equal("Empty path", emptyError);
@@ -192,7 +199,7 @@ public class ProfilerTests
     public void JVisualVM_Registered_Default_Comes_From_The_Path_Search()
     {
         var settings = new TestSettings();
-        var factory = (JVisualVmFactory)Profilers.Value("jvisualvm")!;
+        var factory = Factory<JVisualVmFactory>("jvisualvm");
         factory.RegisterSettings(settings);
 
         var expected = JVisualVmFactory.FindExecutable("jvisualvm");
@@ -209,7 +216,7 @@ public class ProfilerTests
     [Fact]
     public void GenericProfiler_Is_Always_Valid_And_Spawns_Nothing()
     {
-        var factory = (GenericProfilerFactory)Profilers.Value("generic")!;
+        var factory = Factory<GenericProfilerFactory>("generic");
         Assert.True(factory.Check(new TestSettings(), out var error));
         Assert.Equal("", error);
         Assert.True(factory.Check("anything", out _));

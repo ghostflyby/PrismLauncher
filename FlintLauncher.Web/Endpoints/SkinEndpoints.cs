@@ -16,6 +16,7 @@
 // CapeChange accepts a cape *file*, so a file-only PUT body is rejected (a file part may
 // accompany the id, mirroring the multipart shape, but it cannot be used).
 
+using System.Diagnostics.CodeAnalysis;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Skins;
 using FlintLauncher.Web.Models;
@@ -32,10 +33,9 @@ public static class SkinEndpoints
         // ------------------------------------------------- accounts/{id}/skin (read)
         api.MapGet("/accounts/{profileId}/skin", (string profileId, LauncherRuntime runtime) =>
         {
-            var account = LookupAccount(runtime, profileId, out var notFound);
-            if (account is null)
+            if (!TryLookupAccount(runtime, profileId, out var account, out var notFound))
             {
-                return notFound!;
+                return notFound;
             }
 
             // the profile skin data the login flow stored on the account
@@ -48,10 +48,9 @@ public static class SkinEndpoints
         api.MapPut("/accounts/{profileId}/skin", async Task<IResult> (string profileId,
             HttpRequest request, LauncherRuntime runtime) =>
         {
-            var account = LookupAccount(runtime, profileId, out var notFound);
-            if (account is null)
+            if (!TryLookupAccount(runtime, profileId, out var account, out var notFound))
             {
-                return notFound!;
+                return notFound;
             }
 
             var form = await request.ReadFormAsync();
@@ -86,10 +85,9 @@ public static class SkinEndpoints
         api.MapDelete("/accounts/{profileId}/skin", async Task<IResult> (string profileId,
             LauncherRuntime runtime) =>
         {
-            var account = LookupAccount(runtime, profileId, out var notFound);
-            if (account is null)
+            if (!TryLookupAccount(runtime, profileId, out var account, out var notFound))
             {
-                return notFound!;
+                return notFound;
             }
 
             var request = SkinDelete.Make(account.AccessToken(), runtime.Auth);
@@ -103,10 +101,9 @@ public static class SkinEndpoints
         api.MapPut("/accounts/{profileId}/cape", async Task<IResult> (string profileId,
             HttpRequest request, LauncherRuntime runtime) =>
         {
-            var account = LookupAccount(runtime, profileId, out var notFound);
-            if (account is null)
+            if (!TryLookupAccount(runtime, profileId, out var account, out var notFound))
             {
-                return notFound!;
+                return notFound;
             }
 
             var form = await request.ReadFormAsync();
@@ -132,10 +129,9 @@ public static class SkinEndpoints
         api.MapDelete("/accounts/{profileId}/cape", async Task<IResult> (string profileId,
             LauncherRuntime runtime) =>
         {
-            var account = LookupAccount(runtime, profileId, out var notFound);
-            if (account is null)
+            if (!TryLookupAccount(runtime, profileId, out var account, out var notFound))
             {
-                return notFound!;
+                return notFound;
             }
 
             var change = CapeChange.Make(account.AccessToken(), "", runtime.Auth);
@@ -148,18 +144,20 @@ public static class SkinEndpoints
 
     /// <summary>The account for a profile id, or the uniform 404 through
     /// <paramref name="notFound"/> (AccountList lookups are index-based).</summary>
-    private static MinecraftAccount? LookupAccount(LauncherRuntime runtime,
-        string profileId, out IResult? notFound)
+    private static bool TryLookupAccount(LauncherRuntime runtime, string profileId,
+        [NotNullWhen(true)] out MinecraftAccount? account, [NotNullWhen(false)] out IResult? notFound)
     {
         var index = runtime.Accounts.FindAccountByProfileId(profileId);
         if (index == -1)
         {
+            account = null;
             notFound = ApiJson.NotFound("account_not_found",
                 $"no account with profile id '{profileId}'");
-            return null;
+            return false;
         }
 
+        account = runtime.Accounts.At(index);
         notFound = null;
-        return runtime.Accounts.At(index);
+        return true;
     }
 }

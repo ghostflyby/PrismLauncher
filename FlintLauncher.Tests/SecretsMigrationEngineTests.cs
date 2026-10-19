@@ -111,8 +111,12 @@ public class MigrationEngineTests : IDisposable
         var engine = MigrationEngine.CreateDefault();
 
         Assert.Equal(["prism-family", "flint-legacy"], engine.Profiles.Select(p => p.Name).ToList());
-        Assert.False(engine.Find("prism-family")!.AutoRunAtStartup); // API-driven (G2)
-        Assert.True(engine.Find("flint-legacy")!.AutoRunAtStartup);  // startup probe runs once
+        var prism = engine.Find("prism-family");
+        var legacy = engine.Find("flint-legacy");
+        Assert.NotNull(prism);
+        Assert.NotNull(legacy);
+        Assert.False(prism.AutoRunAtStartup); // API-driven (G2)
+        Assert.True(legacy.AutoRunAtStartup);  // startup probe runs once
         Assert.NotNull(engine.Find("FLINT-LEGACY"));                 // lookup is case-insensitive
         Assert.Null(engine.Find("unknown"));
     }
@@ -127,14 +131,16 @@ public class MigrationEngineTests : IDisposable
         var paths = FlintPaths.FromRoots(_dir, Path.Combine(_dir, "data"), Path.Combine(_dir, "store"),
             Path.Combine(_dir, "cache"), Path.Combine(_dir, "state"));
 
-        var candidates = engine.Find("prism-family")!.Detect(paths, Decisions());
+        var profile = engine.Find("prism-family");
+        Assert.NotNull(profile);
+        var candidates = profile.Detect(paths, Decisions());
 
         var hit = Assert.Single(candidates);
         Assert.Equal(prismDir, hit.Path);
         Assert.Equal("prism", hit.SourceId);
         Assert.False(hit.DecisionRecorded);
 
-        var plan = engine.Find("prism-family")!.Plan(prismDir, paths, ImportMode.Copy);
+        var plan = profile.Plan(prismDir, paths, ImportMode.Copy);
         Assert.NotNull(plan);
         Assert.Contains(plan, item => item.Name == "instances");
     }
@@ -158,7 +164,9 @@ public class MigrationEngineTests : IDisposable
         var paths = FlintPaths.FromRoots(_dir, Path.Combine(_dir, "data"), Path.Combine(_dir, "store"),
             Path.Combine(_dir, "cache"), Path.Combine(_dir, "state"));
 
-        var candidates = engine.Find("prism-family")!.Detect(paths, Decisions());
+        var profile = engine.Find("prism-family");
+        Assert.NotNull(profile);
+        var candidates = profile.Detect(paths, Decisions());
 
         Assert.Equal(2, candidates.Count);
         Assert.All(candidates, candidate =>
@@ -178,18 +186,21 @@ public class MigrationEngineTests : IDisposable
         var paths = FlintPaths.FromRoots(_dir, data, Path.Combine(_dir, "store"),
             Path.Combine(_dir, "cache"), Path.Combine(_dir, "state"));
 
+        var legacy = engine.Find("flint-legacy");
+        Assert.NotNull(legacy);
+
         // no legacy anchor → nothing
-        Assert.Empty(engine.Find("flint-legacy")!.Detect(paths, Decisions()));
+        Assert.Empty(legacy.Detect(paths, Decisions()));
 
         // the old flat layout appears (flint.cfg at the root layer)
         await File.WriteAllTextAsync(Path.Combine(data, "flint.cfg"), "k=v");
 
         var decisions = Decisions();
-        var candidates = engine.Find("flint-legacy")!.Detect(paths, decisions);
+        var candidates = legacy.Detect(paths, decisions);
         var hit = Assert.Single(candidates);
         Assert.False(hit.DecisionRecorded);
         // the auto-run predicate lights up for the undecided detection (assembly step 5 hook)
-        Assert.Equal([engine.Find("flint-legacy")!], engine.AutoRunCandidates(paths, decisions));
+        Assert.Equal([legacy], engine.AutoRunCandidates(paths, decisions));
 
         // the S3 record settles it — the engine never proposes twice
         decisions.Write(new MigrationDecisionRecord
@@ -198,20 +209,22 @@ public class MigrationEngineTests : IDisposable
             Decision = MigrationDecisionRecord.Imported,
             At = DateTimeOffset.Now.ToString("o"),
         });
-        Assert.True(engine.Find("flint-legacy")!.Detect(paths, decisions).Single().DecisionRecorded);
+        Assert.True(legacy.Detect(paths, decisions).Single().DecisionRecorded);
         Assert.Empty(engine.AutoRunCandidates(paths, decisions));
 
         // the flat→five-root whitelist mapping (G2): flint.cfg plans onto the config root
-        var plan = engine.Find("flint-legacy")!.Plan(data, paths, ImportMode.Move);
-        var cfgItem = Assert.Single(plan!, item => item.Name == "flint.cfg");
+        var plan = legacy.Plan(data, paths, ImportMode.Move);
+        Assert.NotNull(plan);
+        var cfgItem = Assert.Single(plan, item => item.Name == "flint.cfg");
         Assert.False(cfgItem.IsDirectory);
         Assert.Equal(PlannedMethod.RenameDirectory, cfgItem.Method);
 
         // an old in-data cache area plans its children 1:1 under the cache root
         Directory.CreateDirectory(Path.Combine(data, "cache", "icons"));
         await File.WriteAllTextAsync(Path.Combine(data, "cache", "icons", "i.png"), "x");
-        var planWithCache = engine.Find("flint-legacy")!.Plan(data, paths, ImportMode.Move);
-        Assert.Contains(planWithCache!, item => item is { Name: "icons", IsDirectory: true });
+        var planWithCache = legacy.Plan(data, paths, ImportMode.Move);
+        Assert.NotNull(planWithCache);
+        Assert.Contains(planWithCache, item => item is { Name: "icons", IsDirectory: true });
     }
 
     [Fact]
@@ -236,7 +249,9 @@ public class MigrationEngineTests : IDisposable
         // content, the old in-data cache area, and the Prism bare ledger (E8 dead stock)
         await File.WriteAllTextAsync(Path.Combine(data, "flint.cfg"), "JavaPath=old");
         var metaFile = Path.Combine(data, "meta", "net.minecraft", "index.json");
-        Directory.CreateDirectory(Path.GetDirectoryName(metaFile)!);
+        var metaDir = Path.GetDirectoryName(metaFile);
+        Assert.NotNull(metaDir);
+        Directory.CreateDirectory(metaDir);
         const string metaBody = "{}";
         await File.WriteAllTextAsync(metaFile, metaBody);
         var md5 = Convert.ToHexString(MD5.HashData("{}"u8.ToArray()))
@@ -401,7 +416,8 @@ public class MigrationEngineTests : IDisposable
 
         // and it never touches the decision record — the seal is the startup gate's business
         var after = decisions.Read(FlintLegacyMigrationProfile.ProfileName);
-        Assert.Equal(sealedRecord.At, after!.At);
+        Assert.NotNull(after);
+        Assert.Equal(sealedRecord.At, after.At);
         Assert.Equal(sealedRecord.Bytes, after.Bytes);
     }
 

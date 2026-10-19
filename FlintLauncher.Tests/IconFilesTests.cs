@@ -29,7 +29,9 @@ public class IconFilesTests : IDisposable
 
     private static void WriteFile(string path, string content = "fake png bytes")
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var dir = Path.GetDirectoryName(path);
+        Assert.NotNull(dir);
+        Directory.CreateDirectory(dir);
         File.WriteAllText(path, content);
     }
 

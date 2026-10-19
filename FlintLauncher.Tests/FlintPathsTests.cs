@@ -323,13 +323,15 @@ public class FlintPathsTests : IDisposable
         }
 
         using var fixture = TestFlintPaths.UnderHome();
+        var homeRoot = fixture.HomeRoot;
+        Assert.NotNull(homeRoot);
         var unixMode = File.GetUnixFileMode(fixture.Paths.ConfigRoot);
         File.SetUnixFileMode(fixture.Paths.ConfigRoot,
             UnixFileMode.UserRead | UnixFileMode.UserExecute);
         try
         {
             var error = Assert.Throws<InvalidOperationException>(() => WebHostBuilder
-                .BuildWebApplication(["--home-dir", fixture.HomeRoot!]));
+                .BuildWebApplication(["--home-dir", homeRoot]));
             Assert.Contains("'config'", error.Message);
         }
         finally
@@ -342,8 +344,9 @@ public class FlintPathsTests : IDisposable
     public void BuildWebApplication_Starts_On_The_Home_Layout_And_Logs_Under_The_State_Root()
     {
         using var fixture = TestFlintPaths.UnderHome();
-
-        using var app = WebHostBuilder.BuildWebApplication(["--home-dir", fixture.HomeRoot!]);
+        var homeRoot = fixture.HomeRoot;
+        Assert.NotNull(homeRoot);
+        using var app = WebHostBuilder.BuildWebApplication(["--home-dir", homeRoot]);
         // the S4 anchor: the rolling provider opened its file under <state>/logs before any
         // service ran, and the old data-root anchor is gone
         Assert.True(Directory.Exists(Path.Combine(fixture.Paths.StateRoot, "logs")));

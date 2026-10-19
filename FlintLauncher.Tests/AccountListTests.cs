@@ -114,8 +114,9 @@ public class AccountListTests : IDisposable
         var list = LoadedList();
 
         Assert.Equal(2, list.Count);
-        Assert.NotNull(list.DefaultAccount);
-        Assert.Equal("PlayerOne", list.DefaultAccount!.ProfileName());
+        var defaultAccount = list.DefaultAccount;
+        Assert.NotNull(defaultAccount);
+        Assert.Equal("PlayerOne", defaultAccount.ProfileName());
         Assert.Equal("b50ad385829d3141a2167e7d7539ba7f", list.At(0).ProfileId());
         Assert.Equal("cb7ecbf7173e39428f9fb92995eab3d0", list.At(1).ProfileId());
 
@@ -136,18 +137,27 @@ public class AccountListTests : IDisposable
         // the written file is the typed wire: formatVersion 3, both accounts, the default
         // carrying "active" (the write shape is ours; the values are the gate)
         var root = JsonSerializer.Deserialize(
-            File.ReadAllText(savePath), AuthJsonContext.Default.AccountFileJson)!;
+            File.ReadAllText(savePath), AuthJsonContext.Default.AccountFileJson);
+        Assert.NotNull(root);
         Assert.Equal(3, root.FormatVersion);
-        Assert.Equal(2, root.Accounts!.Length);
+        var accounts = root.Accounts;
+        Assert.NotNull(accounts);
+        Assert.Equal(2, accounts.Length);
 
-        var first = root.Accounts[0].Deserialize(AuthJsonContext.Default.AccountJson)!;
-        var second = root.Accounts[1].Deserialize(AuthJsonContext.Default.AccountJson)!;
+        var first = accounts[0].Deserialize(AuthJsonContext.Default.AccountJson);
+        var second = accounts[1].Deserialize(AuthJsonContext.Default.AccountJson);
+        Assert.NotNull(first);
+        Assert.NotNull(second);
         Assert.True(first.Active);
         Assert.Equal("MSA", first.Type);
-        Assert.Equal("b50ad385829d3141a2167e7d7539ba7f", first.Profile!.Id);
+        var firstProfile = first.Profile;
+        Assert.NotNull(firstProfile);
+        Assert.Equal("b50ad385829d3141a2167e7d7539ba7f", firstProfile.Id);
         Assert.Null(second.Active);
         Assert.Equal("Offline", second.Type);
-        Assert.Equal("cb7ecbf7173e39428f9fb92995eab3d0", second.Profile!.Id);
+        var secondProfile = second.Profile;
+        Assert.NotNull(secondProfile);
+        Assert.Equal("cb7ecbf7173e39428f9fb92995eab3d0", secondProfile.Id);
     }
 
     [Fact]
@@ -290,7 +300,9 @@ public class AccountListTests : IDisposable
         Assert.Equal("OfflinePlayer", list.At(1).ProfileName());
         Assert.Same(replacement, list.At(1));
         // the default account is untouched
-        Assert.Equal("PlayerOne", list.DefaultAccount!.ProfileName());
+        var defaultAccount = list.DefaultAccount;
+        Assert.NotNull(defaultAccount);
+        Assert.Equal("PlayerOne", defaultAccount.ProfileName());
 
         // adding an unknown profile id appends
         var fresh = MinecraftAccount.CreateOffline("SomeoneElse");

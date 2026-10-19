@@ -75,7 +75,9 @@ public class ExtractNativesTests
         foreach (var classifier in new[] { "osx", "linux", "windows" })
         {
             var jarPath = Path.Combine(localLibraryPath, $"testnatives-1.0-natives-{classifier}.jar");
-            Directory.CreateDirectory(Path.GetDirectoryName(jarPath)!);
+            var jarDir = Path.GetDirectoryName(jarPath);
+            Assert.NotNull(jarDir);
+            Directory.CreateDirectory(jarDir);
             using var zip = new ZipArchive(File.Create(jarPath), ZipArchiveMode.Create);
             zip.CreateEntryFromBytes(dylib, "liblwjgl.dylib");
             zip.CreateEntryFromBytes(jnilib, "libtest.jnilib");
@@ -154,7 +156,9 @@ public class ExtractNativesTests
     {
         // the "minecraft client jar" the mods get merged into
         var clientJar = Path.Combine(instance.GetLocalLibraryPath(), "client.jar");
-        Directory.CreateDirectory(Path.GetDirectoryName(clientJar)!);
+        var clientDir = Path.GetDirectoryName(clientJar);
+        Assert.NotNull(clientDir);
+        Directory.CreateDirectory(clientDir);
         using (var zip = new ZipArchive(File.Create(clientJar), ZipArchiveMode.Create))
         {
             zip.CreateEntryFromBytes("source-common", "common.txt");
@@ -164,7 +168,9 @@ public class ExtractNativesTests
 
         // the jar mod: one new file plus one entry that overrides the source's
         var jarMod = Path.Combine(instance.JarModsDir(), "jarmod.zip");
-        Directory.CreateDirectory(Path.GetDirectoryName(jarMod)!);
+        var jarModDir = Path.GetDirectoryName(jarMod);
+        Assert.NotNull(jarModDir);
+        Directory.CreateDirectory(jarModDir);
         using (var zip = new ZipArchive(File.Create(jarMod), ZipArchiveMode.Create))
         {
             zip.CreateEntryFromBytes("mod-new", "aaa/new.txt");
@@ -287,7 +293,8 @@ public class ExtractNativesTests
         using var assetsRoot = new AssetsRootRedirect();
         using var server = new TestHttpServer(context =>
         {
-            var path = context.Request.Url!.AbsolutePath.TrimEnd('/');
+            var requestUrl = context.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
+            var path = requestUrl.AbsolutePath.TrimEnd('/');
             byte[] payload;
             if (path.EndsWith("/indexes/" + assetsId + ".json"))
             {
@@ -381,11 +388,12 @@ public static class ZipArchiveTestExtensions
 internal sealed class AssetsRootRedirect : IDisposable
 {
     private readonly string _linkPath = Path.Combine(AppContext.BaseDirectory, "assets");
-    private readonly string? _target;
+    private readonly string _target;
     private readonly bool _isLink;
 
     public AssetsRootRedirect()
     {
+        _target = _linkPath; // the fallback root is the link path itself
         var root = Path.Combine(Path.GetTempPath(), $"flint-assets-{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);
         try
@@ -412,7 +420,7 @@ internal sealed class AssetsRootRedirect : IDisposable
     }
 
     /// <summary>The real root behind the "assets" symlink (the fallback root is the link path itself).</summary>
-    public string Root => _isLink ? _target! : _linkPath;
+    public string Root => _target;
 
     public void WriteIndex(string assetsId, string json)
     {

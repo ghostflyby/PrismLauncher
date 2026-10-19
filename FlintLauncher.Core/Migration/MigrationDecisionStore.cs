@@ -70,8 +70,8 @@ public sealed class MigrationDecisionStore(string migrationDir, JsonTypeInfo<Mig
             return null;
         }
 
-        // load-or-default with a null default: exists ⇒ parse, corrupt ⇒ undecided
-        return new TypedJsonFile<MigrationDecisionRecord>(path, typeInfo).LoadOrDefault(() => null!);
+        // load-or-null: exists ⇒ parse, corrupt ⇒ undecided
+        return new TypedJsonFile<MigrationDecisionRecord>(path, typeInfo).LoadOrNull();
     }
 
     /// <summary>Write (or replace) the decision record for its source. The source name must

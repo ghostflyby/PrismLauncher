@@ -80,7 +80,8 @@ internal sealed class StubTechnicServer : IDisposable
 
     private void Handle(HttpListenerContext ctx)
     {
-        LastPath = ctx.Request.Url!.AbsolutePath;
+        var url = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
+        LastPath = url.AbsolutePath;
         LastQuery.Clear();
         foreach (var key in ctx.Request.QueryString.AllKeys)
         {
@@ -251,7 +252,9 @@ internal sealed class TechnicZipPackBuilder
         try
         {
             var inner = Path.Combine(dir, innerPath.Replace('/', Path.DirectorySeparatorChar));
-            Directory.CreateDirectory(Path.GetDirectoryName(inner)!);
+            var innerDir = Path.GetDirectoryName(inner);
+            Assert.NotNull(innerDir);
+            Directory.CreateDirectory(innerDir);
             File.WriteAllBytes(inner, content);
             var zipPath = Path.Combine(dir, "mod.zip");
             Assert.True(MmcZip.CompressDir(zipPath, dir));

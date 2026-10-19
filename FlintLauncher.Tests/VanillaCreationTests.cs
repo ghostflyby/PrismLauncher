@@ -117,7 +117,7 @@ public class VanillaCreationTests : IDisposable
         using var doc = JsonDocument.Parse(
             await File.ReadAllTextAsync(Path.Combine(_instancesDir, "Fab", "mmc-pack.json")));
         var uids = doc.RootElement.GetProperty("components").EnumerateArray()
-            .Select(c => c.GetProperty("uid").GetString()!).ToList();
+            .Select(c => c.GetProperty("uid").GetString()).ToList();
         Assert.Equal(["net.minecraft", "net.fabricmc.fabric-loader"], uids);
 
         var fabric = doc.RootElement.GetProperty("components").EnumerateArray().Last();

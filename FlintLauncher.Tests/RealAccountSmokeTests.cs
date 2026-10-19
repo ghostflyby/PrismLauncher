@@ -62,21 +62,29 @@ public class RealAccountSmokeTests : IDisposable
         list.SetListFilePath(savedPath);
         Assert.True(list.SaveList());
 
-        var originalRoot = JsonNode.Parse(File.ReadAllText(RealAccountsPath))!.AsObject();
-        var savedRoot = JsonNode.Parse(File.ReadAllText(savedPath))!.AsObject();
+        var originalNode = JsonNode.Parse(File.ReadAllText(RealAccountsPath));
+        var savedNode = JsonNode.Parse(File.ReadAllText(savedPath));
+        var originalRoot = originalNode?.AsObject();
+        var savedRoot = savedNode?.AsObject();
+        Assert.NotNull(originalRoot);
+        Assert.NotNull(savedRoot);
 
         Assert.Equal(
             new HashSet<string>(originalRoot.Select(p => p.Key)),
             new HashSet<string>(savedRoot.Select(p => p.Key)));
 
-        var originalAccounts = originalRoot["accounts"]!.AsArray();
-        var savedAccounts = savedRoot["accounts"]!.AsArray();
+        var originalAccounts = originalRoot["accounts"]?.AsArray();
+        var savedAccounts = savedRoot["accounts"]?.AsArray();
+        Assert.NotNull(originalAccounts);
+        Assert.NotNull(savedAccounts);
         Assert.Equal(originalAccounts.Count, savedAccounts.Count);
 
         for (var i = 0; i < originalAccounts.Count; i++)
         {
-            var original = originalAccounts[i]!.AsObject();
-            var saved = savedAccounts[i]!.AsObject();
+            var original = originalAccounts[i]?.AsObject();
+            var saved = savedAccounts[i]?.AsObject();
+            Assert.NotNull(original);
+            Assert.NotNull(saved);
 
             // key sets must be identical (ordering may differ, contents must round-trip)
             Assert.Equal(
@@ -92,7 +100,7 @@ public class RealAccountSmokeTests : IDisposable
             Assert.Equal(original["profile"]?["name"]?.GetValue<string>(), saved["profile"]?["name"]?.GetValue<string>());
             if (original["msa"]?["refresh_token"] is { } refreshToken)
             {
-                Assert.Equal(refreshToken.GetValue<string>(), saved["msa"]!["refresh_token"]!.GetValue<string>());
+                Assert.Equal(refreshToken.GetValue<string>(), saved["msa"]?["refresh_token"]?.GetValue<string>());
             }
         }
     }

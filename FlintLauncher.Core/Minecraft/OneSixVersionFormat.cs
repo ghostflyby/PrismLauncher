@@ -174,17 +174,17 @@ public static partial class OneSixVersionFormat
                 "Version file has both '+libraries' and 'libraries'. This is no longer supported.");
         }
 
-        if (hasLibs)
+        if (dto.Libraries is { } libraries)
         {
-            foreach (var libDto in dto.Libraries!)
+            foreach (var libDto in libraries)
             {
                 outInfo.Libraries.Add(MapLib(libDto, outInfo, filename));
             }
         }
 
-        if (hasPlusLibs)
+        if (dto.PlusLibraries is { } plusLibraries)
         {
-            foreach (var libDto in dto.PlusLibraries!)
+            foreach (var libDto in plusLibraries)
             {
                 outInfo.Libraries.Add(MapLib(libDto, outInfo, filename));
             }

@@ -130,30 +130,30 @@ public static class TechnicEndpoints
         {
             // two request shapes: {url, minecraftVersion?} (zip download) or
             // {solder, slug, build?} (Solder instance); build omitted = the recommended one
-            var zipUrl = request.Url;
-            var solderUrl = request.Solder;
-            var slug = request.Slug?.Trim();
-            if (string.IsNullOrWhiteSpace(zipUrl) == string.IsNullOrWhiteSpace(solderUrl))
+            var zipUrl = request.Url?.Trim() ?? "";
+            var solderUrl = request.Solder?.Trim() ?? "";
+            var slug = request.Slug?.Trim() ?? "";
+            if ((zipUrl.Length == 0) == (solderUrl.Length == 0))
             {
                 return ApiJson.Error("invalid_body",
                     "either 'url' (zip pack) or 'solder' + 'slug' (Solder pack) is required", 400);
             }
 
-            if (zipUrl is { Length: > 0 } zip &&
-                (!Uri.TryCreate(zip.Trim(), UriKind.Absolute, out var zipUri) ||
+            if (zipUrl.Length != 0 &&
+                (!Uri.TryCreate(zipUrl, UriKind.Absolute, out var zipUri) ||
                  zipUri.Scheme is not ("http" or "https")))
             {
                 return ApiJson.Error("invalid_url", "'url' must be an absolute http(s) URL", 400);
             }
 
-            if (!string.IsNullOrWhiteSpace(solderUrl) &&
-                (!Uri.TryCreate(solderUrl.Trim(), UriKind.Absolute, out var solderUri) ||
+            if (solderUrl.Length != 0 &&
+                (!Uri.TryCreate(solderUrl, UriKind.Absolute, out var solderUri) ||
                  solderUri.Scheme is not ("http" or "https")))
             {
                 return ApiJson.Error("invalid_url", "'solder' must be an absolute http(s) URL", 400);
             }
 
-            if (string.IsNullOrWhiteSpace(zipUrl) && string.IsNullOrWhiteSpace(slug))
+            if (zipUrl.Length == 0 && slug.Length == 0)
             {
                 return ApiJson.Error("invalid_body", "'slug' is required with 'solder'", 400);
             }
@@ -170,27 +170,28 @@ public static class TechnicEndpoints
             try
             {
                 InstanceTask task;
-                var taskName = request.Name?.Trim();
-                if (zipUrl is { Length: > 0 })
+                var requestedName = request.Name?.Trim();
+                string taskName;
+                if (zipUrl.Length != 0)
                 {
-                    task = new SingleZipPackInstallTask(
-                        new Uri(zipUrl.Trim(), UriKind.Absolute), request.MinecraftVersion ?? "")
+                    var packUri = new Uri(zipUrl, UriKind.Absolute);
+                    task = new SingleZipPackInstallTask(packUri, request.MinecraftVersion ?? "")
                     {
                         MetaCache = runtime.MetaCache,
                         Group = request.Group ?? "",
                     };
-                    taskName ??= FileNameWithoutExtension(new Uri(zipUrl.Trim(), UriKind.Absolute));
+                    taskName = requestedName ?? FileNameWithoutExtension(packUri);
                 }
                 else
                 {
                     // the C++ strips the Solder URL's trailing slashes before building URLs
-                    var solder = solderUrl!.Trim().TrimEnd('/');
+                    var solder = solderUrl.TrimEnd('/');
                     var build = request.Build?.Trim();
                     if (string.IsNullOrEmpty(build))
                     {
                         // no build given: resolve the Solder listing's default (the version
                         // box preselects the recommended build, like TechnicPage)
-                        var (resolveError, resolved) = await ResolveDefaultBuildAsync(api, solder, slug!);
+                        var (resolveError, resolved) = await ResolveDefaultBuildAsync(api, solder, slug);
                         if (resolveError is not null)
                         {
                             return resolveError;
@@ -199,18 +200,18 @@ public static class TechnicEndpoints
                         build = resolved;
                     }
 
-                    task = new SolderPackInstallTask(new Uri(solder), slug!, build,
+                    task = new SolderPackInstallTask(new Uri(solder), slug, build,
                         request.MinecraftVersion ?? "")
                     {
                         Group = request.Group ?? "",
                     };
-                    taskName ??= slug;
+                    taskName = requestedName ?? slug;
                 }
 
                 // the staged commit derives the folder from the display name: the pack name
                 // (or the request's) is the instance name, the icon follows the vanilla
                 // endpoint's "default" fallback
-                task.SetName(taskName!);
+                task.SetName(taskName);
                 task.Icon = request.IconKey ?? "default";
 
                 // staged-commit path: the task runs inside an InstanceList staging folder

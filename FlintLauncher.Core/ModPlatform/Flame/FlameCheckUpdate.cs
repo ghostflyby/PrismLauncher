@@ -242,13 +242,21 @@ public sealed class FlameCheckUpdate(
             List<FlameProjectJson?>? entries = null;
             try
             {
-                entries = single
-                    ? [FlameMod.ParseResponse(projRequest.BodyAsString,
-                           FlameModJsonContext.Default.FlameProjectEnvelopeJson).Data
-                       ?? throw new JsonParseException("'data' is not an object")]
-                    : FlameMod.ParseResponse(projRequest.BodyAsString,
-                           FlameModJsonContext.Default.FlameProjectListJson).Data
-                      ?? throw new JsonParseException("'data' is not an array");
+                if (single)
+                {
+                    entries =
+                    [
+                        FlameMod.ParseResponse(projRequest.BodyAsString,
+                            FlameModJsonContext.Default.FlameProjectEnvelopeJson).Data
+                        ?? throw new JsonParseException("'data' is not an object"),
+                    ];
+                }
+                else
+                {
+                    entries = FlameMod.ParseResponse(projRequest.BodyAsString,
+                                  FlameModJsonContext.Default.FlameProjectListJson).Data
+                              ?? throw new JsonParseException("'data' is not an array");
+                }
             }
             catch (JsonParseException) { }
 

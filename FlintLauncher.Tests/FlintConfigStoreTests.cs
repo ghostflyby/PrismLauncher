@@ -59,6 +59,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Equal("127.0.0.1", resolved.Proxy.ProxyAddr);
         Assert.Equal(8080, resolved.Proxy.ProxyPort);
         Assert.Equal((int)PasteUpload.PasteType.Mclogs, resolved.Api.PastebinType);
+        Assert.NotNull(resolved.MinecraftMisc.Env);
         Assert.Empty(resolved.MinecraftMisc.Env);
         Assert.Equal("[]", resolved.ModDownload.ModUpdateReleaseTypes);
     }
@@ -79,7 +80,9 @@ public class FlintConfigStoreTests : IDisposable
             """{"memory":{"minMemAlloc":2048}}""",
             FlintJsonContext.Default.FlintConfigFile);
 
-        var resolved = FlintConfigFold.MergeOverDefault(FlintConfigFold.Merge(user!, instance!));
+        Assert.NotNull(user);
+        Assert.NotNull(instance);
+        var resolved = FlintConfigFold.MergeOverDefault(FlintConfigFold.Merge(user, instance));
         Assert.Equal(2048, resolved.Memory.MinMemAlloc);                            // instance wins
         Assert.Equal("/opt/jdk-21", resolved.Java.JavaPath);                        // inherited from user
         Assert.Equal(MemoryConfig.DefaultMaxMemAlloc, resolved.Memory.MaxMemAlloc); // default
@@ -359,7 +362,9 @@ public class FlintConfigStoreTests : IDisposable
         foreach (var (alias, primary) in pairs)
         {
             Assert.Equal(primary, FlintConfigKeys.Canonical(alias));
-            Assert.Equal(primary, FlintConfigKeys.Resolve(alias)!.Key);
+            var resolved = FlintConfigKeys.Resolve(alias);
+            Assert.NotNull(resolved);
+            Assert.Equal(primary, resolved.Key);
             Assert.Equal(FlintConfigKeys.Default(primary), FlintConfigKeys.Default(alias));
             Assert.True(FlintConfigKeys.Resolve(alias) == FlintConfigKeys.Resolve(primary));
         }

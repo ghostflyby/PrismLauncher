@@ -207,8 +207,9 @@ public class PasteUploadTests : IDisposable
         using var doc = JsonDocument.Parse(request.BodyAsString);
         var root = doc.RootElement;
         // expires = upload time + 100 days (Qt ISODate, UTC)
-        var expires = DateTime.Parse(root.GetProperty("expires").GetString()!, null,
-            DateTimeStyles.RoundtripKind);
+        var expiresText = root.GetProperty("expires").GetString();
+        Assert.NotNull(expiresText);
+        var expires = DateTime.Parse(expiresText, null, DateTimeStyles.RoundtripKind);
         var delta = expires - DateTime.UtcNow;
         Assert.True(delta > TimeSpan.FromDays(99.9) && delta < TimeSpan.FromDays(100.1),
             "expires should be ~100 days out, got " + delta);

@@ -241,12 +241,13 @@ public class InstanceQueryApiTests : IAsyncDisposable
 
     private async Task PatchGroup(string id, string group)
     {
+        Assert.NotNull(host);
         var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/v1/instances/{id}")
         {
             Content = new StringContent(
                 JsonSerializer.Serialize(new { group }), Encoding.UTF8, "application/json"),
         };
-        var response = await host!.Client.SendAsync(request);
+        var response = await host.Client.SendAsync(request);
         response.EnsureSuccessStatusCode();
     }
 
@@ -309,7 +310,8 @@ public class InstanceCopyApiTests : IAsyncDisposable
             new { name = "Copy Src", mcVersion = "1.20.1" });
         create.EnsureSuccessStatusCode();
         var srcId = JsonDocument.Parse(await create.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("id").GetString()!;
+            .RootElement.GetProperty("id").GetString();
+        Assert.NotNull(srcId);
 
         var gameRoot = host.GameRootOf(srcId);
         Directory.CreateDirectory(Path.Combine(gameRoot, "mods"));
@@ -327,14 +329,16 @@ public class InstanceCopyApiTests : IAsyncDisposable
             });
         Assert.Equal(HttpStatusCode.Accepted, copy.StatusCode);
         var taskId = JsonDocument.Parse(await copy.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("taskId").GetString()!;
+            .RootElement.GetProperty("taskId").GetString();
+        Assert.NotNull(taskId);
         await host.WaitForTaskAsync(taskId, TimeSpan.FromSeconds(20));
 
         // the copy is discoverable (the finished task refreshed the list) and named
         var list = JsonDocument.Parse(await host.Client.GetStringAsync(
             "/api/v1/instances?search=Copy%20Tgt")).RootElement;
         Assert.Equal(1, list.GetArrayLength());
-        var copyId = list[0].GetProperty("id").GetString()!;
+        var copyId = list[0].GetProperty("id").GetString();
+        Assert.NotNull(copyId);
         Assert.NotEqual(srcId, copyId);
         Assert.Equal("Copies", list[0].GetProperty("group").GetString());
 
@@ -864,7 +868,8 @@ public class ScreenshotApiTests : IAsyncDisposable
             capturedContentType = ctx.Request.ContentType;
             using var reader = new StreamReader(ctx.Request.InputStream, Encoding.Latin1);
             capturedBodies.Add(await reader.ReadToEndAsync());
-            capturedPaths.Add(ctx.Request.Url!.AbsolutePath);
+            var requestUrl = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
+            capturedPaths.Add(requestUrl.AbsolutePath);
             var body = """{"success":true,"data":{"id":"img1","link":"https://imgur.test/img1","deletehash":"hash1"}}""";
             var bytes = Encoding.UTF8.GetBytes(body);
             ctx.Response.ContentType = "application/json";
@@ -884,7 +889,8 @@ public class ScreenshotApiTests : IAsyncDisposable
                 new { names = new[] { "b.png" } });
             Assert.Equal(HttpStatusCode.Accepted, upload.StatusCode);
             var taskId = JsonDocument.Parse(await upload.Content.ReadAsStringAsync())
-                .RootElement.GetProperty("taskId").GetString()!;
+                .RootElement.GetProperty("taskId").GetString();
+            Assert.NotNull(taskId);
             await host.WaitForTaskAsync(taskId, TimeSpan.FromSeconds(20));
 
             Assert.Single(capturedBodies);
@@ -904,7 +910,8 @@ public class ScreenshotApiTests : IAsyncDisposable
                 new { names = new[] { "a.png", "b.png" } });
             ok.EnsureSuccessStatusCode();
             var multiTaskId = JsonDocument.Parse(await ok.Content.ReadAsStringAsync())
-                .RootElement.GetProperty("taskId").GetString()!;
+                .RootElement.GetProperty("taskId").GetString();
+            Assert.NotNull(multiTaskId);
             await host.WaitForTaskAsync(multiTaskId, TimeSpan.FromSeconds(20));
             Assert.Equal(4, capturedBodies.Count); // 1 + 2 images + 1 album
             Assert.Equal(3, capturedPaths.Count(path => path == "/image"));

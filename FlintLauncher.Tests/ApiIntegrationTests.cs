@@ -87,8 +87,12 @@ internal sealed class FlintApiHost : IAsyncDisposable
     }
 
     /// <summary>A client WITHOUT credentials, for auth-rejection assertions.</summary>
-    public HttpClient CreateUnauthorizedClient() =>
-        new() { BaseAddress = new Uri(Client.BaseAddress!.ToString()) };
+    public HttpClient CreateUnauthorizedClient()
+    {
+        var baseAddress = Client.BaseAddress;
+        Assert.NotNull(baseAddress);
+        return new HttpClient { BaseAddress = new Uri(baseAddress.ToString()) };
+    }
 
     public string Token { get; } = "";
 
@@ -259,7 +263,8 @@ public class FlintApiIntegrationTests
             new { name = "Round Trip", mcVersion = "1.20.1", iconKey = "flint", group = "Packs" });
         Assert.Equal(HttpStatusCode.Created, create.StatusCode);
         var created = JsonDocument.Parse(await create.Content.ReadAsStringAsync()).RootElement;
-        var id = created.GetProperty("id").GetString()!;
+        var id = created.GetProperty("id").GetString();
+        Assert.NotNull(id);
         Assert.False(string.IsNullOrEmpty(id));
 
         // list -------------------------------------------------------------------------
@@ -274,7 +279,8 @@ public class FlintApiIntegrationTests
         Assert.False(entry.GetProperty("running").GetBoolean());
         // DATA D2 wire shape: every handle of the addressing chain is exposed
         Assert.Equal(id, entry.GetProperty("dirName").GetString());
-        var uuid = entry.GetProperty("uuid").GetString()!;
+        var uuid = entry.GetProperty("uuid").GetString();
+        Assert.NotNull(uuid);
         Assert.False(string.IsNullOrEmpty(uuid));
         Assert.NotEqual(0L, entry.GetProperty("inode").GetInt64()); // unix stat; Windows would be 0
 
@@ -353,7 +359,8 @@ public class FlintApiIntegrationTests
             new { name = "Settings Inst", mcVersion = "1.20.1" });
         create.EnsureSuccessStatusCode();
         var id = JsonDocument.Parse(await create.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("id").GetString()!;
+            .RootElement.GetProperty("id").GetString();
+        Assert.NotNull(id);
 
         // PUT with kind-carrying values -------------------------------------------------
         // C7: the gate has no boolean anymore — JavaPath at the instance layer IS the
@@ -405,7 +412,8 @@ public class FlintApiIntegrationTests
         var create = await host.PostAsync("/api/v1/accounts/offline", new { name = "ApiHero" });
         Assert.Equal(HttpStatusCode.Created, create.StatusCode);
         var account = JsonDocument.Parse(await create.Content.ReadAsStringAsync()).RootElement;
-        var profileId = account.GetProperty("profileId").GetString()!;
+        var profileId = account.GetProperty("profileId").GetString();
+        Assert.NotNull(profileId);
         Assert.Equal("ApiHero", account.GetProperty("name").GetString());
         Assert.Equal("offline", account.GetProperty("type").GetString());
         Assert.False(account.GetProperty("isDefault").GetBoolean());
@@ -448,7 +456,8 @@ public class FlintApiIntegrationTests
             new { url = new Uri(zipPath).ToString(), name = "Imported Pack" });
         Assert.Equal(HttpStatusCode.Accepted, post.StatusCode);
         var taskId = JsonDocument.Parse(await post.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("taskId").GetString()!;
+            .RootElement.GetProperty("taskId").GetString();
+        Assert.NotNull(taskId);
 
         var task = await host.WaitForTaskStateAsync(taskId, "succeeded", TimeSpan.FromSeconds(20));
         Assert.Equal("import", task.GetProperty("kind").GetString());
@@ -457,7 +466,8 @@ public class FlintApiIntegrationTests
         var list = JsonDocument.Parse(
             await (await host.GetAsync("/api/v1/instances")).Content.ReadAsStringAsync()).RootElement;
         var imported = list.EnumerateArray().Single(e => e.GetProperty("name").GetString() == "Imported Pack");
-        var importedId = imported.GetProperty("id").GetString()!;
+        var importedId = imported.GetProperty("id").GetString();
+        Assert.NotNull(importedId);
 
         // tasks listing shows the finished import
         var tasks = JsonDocument.Parse(
@@ -596,7 +606,8 @@ public class FlintApiIntegrationTests
                 new { mode = "offline", offlineName = "ApiTester" });
             Assert.Equal(HttpStatusCode.Accepted, launch.StatusCode);
             var taskId = JsonDocument.Parse(await launch.Content.ReadAsStringAsync())
-                .RootElement.GetProperty("taskId").GetString()!;
+                .RootElement.GetProperty("taskId").GetString();
+            Assert.NotNull(taskId);
 
             // the same instance cannot launch twice (core CanLaunch) --------------------
             var second = await client.PostAsJsonAsync("/api/v1/instances/e2e-inst/launch",
@@ -649,7 +660,9 @@ public class FlintApiIntegrationTests
                        HttpCompletionOption.ResponseHeadersRead))
             {
                 stream.EnsureSuccessStatusCode();
-                Assert.Contains("text/event-stream", stream.Content.Headers.ContentType!.ToString());
+                var contentType = stream.Content.Headers.ContentType;
+                Assert.NotNull(contentType);
+                Assert.Contains("text/event-stream", contentType.ToString());
                 var text = await stream.Content.ReadAsStringAsync();
                 Assert.Contains("data: ", text);
                 Assert.Contains("userName ApiTester", text);
@@ -742,7 +755,8 @@ public class FlintApiDeviceCodeTests : IDisposable
         msaToken = """{"error":"authorization_pending"}""";
         _server = new ApiStubServer(async ctx =>
         {
-            var body = ctx.Request.Url!.AbsolutePath.EndsWith("/devicecode", StringComparison.Ordinal)
+            var url = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
+            var body = url.AbsolutePath.EndsWith("/devicecode", StringComparison.Ordinal)
                 ? MsaDeviceCode
                 : msaToken;
             var bytes = Encoding.UTF8.GetBytes(body);
@@ -772,7 +786,8 @@ public class FlintApiDeviceCodeTests : IDisposable
         Assert.Equal("FLNT-CODE", started.GetProperty("userCode").GetString());
         Assert.Equal("https://microsoft.test/link", started.GetProperty("verificationUri").GetString());
         Assert.Equal(900, started.GetProperty("expiresInSeconds").GetInt32());
-        var deviceId = started.GetProperty("deviceId").GetString()!;
+        var deviceId = started.GetProperty("deviceId").GetString();
+        Assert.NotNull(deviceId);
         Assert.False(string.IsNullOrEmpty(deviceId));
 
         // unknown device -> 404
@@ -795,8 +810,10 @@ public class FlintApiDeviceCodeTests : IDisposable
             await Task.Delay(500);
             var next = await host.PostAsync($"/api/v1/accounts/msa/devicecode/{deviceId}/poll", new { });
             next.EnsureSuccessStatusCode();
-            state = JsonDocument.Parse(await next.Content.ReadAsStringAsync())
-                .RootElement.GetProperty("state").GetString()!;
+            var nextState = JsonDocument.Parse(await next.Content.ReadAsStringAsync())
+                .RootElement.GetProperty("state").GetString();
+            Assert.NotNull(nextState);
+            state = nextState;
         }
 
         Assert.Equal("expired", state);
@@ -817,7 +834,8 @@ public class FlintApiModrinthSearchTests : IDisposable
 
     private static async Task ServeSearch(HttpListenerContext ctx)
     {
-        LastSearchQuery = ctx.Request.Url!.Query;
+        var url = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
+        LastSearchQuery = url.Query;
         var bytes = Encoding.UTF8.GetBytes(HitsJson);
         ctx.Response.ContentType = "application/json";
         await ctx.Response.OutputStream.WriteAsync(bytes);

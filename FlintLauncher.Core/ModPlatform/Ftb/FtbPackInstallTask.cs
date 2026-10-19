@@ -33,9 +33,13 @@ public sealed class FtbPackInstallTask(
     private readonly FlameApi _flame = flame ?? new FlameApi();
     private readonly FtbApi _ftb = ftb ?? new FtbApi();
 
-    // assigned by OnManifestDownloadSucceeded before any read (required members make the
-    // model constructible only through deserialization)
-    private FtbVersion _version = null!;
+    // assigned by OnManifestDownloadSucceeded before any read
+    private FtbVersion? manifest;
+
+    /// <summary>The manifest payload; the state machine only reads it after the download
+    /// succeeded, so a read before that is a broken invariant rather than a null value.</summary>
+    private FtbVersion Manifest => manifest
+        ?? throw new InvalidOperationException("the pack manifest has not been downloaded");
     private readonly List<long> _fileIds = [];
     private readonly List<BlockedMod> _blockedMods = [];
 
@@ -82,9 +86,9 @@ public sealed class FtbPackInstallTask(
     {
         try
         {
-            // the deserialized payload replaces the (not yet populated) version wholesale;
+            // the deserialized payload replaces the (not yet populated) manifest wholesale;
             // reads below only run after this assignment
-            _version = FtbApi.LoadVersion(response);
+            manifest = FtbApi.LoadVersion(response);
         }
         catch (JsonParseException e)
         {
@@ -102,8 +106,8 @@ public sealed class FtbPackInstallTask(
 
         _fileIds.Clear();
 
-        var manifest = new FlameManifest();
-        foreach (var file in _version.Files)
+        var flameManifest = new FlameManifest();
+        foreach (var file in Manifest.Files)
         {
             if (file is { ServerOnly: false, Url.Length: 0 })
             {
@@ -119,7 +123,7 @@ public sealed class FtbPackInstallTask(
                     FileId = file.Curseforge.FileId,
                 };
 
-                manifest.Files.Add(flameFile.FileId, flameFile);
+                flameManifest.Files.Add(flameFile.FileId, flameFile);
                 _fileIds.Add(flameFile.FileId);
             }
             else
@@ -128,7 +132,7 @@ public sealed class FtbPackInstallTask(
             }
         }
 
-        var modIdResolverTask = new FileResolvingTask(manifest, flame: _flame);
+        var modIdResolverTask = new FileResolvingTask(flameManifest, flame: _flame);
 
         EmitStatus("Resolving mods...");
         await modIdResolverTask.StartAsync(cancellationToken);
@@ -154,7 +158,7 @@ public sealed class FtbPackInstallTask(
             }
 
             var resultsFile = results.Files[fileId];
-            var localFile = _version.Files[index];
+            var localFile = Manifest.Files[index];
 
             // First check for blocked mods
             if (resultsFile.Version.DownloadUrl.Length == 0)
@@ -214,7 +218,7 @@ public sealed class FtbPackInstallTask(
         var components = instance.GetPackProfile();
         components.BuildingFromScratch();
 
-        foreach (var target in _version.Targets)
+        foreach (var target in Manifest.Targets)
         {
             if (target is { Type: "game", Name: "minecraft" })
             {
@@ -223,7 +227,7 @@ public sealed class FtbPackInstallTask(
             }
         }
 
-        foreach (var target in _version.Targets)
+        foreach (var target in Manifest.Targets)
         {
             if (target.Type != "modloader")
             {
@@ -261,7 +265,7 @@ public sealed class FtbPackInstallTask(
         instance.SetName(Name());
         instance.SetIconKey(Icon);
         instance.SetManagedPack("ftb", pack.Id.ToString(), pack.Name,
-            _version.Id.ToString(), _version.Name);
+            Manifest.Id.ToString(), Manifest.Name);
 
         instance.SaveNow();
 
@@ -275,7 +279,7 @@ public sealed class FtbPackInstallTask(
         // FTB blocks multiple requests at a time
         var jobPtr = new NetJob("Mod download", maxConcurrent: 1);
         var downloadRequests = new List<NetRequest>();
-        foreach (var file in _version.Files)
+        foreach (var file in Manifest.Files)
         {
             if (file.ServerOnly || file.Url.Length == 0)
             {

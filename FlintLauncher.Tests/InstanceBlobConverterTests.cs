@@ -38,8 +38,26 @@ public class InstanceBlobConverterTests : IDisposable
 
     private string RealDirPath() => Path.Combine(_dir, "real-dir");
 
-    private static InstanceConfigFile Parse(string json) =>
-        JsonSerializer.Deserialize(json, FlintJsonContext.Default.InstanceConfigFile)!;
+    private static InstanceConfigFile Parse(string json)
+    {
+        var config = JsonSerializer.Deserialize(json, FlintJsonContext.Default.InstanceConfigFile);
+        Assert.NotNull(config);
+        return config;
+    }
+
+    private static EnvMap Env(InstanceConfigFile config)
+    {
+        Assert.NotNull(config.Launch);
+        Assert.NotNull(config.Launch.Env);
+        return config.Launch.Env;
+    }
+
+    private static List<ShortcutData> Shortcuts(InstanceConfigFile config)
+    {
+        Assert.NotNull(config.Identity);
+        Assert.NotNull(config.Identity.Shortcuts);
+        return config.Identity.Shortcuts;
+    }
 
     /// <summary>The legacy wire shape: <paramref name="member"/> holds the embedded JSON
     /// as a string token (what the C++ QJsonDocument blob looked like on disk).</summary>
@@ -60,16 +78,18 @@ public class InstanceBlobConverterTests : IDisposable
     public void Env_Legacy_String_Blob_Parses_The_Embedded_Map()
     {
         var config = Parse(LegacyDoc("launch", "env", """{"JAVA_HOME":"/opt/jdk","X":"1"}"""));
-        Assert.Equal("/opt/jdk", config.Launch.Env!["JAVA_HOME"]);
-        Assert.Equal("1", config.Launch.Env!["X"]);
+        var env = Env(config);
+        Assert.Equal("/opt/jdk", env["JAVA_HOME"]);
+        Assert.Equal("1", env["X"]);
     }
 
     [Fact]
     public void Env_Native_Object_Binds_Directly()
     {
-        var config = Parse(NativeDoc("launch", "env",
-            JsonNode.Parse("""{"JAVA_HOME":"/opt/jdk21"}""")!));
-        var env = Assert.IsType<EnvMap>(config.Launch.Env);
+        var node = JsonNode.Parse("""{"JAVA_HOME":"/opt/jdk21"}""");
+        Assert.NotNull(node);
+        var config = Parse(NativeDoc("launch", "env", node));
+        var env = Assert.IsType<EnvMap>(config.Launch?.Env);
         Assert.Equal("/opt/jdk21", env["JAVA_HOME"]);
     }
 
@@ -77,18 +97,20 @@ public class InstanceBlobConverterTests : IDisposable
     public void Env_Junk_String_And_Wrong_Kinds_Collapse_To_An_Empty_Map()
     {
         // the former lenient read: anything unparseable / not an object -> an empty map
-        Assert.Empty(Parse(LegacyDoc("launch", "env", "not json at all")).Launch.Env!);
-        Assert.Empty(Parse(LegacyDoc("launch", "env", "[1,2]")).Launch.Env!); // array, not a map
-        Assert.Empty(Parse("""{"launch":{"env":42}}""").Launch.Env!);        // wrong kind
+        Assert.Empty(Env(Parse(LegacyDoc("launch", "env", "not json at all"))));
+        Assert.Empty(Env(Parse(LegacyDoc("launch", "env", "[1,2]")))); // array, not a map
+        Assert.Empty(Env(Parse("""{"launch":{"env":42}}""")));        // wrong kind
     }
 
     [Fact]
     public void Env_Non_String_Values_Coerce_To_The_Empty_String()
     {
         // the C++ QVariantMap read was string-typed; a stray number lands as ""
-        var config = Parse(NativeDoc("launch", "env", JsonNode.Parse("""{"K":7,"OK":"v"}""")!));
-        Assert.Equal("", config.Launch.Env!["K"]);
-        Assert.Equal("v", config.Launch.Env!["OK"]);
+        var node = JsonNode.Parse("""{"K":7,"OK":"v"}""");
+        Assert.NotNull(node);
+        var env = Env(Parse(NativeDoc("launch", "env", node)));
+        Assert.Equal("", env["K"]);
+        Assert.Equal("v", env["OK"]);
     }
 
     [Fact]
@@ -103,21 +125,29 @@ public class InstanceBlobConverterTests : IDisposable
         Assert.Equal(JsonValueKind.Object, env.ValueKind);
         Assert.Equal("1", env.GetProperty("A").GetString());
 
-        Assert.Equal("1", Parse(written).Launch.Env!["A"]);
+        Assert.Equal("1", Env(Parse(written))["A"]);
     }
 
     [Fact]
     public void Env_FromObject_Accepts_The_Three_Runtime_Value_Shapes()
     {
-        Assert.Equal("runtime", EnvMapJsonConverter.FromObject(new EnvMap { ["K"] = "runtime" })!["K"]);
+        var runtime = EnvMapJsonConverter.FromObject(new EnvMap { ["K"] = "runtime" });
+        Assert.NotNull(runtime);
+        Assert.Equal("runtime", runtime["K"]);
 
         var element = JsonDocument.Parse("""{"A":"element"}""").RootElement;
-        Assert.Equal("element", EnvMapJsonConverter.FromObject(element.Clone())!["A"]);
+        var fromElement = EnvMapJsonConverter.FromObject(element.Clone());
+        Assert.NotNull(fromElement);
+        Assert.Equal("element", fromElement["A"]);
 
         // the legacy embedded-JSON text, as a raw string and inside a string token
-        Assert.Equal("legacy", EnvMapJsonConverter.FromObject("""{"B":"legacy"}""")!["B"]);
+        var legacy = EnvMapJsonConverter.FromObject("""{"B":"legacy"}""");
+        Assert.NotNull(legacy);
+        Assert.Equal("legacy", legacy["B"]);
         var legacyToken = JsonDocument.Parse(""""{"B":"legacy"}"""").RootElement;
-        Assert.Equal("legacy", EnvMapJsonConverter.FromObject(legacyToken.Clone())!["B"]);
+        var fromToken = EnvMapJsonConverter.FromObject(legacyToken.Clone());
+        Assert.NotNull(fromToken);
+        Assert.Equal("legacy", fromToken["B"]);
 
         Assert.Null(EnvMapJsonConverter.FromObject(null));
         Assert.Null(EnvMapJsonConverter.FromObject(42));
@@ -132,7 +162,7 @@ public class InstanceBlobConverterTests : IDisposable
         var blob = $$"""[{"name":"Minecraft","filePath":"{{RealFilePath()}}","target":1}]""";
         var config = Parse(LegacyDoc("identity", "shortcuts", blob));
 
-        var shortcut = Assert.Single(config.Identity.Shortcuts!);
+        var shortcut = Assert.Single(Shortcuts(config));
         Assert.Equal("Minecraft", shortcut.Name);
         Assert.Equal(RealFilePath(), shortcut.FilePath);
         Assert.Equal(ShortcutTarget.Applications, shortcut.Target);
@@ -142,9 +172,10 @@ public class InstanceBlobConverterTests : IDisposable
     public void Shortcuts_Native_Array_Binds_Directly()
     {
         File.WriteAllText(RealFilePath(), "x");
-        var config = Parse(NativeDoc("identity", "shortcuts",
-            JsonNode.Parse($$"""[{"name":"N","filePath":"{{RealFilePath()}}","target":0}]""")!));
-        var shortcut = Assert.Single(config.Identity.Shortcuts!);
+        var node = JsonNode.Parse($$"""[{"name":"N","filePath":"{{RealFilePath()}}","target":0}]""");
+        Assert.NotNull(node);
+        var config = Parse(NativeDoc("identity", "shortcuts", node));
+        var shortcut = Assert.Single(Shortcuts(config));
         Assert.Equal(ShortcutTarget.Desktop, shortcut.Target);
     }
 
@@ -167,11 +198,12 @@ public class InstanceBlobConverterTests : IDisposable
               "not-a-shortcut",
               {"name":42,"filePath":"{{file}}","target":0}
             ]
-            """)!;
+            """);
+        Assert.NotNull(array);
         var config = Parse(NativeDoc("identity", "shortcuts", array));
 
         // only the well-formed entries whose path exists survive the former reader's filter
-        var kept = config.Identity.Shortcuts!;
+        var kept = Shortcuts(config);
         Assert.Equal(2, kept.Count);
         Assert.Equal("Good", kept[0].Name);
         Assert.Equal(ShortcutTarget.Desktop, kept[0].Target);
@@ -199,7 +231,7 @@ public class InstanceBlobConverterTests : IDisposable
         Assert.Equal(RealFilePath(), arr[0].GetProperty("filePath").GetString());
         Assert.Equal(2, arr[0].GetProperty("target").GetInt32());
 
-        Assert.Equal(ShortcutTarget.Other, Assert.Single(Parse(written).Identity.Shortcuts!).Target);
+        Assert.Equal(ShortcutTarget.Other, Assert.Single(Shortcuts(Parse(written))).Target);
     }
 
     [Fact]
@@ -209,7 +241,7 @@ public class InstanceBlobConverterTests : IDisposable
         Assert.Null(Parse(LegacyDoc("identity", "shortcuts", "")).Identity.Shortcuts);
         Assert.Null(Parse("""{"identity":{"shortcuts":42}}""").Identity.Shortcuts);
         // an embedded array whose entries all fail validation reads as an EMPTY list
-        Assert.Empty(Parse(LegacyDoc("identity", "shortcuts", """["x"]""")).Identity.Shortcuts!);
+        Assert.Empty(Shortcuts(Parse(LegacyDoc("identity", "shortcuts", """["x"]"""))));
     }
 
     // ------------------------------------------- ModDownloadLoaders (the string list)
@@ -224,7 +256,9 @@ public class InstanceBlobConverterTests : IDisposable
     [Fact]
     public void ModDownloadLoaders_Native_Array_Binds_Directly_And_Skips_Non_Strings()
     {
-        var config = Parse(NativeDoc("misc", "modDownloadLoaders", JsonNode.Parse("""["quilt",7,null]""")!));
+        var node = JsonNode.Parse("""["quilt",7,null]""");
+        Assert.NotNull(node);
+        var config = Parse(NativeDoc("misc", "modDownloadLoaders", node));
         Assert.Equal(["quilt"], config.Misc.ModDownloadLoaders);
     }
 

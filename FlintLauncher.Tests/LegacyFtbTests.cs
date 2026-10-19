@@ -400,7 +400,8 @@ internal sealed class StubLegacyFtbServer : IDisposable
 
     private void Handle(HttpListenerContext ctx)
     {
-        var path = ctx.Request.Url!.AbsolutePath.TrimStart('/');
+        var url = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
+        var path = url.AbsolutePath.TrimStart('/');
 
         byte[] body;
         if (path == "static/modpacks.xml")

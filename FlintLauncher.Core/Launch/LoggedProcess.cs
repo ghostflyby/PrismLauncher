@@ -55,8 +55,8 @@ public sealed class LoggedProcess : IDisposable
 {
     private readonly Process _process = new();
     private readonly object _lock = new();
-    private readonly Decoder? errDecoder;
-    private readonly Decoder? outDecoder;
+    private readonly Decoder errDecoder;
+    private readonly Decoder outDecoder;
     private string leftoverLine = "";
     private string errLeftoverLine = "";
     private bool isAborting;
@@ -203,7 +203,18 @@ public sealed class LoggedProcess : IDisposable
         var exitTask = _process.WaitForExitAsync();
 
         _ = Task.WhenAll(stdoutTask, stderrTask, exitTask).ContinueWith(
-            static (_, state) => ((LoggedProcess)state!).OnTerminated(),
+            static (_, state) =>
+            {
+                // ContinueWith hands back the continuation state verbatim, so a miss here is
+                // an internal invariant break and must stay observable (a silent skip would
+                // leave terminatedTcs uncompleted and hang every waiter).
+                if (state is not LoggedProcess process)
+                {
+                    throw new InvalidOperationException("the exit continuation lost its process state");
+                }
+
+                process.OnTerminated();
+            },
             this,
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
@@ -323,7 +334,7 @@ public sealed class LoggedProcess : IDisposable
             }
 
             var decoder = isStdErr ? errDecoder : outDecoder;
-            var chars = new char[decoder!.GetCharCount(buffer, 0, read)];
+            var chars = new char[decoder.GetCharCount(buffer, 0, read)];
             decoder.GetChars(buffer, 0, read, chars, 0);
             var str = new string(chars);
 

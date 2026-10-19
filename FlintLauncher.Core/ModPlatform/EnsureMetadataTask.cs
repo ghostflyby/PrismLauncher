@@ -317,13 +317,21 @@ public sealed class EnsureMetadataTask(
             List<FlameProjectJson?> entries;
             try
             {
-                entries = multiple
-                    ? FlameMod.ParseResponse(projectRequest.BodyAsString,
-                            FlameModJsonContext.Default.FlameProjectListJson).Data
-                      ?? throw new JsonParseException("'data' is not an array")
-                    : [FlameMod.ParseResponse(projectRequest.BodyAsString,
+                if (multiple)
+                {
+                    entries = FlameMod.ParseResponse(projectRequest.BodyAsString,
+                                  FlameModJsonContext.Default.FlameProjectListJson).Data
+                              ?? throw new JsonParseException("'data' is not an array");
+                }
+                else
+                {
+                    entries =
+                    [
+                        FlameMod.ParseResponse(projectRequest.BodyAsString,
                             FlameModJsonContext.Default.FlameProjectEnvelopeJson).Data
-                       ?? throw new JsonParseException("'data' is not an object")];
+                        ?? throw new JsonParseException("'data' is not an object"),
+                    ];
+                }
             }
             catch (JsonParseException)
             {

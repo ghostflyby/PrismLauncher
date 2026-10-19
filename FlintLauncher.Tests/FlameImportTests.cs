@@ -282,7 +282,9 @@ public class FlameImportTests : IDisposable
         // root must abort the import, not move arbitrary directories
         var pack = FlamePackBuilder.Create();
         RegisterResolvedMod();
-        var manifestObj = JsonObject.Parse(pack.ManifestJson)!.AsObject();
+        var manifestNode = JsonObject.Parse(pack.ManifestJson);
+        var manifestObj = manifestNode?.AsObject();
+        Assert.NotNull(manifestObj);
         manifestObj["overrides"] = "../outside";
         var staging = TempPath("staging-traversal");
         Directory.CreateDirectory(staging);
@@ -310,8 +312,16 @@ public class FlameImportTests : IDisposable
         var pack = FlamePackBuilder.Create(loader: "forge-recommended");
         RegisterResolvedMod();
         // rebuild the manifest with the "recommended" loader version
-        var manifestObj = JsonObject.Parse(pack.ManifestJson)!.AsObject();
-        ((JsonObject)((JsonArray)manifestObj["minecraft"]!["modLoaders"]!)[0]!)["id"] = "forge-recommended";
+        var manifestNode = JsonObject.Parse(pack.ManifestJson);
+        var manifestObj = manifestNode?.AsObject();
+        Assert.NotNull(manifestObj);
+        var minecraft = manifestObj["minecraft"]?.AsObject();
+        Assert.NotNull(minecraft);
+        var modLoaders = minecraft["modLoaders"]?.AsArray();
+        Assert.NotNull(modLoaders);
+        var firstLoader = modLoaders[0]?.AsObject();
+        Assert.NotNull(firstLoader);
+        firstLoader["id"] = "forge-recommended";
         var staging = TempPath("staging-recommended");
         Directory.CreateDirectory(staging);
         await File.WriteAllTextAsync(Path.Combine(staging, "manifest.json"), manifestObj.ToJsonString());
@@ -387,8 +397,14 @@ public class FlameImportTests : IDisposable
         // list -> installs with the ".disabled" suffix (headless equivalent of the dialog)
         var pack = FlamePackBuilder.Create();
         // rewrite the manifest so the file is optional
-        var manifestObj = JsonObject.Parse(pack.ManifestJson)!.AsObject();
-        ((JsonObject)((JsonArray)manifestObj["files"]!)[0]!)["required"] = false;
+        var manifestNode = JsonObject.Parse(pack.ManifestJson);
+        var manifestObj = manifestNode?.AsObject();
+        Assert.NotNull(manifestObj);
+        var files = manifestObj["files"]?.AsArray();
+        Assert.NotNull(files);
+        var firstFile = files[0]?.AsObject();
+        Assert.NotNull(firstFile);
+        firstFile["required"] = false;
         var staging = TempPath("staging-optional");
         Directory.CreateDirectory(staging);
         await File.WriteAllTextAsync(Path.Combine(staging, "manifest.json"), manifestObj.ToJsonString());

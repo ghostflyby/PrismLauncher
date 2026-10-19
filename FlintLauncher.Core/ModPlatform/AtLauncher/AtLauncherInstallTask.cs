@@ -104,9 +104,13 @@ public sealed partial class AtLauncherPackInstallTask(
 
     // -------------------------------------------------------------------- state
 
-    // assigned by OnDownloadSucceeded before any read (required members make the model
-    // constructible only through deserialization)
-    private PackVersion _version = null!;
+    // assigned by OnDownloadSucceeded before any read
+    private PackVersion? configs;
+
+    /// <summary>The Configs payload; the state machine only reads it after the download
+    /// succeeded, so a read before that is a broken invariant rather than a null value.</summary>
+    private PackVersion Configs => configs
+        ?? throw new InvalidOperationException("the pack configs have not been downloaded");
     private string archivePath = "";
     private readonly List<string> _jarMods = [];
     private VersionFile? minecraftVersionData;
@@ -139,7 +143,7 @@ public sealed partial class AtLauncherPackInstallTask(
         {
             // (the parse keeps the "JSON response from ATLauncher" wrapper of the former
             // RequireDocument + LoadVersion reads; Normalize runs the load-time fixups)
-            _version = AtLauncherApi.LoadPackVersion(response);
+            configs = AtLauncherApi.LoadPackVersion(response);
         }
         catch (JsonParseException e)
         {
@@ -155,12 +159,12 @@ public sealed partial class AtLauncherPackInstallTask(
         {
             case InstallMode.Reinstall:
             case InstallMode.Update:
-                message = _version.Messages.Update;
+                message = Configs.Messages.Update;
                 resetDirectory = true;
                 break;
 
             case InstallMode.Install:
-                message = _version.Messages.Install;
+                message = Configs.Messages.Install;
                 resetDirectory = false;
                 break;
 
@@ -177,14 +181,14 @@ public sealed partial class AtLauncherPackInstallTask(
 
         // (the C++ fails the install when net.minecraft is not in the local metadata index;
         //  see the header note for the best-effort deviation)
-        minecraftVersionData = MetaVersionDataLookup?.Invoke("net.minecraft", _version.Minecraft);
+        minecraftVersionData = MetaVersionDataLookup?.Invoke("net.minecraft", Configs.Minecraft);
 
         if (resetDirectory)
         {
             DeleteExistingFiles();
         }
 
-        if (_version.NoConfigs)
+        if (Configs.NoConfigs)
         {
             await DownloadMods(cancellationToken);
         }
@@ -214,10 +218,10 @@ public sealed partial class AtLauncherPackInstallTask(
         keeps.Files.Add(new VersionKeep { Base = "root", Target = "servers.dat" });
 
         // Merge with version deletes and keeps
-        deletes.Files.AddRange(_version.Deletes.Files);
-        deletes.Folders.AddRange(_version.Deletes.Folders);
-        keeps.Files.AddRange(_version.Keeps.Files);
-        keeps.Folders.AddRange(_version.Keeps.Folders);
+        deletes.Files.AddRange(Configs.Deletes.Files);
+        deletes.Folders.AddRange(Configs.Deletes.Folders);
+        keeps.Files.AddRange(Configs.Keeps.Files);
+        keeps.Folders.AddRange(Configs.Keeps.Folders);
 
         string GetPathForBase(string baseName)
         {
@@ -327,7 +331,7 @@ public sealed partial class AtLauncherPackInstallTask(
             case ModType.Flan:
                 return "Flan";
             case ModType.Dependency:
-                return FileSystem.PathCombine("mods", _version.Minecraft);
+                return FileSystem.PathCombine("mods", Configs.Minecraft);
             case ModType.Ic2Lib:
                 return FileSystem.PathCombine("mods", "ic2");
             case ModType.DenLib:
@@ -355,7 +359,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
     private string? GetVersionForLoader(string uid)
     {
-        var loader = _version.Loader;
+        var loader = Configs.Loader;
         if (loader.Recommended || loader.Latest || loader.Choose)
         {
             if (loader.Recommended || loader.Latest)
@@ -369,7 +373,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
                 // (the version-list traversal lives in the hook; forge/neoforge are filtered
                 //  by the minecraft version, fabric is not)
-                var found = lookup(uid, loader.Type, loader.Type != "fabric" ? _version.Minecraft : "");
+                var found = lookup(uid, loader.Type, loader.Type != "fabric" ? Configs.Minecraft : "");
                 if (string.IsNullOrEmpty(found))
                 {
                     EmitFailed($"Failed to find version for {loader.Type} loader");
@@ -382,7 +386,7 @@ public sealed partial class AtLauncherPackInstallTask(
             if (loader.Choose)
             {
                 // Fabric Loader doesn't depend on a given Minecraft version.
-                return ChooseLoaderVersion?.Invoke(uid, loader.Type == "fabric" ? null : _version.Minecraft);
+                return ChooseLoaderVersion?.Invoke(uid, loader.Type == "fabric" ? null : Configs.Minecraft);
             }
         }
 
@@ -436,7 +440,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
     private bool CreateLibrariesComponent(string instanceRoot, PackProfile profile)
     {
-        if (_version.Libraries.Count == 0)
+        if (Configs.Libraries.Count == 0)
         {
             return true;
         }
@@ -478,7 +482,7 @@ public sealed partial class AtLauncherPackInstallTask(
             Name = PackName + " " + VersionName + " (libraries)",
         };
 
-        foreach (var lib in _version.Libraries)
+        foreach (var lib in Configs.Libraries)
         {
             // If the library is LiteLoader, we need to ignore it and handle it separately.
             if (LiteLoaderMap.TryGetValue(lib.Md5, out var liteLoaderVersion))
@@ -543,30 +547,30 @@ public sealed partial class AtLauncherPackInstallTask(
 
     private bool CreatePackComponent(string instanceRoot, PackProfile profile)
     {
-        if (_version.MainClass.MainClass.Length == 0 && _version.ExtraArguments.Arguments.Length == 0)
+        if (Configs.MainClass.MainClass.Length == 0 && Configs.ExtraArguments.Arguments.Length == 0)
         {
             return true;
         }
 
-        var mainClass = _version.MainClass.MainClass;
-        var extraArguments = _version.ExtraArguments.Arguments;
+        var mainClass = Configs.MainClass.MainClass;
+        var extraArguments = Configs.ExtraArguments.Arguments;
 
-        var hasMainClassDepends = _version.MainClass.Depends.Length != 0;
-        var hasExtraArgumentsDepends = _version.ExtraArguments.Depends.Length != 0;
+        var hasMainClassDepends = Configs.MainClass.Depends.Length != 0;
+        var hasExtraArgumentsDepends = Configs.ExtraArguments.Depends.Length != 0;
         if (hasMainClassDepends || hasExtraArgumentsDepends)
         {
             var mods = new HashSet<string>();
-            foreach (var item in _version.Mods)
+            foreach (var item in Configs.Mods)
             {
                 mods.Add(item.Name);
             }
 
-            if (hasMainClassDepends && !mods.Contains(_version.MainClass.Depends))
+            if (hasMainClassDepends && !mods.Contains(Configs.MainClass.Depends))
             {
                 mainClass = "";
             }
 
-            if (hasExtraArgumentsDepends && !mods.Contains(_version.ExtraArguments.Depends))
+            if (hasExtraArgumentsDepends && !mods.Contains(Configs.ExtraArguments.Depends))
             {
                 extraArguments = "";
             }
@@ -676,9 +680,9 @@ public sealed partial class AtLauncherPackInstallTask(
             dl = NetRequest.MakeFile(new Uri(url), archivePath, stack: _api.Net);
         }
 
-        if (_version.Configs.Sha1.Length != 0)
+        if (Configs.Configs.Sha1.Length != 0)
         {
-            dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, _version.Configs.Sha1));
+            dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, Configs.Configs.Sha1));
         }
 
         await dl.StartAsync(cancellationToken);
@@ -705,7 +709,7 @@ public sealed partial class AtLauncherPackInstallTask(
     private async Task DownloadMods(CancellationToken cancellationToken)
     {
         var optionalMods = new List<VersionMod>();
-        foreach (var mod in _version.Mods)
+        foreach (var mod in Configs.Mods)
         {
             if (mod.Optional)
             {
@@ -736,7 +740,7 @@ public sealed partial class AtLauncherPackInstallTask(
         var downloadRequests = new List<NetRequest>();
         var blockedMods = new List<(VersionMod Mod, BlockedMod Blocked)>();
 
-        foreach (var mod in _version.Mods)
+        foreach (var mod in Configs.Mods)
         {
             // skip non-client mods
             if (!mod.Client)
@@ -1078,10 +1082,10 @@ public sealed partial class AtLauncherPackInstallTask(
             }
 
             // Minecraft
-            await components.SetComponentVersion("net.minecraft", _version.Minecraft, important: true, cancellationToken);
+            await components.SetComponentVersion("net.minecraft", Configs.Minecraft, important: true, cancellationToken);
 
             // Loader
-            if (_version.Loader.Type == "forge")
+            if (Configs.Loader.Type == "forge")
             {
                 var version = GetVersionForLoader("net.minecraftforge");
                 if (version is null)
@@ -1091,7 +1095,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
                 await components.SetComponentVersion("net.minecraftforge", version, cancellationToken: cancellationToken);
             }
-            else if (_version.Loader.Type == "neoforge")
+            else if (Configs.Loader.Type == "neoforge")
             {
                 var version = GetVersionForLoader("net.neoforged");
                 if (version is null)
@@ -1101,7 +1105,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
                 await components.SetComponentVersion("net.neoforged", version, cancellationToken: cancellationToken);
             }
-            else if (_version.Loader.Type == "fabric")
+            else if (Configs.Loader.Type == "fabric")
             {
                 var version = GetVersionForLoader("net.fabricmc.fabric-loader");
                 if (version is null)
@@ -1111,9 +1115,9 @@ public sealed partial class AtLauncherPackInstallTask(
 
                 await components.SetComponentVersion("net.fabricmc.fabric-loader", version, cancellationToken: cancellationToken);
             }
-            else if (_version.Loader.Type.Length != 0)
+            else if (Configs.Loader.Type.Length != 0)
             {
-                EmitFailed("Unknown loader type: " + _version.Loader.Type);
+                EmitFailed("Unknown loader type: " + Configs.Loader.Type);
                 return;
             }
 

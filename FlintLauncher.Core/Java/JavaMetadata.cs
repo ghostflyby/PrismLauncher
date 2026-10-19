@@ -158,9 +158,9 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
             return !date.HasValue;
         }
 
-        if (date.HasValue)
+        if (date.HasValue && rhsDate.HasValue)
         {
-            if (date.Value < rhsDate!.Value)
+            if (date.Value < rhsDate.Value)
             {
                 return true;
             }

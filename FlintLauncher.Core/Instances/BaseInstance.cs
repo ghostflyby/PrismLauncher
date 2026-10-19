@@ -394,8 +394,13 @@ public abstract class BaseInstance
                     continue;
                 }
 
-                var shortcutName = name.GetString()!;
-                var path = filePath.GetString()!;
+                var shortcutName = name.GetString();
+                var path = filePath.GetString();
+                if (shortcutName is null || path is null)
+                {
+                    continue;
+                }
+
                 if (!File.Exists(path) && !Directory.Exists(path))
                 {
                     // (upstream logs a qWarning here)

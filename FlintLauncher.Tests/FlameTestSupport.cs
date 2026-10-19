@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Hashing;
+using Xunit;
 
 namespace FlintLauncher.Tests;
 
@@ -90,8 +91,9 @@ internal sealed class StubFlameServer : IDisposable
 
     private void Handle(HttpListenerContext ctx)
     {
-        var path = ctx.Request.Url!.PathAndQuery;
-        LastPath = ctx.Request.Url.GetComponents(UriComponents.AbsoluteUri, UriFormat.SafeUnescaped);
+        var url = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
+        var path = url.PathAndQuery;
+        LastPath = url.GetComponents(UriComponents.AbsoluteUri, UriFormat.SafeUnescaped);
         LastMethod = ctx.Request.HttpMethod;
         Requests.Add($"{ctx.Request.HttpMethod} {path}");
         LastHeaders.Clear();
@@ -228,9 +230,11 @@ internal static class FlamePayloads
         bool isAvailable = true)
     {
         var versions = new JsonArray();
-        foreach (var v in JsonObject.Parse(gameVersions ?? """["1.18.2", "forge"]""")!.AsArray())
+        var versionNodes = JsonObject.Parse(gameVersions ?? """["1.18.2", "forge"]""")?.AsArray();
+        Assert.NotNull(versionNodes);
+        foreach (var v in versionNodes)
         {
-            versions.Add((JsonNode?)v!.DeepClone());
+            versions.Add(v?.DeepClone());
         }
 
         var hashes = new JsonArray();
@@ -250,7 +254,7 @@ internal static class FlamePayloads
             ["gameVersions"] = versions,
             ["downloadUrl"] = downloadUrlPath is null ? null : $"{baseUrl}/{downloadUrlPath}",
             ["hashes"] = hashes,
-            ["dependencies"] = JsonObject.Parse(dependencies ?? "[]")!.DeepClone(),
+            ["dependencies"] = JsonObject.Parse(dependencies ?? "[]")?.DeepClone(),
             ["fileFingerprint"] = fileFingerprint ?? fileId,
             ["isAvailable"] = isAvailable,
         };
@@ -293,7 +297,7 @@ internal static class FlamePayloads
             ["summary"] = "A synthetic mod",
             ["classId"] = classId,
             ["links"] = new JsonObject { ["websiteUrl"] = websiteUrl },
-            ["authors"] = JsonNode.Parse(authors)!.DeepClone(),
+            ["authors"] = JsonNode.Parse(authors)?.DeepClone(),
             ["logo"] = new JsonObject { ["title"] = "logo", ["thumbnailUrl"] = "", ["url"] = "" },
         };
         return obj.ToJsonString();

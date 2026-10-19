@@ -59,7 +59,7 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
 
         public bool Succeeded;
 
-        public FlintTask? Task;
+        public required FlintTask Task { get; init; }
     }
 
     /// <summary>Port of the RequireEx helper from ComponentUpdateTask.cpp.</summary>
@@ -248,7 +248,7 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
     /// </summary>
     private async Task AwaitRemoteLoadAsync(RemoteLoadStatus status)
     {
-        var loadTask = status.Task!;
+        var loadTask = status.Task;
         // the task is already running; StartAsync returns the in-flight run
         await loadTask.StartAsync();
         if (status.Finished)

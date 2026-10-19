@@ -97,7 +97,8 @@ internal sealed class PeripheralStubServer : IDisposable
             }
         }
 
-        var recorded = new CapturedRequest(ctx.Request.HttpMethod, ctx.Request.Url!.AbsolutePath, headers,
+        var url = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
+        var recorded = new CapturedRequest(ctx.Request.HttpMethod, url.AbsolutePath, headers,
             bodyStream.ToArray());
         lock (Requests)
         {

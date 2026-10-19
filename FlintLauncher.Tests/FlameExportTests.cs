@@ -128,7 +128,8 @@ public class FlameExportTests : IDisposable
         Assert.Contains("manifest.json", names);
         Assert.Contains("modlist.html", names);
 
-        var manifestEntry = zip.GetEntry("manifest.json")!;
+        var manifestEntry = zip.GetEntry("manifest.json");
+        Assert.NotNull(manifestEntry);
         string manifestJson;
         using (var reader = new StreamReader(await manifestEntry.OpenAsync()))
         {
@@ -155,13 +156,14 @@ public class FlameExportTests : IDisposable
         var files = manifest["files"]?.AsArray();
         Assert.NotNull(files);
         Assert.Equal(2, files.Count);
-        var fileIds = files.Select(f => (long)f!["fileID"]!).ToList();
+        var fileIds = files.Select(f => (long?)f?["fileID"]).ToList();
         Assert.Contains(456L, fileIds); // from the local .pw.toml metadata
         Assert.Contains(999L, fileIds); // from the fingerprint API
-        Assert.All(files, f => Assert.True((long)f!["projectID"]! is 123 or 222));
-        Assert.All(files, f => Assert.True(f!["required"]!.GetValue<bool>()));
+        Assert.All(files, f => Assert.True((long?)f?["projectID"] is 123 or 222));
+        Assert.All(files, f => Assert.True(f?["required"]?.GetValue<bool>()));
 
-        var modlistEntry = zip.GetEntry("modlist.html")!;
+        var modlistEntry = zip.GetEntry("modlist.html");
+        Assert.NotNull(modlistEntry);
         string modlist;
         using (var reader = new StreamReader(await modlistEntry.OpenAsync()))
         {
@@ -207,12 +209,16 @@ public class FlameExportTests : IDisposable
         using var zip = await ZipFile.OpenReadAsync(output);
         Assert.Contains("overrides/mods/unmeta.jar", zip.Entries.Select(e => e.FullName));
 
-        var manifestEntry = zip.GetEntry("manifest.json")!;
+        var manifestEntry = zip.GetEntry("manifest.json");
+        Assert.NotNull(manifestEntry);
         using var reader = new StreamReader(await manifestEntry.OpenAsync());
-        var manifest = JsonNode.Parse(await reader.ReadToEndAsync())!.AsObject();
-        var files = manifest["files"]!.AsArray();
-        var file = Assert.Single(files)!.AsObject();
-        Assert.Equal(123, file["projectID"]!.GetValue<long>());
-        Assert.Equal(456, file["fileID"]!.GetValue<long>());
+        var manifest = JsonNode.Parse(await reader.ReadToEndAsync())?.AsObject();
+        Assert.NotNull(manifest);
+        var files = manifest["files"]?.AsArray();
+        Assert.NotNull(files);
+        var file = Assert.Single(files)?.AsObject();
+        Assert.NotNull(file);
+        Assert.Equal(123, file["projectID"]?.GetValue<long>());
+        Assert.Equal(456, file["fileID"]?.GetValue<long>());
     }
 }

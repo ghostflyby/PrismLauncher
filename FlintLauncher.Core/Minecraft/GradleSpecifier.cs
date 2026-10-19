@@ -102,13 +102,10 @@ public readonly struct GradleSpecifier : IEquatable<GradleSpecifier>
         return retval;
     }
 
-    public readonly string? GetFileName()
-    {
-        if (!IsValid)
-        {
-            return null;
-        }
+    public readonly string? GetFileName() => IsValid ? BuildFileName() : null;
 
+    private readonly string BuildFileName()
+    {
         var filename = ArtifactId + '-' + Version;
         if (Classifier.Length != 0)
         {
@@ -127,7 +124,7 @@ public readonly struct GradleSpecifier : IEquatable<GradleSpecifier>
             return null;
         }
 
-        var filename = filenameOverride.Length == 0 ? GetFileName()! : filenameOverride;
+        var filename = filenameOverride.Length == 0 ? BuildFileName() : filenameOverride;
         var path = GroupId.Replace('.', '/');
         path += '/' + ArtifactId + '/' + Version + '/' + filename;
         return path;

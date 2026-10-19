@@ -213,7 +213,8 @@ public class TechnicApiEndpointsTests : IDisposable
             });
             Assert.Equal(HttpStatusCode.Created, post.StatusCode);
             var created = JsonDocument.Parse(await post.Content.ReadAsStringAsync()).RootElement;
-            var id = created.GetProperty("id").GetString()!;
+            var id = created.GetProperty("id").GetString();
+            Assert.NotNull(id);
             Assert.Equal("Zip Installed", created.GetProperty("name").GetString());
 
             // the extracted pack landed in the committed instance's minecraft/ dir
@@ -307,7 +308,8 @@ public class TechnicApiEndpointsTests : IDisposable
         });
         Assert.Equal(HttpStatusCode.Created, post.StatusCode);
         var id = JsonDocument.Parse(await post.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("id").GetString()!;
+            .RootElement.GetProperty("id").GetString();
+        Assert.NotNull(id);
         Assert.Equal("Default Build", id);
 
         using var doc = JsonDocument.Parse(

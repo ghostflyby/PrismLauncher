@@ -22,7 +22,8 @@ public class MetaComponentParseTests
 
         var data = File.ReadAllText(compRp);
 
-        var obj = JsonNode.Parse(data)!.AsObject();
+        var obj = JsonNode.Parse(data)?.AsObject();
+        Assert.NotNull(obj);
 
         Assert.True(obj.Contains("description"));
         Assert.True(obj.Contains("expected_output"));
@@ -30,8 +31,10 @@ public class MetaComponentParseTests
         var expected = obj.StringOr("expected_output");
 
         // the renderer consumes the typed ChatComponentJson wire now
+        var description = obj["description"];
+        Assert.NotNull(description);
         var component = JsonSerializer.Deserialize(
-            obj["description"]!.ToJsonString(), DataPackJsonContext.Default.ChatComponentJson);
+            description.ToJsonString(), DataPackJsonContext.Default.ChatComponentJson);
         var processed = DataPackUtils.ProcessComponent(component);
 
         Assert.Equal(expected, processed);

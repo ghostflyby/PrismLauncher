@@ -25,10 +25,9 @@ public class LibraryTests
     private Library ReadMojangJson(string path)
     {
         var problems = new ProblemContainer();
-        return MojangVersionFormat.LibraryFromJson(
-            problems,
-            JsonNode.Parse(File.ReadAllText(path))!,
-            path);
+        var node = JsonNode.Parse(File.ReadAllText(path));
+        Assert.NotNull(node);
+        return MojangVersionFormat.LibraryFromJson(problems, node, path);
     }
 
     /// <summary>get absolute path to expected storage, assuming default cache prefix</summary>
@@ -351,14 +350,16 @@ public class LibraryTests
     public void Test_Rules_Parse_And_Activate()
     {
         var problems = new ProblemContainer();
-        var test = MojangVersionFormat.LibraryFromJson(problems, JsonNode.Parse("""
-                                                                                {
-                                                                                    "name": "test.package:testname:testversion",
-                                                                                    "rules": [
-                                                                                        {"action": "allow", "os": {"name": "linux"}}
-                                                                                    ]
-                                                                                }
-                                                                                """)!, "rules.json");
+        var rulesNode = JsonNode.Parse("""
+                                       {
+                                           "name": "test.package:testname:testversion",
+                                           "rules": [
+                                               {"action": "allow", "os": {"name": "linux"}}
+                                           ]
+                                       }
+                                       """);
+        Assert.NotNull(rulesNode);
+        var test = MojangVersionFormat.LibraryFromJson(problems, rulesNode, "rules.json");
 
         Assert.True(test.ApplyRules);
         Assert.Single(test.Rules);

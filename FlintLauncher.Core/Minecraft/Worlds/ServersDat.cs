@@ -65,10 +65,10 @@ public sealed class ServerEntry
             }
         }
 
-        if (server.HasKey("acceptTextures", NbtTagType.Byte))
+        if (server.HasKey("acceptTextures", NbtTagType.Byte) &&
+            server.TryGet<NbtByte>("acceptTextures") is { } acceptTextures)
         {
-            var value = server.TryGet<NbtByte>("acceptTextures")!.Value;
-            AcceptsTextures = value != 0 ? AcceptsTextures.Always : AcceptsTextures.Never;
+            AcceptsTextures = acceptTextures.Value != 0 ? AcceptsTextures.Always : AcceptsTextures.Never;
         }
     }
 

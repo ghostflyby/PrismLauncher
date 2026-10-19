@@ -64,7 +64,9 @@ public class FileTransferTests : IDisposable
     private string WriteSrc(string rel, string content)
     {
         var path = Path.Combine(_root, "src", rel);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var pathDir = Path.GetDirectoryName(path);
+        Assert.NotNull(pathDir);
+        Directory.CreateDirectory(pathDir);
         File.WriteAllText(path, content);
         return path;
     }

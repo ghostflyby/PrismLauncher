@@ -236,7 +236,9 @@ public sealed class LaunchFixture : IDisposable
     public void WriteInstanceFile(string instanceRoot, string relativePath, string content)
     {
         var path = Path.Combine(instanceRoot, relativePath);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var pathDir = Path.GetDirectoryName(path);
+        Assert.NotNull(pathDir);
+        Directory.CreateDirectory(pathDir);
         File.WriteAllText(path, content);
     }
 

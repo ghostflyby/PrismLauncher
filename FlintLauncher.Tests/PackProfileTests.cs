@@ -30,10 +30,19 @@ public class PackProfileTests : IDisposable
         catch (IOException) { }
     }
 
+    private static JsonNode ParseNode(string json)
+    {
+        var node = JsonNode.Parse(json);
+        Assert.NotNull(node);
+        return node;
+    }
+
     private string WriteFile(string relativePath, string content)
     {
         var path = Path.Combine(_root, relativePath);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var dir = Path.GetDirectoryName(path);
+        Assert.NotNull(dir);
+        Directory.CreateDirectory(dir);
         File.WriteAllText(path, content);
         return path;
     }
@@ -178,8 +187,8 @@ public class PackProfileTests : IDisposable
         Assert.Equal(2, profile.Components.Count);
         Assert.Equal("net.minecraft", profile.Components[0].GetId());
         Assert.Equal("0.14.21", profile.Components[1].Version);
-        Assert.True(profile.Components[1].CachedRequires.Contains(
-            new Require { Uid = "net.minecraft", EqualsVersion = "1.20.1" }));
+        Assert.Contains(new Require { Uid = "net.minecraft", EqualsVersion = "1.20.1" },
+            profile.Components[1].CachedRequires);
     }
 
     [Fact]
@@ -283,13 +292,15 @@ public class PackProfileTests : IDisposable
             // the jar is copied into <instance>/libraries/customjar-1.jar
             Assert.True(File.Exists(Path.Combine(_root, "libraries", "customjar-1.jar")));
 
-            var patch = JsonNode.Parse(File.ReadAllText(profile.PatchFilePathForUid("customjar")))!.AsObject();
-            Assert.Equal("customjar", patch["uid"]!.ToString());
+            var patch = ParseNode(File.ReadAllText(profile.PatchFilePathForUid("customjar"))).AsObject();
+            Assert.Equal("customjar", patch["uid"]?.ToString());
             Assert.NotNull(patch["mainJar"]);
 
             profile.SaveNow();
-            var pack = JsonNode.Parse(File.ReadAllText(Path.Combine(_root, "mmc-pack.json")))!;
-            Assert.Equal("customjar", pack["components"]!.AsArray()[0]!["uid"]!.ToString());
+            var pack = ParseNode(File.ReadAllText(Path.Combine(_root, "mmc-pack.json")));
+            var components = pack["components"]?.AsArray();
+            Assert.NotNull(components);
+            Assert.Equal("customjar", components[0]?["uid"]?.ToString());
         }
         finally
         {
@@ -315,10 +326,11 @@ public class PackProfileTests : IDisposable
             // the agent jar is copied into <instance>/libraries/<guid>.jar
             Assert.Single(Directory.EnumerateFiles(Path.Combine(_root, "libraries")));
 
-            var patch = JsonNode.Parse(File.ReadAllText(profile.PatchFilePathForUid(component.GetId())))!.AsObject();
-            var agents = patch["+agents"]!.AsArray();
+            var patch = ParseNode(File.ReadAllText(profile.PatchFilePathForUid(component.GetId()))).AsObject();
+            var agents = patch["+agents"]?.AsArray();
+            Assert.NotNull(agents);
             Assert.Single(agents);
-            Assert.StartsWith("custom.agents:", agents[0]!["name"]!.ToString());
+            Assert.StartsWith("custom.agents:", agents[0]?["name"]?.ToString());
         }
         finally
         {
@@ -338,9 +350,9 @@ public class PackProfileTests : IDisposable
         Assert.Equal("Quilt Loader", component.GetName());
         Assert.True(component.IsCustom());
 
-        var patch = JsonNode.Parse(File.ReadAllText(profile.PatchFilePathForUid("org.quiltmc.quilt-loader")))!;
-        Assert.Equal("org.quiltmc.quilt-loader", patch["uid"]!.ToString());
-        Assert.Equal("1", patch["version"]!.ToString());
+        var patch = ParseNode(File.ReadAllText(profile.PatchFilePathForUid("org.quiltmc.quilt-loader")));
+        Assert.Equal("org.quiltmc.quilt-loader", patch["uid"]?.ToString());
+        Assert.Equal("1", patch["version"]?.ToString());
     }
 
     // ---------------------------------------------------------------- mod loaders

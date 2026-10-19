@@ -102,8 +102,8 @@ internal sealed record VersionFileJson
     public List<JavaRuntimeJson>? Runtimes { get; init; }
     // the shared requires wire (MetaRequireJson — the meta documents and the mmc-pack
     // components flow through the same records)
-    public List<MetaRequireJson>? Requires { get; init; }
-    public List<MetaRequireJson>? Conflicts { get; init; }
+    public List<MetaRequireJson?>? Requires { get; init; }
+    public List<MetaRequireJson?>? Conflicts { get; init; }
     // Mojang
     public string? Id { get; init; }
     public string? MainClass { get; init; }

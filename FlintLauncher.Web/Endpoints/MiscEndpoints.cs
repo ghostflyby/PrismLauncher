@@ -46,33 +46,46 @@ public static class MiscEndpoints
         api.MapPost("/paste", async (PasteRequest? request, LauncherRuntime runtime,
             FlintTaskRegistry registry) =>
         {
-            if (request is null ||
-                (!string.IsNullOrWhiteSpace(request.TaskId) && request.Content is not null) ||
-                (string.IsNullOrWhiteSpace(request.TaskId) && string.IsNullOrEmpty(request.Content)))
+            if (request is null)
             {
                 return ApiJson.Error("invalid_body",
                     "body must be {\"content\": ...} or {\"taskId\": ...} (exactly one)", 400);
             }
 
+            // exactly one of taskId (a finished task's log) or content (inline text); an
+            // explicitly supplied empty content is still "supplied" and therefore rejected
+            var taskId = string.IsNullOrWhiteSpace(request.TaskId) ? null : request.TaskId;
+            var inline = request.Content;
             string content;
-            if (!string.IsNullOrWhiteSpace(request.TaskId))
+            if (taskId is not null)
             {
-                var entry = registry.Get(request.TaskId!);
+                if (inline is not null)
+                {
+                    return ApiJson.Error("invalid_body",
+                        "body must be {\"content\": ...} or {\"taskId\": ...} (exactly one)", 400);
+                }
+
+                var entry = registry.Get(taskId);
                 if (entry is null)
                 {
-                    return ApiJson.NotFound("task_not_found", $"no task '{request.TaskId}'");
+                    return ApiJson.NotFound("task_not_found", $"no task '{taskId}'");
                 }
 
                 content = string.Join("\n", registry.ReadLog(entry, 0).Select(l => l.Line));
                 if (content.Length == 0)
                 {
                     return ApiJson.Error("empty_paste",
-                        $"task '{request.TaskId}' has no log lines to paste", 400);
+                        $"task '{taskId}' has no log lines to paste", 400);
                 }
+            }
+            else if (inline is { Length: > 0 } text)
+            {
+                content = text;
             }
             else
             {
-                content = request.Content!;
+                return ApiJson.Error("invalid_body",
+                    "body must be {\"content\": ...} or {\"taskId\": ...} (exactly one)", 400);
             }
 
             // the typed user layer (C5/D4 — the SettingsObject view retired)

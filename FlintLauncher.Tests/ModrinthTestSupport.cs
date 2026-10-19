@@ -8,6 +8,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
+using Xunit;
 
 namespace FlintLauncher.Tests;
 
@@ -91,7 +92,8 @@ internal sealed class StubModrinthServer : IDisposable
 
     private void Handle(HttpListenerContext ctx)
     {
-        var path = ctx.Request.Url!.PathAndQuery;
+        var url = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
+        var path = url.PathAndQuery;
         LastPath = path;
         Requests.Add($"{ctx.Request.HttpMethod} {path}");
         LastHeaders.Clear();

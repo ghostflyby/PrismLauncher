@@ -104,7 +104,7 @@ public class ModrinthApiTests : IDisposable
         var parsed = JsonDocument.Parse(facetsText);
         Assert.Equal(JsonValueKind.Array, parsed.RootElement.ValueKind);
         var groups = parsed.RootElement.EnumerateArray()
-            .Select(g => g.EnumerateArray().Select(v => v.GetString()!).ToList()).ToList();
+            .Select(g => g.EnumerateArray().Select(v => v.GetString()).ToList()).ToList();
         Assert.Contains(groups, g => g.SequenceEqual(["categories:fabric", "categories:quilt"]));
         Assert.Contains(groups, g => g.SequenceEqual(["versions:1.20.1", "versions:1.20.2-pre1"]));
         Assert.Contains(groups, g => g.SequenceEqual(["categories:adventure"]));
@@ -129,13 +129,14 @@ public class ModrinthApiTests : IDisposable
         var urlText = Uri.UnescapeDataString(url);
         var facetsText = urlText[(urlText.IndexOf("facets=", StringComparison.Ordinal) + "facets=".Length)..];
         var groups = JsonDocument.Parse(facetsText).RootElement.EnumerateArray()
-            .Select(g => g.EnumerateArray().Select(v => v.GetString()!).ToList()).ToList();
+            .Select(g => g.EnumerateArray().Select(v => v.GetString()).ToList()).ToList();
 
         Assert.Contains(groups, g => g.SequenceEqual(["categories:adventure"]));
         Assert.Contains(groups, g => g.SequenceEqual(["categories:technology"]));
         Assert.Contains(groups, g => g.SequenceEqual(["categories:utility"]));
-        // no group merges two categories anymore
-        Assert.DoesNotContain(groups, g => g.Count > 1 && g.Any(c => c.StartsWith("categories:", StringComparison.Ordinal)));
+        // no group merges two categories anymore (a null entry is malformed and fails too)
+        Assert.DoesNotContain(groups, g =>
+            g.Count > 1 && g.Any(c => c is null || c.StartsWith("categories:", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -153,7 +154,8 @@ public class ModrinthApiTests : IDisposable
     public async Task Search_SendsFacetsQueryParam()
     {
         var args = new SearchArgs { Type = ResourceType.Mod, Offset = 0, Search = "jei" };
-        var url = _api.GetSearchUrl(args)!;
+        var url = _api.GetSearchUrl(args);
+        Assert.NotNull(url);
 
         var request = NetRequest.MakeByteArray(new Uri(url));
         await request.StartAsync();
@@ -201,7 +203,7 @@ public class ModrinthApiTests : IDisposable
         Assert.Equal(TaskState.Succeeded, job.State);
         Assert.EndsWith("/version_files", _server.LastPath);
 
-        var body = JsonDocument.Parse(Encoding.UTF8.GetString(_server.LastBody!)).RootElement;
+        var body = JsonDocument.Parse(Encoding.UTF8.GetString(_server.LastBody ?? [])).RootElement;
         var hashes = body.GetProperty("hashes").EnumerateArray().Select(h => h.GetString()).ToList();
         Assert.Equal(["hash1", "hash2"], hashes);
         Assert.Equal("sha512", body.GetProperty("algorithm").GetString());
@@ -243,7 +245,7 @@ public class ModrinthApiTests : IDisposable
         Assert.Equal(TaskState.Succeeded, job.State);
         Assert.EndsWith("/version_files/update", _server.LastPath);
 
-        var body = JsonDocument.Parse(Encoding.UTF8.GetString(_server.LastBody!)).RootElement;
+        var body = JsonDocument.Parse(Encoding.UTF8.GetString(_server.LastBody ?? [])).RootElement;
         var versionTypes = body.GetProperty("version_types").EnumerateArray().Select(v => v.GetString()).ToList();
         Assert.Equal(["release", "beta"], versionTypes);
     }
@@ -255,7 +257,7 @@ public class ModrinthApiTests : IDisposable
         await job.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, job.State);
-        var body = JsonDocument.Parse(Encoding.UTF8.GetString(_server.LastBody!)).RootElement;
+        var body = JsonDocument.Parse(Encoding.UTF8.GetString(_server.LastBody ?? [])).RootElement;
         Assert.False(body.TryGetProperty("version_types", out _));
     }
 
@@ -306,7 +308,7 @@ public class ModrinthApiTests : IDisposable
         using (var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json"))))
         {
             var uids = doc.RootElement.GetProperty("components").EnumerateArray()
-                .Select(c => c.GetProperty("uid").GetString()!).ToList();
+                .Select(c => c.GetProperty("uid").GetString()).ToList();
             Assert.Equal(["net.minecraft", "net.fabricmc.fabric-loader"], uids);
         }
 
@@ -494,29 +496,33 @@ public class ModrinthApiTests : IDisposable
         Assert.Contains("overrides/options.txt", names);
         Assert.DoesNotContain("overrides/mods/test.jar", names);
 
-        var indexEntry = zip.GetEntry("modrinth.index.json")!;
+        var indexEntry = zip.GetEntry("modrinth.index.json");
+        Assert.NotNull(indexEntry);
         string indexJson;
         using (var reader = new StreamReader(await indexEntry.OpenAsync()))
         {
             indexJson = await reader.ReadToEndAsync();
         }
 
-        var index = JsonNode.Parse(indexJson)!.AsObject();
-        Assert.Equal(1, index["formatVersion"]!.GetValue<int>());
-        Assert.Equal("minecraft", index["game"]!.GetValue<string>());
-        Assert.Equal("Round Trip Pack", index["name"]!.GetValue<string>());
-        Assert.Equal("1.0.0", index["versionId"]!.GetValue<string>());
-        Assert.Equal("1.20.1", index["dependencies"]!["minecraft"]!.GetValue<string>());
-        Assert.Equal("0.14.21", index["dependencies"]!["fabric-loader"]!.GetValue<string>());
+        var index = JsonNode.Parse(indexJson)?.AsObject();
+        Assert.NotNull(index);
+        Assert.Equal(1, index["formatVersion"]?.GetValue<int>());
+        Assert.Equal("minecraft", index["game"]?.GetValue<string>());
+        Assert.Equal("Round Trip Pack", index["name"]?.GetValue<string>());
+        Assert.Equal("1.0.0", index["versionId"]?.GetValue<string>());
+        Assert.Equal("1.20.1", index["dependencies"]?["minecraft"]?.GetValue<string>());
+        Assert.Equal("0.14.21", index["dependencies"]?["fabric-loader"]?.GetValue<string>());
 
-        var files = index["files"]!.AsArray();
-        var entry = Assert.Single(files)!.AsObject();
-        Assert.Equal("mods/test.jar", entry["path"]!.GetValue<string>());
-        Assert.Equal("required", entry["env"]!["client"]!.GetValue<string>());
-        Assert.Equal(pack.ModSha1, entry["hashes"]!["sha1"]!.GetValue<string>());
-        Assert.Equal(pack.ModSha512, entry["hashes"]!["sha512"]!.GetValue<string>());
-        Assert.Equal(pack.ModBytes.Length, entry["fileSize"]!.GetValue<int>());
-        Assert.Equal($"{_server.Url}/mod.bin", entry["downloads"]!.AsArray().Single()!.GetValue<string>());
+        var files = index["files"]?.AsArray();
+        Assert.NotNull(files);
+        var entry = Assert.Single(files)?.AsObject();
+        Assert.NotNull(entry);
+        Assert.Equal("mods/test.jar", entry["path"]?.GetValue<string>());
+        Assert.Equal("required", entry["env"]?["client"]?.GetValue<string>());
+        Assert.Equal(pack.ModSha1, entry["hashes"]?["sha1"]?.GetValue<string>());
+        Assert.Equal(pack.ModSha512, entry["hashes"]?["sha512"]?.GetValue<string>());
+        Assert.Equal(pack.ModBytes.Length, entry["fileSize"]?.GetValue<int>());
+        Assert.Equal($"{_server.Url}/mod.bin", entry["downloads"]?.AsArray().Single()?.GetValue<string>());
     }
 
     [Fact]
@@ -533,7 +539,8 @@ public class ModrinthApiTests : IDisposable
                              "url": "https://cdn.modrinth.com/a.jar" } ]
             }
             """));
-        var indexed = ModrinthPackIndex.LoadIndexedPackVersion(dto!);
+        Assert.NotNull(dto);
+        var indexed = ModrinthPackIndex.LoadIndexedPackVersion(dto);
 
         Assert.Equal("sha1", indexed.HashType);
         Assert.Equal("abc", indexed.Hash);

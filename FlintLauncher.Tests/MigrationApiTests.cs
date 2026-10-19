@@ -44,7 +44,9 @@ public class MigrationApiTests
     private static string ErrorCode(HttpResponseMessage response)
     {
         var json = JsonDocument.Parse(response.Content.ReadAsStream()).RootElement;
-        return json.GetProperty("error").GetProperty("code").GetString()!;
+        var code = json.GetProperty("error").GetProperty("code").GetString();
+        Assert.NotNull(code);
+        return code;
     }
 
     // ------------------------------------------------------------- unknown-source guard
@@ -176,7 +178,8 @@ public class MigrationApiTests
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var accepted = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
-        var taskId = accepted.GetProperty("taskId").GetString()!;
+        var taskId = accepted.GetProperty("taskId").GetString();
+        Assert.NotNull(taskId);
         await host.WaitForTaskStateAsync(taskId, "succeeded", TimeSpan.FromSeconds(30));
         // the import ran to completion: whitelisted files and un-shadowed directories landed
         // at the data root, and the decision record sealed under the ACTUAL source name (S7)
@@ -295,7 +298,8 @@ public class MigrationApiTests
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var taskId = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement
-            .GetProperty("taskId").GetString()!;
+            .GetProperty("taskId").GetString();
+        Assert.NotNull(taskId);
         await host.WaitForTaskStateAsync(taskId, "succeeded", TimeSpan.FromSeconds(60));
 
         // the remount half (already the pre-fix behavior, kept as the pass's first step):
@@ -388,7 +392,8 @@ public class MigrationApiTests
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var taskId = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement
-            .GetProperty("taskId").GetString()!;
+            .GetProperty("taskId").GetString();
+        Assert.NotNull(taskId);
 
         // wait for the instances item to have landed while the bulk walk is still going
         var instanceLanded = Path.Combine(host.DataDir, "instances", "reloadme", "instance.cfg");

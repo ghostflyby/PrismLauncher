@@ -14,6 +14,7 @@
 // The SkinsDir SETTING decides where the library lives (LauncherRuntime resolves it
 // data-root-relative, the C++ convention).
 
+using System.Diagnostics.CodeAnalysis;
 using FlintLauncher.Core.Skins;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
@@ -64,7 +65,7 @@ public static class SkinLibraryEndpoints
 
             if (!TryParseModel(request.Form["model"].ToString(), out var model, out var modelError))
             {
-                return modelError!;
+                return modelError;
             }
 
             // stage the upload with its original suffix (Install re-checks readability; the
@@ -149,7 +150,8 @@ public static class SkinLibraryEndpoints
 
     /// <summary>The form/body model field: "classic"/"slim" (the account upload spelling);
     /// omitted/empty = classic (the SkinManageDialog default).</summary>
-    private static bool TryParseModel(string raw, out SkinModelKind kind, out IResult? error)
+    private static bool TryParseModel(string raw, out SkinModelKind kind,
+        [NotNullWhen(false)] out IResult? error)
     {
         var value = raw.Trim().ToLowerInvariant();
         switch (value)

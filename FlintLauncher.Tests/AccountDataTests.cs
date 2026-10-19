@@ -73,8 +73,12 @@ public class AccountDataTests
                                           }
                                           """;
 
-    private static AccountJson Wire(string json) =>
-        JsonSerializer.Deserialize(json, AuthJsonContext.Default.AccountJson)!;
+    private static AccountJson Wire(string json)
+    {
+        var account = JsonSerializer.Deserialize(json, AuthJsonContext.Default.AccountJson);
+        Assert.NotNull(account);
+        return account;
+    }
 
     private static AccountData ResumedMsaAccount()
     {
@@ -94,8 +98,10 @@ public class AccountDataTests
         Assert.Equal("MSA_TOKEN", data.MsaToken.Value);
         Assert.Equal("MSA_REFRESH", data.MsaToken.RefreshToken);
         Assert.Equal(Validity.Assumed, data.MsaToken.Validity);
-        Assert.Equal(1638904328, new DateTimeOffset(data.MsaToken.IssueInstant!.Value).ToUnixTimeSeconds());
-        Assert.Equal(1638990728, new DateTimeOffset(data.MsaToken.NotAfter!.Value).ToUnixTimeSeconds());
+        Assert.NotNull(data.MsaToken.IssueInstant);
+        Assert.Equal(1638904328, new DateTimeOffset(data.MsaToken.IssueInstant.Value).ToUnixTimeSeconds());
+        Assert.NotNull(data.MsaToken.NotAfter);
+        Assert.Equal(1638990728, new DateTimeOffset(data.MsaToken.NotAfter.Value).ToUnixTimeSeconds());
         // the numeric extra value must survive as a number
         Assert.True(data.MsaToken.Extra.TryGetValue("expires_in", out var expiresIn));
         Assert.Equal("86400", expiresIn.GetRawText());
@@ -126,34 +132,49 @@ public class AccountDataTests
         Assert.Equal("MSA", saved.Type);
         Assert.Equal("c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb", saved.MsaClientId);
 
-        var msa = saved.Msa!;
+        var msa = saved.Msa;
+        Assert.NotNull(msa);
         Assert.Equal(1638904328, msa.Iat);
         Assert.Equal(1638990728, msa.Exp);
         Assert.Equal("MSA_TOKEN", msa.Token);
         Assert.Equal("MSA_REFRESH", msa.RefreshToken);
-        Assert.Equal("Bearer", AccountData.GetString(msa.Extra!["token_type"]));
-        Assert.Equal("86400", msa.Extra!["expires_in"].GetRawText());
+        var extra = msa.Extra;
+        Assert.NotNull(extra);
+        Assert.Equal("Bearer", AccountData.GetString(extra["token_type"]));
+        Assert.Equal("86400", extra["expires_in"].GetRawText());
 
-        Assert.Equal("USER_TOKEN", saved.Utoken!.Token);
-        Assert.Equal("XSTS_TOKEN", saved.XrpMc!.Token);
+        var utoken = saved.Utoken;
+        Assert.NotNull(utoken);
+        Assert.Equal("USER_TOKEN", utoken.Token);
+        var xrpMc = saved.XrpMc;
+        Assert.NotNull(xrpMc);
+        Assert.Equal("XSTS_TOKEN", xrpMc.Token);
 
-        var ygg = saved.Ygg!;
+        var ygg = saved.Ygg;
+        Assert.NotNull(ygg);
         Assert.Equal("YGG_TOKEN", ygg.Token);
         Assert.Equal(1638904328, ygg.Iat);
         Assert.Equal(1638907928, ygg.Exp);
 
-        var profile = saved.Profile!;
+        var profile = saved.Profile;
+        Assert.NotNull(profile);
         Assert.Equal("b50ad385829d3141a2167e7d7539ba7f", profile.Id);
         Assert.Equal("TestPlayer", profile.Name);
         Assert.Equal("cape-id", profile.Cape);
-        Assert.Equal("skin-id", profile.Skin!.Id);
-        Assert.Equal("aGVsbG8gc2tpbg==", profile.Skin.Data);
-        var cape = Assert.Single(profile.Capes!);
+        var skin = profile.Skin;
+        Assert.NotNull(skin);
+        Assert.Equal("skin-id", skin.Id);
+        Assert.Equal("aGVsbG8gc2tpbg==", skin.Data);
+        var capes = profile.Capes;
+        Assert.NotNull(capes);
+        var cape = Assert.Single(capes);
         Assert.Equal("cape-id", cape.Id);
         Assert.Equal("Migrator", cape.Alias);
 
-        Assert.True(saved.Entitlement!.OwnsMinecraft);
-        Assert.True(saved.Entitlement.CanPlayMinecraft);
+        var entitlement = saved.Entitlement;
+        Assert.NotNull(entitlement);
+        Assert.True(entitlement.OwnsMinecraft);
+        Assert.True(entitlement.CanPlayMinecraft);
     }
 
     [Fact]
@@ -164,9 +185,14 @@ public class AccountDataTests
         // textures http->https rewrite landing in the SAVED document — stays as a value gate
         var saved = ResumedMsaAccount().SaveState();
 
-        Assert.Equal("https://textures.minecraft.net/texture/skinhash", saved.Profile!.Skin!.Url);
-        Assert.Equal("https://textures.minecraft.net/texture/capehash",
-            Assert.Single(saved.Profile.Capes!).Url);
+        var profile = saved.Profile;
+        Assert.NotNull(profile);
+        var skin = profile.Skin;
+        Assert.NotNull(skin);
+        Assert.Equal("https://textures.minecraft.net/texture/skinhash", skin.Url);
+        var capes = profile.Capes;
+        Assert.NotNull(capes);
+        Assert.Equal("https://textures.minecraft.net/texture/capehash", Assert.Single(capes).Url);
     }
 
     [Fact]
@@ -228,7 +254,9 @@ public class AccountDataTests
                                                 """)));
         Assert.Equal("0", data.AccessToken());
         // and it saves the migrated value
-        Assert.Equal("0", data.SaveState().Ygg!.Token);
+        var ygg = data.SaveState().Ygg;
+        Assert.NotNull(ygg);
+        Assert.Equal("0", ygg.Token);
     }
 
     [Fact]
@@ -299,8 +327,12 @@ public class AccountDataTests
         Assert.Null(saved.Utoken);
         Assert.Null(saved.XrpMc);
         Assert.Null(saved.Entitlement); // the offline entitlement never parsed -> Validity None
-        Assert.Equal("0", saved.Ygg!.Token);
-        Assert.Equal("Notch", saved.Profile!.Name);
+        var ygg = saved.Ygg;
+        Assert.NotNull(ygg);
+        Assert.Equal("0", ygg.Token);
+        var profile = saved.Profile;
+        Assert.NotNull(profile);
+        Assert.Equal("Notch", profile.Name);
     }
 
     [Fact]

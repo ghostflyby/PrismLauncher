@@ -156,9 +156,10 @@ public class ComponentTests : IDisposable
 
         var patchPath = profile.PatchFilePathForUid("net.minecraft");
         Assert.True(File.Exists(patchPath));
-        var patch = JsonNode.Parse(File.ReadAllText(patchPath))!;
-        Assert.Equal("net.minecraft", patch["uid"]!.ToString());
-        Assert.Equal("1.12.2", patch["version"]!.ToString());
+        var patchNode = JsonNode.Parse(File.ReadAllText(patchPath));
+        Assert.NotNull(patchNode);
+        Assert.Equal("net.minecraft", patchNode["uid"]?.ToString());
+        Assert.Equal("1.12.2", patchNode["version"]?.ToString());
 
         // reverting deletes the file again
         Assert.True(component.Revert());

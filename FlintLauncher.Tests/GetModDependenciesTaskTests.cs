@@ -174,7 +174,8 @@ public class GetModDependenciesTaskTests : IDisposable
         Assert.True(dep.Version.IsCurrentlySelected);
         Assert.True(dep.Pack.VersionsLoaded);
         Assert.Equal(ResourceProvider.Modrinth, dep.Pack.Provider);
-        Assert.Equal(DependencyTypeValue.Required, dep.Dependency!.Type.Value);
+        Assert.NotNull(dep.Dependency);
+        Assert.Equal(DependencyTypeValue.Required, dep.Dependency.Type.Value);
 
         // the walk consulted B's version list but never touched C's (installed) or D's (optional)
         Assert.Contains(_server.Requests, r => r.Contains("/project/projB/version"));

@@ -76,7 +76,8 @@ internal sealed class StubAtlServer : IDisposable
 
     private void Handle(HttpListenerContext ctx)
     {
-        var path = ctx.Request.Url!.AbsolutePath;
+        var url = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
+        var path = url.AbsolutePath;
 
         byte[] body;
         if (path == "/launcher/json/packsnew.json")

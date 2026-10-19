@@ -97,7 +97,8 @@ public class OfflineAccountTests
     public void LoadFromJsonV3_Rejects_Garbage()
     {
         Assert.Null(MinecraftAccount.LoadFromJsonV3(new AccountJson()));
-        Assert.Null(MinecraftAccount.LoadFromJsonV3(
-            JsonSerializer.Deserialize("""{"type": "Nonsense"}""", AuthJsonContext.Default.AccountJson)!));
+        var garbage = JsonSerializer.Deserialize("""{"type": "Nonsense"}""", AuthJsonContext.Default.AccountJson);
+        Assert.NotNull(garbage);
+        Assert.Null(MinecraftAccount.LoadFromJsonV3(garbage));
     }
 }

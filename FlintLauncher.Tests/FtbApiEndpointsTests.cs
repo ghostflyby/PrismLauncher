@@ -148,7 +148,8 @@ public class FtbApiEndpointsTests : IDisposable
         });
         Assert.Equal(HttpStatusCode.Created, post.StatusCode);
         var created = JsonDocument.Parse(await post.Content.ReadAsStringAsync()).RootElement;
-        var id = created.GetProperty("id").GetString()!;
+        var id = created.GetProperty("id").GetString();
+        Assert.NotNull(id);
         Assert.False(string.IsNullOrEmpty(id));
         Assert.Equal("FTB API Import", created.GetProperty("name").GetString());
 
@@ -203,7 +204,8 @@ public class FtbApiEndpointsTests : IDisposable
         });
         Assert.Equal(HttpStatusCode.Created, post.StatusCode);
         var id = JsonDocument.Parse(await post.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("id").GetString()!;
+            .RootElement.GetProperty("id").GetString();
+        Assert.NotNull(id);
 
         // the pack's first-listed version (the fixture's 1.0.0/4242) was installed and the
         // instance name/icon fell back to the pack name / "default" (D4: instance.json)

@@ -98,7 +98,9 @@ public class FtbAppTests : IDisposable
     {
         var packPath = BuildFtbAppTree(_ => { });
 
-        Assert.Equal(Directory.GetParent(packPath)!.FullName, paths.GetDynamicInstancesPath());
+        var packDir = Directory.GetParent(packPath);
+        Assert.NotNull(packDir);
+        Assert.Equal(packDir.FullName, paths.GetDynamicInstancesPath());
     }
 
     [Fact]

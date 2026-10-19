@@ -561,7 +561,8 @@ public class CoverageFixLaunchJoinApiTests
             });
             Assert.Equal(HttpStatusCode.Accepted, launch.StatusCode);
             var taskId = JsonDocument.Parse(await launch.Content.ReadAsStringAsync())
-                .RootElement.GetProperty("taskId").GetString()!;
+                .RootElement.GetProperty("taskId").GetString();
+            Assert.NotNull(taskId);
             await PollTaskState(client, taskId, "waiting", TimeSpan.FromSeconds(30));
             Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync(
                 $"/api/v1/tasks/{taskId}/proceed", new { })).StatusCode);
@@ -590,7 +591,8 @@ public class CoverageFixLaunchJoinApiTests
             });
             Assert.Equal(HttpStatusCode.Accepted, launch2.StatusCode);
             var taskId2 = JsonDocument.Parse(await launch2.Content.ReadAsStringAsync())
-                .RootElement.GetProperty("taskId").GetString()!;
+                .RootElement.GetProperty("taskId").GetString();
+            Assert.NotNull(taskId2);
             await PollTaskState(client, taskId2, "waiting", TimeSpan.FromSeconds(30));
             Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync(
                 $"/api/v1/tasks/{taskId2}/proceed", new { })).StatusCode);
@@ -620,6 +622,12 @@ public class CoverageFixLaunchJoinApiTests
             Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/v1/paste", new
             {
                 content = "x",
+                taskId = "t1-abc",
+            })).StatusCode);
+            // an explicitly supplied empty content is still a second shape, not an absent one
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/v1/paste", new
+            {
+                content = "",
                 taskId = "t1-abc",
             })).StatusCode);
             Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync("/api/v1/paste", new

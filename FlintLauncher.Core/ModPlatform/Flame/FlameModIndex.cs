@@ -99,9 +99,10 @@ internal sealed record FlameFingerprintMatchJson(
 internal sealed record FlameFileListJson(
     List<FlameModFileJson>? Data);
 
-/// <summary>The {data: [...]} envelope of the projects list response.</summary>
+/// <summary>The {data: [...]} envelope of the projects list response. Elements stay
+/// nullable: a JSON null project is tolerated by the readers, not silently re-typed.</summary>
 internal sealed record FlameProjectListJson(
-    List<FlameProjectJson>? Data);
+    List<FlameProjectJson?>? Data);
 
 /// <summary>The {data: {...}} envelope of the single-project response.</summary>
 internal sealed record FlameProjectEnvelopeJson(

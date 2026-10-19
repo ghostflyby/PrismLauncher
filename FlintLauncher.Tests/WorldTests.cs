@@ -139,8 +139,10 @@ public class WorldTests : IDisposable
         Assert.Equal(GameTypeKind.Creative, reloaded.GameType.Kind);
         Assert.Equal(12345, reloaded.Seed);
         Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1700000000000), reloaded.LastPlayed);
-        Assert.Equal(2, ((NbtInt)((NbtCompound)NbtIo.TryReadCompound(
-            File.ReadAllBytes(Path.Combine(newDir, "level.dat")))!["Data"])["Difficulty"]).Value);
+        var root = NbtIo.TryReadCompound(File.ReadAllBytes(Path.Combine(newDir, "level.dat")));
+        Assert.NotNull(root);
+        var data = Assert.IsType<NbtCompound>(root["Data"]);
+        Assert.Equal(2, Assert.IsType<NbtInt>(data["Difficulty"]).Value);
     }
 
     [Fact]

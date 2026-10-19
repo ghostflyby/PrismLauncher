@@ -121,8 +121,10 @@ public class JsonNullToleranceTests
     [Fact]
     public void Mojang_Downloads_NullEntry_FailsAsAnObjectCheck()
     {
-        var e = Assert.Throws<JsonParseException>(() => MojangVersionFormat.ReadVersionProperties(
-            JsonNode.Parse("""{"downloads": {"client": null}}""")!, new VersionFile()));
+        var downloadsNode = JsonNode.Parse("""{"downloads": {"client": null}}""");
+        Assert.NotNull(downloadsNode);
+        var e = Assert.Throws<JsonParseException>(() =>
+            MojangVersionFormat.ReadVersionProperties(downloadsNode, new VersionFile()));
         Assert.Equal("Value is not an object", e.Message);
     }
 

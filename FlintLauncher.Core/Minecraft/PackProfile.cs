@@ -421,9 +421,9 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         [JsonConverter(typeof(QtCoercingStringConverter))]
         public string CachedName { get; set; } = "";
 
-        public List<MetaRequireJson>? CachedRequires { get; set; }
+        public List<MetaRequireJson?>? CachedRequires { get; set; }
 
-        public List<MetaRequireJson>? CachedConflicts { get; set; }
+        public List<MetaRequireJson?>? CachedConflicts { get; set; }
 
         [JsonConverter(typeof(QtCoercingBoolConverter))]
         public bool Volatile { get; set; }

@@ -43,7 +43,9 @@ public class StoreCompletenessTests : IDisposable
     private HttpMetaCache CacheWithLedger(string body)
     {
         var cacheFile = Path.Combine(_home, "cache", "metacache.json");
-        Directory.CreateDirectory(Path.GetDirectoryName(cacheFile)!);
+        var cacheDir = Path.GetDirectoryName(cacheFile);
+        Assert.NotNull(cacheDir);
+        Directory.CreateDirectory(cacheDir);
         File.WriteAllText(cacheFile, body);
         var cache = new HttpMetaCache(cacheFile);
         cache.AddBase("libraries", Paths().LibrariesRoot);
@@ -63,7 +65,9 @@ public class StoreCompletenessTests : IDisposable
 
     private static string WriteFile(string path, string content)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var dir = Path.GetDirectoryName(path);
+        Assert.NotNull(dir);
+        Directory.CreateDirectory(dir);
         File.WriteAllText(path, content);
         return path;
     }
@@ -186,9 +190,13 @@ public class StoreStatusApiTests
                                                                                                        "releaseTime":"2024-12-03T10:15:07+00:00","type":"release",
                                                                                                        "libraries":[{"name":"com.mojang:brigadier:1.0.18"},{"name":"com.mojang:datafixerupper:8.0.16"}]}
                                                                                                       """);
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(paths.LibrariesRoot, brigadier))!);
+            var libraryDir = Path.GetDirectoryName(Path.Combine(paths.LibrariesRoot, brigadier));
+            Assert.NotNull(libraryDir);
+            Directory.CreateDirectory(libraryDir);
             await File.WriteAllTextAsync(Path.Combine(paths.LibrariesRoot, brigadier), "jar!");
-            Directory.CreateDirectory(Path.GetDirectoryName(paths.MetacacheFile)!);
+            var metacacheDir = Path.GetDirectoryName(paths.MetacacheFile);
+            Assert.NotNull(metacacheDir);
+            Directory.CreateDirectory(metacacheDir);
             await File.WriteAllTextAsync(paths.MetacacheFile, $$"""
                                                                 {"version":"1","entries":[
                                                                   {"base":"libraries","path":"{{brigadier}}","md5sum":"","etag":"","last_changed_timestamp":0,"eternal":true}]}

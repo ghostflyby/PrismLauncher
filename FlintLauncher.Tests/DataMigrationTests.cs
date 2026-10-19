@@ -35,7 +35,9 @@ public class DataMigrationTests : IDisposable
         foreach (var relative in relativePaths)
         {
             var fullPath = Path.Combine(root, relative);
-            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+            var fullDir = Path.GetDirectoryName(fullPath);
+            Assert.NotNull(fullDir);
+            Directory.CreateDirectory(fullDir);
             File.WriteAllText(fullPath, "content of " + relative);
         }
 

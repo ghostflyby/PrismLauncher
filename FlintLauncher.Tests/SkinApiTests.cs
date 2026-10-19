@@ -153,14 +153,18 @@ public class SkinApiTests : IDisposable
         SkinListStore.Save(_dir, skins);
 
         // {"skins": [{"name": ..., "capeId": ..., "url": ..., "model": ...}]}
-        var root = JsonNode.Parse(
-            File.ReadAllText(Path.Combine(_dir, "index.json")))!.AsObject();
+        var indexNode = JsonNode.Parse(File.ReadAllText(Path.Combine(_dir, "index.json")));
+        var root = indexNode?.AsObject();
+        Assert.NotNull(root);
         Assert.Equal(new HashSet<string> { "skins" }, new HashSet<string>(root.Select(p => p.Key)));
-        var entry = root["skins"]![0]!.AsObject();
-        Assert.Equal("myskin", entry["name"]!.GetValue<string>());
-        Assert.Equal("cape-id", entry["capeId"]!.GetValue<string>());
-        Assert.Equal("https://textures.minecraft.net/texture/abc", entry["url"]!.GetValue<string>());
-        Assert.Equal("SLIM", entry["model"]!.GetValue<string>());
+        var skinsNode = root["skins"]?.AsArray();
+        Assert.NotNull(skinsNode);
+        var entry = skinsNode[0]?.AsObject();
+        Assert.NotNull(entry);
+        Assert.Equal("myskin", entry["name"]?.GetValue<string>());
+        Assert.Equal("cape-id", entry["capeId"]?.GetValue<string>());
+        Assert.Equal("https://textures.minecraft.net/texture/abc", entry["url"]?.GetValue<string>());
+        Assert.Equal("SLIM", entry["model"]?.GetValue<string>());
 
         var loaded = SkinListStore.Load(_dir);
         var skin = Assert.Single(loaded);

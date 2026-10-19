@@ -63,7 +63,9 @@ public class ComponentUpdateTaskTests : IDisposable
     private string WriteInstanceFile(string relativePath, string content)
     {
         var path = Path.Combine(_root, relativePath);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var dir = Path.GetDirectoryName(path);
+        Assert.NotNull(dir);
+        Directory.CreateDirectory(dir);
         File.WriteAllText(path, content);
         return path;
     }
@@ -236,7 +238,9 @@ public class ComponentUpdateTaskTests : IDisposable
         Assert.True(result.Ok, result.ErrorMessage);
         Assert.Null(profile.GetCurrentTask()); // updateFailed() released it
 
-        var problems = profile.GetComponent("test.modloader")!.GetProblems();
+        var component = profile.GetComponent("test.modloader");
+        Assert.NotNull(component);
+        var problems = component.GetProblems();
         Assert.Contains(problems, p =>
             p.Severity == ProblemSeverity.Error &&
             p.Description.Contains("is missing requirement net.minecraft 1.12.2"));
@@ -278,12 +282,14 @@ public class ComponentUpdateTaskTests : IDisposable
             // the injected component is persisted as dependencyOnly on the next save
             profile.SaveNow();
             var pack = JsonNode.Parse(
-                await File.ReadAllTextAsync(Path.Combine(_root, "mmc-pack.json")))!;
-            var depEntry = pack["components"]!.AsArray()
-                .OfType<JsonObject>()
-                .First(o => o["uid"]!.ToString() == "test.deplib");
-            Assert.True(depEntry["dependencyOnly"]!.GetValue<bool>());
-            Assert.Equal("1.0", depEntry["version"]!.ToString());
+                await File.ReadAllTextAsync(Path.Combine(_root, "mmc-pack.json")));
+            Assert.NotNull(pack);
+            var components = pack["components"]?.AsArray();
+            Assert.NotNull(components);
+            var depEntry = components.OfType<JsonObject>()
+                .First(o => o["uid"]?.ToString() == "test.deplib");
+            Assert.True(depEntry["dependencyOnly"]?.GetValue<bool>());
+            Assert.Equal("1.0", depEntry["version"]?.ToString());
         }
         finally
         {
@@ -317,8 +323,11 @@ public class ComponentUpdateTaskTests : IDisposable
         Assert.False(File.Exists(depPatchPath));
         profile.SaveNow();
         var pack = JsonNode.Parse(
-            await File.ReadAllTextAsync(Path.Combine(_root, "mmc-pack.json")))!;
-        Assert.Single(pack["components"]!.AsArray());
+            await File.ReadAllTextAsync(Path.Combine(_root, "mmc-pack.json")));
+        Assert.NotNull(pack);
+        var components = pack["components"]?.AsArray();
+        Assert.NotNull(components);
+        Assert.Single(components);
     }
 
     // ---------------------------------------------------------------- update actions
@@ -350,7 +359,8 @@ public class ComponentUpdateTaskTests : IDisposable
         using var profile = NewProfile();
         var result = await profile.ReloadAsync(NetMode.Offline);
         Assert.True(result.Ok, result.ErrorMessage);
-        var component = profile.GetComponent("test.a")!;
+        var component = profile.GetComponent("test.a");
+        Assert.NotNull(component);
         Assert.Equal("1.0", component.GetVersion());
 
         component.SetUpdateAction(new UpdateAction.ChangeVersion("2.0"));

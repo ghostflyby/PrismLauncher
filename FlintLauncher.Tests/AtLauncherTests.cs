@@ -46,6 +46,20 @@ public class AtLauncherTests : IDisposable
         catch (DirectoryNotFoundException) { }
     }
 
+    private static JsonObject ParseObject(string json)
+    {
+        var node = JsonNode.Parse(json)?.AsObject();
+        Assert.NotNull(node);
+        return node;
+    }
+
+    private static JsonObject ChildObject(JsonObject parent, string property)
+    {
+        var node = parent[property]?.AsObject();
+        Assert.NotNull(node);
+        return node;
+    }
+
     private InstanceList CreateList()
     {
         var instancesDir = Path.Combine(_root, "instances");
@@ -300,8 +314,8 @@ public class AtLauncherTests : IDisposable
     public async Task Install_ConfigsSha1Mismatch_Fails()
     {
         var fixture = AtlPackFixture.Create();
-        var configsObj = JsonNode.Parse(fixture.ConfigsJson)!.AsObject();
-        ((JsonObject)configsObj["configs"]!)["sha1"] = new string('0', 40);
+        var configsObj = ParseObject(fixture.ConfigsJson);
+        ChildObject(configsObj, "configs")["sha1"] = new string('0', 40);
         fixture.ConfigsJson = configsObj.ToJsonString();
         fixture.Register(_server);
 
@@ -320,8 +334,12 @@ public class AtLauncherTests : IDisposable
     public async Task Install_ModMd5Mismatch_Fails()
     {
         var fixture = AtlPackFixture.Create();
-        var configsObj = JsonNode.Parse(fixture.ConfigsJson)!.AsObject();
-        ((JsonObject)((JsonArray)configsObj["mods"]!)[0]!)["md5"] = new string('0', 32);
+        var configsObj = ParseObject(fixture.ConfigsJson);
+        var mods = configsObj["mods"]?.AsArray();
+        Assert.NotNull(mods);
+        var firstMod = mods[0]?.AsObject();
+        Assert.NotNull(firstMod);
+        firstMod["md5"] = new string('0', 32);
         fixture.ConfigsJson = configsObj.ToJsonString();
         fixture.Register(_server);
 
@@ -457,7 +475,7 @@ public class AtLauncherTests : IDisposable
         // mainClass declared with a depends on a mod that IS in the pack -> the pack
         // component (patches/org.multimc.atlauncher.<uuid>.json) carries the main class
         var fixture = AtlPackFixture.Create();
-        var configsObj = JsonNode.Parse(fixture.ConfigsJson)!.AsObject();
+        var configsObj = ParseObject(fixture.ConfigsJson);
         configsObj["mainClass"] = new JsonObject { ["mainClass"] = "net.minecraft.launchwrapper.Launch", ["depends"] = "Required Mod" };
         fixture.ConfigsJson = configsObj.ToJsonString();
         fixture.Register(_server);
@@ -482,7 +500,7 @@ public class AtLauncherTests : IDisposable
     {
         // depends names a mod that is not in the pack -> no pack component at all
         var fixture = AtlPackFixture.Create();
-        var configsObj = JsonNode.Parse(fixture.ConfigsJson)!.AsObject();
+        var configsObj = ParseObject(fixture.ConfigsJson);
         configsObj["mainClass"] = new JsonObject { ["mainClass"] = "some.Main", ["depends"] = "Not In Pack" };
         fixture.ConfigsJson = configsObj.ToJsonString();
         fixture.Register(_server);
@@ -505,7 +523,7 @@ public class AtLauncherTests : IDisposable
     public async Task Install_InstallMessage_ReachesDisplayHook()
     {
         var fixture = AtlPackFixture.Create();
-        var configsObj = JsonNode.Parse(fixture.ConfigsJson)!.AsObject();
+        var configsObj = ParseObject(fixture.ConfigsJson);
         configsObj["messages"] = new JsonObject { ["install"] = "Welcome!", ["update"] = "Updating!" };
         fixture.ConfigsJson = configsObj.ToJsonString();
         fixture.Register(_server);

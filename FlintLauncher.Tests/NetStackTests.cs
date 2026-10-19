@@ -73,7 +73,9 @@ public class NetStackTests : IDisposable
             cache.AddBase("META", basePath);
 
             var file = Path.Combine(basePath, "net.minecraft/index.json");
-            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+            var fileDir = Path.GetDirectoryName(file);
+            Assert.NotNull(fileDir);
+            Directory.CreateDirectory(fileDir);
             File.WriteAllText(file, "{}");
 
 
@@ -91,6 +93,15 @@ public class NetStackTests : IDisposable
             entry.RemoteChangedTimestamp = "Tue, 01 Jan 2030 00:00:00 GMT";
             entry.IsEternal = true;
             Assert.True(cache.UpdateEntry(entry));
+
+            // a non-ASCII base rides the same write: QJsonDocument leaves unicode alone, so
+            // the relaxed encoder must not turn it into \uXXXX escapes
+            const string unicodeBase = "路径/é/日本語";
+            cache.AddBase(unicodeBase, basePath);
+            var unicodeEntry = cache.ResolveEntry(unicodeBase, "net.minecraft/index.json");
+            unicodeEntry.SetStale(false);
+            unicodeEntry.IsEternal = true;
+            Assert.True(cache.UpdateEntry(unicodeEntry));
             cache.SaveNow();
         }
 
@@ -100,6 +111,9 @@ public class NetStackTests : IDisposable
         Assert.Contains("\"base\":\"META\"", json);
         Assert.Contains("\"path\":\"net.minecraft/index.json\"", json);
         Assert.Contains("\"etag\":\"\\\"abc123\\\"\"", json);
+        // unicode survives verbatim (the PrismLauncher-identical Qt escaping)
+        Assert.Contains("\"base\":\"路径/é/日本語\"", json);
+        Assert.DoesNotContain("\\u8DEF", json);
 
         using var cache2 = new HttpMetaCache(indexPath);
         cache2.AddBase("META", basePath);
@@ -383,7 +397,8 @@ public class NetStackTests : IDisposable
     {
         using var server = new TestHttpServer(ctx =>
         {
-            var body = Encoding.UTF8.GetBytes(ctx.Request.Url!.AbsolutePath);
+            var url = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
+            var body = Encoding.UTF8.GetBytes(url.AbsolutePath);
             ctx.Response.StatusCode = 200;
             ctx.Response.ContentLength64 = body.Length;
             ctx.Response.OutputStream.Write(body);

@@ -855,9 +855,17 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         return env;
     }
 
+    /// <summary>The applied-profile arguments, or an empty list while the profile cannot be
+    /// applied: the broken-instance diagnostics (VerboseDescription) call this without a
+    /// profile guard, and the launch pipeline fails earlier on its own profile check.</summary>
     public List<string> ProcessMinecraftArgs(AuthSession? session, MinecraftTarget? targetToJoin)
     {
-        var profile = Components.GetProfile()!;
+        var profile = Components.GetProfile();
+        if (profile is null)
+        {
+            return [];
+        }
+
         var args = profile.GetMinecraftArguments()
             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .ToList();
@@ -1221,7 +1229,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         var jars = new List<string>();
         var nativeJars = new List<string>();
-        var profile = Components.GetProfile()!;
+        var profile = RequireProfile();
         profile.GetLibraryFiles(RuntimeContext, jars, nativeJars, GetLocalLibraryPath(), BinRoot(),
             storageBase: LibraryStorageBase());
         return jars;
@@ -1231,7 +1239,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         var jars = new List<string>();
         var nativeJars = new List<string>();
-        var profile = Components.GetProfile()!;
+        var profile = RequireProfile();
         profile.GetLibraryFiles(RuntimeContext, jars, nativeJars, GetLocalLibraryPath(), BinRoot(),
             storageBase: LibraryStorageBase());
         return nativeJars;
@@ -1243,11 +1251,15 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// stamped layout keep the historical CWD-relative behavior.</summary>
     public string LibraryStorageBase() => Paths?.StoreRoot ?? "";
 
-    public string GetMainClass()
-    {
-        var profile = Components.GetProfile()!;
-        return profile.GetMainClass();
-    }
+    /// <summary>The applied profile's main class, or "" while the profile cannot be applied —
+    /// VerboseDescription prints this line for broken instances, so it must not throw.</summary>
+    public string GetMainClass() => Components.GetProfile()?.GetMainClass() ?? "";
+
+    /// <summary>The applied launch profile. The launch-path accessors below reach it only
+    /// after the pipeline's own profile check, so a missing profile is a broken invariant —
+    /// thrown with a domain message instead of surfacing as an empty value.</summary>
+    private LaunchProfile RequireProfile() =>
+        Components.GetProfile() ?? throw new InvalidOperationException("the instance profile is missing");
 
     public JavaVersion GetJavaVersion()
     {
@@ -1324,7 +1336,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public List<Mod> GetJarMods()
     {
-        var profile = Components.GetProfile()!;
+        var profile = RequireProfile();
         var mods = new List<Mod>();
         foreach (var jarmod in profile.GetJarMods())
         {

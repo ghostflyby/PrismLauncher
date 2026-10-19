@@ -76,7 +76,7 @@ internal sealed record MetaPackageJson(
 internal sealed record MetaVersionListJson(
     JsonElement? FormatVersion,    string? Uid,    string? Name,    List<MetaVersionEntryJson>? Versions);
 internal sealed record MetaVersionEntryJson(
-    string? Version,    string? ReleaseTime,    string? Type,    bool? Recommended,    bool? Volatile,    List<MetaRequireJson>? Requires,    List<MetaRequireJson>? Conflicts,    string? Sha256);
+    string? Version,    string? ReleaseTime,    string? Type,    bool? Recommended,    bool? Volatile,    List<MetaRequireJson?>? Requires,    List<MetaRequireJson?>? Conflicts,    string? Sha256);
 
 /// <summary>The ONE requires wire — shared by the meta documents, the OneSix version
 /// format and the mmc-pack components. equals/suggests coerce (a junk member reads as
@@ -96,8 +96,8 @@ internal sealed record MetaVersionDocumentJson(
     string? Type,
     bool? Recommended,
     bool? Volatile,
-    List<MetaRequireJson>? Requires,
-    List<MetaRequireJson>? Conflicts,
+    List<MetaRequireJson?>? Requires,
+    List<MetaRequireJson?>? Conflicts,
     string? Sha256);
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(MetaIndexJson))]
@@ -209,7 +209,7 @@ public static class MetaJsonFormat
     /// <summary>The requires/conflicts arrays of a parsed member (absent member -> empty).
     /// The meta documents flow through here (not the JsonParseException ParseRequires);
     /// a null entry fails as a MetaParseException like the former node read.</summary>
-    private static void MapRequires(List<MetaRequireJson>? raw, SortedSet<Require> ptr)
+    private static void MapRequires(List<MetaRequireJson?>? raw, SortedSet<Require> ptr)
     {
         if (raw is null)
         {
@@ -220,7 +220,7 @@ public static class MetaJsonFormat
         {
             ptr.Add(new Require
             {
-                Uid = RequireStringOf(req.Uid, "uid"),
+                Uid = RequireStringOf(req?.Uid, "uid"),
                 EqualsVersion = req?.EqualsVersion ?? "",
                 Suggests = req?.Suggests ?? "",
             });

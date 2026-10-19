@@ -43,26 +43,21 @@ public sealed class JavaInstallList
     }
 
     /// <summary>Port of JavaInstallList::getLoadTask().</summary>
-    public FlintTask GetLoadTask(bool forceReload = false)
-    {
-        Load();
-        return GetCurrentTask()!;
-    }
+    public FlintTask GetLoadTask(bool forceReload = false) => Load();
 
-    private FlintTask? GetCurrentTask()
+    private FlintTask Load()
     {
-        return status == Status.InProgress ? loadTask : null;
-    }
-
-    private void Load()
-    {
-        if (status != Status.InProgress)
+        if (status == Status.InProgress && loadTask is { } inFlight)
         {
-            status = Status.InProgress;
-            loadTask = new JavaListLoadTask(this, _onlyManagedVersions, _javaRoot);
-            // C++ starts the task immediately; the returned Task tracks the in-flight run.
-            _ = loadTask.StartAsync();
+            return inFlight;
         }
+
+        status = Status.InProgress;
+        var task = new JavaListLoadTask(this, _onlyManagedVersions, _javaRoot);
+        loadTask = task;
+        // C++ starts the task immediately; the returned Task tracks the in-flight run.
+        _ = task.StartAsync();
+        return task;
     }
 
     public bool IsLoaded() => status == Status.Done;

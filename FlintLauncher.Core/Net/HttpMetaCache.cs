@@ -10,6 +10,7 @@ using System.Security.Cryptography;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 
@@ -45,6 +46,13 @@ internal static class MetaCacheJson
         {
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         };
+
+    /// <summary>The writer's source-generated type info: a context bound to
+    /// <see cref="WriterOptions"/>, so the AOT-safe serialize overload keeps the Qt encoder
+    /// instead of falling back to reflection.</summary>
+    private static readonly MetaCacheJsonContext WriterContext = new(WriterOptions);
+
+    public static JsonTypeInfo<MetaCacheFileJson> WriterTypeInfo => WriterContext.MetaCacheFileJson;
 }
 
 public sealed class MetaEntry
@@ -454,7 +462,7 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
             // metacache files stay byte-compatible with PrismLauncher's.
             File.WriteAllText(
                 _indexFile,
-                JsonSerializer.Serialize(entriesRoot, MetaCacheJson.WriterOptions));
+                JsonSerializer.Serialize(entriesRoot, MetaCacheJson.WriterTypeInfo));
         }
         catch (IOException) { }
     }

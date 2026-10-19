@@ -14,7 +14,12 @@ namespace FlintLauncher.Tests;
 
 public class MetaJsonFormatTests
 {
-    private static JsonNode Parse(string json) => JsonNode.Parse(json)!;
+    private static JsonNode Parse(string json)
+    {
+        var node = JsonNode.Parse(json);
+        Assert.NotNull(node);
+        return node;
+    }
 
     private static void ParseAndDiscard(string json)
     {
@@ -155,7 +160,7 @@ public class MetaJsonFormatTests
     {
         // the typed wire is the one requires shape (the MetaRequireJson records); the
         // former SerializeRequires node helper is gone with the node reads
-        var original = new List<MetaRequireJson>
+        var original = new List<MetaRequireJson?>
         {
             new("org.lwjgl3", "3.2.2", null),
             new("net.fabricmc.intermediary", null, "1.18"),
