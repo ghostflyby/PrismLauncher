@@ -15,7 +15,6 @@
 //  - String comparisons use StringComparison.OrdinalIgnoreCase where Qt uses
 //    Qt::CaseInsensitive and CurrentCulture for localeAwareCompare.
 
-using System.Globalization;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.IO;
 
@@ -115,8 +114,6 @@ public partial class Resource
 
     public bool Enabled { get; protected set; } = true;
 
-    public string SizeStr { get; private set; } = "";
-
     public long SizeInfo { get; private set; }
 
     public virtual string Name => name;
@@ -170,7 +167,7 @@ public partial class Resource
 
         InternalId = fileName;
 
-        (SizeStr, SizeInfo) = CalculateFileSize(Fileinfo);
+        SizeInfo = CalculateFileSize(Fileinfo);
         if (Directory.Exists(Fileinfo.FullName) && !File.Exists(Fileinfo.FullName))
         {
             Type = ResourceType.Folder;
@@ -444,18 +441,16 @@ public partial class Resource
         }
     }
 
-    /// <summary>Port of the calculateFileSize helper from Resource.cpp.</summary>
-    private static (string Str, long Info) CalculateFileSize(FileInfo file)
+    /// <summary>Port of the calculateFileSize helper from Resource.cpp; only the byte count
+    /// survives (the human-readable string had no reader).</summary>
+    private static long CalculateFileSize(FileInfo file)
     {
         if (Directory.Exists(file.FullName) && !File.Exists(file.FullName))
         {
-            var count = Directory.GetFileSystemEntries(file.FullName).Length;
-            var str = count != 1 ? "items" : "item";
-            return ($"{count.ToString(CultureInfo.InvariantCulture)} {str}", count);
+            return Directory.GetFileSystemEntries(file.FullName).Length;
         }
 
-        var size = File.Exists(file.FullName) ? file.Length : 0;
-        return (HumanReadableFileSize(size, useSi: true), size);
+        return File.Exists(file.FullName) ? file.Length : 0;
     }
 
     private static DateTime LastModified(FileInfo file)
@@ -480,24 +475,4 @@ public partial class Resource
     [GeneratedRegex("^(?:the|teh) +", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ThePrefixRegex();
 
-    /// <summary>
-    /// Port of StringUtils::humanReadableFileSize (kept local: Text/StringUtils.cs has no
-    /// call site for it yet and only Resources/ may be touched here).
-    /// </summary>
-    private static string HumanReadableFileSize(double bytes, bool useSi, int decimalPoints = 1)
-    {
-        string[] units = useSi ? ["KB", "MB", "GB", "TB"] : ["KiB", "MiB", "GiB", "TiB"];
-        var scale = useSi ? 1000 : 1024;
-
-        int u = -1;
-        var r = Math.Pow(10, decimalPoints);
-
-        do
-        {
-            bytes /= scale;
-            u++;
-        } while (Math.Round(Math.Abs(bytes) * r) / r >= scale && u < units.Length - 1);
-
-        return bytes.ToString("F2", CultureInfo.InvariantCulture) + " " + units[u];
-    }
 }

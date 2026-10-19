@@ -72,7 +72,7 @@ public sealed class NetStack
         }
 
         var next = (ua, type, host, port, user, pass);
-        if (this.applied is { } applied && applied.Equals(next))
+        if (this.applied is { } previous && previous.Equals(next))
         {
             return;
         }
@@ -99,11 +99,11 @@ public sealed class NetStack
             PooledConnectionLifetime = TimeSpan.FromMinutes(10),
             Proxy = BuildProxy(),
         };
-        var client = new HttpClient(handler, disposeHandler: true);
+        var httpClient = new HttpClient(handler, disposeHandler: true);
         // user-supplied user-agent overrides may not be valid product tokens; ignore those
-        _ = client.DefaultRequestHeaders.UserAgent.TryParseAdd(UserAgent);
-        client.Timeout = TimeSpan.FromMinutes(10);
-        return client;
+        _ = httpClient.DefaultRequestHeaders.UserAgent.TryParseAdd(UserAgent);
+        httpClient.Timeout = TimeSpan.FromMinutes(10);
+        return httpClient;
     }
 
     private IWebProxy? BuildProxy() => proxy.Type switch
@@ -118,12 +118,12 @@ public sealed class NetStack
 
     private WebProxy NamedProxy(Uri uri)
     {
-        var proxy = new WebProxy(uri);
+        var webProxy = new WebProxy(uri);
         if (this.proxy.User.Length != 0)
         {
-            proxy.Credentials = new NetworkCredential(this.proxy.User, this.proxy.Pass);
+            webProxy.Credentials = new NetworkCredential(this.proxy.User, this.proxy.Pass);
         }
 
-        return proxy;
+        return webProxy;
     }
 }

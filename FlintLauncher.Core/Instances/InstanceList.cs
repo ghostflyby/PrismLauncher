@@ -74,7 +74,6 @@ public class InstanceList
 
     // C++ m_instanceRootDirMap: id -> instance dir that provided it
     private readonly Dictionary<string, string> _instanceRootDirMap = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _instanceSet = new(StringComparer.Ordinal);
 
     // D2 inode index: instance uuid <-> the stat(2) inode of its instance dir. Rebuilt on
     // every LoadList ("索引随 LoadList 重建"); empty on platforms without inode support
@@ -720,8 +719,6 @@ public class InstanceList
             _instanceRootDirMap[instId] = targetDir;
         }
 
-        _instanceSet.Add(instId);
-
         if (groupName.Length != 0)
         {
             // D3: the group file stores UUID references, but the committed folder is not
@@ -844,12 +841,6 @@ public class InstanceList
                 _instanceRootDirMap[id] = rootDir;
                 outList.Add(id);
             }
-        }
-
-        _instanceSet.Clear();
-        foreach (var id in outList)
-        {
-            _instanceSet.Add(id);
         }
 
         instancesProbed = true;

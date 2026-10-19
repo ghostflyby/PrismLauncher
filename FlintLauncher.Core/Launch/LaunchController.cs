@@ -11,24 +11,24 @@
 //  - decideAccount(): the "no accounts" info box and the ProfileSelectDialog are not ported;
 //    the instance account (or the default account) is used as-is. A fresh selection can be
 //    injected through <see cref="AccountToUse"/> (the C++ setAccountToUse()).
-//  - askPlayDemo(): the demo confirmation box becomes <see cref="AskPlayDemoHandler"/>; unset
-//    means "do not play the demo" (the C++ default button is Cancel).
+//  - askPlayDemo(): the demo confirmation box is not ported — the C++ default button
+//    (Cancel) wins, so a decided Demo launch without the explicit demo mode aborts.
 //  - askOfflineName(): the name dialog becomes <see cref="AskOfflineNameHandler"/>; the
 //    headless default uses <see cref="OfflineName"/> and falls back to the suggested name.
 //    The C++ stores the choice in APPLICATION->settings() "LastOfflinePlayerName"; the port
 //    mirrors that through the launcher runtime state (launcher-state.json, S5 — CONFIG C9
 //    moved the key out of settings) when one is installed, and the dialog suggestion
 //    prefers the stored name like the C++.
-//  - reauthenticateAccount(): the re-login dialog becomes <see cref="ReauthenticateHandler"/>;
-//    unset means the launch aborts (the C++ "No" button).
+//  - reauthenticateAccount(): the re-login dialog is not ported — unset behavior (abort)
+//    is the only path.
 //  - the ProfileSetupDialog branch (Normal launch without a profile) aborts the launch —
 //    there is no dialog to collect a new profile name in the headless core.
 //  - readyForLaunch(): the profiler machinery (BaseProfilerFactory) is UI and not ported; the
 //    controller auto-proceeds unless <see cref="AutoProceed"/> is turned off for API use.
 //  - onProgressRequested(): the progress dialog collapses into an immediate proceed() (the
 //    TaskStepWrapper gate must open for the launch to continue).
-//  - abort(): the "Kill Minecraft?" confirmation becomes <see cref="ConfirmKillHandler"/>;
-//    unset kills right away (the C++ default button is Yes).
+//  - abort(): the "Kill Minecraft?" confirmation is not ported — the C++ default button
+//    (Yes) wins and the game is killed right away.
 //  - reloadSettings() and the console-window plumbing (ShowConsole/ShowConsoleOnError) are
 //    UI-facing and are not ported.
 
@@ -93,21 +93,12 @@ public class LaunchController : FlintTask
 
     public AuthSession? Session => session;
 
-    /// <summary>The C++ askPlayDemo() dialog; returns true to play the demo. Unset = cancel.</summary>
-    public Func<bool>? AskPlayDemoHandler { get; set; }
-
     /// <summary>
     /// The C++ askOfflineName() dialog: receives (dialog title, message, suggested name) and
     /// returns the chosen name, or null when cancelled. Unset uses <see cref="OfflineName"/>
     /// (or the suggested name when that is empty) and never cancels.
     /// </summary>
     public Func<string, string, string, string?>? AskOfflineNameHandler { get; set; }
-
-    /// <summary>The C++ reauthenticateAccount() dialog; returns true when the account was replaced.</summary>
-    public Func<MinecraftAccount, string, bool>? ReauthenticateHandler { get; set; }
-
-    /// <summary>The C++ "Kill Minecraft?" confirmation; returns true to kill. Unset = kill.</summary>
-    public Func<bool>? ConfirmKillHandler { get; set; }
 
     /// <summary>
     /// Whether ReadyForLaunch is answered with Proceed() automatically (the profiler-less
@@ -245,47 +236,21 @@ public class LaunchController : FlintTask
             }
         }
 
-        string reauthReason;
-        switch (state)
+        // the C++ asks reauthenticateAccount() (dialog) for these states; the headless port
+        // takes the dialog's "No" default and aborts
+        if (state is AccountState.Errored or AccountState.Expired or AccountState.Disabled or AccountState.Gone)
         {
-            case AccountState.Errored:
-                reauthReason = $"An error occurred while refreshing '{accountToCheck.ProfileName()}'";
-                break;
-            case AccountState.Expired:
-                reauthReason = $"'{accountToCheck.ProfileName()}' has expired and needs to be reauthenticated";
-                break;
-            case AccountState.Disabled:
-                reauthReason = "The launcher's client identification has changed";
-                break;
-            case AccountState.Gone:
-                reauthReason = $"'{accountToCheck.ProfileName()}' no longer exists on the servers";
-                break;
-            default:
-                actualLaunchMode = state == AccountState.Online && WantedLaunchMode == LaunchMode.Normal
-                    ? LaunchMode.Normal
-                    : LaunchMode.Offline;
-                return LaunchDecision.Continue; // All good to go
+            return LaunchDecision.Abort;
         }
 
-        if (ReauthenticateHandler is not null && ReauthenticateHandler(accountToCheck, reauthReason))
-        {
-            // the hook replaced/refreshed the account; loop like the C++ Undecided result
-            return LaunchDecision.Undecided;
-        }
-
-        return LaunchDecision.Abort;
+        actualLaunchMode = state == AccountState.Online && WantedLaunchMode == LaunchMode.Normal
+            ? LaunchMode.Normal
+            : LaunchMode.Offline;
+        return LaunchDecision.Continue; // All good to go
     }
 
-    /// <summary>Port of askPlayDemo() (headless default: cancel — see the header note).</summary>
-    private bool AskPlayDemo()
-    {
-        if (AskPlayDemoHandler is not null)
-        {
-            return AskPlayDemoHandler();
-        }
-
-        return false;
-    }
+    /// <summary>Port of askPlayDemo() (the C++ default button is Cancel — see the header note).</summary>
+    private bool AskPlayDemo() => false;
 
     /// <summary>Port of askOfflineName(); returns null when the (hook) dialog was cancelled.</summary>
     private string? AskOfflineName(string playerName, LaunchMode mode)
@@ -537,9 +502,7 @@ public class LaunchController : FlintTask
             return;
         }
 
-        if (ConfirmKillHandler is null || ConfirmKillHandler())
-        {
-            launcher.Abort();
-        }
+        // the C++ "Kill Minecraft?" confirm defaults to Yes; the headless port kills directly
+        launcher.Abort();
     }
 }

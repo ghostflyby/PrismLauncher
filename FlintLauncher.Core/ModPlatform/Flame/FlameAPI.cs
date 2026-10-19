@@ -452,14 +452,14 @@ public sealed class FlameApi(NetStack? net = null) : ResourceApi
         // https://docs.curseforge.com/?python#tocS_ModsSearchSortField
         return
         [
-            new SortingMethod { Index = 1, Name = "Featured", ReadableName = "Sort by Featured" },
-            new SortingMethod { Index = 2, Name = "Popularity", ReadableName = "Sort by Popularity" },
-            new SortingMethod { Index = 3, Name = "LastUpdated", ReadableName = "Sort by Last Updated" },
-            new SortingMethod { Index = 4, Name = "Name", ReadableName = "Sort by Name" },
-            new SortingMethod { Index = 5, Name = "Author", ReadableName = "Sort by Author" },
-            new SortingMethod { Index = 6, Name = "TotalDownloads", ReadableName = "Sort by Downloads" },
-            new SortingMethod { Index = 7, Name = "Category", ReadableName = "Sort by Category" },
-            new SortingMethod { Index = 8, Name = "GameVersion", ReadableName = "Sort by Game Version" },
+            new SortingMethod { Index = 1, Name = "Featured" },
+            new SortingMethod { Index = 2, Name = "Popularity" },
+            new SortingMethod { Index = 3, Name = "LastUpdated" },
+            new SortingMethod { Index = 4, Name = "Name" },
+            new SortingMethod { Index = 5, Name = "Author" },
+            new SortingMethod { Index = 6, Name = "TotalDownloads" },
+            new SortingMethod { Index = 7, Name = "Category" },
+            new SortingMethod { Index = 8, Name = "GameVersion" },
         ];
     }
 

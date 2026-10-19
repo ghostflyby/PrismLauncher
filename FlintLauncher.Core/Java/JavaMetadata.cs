@@ -37,12 +37,10 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
     public string Descriptor() => Version.ToString();
 
     /// <summary>Port of BaseVersion::name().</summary>
-    public string Name() => name;
+    public string Name { get; internal set; } = "";
 
     /// <summary>Port of BaseVersion::typeString().</summary>
     public string TypeString() => Vendor;
-
-    internal string name = "";
 
     public string Vendor { get; set; } = "";
 
@@ -94,7 +92,7 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
     {
         var meta = new JavaMetadata
         {
-            name = dto.Name ?? "",
+            Name = dto.Name ?? "",
             Vendor = dto.Vendor ?? "",
             Url = dto.Url ?? "",
             ReleaseTime = ParseUtils.TimeFromS3Time(dto.ReleaseTime ?? ""),
@@ -115,8 +113,7 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
                 version.Major ?? 0,
                 version.Minor ?? 0,
                 version.Security ?? 0,
-                version.Build ?? 0,
-                version.Name ?? "");
+                version.Build ?? 0);
         }
 
         return meta;
@@ -126,7 +123,7 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
     {
         try
         {
-            return JsonSerializer.Deserialize(obj, JavaJsonContext.Default.JavaRuntimeJson)
+            return obj.Deserialize(JavaJsonContext.Default.JavaRuntimeJson)
                    ?? throw new JsonParseException("java runtime: Error parsing JSON: document is null");
         }
         catch (JsonException e)
@@ -171,7 +168,7 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
             }
         }
 
-        return StringUtils.NaturalCompare(name, rhs.name, ignoreCase: true) < 0;
+        return StringUtils.NaturalCompare(Name, rhs.Name, ignoreCase: true) < 0;
     }
 
     /// <summary>Port of Metadata::operator==.</summary>
@@ -182,7 +179,7 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
             return false;
         }
 
-        return Version == other.Version && name == other.name;
+        return Version == other.Version && Name == other.Name;
     }
 
     /// <summary>Port of Metadata::operator&gt;.</summary>
@@ -210,7 +207,7 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
 
     public override bool Equals(object? obj) => Equals(obj as JavaMetadata);
 
-    public override int GetHashCode() => HashCode.Combine(Version, name);
+    public override int GetHashCode() => HashCode.Combine(Version, Name);
 
     public static bool operator <(JavaMetadata left, JavaMetadata right)
     {

@@ -84,7 +84,6 @@ internal sealed class StubFlameServer : IDisposable
 
     // last request info (single-request tests only)
     public string LastPath { get; private set; } = "";
-    public string LastMethod { get; private set; } = "";
     public Dictionary<string, string> LastQuery { get; } = new(StringComparer.Ordinal);
     public Dictionary<string, string> LastHeaders { get; } = new(StringComparer.Ordinal);
     public byte[]? LastBody { get; private set; }
@@ -94,7 +93,6 @@ internal sealed class StubFlameServer : IDisposable
         var url = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
         var path = url.PathAndQuery;
         LastPath = url.GetComponents(UriComponents.AbsoluteUri, UriFormat.SafeUnescaped);
-        LastMethod = ctx.Request.HttpMethod;
         Requests.Add($"{ctx.Request.HttpMethod} {path}");
         LastHeaders.Clear();
         foreach (var key in ctx.Request.Headers.AllKeys)

@@ -5,7 +5,6 @@
 // installation layout.
 
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Launch;
 
 namespace FlintLauncher.Core.Java;
 
@@ -14,12 +13,6 @@ public static class EmbeddedJars
     /// <summary>Extraction target: &lt;temp&gt;/Flint/jars/&lt;name&gt;.jar.</summary>
     public static string CacheDir { get; } =
         FileSystem.PathCombine(Path.GetTempPath(), "Flint", "jars");
-
-    private static readonly string[] JarNames =
-    [
-        LauncherJars.NewLaunchJarName,
-        LauncherJars.NewLaunchLegacyJarName,
-    ];
 
     /// <summary>The assembly namespace prefix embedded resource names live under.</summary>
     private static string ResourcePrefix =>

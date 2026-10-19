@@ -88,7 +88,7 @@ public sealed class AtLauncherApi(NetStack? net = null)
         var root = AtLauncherJson.RequireDocument(response, "JSON response from ATLauncher");
         try
         {
-            return JsonSerializer.Deserialize(root, AtLauncherJsonContext.Default.ListIndexedPack) ?? [];
+            return root.Deserialize(AtLauncherJsonContext.Default.ListIndexedPack) ?? [];
         }
         catch (JsonException e)
         {
@@ -138,7 +138,7 @@ public sealed class AtLauncherApi(NetStack? net = null)
         PackVersion? version;
         try
         {
-            version = JsonSerializer.Deserialize(root, AtLauncherJsonContext.Default.PackVersion)
+            version = root.Deserialize(AtLauncherJsonContext.Default.PackVersion)
                       ?? throw new JsonParseException("Value is not an object");
         }
         catch (JsonException e)

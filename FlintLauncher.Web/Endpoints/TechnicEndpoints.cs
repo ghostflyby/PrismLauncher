@@ -56,13 +56,13 @@ public static class TechnicEndpoints
                 return ApiJson.Error("invalid_request", "'slug' is required", 400);
             }
 
-            var api = ResolveApi(runtime, serverUrl, out var hookError);
+            var technicApi = ResolveApi(runtime, serverUrl, out var hookError);
             if (hookError is not null)
             {
                 return hookError;
             }
 
-            var (metaError, metaFailReason, metaBody) = await FetchAsync(api.PackMetadataUrl(slug), api.Net);
+            var (metaError, metaFailReason, metaBody) = await FetchAsync(technicApi.PackMetadataUrl(slug), technicApi.Net);
             if (metaError is not null)
             {
                 // an upstream 404 is an unknown slug (the REST mapping of the C++ page's
@@ -89,7 +89,7 @@ public static class TechnicEndpoints
             if (solderUrl is not null)
             {
                 var (solderError, _, solderBody) = await FetchAsync(
-                    TechnicApi.SolderPackUrl(solderUrl, slug), api.Net);
+                    TechnicApi.SolderPackUrl(solderUrl, slug), technicApi.Net);
                 var listing = solderError is null ? TechnicApi.LoadSolderPack(solderBody) : null;
                 if (listing is not null)
                 {
@@ -160,7 +160,7 @@ public static class TechnicEndpoints
 
             // the request's client is resolved up front: a serverUrl override derives its own
             // client, the runtime's shared one is never mutated (nothing to restore)
-            var api = ResolveApi(runtime, request.ServerUrl, out var serverError);
+            var technicApi = ResolveApi(runtime, request.ServerUrl, out var serverError);
             if (serverError is not null)
             {
                 return serverError;
@@ -191,7 +191,7 @@ public static class TechnicEndpoints
                     {
                         // no build given: resolve the Solder listing's default (the version
                         // box preselects the recommended build, like TechnicPage)
-                        var (resolveError, resolved) = await ResolveDefaultBuildAsync(api, solder, slug);
+                        var (resolveError, resolved) = await ResolveDefaultBuildAsync(technicApi, solder, slug);
                         if (resolveError is not null)
                         {
                             return resolveError;
@@ -277,14 +277,14 @@ public static class TechnicEndpoints
     /// [{id, name, displayName?, iconUrl}].</summary>
     private static async Task<IResult> SearchAsync(string term, string? serverUrl, LauncherRuntime runtime)
     {
-        var api = ResolveApi(runtime, serverUrl, out var hookError);
+        var technicApi = ResolveApi(runtime, serverUrl, out var hookError);
         if (hookError is not null)
         {
             return hookError;
         }
 
-        var (url, mode) = api.SearchUrl(term);
-        var request = NetRequest.MakeByteArray(new Uri(url), stack: api.Net);
+        var (url, mode) = technicApi.SearchUrl(term);
+        var request = NetRequest.MakeByteArray(new Uri(url), stack: technicApi.Net);
         await request.StartAsync();
         if (request.State != TaskState.Succeeded)
         {

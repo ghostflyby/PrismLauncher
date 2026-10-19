@@ -532,7 +532,7 @@ internal static class VersionFormatMapper
     {
         var meta = new JavaMetadata
         {
-            name = dto.Name ?? "",
+            Name = dto.Name ?? "",
             Vendor = dto.Vendor ?? "",
             Url = dto.Url ?? "",
             ReleaseTime = ParseUtils.TimeFromS3Time(dto.ReleaseTime ?? ""),
@@ -553,8 +553,7 @@ internal static class VersionFormatMapper
                 version.Major ?? 0,
                 version.Minor ?? 0,
                 version.Security ?? 0,
-                version.Build ?? 0,
-                version.Name ?? "");
+                version.Build ?? 0);
         }
 
         return meta;

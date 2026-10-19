@@ -37,7 +37,7 @@ public sealed class EnvMapJsonConverter : JsonConverter<EnvMap>
         _ => null,
     };
 
-    private static EnvMap? ReadText(string? text)
+    private static EnvMap ReadText(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -54,7 +54,7 @@ public sealed class EnvMapJsonConverter : JsonConverter<EnvMap>
         }
     }
 
-    private static EnvMap? ReadElement(JsonElement element)
+    private static EnvMap ReadElement(JsonElement element)
     {
         return element.ValueKind switch
         {
@@ -64,7 +64,7 @@ public sealed class EnvMapJsonConverter : JsonConverter<EnvMap>
         };
     }
 
-    public override EnvMap? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override EnvMap Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         // legacy: the member held the environment map as its embedded JSON text
         if (reader.TokenType == JsonTokenType.String)
@@ -93,7 +93,7 @@ public sealed class EnvMapJsonConverter : JsonConverter<EnvMap>
         writer.WriteEndObject();
     }
 
-    internal static EnvMap? FromText(string? text)
+    internal static EnvMap FromText(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -288,7 +288,7 @@ public sealed class StringListJsonConverter : JsonConverter<List<string>?>
         };
     }
 
-    private static List<string>? FromNode(JsonNode? node)
+    private static List<string> FromNode(JsonNode? node)
     {
         var parsed = new List<string>();
         if (node is JsonArray array)

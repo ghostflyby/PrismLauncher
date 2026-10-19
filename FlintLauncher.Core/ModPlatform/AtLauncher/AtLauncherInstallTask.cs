@@ -766,7 +766,6 @@ public sealed partial class AtLauncherPackInstallTask(
                     {
                         Name = mod.File,
                         WebsiteUrl = mod.Url,
-                        Hash = mod.Md5,
                         Matched = false,
                         LocalPath = "",
                     }));

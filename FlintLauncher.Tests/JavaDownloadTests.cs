@@ -147,7 +147,10 @@ public class JavaDownloadTests : IDisposable
         Directory.CreateDirectory(_dir);
         var javaBytes = "#!/bin/sh\necho java"u8.ToArray();
         var releaseBytes = "release-info"u8.ToArray();
-        byte[] manifestBody = [];
+        // late-bound payload holder: the manifest can only be built once the server (and its
+        // URL) exist, so the handler reads through the holder instead of a captured variable
+        // the test reassigns (access-to-modified-closure)
+        var manifestJson = new string?[1];
         using var server = new TestHttpServer(ctx =>
         {
             var requestUrl = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
@@ -155,7 +158,7 @@ public class JavaDownloadTests : IDisposable
             switch (requestUrl.AbsolutePath)
             {
                 case "/manifest":
-                    body = manifestBody;
+                    body = manifestJson[0] is { } json ? Encoding.UTF8.GetBytes(json) : [];
                     break;
                 case "/files/java":
                     body = javaBytes;
@@ -175,7 +178,7 @@ public class JavaDownloadTests : IDisposable
         // the manifest can only be built once the server (and its URL) exist; the handler above
         // is not invoked before the task starts. NOTE: braces are kept apart so no "}}" run
         // collides with the $$ interpolation delimiters.
-        manifestBody = Encoding.UTF8.GetBytes($$"""
+        manifestJson[0] = $$"""
                                                 {
                                                   "files": {
                                                     "bin/": {"type": "directory"},
@@ -203,7 +206,7 @@ public class JavaDownloadTests : IDisposable
                                                     }
                                                   }
                                                 }
-                                                """);
+                                                """;
 
         var finalPath = TempPath("install-manifest");
         var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), finalPath);
@@ -250,31 +253,34 @@ public class JavaDownloadTests : IDisposable
     public async Task ManifestDownloadTask_FailsWhenFileChecksumMismatch()
     {
         Directory.CreateDirectory(_dir);
-        byte[] manifestBody = [];
+        // late-bound payload holder (see the checksum-ok test for the rationale)
+        var manifestJson = new string?[1];
         using var server = new TestHttpServer(ctx =>
         {
             ctx.Response.StatusCode = 200;
             var requestUrl = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
-            var body = requestUrl.AbsolutePath == "/manifest" ? manifestBody : "wrong-bytes"u8.ToArray();
+            var body = requestUrl.AbsolutePath == "/manifest"
+                ? (manifestJson[0] is { } json ? Encoding.UTF8.GetBytes(json) : [])
+                : "wrong-bytes"u8.ToArray();
             ctx.Response.ContentLength64 = body.Length;
             ctx.Response.OutputStream.Write(body);
         });
-        manifestBody = Encoding.UTF8.GetBytes($$"""
-                                                {
-                                                  "files": {
-                                                    "bin/java": {
-                                                      "type": "file",
-                                                      "executable": true,
-                                                      "downloads": {
-                                                        "raw": {
-                                                          "url": "{{server.Url}}/files/java",
-                                                          "sha1": "{{new string('9', 40)}}"
-                                                        }
-                                                      }
-                                                    }
-                                                  }
-                                                }
-                                                """);
+        manifestJson[0] = $$"""
+                         {
+                           "files": {
+                             "bin/java": {
+                               "type": "file",
+                               "executable": true,
+                               "downloads": {
+                                 "raw": {
+                                   "url": "{{server.Url}}/files/java",
+                                   "sha1": "{{new string('9', 40)}}"
+                                 }
+                               }
+                             }
+                           }
+                         }
+                         """;
 
         var finalPath = TempPath("install-manifest-badfile");
         var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), finalPath);

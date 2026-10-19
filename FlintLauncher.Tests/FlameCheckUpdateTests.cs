@@ -41,7 +41,7 @@ public class FlameCheckUpdateTests : IDisposable
 
     private string TempPath(string name) => Path.Combine(_root, name);
 
-    private (string ModsDir, Mod Mod, string OldSha1) SetupInstalledMod(byte[] jarBytes)
+    private (Mod Mod, string OldSha1) SetupInstalledMod(byte[] jarBytes)
     {
         var modsDir = TempPath("mods");
         Directory.CreateDirectory(Path.Combine(modsDir, ".index"));
@@ -69,13 +69,13 @@ public class FlameCheckUpdateTests : IDisposable
         PackwizModel.UpdateModIndex(Path.Combine(modsDir, ".index"), metadata);
 
         var mod = new Mod(jarPath);
-        return (modsDir, mod, oldSha1);
+        return (mod, oldSha1);
     }
 
     [Fact]
     public async Task CheckUpdate_NewerFileWithHash_DetectsUpdateAndChangelog()
     {
-        var (_, mod, oldSha1) = SetupInstalledMod("old flame jar content"u8.ToArray());
+        var (mod, oldSha1) = SetupInstalledMod("old flame jar content"u8.ToArray());
 
         // the API answers with a newer file (different sha1, later date)
         _server.FilesJson = new JsonObject
@@ -110,7 +110,7 @@ public class FlameCheckUpdateTests : IDisposable
     [Fact]
     public async Task CheckUpdate_SameFileIdMeansNoUpdate()
     {
-        var (_, mod, oldSha1) = SetupInstalledMod("same content"u8.ToArray());
+        var (mod, oldSha1) = SetupInstalledMod("same content"u8.ToArray());
 
         // the latest file is still file 456 (the installed one) and reports the same sha1
         // -> no update
@@ -131,7 +131,7 @@ public class FlameCheckUpdateTests : IDisposable
     [Fact]
     public async Task CheckUpdate_BlockedUpdate_ReportsRecoverUrl()
     {
-        var (_, mod, _) = SetupInstalledMod("old flame jar content"u8.ToArray());
+        var (mod, _) = SetupInstalledMod("old flame jar content"u8.ToArray());
 
         // newer file 789 has no download URL (CF blocks third-party launchers)
         _server.FilesJson = new JsonObject
@@ -165,7 +165,7 @@ public class FlameCheckUpdateTests : IDisposable
     [Fact]
     public async Task CheckUpdate_LoaderMismatch_ReportsCheckFailed()
     {
-        var (_, mod, _) = SetupInstalledMod("old flame jar content"u8.ToArray());
+        var (mod, _) = SetupInstalledMod("old flame jar content"u8.ToArray());
 
         // the newest file for the project targets fabric only -> nothing matches the
         // forge instance

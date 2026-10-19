@@ -121,45 +121,45 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // Java Settings (C7: the gate keys register as derived keys — inheritance is the
         // fold, the override chains are gone; the java probe quintet is NOT here, it lives
         // in launcher-state.json's path-keyed map, S5/C9)
-        _settings.RegisterSetting("OverrideJavaLocation", false);
-        _settings.RegisterSetting("OverrideJavaArgs", false);
-        _settings.RegisterSetting("AutomaticJava", false);
-        _settings.RegisterSetting("UseLatestMinecraftVersion", false);
-        _settings.RegisterSetting("UseLatestMinecraftVersionType", "release");
+        InstanceSettings.RegisterSetting("OverrideJavaLocation", false);
+        InstanceSettings.RegisterSetting("OverrideJavaArgs", false);
+        InstanceSettings.RegisterSetting("AutomaticJava", false);
+        InstanceSettings.RegisterSetting("UseLatestMinecraftVersion", false);
+        InstanceSettings.RegisterSetting("UseLatestMinecraftVersionType", "release");
 
-        _settings.RegisterSetting("OverrideWindow", false);
-        _settings.RegisterSetting("LaunchMaximized", false);
-        _settings.RegisterSetting("MinecraftWinWidth", 854);
-        _settings.RegisterSetting("MinecraftWinHeight", 480);
-        _settings.RegisterSetting("OverrideMemory", false);
-        _settings.RegisterSetting("MinMemAlloc", 512);
-        _settings.RegisterSetting("MaxMemAlloc", 4096);
-        _settings.RegisterSetting("LowMemWarning", true);
-        _settings.RegisterSetting("OverrideNativeWorkarounds", false);
-        _settings.RegisterSetting("UseNativeOpenAL", false);
-        _settings.RegisterSetting("CustomOpenALPath", "");
-        _settings.RegisterSetting("UseNativeGLFW", false);
-        _settings.RegisterSetting("CustomGLFWPath", "");
-        _settings.RegisterSetting("UseNativeSDL", false);
-        _settings.RegisterSetting("CustomSDLPath", "");
-        _settings.RegisterSetting("OverridePerformance", false);
-        _settings.RegisterSetting("EnableFeralGamemode", false);
-        _settings.RegisterSetting("EnableMangoHud", false);
-        _settings.RegisterSetting("UseDiscreteGpu", false);
-        _settings.RegisterSetting("UseZink", false);
-        _settings.RegisterSetting("OverrideMiscellaneous", false);
-        _settings.RegisterSetting("CloseAfterLaunch", false);
-        _settings.RegisterSetting("QuitAfterGameStop", false);
-        _settings.RegisterSetting("OverrideLegacySettings", false);
-        _settings.RegisterSetting("OnlineFixes", false);
-        _settings.RegisterSetting("OverrideEnv", false);
-        _settings.RegisterSetting("Env", "{}");
+        InstanceSettings.RegisterSetting("OverrideWindow", false);
+        InstanceSettings.RegisterSetting("LaunchMaximized", false);
+        InstanceSettings.RegisterSetting("MinecraftWinWidth", 854);
+        InstanceSettings.RegisterSetting("MinecraftWinHeight", 480);
+        InstanceSettings.RegisterSetting("OverrideMemory", false);
+        InstanceSettings.RegisterSetting("MinMemAlloc", 512);
+        InstanceSettings.RegisterSetting("MaxMemAlloc", 4096);
+        InstanceSettings.RegisterSetting("LowMemWarning", true);
+        InstanceSettings.RegisterSetting("OverrideNativeWorkarounds", false);
+        InstanceSettings.RegisterSetting("UseNativeOpenAL", false);
+        InstanceSettings.RegisterSetting("CustomOpenALPath", "");
+        InstanceSettings.RegisterSetting("UseNativeGLFW", false);
+        InstanceSettings.RegisterSetting("CustomGLFWPath", "");
+        InstanceSettings.RegisterSetting("UseNativeSDL", false);
+        InstanceSettings.RegisterSetting("CustomSDLPath", "");
+        InstanceSettings.RegisterSetting("OverridePerformance", false);
+        InstanceSettings.RegisterSetting("EnableFeralGamemode", false);
+        InstanceSettings.RegisterSetting("EnableMangoHud", false);
+        InstanceSettings.RegisterSetting("UseDiscreteGpu", false);
+        InstanceSettings.RegisterSetting("UseZink", false);
+        InstanceSettings.RegisterSetting("OverrideMiscellaneous", false);
+        InstanceSettings.RegisterSetting("CloseAfterLaunch", false);
+        InstanceSettings.RegisterSetting("QuitAfterGameStop", false);
+        InstanceSettings.RegisterSetting("OverrideLegacySettings", false);
+        InstanceSettings.RegisterSetting("OnlineFixes", false);
+        InstanceSettings.RegisterSetting("OverrideEnv", false);
+        InstanceSettings.RegisterSetting("Env", "{}");
         // the layered member keys resolve instance ?? user through the adapter — the
         // registered values are type anchors only (C6 defaults live in the flint.json
         // record property initializers, the single source)
-        _settings.RegisterSetting("JavaPath", "");
-        _settings.RegisterSetting("JvmArgs", "");
-        _settings.RegisterSetting("IgnoreJavaCompatibility", false);
+        InstanceSettings.RegisterSetting("JavaPath", "");
+        InstanceSettings.RegisterSetting("JvmArgs", "");
+        InstanceSettings.RegisterSetting("IgnoreJavaCompatibility", false);
 
         // the C++ force-wrote InstanceType=OneSix here; with the typed layer the record
         // default IS OneSix (BaseInstance registration) and a non-OneSix type never
@@ -167,29 +167,29 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // a fresh load performs no write — the dual-track read-only guarantee (D4)
 
         // Join server on launch, this does not have a global override
-        _settings.RegisterSetting("JoinServerOnLaunch", false);
-        _settings.RegisterSetting("JoinServerOnLaunchAddress", "");
-        _settings.RegisterSetting("JoinWorldOnLaunch", "");
+        InstanceSettings.RegisterSetting("JoinServerOnLaunch", false);
+        InstanceSettings.RegisterSetting("JoinServerOnLaunchAddress", "");
+        InstanceSettings.RegisterSetting("JoinWorldOnLaunch", "");
 
         // Use account for instance, this does not have a global override
-        _settings.RegisterSetting("UseAccountForInstance", false);
-        _settings.RegisterSetting("InstanceAccountId", "");
+        InstanceSettings.RegisterSetting("UseAccountForInstance", false);
+        InstanceSettings.RegisterSetting("InstanceAccountId", "");
 
-        _settings.RegisterSetting("ExportName", "");
-        _settings.RegisterSetting("ExportVersion", "1.0.0");
-        _settings.RegisterSetting("ExportSummary", "");
-        _settings.RegisterSetting("ExportAuthor", "");
-        _settings.RegisterSetting("ExportOptionalFiles", true);
-        _settings.RegisterSetting("ExportRecommendedRAM");
+        InstanceSettings.RegisterSetting("ExportName", "");
+        InstanceSettings.RegisterSetting("ExportVersion", "1.0.0");
+        InstanceSettings.RegisterSetting("ExportSummary", "");
+        InstanceSettings.RegisterSetting("ExportAuthor", "");
+        InstanceSettings.RegisterSetting("ExportOptionalFiles", true);
+        InstanceSettings.RegisterSetting("ExportRecommendedRAM");
 
-        _settings.RegisterSetting("GlobalDataPacksEnabled", false);
-        _settings.RegisterSetting("GlobalDataPacksPath", "");
+        InstanceSettings.RegisterSetting("GlobalDataPacksEnabled", false);
+        InstanceSettings.RegisterSetting("GlobalDataPacksPath", "");
         // (upstream connects both settings to reset the data pack folder model; that model is
         //  not ported yet, so there is nothing to reset here)
 
         // Mod download loaders (the C7 OverrideModDownloadLoaders family; instance-only)
-        _settings.RegisterSetting("OverrideModDownloadLoaders", false);
-        _settings.RegisterSetting("ModDownloadLoaders", "[]");
+        InstanceSettings.RegisterSetting("OverrideModDownloadLoaders", false);
+        InstanceSettings.RegisterSetting("ModDownloadLoaders", "[]");
 
         SetSpecificSettingsLoaded(true);
 
@@ -410,7 +410,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // if we aren't in offline mode
         if (session?.LaunchMode != LaunchMode.Offline)
         {
-            process.AppendStep(new ClaimAccount(process, session));
+            process.AppendStep(new ClaimAccount(process));
             foreach (var t in CreateUpdateTask())
             {
                 process.AppendStep(new TaskStepWrapper(process, t));
@@ -461,7 +461,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             process.SetCensorFilter(CreateCensorFilterFromSession(session));
         }
 
-        if (Variant.AsBool(_settings.Get("QuitAfterGameStop")))
+        if (Variant.AsBool(InstanceSettings.Get("QuitAfterGameStop")))
         {
             process.AppendStep(new QuitAfterGameStop(process));
         }
@@ -473,14 +473,12 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     /// <summary>Headless LaunchServices for bare fixtures (no stamped services, no explicit
     /// per-launch override): CWD-anchored paths, a null logger and the injected instance
-    /// cache/settings — the same behavior the former unset static hooks produced.</summary>
+    /// settings — the same behavior the former unset static hooks produced.</summary>
     private LaunchServices BuildLaunchServices() => new()
     {
         Paths = Paths ?? FlintPaths.FromHomeDir(Directory.GetCurrentDirectory()),
         LoggerFactory = NullLoggerFactory.Instance,
-        MetaCache = MetaCache,
         Config = UserConfigStore,
-        InstallRoot = Paths?.InstallRoot ?? AppContext.BaseDirectory,
     };
 
     public string CreateLaunchScript(AuthSession? session, MinecraftTarget? targetToJoin) =>
@@ -1180,12 +1178,8 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public override string GetStatusbarDescription()
     {
-        var traitsList = new List<string>();
-        if (HasVersionBroken)
-        {
-            traitsList.Add("broken");
-        }
-
+        // (the C++ collected version traits into a list for the statusbar; the ported
+        // description only surfaces the broken flag, so the list itself is gone)
         var mcVersion = Components.GetComponentVersion("net.minecraft");
         if (mcVersion.Length == 0)
         {
@@ -1199,7 +1193,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         }
 
         var description = $"Minecraft {mcVersion}";
-        if (Variant.AsBool(_settings.Get("ShowGameTime")))
+        if (Variant.AsBool(InstanceSettings.Get("ShowGameTime")))
         {
             // the without-days display flag is global-only (no instance override in C++)
             var withoutDays = UserLayer.GameTime.ShowGameTimeWithoutDays ?? false;

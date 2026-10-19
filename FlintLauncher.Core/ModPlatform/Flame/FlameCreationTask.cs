@@ -74,7 +74,6 @@ public sealed partial class FlameCreationTask : InstanceTask
     private readonly string _managedVersionId;
 
     private readonly List<(string FileName, string TargetFolder)> _otherResources = [];
-    private readonly List<string> _selectedOptionalMods = [];
 
     private MinecraftInstance? newInstance;
 
@@ -102,15 +101,10 @@ public sealed partial class FlameCreationTask : InstanceTask
     public IReadOnlyDictionary<string, bool> OptionalModsSelection { get; set; } =
         new Dictionary<string, bool>();
 
-    /// <summary>The optional-mods selection check for a relative file path (the private
-    /// dialog-result list OR the headless selection map, '/'-normalized).</summary>
+    /// <summary>The optional-mods selection check for a relative path against the headless
+    /// selection map, '/'-normalized (the C++ dialog-result list has no ported producer).</summary>
     private bool IsOptionalSelected(string relPath)
     {
-        if (_selectedOptionalMods.Contains(relPath))
-        {
-            return true;
-        }
-
         var normalized = relPath.Replace('\\', '/');
         return OptionalModsSelection.TryGetValue(normalized, out var selected) && selected;
     }
@@ -458,7 +452,6 @@ public sealed partial class FlameCreationTask : InstanceTask
                 {
                     Name = result.Version.FileName,
                     WebsiteUrl = $"{result.Pack.WebsiteUrl}/download/{result.Version.FileId}",
-                    Hash = result.Version.Hash,
                     Matched = false,
                     LocalPath = "",
                     TargetFolder = result.TargetFolder,
@@ -570,24 +563,16 @@ public sealed partial class FlameCreationTask : InstanceTask
 
             EmitStatus($"Copying Blocked Mods ({i} out of {total} are done)");
 
-            if (mod.Move)
+            // the C++ Move/copy fork was the BlockedModsDialog's checkbox; the headless port
+            // always copies (never moves) the user-picked local file
+            try
             {
-                if (!FileSystem.Move(mod.LocalPath, destPath))
-                {
-                    // (the C++ only logs the failure)
-                }
+                FileSystem.EnsureFilePathExists(destPath);
+                File.Copy(mod.LocalPath, destPath, overwrite: true);
             }
-            else
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
             {
-                try
-                {
-                    FileSystem.EnsureFilePathExists(destPath);
-                    File.Copy(mod.LocalPath, destPath, overwrite: true);
-                }
-                catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
-                {
-                    // (the C++ only logs the failure)
-                }
+                // (the C++ only logs the failure)
             }
 
             i++;

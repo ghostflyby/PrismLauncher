@@ -11,14 +11,10 @@
 // adjust UiHooks/XmlLogParsing on ITS OWN LaunchServices before handing it to a launch, and
 // no other pipeline in the process can observe that.
 
-using System.Net;
 using FlintLauncher.Core.Config;
-using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Java;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.State;
 using Microsoft.Extensions.Logging;
-using Index = FlintLauncher.Core.Meta.Index;
 
 namespace FlintLauncher.Core.Launch;
 
@@ -27,13 +23,6 @@ public sealed class LaunchServices
     public required FlintPaths Paths { get; init; }
 
     public required ILoggerFactory LoggerFactory { get; init; }
-
-    /// <summary>Shared metadata cache for library/asset-index downloads (the C++
-    /// APPLICATION->metacache()). The update steps read the INSTANCE-stamped cache
-    /// (MinecraftInstance.MetaCache — the same object the composition root registered);
-    /// this mirror exists for pure-core consumers of the services. Since E6 there is no
-    /// bare-fixture fallback anywhere: an unstamped instance fails the update steps.</summary>
-    public HttpMetaCache? MetaCache { get; init; }
 
     /// <summary>The typed flint.json store (the user layer of the C7 stack — D4 retired the
     /// SettingsObject adapter view). AutoInstallJava reads the java/download switches from
@@ -53,22 +42,9 @@ public sealed class LaunchServices
     /// C++ had no switch — the host enables it).</summary>
     public bool XmlLogParsing { get; init; }
 
-    /// <summary>Where the Flint binary itself lives (jar extraction, share/&lt;launcher&gt;);
-    /// replaces the JavaUtils.LauncherRootPath static.</summary>
-    public string InstallRoot { get; init; } = AppContext.BaseDirectory;
-
-    /// <summary>Test/override DNS endpoint for the SRV lookup (SrvResolver via
-    /// LookupServerAddress; the C++ had QDnsLookup on the system resolver). Null queries the
-    /// system nameserver.</summary>
-    public IPEndPoint? SrvServerEndpoint { get; init; }
-
     /// <summary>C++ settings "ResourceURLOverride" (AssetUpdateTask asset-object base URL).
     /// Null keeps the build default base.</summary>
     public string? ResourceUrlOverride { get; init; }
-
-    /// <summary>C++ settings "LegacyFMLLibsURLOverride" (LegacyFMLLibrariesTask download
-    /// base). Null keeps the build default base.</summary>
-    public string? LegacyFmllibsUrlOverride { get; init; }
 
     /// <summary>C++ APPLICATION->javalist() (AutoInstallJava's "no download" branch); null
     /// degrades to the upstream "no compatible Java version was found" warning.</summary>
@@ -83,10 +59,6 @@ public sealed class LaunchServices
     /// <summary>The effective java root: the provider's resolution when wired, else the
     /// store-root java anchor (the same store semantics with the default dir name).</summary>
     public string JavaRoot => JavaRootProvider?.Invoke() ?? Paths.JavaRoot;
-
-    /// <summary>C++ APPLICATION->metadataIndex() (AutoInstallJava's java-meta list); null
-    /// keeps the instance PackProfile's index.</summary>
-    public Func<MinecraftInstance, Index>? MetadataIndexProvider { get; init; }
 
     /// <summary>GUI-only interaction points (dialogs, window management). Unset members keep
     /// the headless defaults — the C++ GUI host would set them.</summary>

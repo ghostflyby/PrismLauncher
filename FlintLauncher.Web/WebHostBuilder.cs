@@ -113,17 +113,15 @@ public static class WebHostBuilder
         }
 
         // the launch pipeline's dependencies (the C++ APPLICATION singleton's launch half):
-        // logger factory from the app services, paths from the FlintPaths layout, meta cache,
-        // global settings and runtime state from the runtime. The launch endpoints hand it to
-        // the controller and the instance list stamps it onto (re)discovered instances.
+        // logger factory from the app services, paths from the FlintPaths layout, global
+        // settings and runtime state from the runtime. The launch endpoints hand it to the
+        // controller and the instance list stamps it onto (re)discovered instances.
         runtime.LaunchServices = new LaunchServices
         {
             Paths = paths,
             LoggerFactory = loggerFactory,
-            MetaCache = runtime.MetaCache,
             Config = runtime.Config,
             LauncherState = runtime.State,
-            InstallRoot = paths.InstallRoot,
             // CACHE E2 via GLOBAL §3: the java root follows the JavaDir setting under store
             // semantics, and the managed-versions javalist scans it (the C++
             // APPLICATION->javalist() the AutoInstallJava "no download" branch reads)

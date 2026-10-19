@@ -79,16 +79,16 @@ public class SkinLibraryApiTests : IAsyncDisposable
     [Fact]
     public async Task Store_List_Delete_RoundTrip()
     {
-        var client = await StartAsync();
+        var httpClient = await StartAsync();
 
         // empty library
-        var empty = await client.GetAsync("/api/v1/skins");
+        var empty = await httpClient.GetAsync("/api/v1/skins");
         Assert.Equal(HttpStatusCode.OK, empty.StatusCode);
         Assert.Equal(0, JsonDocument.Parse(await empty.Content.ReadAsStringAsync())
             .RootElement.GetArrayLength());
 
         // store (name + model from the form)
-        var stored = await client.PostAsync("/api/v1/skins", StoreForm("Test Skin", "slim"));
+        var stored = await httpClient.PostAsync("/api/v1/skins", StoreForm("Test Skin", "slim"));
         Assert.Equal(HttpStatusCode.Created, stored.StatusCode);
         var storedView = JsonDocument.Parse(await stored.Content.ReadAsStringAsync()).RootElement;
         Assert.Equal("Test Skin", storedView.GetProperty("name").GetString());
@@ -98,49 +98,49 @@ public class SkinLibraryApiTests : IAsyncDisposable
         Assert.True(File.Exists(Path.Combine(SkinsDir, "index.json")));
 
         // listed with the stored variant + file presence
-        var list = JsonDocument.Parse(await client.GetStringAsync("/api/v1/skins")).RootElement;
+        var list = JsonDocument.Parse(await httpClient.GetStringAsync("/api/v1/skins")).RootElement;
         var entry = list.EnumerateArray().Single();
         Assert.Equal("Test Skin", entry.GetProperty("name").GetString());
         Assert.Equal("SLIM", entry.GetProperty("model").GetString());
         Assert.True(entry.GetProperty("fileExists").GetBoolean());
 
         // single-skin read agrees
-        var one = JsonDocument.Parse(await client.GetStringAsync("/api/v1/skins/Test%20Skin"))
+        var one = JsonDocument.Parse(await httpClient.GetStringAsync("/api/v1/skins/Test%20Skin"))
             .RootElement;
         Assert.Equal("Test Skin", one.GetProperty("name").GetString());
 
         // duplicate name is a conflict (no overwrite; delete first to replace)
-        var duplicate = await client.PostAsync("/api/v1/skins", StoreForm("Test Skin", "classic"));
+        var duplicate = await httpClient.PostAsync("/api/v1/skins", StoreForm("Test Skin", "classic"));
         Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
-        Assert.Equal("SLIM", JsonDocument.Parse(await client.GetStringAsync("/api/v1/skins"))
+        Assert.Equal("SLIM", JsonDocument.Parse(await httpClient.GetStringAsync("/api/v1/skins"))
             .RootElement.EnumerateArray().Single().GetProperty("model").GetString());
 
         // delete removes entry + texture
         Assert.Equal(HttpStatusCode.NoContent,
-            (await client.DeleteAsync("/api/v1/skins/Test%20Skin")).StatusCode);
+            (await httpClient.DeleteAsync("/api/v1/skins/Test%20Skin")).StatusCode);
         Assert.False(File.Exists(Path.Combine(SkinsDir, "Test Skin.png")));
         Assert.Equal(HttpStatusCode.NotFound,
-            (await client.GetAsync("/api/v1/skins/Test%20Skin")).StatusCode);
+            (await httpClient.GetAsync("/api/v1/skins/Test%20Skin")).StatusCode);
 
         // deleting a missing skin is a 404
         Assert.Equal(HttpStatusCode.NotFound,
-            (await client.DeleteAsync("/api/v1/skins/Test%20Skin")).StatusCode);
+            (await httpClient.DeleteAsync("/api/v1/skins/Test%20Skin")).StatusCode);
     }
 
     [Fact]
     public async Task Apply_Guards_And_Composition()
     {
-        var client = await StartAsync();
+        var httpClient = await StartAsync();
 
         // unknown skin
-        var missingSkin = await client.PostAsJsonAsync("/api/v1/skins/nope/apply",
+        var missingSkin = await httpClient.PostAsJsonAsync("/api/v1/skins/nope/apply",
             new { profileId = "abc" });
         Assert.Equal(HttpStatusCode.NotFound, missingSkin.StatusCode);
 
         // store one, remove the texture behind the library's back
-        await client.PostAsync("/api/v1/skins", StoreForm("Ghost", "classic"));
+        await httpClient.PostAsync("/api/v1/skins", StoreForm("Ghost", "classic"));
         File.Delete(Path.Combine(SkinsDir, "Ghost.png"));
-        var missingTexture = await client.PostAsJsonAsync("/api/v1/skins/Ghost/apply",
+        var missingTexture = await httpClient.PostAsJsonAsync("/api/v1/skins/Ghost/apply",
             new { profileId = "abc" });
         Assert.Equal(HttpStatusCode.Conflict, missingTexture.StatusCode);
         Assert.Equal("skin_texture_missing", JsonDocument.Parse(
@@ -148,8 +148,8 @@ public class SkinLibraryApiTests : IAsyncDisposable
             .GetProperty("error").GetProperty("code").GetString());
 
         // a stored texture + unknown account
-        await client.PostAsync("/api/v1/skins", StoreForm("Real", "classic"));
-        var unknownAccount = await client.PostAsJsonAsync("/api/v1/skins/Real/apply",
+        await httpClient.PostAsync("/api/v1/skins", StoreForm("Real", "classic"));
+        var unknownAccount = await httpClient.PostAsJsonAsync("/api/v1/skins/Real/apply",
             new { profileId = "no-such-profile" });
         Assert.Equal(HttpStatusCode.BadRequest, unknownAccount.StatusCode);
         Assert.Equal("unknown_account", JsonDocument.Parse(
@@ -157,7 +157,7 @@ public class SkinLibraryApiTests : IAsyncDisposable
             .GetProperty("error").GetProperty("code").GetString());
 
         // missing body
-        var noBody = await client.PostAsync("/api/v1/skins/Real/apply",
+        var noBody = await httpClient.PostAsync("/api/v1/skins/Real/apply",
             new StringContent("null", Encoding.UTF8, "application/json"));
         Assert.Equal(HttpStatusCode.BadRequest, noBody.StatusCode);
     }

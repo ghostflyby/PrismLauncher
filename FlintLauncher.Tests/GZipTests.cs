@@ -64,7 +64,9 @@ public class GZipTests
         Assert.True(GZip.Compress(data, out var compressed));
 
         using var source = new MemoryStream(compressed, writable: false);
-        using var output = new MemoryStream();
+        // (no `using`: the block callback only runs inside ReadGzFileByBlocks, and a plain
+        // MemoryStream holds no unmanaged resource)
+        var output = new MemoryStream();
         var error = GZip.ReadGzFileByBlocks(source, block =>
         {
             output.Write(block, 0, block.Length);

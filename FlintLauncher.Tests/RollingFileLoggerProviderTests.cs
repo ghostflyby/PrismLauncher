@@ -42,12 +42,15 @@ public class RollingFileLoggerProviderTests : IDisposable
         File.WriteAllText(PathOf(4), "gen4-oldest\n");
 
         using var provider = new RollingFileLoggerProvider(_dir);
-        using var factory = LoggerFactory.Create(builder =>
+        using (var factory = LoggerFactory.Create(
+                   builder =>
+                   {
+                       builder.SetMinimumLevel(LogLevel.Information);
+                       builder.AddProvider(provider);
+                   }))
         {
-            builder.SetMinimumLevel(LogLevel.Information);
-            builder.AddProvider(provider);
-        });
-        factory.CreateLogger("test.category").LogInformation("hello file");
+            factory.CreateLogger("test.category").LogInformation("hello file");
+        }
 
         // generations shifted down (0->1, 1->2, 3->4) and the oldest was dropped
         Assert.Equal("gen0\n", File.ReadAllText(PathOf(1)));

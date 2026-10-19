@@ -11,8 +11,7 @@
 //    (null degrades to the upstream "no compatible Java version was found" warning)
 //  - APPLICATION->javaPath() (settings "JavaDir")   -> Services.JavaRoot (the JavaDir
 //    setting under E2 store semantics; falls back to the store/java anchor)
-//  - APPLICATION->metadataIndex()                   -> Services.MetadataIndexProvider
-//    (defaults to the instance PackProfile's index)
+//  - APPLICATION->metadataIndex()                   -> the instance PackProfile's index
 //
 // Flow deviations from the C++ (documented):
 //  - The C++ starts the java-meta load task and then emits progressReportingRequest() without
@@ -134,8 +133,7 @@ public sealed class AutoInstallJava : LaunchStep
         await TryNextMajorJava(cancellationToken).ConfigureAwait(false);
     }
 
-    private Index MetadataIndex() =>
-        Services.MetadataIndexProvider?.Invoke(_instance) ?? _instance.GetPackProfile().MetadataIndex;
+    private Index MetadataIndex() => _instance.GetPackProfile().MetadataIndex;
 
     private IReadOnlyList<int> MajorJavaVersions() =>
         _instance.GetPackProfile().GetProfile()?.GetCompatibleJavaMajors() ?? [];
@@ -178,10 +176,10 @@ public sealed class AutoInstallJava : LaunchStep
         var runtimes = version.Data?.Runtimes ?? [];
         foreach (var java in runtimes)
         {
-            if (java.RuntimeOs == _supportedArch && java.Name() == javaName)
+            if (java.RuntimeOs == _supportedArch && java.Name == javaName)
             {
                 var javaDir = Services.JavaRoot;
-                var finalPath = FileSystem.PathCombine(javaDir, java.Name());
+                var finalPath = FileSystem.PathCombine(javaDir, java.Name);
                 switch (java.DownloadType)
                 {
                     case JavaDownloadType.Manifest:

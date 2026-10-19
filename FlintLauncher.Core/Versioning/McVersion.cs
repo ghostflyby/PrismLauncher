@@ -40,7 +40,7 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
 
     private void Parse()
     {
-        var sections = new List<Section>();
+        var parsed = new List<Section>();
         var len = _string.Length;
         for (var i = 0; i < len;)
         {
@@ -92,11 +92,11 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
                     s = s.TrimStart('0');
                 }
 
-                sections.Add(new Section(type, s));
+                parsed.Add(new Section(type, s));
             }
         }
 
-        this.sections = sections.ToArray();
+        this.sections = parsed.ToArray();
     }
 
     private static int CompareSections(Section a, Section b)

@@ -78,9 +78,9 @@ internal static class PortAllocator
         public TcpListener TakeListener()
         {
             ObjectDisposedException.ThrowIf(this.listener is null, this);
-            var listener = this.listener;
+            var leased = this.listener;
             this.listener = null;
-            return listener;
+            return leased;
         }
 
         public void Dispose()

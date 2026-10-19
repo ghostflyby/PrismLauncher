@@ -685,7 +685,6 @@ public static class ModPlatformEndpoints
             {
                 Index = 1,
                 Name = string.IsNullOrWhiteSpace(index) ? "relevance" : index,
-                ReadableName = "Sort by " + (string.IsNullOrWhiteSpace(index) ? "Relevance" : index),
             },
         };
 
@@ -763,7 +762,7 @@ public static class ModPlatformEndpoints
         }
 
         return methods.FirstOrDefault(m => m.Name == "Popularity",
-            new SortingMethod { Index = 2, Name = "Popularity", ReadableName = "Sort by Popularity" });
+            new SortingMethod { Index = 2, Name = "Popularity" });
     }
 
     /// <summary>The optional hit download count (FlameMod does not load it; read it raw).

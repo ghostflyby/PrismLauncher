@@ -114,8 +114,7 @@ public abstract class FlintTask
         cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         previousCts?.Dispose();
 
-        var runTask = RunAsync(cts.Token);
-        this.runTask = runTask;
+        runTask = RunAsync(cts.Token);
         await runTask.ConfigureAwait(false);
     }
 
@@ -246,8 +245,6 @@ public abstract class FlintTask
         {
             Current = current,
             Total = total,
-            Status = Status,
-            Details = details,
             State = TaskStepState.Running,
         });
     }
@@ -267,8 +264,6 @@ public abstract class FlintTask
     {
         Current = progress,
         Total = progressTotal,
-        Status = Status,
-        Details = details,
         State = ToStepState(State),
     };
 

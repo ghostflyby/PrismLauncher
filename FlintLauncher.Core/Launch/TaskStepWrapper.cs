@@ -34,23 +34,23 @@ public sealed class TaskStepWrapper(LaunchTask parent, FlintTask task) : LaunchS
         EmitProgressReportingRequest();
         await proceedSignal.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
 
-        var task = this.task;
-        if (task is null)
+        var wrapped = this.task;
+        if (wrapped is null)
         {
             EmitSucceeded();
             return;
         }
 
-        await task.StartAsync(cancellationToken).ConfigureAwait(false);
+        await wrapped.StartAsync(cancellationToken).ConfigureAwait(false);
 
-        if (task.WasSuccessful)
+        if (wrapped.WasSuccessful)
         {
             this.task = null;
             EmitSucceeded();
         }
         else
         {
-            var reason = $"Instance update failed because: {task.FailReason}\n\n";
+            var reason = $"Instance update failed because: {wrapped.FailReason}\n\n";
             this.task = null;
             EmitLogLine(reason, MessageLevel.Fatal);
             EmitFailed(reason);

@@ -47,7 +47,6 @@ public static class ModrinthPackIndex
             var modAuthor = new ModpackAuthor
             {
                 Name = author,
-                Url = ModrinthApi.GetAuthorUrl(author),
             };
             pack.Authors = [modAuthor];
         }
@@ -72,29 +71,13 @@ public static class ModrinthPackIndex
         pack.ExtraDataLoaded = false;
     }
 
-    /// <summary>Port of Modrinth::loadExtraPackData.</summary>
+    /// <summary>Port of Modrinth::loadExtraPackData (the donation list, discord url and
+    /// status members have no reader and are not ported).</summary>
     public static void LoadExtraPackData(IndexedPack pack, ModrinthProjectJson dto)
     {
         pack.ExtraData.IssuesUrl = ChopTrailingSlash(dto.IssuesUrl ?? "");
         pack.ExtraData.SourceUrl = ChopTrailingSlash(dto.SourceUrl ?? "");
         pack.ExtraData.WikiUrl = ChopTrailingSlash(dto.WikiUrl ?? "");
-        pack.ExtraData.DiscordUrl = ChopTrailingSlash(dto.DiscordUrl ?? "");
-
-        if (dto.DonationUrls is { } donations)
-        {
-            foreach (var d in donations)
-            {
-                var donate = new DonationData
-                {
-                    Id = d.Id ?? "",
-                    Platform = d.Platform ?? "",
-                    Url = d.Url ?? "",
-                };
-                pack.ExtraData.Donate.Add(donate);
-            }
-        }
-
-        pack.ExtraData.Status = dto.Status ?? "";
 
         pack.ExtraData.Body = (dto.Body ?? "").Replace("<br>", "");
 
@@ -141,9 +124,11 @@ public static class ModrinthPackIndex
         file.VersionNumber = ModrinthRequire.String(dto.VersionNumber, "version_number");
         file.VersionType = IndexedVersionType.FromString(ModrinthRequire.String(dto.VersionType, "version_type"));
 
+        // the wire's `changelog` member has no ported reader (UI-only display field), but a
+        // present non-string value still fails the read like it did upstream
         if (dto.Changelog is { } changelog)
         {
-            file.Changelog = ModrinthRequire.String(changelog, "changelog");
+            _ = ModrinthRequire.String(changelog, "changelog");
         }
 
         if (dto.Dependencies is { } dependencies)

@@ -36,7 +36,6 @@ public sealed class ShareCode
 public sealed class ShareCodeResponse
 {
     public bool Error { get; set; }
-    public int Code { get; set; }
     public string Message { get; set; } = "";
     public ShareCode Data { get; } = new();
 }
@@ -47,7 +46,7 @@ public static class AtLauncherShareCode
     public static void LoadShareCodeResponse(ShareCodeResponse r, AtlShareCodeResponseJson obj)
     {
         r.Error = Require(obj.Error, "error");
-        r.Code = Require(obj.Code, "code");
+        Require(obj.Code, "code");
         r.Message = obj.Message ?? "";
 
         if (!r.Error)

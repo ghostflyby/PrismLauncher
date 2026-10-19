@@ -171,7 +171,7 @@ public sealed class ModrinthPackExportTask(
 
         foreach (var (relative, sha512) in _pendingHashes)
         {
-            if (!entries.TryGetValue(sha512, out var version) || version.Files is not { } filesArray)
+            if (!entries.TryGetValue(sha512, out var v) || v.Files is not { } filesArray)
             {
                 continue;
             }

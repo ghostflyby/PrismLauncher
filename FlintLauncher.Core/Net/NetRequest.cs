@@ -142,27 +142,21 @@ public sealed class NetRequest(
 
     private async Task ExecuteOnceAsync(CancellationToken cancellationToken)
     {
-        var spec = new NetRequestSpec { Url = url };
+        var spec = new NetRequestSpec();
         foreach (var (name, value) in _headers)
         {
             spec.Headers[name] = value;
         }
 
-        // RequestTimeout port (QNetworkReply::setTransferTimeout): a one-shot inactivity timer
-        // cancelling the linked token; rearmed before every await that can transfer data.
+        // RequestTimeout port (QNetworkReply::setTransferTimeout): an inactivity timeout that
+        // cancels the linked token. CancelAfter replaces the pending delay on each re-arm, so
+        // the timeout state stays inside the CTS: a Timer callback would instead capture the
+        // using-scoped source from a threadpool context and depend on disposal ordering.
         using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        await using var idleTimer = new Timer(_ => timeoutSource.Cancel());
 
-        void ArmIdleTimer()
+        void ArmIdleTimer(CancellationTokenSource source)
         {
-            try
-            {
-                _ = idleTimer.Change(_stack.RequestTimeout, Timeout.InfiniteTimeSpan);
-            }
-            catch (ObjectDisposedException)
-            {
-                // the request finished while a re-arm was queued; nothing to do
-            }
+            source.CancelAfter(_stack.RequestTimeout);
         }
 
         try
@@ -188,7 +182,7 @@ public sealed class NetRequest(
                     message.Content = new ByteArrayContent(postData);
                 }
 
-                ArmIdleTimer();
+                ArmIdleTimer(timeoutSource);
                 response = await _stack.Client.SendAsync(
                     message,
                     HttpCompletionOption.ResponseHeadersRead,
@@ -229,7 +223,6 @@ public sealed class NetRequest(
             {
                 var responseInfo = new NetResponseInfo
                 {
-                    Url = url,
                     StatusCode = (int)response.StatusCode,
                 };
                 foreach (var header in response.Headers)
@@ -283,7 +276,7 @@ public sealed class NetRequest(
                 {
                     while (true)
                     {
-                        ArmIdleTimer();
+                        ArmIdleTimer(timeoutSource);
                         var read = await stream.ReadAsync(buffer, timeoutSource.Token).ConfigureAwait(false);
                         if (read == 0)
                         {

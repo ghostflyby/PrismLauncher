@@ -115,7 +115,7 @@ public sealed class FtbApi(NetStack? net = null)
 
         try
         {
-            return JsonSerializer.Deserialize(root, typeInfo)
+            return root.Deserialize(typeInfo)
                    ?? throw new JsonParseException("Document is not an object");
         }
         catch (JsonException e)

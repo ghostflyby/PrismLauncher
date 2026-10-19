@@ -64,8 +64,7 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
         // MinecraftInstance.JavaDetectKey — the same resolution the signature covers),
         // replacing the five global settings keys that overwrote each other across JVMs
         // (CONFIG C9)
-        var detectKey = MinecraftInstance.JavaDetectKey(javaPathSetting);
-        this.detectKey = detectKey;
+        detectKey = MinecraftInstance.JavaDetectKey(javaPathSetting);
         var stored = Services.LauncherState?.Current.Java.Detections.GetValueOrDefault(detectKey);
 
         // if timestamps are not the same, or something is missing, check!
@@ -123,15 +122,13 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
         PrintJavaInfo(version, mojangPlatform, osArch, vendor);
         // write the probe result into the path-keyed state cache (S5), then
         // refresh the runtime context from it — settings are out of the loop (C9)
-        var signature = javaSignature;
-        var detectKey = this.detectKey;
         Services.LauncherState?.Update(state =>
         {
             var detections = new Dictionary<string, JavaDetectEntry>(
                 state.Java.Detections, StringComparer.Ordinal)
             {
                 [detectKey] = new(
-                    signature,
+                    javaSignature,
                     mojangPlatform,
                     osArch,
                     version,

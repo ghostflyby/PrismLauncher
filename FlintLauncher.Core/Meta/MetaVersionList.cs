@@ -10,7 +10,6 @@ namespace FlintLauncher.Core.Meta;
 public sealed class VersionList(string uid) : MetaEntity
 {
     private readonly List<MetaVersion> _versions = [];
-    private readonly List<string> _externalRecommendsVersions = [];
     private readonly Dictionary<string, MetaVersion> _lookup = new(StringComparer.Ordinal);
 
     private MetaVersion? recommended;
@@ -59,10 +58,6 @@ public sealed class VersionList(string uid) : MetaEntity
     {
         MetaJsonFormat.ParseVersionList(obj, this);
     }
-
-    public void AddExternalRecommends(IEnumerable<string> recommends) => _externalRecommendsVersions.AddRange(recommends);
-
-    public void ClearExternalRecommends() => _externalRecommendsVersions.Clear();
 
     public void SetVersions(IReadOnlyList<MetaVersion> versions)
     {

@@ -41,18 +41,11 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
         Failed = 2,
     }
 
-    private enum RemoteLoadType
-    {
-        Index,
-        List,
-        Version,
-    }
-
-    /// <summary>Port of the RemoteLoadStatus struct from ComponentUpdateTask_p.h.</summary>
+    /// <summary>Port of the RemoteLoadStatus struct from ComponentUpdateTask_p.h (the
+    /// RemoteLoadType enum is not ported: the ported flow only ever issues whole-version
+    /// loads, so the C++ Index/List arms and the always-true dispatch had no producer).</summary>
     private sealed class RemoteLoadStatus
     {
-        public RemoteLoadType Type = RemoteLoadType.Version;
-
         public int PackProfileIndex;
 
         public bool Finished;
@@ -192,7 +185,6 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
             // versions decided during dependency resolution; the Launch/Resolution split below
             // is disabled upstream (#if 0) as well.
             var singleResult = LoadComponent(component, out var loadTask, netmode, cancellationToken);
-            var loadType = RemoteLoadType.Version;
             if (singleResult == LoadResult.LoadedLocal)
             {
                 component.UpdateCachedData();
@@ -203,7 +195,6 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
             {
                 var status = new RemoteLoadStatus
                 {
-                    Type = loadType,
                     PackProfileIndex = componentIndex,
                     Task = loadTask,
                 };
@@ -289,7 +280,7 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
         remoteTasksInProgress--;
 
         // update the cached data of the component from the downloaded version file.
-        if (loadSucceeded && status.Type == RemoteLoadType.Version)
+        if (loadSucceeded)
         {
             var component = list.GetComponent(status.PackProfileIndex);
             if (component is not null)
@@ -685,7 +676,7 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
     /// <summary>Variant visitation via lambda upstream; pattern matching here.</summary>
     private async Task PerformUpdateActionsAsync(CancellationToken cancellationToken)
     {
-        var addedActions = false;
+        bool addedActions;
         var toRemove = new List<string>();
         do
         {

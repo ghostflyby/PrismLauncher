@@ -41,7 +41,8 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
     private const string Template = "<li><a href=\"{url}\">{name}{authors}</a></li>\n";
     private static readonly string[] FileExtensions = ["jar", "zip"];
 
-    /// <summary>Port of FlamePackExportOptions.</summary>
+    /// <summary>Port of FlamePackExportOptions (the filter/recommendedRam knobs had no
+    /// wired producer and are not ported).</summary>
     public sealed class Options
     {
         public required string Name { get; init; }
@@ -50,8 +51,6 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
         public bool OptionalFiles { get; init; }
         public required MinecraftInstance Instance { get; init; }
         public required string Output { get; init; }
-        public MmcZip.FilterFunction? Filter { get; init; }
-        public int RecommendedRam { get; init; }
         public FlameApi? Flame { get; init; }
     }
 
@@ -98,10 +97,7 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
     private bool CollectFiles()
     {
         _files.Clear();
-        if (!MmcZip.CollectFileListRecursively(options.Instance.GameRoot(), null, _files,
-                options.Filter is null
-                    ? null
-                    : (Func<FileSystemInfo, bool>)(f => options.Filter(GetRelativePath(f.FullName)))))
+        if (!MmcZip.CollectFileListRecursively(options.Instance.GameRoot(), null, _files))
         {
             EmitFailed("Could not search for files");
             return false;
@@ -484,11 +480,6 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
         }
 
         version["modLoaders"] = modLoaders;
-
-        if (options.RecommendedRam > 0)
-        {
-            version["recommendedRam"] = options.RecommendedRam;
-        }
 
         obj["minecraft"] = version;
 

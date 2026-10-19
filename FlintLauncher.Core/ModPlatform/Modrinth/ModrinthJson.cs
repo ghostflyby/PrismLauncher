@@ -363,7 +363,7 @@ public static class ModrinthJson
 
         try
         {
-            return JsonSerializer.Deserialize(node, typeInfo);
+            return node.Deserialize(typeInfo);
         }
         catch (JsonException)
         {

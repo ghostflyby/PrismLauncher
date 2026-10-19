@@ -128,7 +128,7 @@ public static class FlameMod
     {
         try
         {
-            return JsonSerializer.Deserialize(node, typeInfo)
+            return node.Deserialize(typeInfo)
                    ?? throw new JsonParseException("Value is not an object");
         }
         catch (JsonException e)
@@ -186,11 +186,11 @@ public static class FlameMod
             pack.Authors.Clear();
             foreach (var author in authors)
             {
-                pack.Authors.Add(new ModpackAuthor
-                {
-                    Name = Require(author.Name, "name"),
-                    Url = Require(author.Url, "url"),
-                });
+                // upstream requires both name and url; the port has no reader for the
+                // display-only url but keeps the parse-time validation
+                var name = Require(author.Name, "name");
+                _ = Require(author.Url, "url");
+                pack.Authors.Add(new ModpackAuthor { Name = name });
             }
         }
 

@@ -10,8 +10,8 @@
 // usable nameserver wins) and server selection reads /etc/resolv.conf (macOS/Linux/FreeBSD);
 // on Windows there is no resolv.conf, so the resolver falls back to the first nameserver of
 // NetworkInterface properties — if that fails, callers treat the lookup as failed exactly
-// like a QDnsLookup error. The queried server can be overridden per launch through the
-// injected LaunchServices.SrvServerEndpoint (tests point it at a local UDP stub).
+// like a QDnsLookup error. The queried server stays overridable per call through the
+// serverEndpoint parameter (nothing in the solution passes one today).
 
 using System.Buffers.Binary;
 using System.Net;
@@ -20,15 +20,15 @@ using System.Text;
 
 namespace FlintLauncher.Core.Launch;
 
-public sealed record SrvRecord(ushort Priority, ushort Weight, ushort Port, string Target);
+public sealed record SrvRecord(ushort Port, string Target);
 
 public static class SrvResolver
 {
     public const int DefaultTimeoutMs = 5000;
 
     /// <summary>Query SRV records; returns an empty list when the name has no SRV records.
-    /// <paramref name="serverEndpoint"/> overrides the system nameserver (the injected
-    /// LaunchServices.SrvServerEndpoint — the former test hook).</summary>
+    /// <paramref name="serverEndpoint"/> overrides the system nameserver (null = system).
+    /// </summary>
     public static async Task<List<SrvRecord>> QueryAsync(string name, IPEndPoint? serverEndpoint = null,
         CancellationToken cancellationToken = default)
     {
@@ -125,11 +125,11 @@ public static class SrvResolver
                 continue;
             }
 
-            var priority = BinaryPrimitives.ReadUInt16BigEndian(rdata);
-            var weight = BinaryPrimitives.ReadUInt16BigEndian(rdata[2..]);
+            // priority/weight are parsed past (the port takes records in wire order and
+            // never ranks them — record fields would be dead)
             var port = BinaryPrimitives.ReadUInt16BigEndian(rdata[4..]);
-            var (target, _) = ReadName(buffer, offset - rdLength + 6);
-            records.Add(new SrvRecord(priority, weight, port, target));
+            var target = ReadName(buffer, offset - rdLength + 6);
+            records.Add(new SrvRecord(port, target));
         }
 
         return records;
@@ -172,18 +172,18 @@ public static class SrvResolver
         return offset;
     }
 
-    private static (string, int) ReadName(byte[] buffer, int offset)
+    /// <summary>Decode a (possibly compressed) DNS name at <paramref name="offset"/>; the
+    /// end-offset bookkeeping of the C++ port died with its only reader.</summary>
+    private static string ReadName(byte[] buffer, int offset)
     {
         var builder = new StringBuilder();
         var jumps = 0;
-        var end = offset;
         var current = offset;
         while (current < buffer.Length && jumps < 8)
         {
             var length = buffer[current];
             if (length == 0)
             {
-                end = Math.Max(end, current + 1);
                 break;
             }
 
@@ -194,13 +194,7 @@ public static class SrvResolver
                     break;
                 }
 
-                var pointer = ((length & 0x3F) << 8) | buffer[current + 1];
-                if (jumps == 0)
-                {
-                    end = current + 2;
-                }
-
-                current = pointer;
+                current = ((length & 0x3F) << 8) | buffer[current + 1];
                 jumps++;
                 continue;
             }
@@ -212,13 +206,9 @@ public static class SrvResolver
 
             builder.Append(Encoding.ASCII.GetString(buffer, current + 1, Math.Min(length, buffer.Length - current - 1)));
             current += 1 + length;
-            if (jumps == 0)
-            {
-                end = current;
-            }
         }
 
-        return (builder.ToString(), end);
+        return builder.ToString();
     }
 
     private static IPEndPoint ResolveSystemNameserver()

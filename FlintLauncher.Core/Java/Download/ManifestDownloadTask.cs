@@ -117,8 +117,8 @@ public sealed class ManifestDownloadTask(Uri url, string finalPath, string check
                     // TODO download compressed version if it exists ?
                     var raw = meta.Downloads?.Raw;
                     var isExec = meta.Executable ?? false;
-                    var url = raw?.Url ?? "";
-                    if (url.Length != 0 && Uri.TryCreate(url, UriKind.Absolute, out var parsedUrl))
+                    var rawUrl = raw?.Url ?? "";
+                    if (rawUrl.Length != 0 && Uri.TryCreate(rawUrl, UriKind.Absolute, out var parsedUrl))
                     {
                         toDownload.Add(new ManifestFile
                         {

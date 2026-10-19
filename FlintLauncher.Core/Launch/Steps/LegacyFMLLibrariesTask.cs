@@ -3,8 +3,8 @@
 // libraries old Forge versions need and copy them into the instance's lib folder.
 //
 // Application-singleton reach-ins resolve through the instance (see Launch/LaunchController.cs
-// for the same pattern): the global settings override (LegacyFMLLibsURLOverride) comes from
-// the instance-stamped LaunchServices (Services.LegacyFmllibsUrlOverride) and the metacache
+// for the same pattern): the download base is the build default (the LegacyFMLLibsURLOverride
+// setting had no wired consumer and retired with the settings world) and the metacache comes
 // from the instance ("fmllibs" base — registered once at the composition root, E6; an
 // unstamped instance fails the step instead of silently re-downloading).
 
@@ -100,11 +100,9 @@ public sealed class LegacyFmlLibrariesTask(MinecraftInstance inst) : FlintTask
         FmllibsFinished();
     }
 
-    /// <summary>Port of baseUrl(): the LegacyFMLLibsURLOverride setting (the instance-stamped
-    /// LaunchServices override) or the build default.</summary>
-    private string BaseUrl() => inst.LaunchServices?.LegacyFmllibsUrlOverride is { Length: > 0 } urlOverride
-        ? urlOverride
-        : FlintConfig.Default.LegacyFmllibsBaseUrl;
+    /// <summary>Port of baseUrl(): the build default base (the override setting retired with
+    /// the settings world — nothing wired it through the launch services).</summary>
+    private string BaseUrl() => FlintConfig.Default.LegacyFmllibsBaseUrl;
 
     public bool CanAbort() => true;
 

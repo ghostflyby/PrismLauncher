@@ -311,10 +311,16 @@ public static class FileTransfer
     private static bool CloneLinux(string src, string dst)
     {
         using var srcHandle = File.Open(src, FileMode.Open, FileAccess.Read, FileShare.Read);
-        using var dstHandle = File.Open(dst, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-        var srcFd = (int)srcHandle.SafeFileHandle.DangerousGetHandle();
-        var dstFd = (int)dstHandle.SafeFileHandle.DangerousGetHandle();
-        if (ioctl(dstFd, FicloneIoctl, srcFd) == 0)
+        bool cloned;
+        // the destination handle must close before the half-written clone is unlinked
+        using (var dstHandle = File.Open(dst, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        {
+            var srcFd = (int)srcHandle.SafeFileHandle.DangerousGetHandle();
+            var dstFd = (int)dstHandle.SafeFileHandle.DangerousGetHandle();
+            cloned = ioctl(dstFd, FicloneIoctl, srcFd) == 0;
+        }
+
+        if (cloned)
         {
             // FICLONE clones extents only — the CreateNew destination keeps its
             // 0666&~umask mode, so a 0600 accounts.json would land world-readable (B5)
@@ -322,7 +328,6 @@ public static class FileTransfer
             return true;
         }
 
-        dstHandle.Dispose(); // release before removing the half-written clone
         try
         {
             File.Delete(dst);

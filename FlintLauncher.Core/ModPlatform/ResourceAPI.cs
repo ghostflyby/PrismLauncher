@@ -16,11 +16,9 @@ public sealed record SortingMethod
     /// <summary>The index of the sorting method (used by Flame in the API request).</summary>
     public required uint Index { get; init; }
 
-    /// <summary>The real name of the sorting, as used in the respective API specification.</summary>
+    /// <summary>The real name of the sorting, as used in the respective API specification
+    /// (the display-only readable name is not ported).</summary>
     public required string Name { get; init; }
-
-    /// <summary>The human-readable name of the sorting, used for display in the UI.</summary>
-    public required string ReadableName { get; init; }
 }
 
 /// <summary>Port of ResourceAPI::SearchArgs.</summary>
@@ -33,10 +31,8 @@ public sealed class SearchArgs
     public SortingMethod? Sorting { get; set; }
     public ModLoaderType? Loaders { get; set; }
     public List<McVersion>? Versions { get; set; }
-    public SideType? Side { get; set; }
     public List<string>? CategoryIds { get; set; }
     public bool OpenSource { get; set; }
-    public List<IndexedVersionType> ExcludeDisclosureTypes { get; set; } = [];
 }
 
 /// <summary>Port of ResourceAPI::VersionSearchArgs.</summary>
@@ -47,7 +43,6 @@ public sealed class VersionSearchArgs
     public List<McVersion>? McVersions { get; set; }
     public ModLoaderType? Loaders { get; set; }
     public ResourceType ResourceType { get; set; } = ResourceType.Unknown;
-    public bool IncludeChangelog { get; set; }
 }
 
 /// <summary>Port of ResourceAPI::ProjectInfoArgs.</summary>

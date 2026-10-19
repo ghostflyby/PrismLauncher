@@ -35,7 +35,7 @@ public class Rule
         RuleJson? dto;
         try
         {
-            dto = JsonSerializer.Deserialize(obj, VersionFormatJsonContext.Default.RuleJson)
+            dto = obj.Deserialize(VersionFormatJsonContext.Default.RuleJson)
                   ?? throw new JsonParseException("Rule: Error parsing JSON: document is null");
         }
         catch (JsonException e)
@@ -90,7 +90,7 @@ public class Rule
 
     public Action Apply(RuntimeContext runtimeContext)
     {
-        if (this.os is { } os && !runtimeContext.ClassifierMatches(os.Name))
+        if (this.os is { } ruleOs && !runtimeContext.ClassifierMatches(ruleOs.Name))
         {
             return Action.Defer;
         }

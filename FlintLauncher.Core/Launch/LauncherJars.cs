@@ -22,8 +22,8 @@ public static class LauncherJars
 
     /// <summary>Port of Application::getJarPath(jarFile): find an installed launcher jar.
     /// <paramref name="installRoot"/> is the launcher installation root
-    /// (FlintPaths.InstallRoot / LaunchServices.InstallRoot); the default keeps the .NET app
-    /// base directory for bare fixtures.</summary>
+    /// (FlintPaths.InstallRoot); the default keeps the .NET app base directory for bare
+    /// fixtures.</summary>
     public static string GetJarPath(string jarFile, string? installRoot = null)
     {
         var root = installRoot ?? AppContext.BaseDirectory;

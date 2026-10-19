@@ -19,16 +19,12 @@ public abstract class Validator
 /// <summary>Request metadata validators may inspect before the transfer starts.</summary>
 public sealed class NetRequestSpec
 {
-    public required Uri Url { get; init; }
-
     public Dictionary<string, string> Headers { get; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
 /// <summary>Response metadata handed to validators at finalize time.</summary>
 public sealed class NetResponseInfo
 {
-    public required Uri Url { get; init; }
-
     public required int StatusCode { get; init; }
 
     public Dictionary<string, string> Headers { get; } = new(StringComparer.OrdinalIgnoreCase);

@@ -15,7 +15,8 @@ public enum TaskStepState
     Succeeded,
 }
 
-/// <summary>Port of the C++ TaskStepProgress struct (same fields and semantics).</summary>
+/// <summary>Port of the C++ TaskStepProgress struct; the never-read upstream members (the
+/// old-current/old-total deltas and the status/details strings) are not ported.</summary>
 public struct TaskStepProgress(Guid uid)
 {
     public TaskStepProgress()
@@ -24,10 +25,6 @@ public struct TaskStepProgress(Guid uid)
     public Guid Uid { get; set; } = uid;
     public long Current { get; set; } = 0;
     public long Total { get; set; } = -1;
-    public long OldCurrent { get; set; } = 0;
-    public long OldTotal { get; set; } = -1;
-    public string Status { get; set; } = "";
-    public string Details { get; set; } = "";
     public TaskStepState State { get; set; } = TaskStepState.Waiting;
 
     /// <summary>Port of TaskStepProgress::isDone().</summary>
@@ -36,9 +33,6 @@ public struct TaskStepProgress(Guid uid)
     /// <summary>Port of TaskStepProgress::update(new_current, new_total).</summary>
     public void Update(long newCurrent, long newTotal)
     {
-        OldCurrent = Current;
-        OldTotal = Total;
-
         Current = newCurrent;
         Total = newTotal;
         State = TaskStepState.Running;

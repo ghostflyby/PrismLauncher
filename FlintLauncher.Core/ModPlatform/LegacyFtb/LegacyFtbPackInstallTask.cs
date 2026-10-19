@@ -7,8 +7,7 @@
 // C++ "No installation method found!").
 //
 // Deviations (headless port):
-//  - the download goes through the meta cache when MetaCache is set ("FTBPacks" base, like
-//    the C++), otherwise a plain download into a temporary folder
+//  - the download goes straight into a temporary folder (the port has no meta cache)
 //  - downloadFiles() (the P5 update pipeline) is not ported; creation succeeds without
 //    fetching game files, like the other creation tasks.
 
@@ -26,9 +25,6 @@ namespace FlintLauncher.Core.ModPlatform.LegacyFtb;
 public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string version) : InstanceTask
 {
     private string archivePath = "";
-
-    /// <summary>APPLICATION->metacache() hook ("FTBPacks" base); null = plain downloads.</summary>
-    public HttpMetaCache? MetaCache { get; set; }
 
     /// <summary>BuildConfig.LEGACY_FTB_CDN_BASE_URL (per-instance; tests construct the task
     /// pointed at their stub).</summary>
@@ -57,18 +53,10 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
             url = CdnBaseUrl + "modpacks/" + path;
         }
 
-        if (MetaCache is not null)
-        {
-            var entry = MetaCache.ResolveEntry("FTBPacks", path);
-            entry.SetStale(true);
-            archivePath = entry.GetFullPath();
-            request = NetRequest.MakeCached(MetaCache, new Uri(url), entry);
-        }
-        else
-        {
-            archivePath = TempCachePath(path);
-            request = NetRequest.MakeFile(new Uri(url), archivePath);
-        }
+        // (the C++ routed this through APPLICATION->metacache()'s "FTBPacks" base; nothing
+        // in the port wires a cache here, so the download always goes to a temp file)
+        archivePath = TempCachePath(path);
+        request = NetRequest.MakeFile(new Uri(url), archivePath);
 
         var job = new NetJob("Download FTB Pack");
         job.AddNetRequest(request);

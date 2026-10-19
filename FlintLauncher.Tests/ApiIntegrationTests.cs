@@ -565,7 +565,8 @@ public class FlintApiIntegrationTests
                 // JavaUtils.LauncherRootPath static test hook, now LaunchServices.Paths.InstallRoot)
                 paths: FlintPaths.FromHomeDir(dataDir) with { InstallRoot = launcherRoot });
             await app.StartAsync();
-            using var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
+            using var client = new HttpClient();
+            client.BaseAddress = new Uri(app.Urls.First());
             client.DefaultRequestHeaders.Add("X-Api-Token", apiToken);
             Environment.CurrentDirectory = dataDir;
 
@@ -929,7 +930,10 @@ public class ApiAuthTests
                 "--no-auth",
             ]);
             await app.StartAsync();
-            using var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
+            // one-shot request against the hosted stub; a single throwaway client here is
+            // the honest shape (IHttpClientFactory is not registered in the test host)
+            using var client = new HttpClient();
+            client.BaseAddress = new Uri(app.Urls.First());
             Assert.True((await client.GetAsync("/api/v1/instances")).IsSuccessStatusCode);
         }
         finally

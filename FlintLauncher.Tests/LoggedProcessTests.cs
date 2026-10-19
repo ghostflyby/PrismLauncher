@@ -18,12 +18,9 @@ public class LoggedProcessTests
     {
         public List<(MessageLevel Level, string Line)> Lines { get; } = [];
 
-        public List<LoggedProcessState> States { get; } = [];
-
         public void Attach(LoggedProcess process)
         {
             process.Log += (lines, level) => Lines.AddRange(lines.Select(line => (level, line)));
-            process.StateChanged += state => States.Add(state);
         }
 
         public List<string> LinesOf(MessageLevel level) =>

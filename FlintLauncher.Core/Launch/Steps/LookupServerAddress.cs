@@ -19,7 +19,7 @@ public sealed class LookupServerAddress(LaunchTask parent, MinecraftTarget outpu
         SrvRecord? record;
         try
         {
-            record = await SrvResolver.QueryFirstAsync(dnsName, Services.SrvServerEndpoint, cancellationToken)
+            record = await SrvResolver.QueryFirstAsync(dnsName, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (Exception e) when (e is not OperationCanceledException)

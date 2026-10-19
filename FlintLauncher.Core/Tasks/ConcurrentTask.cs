@@ -28,9 +28,9 @@ public class ConcurrentTask : FlintTask
 
     private protected readonly Dictionary<FlintTask, FlintTask> Done = new();
 
-    // the C++ m_failed/m_succeeded maps — the names hide the FlintTask signal events on purpose
+    // the C++ m_failed map — the name hides the FlintTask signal event on purpose
+    // (the C++ m_succeeded map had no reader in the port and is not carried)
     private protected new readonly Dictionary<FlintTask, FlintTask> Failed = new();
-    private new readonly Dictionary<FlintTask, FlintTask> Succeeded = new();
     private readonly Dictionary<Guid, TaskStepProgress> TaskProgress = new();
     private readonly int totalMaxSize;
     private CancellationToken runToken;
@@ -150,8 +150,6 @@ public class ConcurrentTask : FlintTask
             {
                 Current = Done.Count,
                 Total = TotalSizeLocked(),
-                Status = Status,
-                Details = GetDetails(),
                 State = ToStepState(State),
             };
         }
@@ -362,11 +360,7 @@ public class ConcurrentTask : FlintTask
         lock (Gate)
         {
             Done[task] = task;
-            if (state == TaskStepState.Succeeded)
-            {
-                Succeeded[task] = task;
-            }
-            else
+            if (state != TaskStepState.Succeeded)
             {
                 Failed[task] = task;
             }
@@ -408,7 +402,6 @@ public class ConcurrentTask : FlintTask
                 return;
             }
 
-            progress.Status = msg;
             progress.State = TaskStepState.Running;
             TaskProgress[task.Uid] = progress;
             totalSize = TotalSizeLocked();
@@ -433,7 +426,6 @@ public class ConcurrentTask : FlintTask
                 return;
             }
 
-            progress.Details = msg;
             progress.State = TaskStepState.Running;
             TaskProgress[task.Uid] = progress;
             totalSize = TotalSizeLocked();

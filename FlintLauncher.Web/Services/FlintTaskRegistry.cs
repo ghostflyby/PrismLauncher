@@ -34,10 +34,6 @@ public sealed class FlintTaskRegistry(ILoggerFactory loggerFactory)
         public string? InstanceId { get; init; }
         public LaunchController? Controller { get; init; }
 
-        /// <summary>Set when a task completes successfully and the host must re-read state
-        /// (e.g. a staged instance commit -> InstanceList.LoadList()).</summary>
-        public Action? OnFinished { get; init; }
-
         /// <summary>Optional terminal payload exposed through the task view (flag: currently
         /// only the mods-update task publishes its found/applied updates here; null = absent,
         /// and the field is omitted from the JSON entirely).</summary>
@@ -67,7 +63,6 @@ public sealed class FlintTaskRegistry(ILoggerFactory loggerFactory)
             Task = task,
             InstanceId = instanceId,
             Controller = controller,
-            OnFinished = onFinished,
         };
 
         void RunHook()

@@ -82,9 +82,6 @@ public sealed class AuthStepResponse
 
     public string ErrorString { get; init; } = "";
 
-    /// <summary>HTTP status code, 0 when the request failed on the transport level.</summary>
-    public int StatusCode { get; init; }
-
     public byte[] Body { get; init; } = [];
 
     public string BodyText => Encoding.UTF8.GetString(Body);
@@ -190,7 +187,6 @@ public static class AuthStepHttp
                 {
                     Error = StatusCodeToQtError(statusCode),
                     ErrorString = $"HTTP status {statusCode} for {request.Url}",
-                    StatusCode = statusCode,
                     Body = body,
                 };
             }

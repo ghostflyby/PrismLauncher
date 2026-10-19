@@ -107,20 +107,20 @@ public class FtbAppTests : IDisposable
     public void GetDynamicInstancesPath_FallsBackToBinSettings()
     {
         var ftbRoot = Path.Combine(_root, ".ftba-bin");
-        var instancesPath = Path.Combine(_root, "bin-instances");
+        var binInstancesPath = Path.Combine(_root, "bin-instances");
         Directory.CreateDirectory(Path.Combine(ftbRoot, "bin"));
         File.WriteAllText(Path.Combine(ftbRoot, "bin", "settings.json"),
-            $$"""{"instanceLocation": "{{instancesPath.Replace("\\", "\\\\")}}"}""");
-        var paths = new FtbAppPaths(ftbRoot);
+            $$"""{"instanceLocation": "{{binInstancesPath.Replace("\\", "\\\\")}}"}""");
+        var binPaths = new FtbAppPaths(ftbRoot);
 
-        Assert.Equal(instancesPath, paths.GetDynamicInstancesPath());
+        Assert.Equal(binInstancesPath, binPaths.GetDynamicInstancesPath());
     }
 
     [Fact]
     public void GetDynamicInstancesPath_MissingSettings_ReturnsEmpty()
     {
-        var paths = new FtbAppPaths(Path.Combine(_root, "nonexistent-ftba"));
-        Assert.Equal("", paths.GetDynamicInstancesPath());
+        var binPaths = new FtbAppPaths(Path.Combine(_root, "nonexistent-ftba"));
+        Assert.Equal("", binPaths.GetDynamicInstancesPath());
     }
 
     // ----------------------------------------------------------------- parseDirectory

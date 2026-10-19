@@ -81,7 +81,7 @@ public class ModrinthApiTests : IDisposable
             Type = ResourceType.Mod,
             Offset = 50,
             Search = "create mod",
-            Sorting = new SortingMethod { Index = 2, Name = "downloads", ReadableName = "Sort by Downloads" },
+            Sorting = new SortingMethod { Index = 2, Name = "downloads" },
             Loaders = ModLoaderType.Fabric | ModLoaderType.Quilt,
             Versions = [new McVersion("1.20.1"), new McVersion("1.20.2 Pre-Release 1")],
             CategoryIds = ["adventure"],

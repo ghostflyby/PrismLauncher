@@ -57,7 +57,7 @@ public class FlameApiTests : IDisposable
             Type = ResourceType.Mod,
             Offset = 50,
             Search = "create mod",
-            Sorting = new SortingMethod { Index = 2, Name = "Popularity", ReadableName = "Sort by Popularity" },
+            Sorting = new SortingMethod { Index = 2, Name = "Popularity" },
             Loaders = ModLoaderType.Fabric | ModLoaderType.Quilt,
             Versions = [new McVersion("1.18.2")],
             CategoryIds = ["adventure"],

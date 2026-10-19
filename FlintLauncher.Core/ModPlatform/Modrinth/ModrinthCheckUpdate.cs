@@ -21,18 +21,15 @@ namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
 public sealed class ModrinthCheckUpdate : FlintTask
 {
-    /// <summary>Port of CheckUpdateTask::Update (minus the download task, see header note).</summary>
+    /// <summary>Port of CheckUpdateTask::Update (minus the download task, see header note);
+    /// the UI-only members (old hash, changelog, enabled flag) are not ported.</summary>
     public sealed class Update
     {
         public required string Name { get; init; }
-        public required string OldHash { get; init; }
         public required string OldVersion { get; init; }
         public required string NewVersion { get; init; }
-        public IndexedVersionType NewVersionType { get; init; } = IndexedVersionType.Invalid;
-        public string Changelog { get; init; } = "";
         public required ResourceProvider Provider { get; init; }
         public required IndexedVersion Version { get; init; }
-        public bool Enabled { get; init; } = true;
     }
 
     /// <summary>Port of the checkFailed(resource, reason) signal.</summary>
@@ -225,14 +222,10 @@ public sealed class ModrinthCheckUpdate : FlintTask
                     _updates.Add(new Update
                     {
                         Name = metadata?.Name ?? resource.Name,
-                        OldHash = hash,
                         OldVersion = oldVersion,
                         NewVersion = projectVer.VersionNumber,
-                        NewVersionType = projectVer.VersionType,
-                        Changelog = projectVer.Changelog,
                         Provider = ResourceProvider.Modrinth,
                         Version = projectVer,
-                        Enabled = resource.Enabled,
                     });
                 }
             }

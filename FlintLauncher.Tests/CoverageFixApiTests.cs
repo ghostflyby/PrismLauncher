@@ -228,6 +228,24 @@ public class CoverageFixSettingsApiTests
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 
+    // regression: the cache-miss path runs the scan under the same semaphore ScanAsync
+    // takes, so a reentrant implementation deadlocks the first GET (the suite had no
+    // /java coverage at all)
+    [Fact]
+    public async Task Java_Get_Scans_Once_And_Serves_The_Cache()
+    {
+        await using var host = await FlintApiHost.StartAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+
+        var first = await host.Client.GetAsync("/api/v1/java", timeout.Token);
+        first.EnsureSuccessStatusCode();
+        var firstBody = JsonDocument.Parse(await first.Content.ReadAsStringAsync(timeout.Token));
+        Assert.Equal(JsonValueKind.Array, firstBody.RootElement.ValueKind);
+
+        var second = await host.Client.GetAsync("/api/v1/java", timeout.Token);
+        second.EnsureSuccessStatusCode();
+    }
+
     // the settings groups serialize the raw C++ setting ids as dictionary keys — the JSON
     // naming policy only applies to record properties (groups.launcher.ShowConsoleOnError)
     private static async Task<JsonElement> GetGroups(FlintApiHost host)
@@ -511,7 +529,8 @@ public class CoverageFixLaunchJoinApiTests
                 // JavaUtils.LauncherRootPath static test hook, now LaunchServices.Paths.InstallRoot)
                 paths: FlintPaths.FromHomeDir(dataDir) with { InstallRoot = launcherRoot });
             await app.StartAsync();
-            using var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
+            using var client = new HttpClient();
+            client.BaseAddress = new Uri(app.Urls.First());
             client.DefaultRequestHeaders.Add("X-Api-Token", apiToken);
             Environment.CurrentDirectory = dataDir;
 

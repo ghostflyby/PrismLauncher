@@ -51,7 +51,7 @@ public class GetModDependenciesTask : SequentialTask
         }
     }
 
-    public sealed record PackDependencyExtraInfo(bool MaybeInstalled, List<string> RequiredByNames, List<string> RequiredByIds);
+    public sealed record PackDependencyExtraInfo(List<string> RequiredByIds);
 
     public GetModDependenciesTask(MinecraftInstance instance, ModFolderModel folder, List<PackDependency> selected,
         ModrinthApi? modrinth = null, FlameApi? flame = null)
@@ -478,7 +478,6 @@ public class GetModDependenciesTask : SequentialTask
             var addonId = mod.Pack.AddonId;
             var provider = mod.Pack.Provider;
             var version = mod.Version.FileId;
-            var reqNames = new List<string>();
             var reqIds = new List<string>();
             foreach (var smod in fullList)
             {
@@ -492,12 +491,11 @@ public class GetModDependenciesTask : SequentialTask
                                                       (provider == ResourceProvider.Modrinth && d.AddonId.Length == 0 ? version == d.Version : d.AddonId == addonId));
                 if (isRequiredByOther)
                 {
-                    reqNames.Add(smod.Pack.Name);
                     reqIds.Add(smod.Version.FileId);
                 }
             }
 
-            rby[addonId] = new PackDependencyExtraInfo(MaybeInstalled(mod), reqNames, reqIds);
+            rby[addonId] = new PackDependencyExtraInfo(reqIds);
         }
 
         return rby;
@@ -510,11 +508,6 @@ public class GetModDependenciesTask : SequentialTask
                _modsFileNames.Exists(i => i.Length != 0 && LaxCompare(i, pDep.Version.FileName)) ||
                _packDependencies.Exists(i => pDep.Pack.AddonId != i.Pack.AddonId && i.Version.FileName.Length != 0 &&
                                              LaxCompare(pDep.Version.FileName, i.Version.FileName));
-    }
-
-    private bool MaybeInstalled(PackDependency pDep)
-    {
-        return _modsFileNames.Exists(i => i.Length != 0 && LaxCompare(i, pDep.Version.FileName, excludeDigits: true));
     }
 
     /// <summary>

@@ -20,13 +20,12 @@ public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<J
         Parse();
     }
 
-    public JavaVersion(int major, int minor, int security, int build = 0, string? name = null)
+    public JavaVersion(int major, int minor, int security, int build = 0)
     {
         _string = "";
         Major = major;
         Minor = minor;
         Security = security;
-        Name = name ?? "";
         parseable = true;
 
         var versions = new List<string>();
@@ -95,8 +94,6 @@ public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<J
     public int Minor { get; private set; }
 
     public int Security { get; private set; }
-
-    public string Name { get; private set; } = "";
 
     public string Prerelease { get; private set; } = "";
 

@@ -33,18 +33,17 @@ public sealed class FlameCheckUpdate(
     FlameApi? flame = null)
     : FlintTask
 {
-    /// <summary>Port of CheckUpdateTask::Update (minus the download task, see header note).</summary>
+    /// <summary>Port of CheckUpdateTask::Update (minus the download task, see header note);
+    /// the UI-only old-hash/enabled members are not ported.</summary>
     public sealed class Update
     {
         public required string Name { get; init; }
-        public required string OldHash { get; init; }
         public required string OldVersion { get; init; }
         public required string NewVersion { get; init; }
         public IndexedVersionType NewVersionType { get; init; } = IndexedVersionType.Invalid;
         public string Changelog { get; init; } = "";
         public required ResourceProvider Provider { get; init; }
         public required IndexedVersion Version { get; init; }
-        public bool Enabled { get; init; } = true;
     }
 
     /// <summary>Port of the checkFailed(resource, reason, recoverUrl = "") signal.</summary>
@@ -110,10 +109,10 @@ public sealed class FlameCheckUpdate(
     private async Task GetLatestVersionCallback(Resource resource, MetadataHandler.ModStruct metadata,
         string responseBody, CancellationToken cancellationToken)
     {
-        JsonNode? doc;
         try
         {
-            doc = JsonNode.Parse(responseBody);
+            // parse-shape validation only (the typed reads below re-parse the body)
+            JsonNode.Parse(responseBody);
         }
         catch (JsonException e)
         {
@@ -181,14 +180,12 @@ public sealed class FlameCheckUpdate(
             _updates.Add(new Update
             {
                 Name = pack.Name,
-                OldHash = metadata.Hash,
                 OldVersion = oldVersion,
                 NewVersion = latestVer.Version,
                 NewVersionType = latestVer.VersionType,
                 Changelog = changelog,
                 Provider = ResourceProvider.Flame,
                 Version = latestVer,
-                Enabled = resource.Enabled,
             });
         }
     }

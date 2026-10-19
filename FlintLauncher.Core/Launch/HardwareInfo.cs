@@ -311,26 +311,11 @@ public static class HardwareInfo
         return sysctlbyname(Encoding.UTF8.GetBytes(name), out value, ref size, 0, 0);
     }
 
-    private static int SysCtlByNameRaw(string name, out ulong value)
-    {
-        value = 0;
-        if (!OperatingSystem.IsMacOS())
-        {
-            return -1;
-        }
-
-        uint size = sizeof(ulong);
-        return sysctlbyname(Encoding.UTF8.GetBytes(name), out value, ref size, 0, 0);
-    }
-
     [DllImport("libc", SetLastError = false)]
     private static extern int sysctlbyname(byte[] name, byte[] oldValue, ref uint oldSize, nint newValue, nuint newValueSize);
 
     [DllImport("libc", SetLastError = false)]
     private static extern int sysctlbyname(byte[] name, out uint oldValue, ref uint oldSize, nint newValue, nuint newValueSize);
-
-    [DllImport("libc", SetLastError = false)]
-    private static extern int sysctlbyname(byte[] name, out ulong oldValue, ref uint oldSize, nint newValue, nuint newValueSize);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct Memorystatusex

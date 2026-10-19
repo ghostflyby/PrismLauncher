@@ -51,7 +51,7 @@ public class JavaMetadataSortTests
     {
         var meta = Meta("java-macos", "17.0.9", "2023-10-17T12:00:00+00:00", vendor: "adoptium");
 
-        Assert.Equal("java-macos", meta.Name());
+        Assert.Equal("java-macos", meta.Name);
         Assert.Equal("adoptium", meta.Vendor);
         Assert.Equal("https://example.invalid/java-macos.tar.gz", meta.Url);
         Assert.NotNull(meta.ReleaseTime);
@@ -92,7 +92,7 @@ public class JavaMetadataSortTests
             ["version"] = new JsonObject(),
         });
         Assert.Equal("0", meta.Version.ToString()); // all-numeric defaults (major=0)
-        Assert.Equal("java", meta.Name());
+        Assert.Equal("java", meta.Name);
 
         var partial = JavaMetadata.ParseJavaMeta(new JsonObject
         {

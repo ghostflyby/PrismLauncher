@@ -295,17 +295,6 @@ public sealed class ModrinthApi(NetStack? net = null) : ResourceApi
         return string.Join(",", l);
     }
 
-    /// <summary>Port of ModrinthAPI::getSideFilters.</summary>
-    public static string GetSideFilters(SideType side) => side.Value switch
-    {
-        SideTypeValue.ClientSide =>
-            "\"environment:client_only\",\"environment:client_only_server_optional\",\"environment:singleplayer_only\",\"environment:client_or_server\",\"environment:client_or_server_prefers_both\"",
-        SideTypeValue.ServerSide =>
-            "\"environment:server_only\",\"environment:server_only_client_optional\",\"environment:dedicated_server_only\",\"environment:client_or_server\",\"environment:client_or_server_prefers_both\"",
-        SideTypeValue.UniversalSide => "\"environment:client_and_server\",\"client_or_server_prefers_both\"",
-        _ => "",
-    };
-
     /// <summary>Port of ModrinthAPI::mapMCVersionFromModrinth.</summary>
     public static string MapMcVersionFromModrinth(string v)
     {
@@ -361,15 +350,6 @@ public sealed class ModrinthApi(NetStack? net = null) : ResourceApi
             facetsList.Add($"[{GetGameVersionsArray(versions)}]");
         }
 
-        if (args.Side is { } side)
-        {
-            var sideFilter = GetSideFilters(side);
-            if (sideFilter.Length != 0)
-            {
-                facetsList.Add($"[{sideFilter}]");
-            }
-        }
-
         if (args.CategoryIds is { } categoryIds && categoryIds.Count != 0)
         {
             // #6099: every search category gets a facet array of its own (a category list is
@@ -378,11 +358,6 @@ public sealed class ModrinthApi(NetStack? net = null) : ResourceApi
             {
                 facetsList.Add($"[\"categories:{category}\"]");
             }
-        }
-
-        foreach (var d in args.ExcludeDisclosureTypes)
-        {
-            facetsList.Add($"[\"disclosure_types!={d}\"]");
         }
 
         if (args.OpenSource)
@@ -447,7 +422,9 @@ public sealed class ModrinthApi(NetStack? net = null) : ResourceApi
             getArguments.Add($"loaders=[\"{string.Join("\",\"", GetModLoaderStrings(loaders))}\"]");
         }
 
-        getArguments.Add($"include_changelog={(args.IncludeChangelog ? "true" : "false")}");
+        // the port has no VersionSearchArgs.IncludeChangelog producer; the wire default is
+        // true, so keep the upstream request shape (always false) explicit
+        getArguments.Add("include_changelog=false");
 
         return $"{BaseUrl}/project/{args.Pack.AddonId}/version{(getArguments.Count != 0 ? "?" : "")}{string.Join("&", getArguments)}";
     }
@@ -492,11 +469,11 @@ public sealed class ModrinthApi(NetStack? net = null) : ResourceApi
         // https://docs.modrinth.com/api-spec/#tag/projects/operation/searchProjects
         return
         [
-            new SortingMethod { Index = 1, Name = "relevance", ReadableName = "Sort by Relevance" },
-            new SortingMethod { Index = 2, Name = "downloads", ReadableName = "Sort by Downloads" },
-            new SortingMethod { Index = 3, Name = "follows", ReadableName = "Sort by Follows" },
-            new SortingMethod { Index = 4, Name = "newest", ReadableName = "Sort by Newest" },
-            new SortingMethod { Index = 5, Name = "updated", ReadableName = "Sort by Last Updated" },
+            new SortingMethod { Index = 1, Name = "relevance" },
+            new SortingMethod { Index = 2, Name = "downloads" },
+            new SortingMethod { Index = 3, Name = "follows" },
+            new SortingMethod { Index = 4, Name = "newest" },
+            new SortingMethod { Index = 5, Name = "updated" },
         ];
     }
 

@@ -233,19 +233,10 @@ public static class ProviderCapabilities
     };
 }
 
-/// <summary>Port of ModPlatform::ModpackAuthor.</summary>
+/// <summary>Port of ModPlatform::ModpackAuthor (the never-read author url is not ported).</summary>
 public sealed class ModpackAuthor
 {
     public string Name { get; set; } = "";
-    public string Url { get; set; } = "";
-}
-
-/// <summary>Port of ModPlatform::DonationData.</summary>
-public sealed class DonationData
-{
-    public string Id { get; set; } = "";
-    public string Platform { get; set; } = "";
-    public string Url { get; set; } = "";
 }
 
 /// <summary>Port of ModPlatform::Dependency.</summary>
@@ -274,7 +265,6 @@ public sealed class IndexedVersion
     public string HashType { get; set; } = "";
     public string Hash { get; set; } = "";
     public bool IsPreferred { get; set; } = true;
-    public string Changelog { get; set; } = "";
     public List<Dependency> Dependencies { get; set; } = [];
     public SideType Side { get; set; } = SideType.Invalid; // this is for flame API
 
@@ -304,17 +294,13 @@ public sealed class IndexedVersion
     }
 }
 
-/// <summary>Port of ModPlatform::ExtraPackData.</summary>
+/// <summary>Port of ModPlatform::ExtraPackData (the never-read donation list, discord url
+/// and status members are not ported).</summary>
 public sealed class ExtraPackData
 {
-    public List<DonationData> Donate { get; } = [];
-
     public string IssuesUrl { get; set; } = "";
     public string SourceUrl { get; set; } = "";
     public string WikiUrl { get; set; } = "";
-    public string DiscordUrl { get; set; } = "";
-
-    public string Status { get; set; } = "";
 
     public string Body { get; set; } = "";
 }
@@ -364,19 +350,19 @@ public sealed class IndexedPack
     }
 }
 
-/// <summary>Port of ModPlatform::OverrideDep.</summary>
-public sealed record OverrideDep(string Quilt, string Fabric, string Slug, ResourceProvider Provider);
+/// <summary>Port of ModPlatform::OverrideDep (the never-read slug label is not ported).</summary>
+public sealed record OverrideDep(string Quilt, string Fabric, ResourceProvider Provider);
 
 public static class ModIndex
 {
     /// <summary>Port of ModPlatform::getOverrideDeps().</summary>
     public static List<OverrideDep> GetOverrideDeps() =>
     [
-        new(Quilt: "634179", Fabric: "306612", Slug: "API", Provider: ResourceProvider.Flame),
-        new(Quilt: "720410", Fabric: "308769", Slug: "KotlinLibraries", Provider: ResourceProvider.Flame),
+        new(Quilt: "634179", Fabric: "306612", Provider: ResourceProvider.Flame),
+        new(Quilt: "720410", Fabric: "308769", Provider: ResourceProvider.Flame),
 
-        new(Quilt: "qvIfYCYJ", Fabric: "P7dR8mSH", Slug: "API", Provider: ResourceProvider.Modrinth),
-        new(Quilt: "lwVhp9o5", Fabric: "Ha28R6CL", Slug: "KotlinLibraries", Provider: ResourceProvider.Modrinth),
+        new(Quilt: "qvIfYCYJ", Fabric: "P7dR8mSH", Provider: ResourceProvider.Modrinth),
+        new(Quilt: "lwVhp9o5", Fabric: "Ha28R6CL", Provider: ResourceProvider.Modrinth),
     ];
 
     public static string GetMetaUrl(ResourceProvider provider, string projectId)

@@ -35,22 +35,22 @@ public class NetStackTests : IDisposable
         var expected = Convert.ToHexString(SHA1.HashData(data)).ToLowerInvariant();
 
         var ok = ChecksumValidator.FromHex(HashAlgorithmName.SHA1, expected);
-        var spec = new NetRequestSpec { Url = new Uri("https://example.invalid/x") };
+        var spec = new NetRequestSpec();
         Assert.True(ok.Init(spec));
         Assert.True(ok.Write(data));
-        Assert.True(ok.Validate(new NetResponseInfo { Url = spec.Url, StatusCode = 200 }));
+        Assert.True(ok.Validate(new NetResponseInfo { StatusCode = 200 }));
 
         var bad = ChecksumValidator.FromHex(HashAlgorithmName.SHA1, new string('0', 40));
         Assert.True(bad.Init(spec));
         Assert.True(bad.Write(data));
-        Assert.False(bad.Validate(new NetResponseInfo { Url = spec.Url, StatusCode = 200 }));
+        Assert.False(bad.Validate(new NetResponseInfo { StatusCode = 200 }));
     }
 
     [Fact]
     public void ByteArraySink_StoresData()
     {
         var sink = new ByteArraySink();
-        var spec = new NetRequestSpec { Url = new Uri("https://example.invalid/x") };
+        var spec = new NetRequestSpec();
         Assert.True(sink.Init(spec));
         Assert.True(sink.Write("chunk1 "u8.ToArray()));
         Assert.True(sink.Write("chunk2"u8.ToArray()));

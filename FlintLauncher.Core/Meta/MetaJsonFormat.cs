@@ -174,7 +174,7 @@ public static class MetaJsonFormat
             dto.Requires, dto.Conflicts, dto.Sha256));
 
         version.Data = OneSixVersionFormat.VersionFileFromJson(
-            (JsonObject)obj,
+            obj,
             $"{version.Uid}/{version.Version}.json",
             Has(obj, "order"));
         return version;
@@ -337,7 +337,7 @@ public static class MetaJsonFormat
     {
         try
         {
-            return JsonSerializer.Deserialize(obj, typeInfo)
+            return obj.Deserialize(typeInfo)
                    ?? throw new MetaParseException($"The metadata {what} document is null.");
         }
         catch (JsonException e)

@@ -357,14 +357,14 @@ public sealed class LoggedProcess : IDisposable
                 // reprocess(): drop carriage returns, split on line feed, keep the leftover
                 str = str.Replace("\r", "");
                 var lines = str.Split('\n');
-                var leftoverLine = lines[^1];
+                var remaining = lines[^1];
                 if (isStdErr)
                 {
-                    errLeftoverLine = leftoverLine;
+                    errLeftoverLine = remaining;
                 }
                 else
                 {
-                    this.leftoverLine = leftoverLine;
+                    this.leftoverLine = remaining;
                 }
 
                 var complete = lines[..^1];
@@ -404,10 +404,10 @@ public sealed class LoggedProcess : IDisposable
             return;
         }
 
-        int exitCode;
+        int processExitCode;
         try
         {
-            exitCode = _process.ExitCode;
+            processExitCode = _process.ExitCode;
         }
         catch (Exception e) when (e is InvalidOperationException or Win32Exception)
         {
@@ -418,15 +418,15 @@ public sealed class LoggedProcess : IDisposable
         {
             if (this.exitCode == 0)
             {
-                this.exitCode = exitCode;
+                this.exitCode = processExitCode;
             }
         }
 
         // based on state, send signals
         if (!isAborting)
         {
-            DiagLog.Exited(exitCode);
-            Log?.Invoke([$"Process exited with code {exitCode}."], MessageLevel.Launcher);
+            DiagLog.Exited(processExitCode);
+            Log?.Invoke([$"Process exited with code {processExitCode}."], MessageLevel.Launcher);
             ChangeState(LoggedProcessState.Finished);
         }
         else

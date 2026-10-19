@@ -23,7 +23,7 @@ public static partial class OneSixVersionFormat
     {
         try
         {
-            return JsonSerializer.Deserialize(node, typeInfo)
+            return node.Deserialize(typeInfo)
                    ?? throw new JsonParseException(what + ": Error parsing JSON: document is null");
         }
         catch (JsonException e)

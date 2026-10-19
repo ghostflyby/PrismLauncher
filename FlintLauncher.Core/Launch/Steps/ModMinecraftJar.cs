@@ -100,9 +100,13 @@ public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
     /// jar at targetJarPath. Reverse order respects the loading order of the components.</summary>
     public static bool CreateModdedJar(string sourceJarPath, string targetJarPath, IReadOnlyList<Mod> mods)
     {
+        // manual dispose instead of `using`: the error branches below must close the archive
+        // BEFORE deleting the half-written target file, and the finally must cover the
+        // success/throw paths too (ZipArchive.Dispose is idempotent)
+        ZipArchive? zipOut = null;
         try
         {
-            using var zipOut = new ZipArchive(File.Create(targetJarPath), ZipArchiveMode.Create);
+            zipOut = new ZipArchive(File.Create(targetJarPath), ZipArchiveMode.Create);
             // Files already added to the jar. These files will be skipped.
             var addedFiles = new HashSet<string>(StringComparer.Ordinal);
 
@@ -176,6 +180,8 @@ public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException
                                       or ArgumentException or NotSupportedException)
         {
+            // close before deleting: an open handle keeps the half-written file alive on Windows
+            zipOut?.Dispose();
             try
             {
                 FileSystem.DeletePath(targetJarPath);
@@ -186,6 +192,12 @@ public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
             }
 
             return false;
+        }
+        finally
+        {
+            // the error branches already disposed before deleting the half-written file;
+            // ZipArchive.Dispose is idempotent, so the success/throw paths dispose here
+            zipOut?.Dispose();
         }
     }
 

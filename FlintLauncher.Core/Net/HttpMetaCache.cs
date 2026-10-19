@@ -94,9 +94,9 @@ public sealed class MetaEntry
     /// landing) and must not come back through a side door.</summary>
     public string GetFullPath()
     {
-        var owner = this.owner ?? throw new InvalidOperationException(
+        var cache = this.owner ?? throw new InvalidOperationException(
             "meta entry has no owning cache — resolve it through HttpMetaCache.ResolveEntry");
-        var basePath = owner.GetBasePath(BaseId);
+        var basePath = cache.GetBasePath(BaseId);
         return basePath.Length != 0
             ? FileSystem.PathCombine(basePath, RelativePath)
             : throw new InvalidOperationException(

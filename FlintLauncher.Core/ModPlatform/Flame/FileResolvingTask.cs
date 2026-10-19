@@ -7,9 +7,10 @@
 // Blocked-mods semantics (kept from upstream): a file whose resolved downloadUrl is empty
 // (the CurseForge API only hands out direct download URLs to bundled API keys) resolves
 // fine here — it simply has no download URL. The creation task surfaces those files as
-// BlockedMod entries (name/websiteUrl/hash/targetFolder) for the BlockedModsDialog data
+// BlockedMod entries (name/websiteUrl/targetFolder) for the BlockedModsDialog data
 // flow; the optional BlockedModLocalFileResolver hook stands in for the dialog's
-// match-a-local-file step (see FlameCreationTask).
+// match-a-local-file step (see FlameCreationTask). The resolver matches by filename:
+// the headless port does not carry the upstream hash column.
 
 using System.Globalization;
 using FlintLauncher.Core.Json;
@@ -19,17 +20,16 @@ using FlintLauncher.Core.Tasks;
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
 /// <summary>Port of the BlockedMod struct (BlockedModsDialog.h): the per-file data the UI
-/// dialog consumes to let users match locally downloaded copies.</summary>
+/// dialog consumes to let users match locally downloaded copies. The headless port drops the
+/// display-only hash and the dialog's move/copy checkbox (always copies).</summary>
 public sealed class BlockedMod
 {
     public string Name { get; set; } = "";
     public string WebsiteUrl { get; set; } = "";
-    public string Hash { get; set; } = "";
     public bool Matched { get; set; }
     public string LocalPath { get; set; } = "";
     public string TargetFolder { get; set; } = "";
     public bool Disabled { get; set; }
-    public bool Move { get; set; }
 }
 
 public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi? modrinth = null, FlameApi? flame = null) : FlintTask

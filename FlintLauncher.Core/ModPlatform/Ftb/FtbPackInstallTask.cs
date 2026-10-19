@@ -167,7 +167,6 @@ public sealed class FtbPackInstallTask(
                 {
                     Name = resultsFile.Version.FileName,
                     WebsiteUrl = $"{resultsFile.Pack.WebsiteUrl}/download/{resultsFile.FileId}",
-                    Hash = resultsFile.Version.Hash,
                     Matched = false,
                     LocalPath = "",
                     TargetFolder = resultsFile.TargetFolder,

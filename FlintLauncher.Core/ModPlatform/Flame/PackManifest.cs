@@ -57,11 +57,11 @@ public sealed class FlameModloader
     public bool Primary { get; set; }
 }
 
-/// <summary>Port of Flame::Minecraft.</summary>
+/// <summary>Port of Flame::Minecraft (the never-read extra "libraries" member is not
+/// ported).</summary>
 public sealed class FlameMinecraft
 {
     public string Version { get; set; } = "";
-    public string Libraries { get; set; } = "";
     public List<FlameModloader> ModLoaders { get; } = [];
     public int RecommendedRam { get; set; }
 }
@@ -122,10 +122,8 @@ public sealed class FlameManifest
 
         var mc = manifest.Minecraft ?? throw new JsonParseException("'minecraft' is not an object");
         pack.Minecraft.Version = Require(mc.Version, "version");
-        // extra libraries... apparently only used for a custom Minecraft launcher in the
-        // 1.2.5 FTB retro pack; intended use is likely hardcoded in the 'Flame' client,
-        // the manifest says nothing
-        pack.Minecraft.Libraries = mc.Libraries ?? "";
+        // (the manifest's extra "libraries" member — a 1.2.5 FTB retro curiosity with no
+        // reader anywhere — is ignored on the read)
         if (mc.ModLoaders is { } loaders)
         {
             foreach (var loader in loaders)

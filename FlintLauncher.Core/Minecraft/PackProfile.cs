@@ -148,8 +148,6 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
     private string ComponentsFilePath() => FileSystem.PathCombine(env.InstanceRoot, "mmc-pack.json");
 
-    private string PatchesPattern() => FileSystem.PathCombine(env.InstanceRoot, "patches", "%1.json");
-
     public string PatchFilePathForUid(string uid) => FileSystem.PathCombine(env.InstanceRoot, "patches", uid + ".json");
 
     /// <summary>C++ MinecraftInstance::jarModsDir() (lives under the instance root, not the game root).</summary>
@@ -209,7 +207,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
         // load the new component list and swap it with the current one...
         var newComponents = new List<Component>();
-        Result result = LoadPackProfile(this, filename, PatchesPattern(), newComponents);
+        Result result = LoadPackProfile(this, filename, newComponents);
         if (!result)
         {
             return result;
@@ -280,12 +278,12 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     /// </summary>
     public Task Resolve(NetMode netmode, CancellationToken cancellationToken = default)
     {
-        var updateTask = new ComponentUpdateTask(ComponentUpdateTask.Mode.Resolution, netmode, this);
-        this.updateTask = updateTask;
-        updateTask.Succeeded += _ => UpdateSucceeded();
-        updateTask.Failed += (_, _) => UpdateFailed();
-        updateTask.Aborted += _ => UpdateFailed();
-        return updateTask.StartAsync(cancellationToken);
+        var task = new ComponentUpdateTask(ComponentUpdateTask.Mode.Resolution, netmode, this);
+        this.updateTask = task;
+        task.Succeeded += _ => UpdateSucceeded();
+        task.Failed += (_, _) => UpdateFailed();
+        task.Aborted += _ => UpdateFailed();
+        return task.StartAsync(cancellationToken);
     }
 
     private void UpdateSucceeded()
@@ -474,7 +472,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     }
 
     /// <summary>Read the given file into the component container.</summary>
-    private static Result LoadPackProfile(PackProfile parent, string filename, string componentJsonPattern,
+    private static Result LoadPackProfile(PackProfile parent, string filename,
         List<Component> container)
     {
         if (!File.Exists(filename))
@@ -1028,13 +1026,13 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         {
             try
             {
-                var profile = new LaunchProfile();
+                var applied = new LaunchProfile();
                 foreach (var file in _components)
                 {
-                    file.ApplyTo(profile);
+                    file.ApplyTo(applied);
                 }
 
-                this.profile = profile;
+                this.profile = applied;
             }
             catch (Exception e) when (e is JsonParseException or MetaParseException or FileSystemException)
             {

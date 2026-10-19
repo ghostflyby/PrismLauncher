@@ -25,7 +25,6 @@ public sealed class InstanceConfigStore
 
     public InstanceConfigStore(string instanceRoot, JsonTypeInfo<InstanceConfigFile> typeInfo)
     {
-        InstanceRoot = instanceRoot;
         ConfigPath = Path.Combine(instanceRoot, "instance.json");
         _file = new TypedJsonFile<InstanceConfigFile>(ConfigPath, typeInfo);
 
@@ -36,9 +35,6 @@ public sealed class InstanceConfigStore
             ? _file.LoadOrDefault(InstanceConfigFile.Default) // raw payload — nulls are the layer
             : InstanceIniImporter.Import(Path.Combine(instanceRoot, InstanceIniImporter.LegacyFileName));
     }
-
-    /// <summary>The instance directory this store anchors.</summary>
-    public string InstanceRoot { get; }
 
     /// <summary>The instance.json path (the format marker and the only write target).</summary>
     public string ConfigPath { get; }

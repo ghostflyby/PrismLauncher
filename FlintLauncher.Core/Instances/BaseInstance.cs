@@ -71,29 +71,29 @@ public abstract class BaseInstance
     protected BaseInstance(SettingsObject settings, string rootDir)
     {
         RootDir = rootDir;
-        _settings = settings;
+        InstanceSettings = settings;
 
-        _settings.RegisterSetting("name", "Unnamed Instance");
-        _settings.RegisterSetting("iconKey", "default");
-        _settings.RegisterSetting("notes", "");
+        InstanceSettings.RegisterSetting("name", "Unnamed Instance");
+        InstanceSettings.RegisterSetting("iconKey", "default");
+        InstanceSettings.RegisterSetting("notes", "");
 
         // the runtime time trio lives in instance-state.json since D4 — the adapter routes
         // these keys there; the registrations carry their zero defaults
-        _settings.RegisterSetting("lastLaunchTime", 0L);
-        _settings.RegisterSetting("totalTimePlayed", 0L);
-        if (Variant.AsLong(_settings.Get("totalTimePlayed")) < 0)
+        InstanceSettings.RegisterSetting("lastLaunchTime", 0L);
+        InstanceSettings.RegisterSetting("totalTimePlayed", 0L);
+        if (Variant.AsLong(InstanceSettings.Get("totalTimePlayed")) < 0)
         {
-            _settings.Reset("totalTimePlayed");
+            InstanceSettings.Reset("totalTimePlayed");
         }
 
-        _settings.RegisterSetting("lastTimePlayed", 0L);
+        InstanceSettings.RegisterSetting("lastTimePlayed", 0L);
 
         // D4: a real string list (the old JSON text form parses through GetLinkedInstances)
-        _settings.RegisterSetting("linkedInstances", Array.Empty<string>());
-        _settings.RegisterSetting("shortcuts", "");
-        _settings.RegisterSetting("uuid", "");
+        InstanceSettings.RegisterSetting("linkedInstances", Array.Empty<string>());
+        InstanceSettings.RegisterSetting("shortcuts", "");
+        InstanceSettings.RegisterSetting("uuid", "");
 
-        var savedUuid = Variant.AsString(_settings.Get("uuid"));
+        var savedUuid = Variant.AsString(InstanceSettings.Get("uuid"));
         if (savedUuid.Length == 0)
         {
             RegenerateUuid();
@@ -106,49 +106,49 @@ public abstract class BaseInstance
         // Game time override family (C7: the gate key stays readable; its value is derived
         // from Misc.GameTime's members by the adapter — no OverrideSetting chain anymore).
         // The member keys register plain: the adapter resolves them instance ?? user layer.
-        _settings.RegisterSetting("OverrideGameTime", false);
-        _settings.RegisterSetting("ShowGameTime", true);
-        _settings.RegisterSetting("RecordGameTime", true);
-        _settings.RegisterSetting("CountGameTime", true);
+        InstanceSettings.RegisterSetting("OverrideGameTime", false);
+        InstanceSettings.RegisterSetting("ShowGameTime", true);
+        InstanceSettings.RegisterSetting("RecordGameTime", true);
+        InstanceSettings.RegisterSetting("CountGameTime", true);
 
         // NOTE: Sometimes InstanceType is already registered, as it was used to identify the
         // type of a locally stored instance. "OneSix" is the only instantiable type and the
         // record default (an unknown type never constructs a MinecraftInstance — InstanceList
         // pre-reads the type from instance.json/instance.cfg and yields NullInstance).
-        if (_settings.GetSetting("InstanceType") is null)
+        if (InstanceSettings.GetSetting("InstanceType") is null)
         {
-            _settings.RegisterSetting("InstanceType", "OneSix");
+            InstanceSettings.RegisterSetting("InstanceType", "OneSix");
         }
 
         // Custom Commands (OverrideCommands family; the synonym covers the legacy spelling)
-        _settings.RegisterSetting(["OverrideCommands", "OverrideLaunchCmd"], false);
-        _settings.RegisterSetting("PreLoadCommand", "");
-        _settings.RegisterSetting("PreLaunchCommand", "");
-        _settings.RegisterSetting("WrapperCommand", "");
-        _settings.RegisterSetting("PostExitCommand", "");
+        InstanceSettings.RegisterSetting(["OverrideCommands", "OverrideLaunchCmd"], false);
+        InstanceSettings.RegisterSetting("PreLoadCommand", "");
+        InstanceSettings.RegisterSetting("PreLaunchCommand", "");
+        InstanceSettings.RegisterSetting("WrapperCommand", "");
+        InstanceSettings.RegisterSetting("PostExitCommand", "");
 
         // Console (OverrideConsole family)
-        _settings.RegisterSetting("OverrideConsole", false);
-        _settings.RegisterSetting("ShowConsole", false);
-        _settings.RegisterSetting("AutoCloseConsole", false);
-        _settings.RegisterSetting("ShowConsoleOnError", true);
-        _settings.RegisterSetting("LogPrePostOutput", true);
+        InstanceSettings.RegisterSetting("OverrideConsole", false);
+        InstanceSettings.RegisterSetting("ShowConsole", false);
+        InstanceSettings.RegisterSetting("AutoCloseConsole", false);
+        InstanceSettings.RegisterSetting("ShowConsoleOnError", true);
+        InstanceSettings.RegisterSetting("LogPrePostOutput", true);
         // C7 passthrough pair: global-only values (the adapter resolves them from the user
         // layer); registered so the GetConsoleMaxLines/ShouldStopOnConsoleOverflow readers
         // keep finding the keys
-        _settings.RegisterSetting("ConsoleMaxLines", 100000);
-        _settings.RegisterSetting("ConsoleOverflowStop", true);
+        InstanceSettings.RegisterSetting("ConsoleMaxLines", 100000);
+        InstanceSettings.RegisterSetting("ConsoleOverflowStop", true);
 
         // Managed Packs
-        _settings.RegisterSetting("ManagedPack", false);
-        _settings.RegisterSetting("ManagedPackType", "");
-        _settings.RegisterSetting("ManagedPackID", "");
-        _settings.RegisterSetting("ManagedPackName", "");
-        _settings.RegisterSetting("ManagedPackVersionID", "");
-        _settings.RegisterSetting("ManagedPackVersionName", "");
-        _settings.RegisterSetting("ManagedPackURL", "");
+        InstanceSettings.RegisterSetting("ManagedPack", false);
+        InstanceSettings.RegisterSetting("ManagedPackType", "");
+        InstanceSettings.RegisterSetting("ManagedPackID", "");
+        InstanceSettings.RegisterSetting("ManagedPackName", "");
+        InstanceSettings.RegisterSetting("ManagedPackVersionID", "");
+        InstanceSettings.RegisterSetting("ManagedPackVersionName", "");
+        InstanceSettings.RegisterSetting("ManagedPackURL", "");
 
-        _settings.RegisterSetting("Profiler", "");
+        InstanceSettings.RegisterSetting("Profiler", "");
     }
 
     // ---------------------------------------------------------------- events (Qt signals)
@@ -229,7 +229,7 @@ public abstract class BaseInstance
     {
         // QUuid::createUuid().toString(QUuid::Id128): 32 hexadecimal digits without separators
         var newUuid = Guid.NewGuid().ToString("N");
-        _settings.Set("uuid", newUuid);
+        InstanceSettings.Set("uuid", newUuid);
         uuid = newUuid;
     }
 
@@ -284,7 +284,7 @@ public abstract class BaseInstance
 
     public long TotalTimePlayed()
     {
-        var current = Variant.AsLong(_settings.Get("totalTimePlayed"));
+        var current = Variant.AsLong(InstanceSettings.Get("totalTimePlayed"));
         if (IsRunning)
         {
             var timeNow = DateTimeOffset.Now;
@@ -302,10 +302,10 @@ public abstract class BaseInstance
             return TimeStarted is { } timeStarted ? (long)(timeNow - timeStarted).TotalSeconds : 0;
         }
 
-        return Variant.AsLong(_settings.Get("lastTimePlayed"));
+        return Variant.AsLong(InstanceSettings.Get("lastTimePlayed"));
     }
 
-    public bool CountTimePlayed() => Variant.AsBool(_settings.Get("CountGameTime"));
+    public bool CountTimePlayed() => Variant.AsBool(InstanceSettings.Get("CountGameTime"));
 
     public void ResetTimePlayed()
     {
@@ -314,7 +314,7 @@ public abstract class BaseInstance
     }
 
     /// <summary>get the type of this instance</summary>
-    public string InstanceType() => Variant.AsString(_settings.Get("InstanceType"));
+    public string InstanceType() => Variant.AsString(InstanceSettings.Get("InstanceType"));
 
     /// <summary>Path to the instance's root directory.</summary>
     public string InstanceRoot() => RootDir;
@@ -325,12 +325,12 @@ public abstract class BaseInstance
     /// <summary>Path to the instance's mods directory.</summary>
     public abstract string ModsRoot();
 
-    public string Name() => Variant.AsString(_settings.Get("name"));
+    public string Name() => Variant.AsString(InstanceSettings.Get("name"));
 
     public void SetName(string val)
     {
         // FIXME upstream: if no change, do not set. setting involves saving a file.
-        _settings.Set("name", val);
+        InstanceSettings.Set("name", val);
         PropertiesChanged?.Invoke();
     }
 
@@ -350,7 +350,7 @@ public abstract class BaseInstance
 
     public List<ShortcutData> Shortcuts()
     {
-        var data = Variant.AsString(_settings.Get("shortcuts"));
+        var data = Variant.AsString(InstanceSettings.Get("shortcuts"));
         if (data.Length == 0)
         {
             return [];
@@ -429,18 +429,18 @@ public abstract class BaseInstance
             array.Add((JsonNode?)obj); // non-generic Add: AOT/trimming clean
         }
 
-        _settings.Set("shortcuts", array.ToJsonString()); // QJsonDocument::Compact
+        InstanceSettings.Set("shortcuts", array.ToJsonString()); // QJsonDocument::Compact
     }
 
     /// <summary>Value used for instance window titles.</summary>
     public string WindowTitle() => FlintConfig.Default.LauncherDisplayName + ": " + Name();
 
-    public string IconKey() => Variant.AsString(_settings.Get("iconKey"));
+    public string IconKey() => Variant.AsString(InstanceSettings.Get("iconKey"));
 
     public void SetIconKey(string val)
     {
         // FIXME upstream: if no change, do not set. setting involves saving a file.
-        _settings.Set("iconKey", val);
+        InstanceSettings.Set("iconKey", val);
         PropertiesChanged?.Invoke();
     }
 
@@ -453,12 +453,12 @@ public abstract class BaseInstance
         }
     }
 
-    public string Notes() => Variant.AsString(_settings.Get("notes"));
+    public string Notes() => Variant.AsString(InstanceSettings.Get("notes"));
 
     public void SetNotes(string val)
     {
         // FIXME upstream: if no change, do not set. setting involves saving a file.
-        _settings.Set("notes", val);
+        InstanceSettings.Set("notes", val);
     }
 
     public string GetPreLoadCommand() => Variant.AsString(Settings.Get("PreLoadCommand"));
@@ -469,36 +469,36 @@ public abstract class BaseInstance
 
     public string GetWrapperCommand() => Variant.AsString(Settings.Get("WrapperCommand"));
 
-    public bool IsManagedPack() => Variant.AsBool(_settings.Get("ManagedPack"));
+    public bool IsManagedPack() => Variant.AsBool(InstanceSettings.Get("ManagedPack"));
 
-    public string GetManagedPackType() => Variant.AsString(_settings.Get("ManagedPackType"));
+    public string GetManagedPackType() => Variant.AsString(InstanceSettings.Get("ManagedPackType"));
 
-    public string GetManagedPackId() => Variant.AsString(_settings.Get("ManagedPackID"));
+    public string GetManagedPackId() => Variant.AsString(InstanceSettings.Get("ManagedPackID"));
 
-    public string GetManagedPackName() => Variant.AsString(_settings.Get("ManagedPackName"));
+    public string GetManagedPackName() => Variant.AsString(InstanceSettings.Get("ManagedPackName"));
 
-    public string GetManagedPackVersionId() => Variant.AsString(_settings.Get("ManagedPackVersionID"));
+    public string GetManagedPackVersionId() => Variant.AsString(InstanceSettings.Get("ManagedPackVersionID"));
 
-    public string GetManagedPackVersionName() => Variant.AsString(_settings.Get("ManagedPackVersionName"));
+    public string GetManagedPackVersionName() => Variant.AsString(InstanceSettings.Get("ManagedPackVersionName"));
 
     public void SetManagedPack(string type, string id, string name, string versionId, string version)
     {
-        _settings.Set("ManagedPack", true);
-        _settings.Set("ManagedPackType", type);
-        _settings.Set("ManagedPackID", id);
-        _settings.Set("ManagedPackName", name);
-        _settings.Set("ManagedPackVersionID", versionId);
-        _settings.Set("ManagedPackVersionName", version);
+        InstanceSettings.Set("ManagedPack", true);
+        InstanceSettings.Set("ManagedPackType", type);
+        InstanceSettings.Set("ManagedPackID", id);
+        InstanceSettings.Set("ManagedPackName", name);
+        InstanceSettings.Set("ManagedPackVersionID", versionId);
+        InstanceSettings.Set("ManagedPackVersionName", version);
 
         if ((UserLayer.Java.AutomaticJavaSwitch ?? true) &&
-            Variant.AsBool(_settings.Get("AutomaticJava")) &&
-            Variant.AsBool(_settings.Get("OverrideJavaLocation")))
+            Variant.AsBool(InstanceSettings.Get("AutomaticJava")) &&
+            Variant.AsBool(InstanceSettings.Get("OverrideJavaLocation")))
         {
             // C7 translation of the C++ pair (gate=false + JavaPath=""): clear the instance
             // java-location family — every member falls back to the user layer. There is no
             // separate JavaPath="" write anymore: with the gate gone, an explicit empty
             // string would be a real (empty) override, the opposite of the intent.
-            _settings.Set("OverrideJavaLocation", false);
+            InstanceSettings.Set("OverrideJavaLocation", false);
         }
     }
 
@@ -513,13 +513,13 @@ public abstract class BaseInstance
     /// <summary>
     /// Gets the time that the instance was last launched. Stored in milliseconds since epoch.
     /// </summary>
-    public long LastLaunch() => Variant.AsLong(_settings.Get("lastLaunchTime"));
+    public long LastLaunch() => Variant.AsLong(InstanceSettings.Get("lastLaunchTime"));
 
     /// <summary>Sets the last launched time to 'val' milliseconds since epoch.</summary>
     public void SetLastLaunch(long val)
     {
         // FIXME upstream: if no change, do not set. setting involves saving a file.
-        _settings.Set("lastLaunchTime", val);
+        InstanceSettings.Set("lastLaunchTime", val);
         PropertiesChanged?.Invoke();
     }
 
@@ -535,7 +535,7 @@ public abstract class BaseInstance
         {
             LoadSpecificSettings();
 
-            return _settings;
+            return InstanceSettings;
         }
     }
 
@@ -620,7 +620,7 @@ public abstract class BaseInstance
 
     public abstract bool CanExport();
 
-    public bool ReloadSettings() => _settings.Reload();
+    public bool ReloadSettings() => InstanceSettings.Reload();
 
     /// <summary>'print' a verbose description of the instance into a list of strings.</summary>
     public abstract List<string> VerboseDescription(AuthSession? session, MinecraftTarget? targetToJoin);
@@ -631,14 +631,14 @@ public abstract class BaseInstance
     {
         // D4: the typed layer carries a real string array; a legacy JSON text (old cfg value
         // round-tripping through a plain SettingsObject double) still parses
-        return _settings.Get("linkedInstances") is IReadOnlyList<string> list
+        return InstanceSettings.Get("linkedInstances") is IReadOnlyList<string> list
             ? list.ToList()
-            : SettingsJson.ToStringList(Variant.AsString(_settings.Get("linkedInstances")));
+            : SettingsJson.ToStringList(Variant.AsString(InstanceSettings.Get("linkedInstances")));
     }
 
     public void SetLinkedInstances(IReadOnlyList<string> list)
     {
-        _settings.Set("linkedInstances", list);
+        InstanceSettings.Set("linkedInstances", list);
     }
 
     public void AddLinkedInstanceId(string id)
@@ -649,9 +649,9 @@ public abstract class BaseInstance
         // value appends verbatim and converts at the next LoadList round, exactly like the
         // group-file members. The C++ lineage passed id() — the dirname; that form is NOT
         // carried over (the D2 persistent handle is the uuid).
-        var linkedInstances = GetLinkedInstances();
-        linkedInstances.Add(UuidResolver?.Invoke(id) is { Length: > 0 } uuid ? uuid : id);
-        SetLinkedInstances(linkedInstances);
+        var links = GetLinkedInstances();
+        links.Add(UuidResolver?.Invoke(id) is { Length: > 0 } resolvedUuid ? resolvedUuid : id);
+        SetLinkedInstances(links);
     }
 
     public bool RemoveLinkedInstanceId(string id)
@@ -672,11 +672,11 @@ public abstract class BaseInstance
 
     protected void ChangeStatus(Status newStatus)
     {
-        var status = CurrentStatus();
-        if (status != newStatus)
+        var previous = CurrentStatus();
+        if (previous != newStatus)
         {
             this.status = newStatus;
-            StatusChanged?.Invoke(status, newStatus);
+            StatusChanged?.Invoke(previous, newStatus);
         }
     }
 
@@ -684,12 +684,12 @@ public abstract class BaseInstance
     /// C++ reads of APPLICATION->settings() on the instance side. Defaults when the settings
     /// object is not the typed adapter (bare test doubles).</summary>
     protected FlintConfigFile UserLayer =>
-        (_settings as InstanceJsonSettingsObject)?.UserLayer ?? FlintConfigFile.Default();
+        (InstanceSettings as InstanceJsonSettingsObject)?.UserLayer ?? FlintConfigFile.Default();
 
     /// <summary>The live user-layer store (flint.json) when the settings object is the typed
     /// adapter — handed to LaunchServices so the launch pipeline reads the same stack.</summary>
     protected FlintConfigStore? UserConfigStore =>
-        (_settings as InstanceJsonSettingsObject)?.UserConfig;
+        (InstanceSettings as InstanceJsonSettingsObject)?.UserConfig;
 
     protected bool IsSpecificSettingsLoaded() => specificSettingsLoaded;
 
@@ -701,7 +701,7 @@ public abstract class BaseInstance
 
     /// <summary>The backing store of <see cref="Settings"/>; shared with subclasses that
     /// register their instance-type keys (MinecraftInstance).</summary>
-    protected readonly SettingsObject _settings;
+    protected readonly SettingsObject InstanceSettings;
 
     /// <summary>std::unique_ptr&lt;LaunchTask&gt; m_launchProcess.</summary>
     protected LaunchTask? LaunchProcess;

@@ -219,7 +219,6 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
 
     private sealed record AuthenticationResponse(
         string AccessToken,
-        string TokenType,
         string RefreshToken,
         int ExpiresIn,
         string Error,
@@ -230,7 +229,7 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
     {
         if (TryParseObject(data) is not { } obj)
         {
-            return new AuthenticationResponse("", "", "", 0, "", "", new Dictionary<string, JsonElement>());
+            return new AuthenticationResponse("", "", 0, "", "", new Dictionary<string, JsonElement>());
         }
 
         var extra = new Dictionary<string, JsonElement>();
@@ -244,7 +243,6 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
 
         return new AuthenticationResponse(
             AccountData.GetString(AccountData.Get(obj, "access_token")),
-            AccountData.GetString(AccountData.Get(obj, "token_type")),
             AccountData.GetString(AccountData.Get(obj, "refresh_token")),
             AccountData.EnsureInteger(obj, "expires_in"),
             AccountData.GetString(AccountData.Get(obj, "error")),

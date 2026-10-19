@@ -125,22 +125,53 @@ public sealed class JavaScanService(LauncherRuntime runtime)
     private readonly SemaphoreSlim _lock = new(1, 1);
     private volatile IReadOnlyList<JavaView>? cache;
 
-    public async Task<IReadOnlyList<JavaView>> GetAsync() => cache ??= await ScanAsync();
+    public async Task<IReadOnlyList<JavaView>> GetAsync()
+    {
+        var cached = cache;
+        if (cached is not null)
+        {
+            return cached;
+        }
+
+        // double-check after the scan so concurrent first hits share one detection pass
+        await _lock.WaitAsync();
+        try
+        {
+            if (cache is { } raced)
+            {
+                return raced;
+            }
+
+            return await ScanCoreAsync();
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
 
     public async Task<IReadOnlyList<JavaView>> ScanAsync()
     {
         await _lock.WaitAsync();
         try
         {
-            var candidates = await JavaDetection.DetectAsync(runtime.JavaRoot);
-            cache = candidates
-                .Select(candidate => new JavaView(candidate.Path, candidate.Version, candidate.Architecture))
-                .ToArray();
-            return cache;
+            return await ScanCoreAsync();
         }
         finally
         {
             _lock.Release();
         }
+    }
+
+    /// <summary>Runs one detection pass and replaces the cache. Callers hold <see cref="_lock"/>;
+    /// this must stay lock-free because both entry points already hold it.</summary>
+    private async Task<IReadOnlyList<JavaView>> ScanCoreAsync()
+    {
+        var candidates = await JavaDetection.DetectAsync(runtime.JavaRoot);
+        var scanned = candidates
+            .Select(candidate => new JavaView(candidate.Path, candidate.Version, candidate.Architecture))
+            .ToArray();
+        cache = scanned;
+        return scanned;
     }
 }

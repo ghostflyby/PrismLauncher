@@ -216,12 +216,12 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
     /// </summary>
     public bool CompleteWithRedirectUri(string uri)
     {
-        if (this.listener is not { } listener)
+        if (this.listener is not { } httpListener)
         {
             return false;
         }
 
-        listener.CompleteExternally(new Uri(uri));
+        httpListener.CompleteExternally(new Uri(uri));
         return true;
     }
 

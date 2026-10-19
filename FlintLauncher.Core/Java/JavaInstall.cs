@@ -24,11 +24,11 @@ public sealed class JavaInstall(JavaVersion id, string arch, string path) : ICom
     /// <summary>Port of BaseVersion::typeString().</summary>
     public string TypeString() => Arch;
 
-    public JavaVersion Id { get; set; } = id;
+    public JavaVersion Id { get; } = id;
 
-    public string Arch { get; set; } = arch;
+    public string Arch { get; } = arch;
 
-    public string Path { get; set; } = path;
+    public string Path { get; } = path;
 
     public bool Is64Bit { get; set; }
 

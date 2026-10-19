@@ -12,7 +12,7 @@ public class Setting(IReadOnlyList<string> synonyms, object? defVal = null)
 
     public virtual object? Default { get; } = defVal;
 
-    internal SettingsObject? Storage { get; set; } = null;
+    internal SettingsObject? Storage { get; set; }
 
     internal event Action<Setting, object?>? SettingChangedInternal;
 

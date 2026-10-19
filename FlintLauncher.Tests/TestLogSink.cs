@@ -10,7 +10,7 @@ namespace FlintLauncher.Tests;
 
 public sealed class TestLogSink : ILoggerProvider
 {
-    public sealed record Entry(LogLevel Level, string Category, string Message, Exception? Exception);
+    public sealed record Entry(LogLevel Level, string Category, string Message);
 
     private readonly object _lock = new();
     public List<Entry> Entries { get; } = [];
@@ -39,7 +39,7 @@ public sealed class TestLogSink : ILoggerProvider
         {
             lock (sink._lock)
             {
-                sink.Entries.Add(new Entry(logLevel, category, formatter(state, exception), exception));
+                sink.Entries.Add(new Entry(logLevel, category, formatter(state, exception)));
             }
         }
     }

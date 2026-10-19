@@ -47,7 +47,6 @@ public class McVersionTests
     public static IEnumerable<object[]> FlexVerTestVectors()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "TestData", "Version", "test_vectors.txt");
-        var testNumber = 0;
         foreach (var rawLine in File.ReadAllLines(path))
         {
             var line = string.Join(' ', rawLine.Split(' ', StringSplitOptions.RemoveEmptyEntries));
@@ -55,8 +54,6 @@ public class McVersionTests
             {
                 continue;
             }
-
-            testNumber += 1;
 
             var splitLine = line.Split('<');
             if (splitLine.Length == 2)
