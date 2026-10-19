@@ -6,6 +6,7 @@
 // (202 + taskId) like launch/import; the update task additionally publishes its found
 // updates through the task view's optional result payload.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -64,7 +65,7 @@ public static class ModPlatformEndpoints
 
             if (!TryParseSearchType(type, out var resourceType, out var typeError))
             {
-                return ApiJson.Error("invalid_type", typeError!, 400);
+                return ApiJson.Error("invalid_type", typeError, 400);
             }
 
             resourceType = NormalizeSearchType(resourceType, parsedProvider, out var unsupportedReason);
@@ -104,7 +105,7 @@ public static class ModPlatformEndpoints
                 {
                     if (!TryParseSearchType(type, out var resourceType, out var typeError))
                     {
-                        return ApiJson.Error("invalid_type", typeError!, 400);
+                        return ApiJson.Error("invalid_type", typeError, 400);
                     }
 
                     resourceType = NormalizeSearchType(resourceType, parsedProvider, out var unsupported);
@@ -130,7 +131,7 @@ public static class ModPlatformEndpoints
 
             if (!TryParseSearchType(type, out var modrinthType, out var modrinthTypeError))
             {
-                return ApiJson.Error("invalid_type", modrinthTypeError!, 400);
+                return ApiJson.Error("invalid_type", modrinthTypeError, 400);
             }
 
             var projectType = ModrinthProjectType(modrinthType, out var unsupportedType);
@@ -444,7 +445,7 @@ public static class ModPlatformEndpoints
     /// value set mirrors the C++ resource-type search surfaces; default mods/back-compat):
     /// mods | resourcepacks | texturepacks | shaderpacks | datapacks | modpacks | worlds.
     /// </summary>
-    private static bool TryParseSearchType(string? type, out ResourceType resourceType, out string? error)
+    private static bool TryParseSearchType(string? type, out ResourceType resourceType, [NotNullWhen(false)] out string? error)
     {
         resourceType = ResourceType.Mod;
         error = null;

@@ -135,21 +135,25 @@ public class FlameExportTests : IDisposable
             manifestJson = await reader.ReadToEndAsync();
         }
 
-        var manifest = JsonNode.Parse(manifestJson)!.AsObject();
-        Assert.Equal("minecraftModpack", manifest["manifestType"]!.GetValue<string>());
-        Assert.Equal(1, manifest["manifestVersion"]!.GetValue<int>());
-        Assert.Equal("Exported Pack", manifest["name"]!.GetValue<string>());
-        Assert.Equal("2.0.0", manifest["version"]!.GetValue<string>());
-        Assert.Equal("exporter", manifest["author"]!.GetValue<string>());
-        Assert.Equal("overrides", manifest["overrides"]!.GetValue<string>());
+        var manifest = JsonNode.Parse(manifestJson)?.AsObject();
+        Assert.NotNull(manifest);
+        Assert.Equal("minecraftModpack", manifest["manifestType"]?.GetValue<string>());
+        Assert.Equal(1, manifest["manifestVersion"]?.GetValue<int>());
+        Assert.Equal("Exported Pack", manifest["name"]?.GetValue<string>());
+        Assert.Equal("2.0.0", manifest["version"]?.GetValue<string>());
+        Assert.Equal("exporter", manifest["author"]?.GetValue<string>());
+        Assert.Equal("overrides", manifest["overrides"]?.GetValue<string>());
 
-        var minecraft = manifest["minecraft"]!.AsObject();
-        Assert.Equal("1.18.2", minecraft["version"]!.GetValue<string>());
-        var loader = minecraft["modLoaders"]!.AsArray().Single()!.AsObject();
-        Assert.Equal("forge-40.1.0", loader["id"]!.GetValue<string>());
-        Assert.True(loader["primary"]!.GetValue<bool>());
+        var minecraft = manifest["minecraft"]?.AsObject();
+        Assert.NotNull(minecraft);
+        Assert.Equal("1.18.2", minecraft["version"]?.GetValue<string>());
+        var loader = minecraft["modLoaders"]?.AsArray().Single()?.AsObject();
+        Assert.NotNull(loader);
+        Assert.Equal("forge-40.1.0", loader["id"]?.GetValue<string>());
+        Assert.True(loader["primary"]?.GetValue<bool>());
 
-        var files = manifest["files"]!.AsArray();
+        var files = manifest["files"]?.AsArray();
+        Assert.NotNull(files);
         Assert.Equal(2, files.Count);
         var fileIds = files.Select(f => (long)f!["fileID"]!).ToList();
         Assert.Contains(456L, fileIds); // from the local .pw.toml metadata

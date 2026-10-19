@@ -220,7 +220,7 @@ public static class MetaJsonFormat
         {
             ptr.Add(new Require
             {
-                Uid = RequireStringOf(req?.Uid, "uid"),
+                Uid = RequireStringOf(req.Uid, "uid"),
                 EqualsVersion = req?.EqualsVersion ?? "",
                 Suggests = req?.Suggests ?? "",
             });
@@ -355,15 +355,16 @@ public static class MetaJsonFormat
     /// (absent member reads as empty; a null or uid-less entry fails with the collapsed
     /// kind text). Serves the version format and the mmc-pack components — the meta
     /// documents route through MapRequires (MetaParseException semantics).</summary>
-    internal static void ParseRequires(List<MetaRequireJson>? raw, SortedSet<Require> ptr, string keyName = "requires")
+    internal static void ParseRequires(List<MetaRequireJson?>? raw, SortedSet<Require> ptr, string keyName = "requires")
     {
         foreach (var req in raw ?? [])
         {
             ptr.Add(new Require
             {
-                Uid = req?.Uid ?? throw new JsonParseException("'" + keyName + "' entry has no 'uid' string"),
-                EqualsVersion = req.EqualsVersion ?? "",
-                Suggests = req.Suggests ?? "",
+                Uid = (req is not null ? req.Uid : null)
+                    ?? throw new JsonParseException("'" + keyName + "' entry has no 'uid' string"),
+                EqualsVersion = req?.EqualsVersion ?? "",
+                Suggests = req?.Suggests ?? "",
             });
         }
     }

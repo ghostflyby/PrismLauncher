@@ -88,7 +88,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             metaCache = value;
             if (value is not null)
             {
-                Components?.SetMetadataCache(value);
+                Components.SetMetadataCache(value);
             }
         }
     }
@@ -108,7 +108,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public override void SaveNow()
     {
-        Components!.SaveNow();
+        Components.SaveNow();
     }
 
     public override void LoadSpecificSettings()
@@ -208,18 +208,14 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         context.JavaArchitecture = detection?.Architecture ?? "";
         context.JavaRealArchitecture = detection?.RealArchitecture ?? "";
         RuntimeContext = context;
-        Components!.InvalidateLaunchProfile();
+        Components.InvalidateLaunchProfile();
     }
 
-    public PackProfile GetPackProfile() => Components!;
+    public PackProfile GetPackProfile() => Components;
 
     public override IReadOnlySet<string> Traits()
     {
         var components = GetPackProfile();
-        if (components is null)
-        {
-            return new HashSet<string> { "version-incomplete" };
-        }
 
         var profile = components.GetProfile();
         if (profile is null)
@@ -495,11 +491,6 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         var launchScript = "";
 
-        if (Components is null)
-        {
-            return "";
-        }
-
         var profile = Components.GetProfile();
         if (profile is null)
         {
@@ -726,7 +717,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // It *SHOULD* check for the executable to exist before trying to use it for queries but it doesnt,
         // so WE can and force disable xrandr if it is not available.
         if (OperatingSystem.IsLinux() &&
-            Components!.GetComponent("org.lwjgl") is not null &&
+            Components.GetComponent("org.lwjgl") is not null &&
             FindExecutable("xrandr").Length == 0)
         {
             args.Add("-DLWJGL_DISABLE_XRANDR=true");
@@ -866,7 +857,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public List<string> ProcessMinecraftArgs(AuthSession? session, MinecraftTarget? targetToJoin)
     {
-        var profile = Components!.GetProfile()!;
+        var profile = Components.GetProfile()!;
         var args = profile.GetMinecraftArguments()
             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .ToList();
@@ -1187,7 +1178,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             traitsList.Add("broken");
         }
 
-        var mcVersion = Components!.GetComponentVersion("net.minecraft");
+        var mcVersion = Components.GetComponentVersion("net.minecraft");
         if (mcVersion.Length == 0)
         {
             // Load component info if needed. Upstream calls PackProfile::reload(Offline): its
@@ -1230,7 +1221,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         var jars = new List<string>();
         var nativeJars = new List<string>();
-        var profile = Components!.GetProfile()!;
+        var profile = Components.GetProfile()!;
         profile.GetLibraryFiles(RuntimeContext, jars, nativeJars, GetLocalLibraryPath(), BinRoot(),
             storageBase: LibraryStorageBase());
         return jars;
@@ -1240,7 +1231,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         var jars = new List<string>();
         var nativeJars = new List<string>();
-        var profile = Components!.GetProfile()!;
+        var profile = Components.GetProfile()!;
         profile.GetLibraryFiles(RuntimeContext, jars, nativeJars, GetLocalLibraryPath(), BinRoot(),
             storageBase: LibraryStorageBase());
         return nativeJars;
@@ -1254,7 +1245,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public string GetMainClass()
     {
-        var profile = Components!.GetProfile()!;
+        var profile = Components.GetProfile()!;
         return profile.GetMainClass();
     }
 
@@ -1333,7 +1324,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public List<Mod> GetJarMods()
     {
-        var profile = Components!.GetProfile()!;
+        var profile = Components.GetProfile()!;
         var mods = new List<Mod>();
         foreach (var jarmod in profile.GetJarMods())
         {
@@ -1518,7 +1509,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     // ------------------------------------------------------------------------ data
 
-    protected readonly PackProfile? Components; // unique_ptr<PackProfile> m_components (set in ctor)
+    protected readonly PackProfile Components; // unique_ptr<PackProfile> m_components (set in ctor)
     private ModFolderModel? loaderModList;
     private ModFolderModel? coreModList;
 

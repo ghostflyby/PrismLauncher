@@ -278,7 +278,8 @@ public class AtLauncherTests : IDisposable
     {
         // a "noConfigs" pack goes straight to the mods (nothing requests the Configs.zip)
         var fixture = AtlPackFixture.Create();
-        var configsObj = JsonNode.Parse(fixture.ConfigsJson)!.AsObject();
+        var configsObj = JsonNode.Parse(fixture.ConfigsJson)?.AsObject();
+        Assert.NotNull(configsObj);
         configsObj["noConfigs"] = true;
         fixture.ConfigsJson = configsObj.ToJsonString();
         fixture.Register(_server);
