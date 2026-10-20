@@ -125,7 +125,8 @@ public sealed class NetRequest(
         // on the network level (connection refused/reset, DNS, the RequestTimeout idle timeout)
         // is retried up to the stack's ManualRetries times before it finally fails. HTTP error
         // statuses are not retried here (the AutoRetry option covers 429/503 like the C++).
-        for (var attempt = 0;; attempt++)
+        var attempt = 0;
+        while (true)
         {
             try
             {
@@ -137,6 +138,8 @@ public sealed class NetRequest(
             {
                 EmitStatus($"Network error ({e.Message}); retrying ({_stack.ManualRetries - attempt} tries left)");
             }
+
+            attempt++;
         }
     }
 
