@@ -242,6 +242,7 @@ public sealed class LogParser
                                     return null; // parse fail (EndDocument/EOF)
                                 }
 
+                                // (no EndDocument token in System.Xml; EOF returns null above)
                                 switch (parser.NodeType)
                                 {
                                     case XmlNodeType.Text:
@@ -257,7 +258,6 @@ public sealed class LogParser
                                         }
 
                                         break;
-                                    // (no EndDocument token in System.Xml; EOF returns null above)
                                 }
                             }
 

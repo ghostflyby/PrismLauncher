@@ -339,11 +339,12 @@ public static class MmcZip
     /// <summary>Create explicit entries for every folder under dir (see header note).</summary>
     private static bool AddDirectoryEntries(ZipArchive zip, string dir, FilterFunction? excludeFilter)
     {
-        foreach (var sub in Directory.EnumerateDirectories(dir, "*", new EnumerationOptions
-                 {
-                     RecurseSubdirectories = true,
-                     IgnoreInaccessible = true,
-                 }))
+        var subdirectories = Directory.EnumerateDirectories(dir, "*", new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = true,
+        });
+        foreach (var sub in subdirectories)
         {
             var relative = GetRelativePath(dir, sub);
             if (excludeFilter != null && excludeFilter(relative))

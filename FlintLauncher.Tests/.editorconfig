@@ -1,0 +1,2 @@
+[*.cs]
+resharper_parameter_only_used_for_precondition_check_local_highlighting = do_not_show

@@ -271,17 +271,19 @@ public static class WebHostBuilder
             state = Path.Combine(home, "state");
         }
 
-        return FlintPaths.FromRoots(
-                FlagValue(args, "--config-dir", "FLINT_CONFIG_DIR") ?? config,
-                FlagValue(args, "--data-dir", "FLINT_DATA_DIR") ?? data,
-                FlagValue(args, "--store-dir", "FLINT_STORE_DIR") ?? store,
-                FlagValue(args, "--cache-dir", "FLINT_CACHE_DIR") ?? cache,
-                FlagValue(args, "--state-dir", "FLINT_STATE_DIR") ?? state) with
-            {
-                // G1: home mode records its origin so the flint-legacy probe can find the
-                // pre-reform flat files at the home root (the fresh X/data child cannot)
-                HomeRoot = home,
-            };
+        var roots = FlintPaths.FromRoots(
+            FlagValue(args, "--config-dir", "FLINT_CONFIG_DIR") ?? config,
+            FlagValue(args, "--data-dir", "FLINT_DATA_DIR") ?? data,
+            FlagValue(args, "--store-dir", "FLINT_STORE_DIR") ?? store,
+            FlagValue(args, "--cache-dir", "FLINT_CACHE_DIR") ?? cache,
+            FlagValue(args, "--state-dir", "FLINT_STATE_DIR") ?? state);
+
+        // G1: home mode records its origin so the flint-legacy probe can find the
+        // pre-reform flat files at the home root (the fresh X/data child cannot)
+        return roots with
+        {
+            HomeRoot = home,
+        };
     }
 
     /// <summary>The last occurrence of &lt;flag&gt; &lt;value&gt; / &lt;flag&gt;=&lt;value&gt;
