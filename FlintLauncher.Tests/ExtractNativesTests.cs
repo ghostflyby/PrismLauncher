@@ -89,7 +89,7 @@ public class ExtractNativesTests
     public async Task ExtractsNativeJars_WithJniLibRename()
     {
         using var fixture = new LaunchFixture();
-        fixture.SeedJavaDetection("java", 0, version: "17.0.2"); // >= 8: the .jnilib hack applies (C9: state cache)
+        fixture.SeedJavaDetection("java", 0, languageVersion: 17, version: "17.0.2"); // >= 8: the .jnilib hack applies (C9: state cache)
         var instance = await fixture.CreateInstance(NativeLibrariesPatch);
         WriteNativeJars(instance.GetLocalLibraryPath(), "dylib-bytes", "jnilib-bytes");
 

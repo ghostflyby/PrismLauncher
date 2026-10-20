@@ -11,12 +11,14 @@
 // FlintLauncher.Core.Minecraft namespace so its many consumers keep compiling; that is also
 // why this file uses classic block-scoped namespaces instead of the file-scoped form.
 
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Text;
+using JdkFind;
 
 namespace FlintLauncher.Core.Java;
 
@@ -56,7 +58,7 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
 
     public string PackageType { get; set; } = "";
 
-    public JavaVersion Version { get; set; } = new();
+    public JvmVersion Version { get; set; } = JvmVersion.Unknown();
 
     public string RuntimeOs { get; set; } = "";
 
@@ -109,11 +111,11 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
 
         if (dto.Version is { } version)
         {
-            meta.Version = new JavaVersion(
+            meta.Version = JvmVersion.Parse(ComposeVersion(
                 version.Major ?? 0,
                 version.Minor ?? 0,
                 version.Security ?? 0,
-                version.Build ?? 0);
+                version.Build ?? 0));
         }
 
         return meta;
@@ -130,6 +132,41 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
         {
             throw new JsonParseException("java runtime: Error parsing JSON: " + e.Message);
         }
+    }
+
+    /// <summary>The version string the C++ JavaVersion(major, minor, security, build)
+    /// constructor built from the meta "version" members: trailing zero components are
+    /// dropped, a zero between non-zero components is kept, and a non-zero build becomes the
+    /// fourth component. It is the descriptor the entry is displayed and matched by, so the
+    /// shape is kept verbatim and JdkFind only parses the result.</summary>
+    internal static string ComposeVersion(int major, int minor, int security, int build)
+    {
+        var versions = new List<string>();
+        if (build != 0)
+        {
+            versions.Insert(0, build.ToString(CultureInfo.InvariantCulture));
+        }
+
+        if (security != 0)
+        {
+            versions.Insert(0, security.ToString(CultureInfo.InvariantCulture));
+        }
+        else if (versions.Count > 0)
+        {
+            versions.Insert(0, "0");
+        }
+
+        if (minor != 0)
+        {
+            versions.Insert(0, minor.ToString(CultureInfo.InvariantCulture));
+        }
+        else if (versions.Count > 0)
+        {
+            versions.Insert(0, "0");
+        }
+
+        versions.Insert(0, major.ToString(CultureInfo.InvariantCulture));
+        return string.Join(".", versions);
     }
 
     // ------------------------------------------------------------- comparators

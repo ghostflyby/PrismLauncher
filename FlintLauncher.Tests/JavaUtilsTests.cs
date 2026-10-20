@@ -164,7 +164,8 @@ public class JavaUtilsTests : IDisposable
 
         var primary = Assert.Single(candidates, c => c.Path == executable);
         Assert.True(primary.Valid);
-        Assert.Equal("21.0.5", primary.Version);
+        Assert.Equal("21.0.5", primary.Version.Original);
+        Assert.Equal(21, primary.LanguageVersion);
         // the probe cannot execute the empty stub java, so metadata degrades to the release
         // file; OS_ARCH is absent from the fixture
         Assert.Equal("unknown", primary.Architecture);
@@ -172,7 +173,8 @@ public class JavaUtilsTests : IDisposable
         // release-backed but unable to run: listed, marked invalid
         var dead = Assert.Single(candidates, c => c.Path == broken);
         Assert.False(dead.Valid);
-        Assert.Equal("unknown", dead.Version);
+        Assert.Equal("unknown", dead.Version.Original);
+        Assert.Null(dead.LanguageVersion);
 
         // nothing behind it: dropped instead of listed
         Assert.DoesNotContain(candidates, c => c.Path == Path.Combine(root, "nonexistent", "java"));
@@ -200,6 +202,7 @@ public class JavaUtilsTests : IDisposable
         Assert.True(candidate.Valid);
         Assert.Equal("aarch64", candidate.Architecture);
         Assert.True(JavaUtils.Is64BitArchitecture(candidate.Architecture));
+        Assert.Equal(17, candidate.LanguageVersion);
     }
 
     [Fact]
@@ -223,18 +226,10 @@ public class JavaUtilsTests : IDisposable
         await task.StartAsync();
 
         var install = Assert.Single(list.Versions(), j => j.Path == Path.Combine(home, "bin", JavaUtils.JavaExecutable));
-        Assert.Equal(21, install.Id.Major);
+        Assert.Equal("21.0.5", install.Id.ToString());
+        Assert.Equal(21, install.LanguageVersion);
         Assert.Equal("x86_64", install.Arch);
         Assert.True(install.Is64Bit);
-    }
-
-    [Fact]
-    public void JavaVersion_ParsesRuntimeVersionStrings()
-    {
-        // the detection layer feeds RuntimeVersion (java.runtime.version, which carries the
-        // "+build" suffix) into JavaVersion — the same string shape the checker used to
-        Assert.Equal(21, new JavaVersion("21.0.5+9-LTS").Major);
-        Assert.Equal(8, new JavaVersion("1.8.0_402").Major);
     }
 
     [Fact]

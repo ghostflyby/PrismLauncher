@@ -91,7 +91,7 @@ public class LauncherPartLaunchTests : IDisposable
         }
 
         using var fixture = new LaunchFixture();
-        fixture.SeedJavaDetection("java", 0, version: "17.0.2"); // C9: probe cache, not settings
+        fixture.SeedJavaDetection("java", 0, languageVersion: 17, version: "17.0.2"); // C9: probe cache, not settings
         var instance = await fixture.CreateInstance();
         var session = fixture.OfflineSession();
         var javaPath = WriteFakeJava();
@@ -136,7 +136,7 @@ public class LauncherPartLaunchTests : IDisposable
         }
 
         using var fixture = new LaunchFixture();
-        fixture.SeedJavaDetection("java", 0, version: "17.0.2"); // C9: probe cache, not settings
+        fixture.SeedJavaDetection("java", 0, languageVersion: 17, version: "17.0.2"); // C9: probe cache, not settings
         var instance = await fixture.CreateInstance();
         var javaPath = WriteFakeJava();
 

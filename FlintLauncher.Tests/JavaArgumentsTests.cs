@@ -76,12 +76,12 @@ public class JavaArgumentsTests
         // the Java <8 support floor removed the PermGen accommodation: no version string
         // produces -XX:PermSize anymore, whatever the PermGen setting says
         using var fixture = new LaunchFixture();
-        fixture.SeedJavaDetection("java", 0, version: "1.7.0_80");
+        fixture.SeedJavaDetection("java", 0, languageVersion: 7, version: "1.7.0_80");
         var instance = await fixture.CreateInstance();
 
         Assert.DoesNotContain(instance.JavaArguments(), a => a.StartsWith("-XX:PermSize"));
 
-        fixture.SeedJavaDetection("java", 0, version: "17.0.2");
+        fixture.SeedJavaDetection("java", 0, languageVersion: 17, version: "17.0.2");
         var modern = await fixture.CreateInstance();
         Assert.DoesNotContain(modern.JavaArguments(), a => a.StartsWith("-XX:PermSize"));
     }
@@ -93,7 +93,7 @@ public class JavaArgumentsTests
         var patch = LaunchFixture.DefaultPatchJson.Replace("\"+traits\": [\"FirstThreadOnMacOS\"]",
             "\"+traits\": [\"FirstThreadOnMacOS\", \"legacyServices\"]");
         fixture.Global.StubSet("OnlineFixes", true);
-        fixture.SeedJavaDetection("java", 0, version: "17.0.2");
+        fixture.SeedJavaDetection("java", 0, languageVersion: 17, version: "17.0.2");
         var instance = await fixture.CreateInstance(patch);
         Assert.True(instance.ShouldApplyOnlineFixes());
 

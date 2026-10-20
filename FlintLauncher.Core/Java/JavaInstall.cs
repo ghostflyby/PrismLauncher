@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Port of launcher/java/JavaInstall.{h,cpp}: a discovered Java installation (path + JavaVersion
+// Port of launcher/java/JavaInstall.{h,cpp}: a discovered Java installation (path + JvmVersion
 // + architecture). JavaInstall descends from BaseVersion upstream — the trivial BaseVersion
 // accessors (descriptor/name/typeString) are inlined here and the BaseVersion overloads of the
 // comparison operators collapse onto the typed ones (the only polymorphic sibling in the java
 // layer is Java::Metadata, which is ordered independently).
 
 using FlintLauncher.Core.Text;
+using JdkFind;
 
 namespace FlintLauncher.Core.Java;
 
-public sealed class JavaInstall(JavaVersion id, string arch, string path) : IComparable<JavaInstall>, IEquatable<JavaInstall>
+public sealed class JavaInstall(JvmVersion id, string arch, string path) : IComparable<JavaInstall>, IEquatable<JavaInstall>
 {
-    public JavaInstall() : this(new JavaVersion(), "unknown", "") { }
+    public JavaInstall() : this(JvmVersion.Unknown(), "unknown", "") { }
 
-    public JavaInstall(string id, string arch, string path) : this(new JavaVersion(id), arch, path) { }
+    public JavaInstall(string id, string arch, string path) : this(JvmVersion.Parse(id), arch, path) { }
 
     /// <summary>Port of BaseVersion::descriptor().</summary>
     public string Descriptor() => Id.ToString();
@@ -24,7 +25,11 @@ public sealed class JavaInstall(JavaVersion id, string arch, string path) : ICom
     /// <summary>Port of BaseVersion::typeString().</summary>
     public string TypeString() => Arch;
 
-    public JavaVersion Id { get; } = id;
+    public JvmVersion Id { get; } = id;
+
+    /// <summary>The Java SE feature version JdkFind read from the installation; null for a
+    /// hand-built entry (GetDefaultJava) or an installation without a readable release file.</summary>
+    public int? LanguageVersion { get; init; }
 
     public string Arch { get; } = arch;
 

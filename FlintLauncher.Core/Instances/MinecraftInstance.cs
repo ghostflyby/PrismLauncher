@@ -734,9 +734,8 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
         // The PermGen argument died with the Java <8 support floor: PermSize is a
         // pre-8 concept and the launcher no longer accommodates those runtimes.
-        var javaVersion = GetJavaVersion();
-
-        if (javaVersion.IsModular() && ShouldApplyOnlineFixes())
+        // --add-opens exists only on the module system (Java 9+).
+        if (GetJavaLanguageVersion() >= 9 && ShouldApplyOnlineFixes())
         {
             // allow reflective access to java.net - required by the skin fix
             args.Add("--add-opens");
@@ -1253,11 +1252,14 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     private LaunchProfile RequireProfile() =>
         Components.GetProfile() ?? throw new InvalidOperationException("the instance profile is missing");
 
-    public JavaVersion GetJavaVersion()
+    /// <summary>The Java SE feature version of the configured java, as JdkFind read it from
+    /// the installation when CheckJava probed it; null before the first probe, and for an
+    /// installation JdkFind found no release file for.</summary>
+    public int? GetJavaLanguageVersion()
     {
         // the probe cache is launcher-state.json's path-keyed java map now (S5/C9) —
         // settings never carried the probed version back
-        return new JavaVersion(JavaDetection()?.Version ?? "");
+        return JavaDetection()?.LanguageVersion;
     }
 
     /// <summary>The probe-cache key for a configured java path (S5): the resolved executable,

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/launch/VerifyJavaInstall.{h,cpp}: verify that the selected Java
-// major version is compatible with the instance profile. The probed version/architecture
+// feature version is compatible with the instance profile. The probed version/architecture
 // come from the state-side probe cache (S5) via the instance, not from settings (C9).
 
-using FlintLauncher.Core.Java;
+using System.Globalization;
 using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Launch.Steps;
@@ -15,9 +15,9 @@ public sealed class VerifyJavaInstall(LaunchTask parent) : LaunchStep(parent)
         var instance = Parent.Instance;
         var packProfile = instance.GetPackProfile();
         var settings = instance.Settings;
-        var storedVersion = instance.GetJavaVersion().ToString();
+        var detection = instance.JavaDetection();
         var ignoreCompatibility = Variant.AsBool(settings.Get("IgnoreJavaCompatibility"));
-        var javaArchitecture = instance.JavaDetection()?.Architecture ?? "";
+        var javaArchitecture = detection?.Architecture ?? "";
         var maxMemAlloc = Variant.AsInt(settings.Get("MaxMemAlloc"));
 
         if (javaArchitecture == "32" && maxMemAlloc > 2048)
@@ -36,9 +36,11 @@ public sealed class VerifyJavaInstall(LaunchTask parent) : LaunchStep(parent)
 
         var compatibleMajors = profile.GetCompatibleJavaMajors();
 
-        var javaVersion = new JavaVersion(storedVersion);
+        // the feature version JdkFind read at probe time; null means CheckJava has not
+        // probed this java yet or found no release file — never a compatible match
+        var languageVersion = detection?.LanguageVersion;
 
-        if (compatibleMajors.Count == 0 || compatibleMajors.Contains(javaVersion.Major))
+        if (compatibleMajors.Count == 0 || (languageVersion is { } known && compatibleMajors.Contains(known)))
         {
             EmitSucceeded();
             return Task.CompletedTask;
@@ -51,7 +53,8 @@ public sealed class VerifyJavaInstall(LaunchTask parent) : LaunchStep(parent)
             return Task.CompletedTask;
         }
 
-        EmitLogLine($"This instance is not compatible with Java version {javaVersion.Major}.\n" +
+        var javaDescription = languageVersion?.ToString(CultureInfo.InvariantCulture) ?? detection?.Version ?? "unknown";
+        EmitLogLine($"This instance is not compatible with Java version {javaDescription}.\n" +
                     "Please switch to one of the following Java versions for this instance:", MessageLevel.Error);
         foreach (var major in compatibleMajors)
         {

@@ -581,7 +581,7 @@ public class FlintApiIntegrationTests
                         state.Java.Detections, StringComparer.Ordinal)
                     {
                         [javaPath] = new(CheckJava.ComputeJavaSignature(javaUnixTime, javaPath),
-                            "64", "arm64", "17.0.2", "api-e2e"),
+                            "64", "arm64", "17.0.2", "api-e2e", 17),
                     },
                 },
             });

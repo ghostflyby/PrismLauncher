@@ -40,7 +40,7 @@ public class RealLaunchSmokeTests
         // derived OverrideJavaLocation gate reads true — C7; real Prism instance.cfg files
         // carry the same override as a gated value).
         instance.Settings.Set("JavaPath", javaPath);
-        fixture.SeedJavaDetection(javaPath, javaUnixTime, vendor: "smoke");
+        fixture.SeedJavaDetection(javaPath, javaUnixTime, languageVersion: 17, vendor: "smoke");
 
         // Resolve the REAL NewLaunch.jar built by the BuildJavaJars MSBuild target (the fake
         // java ignores the classpath; the launch pipeline extracts the launcher jars).

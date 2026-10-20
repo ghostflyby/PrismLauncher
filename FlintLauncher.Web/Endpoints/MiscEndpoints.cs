@@ -169,7 +169,7 @@ public sealed class JavaScanService(LauncherRuntime runtime)
     {
         var candidates = await JavaDetection.DetectAsync(runtime.JavaRoot);
         var scanned = candidates
-            .Select(candidate => new JavaView(candidate.Path, candidate.Version, candidate.Architecture))
+            .Select(candidate => new JavaView(candidate.Path, candidate.Version.Original, candidate.Architecture))
             .ToArray();
         _cache = scanned;
         return scanned;

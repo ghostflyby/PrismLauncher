@@ -60,7 +60,7 @@ public class LauncherStateStoreTests : IDisposable
                 LastHostname = "box",
                 Detections = new Dictionary<string, JavaDetectEntry>(StringComparer.Ordinal)
                 {
-                    ["/usr/bin/java"] = new("sig", "64", "arm64", "17.0.2", "Eclipse Adoptium"),
+                    ["/usr/bin/java"] = new("sig", "64", "arm64", "17.0.2", "Eclipse Adoptium", 17),
                 },
             },
             Ui = new UiState { HiddenGroups = ["Mods"], UngroupedHidden = true },
@@ -76,7 +76,7 @@ public class LauncherStateStoreTests : IDisposable
         Assert.Equal("box", reloaded.Current.Java.LastHostname);
         var entry = Assert.Single(reloaded.Current.Java.Detections);
         Assert.Equal("/usr/bin/java", entry.Key);
-        Assert.Equal(new JavaDetectEntry("sig", "64", "arm64", "17.0.2", "Eclipse Adoptium"), entry.Value);
+        Assert.Equal(new JavaDetectEntry("sig", "64", "arm64", "17.0.2", "Eclipse Adoptium", 17), entry.Value);
         Assert.Equal(["Mods"], reloaded.Current.Ui.HiddenGroups);
         Assert.True(reloaded.Current.Ui.UngroupedHidden);
     }
@@ -87,22 +87,27 @@ public class LauncherStateStoreTests : IDisposable
         // the C9/S5 fix: the five settings keys overwrote each other — the path-keyed map
         // remembers one entry per binary
         var store = Store();
-        store.Update(state => PutDetection(state, "/jvm/17/bin/java", "sig-17", "17.0.2"));
-        store.Update(state => PutDetection(state, "/jvm/8/bin/java", "sig-8", "1.8.0_402"));
+        store.Update(state => PutDetection(state, "/jvm/17/bin/java", "sig-17", "17.0.2", 17));
+        store.Update(state => PutDetection(state, "/jvm/8/bin/java", "sig-8", "1.8.0_402", 8));
+        // an entry from before the language version existed stays null through the fold
+        store.Update(state => PutDetection(state, "/jvm/old/bin/java", "sig-old", "11.0.9", null));
 
         var reloaded = Store();
         Assert.Equal("17.0.2", reloaded.Current.Java.Detections["/jvm/17/bin/java"].Version);
+        Assert.Equal(17, reloaded.Current.Java.Detections["/jvm/17/bin/java"].LanguageVersion);
         Assert.Equal("1.8.0_402", reloaded.Current.Java.Detections["/jvm/8/bin/java"].Version);
+        Assert.Equal(8, reloaded.Current.Java.Detections["/jvm/8/bin/java"].LanguageVersion);
+        Assert.Null(reloaded.Current.Java.Detections["/jvm/old/bin/java"].LanguageVersion);
     }
 
-    private static LauncherState PutDetection(LauncherState state, string path, string signature, string version) =>
+    private static LauncherState PutDetection(LauncherState state, string path, string signature, string version, int? languageVersion) =>
         state with
         {
             Java = state.Java with
             {
                 Detections = new Dictionary<string, JavaDetectEntry>(state.Java.Detections, StringComparer.Ordinal)
                 {
-                    [path] = new(signature, "64", "arm64", version, "vendor"),
+                    [path] = new(signature, "64", "arm64", version, "vendor", languageVersion),
                 },
             },
         };

@@ -7,7 +7,7 @@ using System.Text;
 
 namespace FlintLauncher.Core.Versioning;
 
-public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
+public sealed record McVersion : IComparable<McVersion>
 {
     private enum SectionType : byte
     {
@@ -24,22 +24,13 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
     }
 
     private readonly string _string;
-    private Section[] _sections = [];
+    private readonly Section[] _sections;
 
     public McVersion() : this("") { }
 
     public McVersion(string str)
     {
         _string = str;
-        Parse();
-    }
-
-    public override string ToString() => _string;
-
-    public bool IsEmpty => _string.Length == 0;
-
-    private void Parse()
-    {
         var parsed = new List<Section>();
         var len = _string.Length;
         for (var i = 0; i < len;)
@@ -96,8 +87,12 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
             }
         }
 
-        this._sections = parsed.ToArray();
+        _sections = parsed.ToArray();
     }
+
+    public override string ToString() => _string;
+
+    public bool IsEmpty => _string.Length == 0;
 
     private static int CompareSections(Section a, Section b)
     {
@@ -160,8 +155,6 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
 
     public bool Equals(McVersion? other) => other is not null && CompareTo(other) == 0;
 
-    public override bool Equals(object? obj) => Equals(obj as McVersion);
-
     public override int GetHashCode()
     {
         var hash = new HashCode();
@@ -181,16 +174,4 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
     public static bool operator <=(McVersion left, McVersion right) => left.CompareTo(right) <= 0;
 
     public static bool operator >=(McVersion left, McVersion right) => left.CompareTo(right) >= 0;
-
-    public static bool operator ==(McVersion? left, McVersion? right)
-    {
-        if (left is null)
-        {
-            return right is null;
-        }
-
-        return left.Equals(right);
-    }
-
-    public static bool operator !=(McVersion? left, McVersion? right) => !(left == right);
 }

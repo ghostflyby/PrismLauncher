@@ -108,8 +108,9 @@ public sealed class JavaListLoadTask(
 
         var installs = candidates
             .Where(candidate => candidate.Valid)
-            .Select(candidate => new JavaInstall(new JavaVersion(candidate.Version), candidate.Architecture, candidate.Path)
+            .Select(candidate => new JavaInstall(candidate.Version, candidate.Architecture, candidate.Path)
             {
+                LanguageVersion = candidate.LanguageVersion,
                 Is64Bit = JavaUtils.Is64BitArchitecture(candidate.Architecture),
             })
             .ToList();

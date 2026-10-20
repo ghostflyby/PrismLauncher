@@ -19,6 +19,7 @@ using System.Text.Json.Serialization;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Meta;
+using JdkFind;
 
 namespace FlintLauncher.Core.Minecraft;
 
@@ -620,11 +621,11 @@ internal static class VersionFormatMapper
 
         if (dto.Version is { } version)
         {
-            meta.Version = new JavaVersion(
+            meta.Version = JvmVersion.Parse(JavaMetadata.ComposeVersion(
                 version.Major ?? 0,
                 version.Minor ?? 0,
                 version.Security ?? 0,
-                version.Build ?? 0);
+                version.Build ?? 0));
         }
 
         return meta;

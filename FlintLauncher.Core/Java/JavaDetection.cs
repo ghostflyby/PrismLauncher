@@ -20,8 +20,9 @@ namespace FlintLauncher.Core.Java;
 /// degrades the metadata. Fallback-layer entries carry the FromExecutable verdict — a
 /// <see cref="JavaExecutable.StartFailure"/> lists the candidate as invalid ("unknown"
 /// placeholders; the /java view keeps it, the install list filters it), and a candidate
-/// with no establishable JVM drops entirely.</summary>
-public sealed record JavaCandidate(string Path, string Version, string Architecture, bool Valid);
+/// with no establishable JVM drops entirely. <see cref="LanguageVersion"/> is the Java SE
+/// feature version JdkFind read from the installation (null when it has none to read).</summary>
+public sealed record JavaCandidate(string Path, JvmVersion Version, int? LanguageVersion, string Architecture, bool Valid);
 
 public static class JavaDetection
 {
@@ -58,7 +59,7 @@ public static class JavaDetection
                     continue;
                 }
 
-                results.Add(new JavaCandidate(executable.Path, executable.Version.Original,
+                results.Add(new JavaCandidate(executable.Path, executable.Version, jvm.LanguageVersion,
                     Architecture(executable), Valid: true));
             }
         }
@@ -99,11 +100,11 @@ public static class JavaDetection
 
                 if (executable.StartFailure is not null)
                 {
-                    results.Add(new JavaCandidate(executable.Path, "unknown", "unknown", Valid: false));
+                    results.Add(new JavaCandidate(executable.Path, JvmVersion.Unknown("unknown"), null, "unknown", Valid: false));
                     continue;
                 }
 
-                results.Add(new JavaCandidate(executable.Path, executable.Version.Original,
+                results.Add(new JavaCandidate(executable.Path, executable.Version, executable.Installation?.LanguageVersion,
                     Architecture(executable), Valid: true));
             }
         }

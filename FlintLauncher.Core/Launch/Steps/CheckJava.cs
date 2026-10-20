@@ -67,9 +67,12 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
         _detectKey = MinecraftInstance.JavaDetectKey(javaPathSetting);
         var stored = Services.LauncherState?.Current.Java.Detections.GetValueOrDefault(_detectKey);
 
-        // if timestamps are not the same, or something is missing, check!
+        // if timestamps are not the same, or something is missing, check! A null
+        // LanguageVersion is either a probe from before the member existed or one JdkFind
+        // could not read a release file for — both get a fresh probe.
         if (stored is null || stored.Signature != _javaSignature || stored.Version.Length == 0 ||
-            stored.Architecture.Length == 0 || stored.RealArchitecture.Length == 0 || stored.Vendor.Length == 0)
+            stored.Architecture.Length == 0 || stored.RealArchitecture.Length == 0 || stored.Vendor.Length == 0 ||
+            stored.LanguageVersion is null)
         {
             await ProbeJavaAsync(realJavaPath, cancellationToken).ConfigureAwait(false);
             return;
@@ -84,7 +87,7 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
     /// child running with JVM-affecting environment variables removed, the verdict on
     /// <see cref="JavaExecutable.StartFailure"/> (spawn error, timeout, non-zero exit —
     /// the old JavaCheck.jar checker's Errored), and the probed properties feeding the
-    /// launcher-state quintet. A null return (no runnable JVM and no release file) maps to
+    /// launcher-state entry. A null return (no runnable JVM and no release file) maps to
     /// the same refusal; a binary that ran but reported an incomplete trio maps to the old
     /// ReturnedInvalidData semantics (warn and proceed, nothing cached).</summary>
     private async Task ProbeJavaAsync(string realJavaPath, CancellationToken cancellationToken)
@@ -120,6 +123,8 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
 
         var mojangPlatform = JavaUtils.Is64BitArchitecture(osArch) ? "64" : "32";
         PrintJavaInfo(version, mojangPlatform, osArch, vendor);
+        // Installation re-reads the release file on every access — resolve it once here
+        var languageVersion = executable.Installation?.LanguageVersion;
         // write the probe result into the path-keyed state cache (S5), then
         // refresh the runtime context from it — settings are out of the loop (C9)
         Services.LauncherState?.Update(state =>
@@ -132,7 +137,8 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
                     mojangPlatform,
                     osArch,
                     version,
-                    vendor),
+                    vendor,
+                    languageVersion),
             };
             return state with { Java = state.Java with { Detections = detections } };
         });

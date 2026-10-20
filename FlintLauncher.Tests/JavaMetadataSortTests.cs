@@ -78,7 +78,7 @@ public class JavaMetadataSortTests
         Assert.Equal("unknown", meta.RuntimeOs);
         Assert.Equal("", meta.Vendor);
         Assert.Null(meta.ReleaseTime);
-        Assert.Equal(new JavaVersion().ToString(), meta.Version.ToString());
+        Assert.Equal("", meta.Version.ToString());
     }
 
     [Fact]
@@ -100,6 +100,31 @@ public class JavaMetadataSortTests
             ["version"] = new JsonObject { ["major"] = 17 },
         });
         Assert.Equal("17", partial.Version.ToString());
+    }
+
+    [Theory]
+    [InlineData(17, 0, 2, 0, "17.0.2")]
+    [InlineData(17, 0, 0, 8, "17.0.0.8")]
+    [InlineData(8, 0, 0, 0, "8")]
+    [InlineData(21, 0, 5, 9, "21.0.5.9")]
+    public void ParseJavaMeta_ComposesTheUpstreamVersionString(int major, int minor, int security, int build, string expected)
+    {
+        // the C++ JavaVersion(major, minor, security, build) string shape: trailing zeros
+        // drop, inner zeros stay, a non-zero build is the fourth component — the descriptor
+        // JdkFind then parses as the comparable value
+        var meta = JavaMetadata.ParseJavaMeta(new JsonObject
+        {
+            ["name"] = "java",
+            ["version"] = new JsonObject
+            {
+                ["major"] = major,
+                ["minor"] = minor,
+                ["security"] = security,
+                ["build"] = build,
+            },
+        });
+        Assert.Equal(expected, meta.Version.ToString());
+        Assert.Equal(expected, meta.Descriptor());
     }
 
     [Theory]

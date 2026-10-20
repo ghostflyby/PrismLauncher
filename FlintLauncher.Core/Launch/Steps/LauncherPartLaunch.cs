@@ -44,7 +44,8 @@ public sealed class LauncherPartLaunch : LaunchStep
     {
         _closeAfterLaunch = Variant.AsBool(parent.Instance.Settings.Get("CloseAfterLaunch"));
         _process = new LoggedProcess(
-            parent.Instance.GetJavaVersion().DefaultsToUtf8() ? Encoding.UTF8 : null,
+            // UTF-8 is the default charset from Java 18 on (JEP 400)
+            parent.Instance.GetJavaLanguageVersion() >= 18 ? Encoding.UTF8 : null,
             parent.Services.LoggerFactory);
 
         _process.Log += OnProcessLog;

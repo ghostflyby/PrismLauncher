@@ -85,13 +85,17 @@ public sealed record JavaDetectState
     public Dictionary<string, JavaDetectEntry> Detections { get; init; } = new();
 }
 
-/// <summary>One probed java binary (CheckJava writes it after a successful JdkFind probe).</summary>
+/// <summary>One probed java binary (CheckJava writes it after a successful JdkFind probe).
+/// <see cref="LanguageVersion"/> is the Java SE feature version of the backing installation;
+/// null when JdkFind found no release file to read it from — and in entries written before
+/// the member existed, which CheckJava treats as a stale probe.</summary>
 public sealed record JavaDetectEntry(
     string Signature,
     string Architecture,
     string RealArchitecture,
     string Version,
-    string Vendor);
+    string Vendor,
+    int? LanguageVersion = null);
 
 /// <summary>The machine-local group view state (C8 hidden half; G4 keeps group NAMES as the
 /// keys — no group IDs). The empty-string group is represented by

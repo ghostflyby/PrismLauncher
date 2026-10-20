@@ -21,8 +21,7 @@ public sealed class ExtractNatives(LaunchTask parent) : LaunchStep(parent)
 
         var outputPath = instance.GetNativePath();
         FileSystem.EnsureFolderPathExists(outputPath);
-        var javaVersion = instance.GetJavaVersion();
-        var jniHackEnabled = javaVersion.Major >= 8;
+        var jniHackEnabled = instance.GetJavaLanguageVersion() >= 8;
         foreach (var source in toExtract)
         {
             if (!UnzipNatives(source, outputPath, jniHackEnabled))

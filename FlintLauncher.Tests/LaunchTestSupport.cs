@@ -127,8 +127,10 @@ public sealed class LaunchFixture : IDisposable
 
     /// <summary>Seed the S5 java probe cache for a configured java path so CheckJava trusts
     /// the binary without running the checker (the former settings-key seeding, C9): the
-    /// stored signature matches ComputeJavaSignature(mtime, resolved-path).</summary>
-    public void SeedJavaDetection(string javaPathSetting, long javaUnixTime, string version = "17.0.2",
+    /// stored signature matches ComputeJavaSignature(mtime, resolved-path). The caller names
+    /// the language version explicitly — it is what the launch rules (--add-opens, JNI
+    /// rename, compatibility) read, and it must agree with the version string it seeds.</summary>
+    public void SeedJavaDetection(string javaPathSetting, long javaUnixTime, int? languageVersion, string version = "17.0.2",
         string architecture = "64", string realArchitecture = "arm64", string vendor = "fixture")
     {
         var key = MinecraftInstance.JavaDetectKey(javaPathSetting);
@@ -141,7 +143,7 @@ public sealed class LaunchFixture : IDisposable
                 {
                     [key] = new(
                         CheckJava.ComputeJavaSignature(javaUnixTime, key),
-                        architecture, realArchitecture, version, vendor),
+                        architecture, realArchitecture, version, vendor, languageVersion),
                 },
             },
         });

@@ -76,7 +76,7 @@ public sealed class AutoInstallJava : LaunchStep
                 for (var i = 0; i < javas.Count; i++)
                 {
                     var java = javas.At(i);
-                    if (compatibleMajors.Contains(java.Id.Major))
+                    if (java.LanguageVersion is { } languageVersion && compatibleMajors.Contains(languageVersion))
                     {
                         if (!java.Is64Bit)
                         {
