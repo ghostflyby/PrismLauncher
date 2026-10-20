@@ -32,11 +32,11 @@ public enum TaskState
 /// </summary>
 public abstract class FlintTask
 {
-    private CancellationTokenSource? cts;
-    private Task? runTask;
-    private long progress;
-    private long progressTotal = 100;
-    private string details = "";
+    private CancellationTokenSource? _cts;
+    private Task? _runTask;
+    private long _progress;
+    private long _progressTotal = 100;
+    private string _details = "";
 
     public TaskState State { get; protected set; } = TaskState.Inactive;
 
@@ -66,13 +66,13 @@ public abstract class FlintTask
     public virtual bool IsMultiStep => false;
 
     /// <summary>Port of Task::getProgress().</summary>
-    public long CurrentProgress => progress;
+    public long CurrentProgress => _progress;
 
     /// <summary>Port of Task::getTotalProgress().</summary>
-    public long TotalProgress => progressTotal;
+    public long TotalProgress => _progressTotal;
 
     /// <summary>Port of Task::getDetails(). (A Details property would clash with the event.)</summary>
-    public string GetDetails() => details;
+    public string GetDetails() => _details;
 
     /// <summary>Port of the succeeded() signal.</summary>
     public event Action<FlintTask>? Succeeded;
@@ -104,18 +104,18 @@ public abstract class FlintTask
         {
             // Task::start() refuses to start a task that is already running; await the in-flight
             // run so the returned Task still completes at the terminal state.
-            await (this.runTask ?? Task.CompletedTask).ConfigureAwait(false);
+            await (this._runTask ?? Task.CompletedTask).ConfigureAwait(false);
             return;
         }
 
         // NOTE: only fall through to here in end states (C++ restarts from any end state).
         State = TaskState.Running;
-        var previousCts = cts;
-        cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var previousCts = _cts;
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         previousCts?.Dispose();
 
-        runTask = RunAsync(cts.Token);
-        await runTask.ConfigureAwait(false);
+        _runTask = RunAsync(_cts.Token);
+        await _runTask.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -127,7 +127,7 @@ public abstract class FlintTask
     {
         if (State == TaskState.Running)
         {
-            cts?.Cancel();
+            _cts?.Cancel();
         }
     }
 
@@ -216,12 +216,12 @@ public abstract class FlintTask
     /// <summary>Port of Task::setDetails(); only emits on change, like the C++ original.</summary>
     protected void EmitDetails(string details)
     {
-        if (this.details == details)
+        if (this._details == details)
         {
             return;
         }
 
-        this.details = details;
+        this._details = details;
         Details?.Invoke(this, details);
     }
 
@@ -234,13 +234,13 @@ public abstract class FlintTask
     /// <summary>Port of Task::setProgress(current, total); only emits on change.</summary>
     protected void SetProgress(long current, long total)
     {
-        if (progress == current && progressTotal == total)
+        if (_progress == current && _progressTotal == total)
         {
             return;
         }
 
-        progress = current;
-        progressTotal = total;
+        _progress = current;
+        _progressTotal = total;
         EmitProgress(new TaskStepProgress(Uid)
         {
             Current = current,
@@ -252,7 +252,7 @@ public abstract class FlintTask
     /// <summary>Used by ConcurrentTask::clear() to reset the overall progress (C++: m_progress = 0).</summary>
     protected void ResetProgress()
     {
-        progress = 0;
+        _progress = 0;
     }
 
     /// <summary>
@@ -262,8 +262,8 @@ public abstract class FlintTask
     /// </summary>
     public virtual TaskStepProgress GetProgress() => new(Uid)
     {
-        Current = progress,
-        Total = progressTotal,
+        Current = _progress,
+        Total = _progressTotal,
         State = ToStepState(State),
     };
 

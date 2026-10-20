@@ -11,7 +11,7 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class LibrariesTask(MinecraftInstance inst) : FlintTask
 {
-    private NetJob? downloadJob;
+    private NetJob? _downloadJob;
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -28,7 +28,7 @@ public sealed class LibrariesTask(MinecraftInstance inst) : FlintTask
         }
 
         var job = new NetJob($"Libraries for instance {inst1.Name()}");
-        downloadJob = job;
+        _downloadJob = job;
 
         // E6: the stamped runtime cache is the only source — the bare-fixture throwaway is
         // gone; an unstamped instance fails the step naming the missing wire
@@ -50,20 +50,20 @@ public sealed class LibrariesTask(MinecraftInstance inst) : FlintTask
         // starting a NetJob that would be useless after the task already failed)
         if (!ProcessArtifactPool(libArtifactPool, failedLocalLibraries, inst1.GetLocalLibraryPath(), metacache, job))
         {
-            downloadJob = null;
+            _downloadJob = null;
             return;
         }
 
         var failedLocalJarMods = new List<string>();
         if (!ProcessArtifactPool(profile.GetJarMods().Cast<Library?>(), failedLocalJarMods, inst1.JarModsDir(), metacache, job))
         {
-            downloadJob = null;
+            _downloadJob = null;
             return;
         }
 
         if (failedLocalJarMods.Count != 0 || failedLocalLibraries.Count != 0)
         {
-            downloadJob = null;
+            _downloadJob = null;
             var failedAll = string.Join("\n", failedLocalLibraries.Concat(failedLocalJarMods));
             EmitFailed("Some artifacts marked as 'local' are missing their files:\n" + failedAll +
                        "\n\nYou need to either add the files, or removed the packages that require them." +
@@ -85,9 +85,9 @@ public sealed class LibrariesTask(MinecraftInstance inst) : FlintTask
 
     public override void Abort()
     {
-        if (downloadJob is not null && downloadJob.IsRunning)
+        if (_downloadJob is not null && _downloadJob.IsRunning)
         {
-            downloadJob.Abort();
+            _downloadJob.Abort();
         }
 
         // Prematurely aborted LibrariesTask

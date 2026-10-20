@@ -186,13 +186,13 @@ internal static class WaveSeed
 public class InstanceQueryApiTests : IAsyncDisposable
 {
     private readonly string _dataDir = Path.Combine(Path.GetTempPath(), $"flint-wave-{Guid.NewGuid():N}");
-    private WaveApiHost? host;
+    private WaveApiHost? _host;
 
     public async ValueTask DisposeAsync()
     {
-        if (host is not null)
+        if (_host is not null)
         {
-            await host.DisposeAsync();
+            await _host.DisposeAsync();
         }
 
         try
@@ -208,46 +208,46 @@ public class InstanceQueryApiTests : IAsyncDisposable
         WaveSeed.Instance(_dataDir, "alpha", "Alpha One");
         WaveSeed.Instance(_dataDir, "beta", "Beta Two");
         WaveSeed.Instance(_dataDir, "gamma", "Gamma Three");
-        host = await WaveApiHost.StartAsync(_dataDir);
+        _host = await WaveApiHost.StartAsync(_dataDir);
 
         // groups are assigned through the existing PATCH endpoint
         await PatchGroup("alpha", "Packs");
         await PatchGroup("beta", "Packs");
 
         // name-contains filter (case-insensitive) -----------------------------------
-        var list = JsonDocument.Parse(await host.Client.GetStringAsync(
+        var list = JsonDocument.Parse(await _host.Client.GetStringAsync(
             "/api/v1/instances?search=beta")).RootElement;
         Assert.Equal(1, list.GetArrayLength());
         Assert.Equal("Beta Two", list[0].GetProperty("name").GetString());
 
         // group-equals filter ---------------------------------------------------------
-        list = JsonDocument.Parse(await host.Client.GetStringAsync(
+        list = JsonDocument.Parse(await _host.Client.GetStringAsync(
             "/api/v1/instances?group=Packs")).RootElement;
         Assert.Equal(2, list.GetArrayLength());
         Assert.DoesNotContain(list.EnumerateArray(),
             e => e.GetProperty("name").GetString() == "Gamma Three");
 
         // combined filters narrow further ----------------------------------------------
-        list = JsonDocument.Parse(await host.Client.GetStringAsync(
+        list = JsonDocument.Parse(await _host.Client.GetStringAsync(
             "/api/v1/instances?search=alpha&group=Packs")).RootElement;
         Assert.Equal(1, list.GetArrayLength());
         Assert.Equal("Alpha One", list[0].GetProperty("name").GetString());
 
         // no hit: empty array, not an error ------------------------------------------
-        list = JsonDocument.Parse(await host.Client.GetStringAsync(
+        list = JsonDocument.Parse(await _host.Client.GetStringAsync(
             "/api/v1/instances?search=zzz")).RootElement;
         Assert.Equal(0, list.GetArrayLength());
     }
 
     private async Task PatchGroup(string id, string group)
     {
-        Assert.NotNull(host);
+        Assert.NotNull(_host);
         var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/v1/instances/{id}")
         {
             Content = new StringContent(
                 JsonSerializer.Serialize(new { group }), Encoding.UTF8, "application/json"),
         };
-        var response = await host.Client.SendAsync(request);
+        var response = await _host.Client.SendAsync(request);
         response.EnsureSuccessStatusCode();
     }
 
@@ -257,19 +257,19 @@ public class InstanceQueryApiTests : IAsyncDisposable
         WaveSeed.Instance(_dataDir, "one", "One");
         WaveSeed.Instance(_dataDir, "two", "Two");
         WaveSeed.Instance(_dataDir, "loose", "Loose");
-        host = await WaveApiHost.StartAsync(_dataDir);
+        _host = await WaveApiHost.StartAsync(_dataDir);
 
         // assign groups through the PATCH endpoint (the group definitions live in the C8
         // groups file, members as uuid references)
         await PatchGroup("one", "Packs");
         await PatchGroup("two", "Packs");
 
-        var groups = JsonDocument.Parse(await host.Client.GetStringAsync(
+        var groups = JsonDocument.Parse(await _host.Client.GetStringAsync(
             "/api/v1/instances/groups")).RootElement;
         Assert.Equal(1, groups.GetArrayLength());
         Assert.Equal("Packs", groups[0].GetProperty("name").GetString());
         // DATA D3: the members are uuid references (the persistent form)
-        var uuidOf = await host.Client.GetStringAsync("/api/v1/instances");
+        var uuidOf = await _host.Client.GetStringAsync("/api/v1/instances");
         var uuids = JsonDocument.Parse(uuidOf).RootElement.EnumerateArray()
             .Where(e => new[] { "one", "two" }.Contains(e.GetProperty("id").GetString()))
             .Select(e => e.GetProperty("uuid").GetString())
@@ -285,13 +285,13 @@ public class InstanceQueryApiTests : IAsyncDisposable
 public class InstanceCopyApiTests : IAsyncDisposable
 {
     private readonly string _dataDir = Path.Combine(Path.GetTempPath(), $"flint-wave-{Guid.NewGuid():N}");
-    private WaveApiHost? host;
+    private WaveApiHost? _host;
 
     public async ValueTask DisposeAsync()
     {
-        if (host is not null)
+        if (_host is not null)
         {
-            await host.DisposeAsync();
+            await _host.DisposeAsync();
         }
 
         try
@@ -305,15 +305,15 @@ public class InstanceCopyApiTests : IAsyncDisposable
     public async Task Copy_With_Prefs_Filters_Selected_Content()
     {
         // seed through the vanilla flow so instance.cfg is fully formed, then add content
-        host = await WaveApiHost.StartAsync(_dataDir);
-        var create = await host.PostAsync("/api/v1/instances/vanilla",
+        _host = await WaveApiHost.StartAsync(_dataDir);
+        var create = await _host.PostAsync("/api/v1/instances/vanilla",
             new { name = "Copy Src", mcVersion = "1.20.1" });
         create.EnsureSuccessStatusCode();
         var srcId = JsonDocument.Parse(await create.Content.ReadAsStringAsync())
             .RootElement.GetProperty("id").GetString();
         Assert.NotNull(srcId);
 
-        var gameRoot = host.GameRootOf(srcId);
+        var gameRoot = _host.GameRootOf(srcId);
         Directory.CreateDirectory(Path.Combine(gameRoot, "mods"));
         await File.WriteAllTextAsync(Path.Combine(gameRoot, "mods", "kept.jar"), "mod");
         Directory.CreateDirectory(Path.Combine(gameRoot, "saves", "World"));
@@ -321,20 +321,23 @@ public class InstanceCopyApiTests : IAsyncDisposable
         await File.WriteAllTextAsync(Path.Combine(gameRoot, "options.txt"), "difficulty=hard");
 
         // copy without saves/mods, resetting playtime, into its own group
-        var copy = await host.PostAsync($"/api/v1/instances/{Uri.EscapeDataString(srcId)}/copy",
+        var copy = await _host.PostAsync($"/api/v1/instances/{Uri.EscapeDataString(srcId)}/copy",
             new
             {
-                name = "Copy Tgt", group = "Copies", copySaves = false, copyMods = false,
+                name = "Copy Tgt",
+                group = "Copies",
+                copySaves = false,
+                copyMods = false,
                 keepPlaytime = false
             });
         Assert.Equal(HttpStatusCode.Accepted, copy.StatusCode);
         var taskId = JsonDocument.Parse(await copy.Content.ReadAsStringAsync())
             .RootElement.GetProperty("taskId").GetString();
         Assert.NotNull(taskId);
-        await host.WaitForTaskAsync(taskId, TimeSpan.FromSeconds(20));
+        await _host.WaitForTaskAsync(taskId, TimeSpan.FromSeconds(20));
 
         // the copy is discoverable (the finished task refreshed the list) and named
-        var list = JsonDocument.Parse(await host.Client.GetStringAsync(
+        var list = JsonDocument.Parse(await _host.Client.GetStringAsync(
             "/api/v1/instances?search=Copy%20Tgt")).RootElement;
         Assert.Equal(1, list.GetArrayLength());
         var copyId = list[0].GetProperty("id").GetString();
@@ -352,7 +355,7 @@ public class InstanceCopyApiTests : IAsyncDisposable
         Assert.True(Directory.Exists(Path.Combine(gameRoot, "saves")));
 
         // invalid body: missing name -> 400
-        var invalid = await host.PostAsync($"/api/v1/instances/{Uri.EscapeDataString(srcId)}/copy",
+        var invalid = await _host.PostAsync($"/api/v1/instances/{Uri.EscapeDataString(srcId)}/copy",
             new { name = "" });
         Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
     }
@@ -362,13 +365,13 @@ public class InstanceCopyApiTests : IAsyncDisposable
 public class WorldApiTests : IAsyncDisposable
 {
     private readonly string _dataDir = Path.Combine(Path.GetTempPath(), $"flint-wave-{Guid.NewGuid():N}");
-    private WaveApiHost? host;
+    private WaveApiHost? _host;
 
     public async ValueTask DisposeAsync()
     {
-        if (host is not null)
+        if (_host is not null)
         {
-            await host.DisposeAsync();
+            await _host.DisposeAsync();
         }
 
         try
@@ -389,10 +392,10 @@ public class WorldApiTests : IAsyncDisposable
     [Fact]
     public async Task Worlds_List_Rename_Delete_RoundTrip()
     {
-        host = await StartHostWithInstance();
+        _host = await StartHostWithInstance();
 
         // list: metadata parsed from the seeded level.dat -----------------------------
-        var worlds = JsonDocument.Parse(await host.Client.GetStringAsync(
+        var worlds = JsonDocument.Parse(await _host.Client.GetStringAsync(
             "/api/v1/instances/worlds-inst/worlds")).RootElement;
         Assert.Equal(1, worlds.GetArrayLength());
         var world = worlds[0];
@@ -404,37 +407,37 @@ public class WorldApiTests : IAsyncDisposable
         Assert.EndsWith("world_one", world.GetProperty("containerPath").GetString());
 
         // rename: level.dat LevelName rewritten + folder renamed ----------------------
-        var rename = await host.PostAsync(
+        var rename = await _host.PostAsync(
             "/api/v1/instances/worlds-inst/worlds/world_one/rename", new { newName = "Renamed One" });
         Assert.Equal(HttpStatusCode.NoContent, rename.StatusCode);
         Assert.True(Directory.Exists(Path.Combine(
-            host.GameRootOf("worlds-inst"), "saves", "Renamed One")));
-        worlds = JsonDocument.Parse(await host.Client.GetStringAsync(
+            _host.GameRootOf("worlds-inst"), "saves", "Renamed One")));
+        worlds = JsonDocument.Parse(await _host.Client.GetStringAsync(
             "/api/v1/instances/worlds-inst/worlds")).RootElement;
         Assert.Equal("Renamed One", worlds[0].GetProperty("name").GetString());
         Assert.Equal("Renamed One", worlds[0].GetProperty("folderName").GetString());
 
         // delete -----------------------------------------------------------------------
-        var delete = await host.Client.DeleteAsync(
+        var delete = await _host.Client.DeleteAsync(
             "/api/v1/instances/worlds-inst/worlds/Renamed%20One");
         Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
         Assert.False(Directory.Exists(Path.Combine(
-            host.GameRootOf("worlds-inst"), "saves", "Renamed One")));
+            _host.GameRootOf("worlds-inst"), "saves", "Renamed One")));
 
         // errors: unknown world 404, missing instance 404 ------------------------------
-        var missing = await host.Client.DeleteAsync(
+        var missing = await _host.Client.DeleteAsync(
             "/api/v1/instances/worlds-inst/worlds/Ghost");
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
         Assert.Equal("world_not_found", JsonDocument.Parse(await missing.Content.ReadAsStringAsync())
             .RootElement.GetProperty("error").GetProperty("code").GetString());
-        var noInst = await host.Client.GetAsync("/api/v1/instances/ghost/worlds");
+        var noInst = await _host.Client.GetAsync("/api/v1/instances/ghost/worlds");
         Assert.Equal(HttpStatusCode.NotFound, noInst.StatusCode);
     }
 
     [Fact]
     public async Task Worlds_Install_From_Multipart_Zip()
     {
-        host = await StartHostWithInstance();
+        _host = await StartHostWithInstance();
 
         var zipPath = WaveSeed.WorldZip(Path.Combine(Path.GetTempPath(),
             $"flint-wave-zip-{Guid.NewGuid():N}.zip"), "Uploaded World");
@@ -446,16 +449,16 @@ public class WorldApiTests : IAsyncDisposable
             content.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
             form.Add(content, "file", "uploaded.zip");
 
-            var install = await host.Client.PostAsync(
+            var install = await _host.Client.PostAsync(
                 "/api/v1/instances/worlds-inst/worlds/install", form);
             Assert.Equal(HttpStatusCode.Created, install.StatusCode);
             var created = JsonDocument.Parse(await install.Content.ReadAsStringAsync()).RootElement;
             Assert.Equal("Uploaded World", created.GetProperty("name").GetString());
             Assert.True(Directory.Exists(Path.Combine(
-                host.GameRootOf("worlds-inst"), "saves", "Uploaded World")));
+                _host.GameRootOf("worlds-inst"), "saves", "Uploaded World")));
 
             // and it shows up in the listing
-            var worlds = JsonDocument.Parse(await host.Client.GetStringAsync(
+            var worlds = JsonDocument.Parse(await _host.Client.GetStringAsync(
                 "/api/v1/instances/worlds-inst/worlds")).RootElement;
             Assert.Contains(worlds.EnumerateArray(),
                 w => w.GetProperty("name").GetString() == "Uploaded World");
@@ -469,7 +472,7 @@ public class WorldApiTests : IAsyncDisposable
         using var badForm = new MultipartFormDataContent();
         var junk = new ByteArrayContent([0x00, 0x01, 0x02]);
         badForm.Add(junk, "file", "not-a-world.zip");
-        var bad = await host.Client.PostAsync("/api/v1/instances/worlds-inst/worlds/install", badForm);
+        var bad = await _host.Client.PostAsync("/api/v1/instances/worlds-inst/worlds/install", badForm);
         Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
         Assert.Equal("world_install_failed", JsonDocument.Parse(await bad.Content.ReadAsStringAsync())
             .RootElement.GetProperty("error").GetProperty("code").GetString());
@@ -480,13 +483,13 @@ public class WorldApiTests : IAsyncDisposable
 public class ServerApiTests : IAsyncDisposable
 {
     private readonly string _dataDir = Path.Combine(Path.GetTempPath(), $"flint-wave-{Guid.NewGuid():N}");
-    private WaveApiHost? host;
+    private WaveApiHost? _host;
 
     public async ValueTask DisposeAsync()
     {
-        if (host is not null)
+        if (_host is not null)
         {
-            await host.DisposeAsync();
+            await _host.DisposeAsync();
         }
 
         try
@@ -505,15 +508,15 @@ public class ServerApiTests : IAsyncDisposable
     [Fact]
     public async Task Servers_Crud_And_Persistence()
     {
-        host = await StartHostWithInstance();
+        _host = await StartHostWithInstance();
 
         // missing servers.dat -> empty list --------------------------------------------
-        var list = JsonDocument.Parse(await host.Client.GetStringAsync(
+        var list = JsonDocument.Parse(await _host.Client.GetStringAsync(
             "/api/v1/instances/servers-inst/servers")).RootElement;
         Assert.Equal(0, list.GetArrayLength());
 
         // add two servers (201 + views) -------------------------------------------------
-        var add = await host.PostAsync("/api/v1/instances/servers-inst/servers",
+        var add = await _host.PostAsync("/api/v1/instances/servers-inst/servers",
             new { name = "Hypixel", address = "mc.hypixel.net" });
         Assert.Equal(HttpStatusCode.Created, add.StatusCode);
         var first = JsonDocument.Parse(await add.Content.ReadAsStringAsync()).RootElement;
@@ -522,29 +525,29 @@ public class ServerApiTests : IAsyncDisposable
         Assert.Equal("ask", first.GetProperty("acceptsTextures").GetString());
         Assert.False(first.GetProperty("hasIcon").GetBoolean());
 
-        await host.PostAsync("/api/v1/instances/servers-inst/servers",
+        await _host.PostAsync("/api/v1/instances/servers-inst/servers",
             new { name = "Local", address = "127.0.0.1:25565" });
 
         // persistence: the list round-trips through the servers.dat file on disk
-        var serversPath = Path.Combine(host.GameRootOf("servers-inst"), "servers.dat");
+        var serversPath = Path.Combine(_host.GameRootOf("servers-inst"), "servers.dat");
         Assert.True(File.Exists(serversPath));
         var persisted = ServersDat.Load(serversPath);
         Assert.Equal(2, persisted.Count);
         Assert.Equal("mc.hypixel.net", persisted[0].Address);
 
         // delete by index: the second entry shifts -------------------------------------
-        var delete = await host.Client.DeleteAsync("/api/v1/instances/servers-inst/servers/0");
+        var delete = await _host.Client.DeleteAsync("/api/v1/instances/servers-inst/servers/0");
         Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
-        list = JsonDocument.Parse(await host.Client.GetStringAsync(
+        list = JsonDocument.Parse(await _host.Client.GetStringAsync(
             "/api/v1/instances/servers-inst/servers")).RootElement;
         Assert.Equal(1, list.GetArrayLength());
         Assert.Equal("Local", list[0].GetProperty("name").GetString());
         Assert.Equal(0, list[0].GetProperty("index").GetInt32());
 
         // errors: bad index 404, bad body 400 ------------------------------------------
-        var badIndex = await host.Client.DeleteAsync("/api/v1/instances/servers-inst/servers/9");
+        var badIndex = await _host.Client.DeleteAsync("/api/v1/instances/servers-inst/servers/9");
         Assert.Equal(HttpStatusCode.NotFound, badIndex.StatusCode);
-        var badBody = await host.PostAsync("/api/v1/instances/servers-inst/servers",
+        var badBody = await _host.PostAsync("/api/v1/instances/servers-inst/servers",
             new { name = "No Address" });
         Assert.Equal(HttpStatusCode.BadRequest, badBody.StatusCode);
     }
@@ -557,11 +560,11 @@ public class ServerApiTests : IAsyncDisposable
         var statusJson = """{"version":{"name":"1.20.1"},"players":{"online":3,"max":20},"description":"A test server"}""";
         using var stub = new PingStubServer(BuildStatusReply(statusJson));
 
-        host = await StartHostWithInstance();
-        await host.PostAsync("/api/v1/instances/servers-inst/servers",
+        _host = await StartHostWithInstance();
+        await _host.PostAsync("/api/v1/instances/servers-inst/servers",
             new { name = "Stub", address = $"127.0.0.1:{stub.Port}" });
 
-        var response = await host.Client.PostAsync(
+        var response = await _host.Client.PostAsync(
             "/api/v1/instances/servers-inst/servers/0/ping", content: null);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var ping = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
@@ -579,17 +582,17 @@ public class ServerApiTests : IAsyncDisposable
     [Fact]
     public async Task Server_Ping_Failures()
     {
-        host = await StartHostWithInstance();
+        _host = await StartHostWithInstance();
 
         // nothing to ping -> 404 -------------------------------------------------------
-        var missing = await host.Client.PostAsync(
+        var missing = await _host.Client.PostAsync(
             "/api/v1/instances/servers-inst/servers/0/ping", content: null);
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
 
         // a closed port -> 502 with the uniform error envelope -------------------------
-        await host.PostAsync("/api/v1/instances/servers-inst/servers",
+        await _host.PostAsync("/api/v1/instances/servers-inst/servers",
             new { name = "Dead", address = "127.0.0.1:1" });
-        var dead = await host.Client.PostAsync(
+        var dead = await _host.Client.PostAsync(
             "/api/v1/instances/servers-inst/servers/0/ping", content: null);
         Assert.Equal(HttpStatusCode.BadGateway, dead.StatusCode);
         Assert.Equal("ping_failed", JsonDocument.Parse(await dead.Content.ReadAsStringAsync())
@@ -626,7 +629,7 @@ public class ServerApiTests : IAsyncDisposable
     private sealed class PingStubServer : IDisposable
     {
         private readonly TcpListener _listener;
-        private bool disposed;
+        private bool _disposed;
 
         public PingStubServer(byte[] reply)
         {
@@ -647,14 +650,14 @@ public class ServerApiTests : IAsyncDisposable
 
         private async Task AcceptLoopAsync()
         {
-            while (!disposed)
+            while (!_disposed)
             {
                 TcpClient client;
                 try
                 {
                     client = await _listener.AcceptTcpClientAsync();
                 }
-                catch (Exception) when (disposed)
+                catch (Exception) when (_disposed)
                 {
                     return;
                 }
@@ -686,12 +689,12 @@ public class ServerApiTests : IAsyncDisposable
 
         public void Dispose()
         {
-            if (disposed)
+            if (_disposed)
             {
                 return;
             }
 
-            disposed = true;
+            _disposed = true;
             try
             {
                 _listener.Stop();
@@ -705,13 +708,13 @@ public class ServerApiTests : IAsyncDisposable
 public class ResourceApiTests : IAsyncDisposable
 {
     private readonly string _dataDir = Path.Combine(Path.GetTempPath(), $"flint-wave-{Guid.NewGuid():N}");
-    private WaveApiHost? host;
+    private WaveApiHost? _host;
 
     public async ValueTask DisposeAsync()
     {
-        if (host is not null)
+        if (_host is not null)
         {
-            await host.DisposeAsync();
+            await _host.DisposeAsync();
         }
 
         try
@@ -730,8 +733,8 @@ public class ResourceApiTests : IAsyncDisposable
     [Fact]
     public async Task Resources_List_Enable_Disable_Delete()
     {
-        host = await StartHostWithInstance();
-        var gameRoot = host.GameRootOf("res-inst");
+        _host = await StartHostWithInstance();
+        var gameRoot = _host.GameRootOf("res-inst");
 
         // seed mods (one disabled via the .disabled suffix) + a resource pack
         Directory.CreateDirectory(Path.Combine(gameRoot, "mods"));
@@ -743,11 +746,11 @@ public class ResourceApiTests : IAsyncDisposable
 
         // the merge decision: type=mods on the resources family is rejected in favor of the
         // metadata-rich /mods surface
-        var rejected = await host.Client.GetAsync(
+        var rejected = await _host.Client.GetAsync(
             "/api/v1/instances/res-inst/resources/mods");
         Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
 
-        var mods = JsonDocument.Parse(await host.Client.GetStringAsync(
+        var mods = JsonDocument.Parse(await _host.Client.GetStringAsync(
             "/api/v1/instances/res-inst/mods")).RootElement;
         Assert.Equal(2, mods.GetArrayLength());
         var alpha = mods.EnumerateArray().Single(m => m.GetProperty("fileName").GetString() == "alpha.jar");
@@ -756,45 +759,45 @@ public class ResourceApiTests : IAsyncDisposable
         Assert.False(beta.GetProperty("enabled").GetBoolean());
 
         // resourcepacks + datapacks types resolve to their folders --------------------
-        var packs = JsonDocument.Parse(await host.Client.GetStringAsync(
+        var packs = JsonDocument.Parse(await _host.Client.GetStringAsync(
             "/api/v1/instances/res-inst/resources/resourcepacks")).RootElement;
         Assert.Equal(1, packs.GetArrayLength());
         Assert.Equal("pack.zip", packs[0].GetProperty("fileName").GetString());
-        var datapacks = JsonDocument.Parse(await host.Client.GetStringAsync(
+        var datapacks = JsonDocument.Parse(await _host.Client.GetStringAsync(
             "/api/v1/instances/res-inst/resources/datapacks")).RootElement;
         Assert.Equal(0, datapacks.GetArrayLength());
 
         // disable: the file gains the .disabled suffix ---------------------------------
-        var disable = await host.PostAsync(
+        var disable = await _host.PostAsync(
             "/api/v1/instances/res-inst/mods/alpha.jar/disable", new { });
         Assert.Equal(HttpStatusCode.NoContent, disable.StatusCode);
         Assert.True(File.Exists(Path.Combine(gameRoot, "mods", "alpha.jar.disabled")));
         Assert.False(File.Exists(Path.Combine(gameRoot, "mods", "alpha.jar")));
 
         // enable (by bare name): the suffix is removed ---------------------------------
-        var enable = await host.PostAsync(
+        var enable = await _host.PostAsync(
             "/api/v1/instances/res-inst/mods/beta.jar/enable", new { });
         Assert.Equal(HttpStatusCode.NoContent, enable.StatusCode);
         Assert.True(File.Exists(Path.Combine(gameRoot, "mods", "beta.jar")));
 
         // toggling an already-enabled resource conflicts (409, no change) --------------
-        var again = await host.PostAsync(
+        var again = await _host.PostAsync(
             "/api/v1/instances/res-inst/mods/beta.jar/enable", new { });
         Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
         Assert.Equal("no_change", JsonDocument.Parse(await again.Content.ReadAsStringAsync())
             .RootElement.GetProperty("error").GetProperty("code").GetString());
 
         // delete by bare name ------------------------------------------------------------
-        var delete = await host.Client.DeleteAsync(
+        var delete = await _host.Client.DeleteAsync(
             "/api/v1/instances/res-inst/mods/alpha.jar");
         Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
         Assert.False(File.Exists(Path.Combine(gameRoot, "mods", "alpha.jar.disabled")));
 
         // errors: unknown resource 404, unknown type 400 --------------------------------
-        var missing = await host.PostAsync(
+        var missing = await _host.PostAsync(
             "/api/v1/instances/res-inst/mods/ghost.jar/disable", new { });
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
-        var unknownType = await host.Client.GetAsync("/api/v1/instances/res-inst/resources/whatnot");
+        var unknownType = await _host.Client.GetAsync("/api/v1/instances/res-inst/resources/whatnot");
         Assert.Equal(HttpStatusCode.BadRequest, unknownType.StatusCode);
         Assert.Equal("unknown_type", JsonDocument.Parse(await unknownType.Content.ReadAsStringAsync())
             .RootElement.GetProperty("error").GetProperty("code").GetString());
@@ -805,13 +808,13 @@ public class ResourceApiTests : IAsyncDisposable
 public class ScreenshotApiTests : IAsyncDisposable
 {
     private readonly string _dataDir = Path.Combine(Path.GetTempPath(), $"flint-wave-{Guid.NewGuid():N}");
-    private WaveApiHost? host;
+    private WaveApiHost? _host;
 
     public async ValueTask DisposeAsync()
     {
-        if (host is not null)
+        if (_host is not null)
         {
-            await host.DisposeAsync();
+            await _host.DisposeAsync();
         }
 
         try
@@ -835,9 +838,9 @@ public class ScreenshotApiTests : IAsyncDisposable
     [Fact]
     public async Task Screenshots_List_And_Delete()
     {
-        host = await StartHostWithScreenshots();
+        _host = await StartHostWithScreenshots();
 
-        var shots = JsonDocument.Parse(await host.Client.GetStringAsync(
+        var shots = JsonDocument.Parse(await _host.Client.GetStringAsync(
             "/api/v1/instances/shots-inst/screenshots")).RootElement;
         Assert.Equal(2, shots.GetArrayLength()); // notes.txt filtered out
         Assert.Equal("a.png", shots[0].GetProperty("name").GetString());
@@ -845,13 +848,13 @@ public class ScreenshotApiTests : IAsyncDisposable
         Assert.True(shots[0].GetProperty("modifiedAt").GetInt64() > 0);
 
         // delete + 404 on the second attempt -------------------------------------------
-        var delete = await host.Client.DeleteAsync("/api/v1/instances/shots-inst/screenshots/a.png");
+        var delete = await _host.Client.DeleteAsync("/api/v1/instances/shots-inst/screenshots/a.png");
         Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
-        var again = await host.Client.DeleteAsync("/api/v1/instances/shots-inst/screenshots/a.png");
+        var again = await _host.Client.DeleteAsync("/api/v1/instances/shots-inst/screenshots/a.png");
         Assert.Equal(HttpStatusCode.NotFound, again.StatusCode);
 
         // path traversal is refused ------------------------------------------------------
-        var escape = await host.Client.DeleteAsync(
+        var escape = await _host.Client.DeleteAsync(
             "/api/v1/instances/shots-inst/screenshots/..%2Finstance.cfg");
         Assert.Equal(HttpStatusCode.NotFound, escape.StatusCode);
         Assert.True(File.Exists(Path.Combine(WaveSeed.InstancesDir(_dataDir), "shots-inst", "instance.cfg")));
@@ -882,16 +885,16 @@ public class ScreenshotApiTests : IAsyncDisposable
         Environment.SetEnvironmentVariable("FLINT_IMGUR_CLIENT_ID", "wave-client");
         try
         {
-            host = await StartHostWithScreenshots();
+            _host = await StartHostWithScreenshots();
 
             // one screenshot: a single image upload, no album request
-            var upload = await host.PostAsync("/api/v1/instances/shots-inst/screenshots/upload",
+            var upload = await _host.PostAsync("/api/v1/instances/shots-inst/screenshots/upload",
                 new { names = new[] { "b.png" } });
             Assert.Equal(HttpStatusCode.Accepted, upload.StatusCode);
             var taskId = JsonDocument.Parse(await upload.Content.ReadAsStringAsync())
                 .RootElement.GetProperty("taskId").GetString();
             Assert.NotNull(taskId);
-            await host.WaitForTaskAsync(taskId, TimeSpan.FromSeconds(20));
+            await _host.WaitForTaskAsync(taskId, TimeSpan.FromSeconds(20));
 
             Assert.Single(capturedBodies);
             Assert.Equal("/image", capturedPaths[0]);
@@ -900,19 +903,19 @@ public class ScreenshotApiTests : IAsyncDisposable
             Assert.Contains("filename=\"b.png\"", capturedBodies[0]);
 
             // unknown names are validated before any task runs --------------------------
-            var multi = await host.PostAsync("/api/v1/instances/shots-inst/screenshots/upload",
+            var multi = await _host.PostAsync("/api/v1/instances/shots-inst/screenshots/upload",
                 new { names = new[] { "a.png", "b.png", "missing.png" } });
             Assert.Equal(HttpStatusCode.NotFound, multi.StatusCode);
             Assert.Single(capturedBodies); // nothing uploaded
 
             // two screenshots: 2 image uploads + the album creation call ----------------
-            var ok = await host.PostAsync("/api/v1/instances/shots-inst/screenshots/upload",
+            var ok = await _host.PostAsync("/api/v1/instances/shots-inst/screenshots/upload",
                 new { names = new[] { "a.png", "b.png" } });
             ok.EnsureSuccessStatusCode();
             var multiTaskId = JsonDocument.Parse(await ok.Content.ReadAsStringAsync())
                 .RootElement.GetProperty("taskId").GetString();
             Assert.NotNull(multiTaskId);
-            await host.WaitForTaskAsync(multiTaskId, TimeSpan.FromSeconds(20));
+            await _host.WaitForTaskAsync(multiTaskId, TimeSpan.FromSeconds(20));
             Assert.Equal(4, capturedBodies.Count); // 1 + 2 images + 1 album
             Assert.Equal(3, capturedPaths.Count(path => path == "/image"));
             Assert.Equal(1, capturedPaths.Count(path => path == "/album"));
@@ -931,13 +934,13 @@ public class ScreenshotApiTests : IAsyncDisposable
 public class GameOptionsApiTests : IAsyncDisposable
 {
     private readonly string _dataDir = Path.Combine(Path.GetTempPath(), $"flint-wave-{Guid.NewGuid():N}");
-    private WaveApiHost? host;
+    private WaveApiHost? _host;
 
     public async ValueTask DisposeAsync()
     {
-        if (host is not null)
+        if (_host is not null)
         {
-            await host.DisposeAsync();
+            await _host.DisposeAsync();
         }
 
         try
@@ -951,9 +954,9 @@ public class GameOptionsApiTests : IAsyncDisposable
     public async Task GameOptions_Put_Get_RoundTrip()
     {
         WaveSeed.Instance(_dataDir, "opts-inst", "Opts Inst");
-        host = await WaveApiHost.StartAsync(_dataDir);
+        _host = await WaveApiHost.StartAsync(_dataDir);
 
-        var put = await host.PutAsync("/api/v1/instances/opts-inst/gameoptions",
+        var put = await _host.PutAsync("/api/v1/instances/opts-inst/gameoptions",
             new
             {
                 options = new[]
@@ -966,22 +969,22 @@ public class GameOptionsApiTests : IAsyncDisposable
 
         // the file itself is the options.txt of the game root
         var text = await File.ReadAllTextAsync(
-            Path.Combine(host.GameRootOf("opts-inst"), "options.txt"));
+            Path.Combine(_host.GameRootOf("opts-inst"), "options.txt"));
         Assert.Contains("difficulty:hard", text);
         Assert.Contains("renderDistance:12", text);
 
         // GET reads the parsed map
-        var options = JsonDocument.Parse(await host.Client.GetStringAsync(
+        var options = JsonDocument.Parse(await _host.Client.GetStringAsync(
             "/api/v1/instances/opts-inst/gameoptions")).RootElement;
         Assert.Equal(2, options.GetArrayLength());
         Assert.Equal("difficulty", options[0].GetProperty("key").GetString());
         Assert.Equal("hard", options[0].GetProperty("value").GetString());
 
         // a second PUT updates an existing key in place
-        put = await host.PutAsync("/api/v1/instances/opts-inst/gameoptions",
+        put = await _host.PutAsync("/api/v1/instances/opts-inst/gameoptions",
             new { options = new[] { new { key = "difficulty", value = "peaceful" } } });
         Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
-        options = JsonDocument.Parse(await host.Client.GetStringAsync(
+        options = JsonDocument.Parse(await _host.Client.GetStringAsync(
             "/api/v1/instances/opts-inst/gameoptions")).RootElement;
         Assert.Equal(2, options.GetArrayLength());
         Assert.Contains(options.EnumerateArray(),
@@ -989,10 +992,10 @@ public class GameOptionsApiTests : IAsyncDisposable
                  o.GetProperty("value").GetString() == "peaceful");
 
         // validation: empty body + unknown instance -----------------------------------
-        var bad = await host.PutAsync("/api/v1/instances/opts-inst/gameoptions",
+        var bad = await _host.PutAsync("/api/v1/instances/opts-inst/gameoptions",
             new { options = Array.Empty<object>() });
         Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
-        var missing = await host.Client.GetAsync("/api/v1/instances/ghost/gameoptions");
+        var missing = await _host.Client.GetAsync("/api/v1/instances/ghost/gameoptions");
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
     }
 }

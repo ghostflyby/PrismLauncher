@@ -94,9 +94,9 @@ public sealed class AccountList
             {
                 var existingAccountPtr = _accounts[existingAccount];
                 _accounts[existingAccount] = account;
-                if (ReferenceEquals(defaultAccount, existingAccountPtr))
+                if (ReferenceEquals(_defaultAccount, existingAccountPtr))
                 {
-                    defaultAccount = account;
+                    _defaultAccount = account;
                 }
 
                 OnListChanged();
@@ -114,9 +114,9 @@ public sealed class AccountList
         if (row >= 0 && row < _accounts.Count)
         {
             var account = _accounts[row];
-            if (ReferenceEquals(account, defaultAccount))
+            if (ReferenceEquals(account, _defaultAccount))
             {
-                defaultAccount = null;
+                _defaultAccount = null;
                 OnDefaultAccountChanged();
             }
 
@@ -137,25 +137,25 @@ public sealed class AccountList
         }
     }
 
-    public MinecraftAccount? DefaultAccount => defaultAccount;
+    public MinecraftAccount? DefaultAccount => _defaultAccount;
 
     public void SetDefaultAccount(MinecraftAccount? newAccount)
     {
-        if (newAccount is null && defaultAccount is not null)
+        if (newAccount is null && _defaultAccount is not null)
         {
-            defaultAccount = null;
+            _defaultAccount = null;
             OnDefaultAccountChanged();
         }
         else
         {
             // upstream only accepts accounts that are actually on the list
             var onList = _accounts.FirstOrDefault(a => ReferenceEquals(a, newAccount));
-            if (onList is null || ReferenceEquals(defaultAccount, onList))
+            if (onList is null || ReferenceEquals(_defaultAccount, onList))
             {
                 return;
             }
 
-            defaultAccount = onList;
+            _defaultAccount = onList;
             OnDefaultAccountChanged();
         }
     }
@@ -176,13 +176,13 @@ public sealed class AccountList
 
     public void SetListFilePath(string path, bool enableAutosave = false)
     {
-        listFilePath = path;
-        this.autosave = enableAutosave;
+        _listFilePath = path;
+        this._autosave = enableAutosave;
     }
 
     public bool LoadList()
     {
-        if (string.IsNullOrEmpty(listFilePath))
+        if (string.IsNullOrEmpty(_listFilePath))
         {
             return false;
         }
@@ -190,7 +190,7 @@ public sealed class AccountList
         byte[] jsonData;
         try
         {
-            jsonData = FileSystem.Read(listFilePath);
+            jsonData = FileSystem.Read(_listFilePath);
         }
         catch (Exception)
         {
@@ -230,7 +230,7 @@ public sealed class AccountList
         // Attempt to rename the old version.
         try
         {
-            File.Move(listFilePath, Path.Combine(Path.GetDirectoryName(listFilePath) ?? "", newName));
+            File.Move(_listFilePath, Path.Combine(Path.GetDirectoryName(_listFilePath) ?? "", newName));
         }
         catch (Exception)
         {
@@ -243,7 +243,7 @@ public sealed class AccountList
     public bool LoadV3(AccountFileJson root)
     {
         _accounts.Clear();
-        defaultAccount = null;
+        _defaultAccount = null;
         if (root.Accounts is null)
         {
             return true;
@@ -288,7 +288,7 @@ public sealed class AccountList
                 _accounts.Add(account);
                 if (wire.Active == true)
                 {
-                    defaultAccount = account;
+                    _defaultAccount = account;
                 }
             }
             // qWarning() << "Failed to load an account.";
@@ -299,23 +299,23 @@ public sealed class AccountList
 
     public bool SaveList()
     {
-        if (string.IsNullOrEmpty(listFilePath))
+        if (string.IsNullOrEmpty(_listFilePath))
         {
             return false;
         }
 
         // make sure the parent folder exists
-        if (!FileSystem.EnsureFilePathExists(listFilePath))
+        if (!FileSystem.EnsureFilePathExists(_listFilePath))
         {
             return false;
         }
 
         // make sure the file wasn't overwritten with a folder before (fixes a bug)
-        if (Directory.Exists(listFilePath))
+        if (Directory.Exists(_listFilePath))
         {
             try
             {
-                Directory.Delete(listFilePath, recursive: true);
+                Directory.Delete(_listFilePath, recursive: true);
             }
             catch (Exception)
             {
@@ -333,7 +333,7 @@ public sealed class AccountList
             Accounts = _accounts.Select(account =>
             {
                 var wire = account.SaveToJson();
-                if (ReferenceEquals(defaultAccount, account))
+                if (ReferenceEquals(_defaultAccount, account))
                 {
                     wire = wire with { Active = true };
                 }
@@ -346,7 +346,7 @@ public sealed class AccountList
         try
         {
             // QSaveFile: write to a temporary file and atomically rename over the target
-            var tmpPath = listFilePath + ".tmp";
+            var tmpPath = _listFilePath + ".tmp";
             using (var stream = new FileStream(tmpPath, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 stream.Write(bytes);
@@ -357,7 +357,7 @@ public sealed class AccountList
                 File.SetUnixFileMode(tmpPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
             }
 
-            File.Move(tmpPath, listFilePath, overwrite: true);
+            File.Move(tmpPath, _listFilePath, overwrite: true);
         }
         catch (Exception)
         {
@@ -377,7 +377,7 @@ public sealed class AccountList
 
     private void OnListChanged()
     {
-        if (autosave)
+        if (_autosave)
         {
             // TODO: Alert the user if this fails.
             SaveList();
@@ -388,7 +388,7 @@ public sealed class AccountList
 
     private void OnDefaultAccountChanged()
     {
-        if (autosave)
+        if (_autosave)
         {
             SaveList();
         }
@@ -397,7 +397,7 @@ public sealed class AccountList
     }
 
     private readonly List<MinecraftAccount> _accounts = [];
-    private MinecraftAccount? defaultAccount;
-    private string listFilePath = "";
-    private bool autosave;
+    private MinecraftAccount? _defaultAccount;
+    private string _listFilePath = "";
+    private bool _autosave;
 }

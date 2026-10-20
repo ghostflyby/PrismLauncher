@@ -42,7 +42,7 @@ public class ResourceFolderModel
 {
     private readonly string _dir;
     private readonly bool _isIndexed;
-    private bool firstFolderLoad = true;
+    private bool _firstFolderLoad = true;
 
     private readonly List<Resource> _resources = [];
 
@@ -209,7 +209,7 @@ public class ResourceFolderModel
     public virtual bool Update()
     {
         var newResources = RunLoadTask();
-        firstFolderLoad = false;
+        _firstFolderLoad = false;
 
         var currentSet = new HashSet<string>(_resourcesIndex.Keys);
         var newSet = new HashSet<string>(newResources.Keys);
@@ -295,7 +295,7 @@ public class ResourceFolderModel
             }
         }
 
-        if (firstFolderLoad)
+        if (_firstFolderLoad)
         {
             // Remove orphan metadata to prevent issues (PolyMC issue 996). The metadata
             // layer is not ported, so there are no NotInstalled-only entries to clean.

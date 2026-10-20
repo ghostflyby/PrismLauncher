@@ -18,15 +18,31 @@ namespace FlintLauncher.Core.ModPlatform.Flame;
 /// <summary>The manifest.json wire shape (the load-side probe; optional members carry the
 /// QJsonValue defaults, required ones are validated by the loader).</summary>
 internal sealed record FlameManifestJson(
-    string? ManifestType,    int? ManifestVersion,    FlameMinecraftJson? Minecraft,    string? Name,    string? Version,    string? Author,    List<FlameFileJson>? Files,    string? Overrides);
+    string? ManifestType,
+    int? ManifestVersion,
+    FlameMinecraftJson? Minecraft,
+    string? Name,
+    string? Version,
+    string? Author,
+    List<FlameFileJson>? Files,
+    string? Overrides);
+
 internal sealed record FlameMinecraftJson(
-    string? Version,    string? Libraries,    List<FlameModloaderJson>? ModLoaders,    int? RecommendedRam);
+    string? Version,
+    string? Libraries,
+    List<FlameModloaderJson>? ModLoaders,
+    int? RecommendedRam);
+
 internal sealed record FlameModloaderJson(
-    string? Id,    bool? Primary);
+    string? Id,
+    bool? Primary);
+
 internal sealed record FlameFileJson(
-    [property: JsonPropertyName("projectID")] long? ProjectId,
+    [property: JsonPropertyName("projectID")]
+    long? ProjectId,
     [property: JsonPropertyName("fileID")] long? FileId,
     bool? Required);
+
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(FlameManifestJson))]
 // a JsonSerializerContext of its own: the STJ source generator emits per-primitive helper

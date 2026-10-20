@@ -57,13 +57,13 @@ internal static class PortAllocator
     /// <summary>A held reservation of a free loopback port.</summary>
     internal sealed class PortLease : IDisposable
     {
-        private TcpListener? listener;
+        private TcpListener? _listener;
 
         public PortLease()
         {
-            listener = new TcpListener(IPAddress.Loopback, 0);
-            listener.Start();
-            Port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            _listener = new TcpListener(IPAddress.Loopback, 0);
+            _listener.Start();
+            Port = ((IPEndPoint)_listener.LocalEndpoint).Port;
         }
 
         /// <summary>The reserved port, still held by the lease.</summary>
@@ -77,16 +77,16 @@ internal static class PortAllocator
         /// </summary>
         public TcpListener TakeListener()
         {
-            ObjectDisposedException.ThrowIf(this.listener is null, this);
-            var leased = this.listener;
-            this.listener = null;
+            ObjectDisposedException.ThrowIf(this._listener is null, this);
+            var leased = this._listener;
+            this._listener = null;
             return leased;
         }
 
         public void Dispose()
         {
-            listener?.Stop();
-            listener = null;
+            _listener?.Stop();
+            _listener = null;
         }
     }
 }

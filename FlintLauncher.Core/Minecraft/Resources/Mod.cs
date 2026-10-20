@@ -18,9 +18,9 @@ namespace FlintLauncher.Core.Minecraft.Resources;
 /// <summary>Port of the Mod class: a Resource with lazily resolved ModDetails.</summary>
 public class Mod : Resource
 {
-    private ModDetails localDetails = new();
-    private int requiredByCount;
-    private int requiresCount;
+    private ModDetails _localDetails = new();
+    private int _requiredByCount;
+    private int _requiresCount;
 
     public Mod(string filePath) : this(new FileInfo(filePath)) { }
 
@@ -29,11 +29,11 @@ public class Mod : Resource
         Enabled = file.Extension != ".disabled";
     }
 
-    public ModDetails Details => localDetails;
+    public ModDetails Details => _localDetails;
 
     public void SetDetails(ModDetails details)
     {
-        localDetails = details;
+        _localDetails = details;
     }
 
     public override int Compare(Resource other, SortType type = SortType.Name)
@@ -233,24 +233,24 @@ public class Mod : Resource
     public string ReleaseType() => "Unknown";
 
     /// <summary>Internal path to the mod's icon file.</summary>
-    public string IconPath => localDetails.IconFile;
+    public string IconPath => _localDetails.IconFile;
 
-    public override bool Valid => localDetails.ModId.Length != 0;
+    public override bool Valid => _localDetails.ModId.Length != 0;
 
     public List<string> Dependencies() => Details.Dependencies;
 
-    public int RequiredByCount => requiredByCount;
+    public int RequiredByCount => _requiredByCount;
 
-    public int RequiresCount => requiresCount;
+    public int RequiresCount => _requiresCount;
 
     public void SetRequiredByCount(int value)
     {
-        requiredByCount = value;
+        _requiredByCount = value;
     }
 
     public void SetRequiresCount(int value)
     {
-        requiresCount = value;
+        _requiresCount = value;
     }
 
     /// <summary>Port of Mod::finishResolvingWithDetails (minus the pixmap-cache bookkeeping).</summary>
@@ -258,6 +258,6 @@ public class Mod : Resource
     {
         SetResolving(false, ResolutionTicket);
         SetResolved();
-        localDetails = details;
+        _localDetails = details;
     }
 }

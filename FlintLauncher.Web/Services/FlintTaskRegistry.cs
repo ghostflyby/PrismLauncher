@@ -48,7 +48,7 @@ public sealed class FlintTaskRegistry(ILoggerFactory loggerFactory)
 
     private readonly object _lock = new();
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.Ordinal);
-    private int sequence;
+    private int _sequence;
 
     /// <summary>Log lines kept per task (absolute indexes preserved beyond the cap).</summary>
     public const int MaxBufferedLines = 5000;
@@ -117,7 +117,7 @@ public sealed class FlintTaskRegistry(ILoggerFactory loggerFactory)
     {
         lock (_lock)
         {
-            return $"t{++sequence}-{Guid.NewGuid().ToString("N")[..8]}";
+            return $"t{++_sequence}-{Guid.NewGuid().ToString("N")[..8]}";
         }
     }
 

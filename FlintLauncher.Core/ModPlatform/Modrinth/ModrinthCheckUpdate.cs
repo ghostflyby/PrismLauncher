@@ -46,8 +46,8 @@ public sealed class ModrinthCheckUpdate : FlintTask
     private readonly Dictionary<string, Resource> _mappings = new(StringComparer.Ordinal); // hash -> resource
 
     private readonly List<Update> _updates = [];
-    private int loaderIdx;
-    private readonly int initialSize;
+    private int _loaderIdx;
+    private readonly int _initialSize;
 
     public ModrinthCheckUpdate(IReadOnlyList<Resource> resources,
         IReadOnlyList<McVersion> mcVersions,
@@ -66,7 +66,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
         if (_loadersList.Count != 0)
         {
             // this is for mods so append all the other posible loaders to the initial list
-            initialSize = _loadersList.Count;
+            _initialSize = _loadersList.Count;
             ModLoaderType modLoaders = ModLoaderType.None;
             foreach (var m in resources)
             {
@@ -123,7 +123,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
     private async Task GetUpdateModsForLoader(ModLoaderType? loader, bool forceModLoaderCheck,
         CancellationToken cancellationToken)
     {
-        loaderIdx++;
+        _loaderIdx++;
 
         EmitStatus("Waiting for the API response from Modrinth...");
 
@@ -247,14 +247,14 @@ public sealed class ModrinthCheckUpdate : FlintTask
             return;
         }
 
-        if (loaderIdx < _loadersList.Count)
+        if (_loaderIdx < _loadersList.Count)
         {
             // this are mods so check with loaders
-            await GetUpdateModsForLoader(_loadersList[loaderIdx], loaderIdx > initialSize, cancellationToken);
+            await GetUpdateModsForLoader(_loadersList[_loaderIdx], _loaderIdx > _initialSize, cancellationToken);
             return;
         }
 
-        if (_loadersList.Count == 0 && loaderIdx == 0)
+        if (_loadersList.Count == 0 && _loaderIdx == 0)
         {
             // this are other resources no need to check more than once with empty loader
             await GetUpdateModsForLoader(null, forceModLoaderCheck: false, cancellationToken);

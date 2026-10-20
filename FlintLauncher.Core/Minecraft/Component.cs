@@ -57,7 +57,7 @@ public class Component : ProblemProvider
         };
 
     private readonly List<PatchProblem> _componentProblems = [];
-    private ProblemSeverity componentProblemSeverity = ProblemSeverity.None;
+    private ProblemSeverity _componentProblemSeverity = ProblemSeverity.None;
 
     private UpdateAction UpdateActionValue { get; set; } = new UpdateAction.None();
 
@@ -309,7 +309,7 @@ public class Component : ProblemProvider
         if (file is not null)
         {
             var severity = file.GetProblemSeverity();
-            return componentProblemSeverity > severity ? componentProblemSeverity : severity;
+            return _componentProblemSeverity > severity ? _componentProblemSeverity : severity;
         }
 
         return ProblemSeverity.Error;
@@ -330,9 +330,9 @@ public class Component : ProblemProvider
 
     public void AddComponentProblem(ProblemSeverity severity, string description)
     {
-        if (severity > componentProblemSeverity)
+        if (severity > _componentProblemSeverity)
         {
-            componentProblemSeverity = severity;
+            _componentProblemSeverity = severity;
         }
 
         _componentProblems.Add(new PatchProblem(severity, description));
@@ -342,7 +342,7 @@ public class Component : ProblemProvider
     public void ResetComponentProblems()
     {
         _componentProblems.Clear();
-        componentProblemSeverity = ProblemSeverity.None;
+        _componentProblemSeverity = ProblemSeverity.None;
         EmitDataChanged();
     }
 

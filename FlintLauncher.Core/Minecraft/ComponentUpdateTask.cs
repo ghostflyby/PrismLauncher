@@ -72,9 +72,9 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
 
     private readonly List<RemoteLoadStatus> _remoteLoadStatusList = [];
 
-    private bool remoteLoadSuccessful = true;
+    private bool _remoteLoadSuccessful = true;
 
-    private int remoteTasksInProgress;
+    private int _remoteTasksInProgress;
 
     public NetMode GetNetMode() => netmode;
 
@@ -173,7 +173,7 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
         var result = LoadResult.LoadedLocal;
         var taskIndex = 0;
         var componentIndex = 0;
-        remoteLoadSuccessful = true;
+        _remoteLoadSuccessful = true;
 
         var waitTasks = new List<Task>();
 
@@ -206,7 +206,7 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
             componentIndex++;
         }
 
-        remoteTasksInProgress = taskIndex;
+        _remoteTasksInProgress = taskIndex;
         SetProgress(0, taskIndex);
         switch (result)
         {
@@ -272,12 +272,12 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
         }
         else
         {
-            remoteLoadSuccessful = false;
+            _remoteLoadSuccessful = false;
             status.Succeeded = false;
         }
 
         status.Finished = true;
-        remoteTasksInProgress--;
+        _remoteTasksInProgress--;
 
         // update the cached data of the component from the downloaded version file.
         if (loadSucceeded)
@@ -294,13 +294,13 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
     private async Task CheckIfAllFinishedAsync(CancellationToken cancellationToken)
     {
         SetProgress(CurrentProgress + 1, TotalProgress);
-        if (remoteTasksInProgress != 0)
+        if (_remoteTasksInProgress != 0)
         {
             // not yet...
             return;
         }
 
-        if (remoteLoadSuccessful)
+        if (_remoteLoadSuccessful)
         {
             // nothing bad happened... clear the temp load status and proceed with looking at dependencies
             _remoteLoadStatusList.Clear();

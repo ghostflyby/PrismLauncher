@@ -51,13 +51,13 @@ public abstract class InstanceTask : FlintTask
 {
     private readonly List<string> _filesToRemove = [];
 
-    private string originalName = "";
-    private string originalVersion = "";
-    private string modifiedName = "";
+    private string _originalName = "";
+    private string _originalVersion = "";
+    private string _modifiedName = "";
 
-    private bool overrideExisting;
-    private bool confirmUpdate = true;
-    private string originalInstanceId = "";
+    private bool _overrideExisting;
+    private bool _confirmUpdate = true;
+    private string _originalInstanceId = "";
 
     /// <summary>The typed instance-layer environment (D4): user flint.json store + the
     /// instance.json/instance-state.json type infos. Set through
@@ -86,52 +86,52 @@ public abstract class InstanceTask : FlintTask
 
     public void SetParentEnvironment(InstanceEnvironment environment) => Environment = environment;
 
-    public bool ShouldConfirmUpdate() => confirmUpdate;
+    public bool ShouldConfirmUpdate() => _confirmUpdate;
 
-    public void SetConfirmUpdate(bool confirm) => confirmUpdate = confirm;
+    public void SetConfirmUpdate(bool confirm) => _confirmUpdate = confirm;
 
-    public bool ShouldOverride => overrideExisting;
+    public bool ShouldOverride => _overrideExisting;
 
     /// <summary>C++ originalInstanceID().</summary>
-    public string OriginalInstanceId => originalInstanceId;
+    public string OriginalInstanceId => _originalInstanceId;
 
-    public string OriginalName() => originalName;
+    public string OriginalName() => _originalName;
 
-    public string ModifiedName() => modifiedName.Length != 0 ? modifiedName : originalName;
+    public string ModifiedName() => _modifiedName.Length != 0 ? _modifiedName : _originalName;
 
     /// <summary>C++ name(): the display name the created instance will get.</summary>
     public string Name()
     {
-        if (modifiedName.Length != 0)
+        if (_modifiedName.Length != 0)
         {
             return ModifiedName();
         }
 
-        if (originalVersion.Length != 0)
+        if (_originalVersion.Length != 0)
         {
-            return originalName + " " + originalVersion;
+            return _originalName + " " + _originalVersion;
         }
 
-        return originalName;
+        return _originalName;
     }
 
     /// <summary>C++ version().</summary>
-    public string Version() => originalVersion;
+    public string Version() => _originalVersion;
 
-    public void SetName(string name) => modifiedName = name;
+    public void SetName(string name) => _modifiedName = name;
 
     public void SetOriginalName(string name, string version)
     {
-        originalName = name;
-        originalVersion = version;
+        _originalName = name;
+        _originalVersion = version;
     }
 
     public void SetOverride(bool overrideExisting, string instanceIdToOverride = "")
     {
-        this.overrideExisting = overrideExisting;
+        this._overrideExisting = overrideExisting;
         if (instanceIdToOverride.Length != 0)
         {
-            originalInstanceId = instanceIdToOverride;
+            _originalInstanceId = instanceIdToOverride;
         }
     }
 

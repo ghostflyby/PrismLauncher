@@ -14,7 +14,7 @@ public sealed class PrivatePackManager(string? filename = null)
 {
     private readonly string _filename = filename ?? "private_packs.txt";
     private readonly HashSet<string> _currentPacks = new(StringComparer.Ordinal);
-    private bool dirty;
+    private bool _dirty;
 
     public bool Empty => _currentPacks.Count == 0;
 
@@ -33,7 +33,7 @@ public sealed class PrivatePackManager(string? filename = null)
                 _currentPacks.Add(code);
             }
 
-            dirty = false;
+            _dirty = false;
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
                                       or SecurityException)
@@ -46,7 +46,7 @@ public sealed class PrivatePackManager(string? filename = null)
     /// the set changed (dirty). Write failures are swallowed like the C++ (warn only).</summary>
     public void Save()
     {
-        if (!dirty)
+        if (!_dirty)
         {
             return;
         }
@@ -54,7 +54,7 @@ public sealed class PrivatePackManager(string? filename = null)
         try
         {
             FileSystem.Write(_filename, Encoding.UTF8.GetBytes(string.Join('\n', _currentPacks)));
-            dirty = false;
+            _dirty = false;
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
                                       or SecurityException) { }
@@ -63,12 +63,12 @@ public sealed class PrivatePackManager(string? filename = null)
     public void Add(string code)
     {
         _currentPacks.Add(code);
-        dirty = true;
+        _dirty = true;
     }
 
     public bool Remove(string code)
     {
-        dirty = true;
+        _dirty = true;
         return _currentPacks.Remove(code);
     }
 }

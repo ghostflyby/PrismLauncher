@@ -19,8 +19,8 @@ namespace FlintLauncher.Tests;
 public class SkinLibraryApiTests : IAsyncDisposable
 {
     private readonly string _homeDir = Path.Combine(Path.GetTempPath(), $"flint-skinlib-{Guid.NewGuid():N}");
-    private WebApplication? app;
-    private HttpClient? client;
+    private WebApplication? _app;
+    private HttpClient? _client;
 
     private string DataDir => Path.Combine(_homeDir, "data");
     private string SkinsDir => Path.Combine(DataDir, "skins");
@@ -30,27 +30,27 @@ public class SkinLibraryApiTests : IAsyncDisposable
         Directory.CreateDirectory(_homeDir);
         Directory.CreateDirectory(DataDir);
         var token = Guid.NewGuid().ToString("N");
-        app = WebHostBuilder.BuildWebApplication(
+        _app = WebHostBuilder.BuildWebApplication(
         [
             "--home-dir", _homeDir,
             "--api-token", token,
             "--urls", "http://127.0.0.1:0",
         ]);
-        await app.StartAsync();
-        client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
-        client.DefaultRequestHeaders.Add("X-Api-Token", token);
-        return client;
+        await _app.StartAsync();
+        _client = new HttpClient { BaseAddress = new Uri(_app.Urls.First()) };
+        _client.DefaultRequestHeaders.Add("X-Api-Token", token);
+        return _client;
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (app is not null)
+        if (_app is not null)
         {
-            await app.StopAsync();
-            app.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            await _app.StopAsync();
+            _app.DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
 
-        client?.Dispose();
+        _client?.Dispose();
         try
         {
             Directory.Delete(_homeDir, recursive: true);

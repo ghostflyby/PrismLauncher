@@ -14,15 +14,15 @@
 //    JSON null member still counts as present (S5).
 
 using System.Text.Json.Nodes;
-using Xunit;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Meta;
-using MetaIndex = FlintLauncher.Core.Meta.Index;
+using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.ModPlatform.Technic;
-using FlintLauncher.Core.Minecraft;
+using Xunit;
+using MetaIndex = FlintLauncher.Core.Meta.Index;
 
 namespace FlintLauncher.Tests;
 
@@ -154,15 +154,15 @@ public class JsonNullToleranceTests
     public void Modrinth_Lookup_MalformedEntry_SkipsOnlyThatEntry()
     {
         var lookup = ModrinthJson.ParseVersionLookup("""
-                                                    {
-                                                        "good": {"project_id": "p", "id": "v", "date_published": "2024-01-01",
-                                                                 "game_versions": ["1.20.1"], "loaders": ["fabric"], "name": "V",
-                                                                 "version_number": "1", "version_type": "release",
-                                                                 "files": [{"filename": "a.jar", "primary": true, "hashes": {"sha1": "h"},
-                                                                            "url": "https://x/a.jar"}]},
-                                                        "bad": 3
-                                                    }
-                                                    """);
+                                                     {
+                                                         "good": {"project_id": "p", "id": "v", "date_published": "2024-01-01",
+                                                                  "game_versions": ["1.20.1"], "loaders": ["fabric"], "name": "V",
+                                                                  "version_number": "1", "version_type": "release",
+                                                                  "files": [{"filename": "a.jar", "primary": true, "hashes": {"sha1": "h"},
+                                                                             "url": "https://x/a.jar"}]},
+                                                         "bad": 3
+                                                     }
+                                                     """);
 
         Assert.NotNull(lookup);
         Assert.Equal(["good"], lookup.Keys.ToArray());
@@ -173,15 +173,15 @@ public class JsonNullToleranceTests
     public void Modrinth_VersionList_MalformedEntry_SkipsOnlyThatEntry()
     {
         var versions = ModrinthJson.ParseVersionListOrEmpty("""
-                                                           [
-                                                               {"project_id": "p", "id": "v", "date_published": "2024-01-01",
-                                                                "game_versions": ["1.20.1"], "loaders": ["fabric"], "name": "V",
-                                                                "version_number": "1", "version_type": "release",
-                                                                "files": [{"filename": "a.jar", "primary": true, "hashes": {"sha1": "h"},
-                                                                           "url": "https://x/a.jar"}]},
-                                                               5
-                                                           ]
-                                                           """);
+                                                            [
+                                                                {"project_id": "p", "id": "v", "date_published": "2024-01-01",
+                                                                 "game_versions": ["1.20.1"], "loaders": ["fabric"], "name": "V",
+                                                                 "version_number": "1", "version_type": "release",
+                                                                 "files": [{"filename": "a.jar", "primary": true, "hashes": {"sha1": "h"},
+                                                                            "url": "https://x/a.jar"}]},
+                                                                5
+                                                            ]
+                                                            """);
 
         Assert.Single(versions);
     }

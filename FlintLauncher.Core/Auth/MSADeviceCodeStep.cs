@@ -26,26 +26,26 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
     /// <summary>Port of the authorizeWithBrowser(QString url, QString code, int expiresIn) signal.</summary>
     public event Action<string, string, int>? AuthorizeWithBrowser;
 
-    private string clientId = "";
-    private string deviceCode = "";
-    private bool isAborted;
-    private int interval = 5;
-    private DateTime? expirationUtc; // stands in for m_expiration_timer
+    private string _clientId = "";
+    private string _deviceCode = "";
+    private bool _isAborted;
+    private int _interval = 5;
+    private DateTime? _expirationUtc; // stands in for m_expiration_timer
 
     public override void Abort()
     {
-        expirationUtc = null; // m_expiration_timer.stop(); m_pool_timer.stop();
-        isAborted = true;
+        _expirationUtc = null; // m_expiration_timer.stop(); m_pool_timer.stop();
+        _isAborted = true;
     }
 
     public override async Task PerformAsync(CancellationToken cancellationToken)
     {
-        clientId = _auth.MsaClientId;
+        _clientId = _auth.MsaClientId;
         await RequestDeviceAuthorization(cancellationToken).ConfigureAwait(false);
-        while (!isAborted && expirationUtc is { } expiration)
+        while (!_isAborted && _expirationUtc is { } expiration)
         {
             var remaining = expiration - DateTime.UtcNow;
-            if (remaining < TimeSpan.FromSeconds(interval))
+            if (remaining < TimeSpan.FromSeconds(_interval))
             {
                 // the device code is about to expire: start the flow over with a fresh code
                 // (upstream startPoolTimer() -> perform())
@@ -53,7 +53,7 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
                 continue;
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(interval), cancellationToken).ConfigureAwait(false);
+            await Task.Delay(TimeSpan.FromSeconds(_interval), cancellationToken).ConfigureAwait(false);
             if (await PollForToken(cancellationToken).ConfigureAwait(false))
             {
                 return;
@@ -63,7 +63,7 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
 
     private async Task RequestDeviceAuthorization(CancellationToken cancellationToken)
     {
-        var payload = FormEncode(("client_id", clientId), ("scope", "XboxLive.SignIn XboxLive.offline_access"));
+        var payload = FormEncode(("client_id", _clientId), ("scope", "XboxLive.SignIn XboxLive.offline_access"));
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
         {
             Url = new Uri(_auth.MsaDeviceCode),
@@ -94,20 +94,20 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
 
         if (rsp.Interval != 0)
         {
-            interval = rsp.Interval;
+            _interval = rsp.Interval;
         }
 
-        deviceCode = rsp.DeviceCode;
+        _deviceCode = rsp.DeviceCode;
         AuthorizeWithBrowser?.Invoke(rsp.VerificationUri, rsp.UserCode, rsp.ExpiresIn);
-        expirationUtc = DateTime.UtcNow.AddSeconds(rsp.ExpiresIn);
+        _expirationUtc = DateTime.UtcNow.AddSeconds(rsp.ExpiresIn);
     }
 
     private async Task<bool> PollForToken(CancellationToken cancellationToken)
     {
         var payload = FormEncode(
-            ("client_id", clientId),
+            ("client_id", _clientId),
             ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
-            ("device_code", deviceCode));
+            ("device_code", _deviceCode));
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
         {
             Url = new Uri(_auth.MsaToken),
@@ -122,7 +122,7 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
             // reduce their polling frequency before retrying.  The use of an
             // exponential backoff algorithm to achieve this, such as doubling the
             // polling interval on each such connection timeout, is RECOMMENDED."
-            interval *= 2;
+            _interval *= 2;
             return false;
         }
 
@@ -133,7 +133,7 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
             // "A variant of 'authorization_pending', the authorization request is
             // still pending and polling should continue, but the interval MUST
             // be increased by 5 seconds for this and all subsequent requests."
-            interval += 5;
+            _interval += 5;
             return false;
         }
 
@@ -155,8 +155,8 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
             return false; // it failed so just try again without increasing the interval
         }
 
-        expirationUtc = null;
-        Data.MsaClientId = clientId;
+        _expirationUtc = null;
+        Data.MsaClientId = _clientId;
         Data.MsaToken.IssueInstant = DateTime.UtcNow;
         // upstream writes QDateTime::currentDateTime() (local time) here, but the consumers
         // (MinecraftAccount refresh check, MsaInteractiveStep) compare against UtcNow — a

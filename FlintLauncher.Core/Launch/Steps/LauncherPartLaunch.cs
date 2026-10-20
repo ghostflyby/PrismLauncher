@@ -33,12 +33,12 @@ public sealed class LauncherPartLaunch : LaunchStep
 
     private readonly LoggedProcess _process;
     private readonly bool _closeAfterLaunch;
-    private bool closeAfterLaunchTriggered;
+    private bool _closeAfterLaunchTriggered;
     public AuthSession? Session { get; set; }
     public MinecraftTarget? TargetToJoin { get; set; }
-    private string launchScript = "";
-    private bool mayProceed;
-    private TaskCompletionSource? exitSignal;
+    private string _launchScript = "";
+    private bool _mayProceed;
+    private TaskCompletionSource? _exitSignal;
 
     public LauncherPartLaunch(LaunchTask parent) : base(parent)
     {
@@ -53,9 +53,9 @@ public sealed class LauncherPartLaunch : LaunchStep
 
     private void OnProcessLog(List<string> lines, MessageLevel level)
     {
-        if (_closeAfterLaunch && !closeAfterLaunchTriggered && LaunchTask.MatchesCloseAfterLaunch(lines))
+        if (_closeAfterLaunch && !_closeAfterLaunchTriggered && LaunchTask.MatchesCloseAfterLaunch(lines))
         {
-            closeAfterLaunchTriggered = true;
+            _closeAfterLaunchTriggered = true;
             Services.Ui.CloseAfterLaunch?.Invoke();
         }
 
@@ -90,7 +90,7 @@ public sealed class LauncherPartLaunch : LaunchStep
             }
         }
 
-        launchScript = instance.CreateLaunchScript(Session, TargetToJoin, Services);
+        _launchScript = instance.CreateLaunchScript(Session, TargetToJoin, Services);
         var args = instance.JavaArguments();
         var allArgs = string.Join(" ", args);
         EmitLogLine("Java arguments:\n  " + Parent.CensorPrivateInfo(allArgs) + "\n", MessageLevel.Launcher);
@@ -144,8 +144,8 @@ public sealed class LauncherPartLaunch : LaunchStep
         // (Linux only: gamemode_request_start_for — not ported, see header)
 
         // park until the process reaches a terminal state (the game exiting)
-        exitSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        return exitSignal.Task.WaitAsync(cancellationToken);
+        _exitSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        return _exitSignal.Task.WaitAsync(cancellationToken);
     }
 
     private void OnState(LoggedProcessState state)
@@ -201,29 +201,29 @@ public sealed class LauncherPartLaunch : LaunchStep
                 EmitLogLine($"Minecraft process ID: {_process.ProcessId}\n\n", MessageLevel.Launcher);
                 Parent.Pid = _process.ProcessId;
                 // send the launch script to the launcher part
-                _process.Write(launchScript);
+                _process.Write(_launchScript);
                 // the script write and the gate below are the two events a "game never
                 // started" investigation turns on — surface them in both channels
-                Log.ScriptWritten(launchScript.Length);
-                EmitLogLine($"Launch script piped to stdin ({launchScript.Length} chars).", MessageLevel.Launcher);
+                Log.ScriptWritten(_launchScript.Length);
+                EmitLogLine($"Launch script piped to stdin ({_launchScript.Length} chars).", MessageLevel.Launcher);
 
-                mayProceed = true;
+                _mayProceed = true;
                 EmitReadyForLaunch();
                 break;
             }
         }
     }
 
-    private void CompleteExit() => exitSignal?.TrySetResult();
+    private void CompleteExit() => _exitSignal?.TrySetResult();
 
     public override void Proceed()
     {
-        if (mayProceed)
+        if (_mayProceed)
         {
             Parent.Instance.SetMinecraftRunning(true);
             const string launchString = "launch\n";
             _process.Write(launchString);
-            mayProceed = false;
+            _mayProceed = false;
             Log.LaunchSignalSent();
             EmitLogLine("Launch signal ('launch') sent to the game process.", MessageLevel.Launcher);
         }
@@ -237,9 +237,9 @@ public sealed class LauncherPartLaunch : LaunchStep
 
     public override bool AbortStep()
     {
-        if (mayProceed)
+        if (_mayProceed)
         {
-            mayProceed = false;
+            _mayProceed = false;
             const string launchString = "abort\n";
             _process.Write(launchString);
         }

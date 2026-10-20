@@ -33,11 +33,11 @@ public class ResourceDownloadTask : SequentialTask
     private readonly IndexedVersion _packVersion;
     private readonly ResourceFolderModel _packModel;
 
-    private NetJob? filesNetJob;
-    private readonly LocalResourceUpdateTask? updateTask;
+    private NetJob? _filesNetJob;
+    private readonly LocalResourceUpdateTask? _updateTask;
 
     // Port of the to_delete tuple: (old metadata name, old file name)
-    private (string Name, string Filename) toDelete = ("", "");
+    private (string Name, string Filename) _toDelete = ("", "");
 
     public ResourceDownloadTask(IndexedPack pack,
         IndexedVersion version,
@@ -55,13 +55,13 @@ public class ResourceDownloadTask : SequentialTask
 
         if (isIndexed)
         {
-            updateTask = new LocalResourceUpdateTask(_packModel.IndexDir, _pack, _packVersion);
-            updateTask.HasOldResource += HasOldResource;
+            _updateTask = new LocalResourceUpdateTask(_packModel.IndexDir, _pack, _packVersion);
+            _updateTask.HasOldResource += HasOldResource;
 
-            AddTask(updateTask);
+            AddTask(_updateTask);
         }
 
-        filesNetJob = new NetJob("Resource download");
+        _filesNetJob = new NetJob("Resource download");
         EmitStatus($"Downloading resource:\n{_packVersion.DownloadUrl}");
 
         var action = modrinth1.MakeFileRequest(_packVersion.DownloadUrl,
@@ -76,12 +76,12 @@ public class ResourceDownloadTask : SequentialTask
             }
         }
 
-        filesNetJob.AddNetRequest(action);
-        filesNetJob.Succeeded += DownloadSucceeded;
-        filesNetJob.Failed += DownloadFailed;
-        filesNetJob.Progress += DownloadProgressChanged;
+        _filesNetJob.AddNetRequest(action);
+        _filesNetJob.Succeeded += DownloadSucceeded;
+        _filesNetJob.Failed += DownloadFailed;
+        _filesNetJob.Progress += DownloadProgressChanged;
 
-        AddTask(filesNetJob);
+        AddTask(_filesNetJob);
     }
 
     public string GetFilename() => _packVersion.FileName;
@@ -138,14 +138,14 @@ public class ResourceDownloadTask : SequentialTask
     // downloaded successfully!
     private void HasOldResource(string name, string filename)
     {
-        toDelete = (name, filename);
+        _toDelete = (name, filename);
     }
 
     private void DownloadSucceeded(FlintTask task)
     {
-        filesNetJob = null;
-        var oldName = toDelete.Name;
-        var oldFilename = toDelete.Filename;
+        _filesNetJob = null;
+        var oldName = _toDelete.Name;
+        var oldFilename = _toDelete.Filename;
 
         if (oldName.Length == 0 || oldFilename == _packVersion.FileName)
         {
@@ -160,7 +160,7 @@ public class ResourceDownloadTask : SequentialTask
 
     private void DownloadFailed(FlintTask task, string reason)
     {
-        filesNetJob = null;
+        _filesNetJob = null;
         EmitFailed(reason);
     }
 

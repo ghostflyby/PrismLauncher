@@ -24,7 +24,7 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
     }
 
     private readonly string _string;
-    private Section[] sections = [];
+    private Section[] _sections = [];
 
     public McVersion() : this("") { }
 
@@ -96,7 +96,7 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
             }
         }
 
-        this.sections = parsed.ToArray();
+        this._sections = parsed.ToArray();
     }
 
     private static int CompareSections(Section a, Section b)
@@ -143,11 +143,11 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
             return 1;
         }
 
-        var size = Math.Max(sections.Length, other.sections.Length);
+        var size = Math.Max(_sections.Length, other._sections.Length);
         for (var i = 0; i < size; i++)
         {
-            var sec1 = i < sections.Length ? sections[i] : default;
-            var sec2 = i < other.sections.Length ? other.sections[i] : default;
+            var sec1 = i < _sections.Length ? _sections[i] : default;
+            var sec2 = i < other._sections.Length ? other._sections[i] : default;
             var cmp = CompareSections(sec1, sec2);
             if (cmp != 0)
             {
@@ -165,7 +165,7 @@ public sealed class McVersion : IComparable<McVersion>, IEquatable<McVersion>
     public override int GetHashCode()
     {
         var hash = new HashCode();
-        foreach (var section in sections)
+        foreach (var section in _sections)
         {
             hash.Add((int)section.Type);
             hash.Add(section.Value, StringComparer.Ordinal);

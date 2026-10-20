@@ -32,7 +32,7 @@ public sealed class NetResponseInfo
 
 public sealed class ChecksumValidator(HashAlgorithmName algorithm, byte[]? expected = null) : Validator
 {
-    private IncrementalHash? hash;
+    private IncrementalHash? _hash;
     public byte[] Expected { get; set; } = expected ?? [];
 
     /// <summary>Port of the hex-string overload.</summary>
@@ -42,19 +42,19 @@ public sealed class ChecksumValidator(HashAlgorithmName algorithm, byte[]? expec
 
     public override bool Init(NetRequestSpec request)
     {
-        hash = IncrementalHash.CreateHash(algorithm);
+        _hash = IncrementalHash.CreateHash(algorithm);
         return true;
     }
 
     public override bool Write(byte[] data)
     {
-        hash?.AppendData(data);
+        _hash?.AppendData(data);
         return true;
     }
 
     public override bool Abort()
     {
-        hash = null;
+        _hash = null;
         return true;
     }
 
@@ -70,13 +70,13 @@ public sealed class ChecksumValidator(HashAlgorithmName algorithm, byte[]? expec
 
     public byte[] Hash()
     {
-        if (hash is null)
+        if (_hash is null)
         {
             return [];
         }
 
-        var result = hash.GetHashAndReset();
-        hash = null;
+        var result = _hash.GetHashAndReset();
+        _hash = null;
         return result;
     }
 }

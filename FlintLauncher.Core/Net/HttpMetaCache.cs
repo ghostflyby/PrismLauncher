@@ -20,17 +20,28 @@ namespace FlintLauncher.Core.Net;
 /// converters keep the QJsonValue fallbacks of the former readers (junk timestamps/ages
 /// truncate to 0, junk strings become "").</summary>
 public sealed record MetaCacheFileJson(
-    string? Version,    List<MetaCacheEntryJson>? Entries);
+    string? Version,
+    List<MetaCacheEntryJson>? Entries);
+
 public sealed record MetaCacheEntryJson(
-        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Base,
-        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Path,
+    [property: JsonConverter(typeof(QtCoercingStringConverter))]
+    string? Base,
+    [property: JsonConverter(typeof(QtCoercingStringConverter))]
+    string? Path,
     [property: JsonPropertyName("md5sum")]
-    [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Md5Sum,
-        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Etag,
-        [property: JsonConverter(typeof(QtCoercingLongConverter))] long LastChangedTimestamp,
-        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? RemoteChangedTimestamp,
-    bool? Eternal,        [property: JsonConverter(typeof(QtCoercingLongConverter))] long? CurrentAge,
-        [property: JsonConverter(typeof(QtCoercingLongConverter))] long? MaxAge);
+    [property: JsonConverter(typeof(QtCoercingStringConverter))]
+    string? Md5Sum,
+    [property: JsonConverter(typeof(QtCoercingStringConverter))]
+    string? Etag,
+    [property: JsonConverter(typeof(QtCoercingLongConverter))]
+    long LastChangedTimestamp,
+    [property: JsonConverter(typeof(QtCoercingStringConverter))]
+    string? RemoteChangedTimestamp,
+    bool? Eternal,
+    [property: JsonConverter(typeof(QtCoercingLongConverter))]
+    long? CurrentAge,
+    [property: JsonConverter(typeof(QtCoercingLongConverter))]
+    long? MaxAge);
 
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
@@ -57,12 +68,10 @@ internal static class MetaCacheJson
 
 public sealed class MetaEntry
 {
-    private bool stale = true;
-
     /// <summary>The cache whose mount table resolves <see cref="GetFullPath"/> (E4: the
     /// base path is NOT a field on the entry — the storage layer owns the baseId → root
     /// table and the key → path resolution; the disk format never carried it anyway).</summary>
-    private HttpMetaCache? owner;
+    private HttpMetaCache? _owner;
 
     public string BaseId { get; set; } = "";
 
@@ -83,9 +92,7 @@ public sealed class MetaEntry
 
     public bool IsEternal { get; set; }
 
-    public bool IsStale => stale;
-
-    public void SetStale(bool stale) => this.stale = stale;
+    public bool IsStale { get; set; } = true;
 
     /// <summary>Full path of the cached file: resolved LIVE through the owning cache's
     /// mount table (E4 — remounting a base re-points every entry with it). Fails fast when
@@ -94,7 +101,7 @@ public sealed class MetaEntry
     /// landing) and must not come back through a side door.</summary>
     public string GetFullPath()
     {
-        var cache = this.owner ?? throw new InvalidOperationException(
+        var cache = this._owner ?? throw new InvalidOperationException(
             "meta entry has no owning cache — resolve it through HttpMetaCache.ResolveEntry");
         var basePath = cache.GetBasePath(BaseId);
         return basePath.Length != 0
@@ -105,7 +112,7 @@ public sealed class MetaEntry
 
     public bool IsExpired(long offset) => !IsEternal && CurrentAge >= MaxAge - offset;
 
-    internal void SetOwner(HttpMetaCache? owner) => this.owner = owner;
+    internal void SetOwner(HttpMetaCache? owner) => this._owner = owner;
 }
 
 public sealed class HttpMetaCache(string? path = null) : IDisposable
@@ -117,12 +124,12 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
 
     private readonly Dictionary<string, string> _basePaths = new(StringComparer.Ordinal);
     private readonly string? _indexFile = string.IsNullOrEmpty(path) ? null : path;
-    private Timer? saveTimer;
+    private Timer? _saveTimer;
 
     public void Dispose()
     {
-        saveTimer?.Dispose();
-        saveTimer = null;
+        _saveTimer?.Dispose();
+        _saveTimer = null;
         SaveNow();
     }
 
@@ -272,7 +279,7 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
             return false;
         }
 
-        entry.SetStale(true);
+        entry.IsStale = true;
         SaveEventually();
         return true;
     }
@@ -286,7 +293,7 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
             {
                 foreach (var entry in map.Values)
                 {
-                    entry.SetStale(true);
+                    entry.IsStale = true;
                 }
 
                 map.Clear();
@@ -330,7 +337,7 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
             RelativePath = resourcePath,
         };
         entry.SetOwner(this);
-        entry.SetStale(true);
+        entry.IsStale = true;
         return entry;
     }
 
@@ -393,7 +400,7 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
 
                 // presumed innocent until closer examination
                 entry.SetOwner(this);
-                entry.SetStale(false);
+                entry.IsStale = false;
                 _entries[baseId][entry.RelativePath] = entry;
             }
         }
@@ -404,8 +411,8 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
         // reset the save timer (30 seconds, like the C++ batching timer)
         lock (_lock)
         {
-            saveTimer?.Dispose();
-            saveTimer = new Timer(_ => SaveNow(), null, 30_000, Timeout.Infinite);
+            _saveTimer?.Dispose();
+            _saveTimer = new Timer(_ => SaveNow(), null, 30_000, Timeout.Infinite);
         }
     }
 
@@ -440,7 +447,7 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
                         // (WhenWritingNull drops the unused halves, like the former
                         // conditional writes)
                         RemoteChangedTimestamp:
-                            entry.RemoteChangedTimestamp.Length > 0 ? entry.RemoteChangedTimestamp : null,
+                        entry.RemoteChangedTimestamp.Length > 0 ? entry.RemoteChangedTimestamp : null,
                         Eternal: entry.IsEternal ? true : null,
                         CurrentAge: entry.IsEternal ? null : entry.CurrentAge,
                         MaxAge: entry.IsEternal ? null : entry.MaxAge));

@@ -47,8 +47,8 @@ public sealed partial class InstanceImportTask(
     private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
     private readonly FlameApi _flame = flame ?? new FlameApi();
     private readonly IReadOnlyDictionary<string, string> _extraInfo = extraInfo ?? new Dictionary<string, string>();
-    private string archivePath = "";
-    private ModpackType modpackType = ModpackType.Unknown;
+    private string _archivePath = "";
+    private ModpackType _modpackType = ModpackType.Unknown;
 
     /// <summary>APPLICATION->metacache() hook; used for the download-from-URL path.</summary>
     public HttpMetaCache? MetaCache { get; set; }
@@ -65,7 +65,7 @@ public sealed partial class InstanceImportTask(
     {
         if (sourceUrl.IsFile)
         {
-            archivePath = sourceUrl.LocalPath;
+            _archivePath = sourceUrl.LocalPath;
             await ProcessZipPack(cancellationToken);
         }
         else
@@ -82,8 +82,8 @@ public sealed partial class InstanceImportTask(
             var path = sourceUrl.Host + '/' + sourceUrl.AbsolutePath.TrimStart('/');
 
             var entry = MetaCache.ResolveEntry("general", path);
-            entry.SetStale(true);
-            archivePath = entry.GetFullPath();
+            entry.IsStale = true;
+            _archivePath = entry.GetFullPath();
 
             var filesNetJob = new NetJob("Modpack download");
             filesNetJob.AddNetRequest(NetRequest.MakeCached(MetaCache, sourceUrl, entry));
@@ -97,9 +97,9 @@ public sealed partial class InstanceImportTask(
         else
         {
             // headless fallback: plain download into the staging folder
-            archivePath = FileSystem.PathCombine(StagingPath, Path.GetFileName(sourceUrl.AbsolutePath));
-            FileSystem.EnsureFilePathExists(archivePath);
-            var request = NetRequest.MakeFile(sourceUrl, archivePath);
+            _archivePath = FileSystem.PathCombine(StagingPath, Path.GetFileName(sourceUrl.AbsolutePath));
+            FileSystem.EnsureFilePathExists(_archivePath);
+            var request = NetRequest.MakeFile(sourceUrl, _archivePath);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
             {
@@ -124,7 +124,7 @@ public sealed partial class InstanceImportTask(
         var root = "";
         try
         {
-            using var packZip = ZipFile.OpenRead(archivePath);
+            using var packZip = ZipFile.OpenRead(_archivePath);
             foreach (var entry in packZip.Entries)
             {
                 var fileName = entry.FullName.Replace('\\', '/');
@@ -132,7 +132,7 @@ public sealed partial class InstanceImportTask(
                 if (fileName == "modrinth.index.json")
                 {
                     // process as Modrinth pack
-                    modpackType = ModpackType.Modrinth;
+                    _modpackType = ModpackType.Modrinth;
                     break;
                 }
 
@@ -141,19 +141,19 @@ public sealed partial class InstanceImportTask(
                     // process as Technic pack
                     Directory.CreateDirectory(FileSystem.PathCombine(extractDir, "minecraft"));
                     extractDir = FileSystem.PathCombine(extractDir, "minecraft");
-                    modpackType = ModpackType.Technic;
+                    _modpackType = ModpackType.Technic;
                     break;
                 }
 
                 if (fileName == "manifest.json")
                 {
-                    modpackType = ModpackType.Flame;
+                    _modpackType = ModpackType.Flame;
                     break;
                 }
 
                 if (Path.GetFileName(fileName) == "instance.cfg")
                 {
-                    modpackType = ModpackType.MultiMc;
+                    _modpackType = ModpackType.MultiMc;
                     root = CleanPath(Path.GetDirectoryName(fileName)?.Replace('\\', '/') ?? "");
                     break;
                 }
@@ -166,7 +166,7 @@ public sealed partial class InstanceImportTask(
             return;
         }
 
-        if (modpackType == ModpackType.Unknown)
+        if (_modpackType == ModpackType.Unknown)
         {
             EmitFailed("Archive does not contain a recognized modpack type.");
             return;
@@ -175,7 +175,7 @@ public sealed partial class InstanceImportTask(
         EmitStatus("Extracting modpack");
 
         // make sure we extract just the pack
-        var extracted = MmcZip.ExtractDir(archivePath, root, extractDir);
+        var extracted = MmcZip.ExtractDir(_archivePath, root, extractDir);
         if (extracted is null)
         {
             EmitFailed("Failed to extract the modpack zip.");
@@ -187,7 +187,7 @@ public sealed partial class InstanceImportTask(
 
     private async Task ExtractFinished(CancellationToken cancellationToken)
     {
-        switch (modpackType)
+        switch (_modpackType)
         {
             case ModpackType.MultiMc:
                 ProcessMultiMc();

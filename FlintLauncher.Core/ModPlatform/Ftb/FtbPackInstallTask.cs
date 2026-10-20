@@ -34,11 +34,11 @@ public sealed class FtbPackInstallTask(
     private readonly FtbApi _ftb = ftb ?? new FtbApi();
 
     // assigned by OnManifestDownloadSucceeded before any read
-    private FtbVersion? manifest;
+    private FtbVersion? _manifest;
 
     /// <summary>The manifest payload; the state machine only reads it after the download
     /// succeeded, so a read before that is a broken invariant rather than a null value.</summary>
-    private FtbVersion Manifest => manifest
+    private FtbVersion Manifest => _manifest
         ?? throw new InvalidOperationException("the pack manifest has not been downloaded");
     private readonly List<long> _fileIds = [];
     private readonly List<BlockedMod> _blockedMods = [];
@@ -88,7 +88,7 @@ public sealed class FtbPackInstallTask(
         {
             // the deserialized payload replaces the (not yet populated) manifest wholesale;
             // reads below only run after this assignment
-            manifest = FtbApi.LoadVersion(response);
+            _manifest = FtbApi.LoadVersion(response);
         }
         catch (JsonParseException e)
         {

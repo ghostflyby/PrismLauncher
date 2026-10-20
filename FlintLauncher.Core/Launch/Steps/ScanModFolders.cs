@@ -10,22 +10,22 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class ScanModFolders(LaunchTask parent) : LaunchStep(parent)
 {
-    private bool modsDone;
-    private bool coreModsDone;
-    private bool nilModsDone;
+    private bool _modsDone;
+    private bool _coreModsDone;
+    private bool _nilModsDone;
 
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         var inst = Parent.Instance;
 
         var loaders = inst.LoaderModList();
-        modsDone = loaders.Update();
+        _modsDone = loaders.Update();
 
         var cores = inst.CoreModList();
-        coreModsDone = cores.Update();
+        _coreModsDone = cores.Update();
 
         var nils = inst.NilModList();
-        nilModsDone = nils.Update();
+        _nilModsDone = nils.Update();
 
         CheckDone();
         return Task.CompletedTask;
@@ -33,7 +33,7 @@ public sealed class ScanModFolders(LaunchTask parent) : LaunchStep(parent)
 
     private void CheckDone()
     {
-        if (modsDone && coreModsDone && nilModsDone)
+        if (_modsDone && _coreModsDone && _nilModsDone)
         {
             EmitSucceeded();
         }

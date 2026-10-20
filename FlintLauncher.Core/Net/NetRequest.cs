@@ -44,8 +44,8 @@ public sealed class NetRequest(
     private readonly NetStack _stack = stack ?? NetStack.Default;
 
     private readonly List<(string name, string value)> _headers = [];
-    private Sink? sink;
-    private int retryCount;
+    private Sink? _sink;
+    private int _retryCount;
 
     /// <summary>Set for makeCached-style requests: the entry is re-registered after success.</summary>
     internal HttpMetaCache? MetaCache { get; set; }
@@ -58,13 +58,13 @@ public sealed class NetRequest(
 
     public Sink? RequestSink
     {
-        get => sink;
-        set => sink = value;
+        get => _sink;
+        set => _sink = value;
     }
 
     public void AddHeader(string name, string value) => _headers.Add((name, value));
 
-    public void AddValidator(Validator validator) => sink?.AddValidator(validator);
+    public void AddValidator(Validator validator) => _sink?.AddValidator(validator);
 
     // ---------------------------------------------------------------- factories
 
@@ -113,9 +113,9 @@ public sealed class NetRequest(
     }
 
     /// <summary>Buffer content when constructed via MakeByteArray.</summary>
-    public byte[] Body => (sink as ByteArraySink)?.Data ?? [];
+    public byte[] Body => (_sink as ByteArraySink)?.Data ?? [];
 
-    public string BodyAsString => (sink as ByteArraySink)?.DataAsString ?? "";
+    public string BodyAsString => (_sink as ByteArraySink)?.DataAsString ?? "";
 
     // ---------------------------------------------------------------- execution
 
@@ -162,7 +162,7 @@ public sealed class NetRequest(
         try
         {
             HttpResponseMessage response;
-            var effectiveSink = sink;
+            var effectiveSink = _sink;
             while (true)
             {
                 if (effectiveSink is not null && !effectiveSink.Init(spec))
@@ -192,9 +192,9 @@ public sealed class NetRequest(
                 var statusCode = (int)response.StatusCode;
                 if (options.HasFlag(RequestOptions.AutoRetry) &&
                     statusCode is 429 or 503 &&
-                    retryCount < MaxAutoRetries)
+                    _retryCount < MaxAutoRetries)
                 {
-                    retryCount++;
+                    _retryCount++;
                     var delay = TimeSpan.Zero;
                     if (response.Headers.RetryAfter?.Delta is { } delta)
                     {

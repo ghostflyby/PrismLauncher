@@ -19,7 +19,7 @@ namespace FlintLauncher.Core.Launch.Steps;
 public sealed class LegacyFmlLibrariesTask(MinecraftInstance inst) : FlintTask
 {
     private readonly List<FmlLib> _fmlLibsToProcess = [];
-    private NetJob? downloadJob;
+    private NetJob? _downloadJob;
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -81,11 +81,11 @@ public sealed class LegacyFmlLibrariesTask(MinecraftInstance inst) : FlintTask
         var metacache = inst.MetaCache ?? throw new InvalidOperationException(
             $"no meta cache stamped on instance '{inst.Name()}' — the composition root must inject it");
         var dlJob = new NetJob("FML libraries");
-        downloadJob = dlJob;
+        _downloadJob = dlJob;
         foreach (var lib in _fmlLibsToProcess)
         {
             var entry = metacache.ResolveEntry("fmllibs", lib.Filename);
-            entry.SetStale(true);
+            entry.IsStale = true;
             var urlString = BaseUrl() + lib.Filename;
             dlJob.AddNetRequest(NetRequest.MakeCached(metacache, new Uri(urlString), entry, RequestOptions.MakeEternal));
         }
@@ -108,7 +108,7 @@ public sealed class LegacyFmlLibrariesTask(MinecraftInstance inst) : FlintTask
 
     private void FmllibsFinished()
     {
-        downloadJob = null;
+        _downloadJob = null;
         if (_fmlLibsToProcess.Count != 0)
         {
             EmitStatus("Copying FML libraries into the instance...");
@@ -154,9 +154,9 @@ public sealed class LegacyFmlLibrariesTask(MinecraftInstance inst) : FlintTask
 
     public override void Abort()
     {
-        if (downloadJob is not null && downloadJob.IsRunning)
+        if (_downloadJob is not null && _downloadJob.IsRunning)
         {
-            downloadJob.Abort();
+            _downloadJob.Abort();
         }
 
         // Prematurely aborted LegacyFMLLibrariesTask

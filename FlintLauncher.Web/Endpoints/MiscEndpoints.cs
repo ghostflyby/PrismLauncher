@@ -123,11 +123,11 @@ public static class MiscEndpoints
 public sealed class JavaScanService(LauncherRuntime runtime)
 {
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private volatile IReadOnlyList<JavaView>? cache;
+    private volatile IReadOnlyList<JavaView>? _cache;
 
     public async Task<IReadOnlyList<JavaView>> GetAsync()
     {
-        var cached = cache;
+        var cached = _cache;
         if (cached is not null)
         {
             return cached;
@@ -137,7 +137,7 @@ public sealed class JavaScanService(LauncherRuntime runtime)
         await _lock.WaitAsync();
         try
         {
-            if (cache is { } raced)
+            if (_cache is { } raced)
             {
                 return raced;
             }
@@ -171,7 +171,7 @@ public sealed class JavaScanService(LauncherRuntime runtime)
         var scanned = candidates
             .Select(candidate => new JavaView(candidate.Path, candidate.Version, candidate.Architecture))
             .ToArray();
-        cache = scanned;
+        _cache = scanned;
         return scanned;
     }
 }

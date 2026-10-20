@@ -17,48 +17,48 @@ public class DataPack(FileInfo fileInfo) : Resource(fileInfo)
     /* The 'version' of a data pack, as defined in the pack.mcmeta file.
      * See https://minecraft.wiki/w/Data_pack#pack.mcmeta
      */
-    private int packFormat;
-    private (int Major, int Minor) minFormat;
-    private (int Major, int Minor) maxFormat;
+    private int _packFormat;
+    private (int Major, int Minor) _minFormat;
+    private (int Major, int Minor) _maxFormat;
 
     /** The data pack's description, as defined in the pack.mcmeta file. */
-    private string description = "";
+    private string _description = "";
 
     /* The pack image header info (port of the pixmap cache slot). */
-    private PngImage image;
+    private PngImage _image;
 
     public DataPack(string filePath) : this(new FileInfo(filePath)) { }
 
     /// <summary>Gets the numerical ID of the pack format.</summary>
-    public int PackFormat => packFormat;
+    public int PackFormat => _packFormat;
 
     /// <summary>Gets the description of the data pack.</summary>
-    public string Description => description;
+    public string Description => _description;
 
     /// <summary>The pack image header info, when a valid pack.png has been processed.</summary>
-    public PngImage Image => image;
+    public PngImage Image => _image;
 
-    public bool HasImage => !image.IsNull;
+    public bool HasImage => !_image.IsNull;
 
     /// <summary>Thread-safe in the C++; the parse here is synchronous.</summary>
     public void SetPackFormat(int newFormatId, (int Major, int Minor) minFormat, (int Major, int Minor) maxFormat)
     {
-        packFormat = newFormatId;
-        this.minFormat = minFormat;
-        this.maxFormat = maxFormat;
+        _packFormat = newFormatId;
+        this._minFormat = minFormat;
+        this._maxFormat = maxFormat;
     }
 
     public void SetDescription(string newDescription)
     {
-        description = newDescription;
+        _description = newDescription;
     }
 
     public void SetImage(PngImage newImage)
     {
-        image = newImage;
+        _image = newImage;
     }
 
-    public override bool Valid => packFormat != 0 || (minFormat.Major != 0 && maxFormat.Major != 0);
+    public override bool Valid => _packFormat != 0 || (_minFormat.Major != 0 && _maxFormat.Major != 0);
 
     public override int Compare(Resource other, SortType type = SortType.Name)
     {
@@ -93,13 +93,13 @@ public class DataPack(FileInfo fileInfo) : Resource(fileInfo)
             return true;
         }
 
-        if (filter.IsMatch(packFormat.ToString()))
+        if (filter.IsMatch(_packFormat.ToString()))
         {
             return true;
         }
 
         var mappings = Mappings();
-        var versions = new[] { Map((packFormat, 0), mappings), Map(minFormat, mappings), Map(maxFormat, mappings) };
+        var versions = new[] { Map((_packFormat, 0), mappings), Map(_minFormat, mappings), Map(_maxFormat, mappings) };
         foreach (var version in versions)
         {
             if (!version.Min.IsEmpty)
@@ -123,19 +123,19 @@ public class DataPack(FileInfo fileInfo) : Resource(fileInfo)
     public string PackFormatStr()
     {
         var mappings = Mappings();
-        if (packFormat != 0)
+        if (_packFormat != 0)
         {
-            var versionBounds = Map((packFormat, 0), mappings);
+            var versionBounds = Map((_packFormat, 0), mappings);
             if (versionBounds.Min.ToString().Length == 0)
             {
-                return packFormat.ToString();
+                return _packFormat.ToString();
             }
 
-            return $"{packFormat} ({versionBounds.Min} - {versionBounds.Max})";
+            return $"{_packFormat} ({versionBounds.Min} - {versionBounds.Max})";
         }
 
-        var minBound = Map(minFormat, mappings);
-        var maxBound = Map(maxFormat, mappings);
+        var minBound = Map(_minFormat, mappings);
+        var maxBound = Map(_maxFormat, mappings);
         var minVersion = minBound.Min;
         var maxVersion = maxBound.Max;
         if (minVersion.IsEmpty || maxVersion.IsEmpty)
@@ -143,16 +143,16 @@ public class DataPack(FileInfo fileInfo) : Resource(fileInfo)
             return "Unrecognized";
         }
 
-        var str = "[" + minFormat.Major;
-        if (minFormat.Minor != 0)
+        var str = "[" + _minFormat.Major;
+        if (_minFormat.Minor != 0)
         {
-            str += "." + minFormat.Minor;
+            str += "." + _minFormat.Minor;
         }
 
-        str += " - " + maxFormat.Major;
-        if (maxFormat.Minor != 0)
+        str += " - " + _maxFormat.Major;
+        if (_maxFormat.Minor != 0)
         {
-            str += "." + maxFormat.Minor;
+            str += "." + _maxFormat.Minor;
         }
 
         return str + $" ({minVersion} - {maxVersion})";

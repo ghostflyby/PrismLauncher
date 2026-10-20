@@ -23,24 +23,43 @@ using FlintLauncher.Core.Meta;
 namespace FlintLauncher.Core.Minecraft;
 
 internal sealed record MojangDownloadInfoJson(
-    string? Path,    string? Sha1,    string? Url,    int? Size);
+    string? Path,
+    string? Sha1,
+    string? Url,
+    int? Size);
+
 internal sealed record MojangAssetIndexJson(
-    string? Path,    string? Sha1,    string? Url,    int? Size,    int? TotalSize,    string? Id);
+    string? Path,
+    string? Sha1,
+    string? Url,
+    int? Size,
+    int? TotalSize,
+    string? Id);
+
 internal sealed record MojangLibraryDownloadsJson(
-    MojangDownloadInfoJson? Artifact,    Dictionary<string, MojangDownloadInfoJson>? Classifiers);
+    MojangDownloadInfoJson? Artifact,
+    Dictionary<string, MojangDownloadInfoJson>? Classifiers);
+
 internal sealed record LibraryExtractJson(
     List<string>? Exclude);
+
 internal sealed record RuleJson(
-    JsonElement? Action,    JsonElement? Os);
+    JsonElement? Action,
+    JsonElement? Os);
+
 internal sealed record LibraryJson
 {
     public string? Name { get; init; }
     public string? Url { get; init; }
     public LibraryExtractJson? Extract { get; init; }
+
     /// <summary>raw elements: non-string native classifiers fall back to "" (QJsonValue::toString default), like the former EnsureString read.</summary>
     public Dictionary<string, JsonElement>? Natives { get; init; }
+
     public List<RuleJson>? Rules { get; init; }
+
     public MojangLibraryDownloadsJson? Downloads { get; init; }
+
     // OneSix MMC extensions (+ the +agents argument member)
     [JsonPropertyName("MMC-hint")] public string? MmcHint { get; init; }
 
@@ -52,21 +71,38 @@ internal sealed record LibraryJson
 
     [JsonPropertyName("MMC-displayname")] public string? MmcDisplayname { get; init; }
 
-    public string? Argument { get; init; }}
+    public string? Argument { get; init; }
+}
 
 /// <summary>The DEPRECATED '+jarMods' entry shape.</summary>
 internal sealed record PlusJarModJson(
-    string? Name,    string? OriginalName);
+    string? Name,
+    string? OriginalName);
+
 internal sealed record JavaChecksumJson(
-    string? Hash,    string? Type);
+    string? Hash,
+    string? Type);
+
 internal sealed record JavaVersionJson(
-    string? Name,    int? Major,    int? Minor,    int? Security,    int? Build);
+    string? Name,
+    int? Major,
+    int? Minor,
+    int? Security,
+    int? Build);
+
 internal sealed record JavaRuntimeJson(
-    string? Name,    string? Vendor,    string? Url,    string? ReleaseTime,    string? DownloadType,
+    string? Name,
+    string? Vendor,
+    string? Url,
+    string? ReleaseTime,
+    string? DownloadType,
     string? PackageType,
     // all-caps "OS" on the wire — camelCase would produce "runtimeOs"
-    [property: JsonPropertyName("runtimeOS")] string? RuntimeOs,
-    JavaChecksumJson? Checksum,    JavaVersionJson? Version);
+    [property: JsonPropertyName("runtimeOS")]
+    string? RuntimeOs,
+    JavaChecksumJson? Checksum,
+    JavaVersionJson? Version);
+
 internal sealed record VersionFileJson
 {
     // OneSix
@@ -99,11 +135,15 @@ internal sealed record VersionFileJson
 
     public LibraryJson? MainJar { get; init; }
     public bool? Volatile { get; init; }
+
     public List<JavaRuntimeJson>? Runtimes { get; init; }
+
     // the shared requires wire (MetaRequireJson — the meta documents and the mmc-pack
     // components flow through the same records)
     public List<MetaRequireJson?>? Requires { get; init; }
+
     public List<MetaRequireJson?>? Conflicts { get; init; }
+
     // Mojang
     public string? Id { get; init; }
     public string? MainClass { get; init; }
@@ -116,7 +156,9 @@ internal sealed record VersionFileJson
     public int? MinimumLauncherVersion { get; init; }
     public List<int>? CompatibleJavaMajors { get; init; }
     public string? CompatibleJavaName { get; init; }
+
     public Dictionary<string, MojangDownloadInfoJson>? Downloads { get; init; }
+
     // removed features — only the PRESENCE matters (each adds a problem)
     [JsonPropertyName("tweakers")] public JsonElement? RemovedTweakers { get; init; }
 
@@ -124,9 +166,11 @@ internal sealed record VersionFileJson
 
     [JsonPropertyName("-tweakers")] public JsonElement? RemovedTweakersDash { get; init; }
 
-    [JsonPropertyName("-minecraftArguments")] public JsonElement? RemovedMinecraftArguments { get; init; }
+    [JsonPropertyName("-minecraftArguments")]
+    public JsonElement? RemovedMinecraftArguments { get; init; }
 
-    [JsonPropertyName("+minecraftArguments")] public JsonElement? RemovedPlusMinecraftArguments { get; init; }
+    [JsonPropertyName("+minecraftArguments")]
+    public JsonElement? RemovedPlusMinecraftArguments { get; init; }
 }
 
 // ---------------------------------------------------------------------------

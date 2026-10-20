@@ -122,19 +122,19 @@ public sealed class MinecraftAccount
 
     public AuthFlow? Refresh(AuthEndpointsOptions? auth = null)
     {
-        if (currentTask is not null)
+        if (_currentTask is not null)
         {
-            return currentTask;
+            return _currentTask;
         }
 
         return Attach(new AuthFlow(Data, AuthFlowAction.Refresh, auth));
     }
 
-    public AuthFlow? CurrentTask => currentTask;
+    public AuthFlow? CurrentTask => _currentTask;
 
     private AuthFlow Attach(AuthFlow flow)
     {
-        currentTask = flow;
+        _currentTask = flow;
         flow.Succeeded += _ => AuthSucceeded();
         flow.Failed += (_, _) => AuthFailed();
         flow.Aborted += _ => AuthFailed();
@@ -144,14 +144,14 @@ public sealed class MinecraftAccount
 
     private void AuthSucceeded()
     {
-        currentTask = null;
+        _currentTask = null;
         Changed?.Invoke();
         ActivityChanged?.Invoke(false);
     }
 
     private void AuthFailed()
     {
-        if (currentTask is { } task)
+        if (_currentTask is { } task)
         {
             switch (task.TaskState)
             {
@@ -193,7 +193,7 @@ public sealed class MinecraftAccount
             }
         }
 
-        currentTask = null;
+        _currentTask = null;
         ActivityChanged?.Invoke(false);
     }
 
@@ -207,7 +207,7 @@ public sealed class MinecraftAccount
         return ProfileName();
     }
 
-    public bool IsActive => currentTask is not null;
+    public bool IsActive => _currentTask is not null;
 
     public AccountType AccountType => Data.Type;
 
@@ -304,5 +304,5 @@ public sealed class MinecraftAccount
     public AccountData AccountData => Data;
 
     // current task we are executing here
-    private AuthFlow? currentTask;
+    private AuthFlow? _currentTask;
 }

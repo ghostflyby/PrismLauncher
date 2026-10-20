@@ -145,15 +145,15 @@ public static class NbtIo
     /// <summary>Stream wrapper that first serves a fixed prefix before the inner stream.</summary>
     private sealed class PushbackStream(Stream inner, byte[] prefix) : Stream
     {
-        private int prefixPosition;
+        private int _prefixPosition;
 
         public override int Read(byte[] buffer, int offset, int count)
         {
             ValidateBuffer(buffer, offset, count);
             var served = 0;
-            while (prefixPosition < prefix.Length && count > 0)
+            while (_prefixPosition < prefix.Length && count > 0)
             {
-                buffer[offset + served] = prefix[prefixPosition++];
+                buffer[offset + served] = prefix[_prefixPosition++];
                 served++;
                 count--;
             }

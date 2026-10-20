@@ -35,7 +35,7 @@ public sealed class MetaVersion(string uid, string version) : MetaEntity
 
     public VersionFile? Data { get; set; }
 
-    public bool IsRecommended { get; set;  }
+    public bool IsRecommended { get; set; }
 
     public override bool IsLoaded => Data is not null && base.IsLoaded;
 
@@ -101,5 +101,4 @@ public sealed class MetaVersion(string uid, string version) : MetaEntity
     {
         return new McVersion(Version);
     }
-
 }

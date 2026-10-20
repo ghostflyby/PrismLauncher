@@ -16,7 +16,7 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
 {
-    private NetJob? downloadJob;
+    private NetJob? _downloadJob;
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -38,7 +38,7 @@ public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
         var metacache = inst.MetaCache ?? throw new InvalidOperationException(
             $"no meta cache stamped on instance '{inst.Name()}' — the composition root must inject it");
         var entry = metacache.ResolveEntry("asset_indexes", localPath);
-        entry.SetStale(true);
+        entry.IsStale = true;
         var job = new NetJob($"Asset index for {inst.Name()}");
 
         // Net::ApiRequest::makeCached(indexUrl, entry) — no extra options upstream
@@ -50,7 +50,7 @@ public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
 
         job.AddNetRequest(dl);
 
-        downloadJob = job;
+        _downloadJob = job;
         await job.StartAsync(cancellationToken).ConfigureAwait(false);
         if (!job.WasSuccessful)
         {
@@ -100,7 +100,7 @@ public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
             }
 
             EmitStatus($"Getting the asset files from {source}...");
-            downloadJob = job;
+            _downloadJob = job;
             await job.StartAsync(cancellationToken).ConfigureAwait(false);
             if (!job.WasSuccessful)
             {
@@ -128,9 +128,9 @@ public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
 
     public override void Abort()
     {
-        if (downloadJob is not null && downloadJob.IsRunning)
+        if (_downloadJob is not null && _downloadJob.IsRunning)
         {
-            downloadJob.Abort();
+            _downloadJob.Abort();
         }
 
         // Prematurely aborted AssetUpdateTask

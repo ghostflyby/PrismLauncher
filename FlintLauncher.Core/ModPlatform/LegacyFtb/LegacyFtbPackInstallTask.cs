@@ -24,7 +24,7 @@ namespace FlintLauncher.Core.ModPlatform.LegacyFtb;
 
 public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string version) : InstanceTask
 {
-    private string archivePath = "";
+    private string _archivePath = "";
 
     /// <summary>BuildConfig.LEGACY_FTB_CDN_BASE_URL (per-instance; tests construct the task
     /// pointed at their stub).</summary>
@@ -55,8 +55,8 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
 
         // (the C++ routed this through APPLICATION->metacache()'s "FTBPacks" base; nothing
         // in the port wires a cache here, so the download always goes to a temp file)
-        archivePath = TempCachePath(path);
-        request = NetRequest.MakeFile(new Uri(url), archivePath);
+        _archivePath = TempCachePath(path);
+        request = NetRequest.MakeFile(new Uri(url), _archivePath);
 
         var job = new NetJob("Download FTB Pack");
         job.AddNetRequest(request);
@@ -84,7 +84,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
         SetProgress(2, 4);
 
         var extractDir = FileSystem.PathCombine(StagingPath, "unzip");
-        if (MmcZip.ExtractDir(archivePath, "", extractDir) is null)
+        if (MmcZip.ExtractDir(_archivePath, "", extractDir) is null)
         {
             EmitFailed("Failed to extract modpack");
             return;

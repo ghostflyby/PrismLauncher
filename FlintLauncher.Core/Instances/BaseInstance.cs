@@ -100,7 +100,7 @@ public abstract class BaseInstance
         }
         else
         {
-            uuid = savedUuid;
+            _uuid = savedUuid;
         }
 
         // Game time override family (C7: the gate key stays readable; its value is derived
@@ -223,14 +223,14 @@ public abstract class BaseInstance
     /// </summary>
     public string Id() => Path.GetFileName(InstanceRoot());
 
-    public string Uuid => uuid;
+    public string Uuid => _uuid;
 
     public void RegenerateUuid()
     {
         // QUuid::createUuid().toString(QUuid::Id128): 32 hexadecimal digits without separators
         var newUuid = Guid.NewGuid().ToString("N");
         InstanceSettings.Set("uuid", newUuid);
-        uuid = newUuid;
+        _uuid = newUuid;
     }
 
     public void SetMinecraftRunning(bool running)
@@ -578,35 +578,35 @@ public abstract class BaseInstance
     // NOTE: struct properties need an explicit construction here or System would stay null
     public RuntimeContext RuntimeContext { get; protected set; } = new();
 
-    public bool HasVersionBroken => hasBrokenVersion;
+    public bool HasVersionBroken => _hasBrokenVersion;
 
     public void SetVersionBroken(bool value)
     {
-        if (hasBrokenVersion != value)
+        if (_hasBrokenVersion != value)
         {
-            hasBrokenVersion = value;
+            _hasBrokenVersion = value;
             PropertiesChanged?.Invoke();
         }
     }
 
-    public bool HasUpdateAvailable => hasUpdate;
+    public bool HasUpdateAvailable => _hasUpdate;
 
     public void SetUpdateAvailable(bool value)
     {
-        if (hasUpdate != value)
+        if (_hasUpdate != value)
         {
-            hasUpdate = value;
+            _hasUpdate = value;
             PropertiesChanged?.Invoke();
         }
     }
 
-    public bool HasCrashed => crashed;
+    public bool HasCrashed => _crashed;
 
     public void SetCrashed(bool value)
     {
-        if (crashed != value)
+        if (_crashed != value)
         {
-            crashed = value;
+            _crashed = value;
             PropertiesChanged?.Invoke();
         }
     }
@@ -625,7 +625,7 @@ public abstract class BaseInstance
     /// <summary>'print' a verbose description of the instance into a list of strings.</summary>
     public abstract List<string> VerboseDescription(AuthSession? session, MinecraftTarget? targetToJoin);
 
-    public Status CurrentStatus() => status;
+    public Status CurrentStatus() => _status;
 
     public List<string> GetLinkedInstances()
     {
@@ -675,7 +675,7 @@ public abstract class BaseInstance
         var previous = CurrentStatus();
         if (previous != newStatus)
         {
-            this.status = newStatus;
+            this._status = newStatus;
             StatusChanged?.Invoke(previous, newStatus);
         }
     }
@@ -691,9 +691,9 @@ public abstract class BaseInstance
     protected FlintConfigStore? UserConfigStore =>
         (InstanceSettings as InstanceJsonSettingsObject)?.UserConfig;
 
-    protected bool IsSpecificSettingsLoaded() => specificSettingsLoaded;
+    protected bool IsSpecificSettingsLoaded() => _specificSettingsLoaded;
 
-    protected void SetSpecificSettingsLoaded(bool loaded) => specificSettingsLoaded = loaded;
+    protected void SetSpecificSettingsLoaded(bool loaded) => _specificSettingsLoaded = loaded;
 
     // ---------------------------------------------------------------------- data
 
@@ -721,11 +721,11 @@ public abstract class BaseInstance
     /// references append verbatim; the LoadList conversion pass is the backstop.</summary>
     internal Func<string, string?>? UuidResolver { get; set; }
 
-    private string uuid = "";
-    private Status status = Status.Present;
-    private bool crashed;
-    private bool hasUpdate;
-    private bool hasBrokenVersion;
+    private string _uuid = "";
+    private Status _status = Status.Present;
+    private bool _crashed;
+    private bool _hasUpdate;
+    private bool _hasBrokenVersion;
 
-    private bool specificSettingsLoaded;
+    private bool _specificSettingsLoaded;
 }

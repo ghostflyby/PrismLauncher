@@ -17,10 +17,15 @@ namespace FlintLauncher.Core.Launch;
 /// <summary>The on-disk assets index shape (assets/indexes/&lt;id&gt;.json): Mojang's
 /// virtual/map_to_resources flags and the object map keyed by resource path.</summary>
 public sealed record AssetsIndexFileJson(
-    bool? Virtual,    [property: JsonPropertyName("map_to_resources")] bool? MapToResources,
+    bool? Virtual,
+    [property: JsonPropertyName("map_to_resources")]
+    bool? MapToResources,
     Dictionary<string, AssetObjectJson>? Objects);
+
 public sealed record AssetObjectJson(
-    string? Hash,    long? Size);
+    string? Hash,
+    long? Size);
+
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(AssetsIndexFileJson))]
 internal sealed partial class AssetsJsonContext : JsonSerializerContext;

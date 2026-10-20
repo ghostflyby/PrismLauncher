@@ -82,7 +82,7 @@ public class NetStackTests : IDisposable
             var entry = cache.ResolveEntry("META", "net.minecraft/index.json");
             Assert.True(entry.IsStale);
 
-            entry.SetStale(false);
+            entry.IsStale = false;
             entry.Etag = "\"abc123\"";
             entry.Md5Sum = Convert.ToHexString(MD5.HashData("{}"u8.ToArray())).ToLowerInvariant();
             // mirror ResolveEntry: the stored timestamp must equal the file's mtime or the
@@ -99,7 +99,7 @@ public class NetStackTests : IDisposable
             const string unicodeBase = "路径/é/日本語";
             cache.AddBase(unicodeBase, basePath);
             var unicodeEntry = cache.ResolveEntry(unicodeBase, "net.minecraft/index.json");
-            unicodeEntry.SetStale(false);
+            unicodeEntry.IsStale = false;
             unicodeEntry.IsEternal = true;
             Assert.True(cache.UpdateEntry(unicodeEntry));
             cache.SaveNow();
@@ -137,7 +137,7 @@ public class NetStackTests : IDisposable
         using var cache = new HttpMetaCache(indexPath);
         cache.AddBase("general", basePath);
         var entry = cache.ResolveEntry("general", "f.json");
-        entry.SetStale(false);
+        entry.IsStale = false;
         entry.Etag = "\"old\"";
         entry.Md5Sum = Convert.ToHexString(MD5.HashData("{}"u8.ToArray())).ToLowerInvariant();
         entry.LocalChangedTimestamp = new DateTimeOffset(File.GetLastWriteTimeUtc(file)).ToUnixTimeMilliseconds();
@@ -173,7 +173,7 @@ public class NetStackTests : IDisposable
         {
             cache.AddBase("general", basePath);
             var entry = cache.ResolveEntry("general", "f.json");
-            entry.SetStale(false);
+            entry.IsStale = false;
             entry.Etag = "\"seed\"";
             entry.Md5Sum = Convert.ToHexString(MD5.HashData("{}"u8.ToArray())).ToLowerInvariant();
             entry.LocalChangedTimestamp = new DateTimeOffset(File.GetLastWriteTimeUtc(file)).ToUnixTimeMilliseconds();
@@ -215,7 +215,7 @@ public class NetStackTests : IDisposable
         {
             cache.AddBase("general", basePath);
             var entry = cache.ResolveEntry("general", "f.json");
-            entry.SetStale(false);
+            entry.IsStale = false;
             entry.Etag = "\"seed\"";
             entry.Md5Sum = Convert.ToHexString(MD5.HashData("{}"u8.ToArray())).ToLowerInvariant();
             entry.LocalChangedTimestamp = new DateTimeOffset(File.GetLastWriteTimeUtc(file)).ToUnixTimeMilliseconds();
@@ -262,7 +262,7 @@ public class NetStackTests : IDisposable
         using var cache = new HttpMetaCache(indexPath);
         cache.AddBase("general", basePath);
         var entry = cache.ResolveEntry("general", "locked.json");
-        entry.SetStale(false);
+        entry.IsStale = false;
         entry.Etag = "\"seed\"";
         entry.Md5Sum = Convert.ToHexString(MD5.HashData("{}"u8.ToArray())).ToLowerInvariant();
         entry.LocalChangedTimestamp = new DateTimeOffset(File.GetLastWriteTimeUtc(file)).ToUnixTimeMilliseconds();

@@ -63,27 +63,27 @@ public sealed class ModrinthCreationTask : InstanceTask
         StagingPath = stagingPath;
         TrustedSource = trustedSource;
         SetParentEnvironment(environment);
-        managedId = id;
-        managedVersionId = versionId;
+        _managedId = id;
+        _managedVersionId = versionId;
         SetOverride(false, originalInstanceId);
     }
 
     public bool TrustedSource { get; }
 
     private readonly ModrinthApi _modrinth;
-    private string minecraftVersion = "";
-    private string fabricVersion = "";
-    private string quiltVersion = "";
-    private string forgeVersion = "";
-    private string neoForgeVersion = "";
-    private readonly string managedId;
-    private string managedVersionId;
-    private string managedName = "";
+    private string _minecraftVersion = "";
+    private string _fabricVersion = "";
+    private string _quiltVersion = "";
+    private string _forgeVersion = "";
+    private string _neoForgeVersion = "";
+    private readonly string _managedId;
+    private string _managedVersionId;
+    private string _managedName = "";
 
     private readonly List<File> _files = [];
     private readonly Dictionary<string, Resource> _resources = new(StringComparer.Ordinal);
 
-    private readonly string rootPath = "minecraft";
+    private readonly string _rootPath = "minecraft";
 
     /// <summary>The untrusted files reported when TrustedSource is false (see header note).</summary>
     public IReadOnlyList<string> UntrustedMods { get; private set; } = [];
@@ -120,7 +120,7 @@ public sealed class ModrinthCreationTask : InstanceTask
         FileSystem.EnsureFilePathExists(newIndexPlace);
         FileSystem.Move(indexPath, newIndexPlace);
 
-        var mcPath = FileSystem.PathCombine(StagingPath, rootPath);
+        var mcPath = FileSystem.PathCombine(StagingPath, _rootPath);
 
         var overridePath = FileSystem.PathCombine(StagingPath, "overrides");
         if (System.IO.File.Exists(overridePath) || Directory.Exists(overridePath))
@@ -166,30 +166,30 @@ public sealed class ModrinthCreationTask : InstanceTask
 
         var components = newInstance.GetPackProfile();
         components.BuildingFromScratch();
-        await components.SetComponentVersion("net.minecraft", minecraftVersion, important: true, cancellationToken);
+        await components.SetComponentVersion("net.minecraft", _minecraftVersion, important: true, cancellationToken);
 
         string loader = "";
-        if (fabricVersion.Length != 0)
+        if (_fabricVersion.Length != 0)
         {
-            await components.SetComponentVersion("net.fabricmc.fabric-loader", fabricVersion, important: false, cancellationToken);
+            await components.SetComponentVersion("net.fabricmc.fabric-loader", _fabricVersion, important: false, cancellationToken);
             loader = ModIndex.GetModLoaderAsString(ModLoaderType.Fabric);
         }
 
-        if (quiltVersion.Length != 0)
+        if (_quiltVersion.Length != 0)
         {
-            await components.SetComponentVersion("org.quiltmc.quilt-loader", quiltVersion, important: false, cancellationToken);
+            await components.SetComponentVersion("org.quiltmc.quilt-loader", _quiltVersion, important: false, cancellationToken);
             loader = ModIndex.GetModLoaderAsString(ModLoaderType.Quilt);
         }
 
-        if (forgeVersion.Length != 0)
+        if (_forgeVersion.Length != 0)
         {
-            await components.SetComponentVersion("net.minecraftforge", forgeVersion, important: false, cancellationToken);
+            await components.SetComponentVersion("net.minecraftforge", _forgeVersion, important: false, cancellationToken);
             loader = ModIndex.GetModLoaderAsString(ModLoaderType.Forge);
         }
 
-        if (neoForgeVersion.Length != 0)
+        if (_neoForgeVersion.Length != 0)
         {
-            await components.SetComponentVersion("net.neoforged", neoForgeVersion, important: false, cancellationToken);
+            await components.SetComponentVersion("net.neoforged", _neoForgeVersion, important: false, cancellationToken);
             loader = ModIndex.GetModLoaderAsString(ModLoaderType.NeoForge);
         }
 
@@ -197,7 +197,7 @@ public sealed class ModrinthCreationTask : InstanceTask
         {
             newInstance.SetIconKey(Icon);
         }
-        else if (managedId.Length != 0)
+        else if (_managedId.Length != 0)
         {
             newInstance.SetIconKey("modrinth");
         }
@@ -208,7 +208,7 @@ public sealed class ModrinthCreationTask : InstanceTask
         newInstance.SaveNow();
 
         // ---------------------------------------------------------- download mods
-        var rootModpackPath = FileSystem.PathCombine(StagingPath, rootPath);
+        var rootModpackPath = FileSystem.PathCombine(StagingPath, _rootPath);
 
         var downloadJob = new ConcurrentTask("Mod Download Modrinth");
         var downloadTasks = new List<ModDownloadTask>();
@@ -242,8 +242,8 @@ public sealed class ModrinthCreationTask : InstanceTask
                 return;
             }
 
-            var meta = new ModrinthApi.DownloadMeta(Reason: "modpack", GameVersion: minecraftVersion, Loader: loader,
-                DependentOn: managedId.Length != 0 ? managedVersionId : "");
+            var meta = new ModrinthApi.DownloadMeta(Reason: "modpack", GameVersion: _minecraftVersion, Loader: loader,
+                DependentOn: _managedId.Length != 0 ? _managedVersionId : "");
 
             var downloadTask = new ModDownloadTask(file, filePath, meta, _modrinth);
             downloadTasks.Add(downloadTask);
@@ -300,12 +300,12 @@ public sealed class ModrinthCreationTask : InstanceTask
 
                 if (setInternalData)
                 {
-                    if (managedVersionId.Length == 0)
+                    if (_managedVersionId.Length == 0)
                     {
-                        managedVersionId = obj.VersionId ?? "";
+                        _managedVersionId = obj.VersionId ?? "";
                     }
 
-                    managedName = obj.Name ?? "";
+                    _managedName = obj.Name ?? "";
                 }
 
                 var jsonFiles = obj.Files ?? throw new JsonParseException("'files' is not an array");
@@ -399,27 +399,27 @@ public sealed class ModrinthCreationTask : InstanceTask
                     {
                         if (name == "minecraft")
                         {
-                            minecraftVersion = dependency
+                            _minecraftVersion = dependency
                                 ?? throw new JsonParseException("Minecraft version is not a string");
                         }
                         else if (name == "fabric-loader")
                         {
-                            fabricVersion = dependency
+                            _fabricVersion = dependency
                                 ?? throw new JsonParseException("Fabric Loader version is not a string");
                         }
                         else if (name == "quilt-loader")
                         {
-                            quiltVersion = dependency
+                            _quiltVersion = dependency
                                 ?? throw new JsonParseException("Quilt Loader version is not a string");
                         }
                         else if (name == "forge")
                         {
-                            forgeVersion = dependency
+                            _forgeVersion = dependency
                                 ?? throw new JsonParseException("Forge version is not a string");
                         }
                         else if (name == "neoforge")
                         {
-                            neoForgeVersion = dependency
+                            _neoForgeVersion = dependency
                                 ?? throw new JsonParseException("NeoForge version is not a string");
                         }
                         else
@@ -490,7 +490,7 @@ public sealed class ModrinthCreationTask : InstanceTask
             }
         }
 
-        var mcDir = FileSystem.PathCombine(StagingPath, rootPath);
+        var mcDir = FileSystem.PathCombine(StagingPath, _rootPath);
         var modsPath = FileSystem.PathCombine(mcDir, "mods");
         if (Directory.Exists(modsPath))
         {
@@ -512,9 +512,9 @@ public sealed class ModrinthCreationTask : InstanceTask
     private void SetManagedPack(MinecraftInstance instance)
     {
         // Don't add managed info to packs without an ID (most likely imported from ZIP)
-        if (managedId.Length != 0)
+        if (_managedId.Length != 0)
         {
-            instance.SetManagedPack("modrinth", managedId, managedName, managedVersionId, Version());
+            instance.SetManagedPack("modrinth", _managedId, _managedName, _managedVersionId, Version());
         }
         else
         {

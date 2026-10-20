@@ -167,7 +167,7 @@ internal sealed class ApiStubServer : IDisposable
 {
     private readonly HttpListener _listener;
     private readonly Task _loop;
-    private bool disposed;
+    private bool _disposed;
 
     public ApiStubServer(Func<HttpListenerContext, Task> handler)
     {
@@ -185,14 +185,14 @@ internal sealed class ApiStubServer : IDisposable
 
     private async Task ListenLoop()
     {
-        while (!disposed)
+        while (!_disposed)
         {
             HttpListenerContext context;
             try
             {
                 context = await _listener.GetContextAsync();
             }
-            catch (Exception) when (disposed)
+            catch (Exception) when (_disposed)
             {
                 return;
             }
@@ -213,12 +213,12 @@ internal sealed class ApiStubServer : IDisposable
 
     public void Dispose()
     {
-        if (disposed)
+        if (_disposed)
         {
             return;
         }
 
-        disposed = true;
+        _disposed = true;
         try
         {
             _listener.Stop();
@@ -748,18 +748,18 @@ public class FlintApiDeviceCodeTests : IDisposable
                                          {"device_code":"dev123","user_code":"FLNT-CODE","verification_uri":"https://microsoft.test/link","expires_in":900,"interval":1}
                                          """;
 
-    private string msaToken;
+    private string _msaToken;
 
     public FlintApiDeviceCodeTests()
     {
         // token endpoint answer is switchable per phase of the test
-        msaToken = """{"error":"authorization_pending"}""";
+        _msaToken = """{"error":"authorization_pending"}""";
         _server = new ApiStubServer(async ctx =>
         {
             var url = ctx.Request.Url ?? throw new InvalidOperationException("the HTTP request has no URL");
             var body = url.AbsolutePath.EndsWith("/devicecode", StringComparison.Ordinal)
                 ? MsaDeviceCode
-                : msaToken;
+                : _msaToken;
             var bytes = Encoding.UTF8.GetBytes(body);
             ctx.Response.ContentType = "application/json";
             await ctx.Response.OutputStream.WriteAsync(bytes);
@@ -803,7 +803,7 @@ public class FlintApiDeviceCodeTests : IDisposable
         Assert.True(poll.GetProperty("account").ValueKind is JsonValueKind.Null);
 
         // deny the code server-side: the flow fails -> "expired"
-        msaToken = """{"error":"authorization_expired"}""";
+        _msaToken = """{"error":"authorization_expired"}""";
         var deadline = DateTime.UtcNow.AddSeconds(20);
         var state = "pending";
         while (state == "pending" && DateTime.UtcNow < deadline)

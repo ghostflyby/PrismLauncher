@@ -94,16 +94,16 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     private const int CurrentComponentsFileVersion = 1;
 
     /// <summary>the launch profile (volatile, temporary thing created on demand)</summary>
-    private LaunchProfile? profile;
+    private LaunchProfile? _profile;
 
     private readonly List<Component> _components = [];
     private readonly Dictionary<string, Component> _componentIndex = new(StringComparer.Ordinal);
 
-    private bool dirty;
+    private bool _dirty;
 
-    private ComponentUpdateTask? updateTask;
+    private ComponentUpdateTask? _updateTask;
 
-    private bool loaded;
+    private bool _loaded;
 
     public PackProfile(string instanceRoot, Index? metadataIndex = null)
         : this(new BasicPackProfileEnv(instanceRoot), metadataIndex) { }
@@ -168,18 +168,18 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         }
     }
 
-    public bool SaveIsScheduled() => dirty;
+    public bool SaveIsScheduled() => _dirty;
 
     /// <summary>call this to explicitly mark the component list as loaded - used to build a new component list from scratch.</summary>
     public void BuildingFromScratch()
     {
-        loaded = true;
-        dirty = true;
+        _loaded = true;
+        _dirty = true;
     }
 
     private void ScheduleSave()
     {
-        if (!loaded)
+        if (!_loaded)
         {
             // "Component list should never save if it didn't successfully load"
             return;
@@ -187,7 +187,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
         // NOTE deviation: the C++ starts a 5s single-shot QTimer here; saving happens through
         // SaveNow()/Dispose() instead (no event loop at this layer)
-        dirty = true;
+        _dirty = true;
     }
 
     private void SaveInternal()
@@ -195,7 +195,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         var filename = ComponentsFilePath();
         if (SavePackProfile(filename, _components))
         {
-            dirty = false;
+            _dirty = false;
         }
     }
 
@@ -228,7 +228,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
             _componentIndex[component.Uid] = component;
         }
 
-        loaded = true;
+        _loaded = true;
         return Result.Success();
     }
 
@@ -240,17 +240,17 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     public async Task<Result> ReloadAsync(NetMode netmode, CancellationToken cancellationToken = default)
     {
         // Do not reload when the update/resolve task is running. It is in control.
-        if (updateTask is not null)
+        if (_updateTask is not null)
         {
-            if (updateTask.GetNetMode() == netmode)
+            if (_updateTask.GetNetMode() == netmode)
             {
                 return Result.Success();
             }
 
             // https://github.com/PrismLauncher/PrismLauncher/issues/5209
             // FIXME upstream: HACK HACK HACK
-            updateTask.Abort();
-            updateTask = null;
+            _updateTask.Abort();
+            _updateTask = null;
         }
 
         // flush any scheduled saves to not lose state
@@ -270,7 +270,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     }
 
     /// <summary>get current running task...</summary>
-    public ComponentUpdateTask? GetCurrentTask() => updateTask;
+    public ComponentUpdateTask? GetCurrentTask() => _updateTask;
 
     /// <summary>
     /// resolve all components (starts a ComponentUpdateTask). The returned Task completes when
@@ -279,7 +279,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     public Task Resolve(NetMode netmode, CancellationToken cancellationToken = default)
     {
         var task = new ComponentUpdateTask(ComponentUpdateTask.Mode.Resolution, netmode, this);
-        this.updateTask = task;
+        this._updateTask = task;
         task.Succeeded += _ => UpdateSucceeded();
         task.Failed += (_, _) => UpdateFailed();
         task.Aborted += _ => UpdateFailed();
@@ -288,13 +288,13 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
     private void UpdateSucceeded()
     {
-        updateTask = null;
+        _updateTask = null;
         InvalidateLaunchProfile();
     }
 
     private void UpdateFailed()
     {
-        updateTask = null;
+        _updateTask = null;
         InvalidateLaunchProfile();
     }
 
@@ -704,7 +704,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
     public void InvalidateLaunchProfile()
     {
-        profile = null;
+        _profile = null;
     }
 
     // ---------------------------------------------------------------- installers
@@ -1022,7 +1022,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     /// <summary>apply the component patches. Catches all the errors and returns null for failure.</summary>
     public LaunchProfile? GetProfile()
     {
-        if (profile is null)
+        if (_profile is null)
         {
             try
             {
@@ -1032,7 +1032,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
                     file.ApplyTo(applied);
                 }
 
-                this.profile = applied;
+                this._profile = applied;
             }
             catch (Exception e) when (e is JsonParseException or MetaParseException or FileSystemException)
             {
@@ -1040,7 +1040,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
             }
         }
 
-        return profile;
+        return _profile;
     }
 
     // ---------------------------------------------------------------- versions

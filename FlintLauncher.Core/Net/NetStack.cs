@@ -18,9 +18,9 @@ public sealed class NetStack
     public static NetStack Default { get; } = CreateDefault();
 
     private readonly Lock _lock = new();
-    private (string Type, string Host, int Port, string User, string Pass) proxy = ("None", "", 0, "", "");
-    private (string Ua, string Type, string Host, int Port, string User, string Pass)? applied;
-    private volatile HttpClient client;
+    private (string Type, string Host, int Port, string User, string Pass) _proxy = ("None", "", 0, "", "");
+    private (string Ua, string Type, string Host, int Port, string User, string Pass)? _applied;
+    private volatile HttpClient _client;
 
     public NetStack() : this(FlintConfig.Default.UserAgent, manualRetries: 1, TimeSpan.FromSeconds(60)) { }
 
@@ -29,7 +29,7 @@ public sealed class NetStack
         UserAgent = userAgent;
         ManualRetries = manualRetries;
         RequestTimeout = requestTimeout;
-        client = CreateClient();
+        _client = CreateClient();
     }
 
     /// <summary>Convenience factory with the C++ defaults (product user agent, 1 manual
@@ -50,9 +50,9 @@ public sealed class NetStack
 
     /// <summary>The proxy configuration currently baked into <see cref="Client"/>
     /// (Application::updateProxySettings state; diagnostics/tests).</summary>
-    public (string Type, string Host, int Port, string User, string Pass) ProxyConfig => proxy;
+    public (string Type, string Host, int Port, string User, string Pass) ProxyConfig => _proxy;
 
-    public HttpClient Client => client;
+    public HttpClient Client => _client;
 
     /// <summary>Port of Application::updateProxySettings (+ the UserAgent the client is built
     /// with): rebuild the shared client so the proxy/user-agent take effect. Proxy semantics
@@ -72,22 +72,22 @@ public sealed class NetStack
         }
 
         var next = (ua, type, host, port, user, pass);
-        if (this.applied is { } previous && previous.Equals(next))
+        if (this._applied is { } previous && previous.Equals(next))
         {
             return;
         }
 
         lock (_lock)
         {
-            if (this.applied is { } appliedAgain && appliedAgain.Equals(next))
+            if (this._applied is { } appliedAgain && appliedAgain.Equals(next))
             {
                 return;
             }
 
-            this.applied = next;
+            this._applied = next;
             UserAgent = ua;
-            proxy = (type, host, port, user, pass);
-            client = CreateClient();
+            _proxy = (type, host, port, user, pass);
+            _client = CreateClient();
         }
     }
 
@@ -106,10 +106,10 @@ public sealed class NetStack
         return httpClient;
     }
 
-    private IWebProxy? BuildProxy() => proxy.Type switch
+    private IWebProxy? BuildProxy() => _proxy.Type switch
     {
-        "HTTP" => NamedProxy(new Uri($"http://{proxy.Host}:{proxy.Port}")),
-        "SOCKS5" => NamedProxy(new Uri($"socks5://{proxy.Host}:{proxy.Port}")),
+        "HTTP" => NamedProxy(new Uri($"http://{_proxy.Host}:{_proxy.Port}")),
+        "SOCKS5" => NamedProxy(new Uri($"socks5://{_proxy.Host}:{_proxy.Port}")),
         // explicit "no proxy"
         "None" => null,
         // C++ "DefaultProxy": the system proxy configuration
@@ -119,9 +119,9 @@ public sealed class NetStack
     private WebProxy NamedProxy(Uri uri)
     {
         var webProxy = new WebProxy(uri);
-        if (this.proxy.User.Length != 0)
+        if (this._proxy.User.Length != 0)
         {
-            webProxy.Credentials = new NetworkCredential(this.proxy.User, this.proxy.Pass);
+            webProxy.Credentials = new NetworkCredential(this._proxy.User, this._proxy.Pass);
         }
 
         return webProxy;

@@ -30,12 +30,15 @@ namespace FlintLauncher.Core.Instances;
 /// (number or numeric string — the file literally writes the string "1") through
 /// GroupFormatVersionConverter.</summary>
 internal sealed record GroupFileJson(
-    [property: JsonPropertyName("formatVersion"), JsonConverter(typeof(GroupFormatVersionConverter))] int Version,
+    [property: JsonPropertyName("formatVersion"), JsonConverter(typeof(GroupFormatVersionConverter))]
+    int Version,
     [property: JsonPropertyName("groups")] Dictionary<string, GroupBodyJson>? Groups,
-    [property: JsonPropertyName("ungrouped")] GroupBodyJson? Ungrouped);
+    [property: JsonPropertyName("ungrouped")]
+    GroupBodyJson? Ungrouped);
 
 internal sealed record GroupBodyJson(
-    [property: JsonPropertyName("instances")] List<string?>? Instances,
+    [property: JsonPropertyName("instances")]
+    List<string?>? Instances,
     [property: JsonPropertyName("hidden")] bool? Hidden);
 
 /// <summary>Input compat for the dual-shape formatVersion: a JSON number uses TryGetInt32
@@ -92,7 +95,7 @@ public sealed class InstanceGroupModel
     /// side; owned by launcher-state.json since C8/S5.</summary>
     private readonly HashSet<string> _collapsed = new(StringComparer.Ordinal);
 
-    private bool loaded;
+    private bool _loaded;
 
     /// <summary><paramref name="canPersist"/> is the upstream "group saving prevented
     /// because we don't know the full list of instances yet" gate (true = writes allowed);
@@ -325,7 +328,7 @@ public sealed class InstanceGroupModel
     /// imports carry dirnames); a reference that resolves to nothing is kept verbatim.</summary>
     public bool Load(Func<string, string?> uuidResolver)
     {
-        if (loaded)
+        if (_loaded)
         {
             return true;
         }
@@ -467,7 +470,7 @@ public sealed class InstanceGroupModel
             }
         }
 
-            loaded = true;
+        _loaded = true;
 
         if (stateSeededHidden)
         {

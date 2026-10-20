@@ -13,8 +13,8 @@
 
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 
@@ -22,7 +22,8 @@ namespace FlintLauncher.Core.Minecraft;
 
 /// <summary>The dt-order/override order file shape ({"version":N,"order":[uid,...]}).</summary>
 internal sealed record OverrideOrderFileJson(
-    [property: JsonPropertyName("version")] int? Version,
+    [property: JsonPropertyName("version")]
+    int? Version,
     [property: JsonPropertyName("order")] List<string>? Order);
 
 [JsonSerializable(typeof(OverrideOrderFileJson))]

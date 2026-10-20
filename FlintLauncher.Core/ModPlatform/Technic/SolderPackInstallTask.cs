@@ -18,7 +18,7 @@ namespace FlintLauncher.Core.ModPlatform.Technic;
 public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string version, string minecraftVersion)
     : InstanceTask
 {
-    private string minecraftVersion = minecraftVersion;
+    private string _minecraftVersion = minecraftVersion;
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -55,7 +55,7 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
 
         if (build.Minecraft.Length != 0)
         {
-            minecraftVersion = build.Minecraft;
+            _minecraftVersion = build.Minecraft;
         }
 
         var outputDir = Path.Combine(Path.GetTempPath(), $"flint-solder-{Guid.NewGuid():N}");
@@ -126,7 +126,7 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
         var failure = await TechnicPackProcessor.RunAsync(
             Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution."),
-            Name(), Icon, StagingPath, minecraftVersion, isSolder: true,
+            Name(), Icon, StagingPath, _minecraftVersion, isSolder: true,
             cancellationToken: cancellationToken);
         if (failure is not null)
         {

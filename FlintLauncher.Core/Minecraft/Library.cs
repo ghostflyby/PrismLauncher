@@ -276,7 +276,7 @@ public class Library
             var entry = cache.ResolveEntry("libraries", storage);
             if (stale)
             {
-                entry.SetStale(true);
+                entry.IsStale = true;
             }
 
             if (!entry.IsStale)

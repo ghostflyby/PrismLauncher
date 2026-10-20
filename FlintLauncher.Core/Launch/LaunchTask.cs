@@ -62,11 +62,11 @@ public class LaunchTask : FlintTask
     private readonly List<LaunchStep> _steps = [];
     private readonly LogParser _stdoutParser = new();
     private readonly LogParser _stderrParser = new();
-    private SortedDictionary<string, string> censorFilter = new(StringComparer.Ordinal);
-    private int currentStep = -1;
-    private LaunchState state = LaunchState.NotStarted;
-    private LogModel? logModel;
-    private TaskCompletionSource? terminalSignal;
+    private SortedDictionary<string, string> _censorFilter = new(StringComparer.Ordinal);
+    private int _currentStep = -1;
+    private LaunchState _state = LaunchState.NotStarted;
+    private LogModel? _logModel;
+    private TaskCompletionSource? _terminalSignal;
 
     internal LaunchTask(MinecraftInstance instance, LaunchServices services)
     {
@@ -85,14 +85,14 @@ public class LaunchTask : FlintTask
     public event Action<FlintTask>? RequestProgress;
 
     /// <summary>Diagnostics/test hook for the internal LaunchState state machine.</summary>
-    internal LaunchState CurrentState => state;
+    internal LaunchState CurrentState => _state;
 
     /// <summary>
     /// Port of the C++ LaunchTask "Waiting" state observable: the launch preparations are
     /// done and ReadyForLaunch is outstanding — Proceed() will start the game. Used by the
     /// headless host (API) to surface the proceed gate without the internal enum.
     /// </summary>
-    public bool IsWaitingForProceed => state == LaunchState.Waiting;
+    public bool IsWaitingForProceed => _state == LaunchState.Waiting;
 
     public MinecraftInstance Instance => _instance;
 
@@ -111,27 +111,27 @@ public class LaunchTask : FlintTask
 
     public LogModel GetLogModel()
     {
-        if (logModel is null)
+        if (_logModel is null)
         {
-            logModel = new LogModel
+            _logModel = new LogModel
             {
                 MaxLines = BaseInstance.GetConsoleMaxLines(_instance.Settings),
                 StopOnOverflow = BaseInstance.ShouldStopOnConsoleOverflow(_instance.Settings)
             };
             // FIXME: should this really be here?
-            logModel.OverflowMessage = $"Stopped watching the game log because the log length surpassed {logModel.MaxLines} lines.\n" +
+            _logModel.OverflowMessage = $"Stopped watching the game log because the log length surpassed {_logModel.MaxLines} lines.\n" +
                                        "You may have to fix your mods because the game is still logging to files and" +
                                        " likely wasting harddrive space at an alarming rate!";
         }
 
-        return logModel;
+        return _logModel;
     }
 
     public void AppendStep(LaunchStep step) => _steps.Add(step);
 
     public void PrependStep(LaunchStep step) => _steps.Insert(0, step);
 
-    public void SetCensorFilter(SortedDictionary<string, string> filter) => censorFilter = filter;
+    public void SetCensorFilter(SortedDictionary<string, string> filter) => _censorFilter = filter;
 
     /// <summary>Port of LaunchTask::create().</summary>
     public static LaunchTask Create(MinecraftInstance instance, LaunchServices services) => new(instance, services);
@@ -140,45 +140,45 @@ public class LaunchTask : FlintTask
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        terminalSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _terminalSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        if (state == LaunchState.Aborted)
+        if (_state == LaunchState.Aborted)
         {
             // C++ abort() before start(): emitAborted() straight away. Deferred to the start
             // call here — see the header note.
             EmitAborted();
-            terminalSignal.TrySetResult();
+            _terminalSignal.TrySetResult();
             return;
         }
 
         _instance.SetCrashed(false);
         if (_steps.Count == 0)
         {
-            state = LaunchState.Finished;
+            _state = LaunchState.Finished;
             EmitSucceeded();
-            terminalSignal.TrySetResult();
+            _terminalSignal.TrySetResult();
             return;
         }
 
-        state = LaunchState.Running;
+        _state = LaunchState.Running;
         OnStepFinishedCore();
-        await terminalSignal.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        await _terminalSignal.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Port of onReadyForLaunch(): the current step waits for user confirmation.</summary>
     internal void OnReadyForLaunch()
     {
-        state = LaunchState.Waiting;
-        Log.ReadyForLaunch(StepName(currentStep));
+        _state = LaunchState.Waiting;
+        Log.ReadyForLaunch(StepName(_currentStep));
         ReadyForLaunch?.Invoke();
     }
 
     /// <summary>Port of onProgressReportingRequested().</summary>
     internal void OnProgressReportingRequested()
     {
-        state = LaunchState.Waiting;
-        Log.ProgressGate(StepName(currentStep));
-        RequestProgress?.Invoke(_steps[currentStep]);
+        _state = LaunchState.Waiting;
+        Log.ProgressGate(StepName(_currentStep));
+        RequestProgress?.Invoke(_steps[_currentStep]);
     }
 
     /// <summary>Port of onStepFinished(): the initial call starts the first step, later calls
@@ -198,26 +198,26 @@ public class LaunchTask : FlintTask
         }
 
         // initial -> just start the first step
-        if (currentStep == -1)
+        if (_currentStep == -1)
         {
-            currentStep++;
-            StartStep(_steps[currentStep]);
+            _currentStep++;
+            StartStep(_steps[_currentStep]);
             return;
         }
 
-        var step = _steps[currentStep];
-        Log.StepFinished(StepName(currentStep), step.WasSuccessful, step.FailReason);
+        var step = _steps[_currentStep];
+        Log.StepFinished(StepName(_currentStep), step.WasSuccessful, step.FailReason);
         if (step.WasSuccessful)
         {
             // end?
-            if (currentStep == _steps.Count - 1)
+            if (_currentStep == _steps.Count - 1)
             {
                 FinalizeSteps(true, "");
             }
             else
             {
-                currentStep++;
-                StartStep(_steps[currentStep]);
+                _currentStep++;
+                StartStep(_steps[_currentStep]);
             }
         }
         else
@@ -228,7 +228,7 @@ public class LaunchTask : FlintTask
 
     private void StartStep(LaunchStep step)
     {
-        Log.StepStarted(currentStep + 1, _steps.Count, StepName(currentStep));
+        Log.StepStarted(_currentStep + 1, _steps.Count, StepName(_currentStep));
         _ = step.StartAsync(); // the step reports its terminal state through the events
     }
 
@@ -240,7 +240,7 @@ public class LaunchTask : FlintTask
     /// <summary>Port of finalizeSteps(): finalize from the current step backwards, then emit.</summary>
     private void FinalizeSteps(bool successful, string error)
     {
-        for (var step = currentStep; step >= 0; step--)
+        for (var step = _currentStep; step >= 0; step--)
         {
             _steps[step].FinalizeStep();
         }
@@ -254,7 +254,7 @@ public class LaunchTask : FlintTask
             EmitFailed(error);
         }
 
-        terminalSignal?.TrySetResult();
+        _terminalSignal?.TrySetResult();
     }
 
     // ------------------------------------------------------------- launch confirmation
@@ -265,15 +265,15 @@ public class LaunchTask : FlintTask
     /// caller's signal to check the state instead of silently retrying).</summary>
     public void Proceed()
     {
-        if (state != LaunchState.Waiting)
+        if (_state != LaunchState.Waiting)
         {
-            Log.ProceedIgnored(state.ToString());
+            Log.ProceedIgnored(_state.ToString());
             return;
         }
 
-        Log.ProceedRouted(StepName(currentStep));
-        _steps[currentStep].Proceed();
-        state = LaunchState.Running;
+        Log.ProceedRouted(StepName(_currentStep));
+        _steps[_currentStep].Proceed();
+        _state = LaunchState.Running;
     }
 
     /// <summary>C#-side shorthand for aborting while Waiting (documented addition).</summary>
@@ -284,7 +284,7 @@ public class LaunchTask : FlintTask
     /// <summary>Port of canAbort().</summary>
     public bool CanAbort()
     {
-        switch (state)
+        switch (_state)
         {
             case LaunchState.Aborted:
             case LaunchState.Failed:
@@ -294,7 +294,7 @@ public class LaunchTask : FlintTask
                 return true;
             case LaunchState.Running:
             case LaunchState.Waiting:
-                return _steps[currentStep].CanAbort();
+                return _steps[_currentStep].CanAbort();
             default:
                 return false;
         }
@@ -303,7 +303,7 @@ public class LaunchTask : FlintTask
     /// <summary>Port of abort().</summary>
     public override void Abort()
     {
-        switch (state)
+        switch (_state)
         {
             case LaunchState.Aborted:
             case LaunchState.Failed:
@@ -311,11 +311,11 @@ public class LaunchTask : FlintTask
                 return;
             case LaunchState.NotStarted:
             {
-                state = LaunchState.Aborted;
+                _state = LaunchState.Aborted;
                 if (IsRunning)
                 {
                     EmitAborted();
-                    terminalSignal?.TrySetResult();
+                    _terminalSignal?.TrySetResult();
                 }
 
                 return;
@@ -323,7 +323,7 @@ public class LaunchTask : FlintTask
             case LaunchState.Running:
             case LaunchState.Waiting:
             {
-                var step = _steps[currentStep];
+                var step = _steps[_currentStep];
                 if (!step.CanAbort())
                 {
                     return;
@@ -331,7 +331,7 @@ public class LaunchTask : FlintTask
 
                 if (step.AbortStep())
                 {
-                    state = LaunchState.Aborted;
+                    _state = LaunchState.Aborted;
                 }
 
                 return;
@@ -485,7 +485,7 @@ public class LaunchTask : FlintTask
     /// <summary>Port of censorPrivateInfo().</summary>
     public string CensorPrivateInfo(string input)
     {
-        foreach (var (key, value) in censorFilter)
+        foreach (var (key, value) in _censorFilter)
         {
             input = input.Replace(key, value, StringComparison.Ordinal);
         }

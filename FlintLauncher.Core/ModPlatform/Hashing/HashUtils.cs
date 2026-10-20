@@ -103,7 +103,7 @@ public static class HashUtils
 /// <summary>Port of Hashing::Hasher: a Task that computes a file hash off the caller's flow.</summary>
 public sealed class Hasher(string filePath, Algorithm alg) : FlintTask
 {
-    private string result = "";
+    private string _result = "";
 
     public Hasher(string filePath, string alg)
         : this(filePath, HashUtils.AlgorithmFromString(alg)) { }
@@ -112,7 +112,7 @@ public sealed class Hasher(string filePath, Algorithm alg) : FlintTask
 
     public Algorithm Alg { get; } = alg;
 
-    public string GetResult() => result;
+    public string GetResult() => _result;
 
     public string GetPath() => Path;
 
@@ -121,14 +121,14 @@ public sealed class Hasher(string filePath, Algorithm alg) : FlintTask
 
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        result = HashUtils.HashFile(Path, Alg);
-        if (result.Length == 0)
+        _result = HashUtils.HashFile(Path, Alg);
+        if (_result.Length == 0)
         {
             EmitFailed("Empty hash!");
             return Task.CompletedTask;
         }
 
-        ResultsReady?.Invoke(result);
+        ResultsReady?.Invoke(_result);
         EmitSucceeded();
         return Task.CompletedTask;
     }

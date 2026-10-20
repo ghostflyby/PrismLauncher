@@ -31,8 +31,8 @@ namespace FlintLauncher.Core.Auth;
 public sealed class MsaInteractiveStep(AccountData data, bool silent = false, AuthEndpointsOptions? auth = null) : AuthStep(data)
 {
     private readonly AuthEndpointsOptions _auth = auth ?? new AuthEndpointsOptions();
-    private string clientId = "";
-    private LoopbackListener? listener;
+    private string _clientId = "";
+    private LoopbackListener? _listener;
 
     /// <summary>Port of the authorizeWithBrowser(const QUrl&amp;) signal.</summary>
     public event Action<string>? AuthorizeWithBrowser;
@@ -41,16 +41,16 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
 
     public override void Abort()
     {
-        listener?.Dispose();
-        listener = null;
+        _listener?.Dispose();
+        _listener = null;
     }
 
     public override async Task PerformAsync(CancellationToken cancellationToken)
     {
-        clientId = _auth.MsaClientId;
+        _clientId = _auth.MsaClientId;
         if (silent)
         {
-            if (Data.MsaClientId != clientId)
+            if (Data.MsaClientId != _clientId)
             {
                 EmitFinished(AccountTaskState.Disabled,
                     "Microsoft user authentication failed - client identification has changed.");
@@ -70,7 +70,7 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
 
         // *m_data = AccountData(); m_data->msaClientID = m_clientId;
         Data.Type = AccountType.Msa;
-        Data.MsaClientId = clientId;
+        Data.MsaClientId = _clientId;
         Data.MsaToken = new Token();
         Data.UserToken = new Token();
         Data.MojangServicesToken = new Token();
@@ -91,7 +91,7 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
     {
         var payload = FormEncode(
             ("grant_type", "refresh_token"),
-            ("client_id", clientId),
+            ("client_id", _clientId),
             ("refresh_token", Data.MsaToken.RefreshToken));
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
         {
@@ -127,13 +127,13 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
 
     private async Task GrantAsync(CancellationToken cancellationToken)
     {
-        listener = new LoopbackListener();
-        var redirectUri = listener.Start();
+        _listener = new LoopbackListener();
+        var redirectUri = _listener.Start();
 
         // QOAuth2AuthorizationCodeFlow::buildAuthenticateUrl() + modifyParametersFunction(prompt)
         var authorizeUrl = _auth.MsaAuthorize +
                            "?response_type=code" +
-                           "&client_id=" + Uri.EscapeDataString(clientId) +
+                           "&client_id=" + Uri.EscapeDataString(_clientId) +
                            "&scope=" + Uri.EscapeDataString("XboxLive.SignIn XboxLive.offline_access") +
                            "&redirect_uri=" + Uri.EscapeDataString(redirectUri) +
                            "&prompt=select_account";
@@ -144,7 +144,7 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
         string? oauthError = null;
         try
         {
-            var redirect = await listener.WaitForRedirectAsync(cancellationToken).ConfigureAwait(false);
+            var redirect = await _listener.WaitForRedirectAsync(cancellationToken).ConfigureAwait(false);
             if (redirect is not null)
             {
                 var query = ParseQuery(redirect.Query);
@@ -162,8 +162,8 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
         }
         finally
         {
-            listener.Dispose();
-            listener = null;
+            _listener.Dispose();
+            _listener = null;
         }
 
         if (oauthError is not null)
@@ -181,7 +181,7 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
 
         var payload = FormEncode(
             ("grant_type", "authorization_code"),
-            ("client_id", clientId),
+            ("client_id", _clientId),
             ("code", code),
             ("redirect_uri", redirectUri));
         var response = await AuthStepHttp.SendAsync(new AuthStepRequest
@@ -216,7 +216,7 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
     /// </summary>
     public bool CompleteWithRedirectUri(string uri)
     {
-        if (this.listener is not { } httpListener)
+        if (this._listener is not { } httpListener)
         {
             return false;
         }
@@ -229,7 +229,7 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
 
     private void ApplyGrantedTokens(TokenResponse rsp)
     {
-        Data.MsaClientId = clientId;
+        Data.MsaClientId = _clientId;
         Data.MsaToken.IssueInstant = DateTime.UtcNow;
         Data.MsaToken.NotAfter = DateTime.UtcNow.AddSeconds(rsp.ExpiresIn);
         Data.MsaToken.Extra = rsp.Extra;
@@ -322,27 +322,27 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
     {
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
 
-        private readonly TaskCompletionSource<Uri?> redirectSource =
+        private readonly TaskCompletionSource<Uri?> _redirectSource =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        private readonly CancellationTokenSource acceptCts = new();
-        private bool disposed;
+        private readonly CancellationTokenSource _acceptCts = new();
+        private bool _disposed;
 
         public string Start()
         {
             _listener.Start();
             var port = ((IPEndPoint)_listener.LocalEndpoint).Port;
-            _ = AcceptLoopAsync(acceptCts.Token);
+            _ = AcceptLoopAsync(_acceptCts.Token);
             return $"http://127.0.0.1:{port}/";
         }
 
         public async Task<Uri?> WaitForRedirectAsync(CancellationToken cancellationToken)
         {
             var registration = cancellationToken.Register(() =>
-                redirectSource.TrySetCanceled(cancellationToken));
+                _redirectSource.TrySetCanceled(cancellationToken));
             try
             {
-                return await redirectSource.Task.ConfigureAwait(false);
+                return await _redirectSource.Task.ConfigureAwait(false);
             }
             finally
             {
@@ -353,7 +353,7 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
         /// <summary>Feeds a callback URI from outside (custom-scheme handler).</summary>
         public void CompleteExternally(Uri uri)
         {
-            redirectSource.TrySetResult(uri);
+            _redirectSource.TrySetResult(uri);
         }
 
         private async Task AcceptLoopAsync(CancellationToken cancellationToken)
@@ -424,7 +424,7 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
 
                 if (requestUri is not null)
                 {
-                    redirectSource.TrySetResult(requestUri);
+                    _redirectSource.TrySetResult(requestUri);
                 }
             }
             catch (Exception)
@@ -435,13 +435,13 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
 
         public void Dispose()
         {
-            if (disposed)
+            if (_disposed)
             {
                 return;
             }
 
-            disposed = true;
-            acceptCts.Cancel();
+            _disposed = true;
+            _acceptCts.Cancel();
             try
             {
                 _listener.Stop();
@@ -451,7 +451,7 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
                 // best-effort stop: the loopback listener dies with the process anyway
             }
 
-            redirectSource.TrySetResult(null);
+            _redirectSource.TrySetResult(null);
         }
     }
 }

@@ -26,9 +26,9 @@ public class Rule
         public string Version;
     }
 
-    private Action action = Action.Defer;
+    private Action _action = Action.Defer;
 
-    private Os? os;
+    private Os? _os;
 
     public static Rule FromJson(JsonObject obj)
     {
@@ -49,10 +49,10 @@ public class Rule
     /// <summary>The typed-probe seam (RuleJson arrives from the version format readers).</summary>
     internal static Rule FromWire(Action action, string? osName, string osVersion)
     {
-        var result = new Rule { action = action };
+        var result = new Rule { _action = action };
         if (osName is not null)
         {
-            result.os = new Os
+            result._os = new Os
             {
                 Name = osName,
                 Version = osVersion,
@@ -67,7 +67,7 @@ public class Rule
     internal RuleOutJson ToWire()
     {
         RuleOsOutJson? osWire = null;
-        if (os is { } ruleOs)
+        if (_os is { } ruleOs)
         {
             osWire = new RuleOsOutJson
             {
@@ -78,7 +78,7 @@ public class Rule
 
         return new RuleOutJson
         {
-            Action = action switch
+            Action = _action switch
             {
                 Action.Allow => "allow",
                 Action.Disallow => "disallow",
@@ -90,11 +90,11 @@ public class Rule
 
     public Action Apply(RuntimeContext runtimeContext)
     {
-        if (this.os is { } ruleOs && !runtimeContext.ClassifierMatches(ruleOs.Name))
+        if (this._os is { } ruleOs && !runtimeContext.ClassifierMatches(ruleOs.Name))
         {
             return Action.Defer;
         }
 
-        return action;
+        return _action;
     }
 }

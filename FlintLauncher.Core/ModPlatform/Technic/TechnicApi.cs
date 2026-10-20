@@ -29,11 +29,15 @@ namespace FlintLauncher.Core.ModPlatform.Technic;
 /// <summary>The trending/search list root.</summary>
 public sealed record TechnicSearchListJson(
     List<TechnicListEntryJson>? Modpacks);
+
 /// <summary>One trending/search entry; the iconUrl member keeps the QJsonValue
 /// toString("null") fallback — a missing/null/non-string value carries the literal "null"
 /// sentinel (the caller maps it to the null-logo placeholder), hence the raw element.</summary>
 public sealed record TechnicListEntryJson(
-    string? Name,    string? Slug,    JsonElement? IconUrl);
+    string? Name,
+    string? Slug,
+    JsonElement? IconUrl);
+
 /// <summary>The single-pack response; unbound members (the "error" sentinel above all)
 /// land in Extension. Not a positional record: an extension-data property cannot bind to a
 /// deserialization constructor parameter.</summary>
@@ -45,21 +49,28 @@ public sealed class TechnicSinglePackJson
 
     public TechnicIconJson? Icon { get; init; }
 
-    [JsonExtensionData]
-    public Dictionary<string, JsonElement> Extension { get; set; } = new();
+    [JsonExtensionData] public Dictionary<string, JsonElement> Extension { get; set; } = new();
 }
 
 public sealed record TechnicIconJson(
     string? Url);
+
 /// <summary>The pack metadata response: a string "url" (direct zip) wins over a string
 /// "solder" (Solder API root); neither fails the load. The remaining members keep the
 /// QJsonValue toString("") fallback (a missing/junk value becomes "").</summary>
 public sealed record TechnicMetadataJson(
-    string? Url,    string? Solder,        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Minecraft,
-        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? PlatformUrl,
-        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? User,
-        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Description,
-        [property: JsonConverter(typeof(QtCoercingStringConverter))] string? Version);
+    string? Url,
+    string? Solder,
+    [property: JsonConverter(typeof(QtCoercingStringConverter))]
+    string? Minecraft,
+    [property: JsonConverter(typeof(QtCoercingStringConverter))]
+    string? PlatformUrl,
+    [property: JsonConverter(typeof(QtCoercingStringConverter))]
+    string? User,
+    [property: JsonConverter(typeof(QtCoercingStringConverter))]
+    string? Description,
+    [property: JsonConverter(typeof(QtCoercingStringConverter))]
+    string? Version);
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(TechnicSearchListJson))]
@@ -333,7 +344,7 @@ public sealed class TechnicApi(NetStack? net = null)
     public static SolderPackBuild LoadSolderPackBuild(string response)
     {
         var build = DeserializeDocument<SolderPackBuild>(response, "JSON response from Solder",
-            TechnicJsonContext.Default.SolderPackBuild)
+                        TechnicJsonContext.Default.SolderPackBuild)
                     ?? throw new JsonParseException("JSON response from Solder: Error parsing JSON: document is null");
 
         // JSON null members/elements are not enforced by the binding — surface them like the

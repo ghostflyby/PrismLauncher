@@ -10,7 +10,7 @@ namespace FlintLauncher.Core.Java;
 public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<JavaVersion>
 {
     private readonly string _string;
-    private bool parseable;
+    private bool _parseable;
 
     public JavaVersion() : this("") { }
 
@@ -26,7 +26,7 @@ public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<J
         Major = major;
         Minor = minor;
         Security = security;
-        parseable = true;
+        _parseable = true;
 
         var versions = new List<string>();
         if (build != 0)
@@ -63,7 +63,7 @@ public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<J
         // Same patterns as the C++ port: unanchored first match, like QRegularExpression::match.
         var pattern = _string.StartsWith("1.", StringComparison.Ordinal) ? WithOne() : WithoutOne();
         var match = pattern.Match(_string);
-        parseable = match.Success;
+        _parseable = match.Success;
         Major = GetCapturedInteger(match, "major");
         Minor = GetCapturedInteger(match, "minor");
         Security = GetCapturedInteger(match, "security");
@@ -98,9 +98,9 @@ public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<J
     public string Prerelease { get; private set; } = "";
 
     /// <summary>Starting from Java 18, UTF-8 is the default charset: https://openjdk.org/jeps/400</summary>
-    public bool DefaultsToUtf8() => parseable && Major >= 18;
+    public bool DefaultsToUtf8() => _parseable && Major >= 18;
 
-    public bool IsModular() => parseable && Major >= 9;
+    public bool IsModular() => _parseable && Major >= 9;
 
     public int CompareTo(JavaVersion? other)
     {
@@ -129,7 +129,7 @@ public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<J
             return false;
         }
 
-        if (parseable && other.parseable)
+        if (_parseable && other._parseable)
         {
             return Major == other.Major && Minor == other.Minor && Security == other.Security && Prerelease == other.Prerelease;
         }
@@ -140,13 +140,13 @@ public sealed partial class JavaVersion : IComparable<JavaVersion>, IEquatable<J
     public override bool Equals(object? obj) => Equals(obj as JavaVersion);
 
     public override int GetHashCode() =>
-        parseable ? HashCode.Combine(Major, Minor, Security, Prerelease) : _string.GetHashCode(StringComparison.Ordinal);
+        _parseable ? HashCode.Combine(Major, Minor, Security, Prerelease) : _string.GetHashCode(StringComparison.Ordinal);
 
     public static bool operator <(JavaVersion left, JavaVersion right)
     {
         ArgumentNullException.ThrowIfNull(left);
         ArgumentNullException.ThrowIfNull(right);
-        if (left.parseable && right.parseable)
+        if (left._parseable && right._parseable)
         {
             if (left.Major < right.Major)
             {

@@ -85,8 +85,8 @@ public class InstanceList
     // and the state-side collapse flags; the list only translates instance handles.
     private readonly InstanceGroupModel _groups;
 
-    private bool groupsLoaded;
-    private bool instancesProbed;
+    private bool _groupsLoaded;
+    private bool _instancesProbed;
 
     public InstanceList(IEnumerable<string> instDirs)
     {
@@ -106,7 +106,7 @@ public class InstanceList
             CanonicalGroupFile,
             LegacyGroupFiles,
             () => LauncherState,
-            canPersist: () => instancesProbed);
+            canPersist: () => _instancesProbed);
     }
 
     /// <summary>The typed instance-layer environment (D4): the user-layer flint.json store
@@ -221,7 +221,7 @@ public class InstanceList
 
         RebuildInodeIndex();               // D2: the inode index follows every (re)discovery
         ConvertLinkedInstanceReferences(); // D3: persisted link references are uuids
-        if (groupsLoaded)
+        if (_groupsLoaded)
         {
             // D3: discovery is complete — dirname members resolve now (the model was loaded
             // earlier in this session with some references unresolvable; without this the
@@ -520,9 +520,9 @@ public class InstanceList
     /// (e.g. a Prism import landing instgroups.json mid-session).</summary>
     private void EnsureGroupsLoaded()
     {
-        if (!groupsLoaded)
+        if (!_groupsLoaded)
         {
-            groupsLoaded = _groups.Load(ResolveMemberUuid);
+            _groupsLoaded = _groups.Load(ResolveMemberUuid);
         }
     }
 
@@ -766,14 +766,14 @@ public class InstanceList
             return;
         }
 
-        if (groupsLoaded)
+        if (_groupsLoaded)
         {
             _groups.Save();
         }
 
         _instDirs.Clear();
         _instDirs.AddRange(newDirs);
-        groupsLoaded = false;
+        _groupsLoaded = false;
         _instances.Clear();
         // (upstream emits instancesChanged; the connected providerUpdated reloads right away)
         InstanceListChanged?.Invoke();
@@ -843,7 +843,7 @@ public class InstanceList
             }
         }
 
-        instancesProbed = true;
+        _instancesProbed = true;
         return outList;
     }
 

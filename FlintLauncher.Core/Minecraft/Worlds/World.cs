@@ -81,7 +81,7 @@ public enum GameTypeKind
 /// <summary>Port of the World class (launcher/minecraft/World.h).</summary>
 public sealed class World
 {
-    private bool metadataLoaded;
+    private bool _metadataLoaded;
 
     public World(string containerPath)
     {
@@ -118,7 +118,7 @@ public sealed class World
 
     public bool IsValid { get; private set; }
 
-    public bool IsMetadataLoaded => metadataLoaded;
+    public bool IsMetadataLoaded => _metadataLoaded;
 
     public bool IsOnFs => Directory.Exists(ContainerPath);
 
@@ -129,7 +129,7 @@ public sealed class World
         ContainerPath = full;
         FolderName = Path.GetFileName(full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         ContainerOffsetPath = "";
-        metadataLoaded = false;
+        _metadataLoaded = false;
         IconFile = "";
         if (File.Exists(full) && Path.GetExtension(full) == ".zip")
         {
@@ -155,7 +155,7 @@ public sealed class World
     /// <summary>Port of World::loadMetadata: parse level.dat (from folder or zip) once.</summary>
     public void LoadMetadata()
     {
-        if (metadataLoaded)
+        if (_metadataLoaded)
         {
             return;
         }
@@ -169,7 +169,7 @@ public sealed class World
             ReadFromFs(ContainerPath);
         }
 
-        metadataLoaded = true;
+        _metadataLoaded = true;
     }
 
     /// <summary>Port of World::resetIcon: remove the icon file, if any.</summary>
@@ -274,7 +274,7 @@ public sealed class World
         // The C++ installed from unloaded World objects, deriving the target folder from
         // an empty name (FS::DirNameFromString("") -> "(1)"); loading the metadata here
         // gives the intended folder name instead.
-        if (!metadataLoaded)
+        if (!_metadataLoaded)
         {
             LoadMetadata();
         }

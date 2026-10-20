@@ -27,12 +27,16 @@ namespace FlintLauncher.Core.Screenshots;
 /// <summary>The imgur response envelope {"success": true, "data": {...}} — shared by the
 /// image upload and album creation parse functions (the RPC::Sink payloads).</summary>
 public sealed record ImgurResponseJson(
-    bool? Success,    ImgurDataJson? Data);
+    bool? Success,
+    ImgurDataJson? Data);
 
 public sealed record ImgurDataJson(
-    string? Id,    string? Link,
+    string? Id,
+    string? Link,
     // all-lowercase on the wire — camelCase would produce "deleteHash"
-    [property: JsonPropertyName("deletehash")] string? DeleteHash);
+    [property: JsonPropertyName("deletehash")]
+    string? DeleteHash);
+
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(ImgurResponseJson))]
 internal sealed partial class ImgurJsonContext : JsonSerializerContext;
@@ -78,12 +82,14 @@ public sealed class ImgurUpload(
     NetStack? net = null)
     : FlintTask
 {
-    private readonly string _baseUrl = baseUrl ?? FlintConfig.Default.ImgurBaseUrl;
     private readonly string _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
     private readonly NetStack _net = net ?? NetStack.Default;
 
     /// <summary>The imgur endpoint: BuildConfig.IMGUR_BASE_URL + "image".</summary>
-    public string EndpointUrl => _baseUrl + "image";
+    public string EndpointUrl
+    {
+        get => field + "image";
+    } = baseUrl ?? FlintConfig.Default.ImgurBaseUrl;
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -198,12 +204,14 @@ public sealed class ImgurAlbumCreation(
     NetStack? net = null)
     : FlintTask
 {
-    private readonly string _baseUrl = baseUrl ?? FlintConfig.Default.ImgurBaseUrl;
     private readonly string _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
     private readonly NetStack _net = net ?? NetStack.Default;
 
     /// <summary>The imgur endpoint: BuildConfig.IMGUR_BASE_URL + "album".</summary>
-    public string EndpointUrl => _baseUrl + "album";
+    public string EndpointUrl
+    {
+        get => field + "album";
+    } = baseUrl ?? FlintConfig.Default.ImgurBaseUrl;
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {

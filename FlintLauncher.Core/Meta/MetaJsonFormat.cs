@@ -37,7 +37,7 @@ public sealed class MetaParseException(string message) : Exception(message) { }
 
 /// <summary>Port of Meta::Require. Set identity is by uid only, like the C++ operator==/operator&lt;.
 /// DeepEquals compares all fields (used by Component's deep-inspect change detection).</summary>
-public sealed class Require: IEquatable<Require>, IComparable<Require>
+public sealed class Require : IEquatable<Require>, IComparable<Require>
 {
     public required string Uid { get; init; }
 
@@ -70,21 +70,39 @@ public sealed class Require: IEquatable<Require>, IComparable<Require>
 /// preserved (a quoted "1" is NOT a format version); the required strings are validated by
 /// the mappers with document-level failures.</summary>
 internal sealed record MetaIndexJson(
-    JsonElement? FormatVersion,    List<MetaPackageJson>? Packages);
+    JsonElement? FormatVersion,
+    List<MetaPackageJson>? Packages);
+
 internal sealed record MetaPackageJson(
-    string? Uid,    string? Name,    string? Sha256);
+    string? Uid,
+    string? Name,
+    string? Sha256);
+
 internal sealed record MetaVersionListJson(
-    JsonElement? FormatVersion,    string? Uid,    string? Name,    List<MetaVersionEntryJson>? Versions);
+    JsonElement? FormatVersion,
+    string? Uid,
+    string? Name,
+    List<MetaVersionEntryJson>? Versions);
+
 internal sealed record MetaVersionEntryJson(
-    string? Version,    string? ReleaseTime,    string? Type,    bool? Recommended,    bool? Volatile,    List<MetaRequireJson?>? Requires,    List<MetaRequireJson?>? Conflicts,    string? Sha256);
+    string? Version,
+    string? ReleaseTime,
+    string? Type,
+    bool? Recommended,
+    bool? Volatile,
+    List<MetaRequireJson?>? Requires,
+    List<MetaRequireJson?>? Conflicts,
+    string? Sha256);
 
 /// <summary>The ONE requires wire — shared by the meta documents, the OneSix version
 /// format and the mmc-pack components. equals/suggests coerce (a junk member reads as
 /// absent, like the former Str read); uid is enforced by the parsers.</summary>
 internal sealed record MetaRequireJson(
     string? Uid,
-    [property: JsonPropertyName("equals"), JsonConverter(typeof(QtCoercingNullableStringConverter))] string? EqualsVersion,
-    [property: JsonConverter(typeof(QtCoercingNullableStringConverter))] string? Suggests);
+    [property: JsonPropertyName("equals"), JsonConverter(typeof(QtCoercingNullableStringConverter))]
+    string? EqualsVersion,
+    [property: JsonConverter(typeof(QtCoercingNullableStringConverter))]
+    string? Suggests);
 
 /// <summary>The version DOCUMENT header (uid + the common version members); the OneSix
 /// body keys are read by OneSixVersionFormat over the same node.</summary>
@@ -99,6 +117,7 @@ internal sealed record MetaVersionDocumentJson(
     List<MetaRequireJson?>? Requires,
     List<MetaRequireJson?>? Conflicts,
     string? Sha256);
+
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(MetaIndexJson))]
 [JsonSerializable(typeof(MetaVersionListJson))]
@@ -363,11 +382,10 @@ public static class MetaJsonFormat
             ptr.Add(new Require
             {
                 Uid = (req is not null ? req.Uid : null)
-                    ?? throw new JsonParseException("'" + keyName + "' entry has no 'uid' string"),
+                      ?? throw new JsonParseException("'" + keyName + "' entry has no 'uid' string"),
                 EqualsVersion = req?.EqualsVersion ?? "",
                 Suggests = req?.Suggests ?? "",
             });
         }
     }
-
 }

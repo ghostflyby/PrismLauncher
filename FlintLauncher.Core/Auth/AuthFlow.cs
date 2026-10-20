@@ -20,9 +20,9 @@ public enum AuthFlowAction
 
 public sealed class AuthFlow : FlintTask
 {
-    private AccountTaskState taskState = AccountTaskState.Created;
+    private AccountTaskState _taskState = AccountTaskState.Created;
     private readonly List<AuthStep> _steps = [];
-    private AuthStep? currentStep;
+    private AuthStep? _currentStep;
 
     public AuthFlow(AccountData data, AuthFlowAction action = AuthFlowAction.Refresh,
         AuthEndpointsOptions? auth = null)
@@ -61,7 +61,7 @@ public sealed class AuthFlow : FlintTask
     public AccountData Data { get; }
 
     /// <summary>Port of AuthFlow::taskState().</summary>
-    public AccountTaskState TaskState => taskState;
+    public AccountTaskState TaskState => _taskState;
 
     /// <summary>Port of the authorizeWithBrowser(QUrl) signal (interactive login).</summary>
     public event Action<string>? AuthorizeWithBrowser;
@@ -77,14 +77,14 @@ public sealed class AuthFlow : FlintTask
             if (_steps.Count == 0)
             {
                 // we got to the end without an incident... assume this is all.
-                currentStep = null;
+                _currentStep = null;
                 Succeed();
                 return;
             }
 
-            currentStep = _steps[0];
+            _currentStep = _steps[0];
             _steps.RemoveAt(0);
-            EmitStatus(currentStep.Describe());
+            EmitStatus(_currentStep.Describe());
             var stepReported = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             void Handler(AccountTaskState resultingState, string message)
@@ -93,10 +93,10 @@ public sealed class AuthFlow : FlintTask
                 stepReported.TrySetResult(ChangeState(resultingState, message));
             }
 
-            currentStep.Finished += Handler;
+            _currentStep.Finished += Handler;
             try
             {
-                await currentStep.PerformAsync(cancellationToken).ConfigureAwait(false);
+                await _currentStep.PerformAsync(cancellationToken).ConfigureAwait(false);
                 // WaitAsync: a step whose loop exits through its abort flag without reporting
                 // (upstream MSADeviceCodeStep expiry quirk) must not wedge the flow when the
                 // task is cancelled — the cancellation surfaces as the aborted state.
@@ -108,14 +108,14 @@ public sealed class AuthFlow : FlintTask
             }
             finally
             {
-                currentStep.Finished -= Handler;
+                _currentStep.Finished -= Handler;
             }
         }
     }
 
     public override void Abort()
     {
-        currentStep?.Abort();
+        _currentStep?.Abort();
         base.Abort();
     }
 
@@ -127,7 +127,7 @@ public sealed class AuthFlow : FlintTask
 
     private bool ChangeState(AccountTaskState newState, string reason = "")
     {
-        taskState = newState;
+        _taskState = newState;
         EmitDetails(reason);
         switch (newState)
         {
@@ -136,7 +136,7 @@ public sealed class AuthFlow : FlintTask
                 Data.ErrorString = "";
                 return true;
             case AccountTaskState.Working:
-                if (currentStep is null)
+                if (_currentStep is null)
                 {
                     EmitStatus("Preparing to log in...");
                 }

@@ -29,9 +29,9 @@ public sealed class JavaInstallList
 
     private readonly bool _onlyManagedVersions;
     private readonly string? _javaRoot;
-    private Status status = Status.NotDone;
-    private JavaListLoadTask? loadTask;
-    private List<JavaInstall> vlist = [];
+    private Status _status = Status.NotDone;
+    private JavaListLoadTask? _loadTask;
+    private List<JavaInstall> _vlist = [];
 
     /// <summary><paramref name="javaRoot"/> is the launcher-managed java dir (the JavaDir
     /// setting under E2 store semantics — the host passes the resolved root; the default
@@ -47,34 +47,34 @@ public sealed class JavaInstallList
 
     private FlintTask Load()
     {
-        if (status == Status.InProgress && loadTask is { } inFlight)
+        if (_status == Status.InProgress && _loadTask is { } inFlight)
         {
             return inFlight;
         }
 
-        status = Status.InProgress;
+        _status = Status.InProgress;
         var task = new JavaListLoadTask(this, _onlyManagedVersions, _javaRoot);
-        loadTask = task;
+        _loadTask = task;
         // C++ starts the task immediately; the returned Task tracks the in-flight run.
         _ = task.StartAsync();
         return task;
     }
 
-    public bool IsLoaded() => status == Status.Done;
+    public bool IsLoaded() => _status == Status.Done;
 
-    public JavaInstall At(int i) => vlist[i];
+    public JavaInstall At(int i) => _vlist[i];
 
-    public int Count => vlist.Count;
+    public int Count => _vlist.Count;
 
-    public IReadOnlyList<JavaInstall> Versions() => vlist;
+    public IReadOnlyList<JavaInstall> Versions() => _vlist;
 
     /// <summary>Port of JavaInstallList::updateListData().</summary>
     public void UpdateListData(IReadOnlyList<JavaInstall> versions)
     {
-        vlist = [.. versions];
+        _vlist = [.. versions];
         SortVersions();
-        status = Status.Done;
-        loadTask = null;
+        _status = Status.Done;
+        _loadTask = null;
     }
 
     /// <summary>
@@ -84,7 +84,7 @@ public sealed class JavaInstallList
     /// </summary>
     public void SortVersions()
     {
-        vlist.Sort((left, right) => right.GreaterThan(left) ? -1 : left.GreaterThan(right) ? 1 : 0);
+        _vlist.Sort((left, right) => right.GreaterThan(left) ? -1 : left.GreaterThan(right) ? 1 : 0);
     }
 }
 

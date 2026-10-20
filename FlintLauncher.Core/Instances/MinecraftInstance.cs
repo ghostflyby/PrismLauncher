@@ -82,18 +82,16 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// SetMetadataCache call the former static SharedCache default papered over).</summary>
     public HttpMetaCache? MetaCache
     {
-        get => metaCache;
+        get;
         set
         {
-            metaCache = value;
+            field = value;
             if (value is not null)
             {
                 Components.SetMetadataCache(value);
             }
         }
     }
-
-    private HttpMetaCache? metaCache;
 
     /// <summary>Injected data-directory layout (assets/libraries/java roots, instgroups.json).
     /// Null keeps the legacy CWD-anchored behavior for bare fixtures; hosts always set it
@@ -1292,36 +1290,36 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public ModFolderModel LoaderModList()
     {
-        if (loaderModList is null)
+        if (_loaderModList is null)
         {
             var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
-            loaderModList = new ModFolderModel(ModsRoot(), isIndexed, createDir: true);
+            _loaderModList = new ModFolderModel(ModsRoot(), isIndexed, createDir: true);
         }
 
-        return loaderModList;
+        return _loaderModList;
     }
 
     public ModFolderModel CoreModList()
     {
-        if (coreModList is null)
+        if (_coreModList is null)
         {
             var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
-            coreModList = new ModFolderModel(CoreModsDir(), isIndexed, createDir: true);
+            _coreModList = new ModFolderModel(CoreModsDir(), isIndexed, createDir: true);
         }
 
-        return coreModList;
+        return _coreModList;
     }
 
     public ModFolderModel NilModList()
     {
-        if (nilModList is null)
+        if (_nilModList is null)
         {
             var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
             // NOTE: upstream does not create the folder for the nil mod list (4th arg false)
-            nilModList = new ModFolderModel(NilModsDir(), isIndexed, createDir: false);
+            _nilModList = new ModFolderModel(NilModsDir(), isIndexed, createDir: false);
         }
 
-        return nilModList;
+        return _nilModList;
     }
 
     // (resourcePackList()/texturePackList()/shaderPackList()/dataPackList()/resourceLists()/
@@ -1516,10 +1514,10 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     // ------------------------------------------------------------------------ data
 
     protected readonly PackProfile Components; // unique_ptr<PackProfile> m_components (set in ctor)
-    private ModFolderModel? loaderModList;
-    private ModFolderModel? coreModList;
+    private ModFolderModel? _loaderModList;
+    private ModFolderModel? _coreModList;
 
-    private ModFolderModel? nilModList;
+    private ModFolderModel? _nilModList;
     // (the resource pack / texture pack / shader pack / data pack models and the world list
     //  arrive with the remaining P3b folder-model ports)
 }

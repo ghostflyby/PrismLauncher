@@ -75,7 +75,7 @@ public sealed partial class FlameCreationTask : InstanceTask
 
     private readonly List<(string FileName, string TargetFolder)> _otherResources = [];
 
-    private MinecraftInstance? newInstance;
+    private MinecraftInstance? _newInstance;
 
     /// <summary>logWarning() output (no warningLogged signal in this port).</summary>
     public IReadOnlyList<string> Warnings => _warnings;
@@ -233,7 +233,7 @@ public sealed partial class FlameCreationTask : InstanceTask
         }
 
         // D4: the staged instance is Flint format from birth (typed instance.json adapter)
-        newInstance = new MinecraftInstance(
+        _newInstance = new MinecraftInstance(
             new InstanceJsonSettingsObject(StagingPath, Environment ??
                                                         throw new InvalidOperationException(
                                                             "InstanceTask requires SetParentEnvironment before execution.")),
@@ -247,7 +247,7 @@ public sealed partial class FlameCreationTask : InstanceTask
             LogWarning("Mysterious trailing dots removed from Minecraft version while importing pack.");
         }
 
-        var components = newInstance.GetPackProfile();
+        var components = _newInstance.GetPackProfile();
         components.BuildingFromScratch();
         await components.SetComponentVersion("net.minecraft", mcVersion, important: true, cancellationToken);
         if (loaderType.Length != 0)
@@ -264,22 +264,22 @@ public sealed partial class FlameCreationTask : InstanceTask
 
         if (Icon != "default")
         {
-            newInstance.SetIconKey(Icon);
+            _newInstance.SetIconKey(Icon);
         }
         else
         {
             if (_pack.Name.Contains("Direwolf20", StringComparison.Ordinal))
             {
-                newInstance.SetIconKey("steve");
+                _newInstance.SetIconKey("steve");
             }
             else if (_pack.Name.Contains("FTB", StringComparison.Ordinal)
                      || _pack.Name.Contains("Feed The Beast", StringComparison.Ordinal))
             {
-                newInstance.SetIconKey("ftb_logo");
+                _newInstance.SetIconKey("ftb_logo");
             }
             else
             {
-                newInstance.SetIconKey("flame");
+                _newInstance.SetIconKey("flame");
             }
         }
 
@@ -300,7 +300,7 @@ public sealed partial class FlameCreationTask : InstanceTask
 
             // C7: writing MaxMemAlloc sets the instance-layer member, which IS the override
             // (the derived OverrideMemory gate reads true; no separate gate write exists)
-            newInstance.Settings.Set("MaxMemAlloc", recommendedRam);
+            _newInstance.Settings.Set("MaxMemAlloc", recommendedRam);
         }
 
         var jarmodsPath = FileSystem.PathCombine(StagingPath, "minecraft", "jarmods");
@@ -308,15 +308,15 @@ public sealed partial class FlameCreationTask : InstanceTask
         {
             // install all the jar mods
             var jarMods = Directory.EnumerateFiles(jarmodsPath).ToList();
-            _ = newInstance.GetPackProfile().InstallJarMods(jarMods);
+            _ = _newInstance.GetPackProfile().InstallJarMods(jarMods);
             // nuke the original files
             FileSystem.DeletePath(jarmodsPath);
         }
 
-        SetManagedPack(newInstance);
+        SetManagedPack(_newInstance);
 
-        newInstance.SetName(Name());
-        newInstance.SaveNow();
+        _newInstance.SetName(Name());
+        _newInstance.SaveNow();
 
         // ---------------------------------------------------------- resolve + download
         var modIdResolver = new FileResolvingTask(_pack, _modrinth, _flame);

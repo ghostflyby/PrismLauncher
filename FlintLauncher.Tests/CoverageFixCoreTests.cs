@@ -268,7 +268,7 @@ public class CoverageFixCoreTests
                 Md5Sum = Convert.ToHexString(MD5.HashData(File.ReadAllBytes(file)))
                     .ToLowerInvariant(),
             };
-            entry.SetStale(false);
+            entry.IsStale = false;
             Assert.True(cache.UpdateEntry(entry));
             Assert.NotNull(cache.GetEntry("general", "thing.bin"));
 

@@ -12,7 +12,7 @@ public sealed class VersionList(string uid) : MetaEntity
     private readonly List<MetaVersion> _versions = [];
     private readonly Dictionary<string, MetaVersion> _lookup = new(StringComparer.Ordinal);
 
-    private MetaVersion? recommended;
+    private MetaVersion? _recommended;
 
     public string Uid { get; } = uid;
 
@@ -80,7 +80,7 @@ public sealed class VersionList(string uid) : MetaEntity
         }
 
         // FIXME upstream: this is dumb, we have 'recommended' as part of the metadata already...
-        recommended = _versions.Find(ptr => ptr.Type == "release");
+        _recommended = _versions.Find(ptr => ptr.Type == "release");
     }
 
     public void MergeFromIndex(VersionList other)
@@ -134,7 +134,7 @@ public sealed class VersionList(string uid) : MetaEntity
                 version = otherVersion;
             }
 
-            recommended = GetBetterVersion(recommended, version);
+            _recommended = GetBetterVersion(_recommended, version);
         }
     }
 
@@ -161,7 +161,7 @@ public sealed class VersionList(string uid) : MetaEntity
         return a.Type == "release" ? a : b;
     }
 
-    public MetaVersion? GetRecommended() => recommended;
+    public MetaVersion? GetRecommended() => _recommended;
 
     public MetaVersion? GetRecommendedForParent(string uid, string version)
     {

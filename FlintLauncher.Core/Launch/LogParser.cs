@@ -44,41 +44,41 @@ public sealed class LogParser
 
     private const string TargetStart = "<log4j:event";
 
-    private string buffer = "";
-    private string partialData = "";
-    private ParseError? error;
+    private string _buffer = "";
+    private string _partialData = "";
+    private ParseError? _error;
 
     /// <summary>Port of appendLine(): completes a pending partial with a newline separator, then
     /// appends the incoming data.</summary>
     public void AppendLine(string data)
     {
-        if (partialData.Length > 0)
+        if (_partialData.Length > 0)
         {
-            buffer = partialData;
-            buffer += "\n";
-            partialData = "";
+            _buffer = _partialData;
+            _buffer += "\n";
+            _partialData = "";
         }
 
-        buffer += data;
+        _buffer += data;
     }
 
     /// <summary>Port of getError().</summary>
-    public ParseError? GetError() => error;
+    public ParseError? GetError() => _error;
 
     /// <summary>Port of parseNext(): null when the buffer is exhausted.</summary>
     public ParsedItem? ParseNext()
     {
-        error = null;
+        _error = null;
 
-        if (buffer.Length == 0)
+        if (_buffer.Length == 0)
         {
             return null;
         }
 
-        if (buffer.Trim().Length == 0)
+        if (_buffer.Trim().Length == 0)
         {
-            var text = buffer;
-            buffer = "";
+            var text = _buffer;
+            _buffer = "";
             return new PlainText(text);
         }
 
@@ -86,7 +86,7 @@ public sealed class LogParser
         var isCompleteLog4J = false;
         try
         {
-            using var parser = CreateReader(buffer);
+            using var parser = CreateReader(_buffer);
             if (ReadNextStartElement(parser) && MatchesEvent(parser.Name))
             {
                 var depth = 1;
@@ -124,44 +124,44 @@ public sealed class LogParser
             return ParseLog4J();
         }
 
-        if (IsPotentialLog4JStart(buffer))
+        if (IsPotentialLog4JStart(_buffer))
         {
-            partialData = buffer;
-            return new Partial(buffer);
+            _partialData = _buffer;
+            return new Partial(_buffer);
         }
 
         var start = 0;
-        while (start < buffer.Length)
+        while (start < _buffer.Length)
         {
-            var pos = buffer.IndexOf('<', start);
+            var pos = _buffer.IndexOf('<', start);
             if (pos == -1)
             {
                 break;
             }
 
-            var slice = buffer[pos..];
+            var slice = _buffer[pos..];
             if (IsPotentialLog4JStart(slice))
             {
                 if (pos > 0)
                 {
-                    var text = buffer[..pos];
-                    buffer = buffer[pos..];
+                    var text = _buffer[..pos];
+                    _buffer = _buffer[pos..];
                     if (text.Trim().Length > 0)
                     {
                         return new PlainText(text);
                     }
                 }
 
-                partialData = buffer;
-                return new Partial(buffer);
+                _partialData = _buffer;
+                return new Partial(_buffer);
             }
 
             start = pos + 1;
         }
 
         // no log4j found, all plain text
-        var allText = buffer;
-        buffer = "";
+        var allText = _buffer;
+        _buffer = "";
         return new PlainText(allText);
     }
 
@@ -174,7 +174,7 @@ public sealed class LogParser
         while (doNext)
         {
             var item = ParseNext();
-            if (error is not null)
+            if (_error is not null)
             {
                 return [];
             }
@@ -201,7 +201,7 @@ public sealed class LogParser
 
     private ParsedItem? ParseLog4J()
     {
-        using var parser = CreateReader(buffer);
+        using var parser = CreateReader(_buffer);
         try
         {
             if (!ReadNextStartElement(parser) || !MatchesEvent(parser.Name))
@@ -275,18 +275,18 @@ public sealed class LogParser
                         {
                             if (foundMessage)
                             {
-                                var consumed = ConsumedOffset(parser, buffer);
-                                if (consumed > 0 && consumed <= buffer.Length)
+                                var consumed = ConsumedOffset(parser, _buffer);
+                                if (consumed > 0 && consumed <= _buffer.Length)
                                 {
-                                    buffer = buffer[consumed..];
+                                    _buffer = _buffer[consumed..];
                                     // potential whitespace preserved for next item
                                 }
 
-                                error = null; // clearError
+                                _error = null; // clearError
                                 return entry; // entryReady
                             }
 
-                            error = new ParseError("log4j:Event Missing required attribute: message");
+                            _error = new ParseError("log4j:Event Missing required attribute: message");
                             return null;
                         }
 
@@ -298,7 +298,7 @@ public sealed class LogParser
         }
         catch (XmlException e)
         {
-            error = new ParseError(e.Message);
+            _error = new ParseError(e.Message);
             return null;
         }
     }
@@ -324,7 +324,7 @@ public sealed class LogParser
                     case "timestamp":
                         if (value.Length == 0)
                         {
-                            error = new ParseError("log4j:Event Missing required attribute: timestamp");
+                            _error = new ParseError("log4j:Event Missing required attribute: timestamp");
                             return null;
                         }
 
@@ -343,7 +343,7 @@ public sealed class LogParser
         parser.MoveToElement();
         if (logger.Length == 0)
         {
-            error = new ParseError("log4j:Event Missing required attribute: logger");
+            _error = new ParseError("log4j:Event Missing required attribute: logger");
             return null;
         }
 

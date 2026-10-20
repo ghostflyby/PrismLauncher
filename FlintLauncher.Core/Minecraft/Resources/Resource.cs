@@ -116,7 +116,7 @@ public partial class Resource
 
     public long SizeInfo { get; private set; }
 
-    public virtual string Name => name;
+    public virtual string Name => _name;
 
     public virtual bool Valid => Type != ResourceType.Unknown;
 
@@ -171,7 +171,7 @@ public partial class Resource
         if (Directory.Exists(Fileinfo.FullName) && !File.Exists(Fileinfo.FullName))
         {
             Type = ResourceType.Folder;
-            name = fileName;
+            _name = fileName;
         }
         else if (File.Exists(Fileinfo.FullName))
         {
@@ -201,7 +201,7 @@ public partial class Resource
                 Type = ResourceType.SingleFile;
             }
 
-            name = fileName;
+            _name = fileName;
         }
 
         DateTimeChanged = LastModified(Fileinfo);
@@ -421,7 +421,7 @@ public partial class Resource
     /* The cached date when this file was last changed. */
     /* Internal ID for internal purposes. Properties such as human-readability should not be assumed. */
     /* Name as reported via the file name. In the absence of a better name, this is shown to the user. */
-    private string name = "";
+    private string _name = "";
     /* The type of file we're dealing with. */
     /* Installation status of the resource. */
     /* Used to keep track of pending / concluded parse actions on the resource. */

@@ -20,7 +20,7 @@ public class FtbAppTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-ftbapp-{Guid.NewGuid():N}");
     private readonly TestGlobalSettings _global = new();
-    private string instancesPath = "";
+    private string _instancesPath = "";
 
     public FtbAppTests()
     {
@@ -54,24 +54,24 @@ public class FtbAppTests : IDisposable
 
     /// <summary>A synthetic FTB App root: storage/settings.json pointing at an instances
     /// folder that holds one modpack folder (built by <paramref name="populate"/>). The
-    /// matching <see cref="FtbAppPaths"/> instance lands in <see cref="paths"/>.</summary>
+    /// matching <see cref="FtbAppPaths"/> instance lands in <see cref="_paths"/>.</summary>
     private string BuildFtbAppTree(Action<string> populate)
     {
         var ftbRoot = Path.Combine(_root, ".ftba");
-        instancesPath = Path.Combine(_root, "ftb-instances");
+        _instancesPath = Path.Combine(_root, "ftb-instances");
         Directory.CreateDirectory(Path.Combine(ftbRoot, "storage"));
-        Directory.CreateDirectory(instancesPath);
+        Directory.CreateDirectory(_instancesPath);
         File.WriteAllText(Path.Combine(ftbRoot, "storage", "settings.json"),
-            $$"""{"instanceLocation": "{{instancesPath.Replace("\\", "\\\\")}}"}""");
+            $$"""{"instanceLocation": "{{_instancesPath.Replace("\\", "\\\\")}}"}""");
 
-        var packPath = Path.Combine(instancesPath, "my-ftb-pack");
+        var packPath = Path.Combine(_instancesPath, "my-ftb-pack");
         Directory.CreateDirectory(packPath);
         populate(packPath);
-        paths = new FtbAppPaths(ftbRoot);
+        _paths = new FtbAppPaths(ftbRoot);
         return packPath;
     }
 
-    private FtbAppPaths paths = new();
+    private FtbAppPaths _paths = new();
 
     private static void WriteInstanceJson(string packPath, string modLoader)
     {
@@ -100,7 +100,7 @@ public class FtbAppTests : IDisposable
 
         var packDir = Directory.GetParent(packPath);
         Assert.NotNull(packDir);
-        Assert.Equal(packDir.FullName, paths.GetDynamicInstancesPath());
+        Assert.Equal(packDir.FullName, _paths.GetDynamicInstancesPath());
     }
 
     [Fact]
@@ -215,13 +215,13 @@ public class FtbAppTests : IDisposable
     {
         BuildFtbAppTree(pack => WriteInstanceJson(pack, "forge-14.23.5.2860"));
         // a sibling folder without an instance.json is ignored
-        Directory.CreateDirectory(Path.Combine(instancesPath, "not-a-pack"));
+        Directory.CreateDirectory(Path.Combine(_instancesPath, "not-a-pack"));
 
-        var modpacks = FtbAppPackParse.ParseInstancesDirectory(instancesPath);
+        var modpacks = FtbAppPackParse.ParseInstancesDirectory(_instancesPath);
 
         var pack = Assert.Single(modpacks);
         Assert.Equal("My FTB Pack", pack.Name);
-        Assert.Equal(Path.Combine(instancesPath, "my-ftb-pack"), pack.Path);
+        Assert.Equal(Path.Combine(_instancesPath, "my-ftb-pack"), pack.Path);
 
         Assert.Empty(FtbAppPackParse.ParseInstancesDirectory(Path.Combine(_root, "missing")));
     }

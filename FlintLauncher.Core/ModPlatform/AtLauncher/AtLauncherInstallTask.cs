@@ -105,15 +105,15 @@ public sealed partial class AtLauncherPackInstallTask(
     // -------------------------------------------------------------------- state
 
     // assigned by OnDownloadSucceeded before any read
-    private PackVersion? configs;
+    private PackVersion? _configs;
 
     /// <summary>The Configs payload; the state machine only reads it after the download
     /// succeeded, so a read before that is a broken invariant rather than a null value.</summary>
-    private PackVersion Configs => configs
+    private PackVersion Configs => _configs
         ?? throw new InvalidOperationException("the pack configs have not been downloaded");
-    private string archivePath = "";
+    private string _archivePath = "";
     private readonly List<string> _jarMods = [];
-    private VersionFile? minecraftVersionData;
+    private VersionFile? _minecraftVersionData;
     private readonly Dictionary<string, string> _componentsToInstall = new();
     private readonly Dictionary<string, VersionMod> _modsToExtract = new();
     private readonly Dictionary<string, VersionMod> _modsToDecomp = new();
@@ -143,7 +143,7 @@ public sealed partial class AtLauncherPackInstallTask(
         {
             // (the parse keeps the "JSON response from ATLauncher" wrapper of the former
             // RequireDocument + LoadVersion reads; Normalize runs the load-time fixups)
-            configs = AtLauncherApi.LoadPackVersion(response);
+            _configs = AtLauncherApi.LoadPackVersion(response);
         }
         catch (JsonParseException e)
         {
@@ -181,7 +181,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
         // (the C++ fails the install when net.minecraft is not in the local metadata index;
         //  see the header note for the best-effort deviation)
-        minecraftVersionData = MetaVersionDataLookup?.Invoke("net.minecraft", Configs.Minecraft);
+        _minecraftVersionData = MetaVersionDataLookup?.Invoke("net.minecraft", Configs.Minecraft);
 
         if (resetDirectory)
         {
@@ -458,9 +458,9 @@ public sealed partial class AtLauncherPackInstallTask(
             }
         }
 
-        if (minecraftVersionData is not null)
+        if (_minecraftVersionData is not null)
         {
-            foreach (var library in minecraftVersionData.Libraries)
+            foreach (var library in _minecraftVersionData.Libraries)
             {
                 exempt.Add(library.RawName());
             }
@@ -670,14 +670,14 @@ public sealed partial class AtLauncherPackInstallTask(
         if (MetaCache is not null)
         {
             var entry = MetaCache.ResolveEntry("ATLauncherPacks", path);
-            entry.SetStale(true);
+            entry.IsStale = true;
             dl = NetRequest.MakeCached(MetaCache, new Uri(url), entry, stack: _api.Net);
-            archivePath = entry.GetFullPath();
+            _archivePath = entry.GetFullPath();
         }
         else
         {
-            archivePath = TempCachePath(path);
-            dl = NetRequest.MakeFile(new Uri(url), archivePath, stack: _api.Net);
+            _archivePath = TempCachePath(path);
+            dl = NetRequest.MakeFile(new Uri(url), _archivePath, stack: _api.Net);
         }
 
         if (Configs.Configs.Sha1.Length != 0)
@@ -701,7 +701,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
         var extractDir = FileSystem.PathCombine(StagingPath, "minecraft");
         // (the C++ does not check the extraction result here — it proceeds to the mods)
-        _ = MmcZip.ExtractDir(archivePath, "", extractDir);
+        _ = MmcZip.ExtractDir(_archivePath, "", extractDir);
 
         await DownloadMods(cancellationToken);
     }
@@ -941,7 +941,7 @@ public sealed partial class AtLauncherPackInstallTask(
         if (MetaCache is not null)
         {
             var entry = MetaCache.ResolveEntry("ATLauncherPacks", cacheName);
-            entry.SetStale(true);
+            entry.IsStale = true;
             cachePath = entry.GetFullPath();
             dl = NetRequest.MakeCached(MetaCache, new Uri(url), entry, stack: _api.Net);
         }

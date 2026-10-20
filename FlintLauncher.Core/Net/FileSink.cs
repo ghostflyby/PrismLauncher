@@ -10,12 +10,12 @@ namespace FlintLauncher.Core.Net;
 /// <summary>Writes the response body to a file via an atomic temp file + rename (PSaveFile).</summary>
 public class FileSink(string filename) : Sink
 {
-    private bool wroteAnyData;
+    private bool _wroteAnyData;
 
     /// <summary>Writable by MetaCacheSink (C++: protected member access).</summary>
-    private protected bool WroteAnyData => wroteAnyData;
+    private protected bool WroteAnyData => _wroteAnyData;
 
-    private string? tempFile;
+    private string? _tempFile;
 
     public string Filename => filename;
 
@@ -33,16 +33,16 @@ public class FileSink(string filename) : Sink
             return false;
         }
 
-        wroteAnyData = false;
-        tempFile = filename + ".flint-tmp";
+        _wroteAnyData = false;
+        _tempFile = filename + ".flint-tmp";
         try
         {
-            File.Create(tempFile).Dispose();
+            File.Create(_tempFile).Dispose();
         }
         catch (IOException e)
         {
             FailReason = $"Could not open {filename} for writing: {e.Message}";
-            tempFile = null;
+            _tempFile = null;
             return false;
         }
 
@@ -57,7 +57,7 @@ public class FileSink(string filename) : Sink
 
     public override bool Write(byte[] data)
     {
-        if (tempFile is null)
+        if (_tempFile is null)
         {
             FailReason = "Writing into a closed file sink";
             return false;
@@ -65,14 +65,14 @@ public class FileSink(string filename) : Sink
 
         try
         {
-            using var stream = File.Open(tempFile, FileMode.Append, FileAccess.Write);
+            using var stream = File.Open(_tempFile, FileMode.Append, FileAccess.Write);
             stream.Write(data);
         }
         catch (IOException e)
         {
             FailReason = $"Failed writing into {filename}: {e.Message}";
             CancelWriting();
-            wroteAnyData = false;
+            _wroteAnyData = false;
             return false;
         }
 
@@ -80,11 +80,11 @@ public class FileSink(string filename) : Sink
         {
             FailReason = $"Failed writing into {filename}: validators failed";
             CancelWriting();
-            wroteAnyData = false;
+            _wroteAnyData = false;
             return false;
         }
 
-        wroteAnyData = true;
+        _wroteAnyData = true;
         return true;
     }
 
@@ -102,7 +102,7 @@ public class FileSink(string filename) : Sink
 
         // if we wrote any data to the save file, we try to commit the data to the real file.
         // if it actually got a proper file, we write it even if it was empty
-        if (gotFile || wroteAnyData)
+        if (gotFile || _wroteAnyData)
         {
             // ask validators for data consistency: only for actual downloads, not cache hits
             if (!FinalizeAllValidators(response))
@@ -111,11 +111,11 @@ public class FileSink(string filename) : Sink
                 return false;
             }
 
-            if (tempFile is not null)
+            if (_tempFile is not null)
             {
                 try
                 {
-                    File.Move(tempFile, filename, overwrite: true);
+                    File.Move(_tempFile, filename, overwrite: true);
                 }
                 catch (IOException e)
                 {
@@ -124,7 +124,7 @@ public class FileSink(string filename) : Sink
                     return false;
                 }
 
-                tempFile = null;
+                _tempFile = null;
             }
         }
 
@@ -140,18 +140,18 @@ public class FileSink(string filename) : Sink
 
     private void CancelWriting()
     {
-        if (tempFile is not null)
+        if (_tempFile is not null)
         {
             try
             {
-                File.Delete(tempFile);
+                File.Delete(_tempFile);
             }
             catch (IOException) { }
 
-            tempFile = null;
+            _tempFile = null;
         }
 
-        wroteAnyData = false;
+        _wroteAnyData = false;
     }
 
     protected virtual bool InitCache(NetRequestSpec request) => true;
@@ -252,7 +252,7 @@ public sealed class MetaCacheSink(MetaEntry entry, ChecksumValidator md5Sum, boo
             ? age
             : 0;
 
-        entry.SetStale(false);
+        entry.IsStale = false;
         MetaCache?.UpdateEntry(entry);
         return true;
     }

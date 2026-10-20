@@ -35,10 +35,12 @@ public sealed record ModrinthVersionUpdateRequest(
     List<string>? Loaders,
     List<string>? GameVersions,
     List<string>? VersionTypes);
+
 /// <summary>The modrinth-download-meta request header payload (net/ApiHeaderProxy).</summary>
 public sealed record ModrinthDownloadMetaJson(
     string? Reason,
-    string? GameVersion,    string? Loader,
+    string? GameVersion,
+    string? Loader,
     string? DependentOn);
 
 // ------------------------------------------------------------------------ response models
@@ -58,21 +60,25 @@ public sealed record ModrinthProjectJson
     public string? Author { get; init; }
     public string? ClientSide { get; init; }
     public string? ServerSide { get; init; }
+
     /// <summary>Search hits only: the raw download count member. Left as JsonElement so the
     /// "only real JSON number tokens count" sniff survives (a quoted "123" stays 0).</summary>
     public JsonElement? Downloads { get; init; }
+
     public string? IssuesUrl { get; init; }
     public string? SourceUrl { get; init; }
     public string? WikiUrl { get; init; }
     public string? DiscordUrl { get; init; }
     public List<ModrinthDonationJson>? DonationUrls { get; init; }
     public string? Status { get; init; }
-    public string? Body { get; init; }}
+    public string? Body { get; init; }
+}
 
 public sealed record ModrinthDonationJson(
     string? Id,
     string? Platform,
     string? Url);
+
 /// <summary>GET /search body ({hits: [...]}).</summary>
 public sealed record ModrinthSearchResponseJson(
     List<ModrinthProjectJson>? Hits);
@@ -101,7 +107,8 @@ public sealed record ModrinthVersionJson
     /// <summary>JSON null elements drop at binding (ModrinthVersionFileListConverter), so
     /// the non-nullable element label holds — docs/JSON-MIGRATION.md §2.4.</summary>
     [property: JsonConverter(typeof(ModrinthVersionFileListConverter))]
-    public List<ModrinthVersionFileJson>? Files { get; init; }}
+    public List<ModrinthVersionFileJson>? Files { get; init; }
+}
 
 public sealed record ModrinthDependencyJson(
     string? ProjectId,
@@ -114,7 +121,8 @@ public sealed record ModrinthDependencyJson(
 public sealed record ModrinthVersionFileJson(
     string? Filename,
     bool? Primary,
-    string? Url,    long? Size,
+    string? Url,
+    long? Size,
     [property: JsonConverter(typeof(ModrinthHashMapConverter))]
     Dictionary<string, string>? Hashes);
 
@@ -131,14 +139,19 @@ public sealed record MrPackIndexJson
     public string? VersionId { get; init; }
     public string? Summary { get; init; }
     public Dictionary<string, string?>? Dependencies { get; init; }
-    public List<MrPackFileJson>? Files { get; init; }}
+    public List<MrPackFileJson>? Files { get; init; }
+}
 
 public sealed record MrPackFileJson(
-    MrPackEnvJson? Env,    string? Path,    List<string>? Downloads,
+    MrPackEnvJson? Env,
+    string? Path,
+    List<string>? Downloads,
     Dictionary<string, string>? Hashes,
     long? FileSize);
+
 public sealed record MrPackEnvJson(
-    string? Client,    string? Server);
+    string? Client,
+    string? Server);
 // ------------------------------------------------------------------------------- context
 
 // The Modrinth v2 API is snake_case end to end (project_id, date_published, game_versions,

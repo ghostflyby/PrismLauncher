@@ -14,7 +14,7 @@ namespace FlintLauncher.Core.Launch;
 
 public sealed class LogModel
 {
-    private (MessageLevel Level, string Line)[] content;
+    private (MessageLevel Level, string Line)[] _content;
 
     public int MaxLines
     {
@@ -28,81 +28,81 @@ public sealed class LogModel
             }
 
             // if it all still fits in the buffer, just resize it
-            if (firstLine + numLines < field)
+            if (_firstLine + _numLines < field)
             {
                 field = value;
-                Array.Resize(ref content, value);
+                Array.Resize(ref _content, value);
                 return;
             }
 
             // otherwise, we need to reorganize the data because it crosses the wrap boundary
             var newContent = new (MessageLevel, string)[value];
-            if (numLines <= value)
+            if (_numLines <= value)
             {
                 // if it all fits in the new buffer, just copy it over
-                for (var i = 0; i < numLines; i++)
+                for (var i = 0; i < _numLines; i++)
                 {
-                    newContent[i] = content[(firstLine + i) % field];
+                    newContent[i] = _content[(_firstLine + i) % field];
                 }
             }
             else
             {
                 // if it doesn't fit, part of the data needs to be thrown away (the oldest log messages)
-                var lead = numLines - value;
+                var lead = _numLines - value;
                 for (var i = 0; i < value; i++)
                 {
-                    newContent[i] = content[(firstLine + lead + i) % field];
+                    newContent[i] = _content[(_firstLine + lead + i) % field];
                 }
 
-                numLines = field;
+                _numLines = field;
             }
 
-            content = newContent;
-            firstLine = 0;
+            _content = newContent;
+            _firstLine = 0;
             field = value;
         }
     } = 1000;
 
-    private int firstLine;
-    private int numLines;
-    private bool suspended;
+    private int _firstLine;
+    private int _numLines;
+    private bool _suspended;
     public bool StopOnOverflow { get; set; }
     public string OverflowMessage { get; set; } = "";
 
     public LogModel()
     {
-        content = new (MessageLevel, string)[MaxLines];
+        _content = new (MessageLevel, string)[MaxLines];
     }
 
-    public int RowCount => numLines;
+    public int RowCount => _numLines;
 
     /// <summary>The (level, line) entries in chronological order.</summary>
     public IReadOnlyList<(MessageLevel Level, string Line)> Entries
     {
         get
         {
-            var result = new List<(MessageLevel, string)>(numLines);
-            for (var i = 0; i < numLines; i++)
+            var result = new List<(MessageLevel, string)>(_numLines);
+            for (var i = 0; i < _numLines; i++)
             {
-                result.Add(content[(firstLine + i) % MaxLines]);
+                result.Add(_content[(_firstLine + i) % MaxLines]);
             }
 
             return result;
         }
     }
 
-    public bool IsOverFlow => numLines >= MaxLines && StopOnOverflow;
+    public bool IsOverFlow => _numLines >= MaxLines && StopOnOverflow;
 
     public void Append(MessageLevel level, string line)
     {
-        if (suspended)
+        if (_suspended)
         {
             return;
         }
 
-        var lineNum = (firstLine + numLines) % MaxLines;
+        var lineNum = (_firstLine + _numLines) % MaxLines;
         // overflow
-        if (numLines == MaxLines)
+        if (_numLines == MaxLines)
         {
             if (StopOnOverflow)
             {
@@ -110,27 +110,27 @@ public sealed class LogModel
                 return;
             }
 
-            firstLine = (firstLine + 1) % MaxLines;
-            numLines--;
+            _firstLine = (_firstLine + 1) % MaxLines;
+            _numLines--;
         }
-        else if (numLines == MaxLines - 1 && StopOnOverflow)
+        else if (_numLines == MaxLines - 1 && StopOnOverflow)
         {
             level = MessageLevel.Fatal;
             line = OverflowMessage;
         }
 
-        numLines++;
-        content[lineNum] = (level, line);
+        _numLines++;
+        _content[lineNum] = (level, line);
     }
 
-    public void Suspend(bool suspend) => suspended = suspend;
+    public void Suspend(bool suspend) => _suspended = suspend;
 
-    public bool Suspended => suspended;
+    public bool Suspended => _suspended;
 
     public void Clear()
     {
-        firstLine = 0;
-        numLines = 0;
+        _firstLine = 0;
+        _numLines = 0;
     }
 
     public string ToPlainText()
@@ -148,9 +148,9 @@ public sealed class LogModel
     /// the content array without the ring wrap — ported as the newest entry).</summary>
     public MessageLevel PreviousLevel()
     {
-        if (numLines > 0)
+        if (_numLines > 0)
         {
-            return content[(firstLine + numLines - 1) % MaxLines].Level;
+            return _content[(_firstLine + _numLines - 1) % MaxLines].Level;
         }
 
         return MessageLevel.Unknown;

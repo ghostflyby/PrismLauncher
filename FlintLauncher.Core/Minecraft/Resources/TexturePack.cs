@@ -12,29 +12,29 @@ public class TexturePack : Resource
 {
     /** The texture pack's description, as defined in the pack.txt file (null until set —
      *  the C++ null-QString check in valid()). */
-    private string? description;
+    private string? _description;
 
     /* The pack image header info (port of the pixmap cache slot). */
-    private PngImage image;
+    private PngImage _image;
 
     public TexturePack(string filePath) : this(new FileInfo(filePath)) { }
 
     public TexturePack(FileInfo fileInfo) : base(fileInfo) { }
 
     /// <summary>Gets the description of the texture pack.</summary>
-    public string Description { get => description ?? ""; set => description = value; }
+    public string Description { get => _description ?? ""; set => _description = value; }
 
     /// <summary>The pack image header info, when a valid pack.png has been processed.</summary>
-    public PngImage Image => image;
+    public PngImage Image => _image;
 
-    public bool HasImage => !image.IsNull;
+    public bool HasImage => !_image.IsNull;
 
 
     public void SetImage(PngImage newImage)
     {
-        image = newImage;
+        _image = newImage;
     }
 
     /// <summary>Port of TexturePack::valid (`m_description != nullptr`).</summary>
-    public override bool Valid => description != null;
+    public override bool Valid => _description != null;
 }
