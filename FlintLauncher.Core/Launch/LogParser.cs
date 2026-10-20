@@ -98,6 +98,8 @@ public sealed class LogParser
                         break; // EOF: the event is incomplete
                     }
 
+                    // (System.Xml has no EndDocument token: Read() returns false at the end,
+                    // which the EOF break above treats as an incomplete event.)
                     switch (parser.NodeType)
                     {
                         case XmlNodeType.Element:
@@ -106,8 +108,6 @@ public sealed class LogParser
                         case XmlNodeType.EndElement:
                             depth -= 1;
                             break;
-                        // (System.Xml has no EndDocument token: Read() returns false at the end,
-                        // which the EOF break above treats as an incomplete event.)
                     }
                 }
 

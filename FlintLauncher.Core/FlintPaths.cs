@@ -41,8 +41,7 @@ public sealed record FlintPaths
 
     /// <summary>Explicit named factory: all five roots given independently (the precise-flag
     /// resolution shape, G1). Paths are made absolute.</summary>
-    public static FlintPaths FromRoots(string configRoot, string dataRoot, string storeRoot,
-        string cacheRoot, string stateRoot) => new()
+    public static FlintPaths FromRoots(string configRoot, string dataRoot, string storeRoot, string cacheRoot, string stateRoot) => new()
     {
         ConfigRoot = Path.GetFullPath(configRoot),
         DataRoot = Path.GetFullPath(dataRoot),

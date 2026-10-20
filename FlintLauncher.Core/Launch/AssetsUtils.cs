@@ -233,11 +233,12 @@ public static class AssetsUtils
             return result;
         }
 
-        foreach (var file in Directory.EnumerateFiles(dirPath, "*", new EnumerationOptions
-                 {
-                     RecurseSubdirectories = true,
-                     IgnoreInaccessible = true,
-                 }))
+        var files = Directory.EnumerateFiles(dirPath, "*", new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = true,
+        });
+        foreach (var file in files)
         {
             result.Add(file);
         }
