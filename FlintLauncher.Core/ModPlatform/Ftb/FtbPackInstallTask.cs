@@ -39,7 +39,8 @@ public sealed class FtbPackInstallTask(
     /// <summary>The manifest payload; the state machine only reads it after the download
     /// succeeded, so a read before that is a broken invariant rather than a null value.</summary>
     private FtbVersion Manifest => _manifest
-        ?? throw new InvalidOperationException("the pack manifest has not been downloaded");
+                                   ?? throw new InvalidOperationException("the pack manifest has not been downloaded");
+
     private readonly List<long> _fileIds = [];
     private readonly List<BlockedMod> _blockedMods = [];
 

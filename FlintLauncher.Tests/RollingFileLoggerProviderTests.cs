@@ -42,12 +42,11 @@ public class RollingFileLoggerProviderTests : IDisposable
         File.WriteAllText(PathOf(4), "gen4-oldest\n");
 
         using var provider = new RollingFileLoggerProvider(_dir);
-        using (var factory = LoggerFactory.Create(
-                   builder =>
-                   {
-                       builder.SetMinimumLevel(LogLevel.Information);
-                       builder.AddProvider(provider);
-                   }))
+        using (var factory = LoggerFactory.Create(builder =>
+               {
+                   builder.SetMinimumLevel(LogLevel.Information);
+                   builder.AddProvider(provider);
+               }))
         {
             factory.CreateLogger("test.category").LogInformation("hello file");
         }

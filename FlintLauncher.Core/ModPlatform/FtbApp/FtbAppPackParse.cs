@@ -139,7 +139,7 @@ public static class FtbAppPackParse
         try
         {
             var wire = JsonSerializer.Deserialize(FileSystem.Read(instanceFile),
-                FtbAppJsonContext.Default.FtbAppInstanceJson)
+                           FtbAppJsonContext.Default.FtbAppInstanceJson)
                        ?? throw new JsonException("the document is null");
 
             modpack.Uuid = wire.Uuid;
@@ -211,7 +211,7 @@ public static class FtbAppPackParse
         try
         {
             var wire = JsonSerializer.Deserialize(FileSystem.Read(versionsFile),
-                FtbAppJsonContext.Default.FtbAppVersionJson)
+                           FtbAppJsonContext.Default.FtbAppVersionJson)
                        ?? throw new JsonException("the document is null");
 
             foreach (var target in wire.Targets)

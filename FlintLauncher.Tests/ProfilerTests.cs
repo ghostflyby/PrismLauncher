@@ -33,7 +33,7 @@ public class ProfilerTests
     private static T Factory<T>(string key) where T : ProfilerFactory
     {
         var factory = Profilers.Value(key)
-            ?? throw new Xunit.Sdk.XunitException($"the profiler registry has no '{key}' entry");
+                      ?? throw new Xunit.Sdk.XunitException($"the profiler registry has no '{key}' entry");
         return Assert.IsType<T>(factory);
     }
 

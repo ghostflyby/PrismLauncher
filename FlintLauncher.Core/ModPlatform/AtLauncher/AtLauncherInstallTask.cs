@@ -110,7 +110,8 @@ public sealed partial class AtLauncherPackInstallTask(
     /// <summary>The Configs payload; the state machine only reads it after the download
     /// succeeded, so a read before that is a broken invariant rather than a null value.</summary>
     private PackVersion Configs => _configs
-        ?? throw new InvalidOperationException("the pack configs have not been downloaded");
+                                   ?? throw new InvalidOperationException("the pack configs have not been downloaded");
+
     private string _archivePath = "";
     private readonly List<string> _jarMods = [];
     private VersionFile? _minecraftVersionData;

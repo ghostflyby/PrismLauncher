@@ -295,7 +295,7 @@ public static class DataPackUtils
         }
 
         if (obj.ClickEvent is { } clickEvent && clickEvent.Action == "open_url"
-            && clickEvent.Value is { Length: > 0 } value)
+                                             && clickEvent.Value is { Length: > 0 } value)
         {
             result = $"<a href=\"{value}\">{result}</a>";
         }

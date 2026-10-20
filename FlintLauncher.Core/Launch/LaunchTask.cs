@@ -120,8 +120,8 @@ public class LaunchTask : FlintTask
             };
             // FIXME: should this really be here?
             _logModel.OverflowMessage = $"Stopped watching the game log because the log length surpassed {_logModel.MaxLines} lines.\n" +
-                                       "You may have to fix your mods because the game is still logging to files and" +
-                                       " likely wasting harddrive space at an alarming rate!";
+                                        "You may have to fix your mods because the game is still logging to files and" +
+                                        " likely wasting harddrive space at an alarming rate!";
         }
 
         return _logModel;

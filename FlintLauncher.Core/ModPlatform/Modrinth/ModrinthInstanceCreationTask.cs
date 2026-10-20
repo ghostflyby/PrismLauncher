@@ -400,27 +400,27 @@ public sealed class ModrinthCreationTask : InstanceTask
                         if (name == "minecraft")
                         {
                             _minecraftVersion = dependency
-                                ?? throw new JsonParseException("Minecraft version is not a string");
+                                                ?? throw new JsonParseException("Minecraft version is not a string");
                         }
                         else if (name == "fabric-loader")
                         {
                             _fabricVersion = dependency
-                                ?? throw new JsonParseException("Fabric Loader version is not a string");
+                                             ?? throw new JsonParseException("Fabric Loader version is not a string");
                         }
                         else if (name == "quilt-loader")
                         {
                             _quiltVersion = dependency
-                                ?? throw new JsonParseException("Quilt Loader version is not a string");
+                                            ?? throw new JsonParseException("Quilt Loader version is not a string");
                         }
                         else if (name == "forge")
                         {
                             _forgeVersion = dependency
-                                ?? throw new JsonParseException("Forge version is not a string");
+                                            ?? throw new JsonParseException("Forge version is not a string");
                         }
                         else if (name == "neoforge")
                         {
                             _neoForgeVersion = dependency
-                                ?? throw new JsonParseException("NeoForge version is not a string");
+                                               ?? throw new JsonParseException("NeoForge version is not a string");
                         }
                         else
                         {

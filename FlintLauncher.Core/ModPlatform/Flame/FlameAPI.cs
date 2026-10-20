@@ -25,13 +25,15 @@ namespace FlintLauncher.Core.ModPlatform.Flame;
 /// <summary>The CurseForge batch request bodies — the id lists are strings of decimal
 /// numbers, the C++ compatibility quirk kept verbatim.</summary>
 public sealed record FlameFingerprintsRequest(
-    [property: JsonPropertyName("fingerprints")] List<string> Fingerprints);
+    [property: JsonPropertyName("fingerprints")]
+    List<string> Fingerprints);
 
 public sealed record FlameModsRequest(
     [property: JsonPropertyName("modIds")] List<string> ModIds);
 
 public sealed record FlameFilesRequest(
-    [property: JsonPropertyName("fileIds")] List<string> FileIds);
+    [property: JsonPropertyName("fileIds")]
+    List<string> FileIds);
 
 /// <summary>The {"data": "&lt;string&gt;"} envelope of the changelog/description endpoints.</summary>
 public sealed record FlameStringEnvelopeJson(

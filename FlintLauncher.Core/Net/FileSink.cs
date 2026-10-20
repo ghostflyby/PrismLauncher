@@ -248,7 +248,7 @@ public sealed class MetaCacheSink(MetaEntry entry, ChecksumValidator md5Sum, boo
         }
 
         entry.CurrentAge = response.Headers.TryGetValue("Age", out var ageHeader)
-                            && long.TryParse(ageHeader, out var age)
+                           && long.TryParse(ageHeader, out var age)
             ? age
             : 0;
 

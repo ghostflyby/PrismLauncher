@@ -283,7 +283,7 @@ public sealed class LogParser
                                 }
 
                                 _error = null; // clearError
-                                return entry; // entryReady
+                                return entry;  // entryReady
                             }
 
                             _error = new ParseError("log4j:Event Missing required attribute: message");

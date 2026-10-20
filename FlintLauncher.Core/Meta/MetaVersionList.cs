@@ -226,5 +226,4 @@ public sealed class VersionList(string uid) : MetaEntity
 
         return a.RawTime > b.RawTime ? a : b;
     }
-
 }
