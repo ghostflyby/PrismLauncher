@@ -99,7 +99,7 @@ public class InstanceBlobConverterTests : IDisposable
         // the former lenient read: anything unparseable / not an object -> an empty map
         Assert.Empty(Env(Parse(LegacyDoc("launch", "env", "not json at all"))));
         Assert.Empty(Env(Parse(LegacyDoc("launch", "env", "[1,2]")))); // array, not a map
-        Assert.Empty(Env(Parse("""{"launch":{"env":42}}""")));        // wrong kind
+        Assert.Empty(Env(Parse("""{"launch":{"env":42}}""")));         // wrong kind
     }
 
     [Fact]

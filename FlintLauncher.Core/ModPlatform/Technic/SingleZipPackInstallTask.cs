@@ -49,7 +49,7 @@ public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVers
             // (the C++ downloads through the global cache — outside the instance folder; the
             //  headless fallback mirrors that with a temporary file)
             _archivePath = Path.Combine(Path.GetTempPath(), "flint-technic-" + Guid.NewGuid().ToString("N") +
-                                                           Path.GetFileName(sourceUrl.AbsolutePath));
+                                                            Path.GetFileName(sourceUrl.AbsolutePath));
             FileSystem.EnsureFilePathExists(_archivePath);
             var request = NetRequest.MakeFile(sourceUrl, _archivePath);
             await request.StartAsync(cancellationToken);

@@ -28,8 +28,10 @@ public sealed record JavaRuntimeManifestJson(
 public sealed record JavaRuntimeFileJson(
     [property: JsonPropertyName("type")] string? Type,
     [property: JsonPropertyName("target")] string? Target,
-    [property: JsonPropertyName("executable")] bool? Executable,
-    [property: JsonPropertyName("downloads")] JavaRuntimeDownloadsJson? Downloads);
+    [property: JsonPropertyName("executable")]
+    bool? Executable,
+    [property: JsonPropertyName("downloads")]
+    JavaRuntimeDownloadsJson? Downloads);
 
 public sealed record JavaRuntimeDownloadsJson(
     [property: JsonPropertyName("raw")] JavaRuntimeRawJson? Raw);

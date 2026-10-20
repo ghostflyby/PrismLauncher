@@ -6,4 +6,6 @@
 namespace FlintLauncher.Nbt;
 
 /// <summary>Raised when NBT input cannot be parsed. Corresponds to nbt::io::input_error.</summary>
-public sealed class NbtParseException(string message, Exception? innerException = null) : Exception(message, innerException) { }
+public sealed class NbtParseException(string message, Exception? innerException = null) : Exception(message, innerException)
+{
+}

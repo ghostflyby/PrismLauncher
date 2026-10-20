@@ -106,7 +106,9 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     private bool _loaded;
 
     public PackProfile(string instanceRoot, Index? metadataIndex = null)
-        : this(new BasicPackProfileEnv(instanceRoot), metadataIndex) { }
+        : this(new BasicPackProfileEnv(instanceRoot), metadataIndex)
+    {
+    }
 
     public void Dispose()
     {
@@ -310,7 +312,8 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     {
         public string Uid { get; init; } = "";
 
-        [JsonPropertyName("equals")] public string? EqualsVersion { get; init; }
+        [JsonPropertyName("equals")]
+        public string? EqualsVersion { get; init; }
 
         public string? Suggests { get; init; }
     }
@@ -340,7 +343,8 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
     internal sealed record PackConfigOutJson
     {
-        [JsonPropertyName("formatVersion")] public int FormatVersion { get; init; }
+        [JsonPropertyName("formatVersion")]
+        public int FormatVersion { get; init; }
 
         public List<ComponentOutJson>? Components { get; init; }
     }

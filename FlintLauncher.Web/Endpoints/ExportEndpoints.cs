@@ -106,7 +106,7 @@ public static class ExportEndpoints
                     default:
                     {
                         if (!ModListExportTask.TryParseFormat(request.Format2, out var modlistFormat,
-                            out var modlistExtension))
+                                out var modlistExtension))
                         {
                             return ApiJson.Error("invalid_body",
                                 "'format2' must be one of: html, markdown, plain, json, csv", 400);

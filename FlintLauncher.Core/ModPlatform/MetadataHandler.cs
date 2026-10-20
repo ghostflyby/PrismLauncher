@@ -15,7 +15,9 @@ using PackwizModel = Packwiz.Packwiz;
 
 public static class MetadataHandler
 {
-    public sealed class ModStruct : PackwizModel.Mod { }
+    public sealed class ModStruct : PackwizModel.Mod
+    {
+    }
 
     /// <summary>Port of Metadata::create.</summary>
     public static ModStruct Create(string indexDir, IndexedPack modPack, IndexedVersion modVersion)

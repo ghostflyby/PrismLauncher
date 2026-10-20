@@ -4,7 +4,9 @@
 namespace FlintLauncher.Nbt;
 
 /// <summary>Port of nbt::tag_primitive — the shared shape of the six primitive tags.</summary>
-public abstract class NbtPrimitive : NbtTag { }
+public abstract class NbtPrimitive : NbtTag
+{
+}
 
 /// <summary>Port of nbt::tag_byte (signed 8-bit, like Java's byte).</summary>
 public sealed class NbtByte(sbyte value) : NbtPrimitive

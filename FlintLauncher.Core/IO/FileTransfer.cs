@@ -381,7 +381,9 @@ public static class FileTransfer
             File.SetUnixFileMode(dst, File.GetUnixFileMode(src));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
-                                      or SecurityException or NotSupportedException) { }
+                                      or SecurityException or NotSupportedException)
+        {
+        }
     }
 
     private static void EnsureDirectoryFor(string dst)

@@ -101,7 +101,7 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi? modr
                 try
                 {
                     var version = FlameMod.LoadIndexedPackVersion(fileDto
-                                      ?? throw new JsonParseException("Value is not an object"));
+                                                                  ?? throw new JsonParseException("Value is not an object"));
                     var fileid = long.Parse(version.FileId, CultureInfo.InvariantCulture);
                     if (!toProcess.Files.TryGetValue(fileid, out var manifestFile))
                     {

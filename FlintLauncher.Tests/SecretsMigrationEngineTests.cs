@@ -115,9 +115,9 @@ public class MigrationEngineTests : IDisposable
         var legacy = engine.Find("flint-legacy");
         Assert.NotNull(prism);
         Assert.NotNull(legacy);
-        Assert.False(prism.AutoRunAtStartup); // API-driven (G2)
-        Assert.True(legacy.AutoRunAtStartup);  // startup probe runs once
-        Assert.NotNull(engine.Find("FLINT-LEGACY"));                 // lookup is case-insensitive
+        Assert.False(prism.AutoRunAtStartup);        // API-driven (G2)
+        Assert.True(legacy.AutoRunAtStartup);        // startup probe runs once
+        Assert.NotNull(engine.Find("FLINT-LEGACY")); // lookup is case-insensitive
         Assert.Null(engine.Find("unknown"));
     }
 

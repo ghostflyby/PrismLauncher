@@ -61,15 +61,20 @@ internal sealed record LibraryJson
     public MojangLibraryDownloadsJson? Downloads { get; init; }
 
     // OneSix MMC extensions (+ the +agents argument member)
-    [JsonPropertyName("MMC-hint")] public string? MmcHint { get; init; }
+    [JsonPropertyName("MMC-hint")]
+    public string? MmcHint { get; init; }
 
-    [JsonPropertyName("MMC-absulute_url")] public string? MmcAbsuluteUrl { get; init; }
+    [JsonPropertyName("MMC-absulute_url")]
+    public string? MmcAbsuluteUrl { get; init; }
 
-    [JsonPropertyName("MMC-absoluteUrl")] public string? MmcAbsoluteUrl { get; init; }
+    [JsonPropertyName("MMC-absoluteUrl")]
+    public string? MmcAbsoluteUrl { get; init; }
 
-    [JsonPropertyName("MMC-filename")] public string? MmcFilename { get; init; }
+    [JsonPropertyName("MMC-filename")]
+    public string? MmcFilename { get; init; }
 
-    [JsonPropertyName("MMC-displayname")] public string? MmcDisplayname { get; init; }
+    [JsonPropertyName("MMC-displayname")]
+    public string? MmcDisplayname { get; init; }
 
     public string? Argument { get; init; }
 }
@@ -117,21 +122,31 @@ internal sealed record VersionFileJson
     public string? Version { get; init; }
     public string? McVersion { get; init; }
     public string? AppletClass { get; init; }
-    [JsonPropertyName("+tweakers")] public List<string>? AddTweakers { get; init; }
 
-    [JsonPropertyName("+traits")] public List<string>? AddTraits { get; init; }
+    [JsonPropertyName("+tweakers")]
+    public List<string>? AddTweakers { get; init; }
 
-    [JsonPropertyName("+jvmArgs")] public List<string>? AddJvmArgs { get; init; }
+    [JsonPropertyName("+traits")]
+    public List<string>? AddTraits { get; init; }
+
+    [JsonPropertyName("+jvmArgs")]
+    public List<string>? AddJvmArgs { get; init; }
 
     public List<LibraryJson>? JarMods { get; init; }
-    [JsonPropertyName("+jarMods")] public List<PlusJarModJson>? PlusJarMods { get; init; }
+
+    [JsonPropertyName("+jarMods")]
+    public List<PlusJarModJson>? PlusJarMods { get; init; }
 
     public List<LibraryJson>? Mods { get; init; }
     public List<LibraryJson>? Libraries { get; init; }
-    [JsonPropertyName("+libraries")] public List<LibraryJson>? PlusLibraries { get; init; }
+
+    [JsonPropertyName("+libraries")]
+    public List<LibraryJson>? PlusLibraries { get; init; }
 
     public List<LibraryJson>? MavenFiles { get; init; }
-    [JsonPropertyName("+agents")] public List<LibraryJson>? Agents { get; init; }
+
+    [JsonPropertyName("+agents")]
+    public List<LibraryJson>? Agents { get; init; }
 
     public LibraryJson? MainJar { get; init; }
     public bool? Volatile { get; init; }
@@ -160,11 +175,14 @@ internal sealed record VersionFileJson
     public Dictionary<string, MojangDownloadInfoJson>? Downloads { get; init; }
 
     // removed features — only the PRESENCE matters (each adds a problem)
-    [JsonPropertyName("tweakers")] public JsonElement? RemovedTweakers { get; init; }
+    [JsonPropertyName("tweakers")]
+    public JsonElement? RemovedTweakers { get; init; }
 
-    [JsonPropertyName("-libraries")] public JsonElement? RemovedLibraries { get; init; }
+    [JsonPropertyName("-libraries")]
+    public JsonElement? RemovedLibraries { get; init; }
 
-    [JsonPropertyName("-tweakers")] public JsonElement? RemovedTweakersDash { get; init; }
+    [JsonPropertyName("-tweakers")]
+    public JsonElement? RemovedTweakersDash { get; init; }
 
     [JsonPropertyName("-minecraftArguments")]
     public JsonElement? RemovedMinecraftArguments { get; init; }
@@ -241,13 +259,17 @@ internal sealed record LibraryOutJson
     public LibDownloadsOutJson? Downloads { get; init; }
 
     // OneSix MMC extensions (+ the +agents argument member)
-    [JsonPropertyName("MMC-hint")] public string? MmcHint { get; init; }
+    [JsonPropertyName("MMC-hint")]
+    public string? MmcHint { get; init; }
 
-    [JsonPropertyName("MMC-absoluteUrl")] public string? MmcAbsoluteUrl { get; init; }
+    [JsonPropertyName("MMC-absoluteUrl")]
+    public string? MmcAbsoluteUrl { get; init; }
 
-    [JsonPropertyName("MMC-filename")] public string? MmcFilename { get; init; }
+    [JsonPropertyName("MMC-filename")]
+    public string? MmcFilename { get; init; }
 
-    [JsonPropertyName("MMC-displayname")] public string? MmcDisplayname { get; init; }
+    [JsonPropertyName("MMC-displayname")]
+    public string? MmcDisplayname { get; init; }
 
     public string? Argument { get; init; }
 }
@@ -269,17 +291,22 @@ internal sealed record VersionFileOutJson
 
     public string? Version { get; init; }
 
-    [JsonPropertyName("formatVersion")] public int? FormatVersion { get; init; }
+    [JsonPropertyName("formatVersion")]
+    public int? FormatVersion { get; init; }
 
     public string? AppletClass { get; init; }
 
-    [JsonPropertyName("+tweakers")] public List<string>? AddTweakers { get; init; }
+    [JsonPropertyName("+tweakers")]
+    public List<string>? AddTweakers { get; init; }
 
-    [JsonPropertyName("+traits")] public List<string>? AddTraits { get; init; }
+    [JsonPropertyName("+traits")]
+    public List<string>? AddTraits { get; init; }
 
-    [JsonPropertyName("+jvmArgs")] public List<string>? AddJvmArgs { get; init; }
+    [JsonPropertyName("+jvmArgs")]
+    public List<string>? AddJvmArgs { get; init; }
 
-    [JsonPropertyName("+agents")] public List<LibraryOutJson>? Agents { get; init; }
+    [JsonPropertyName("+agents")]
+    public List<LibraryOutJson>? Agents { get; init; }
 
     public List<LibraryOutJson>? JarMods { get; init; }
 

@@ -22,7 +22,6 @@
 // is a runtime failure, not a compile error).
 
 using System.Text.Json.Serialization;
-
 using FlintLauncher.Core.Instances;
 
 namespace FlintLauncher.Core.Config;

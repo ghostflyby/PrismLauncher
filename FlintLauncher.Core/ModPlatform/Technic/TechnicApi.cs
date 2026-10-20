@@ -49,7 +49,8 @@ public sealed class TechnicSinglePackJson
 
     public TechnicIconJson? Icon { get; init; }
 
-    [JsonExtensionData] public Dictionary<string, JsonElement> Extension { get; set; } = new();
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement> Extension { get; set; } = new();
 }
 
 public sealed record TechnicIconJson(

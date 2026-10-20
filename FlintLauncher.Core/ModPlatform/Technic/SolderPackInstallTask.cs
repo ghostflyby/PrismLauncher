@@ -70,7 +70,7 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
             {
                 // LoadSolderPackBuild rejects null elements and null urls before this runs
                 var modUrl = mod?.Url
-                    ?? throw new InvalidOperationException("the Solder build carries an unvalidated mod");
+                             ?? throw new InvalidOperationException("the Solder build carries an unvalidated mod");
                 var path = Path.Combine(outputDir, i.ToString());
                 var dl = NetRequest.MakeFile(new Uri(modUrl), path);
                 if (mod.Md5.Length != 0)

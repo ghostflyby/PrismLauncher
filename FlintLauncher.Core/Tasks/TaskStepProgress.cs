@@ -20,7 +20,9 @@ public enum TaskStepState
 public struct TaskStepProgress(Guid uid)
 {
     public TaskStepProgress()
-        : this(Guid.NewGuid()) { }
+        : this(Guid.NewGuid())
+    {
+    }
 
     public Guid Uid { get; set; } = uid;
     public long Current { get; set; } = 0;

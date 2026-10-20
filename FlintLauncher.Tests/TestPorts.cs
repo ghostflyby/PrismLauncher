@@ -32,7 +32,8 @@ internal static class PortAllocator
     public static (HttpListener Listener, string Url) StartHttpListener()
     {
         var listener = new HttpListener();
-        for (var attempt = 1;; attempt++)
+        var attempt = 1;
+        while (true)
         {
             string url;
             using (var lease = Reserve())
@@ -51,6 +52,8 @@ internal static class PortAllocator
             {
                 // the freed port was taken inside the rebind window — next lease, next port
             }
+
+            attempt++;
         }
     }
 

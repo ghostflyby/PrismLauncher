@@ -5,4 +5,6 @@
 
 namespace FlintLauncher.Core.Json;
 
-public sealed class JsonParseException(string message) : Exception(message) { }
+public sealed class JsonParseException(string message) : Exception(message)
+{
+}

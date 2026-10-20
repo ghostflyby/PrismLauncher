@@ -21,7 +21,9 @@ using System.Text;
 namespace FlintLauncher.Core.ModPlatform.Packwiz;
 
 /// <summary>Port of toml++'s parse_error for the subset parser.</summary>
-public sealed class TomlParseException(string message) : Exception(message) { }
+public sealed class TomlParseException(string message) : Exception(message)
+{
+}
 
 /// <summary>
 /// A parsed TOML table: an ordered map of keys to values, where a value is a

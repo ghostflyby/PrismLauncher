@@ -281,7 +281,6 @@ public sealed class IniFile
                     WriteIndented = false,
                     Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                 }));
-
             }
             case "Env":
                 // Json::fromMap over QVariantMap; INI-stored maps only come through @Variant blobs,

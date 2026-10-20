@@ -150,7 +150,9 @@ public static class MigrationEndpoints
                 });
             }
             catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException
-                                          or NotSupportedException or SecurityException) { }
+                                          or NotSupportedException or SecurityException)
+            {
+            }
 
             return Results.NoContent();
         }).Produces(204);

@@ -57,7 +57,9 @@ public sealed class PrivatePackManager(string? filename = null)
             _dirty = false;
         }
         catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
-                                      or SecurityException) { }
+                                      or SecurityException)
+        {
+        }
     }
 
     public void Add(string code)

@@ -21,7 +21,6 @@ using FlintLauncher.Core.Minecraft;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
-
 // ------------------------------------------------------------------ wire probes
 //
 // The CurseForge project/file shapes as parsed DTOs; every member is camel-conforming

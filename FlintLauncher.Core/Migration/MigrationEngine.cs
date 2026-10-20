@@ -346,7 +346,9 @@ public static class FlintLegacyMigration
                 });
             }
             catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException
-                                          or NotSupportedException or SecurityException) { }
+                                          or NotSupportedException or SecurityException)
+            {
+            }
         }
 
         return new Result(ran, moved, bytes, ledgerCleaned, error);

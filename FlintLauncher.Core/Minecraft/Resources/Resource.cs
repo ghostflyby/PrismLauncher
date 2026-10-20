@@ -474,5 +474,4 @@ public partial class Resource
 
     [GeneratedRegex("^(?:the|teh) +", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ThePrefixRegex();
-
 }

@@ -110,6 +110,7 @@ public sealed class World
 
     /// <summary>Size in bytes; set externally via SetSize (WorldList::calculateWorldSize).</summary>
     public void SetSize(long size) => Size = size;
+
     public long Size { get; private set; }
 
     public long Seed { get; private set; }
