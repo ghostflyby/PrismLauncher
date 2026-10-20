@@ -106,7 +106,9 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     private bool _loaded;
 
     public PackProfile(string instanceRoot, Index? metadataIndex = null)
-        : this(new BasicPackProfileEnv(instanceRoot), metadataIndex) { }
+        : this(new BasicPackProfileEnv(instanceRoot), metadataIndex)
+    {
+    }
 
     public void Dispose()
     {

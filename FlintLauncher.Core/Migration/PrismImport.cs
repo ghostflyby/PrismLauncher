@@ -284,7 +284,9 @@ public sealed class PrismImportTask : FlintTask
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                       or SecurityException or ArgumentException
-                                      or NotSupportedException) { }
+                                      or NotSupportedException)
+        {
+        }
 
         RecordImportDecision(plan, sourceInstances);
         EmitSucceeded();

@@ -459,7 +459,9 @@ internal sealed class AssetsRootRedirect : IDisposable
             }
         }
         catch (Exception e) when (e is DirectoryNotFoundException or FileNotFoundException or IOException
-                                      or UnauthorizedAccessException) { }
+                                      or UnauthorizedAccessException)
+        {
+        }
     }
 }
 

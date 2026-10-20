@@ -33,7 +33,9 @@ public enum MetadataVersion
 /// JsonParseException by the metadata-document consumers (see MetaEntity.ParsingValidator,
 /// whose filter used to miss this type); derives directly from Exception like the upstream
 /// ::Exception root.</summary>
-public sealed class MetaParseException(string message) : Exception(message) { }
+public sealed class MetaParseException(string message) : Exception(message)
+{
+}
 
 /// <summary>Port of Meta::Require. Set identity is by uid only, like the C++ operator==/operator&lt;.
 /// DeepEquals compares all fields (used by Component's deep-inspect change detection).</summary>

@@ -302,7 +302,9 @@ public static class DataMigration
                 File.Delete(legacyMarker);
             }
             catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException
-                                          or NotSupportedException or SecurityException) { }
+                                          or NotSupportedException or SecurityException)
+            {
+            }
         }
 
         return true;

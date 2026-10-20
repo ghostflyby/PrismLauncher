@@ -15,7 +15,9 @@ using System.Text;
 namespace FlintLauncher.Core.IO;
 
 /// <summary>Port of FS::FileSystemException.</summary>
-public sealed class FileSystemException(string message) : Exception(message) { }
+public sealed class FileSystemException(string message) : Exception(message)
+{
+}
 
 public static class FileSystem
 {

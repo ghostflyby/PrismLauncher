@@ -106,7 +106,9 @@ public sealed class Hasher(string filePath, Algorithm alg) : FlintTask
     private string _result = "";
 
     public Hasher(string filePath, string alg)
-        : this(filePath, HashUtils.AlgorithmFromString(alg)) { }
+        : this(filePath, HashUtils.AlgorithmFromString(alg))
+    {
+    }
 
     public string Path { get; } = filePath;
 

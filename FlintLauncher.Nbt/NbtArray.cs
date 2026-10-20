@@ -4,7 +4,9 @@
 
 namespace FlintLauncher.Nbt;
 
-public abstract class NbtArray : NbtTag { }
+public abstract class NbtArray : NbtTag
+{
+}
 
 /// <summary>Port of nbt::tag_byte_array.</summary>
 public sealed class NbtByteArray : NbtArray
