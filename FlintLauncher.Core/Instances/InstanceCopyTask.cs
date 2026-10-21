@@ -81,7 +81,7 @@ public class InstanceCopyTask : InstanceTask
         }
 
         Func<string, bool>? matcher = _matcher is null ? null : path => _matcher.IsMatch(path);
-        if (!FileOps.Copy(new LocalPath(_origInstance.InstanceRoot()), new LocalPath(StagingPath), matcher))
+        if (!FileOps.Copy(new AbsolutePath(_origInstance.InstanceRoot()), new AbsolutePath(StagingPath), matcher))
         {
             EmitFailed("Instance folder copy failed.");
             return Task.CompletedTask;

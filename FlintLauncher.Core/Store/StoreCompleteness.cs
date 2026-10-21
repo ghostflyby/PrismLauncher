@@ -125,7 +125,7 @@ public static class StoreCompleteness
         long bytes = 0;
         foreach (var (objectName, assetObject) in index.Objects)
         {
-            var file = new FileInfo(assetObject.GetLocalPath(paths.AssetsRoot));
+            var file = new FileInfo(assetObject.GetAbsolutePath(paths.AssetsRoot));
             // the GetDownloadAction re-download condition: absent OR wrong size
             if (!file.Exists || file.Length != assetObject.Size)
             {

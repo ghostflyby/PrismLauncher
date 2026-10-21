@@ -386,7 +386,7 @@ public sealed class EnsureMetadataTask(
         }
 
         // LocalResourceUpdateTask: ensure a '.index' folder exists in the mods folder
-        if (!FileOps.EnsureFolderPathExists(new LocalPath(indexDir)))
+        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(indexDir)))
         {
             EmitMetadataFailed(resource, $"Unable to create index directory at {indexDir}!");
             return;

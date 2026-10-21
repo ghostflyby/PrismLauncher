@@ -2,7 +2,7 @@
 // The name-derivation helpers of launcher/FileSystem.{h,cpp}: sanitizing user strings into
 // file names (FS::RemoveInvalidPathChars) and picking a free name on disk
 // (FS::DirNameFromString, FS::getUniqueResourceName). Names travel as strings; the folders
-// they are probed against are TruePath LocalPaths.
+// they are probed against are TruePath AbsolutePaths.
 
 using System.Globalization;
 using System.Text;
@@ -21,20 +21,11 @@ public static class FileNaming
     }
 
     /// <summary>
-    /// Port of FS::DirNameFromString: derive a directory name from a user string that clashes
-    /// with nothing inside <paramref name="inDir"/>.
-    /// </summary>
-    public static string DirNameFromString(string str, LocalPath inDir)
-    {
-        return DirNameFromString(str, [inDir]);
-    }
-
-    /// <summary>
     /// Port of FS::DirNameFromString(string, QStringList inDirs): derive a directory name
     /// that clashes with none of the given dirs (#6110 dedupes instance folder names across
     /// every configured instances directory).
     /// </summary>
-    public static string DirNameFromString(string str, IEnumerable<LocalPath> inDirs)
+    public static string DirNameFromString(string str, params IEnumerable<AbsolutePath> inDirs)
     {
         var num = 0;
         var baseName = RemoveChars(str, '-', "\\/"); // FS::RemoveInvalidFilenameChars
@@ -60,7 +51,7 @@ public static class FileNaming
     /// is taken gets the next free "x.duplicateN" name next to it; anything else is returned
     /// unchanged (enabled resources take priority).
     /// </summary>
-    public static LocalPath GetUniqueResourceName(LocalPath filePath)
+    public static AbsolutePath GetUniqueResourceName(AbsolutePath filePath)
     {
         const string disabledSuffix = ".disabled";
         var fileName = filePath.FileName;
@@ -69,7 +60,7 @@ public static class FileNaming
             return filePath;
         }
 
-        var dir = filePath.Parent ?? new LocalPath("");
+        var dir = filePath.Parent ?? new AbsolutePath("");
         if (!Path.Exists((dir / fileName[..^disabledSuffix.Length]).Value))
         {
             return filePath;
@@ -77,7 +68,7 @@ public static class FileNaming
 
         var baseName = Path.GetFileNameWithoutExtension(fileName);
         var counter = 1;
-        LocalPath candidate;
+        AbsolutePath candidate;
         do
         {
             candidate = dir / (counter == 1 ? baseName + ".duplicate" : baseName + ".duplicate" + counter);

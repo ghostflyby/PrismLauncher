@@ -27,7 +27,7 @@ public sealed class WorldList
     public WorldList(string dir)
     {
         Dir = dir;
-        FileOps.EnsureFolderPathExists(new LocalPath(Dir));
+        FileOps.EnsureFolderPathExists(new AbsolutePath(Dir));
     }
 
     /// <summary>The saves directory this list is rooted at (QDir m_dir).</summary>

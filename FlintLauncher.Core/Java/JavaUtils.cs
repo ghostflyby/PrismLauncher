@@ -357,7 +357,7 @@ public static class JavaUtils
             // add the microsoft store version of the launcher to the search. the current path is:
             // C:\Users\USERNAME\AppData\Local\Packages\Microsoft.4297127D64EC6_8wekyb3d8bbwe\LocalCache\Local\runtime
             var localAppDataPath = Environment.GetEnvironmentVariable("LOCALAPPDATA") ?? "";
-            var minecraftMsStorePath = new LocalPath(Path.GetFullPath(localAppDataPath)) / "Packages" / "Microsoft.4297127D64EC6_8wekyb3d8bbwe";
+            var minecraftMsStorePath = new AbsolutePath(Path.GetFullPath(localAppDataPath)) / "Packages" / "Microsoft.4297127D64EC6_8wekyb3d8bbwe";
             processpaths.Add((minecraftMsStorePath / "LocalCache" / "Local" / "runtime").Value);
         }
         else

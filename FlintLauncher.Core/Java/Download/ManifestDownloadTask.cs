@@ -87,7 +87,7 @@ public sealed class ManifestDownloadTask(Uri url, string finalPath, string check
     private async Task DownloadJava(JavaRuntimeManifestJson manifest, CancellationToken cancellationToken)
     {
         // valid json doc, begin making jre spot
-        FileOps.EnsureFolderPathExists(new LocalPath(finalPath));
+        FileOps.EnsureFolderPathExists(new AbsolutePath(finalPath));
         var toDownload = new List<ManifestFile>();
         if (manifest.Files is { } list)
         {
@@ -103,7 +103,7 @@ public sealed class ManifestDownloadTask(Uri url, string finalPath, string check
                 var type = meta.Type ?? "";
                 if (type == "directory")
                 {
-                    FileOps.EnsureFolderPathExists(new LocalPath(file));
+                    FileOps.EnsureFolderPathExists(new AbsolutePath(file));
                 }
                 else if (type == "link")
                 {
@@ -191,7 +191,7 @@ public sealed class ManifestDownloadTask(Uri url, string finalPath, string check
                 return;
             }
 
-            FileOps.EnsureFilePathExists(new LocalPath(linkPath));
+            FileOps.EnsureFilePathExists(new AbsolutePath(linkPath));
             if (!OperatingSystem.IsWindows())
             {
                 File.CreateSymbolicLink(linkPath, target);

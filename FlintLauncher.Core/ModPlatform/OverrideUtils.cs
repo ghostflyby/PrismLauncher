@@ -21,10 +21,10 @@ public static class OverrideUtils
         var filePath = Path.Combine(parentFolder, name + ".txt");
         if (File.Exists(filePath))
         {
-            FileOps.DeletePath(new LocalPath(filePath));
+            FileOps.DeletePath(new AbsolutePath(filePath));
         }
 
-        FileOps.EnsureFilePathExists(new LocalPath(filePath));
+        FileOps.EnsureFilePathExists(new AbsolutePath(filePath));
 
         using var writer = new StreamWriter(filePath);
         foreach (var path in EnumerateOverrideFiles(overridePath))
@@ -64,7 +64,7 @@ public static class OverrideUtils
     /// </summary>
     public static bool OverrideFolder(string overwrittenPath, string overridePath)
     {
-        if (!FileOps.EnsureFolderPathExists(new LocalPath(overwrittenPath)))
+        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(overwrittenPath)))
         {
             return false;
         }
@@ -75,7 +75,7 @@ public static class OverrideUtils
             {
                 var relative = Path.GetRelativePath(overridePath, source);
                 var target = Path.GetFullPath(Path.Combine(overwrittenPath, relative));
-                FileOps.EnsureFilePathExists(new LocalPath(target));
+                FileOps.EnsureFilePathExists(new AbsolutePath(target));
                 File.Copy(source, target, overwrite: true);
             }
 

@@ -21,7 +21,7 @@ public sealed class ExtractNatives(LaunchTask parent) : LaunchStep(parent)
         }
 
         var outputPath = instance.GetNativePath();
-        FileOps.EnsureFolderPathExists(new LocalPath(outputPath));
+        FileOps.EnsureFolderPathExists(new AbsolutePath(outputPath));
         var jniHackEnabled = instance.GetJavaLanguageVersion() >= 8;
         foreach (var source in toExtract)
         {
@@ -70,7 +70,7 @@ public sealed class ExtractNatives(LaunchTask parent) : LaunchStep(parent)
         {
             using var zip = ZipFile.OpenRead(source);
             var directory = Path.GetFullPath(targetFolder);
-            FileOps.EnsureFolderPathExists(new LocalPath(directory));
+            FileOps.EnsureFolderPathExists(new AbsolutePath(directory));
 
             foreach (var entry in zip.Entries)
             {
@@ -82,7 +82,7 @@ public sealed class ExtractNatives(LaunchTask parent) : LaunchStep(parent)
 
                 if (name.EndsWith('/'))
                 {
-                    FileOps.EnsureFolderPathExists((new LocalPath(directory) / name));
+                    FileOps.EnsureFolderPathExists((new AbsolutePath(directory) / name));
                     continue;
                 }
 
@@ -95,7 +95,7 @@ public sealed class ExtractNatives(LaunchTask parent) : LaunchStep(parent)
                     return false;
                 }
 
-                FileOps.EnsureFilePathExists(new LocalPath(absFilePath));
+                FileOps.EnsureFilePathExists(new AbsolutePath(absFilePath));
                 using var entryStream = entry.Open();
                 using var output = File.Create(absFilePath);
                 entryStream.CopyTo(output);

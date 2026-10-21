@@ -195,7 +195,7 @@ public sealed class AutoInstallJava : LaunchStep
                         {
                             if (Directory.Exists(finalPath) || File.Exists(finalPath))
                             {
-                                FileOps.DeletePath(new LocalPath(finalPath));
+                                FileOps.DeletePath(new AbsolutePath(finalPath));
                             }
                         }
                         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }

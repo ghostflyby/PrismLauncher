@@ -75,7 +75,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
     private static string TempCachePath(string relativeName)
     {
         var dir = Path.Combine(Path.GetTempPath(), "flint-ftb-cache");
-        FileOps.EnsureFolderPathExists(new LocalPath(dir));
+        FileOps.EnsureFolderPathExists(new AbsolutePath(dir));
         return Path.Combine(dir, relativeName.Replace('/', '_'));
     }
 
@@ -103,7 +103,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
         if (Directory.Exists(unzipMcDir))
         {
             // ok, found minecraft dir, move contents to instance dir
-            if (!FileOps.Move(new LocalPath(unzipMcDir), (new LocalPath(StagingPath) / "minecraft")))
+            if (!FileOps.Move(new AbsolutePath(unzipMcDir), (new AbsolutePath(StagingPath) / "minecraft")))
             {
                 EmitFailed("Failed to move unpacked Minecraft!");
                 return;
@@ -148,7 +148,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
                             : forgeSpecifier.Version.Replace(pack.McVersion, "").Replace("-", "");
                         await components.SetComponentVersion("net.minecraftforge", forgeVersion,
                             cancellationToken: cancellationToken);
-                        FileOps.DeletePath(new LocalPath(packJsonPath));
+                        FileOps.DeletePath(new AbsolutePath(packJsonPath));
                         fallback = false;
                         break;
                     }
@@ -168,7 +168,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
             }
 
             // just nuke unzip directory, it s not needed anymore
-            FileOps.DeletePath((new LocalPath(StagingPath) / "unzip"));
+            FileOps.DeletePath((new AbsolutePath(StagingPath) / "unzip"));
 
             if (fallback)
             {

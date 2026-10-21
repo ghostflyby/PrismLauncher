@@ -137,7 +137,7 @@ public static class Packwiz
         }
         else
         {
-            FileOps.EnsureFilePathExists(new LocalPath(normalizedPath));
+            FileOps.EnsureFilePathExists(new AbsolutePath(normalizedPath));
         }
 
         string update;

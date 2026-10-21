@@ -306,7 +306,7 @@ public sealed class AccountList
         }
 
         // make sure the parent folder exists
-        if (!FileOps.EnsureFilePathExists(new LocalPath(_listFilePath)))
+        if (!FileOps.EnsureFilePathExists(new AbsolutePath(_listFilePath)))
         {
             return false;
         }

@@ -121,7 +121,7 @@ public sealed class LegacyFmlLibrariesTask(MinecraftInstance inst) : FlintTask
             {
                 SetProgress(index, _fmlLibsToProcess.Count);
                 var entry = metacache.ResolveEntry("fmllibs", lib.Filename);
-                var path = new LocalPath(inst1.LibDir()) / lib.Filename;
+                var path = new AbsolutePath(inst1.LibDir()) / lib.Filename;
                 if (!FileOps.EnsureFilePathExists(path))
                 {
                     EmitFailed("Failed creating FML library folder inside the instance.");

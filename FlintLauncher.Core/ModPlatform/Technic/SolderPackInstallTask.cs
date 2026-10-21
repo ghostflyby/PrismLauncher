@@ -107,7 +107,7 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
     {
         EmitStatus("Extracting modpack");
         var extractDir = Path.Combine(StagingPath, "minecraft");
-        FileOps.EnsureFolderPathExists(new LocalPath(extractDir));
+        FileOps.EnsureFolderPathExists(new AbsolutePath(extractDir));
 
         var i = 0;
         while (modCount > i)

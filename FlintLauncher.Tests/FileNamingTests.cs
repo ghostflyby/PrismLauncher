@@ -35,10 +35,12 @@ public class FileNamingTests : IDisposable
     [Fact]
     public void DirNameFromString_AvoidsClashes()
     {
-        var name = FileNaming.DirNameFromString("My Instance!", new LocalPath(_tempRoot));
+        AbsolutePath inDir = new AbsolutePath(_tempRoot);
+        var name = FileNaming.DirNameFromString("My Instance!", [inDir]);
         Assert.Equal("My Instance-", name);
         Directory.CreateDirectory(Path.Combine(_tempRoot, name));
-        Assert.Equal("My Instance-(1)", FileNaming.DirNameFromString("My Instance!", new LocalPath(_tempRoot)));
+        AbsolutePath inDir1 = new AbsolutePath(_tempRoot);
+        Assert.Equal("My Instance-(1)", FileNaming.DirNameFromString("My Instance!", [inDir1]));
     }
 
     [Fact]
@@ -50,30 +52,31 @@ public class FileNamingTests : IDisposable
         Directory.CreateDirectory(otherDir);
         Directory.CreateDirectory(Path.Combine(otherDir, "My Instance-"));
 
-        var dirs = new[] { new LocalPath(_tempRoot), new LocalPath(otherDir) };
+        var dirs = new[] { new AbsolutePath(_tempRoot), new AbsolutePath(otherDir) };
         // "My Instance-" clashes inside second-root even though first-root is empty
         Assert.Equal("My Instance-(1)", FileNaming.DirNameFromString("My Instance!", dirs));
         // and the single-dir overload still only considers its own dir
-        Assert.Equal("My Instance-", FileNaming.DirNameFromString("My Instance!", new LocalPath(_tempRoot)));
+        AbsolutePath inDir = new AbsolutePath(_tempRoot);
+        Assert.Equal("My Instance-", FileNaming.DirNameFromString("My Instance!", [inDir]));
     }
 
     [Fact]
     public async Task GetUniqueResourceName()
     {
         // enabled mods are prioritized and returned untouched
-        Assert.Equal("/x/mod.jar", FileNaming.GetUniqueResourceName(new LocalPath("/x/mod.jar")).Value);
+        Assert.Equal("/x/mod.jar", FileNaming.GetUniqueResourceName(new AbsolutePath("/x/mod.jar")).Value);
 
         // disabled file whose stripped name does not exist: the original path is returned as-is
         var disabled = Path.Combine(_tempRoot, "mod.jar.disabled");
         await File.WriteAllTextAsync(disabled, "x");
-        Assert.Equal(disabled, FileNaming.GetUniqueResourceName(new LocalPath(disabled)).Value);
+        Assert.Equal(disabled, FileNaming.GetUniqueResourceName(new AbsolutePath(disabled)).Value);
 
         // once "mod.jar" exists, the next free ".duplicate" name is chosen
         await File.WriteAllTextAsync(Path.Combine(_tempRoot, "mod.jar"), "x");
         Assert.Equal(Path.Combine(_tempRoot, "mod.jar.duplicate"),
-            FileNaming.GetUniqueResourceName(new LocalPath(disabled)).Value);
+            FileNaming.GetUniqueResourceName(new AbsolutePath(disabled)).Value);
         await File.WriteAllTextAsync(Path.Combine(_tempRoot, "mod.jar.duplicate"), "x");
         Assert.Equal(Path.Combine(_tempRoot, "mod.jar.duplicate2"),
-            FileNaming.GetUniqueResourceName(new LocalPath(disabled)).Value);
+            FileNaming.GetUniqueResourceName(new AbsolutePath(disabled)).Value);
     }
 }

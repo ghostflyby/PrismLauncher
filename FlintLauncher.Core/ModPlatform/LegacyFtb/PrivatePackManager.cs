@@ -53,7 +53,7 @@ public sealed class PrivatePackManager(string? filename = null)
 
         try
         {
-            FileOps.Write(new LocalPath(_filename), Encoding.UTF8.GetBytes(string.Join('\n', _currentPacks)));
+            FileOps.Write(new AbsolutePath(_filename), Encoding.UTF8.GetBytes(string.Join('\n', _currentPacks)));
             _dirty = false;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or SecurityException)

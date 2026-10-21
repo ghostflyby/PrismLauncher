@@ -148,7 +148,7 @@ public sealed class DataMigrationTask(string sourcePath, string targetPath, Func
     private bool CopyFile(string relative)
     {
         var dstPath = Path.Combine(targetPath, relative);
-        if (!FileOps.EnsureFilePathExists(new LocalPath(dstPath)))
+        if (!FileOps.EnsureFilePathExists(new AbsolutePath(dstPath)))
         {
             return false;
         }

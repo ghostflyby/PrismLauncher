@@ -22,8 +22,8 @@ public sealed class FtbAppPackInstallTask(FtbAppModpack pack) : InstanceTask
         EmitStatus("Copying files...");
         SetProgress(1, 2);
 
-        var target = new LocalPath(StagingPath) / "minecraft";
-        if (!FileOps.Copy(new LocalPath(pack.Path), target))
+        var target = new AbsolutePath(StagingPath) / "minecraft";
+        if (!FileOps.Copy(new AbsolutePath(pack.Path), target))
         {
             EmitFailed("Failed to copy the FTB App instance folder");
             return;

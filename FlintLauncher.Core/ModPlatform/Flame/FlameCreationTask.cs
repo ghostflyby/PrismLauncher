@@ -141,9 +141,9 @@ public sealed partial class FlameCreationTask : InstanceTask
             }
 
             // Keep index file in case we need it some other time (like when changing versions)
-            var newIndexPlace = new LocalPath(parentFolder) / "manifest.json";
+            var newIndexPlace = new AbsolutePath(parentFolder) / "manifest.json";
             FileOps.EnsureFilePathExists(newIndexPlace);
-            FileOps.Move(new LocalPath(indexPath), newIndexPlace);
+            FileOps.Move(new AbsolutePath(indexPath), newIndexPlace);
         }
         catch (JsonException e)
         {
@@ -168,8 +168,8 @@ public sealed partial class FlameCreationTask : InstanceTask
                 // Create a list of overrides in "overrides.txt" inside flame/
                 OverrideUtils.CreateOverrides("overrides", parentFolder, overridePath);
 
-                var mcPath = new LocalPath(StagingPath) / "minecraft";
-                if (!FileOps.Move(new LocalPath(overridePath), mcPath))
+                var mcPath = new AbsolutePath(StagingPath) / "minecraft";
+                if (!FileOps.Move(new AbsolutePath(overridePath), mcPath))
                 {
                     EmitFailed("Could not rename the overrides folder:\n" + _pack.Overrides);
                     return;
@@ -311,7 +311,7 @@ public sealed partial class FlameCreationTask : InstanceTask
             var jarMods = Directory.EnumerateFiles(jarmodsPath).ToList();
             _ = _newInstance.GetPackProfile().InstallJarMods(jarMods);
             // nuke the original files
-            FileOps.DeletePath(new LocalPath(jarmodsPath));
+            FileOps.DeletePath(new AbsolutePath(jarmodsPath));
         }
 
         SetManagedPack(_newInstance);
@@ -568,7 +568,7 @@ public sealed partial class FlameCreationTask : InstanceTask
             // always copies (never moves) the user-picked local file
             try
             {
-                FileOps.EnsureFilePathExists(new LocalPath(destPath));
+                FileOps.EnsureFilePathExists(new AbsolutePath(destPath));
                 File.Copy(mod.LocalPath, destPath, overwrite: true);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
@@ -596,7 +596,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                 if (folder != realTarget)
                 {
                     var destPath = Path.Combine(StagingPath, "minecraft", realTarget, name);
-                    if (FileOps.Move(new LocalPath(localPath), new LocalPath(destPath)))
+                    if (FileOps.Move(new AbsolutePath(localPath), new AbsolutePath(destPath)))
                     {
                         return destPath;
                     }
@@ -708,7 +708,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                     continue;
                 }
 
-                if (!FileOps.DeletePath(new LocalPath(path)))
+                if (!FileOps.DeletePath(new AbsolutePath(path)))
                 {
                     deleteFailed = true;
                 }

@@ -99,7 +99,7 @@ public sealed partial class InstanceImportTask(
         {
             // headless fallback: plain download into the staging folder
             _archivePath = Path.Combine(StagingPath, Path.GetFileName(sourceUrl.AbsolutePath));
-            FileOps.EnsureFilePathExists(new LocalPath(_archivePath));
+            FileOps.EnsureFilePathExists(new AbsolutePath(_archivePath));
             var request = NetRequest.MakeFile(sourceUrl, _archivePath);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)

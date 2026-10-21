@@ -149,7 +149,7 @@ public static class SkinListStore
         {
             Skins = skins.Select(skin => skin.ToWire()).ToArray(),
         };
-        FileOps.Write(new LocalPath(Path.Combine(skinsDir, "index.json")),
+        FileOps.Write(new AbsolutePath(Path.Combine(skinsDir, "index.json")),
             JsonSerializer.SerializeToUtf8Bytes(doc, SkinJsonContext.Default.SkinIndexJson));
     }
 

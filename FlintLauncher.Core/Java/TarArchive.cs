@@ -89,7 +89,7 @@ public static class TarArchive
         var targetTopDir = listOnly ? "" : Path.GetFullPath(targetDir);
         if (!listOnly)
         {
-            FileOps.EnsureFolderPathExists(new LocalPath(targetTopDir));
+            FileOps.EnsureFolderPathExists(new AbsolutePath(targetTopDir));
         }
 
         var header = new byte[BlockSize];
@@ -175,7 +175,7 @@ public static class TarArchive
                 var sections = relativeName.Split('/');
                 subPath = string.Join('/', sections[..^1]) + '/';
                 relativeName = sections[^1];
-                FileOps.EnsureFolderPathExists((new LocalPath(targetTopDir) / subPath));
+                FileOps.EnsureFolderPathExists((new AbsolutePath(targetTopDir) / subPath));
             }
             else
             {
@@ -221,7 +221,7 @@ public static class TarArchive
                 case '5': // directory
                 {
                     var dir = targetFilePath.TrimEnd('/');
-                    if (!FileOps.EnsureFolderPathExists(new LocalPath(dir)))
+                    if (!FileOps.EnsureFolderPathExists(new AbsolutePath(dir)))
                     {
                         error = $"Failed to create directory {dir}";
                         return false;
@@ -232,7 +232,7 @@ public static class TarArchive
                 }
                 case '0' or '\0' or '7': // regular file (the data payload follows)
                 {
-                    FileOps.EnsureFilePathExists(new LocalPath(targetFilePath));
+                    FileOps.EnsureFilePathExists(new AbsolutePath(targetFilePath));
                     using (var output = File.Create(targetFilePath))
                     {
                         CopyExactly(stream, output, size);
@@ -261,7 +261,7 @@ public static class TarArchive
                             return true;
                         }
 
-                        FileOps.EnsureFilePathExists(new LocalPath(targetFilePath));
+                        FileOps.EnsureFilePathExists(new AbsolutePath(targetFilePath));
                         File.CreateSymbolicLink(targetFilePath, linkTarget);
                     }
                     catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -278,7 +278,7 @@ public static class TarArchive
                     var sourcePath = Path.Combine(Path.GetDirectoryName(targetFilePath) ?? "", linkTarget);
                     if (File.Exists(sourcePath))
                     {
-                        FileOps.EnsureFilePathExists(new LocalPath(targetFilePath));
+                        FileOps.EnsureFilePathExists(new AbsolutePath(targetFilePath));
                         File.Copy(sourcePath, targetFilePath, overwrite: true);
                         extracted.Add(targetFilePath);
                     }

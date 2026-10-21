@@ -116,9 +116,9 @@ public sealed class ModrinthCreationTask : InstanceTask
         }
 
         // Keep index file in case we need it some other time (like when changing versions)
-        var newIndexPlace = new LocalPath(parentFolder) / "modrinth.index.json";
+        var newIndexPlace = new AbsolutePath(parentFolder) / "modrinth.index.json";
         FileOps.EnsureFilePathExists(newIndexPlace);
-        FileOps.Move(new LocalPath(indexPath), newIndexPlace);
+        FileOps.Move(new AbsolutePath(indexPath), newIndexPlace);
 
         var mcPath = Path.Combine(StagingPath, _rootPath);
 
@@ -129,7 +129,7 @@ public sealed class ModrinthCreationTask : InstanceTask
             OverrideUtils.CreateOverrides("overrides", parentFolder, overridePath);
 
             // Apply the overrides
-            if (!FileOps.Move(new LocalPath(overridePath), new LocalPath(mcPath)))
+            if (!FileOps.Move(new AbsolutePath(overridePath), new AbsolutePath(mcPath)))
             {
                 EmitFailed("Could not rename the overrides folder:\n" + "overrides");
                 return;
@@ -540,7 +540,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                     continue;
                 }
 
-                if (!FileOps.DeletePath(new LocalPath(path)))
+                if (!FileOps.DeletePath(new AbsolutePath(path)))
                 {
                     deleteFailed = true;
                 }
@@ -583,7 +583,7 @@ public sealed class ModrinthCreationTask : InstanceTask
     {
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            FileOps.EnsureFilePathExists(new LocalPath(filePath));
+            FileOps.EnsureFilePathExists(new AbsolutePath(filePath));
             var hashAlgorithm = file.HashAlgorithm;
 
             while (file.Downloads.Count > 0)

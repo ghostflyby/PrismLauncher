@@ -463,7 +463,7 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
             var dir = Path.GetDirectoryName(_indexFile);
             if (dir is not null)
             {
-                _ = FileOps.EnsureFolderPathExists(new LocalPath(dir));
+                _ = FileOps.EnsureFolderPathExists(new AbsolutePath(dir));
             }
 
             // Qt's QJsonDocument writes `"` as `\"` and leaves unicode alone; match that so

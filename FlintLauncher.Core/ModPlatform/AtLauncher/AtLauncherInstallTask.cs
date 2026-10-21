@@ -307,7 +307,7 @@ public sealed partial class AtLauncherPackInstallTask(
         // Delete the files
         foreach (var item in filesToDelete)
         {
-            FileOps.DeletePath(new LocalPath(item));
+            FileOps.DeletePath(new AbsolutePath(item));
         }
     }
 
@@ -471,7 +471,7 @@ public sealed partial class AtLauncherPackInstallTask(
         var id = Guid.NewGuid().ToString(); // QUuid::createUuid().toString(QUuid::WithoutBraces)
         var targetId = "org.multimc.atlauncher." + id;
 
-        var patchDir = new LocalPath(instanceRoot) / "patches";
+        var patchDir = new AbsolutePath(instanceRoot) / "patches";
         if (!FileOps.EnsureFolderPathExists(patchDir))
         {
             return false;
@@ -586,7 +586,7 @@ public sealed partial class AtLauncherPackInstallTask(
         var id = Guid.NewGuid().ToString();
         var targetId = "org.multimc.atlauncher." + id;
 
-        var patchDir = new LocalPath(instanceRoot) / "patches";
+        var patchDir = new AbsolutePath(instanceRoot) / "patches";
         if (!FileOps.EnsureFolderPathExists(patchDir))
         {
             return false;
@@ -658,7 +658,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
     private static void WritePatchFile(string patchFileName, VersionFile f)
     {
-        FileOps.Write(new LocalPath(patchFileName), Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(f)));
+        FileOps.Write(new AbsolutePath(patchFileName), Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(f)));
     }
 
     private async Task InstallConfigs(CancellationToken cancellationToken)
@@ -966,7 +966,7 @@ public sealed partial class AtLauncherPackInstallTask(
     private static string TempCachePath(string relativeName)
     {
         var dir = Path.Combine(Path.GetTempPath(), "flint-atl-cache");
-        FileOps.EnsureFolderPathExists(new LocalPath(dir));
+        FileOps.EnsureFolderPathExists(new AbsolutePath(dir));
         return Path.Combine(dir, relativeName.Replace("%s%", "_").Replace('/', '_'));
     }
 
@@ -1046,13 +1046,13 @@ public sealed partial class AtLauncherPackInstallTask(
         {
             // If the file already exists, assume the mod is the correct copy - and remove
             // the copy from the Configs.zip
-            if (File.Exists(to) && !FileOps.DeletePath(new LocalPath(to)))
+            if (File.Exists(to) && !FileOps.DeletePath(new AbsolutePath(to)))
             {
                 EmitStatus("Failed to delete " + to);
                 return false;
             }
 
-            if (!File.Exists(from) || !FileOps.Copy(new LocalPath(from), new LocalPath(to)))
+            if (!File.Exists(from) || !FileOps.Copy(new AbsolutePath(from), new AbsolutePath(to)))
             {
                 EmitStatus($"Failed to copy {from} to {to}");
                 return false;

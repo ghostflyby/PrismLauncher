@@ -2,7 +2,7 @@
 // The fault-tolerant file operations of launcher/FileSystem.{h,cpp} (FS::copy, FS::move,
 // FS::deletePath, FS::ensure*PathExists) and the atomic save of launcher/PSaveFile.h — the
 // parts of the C++ FS namespace that have no BCL counterpart. Path arithmetic is TruePath's
-// (LocalPath); plain reads and existence checks go straight to System.IO at the call sites.
+// (AbsolutePath); plain reads and existence checks go straight to System.IO at the call sites.
 //
 // Error contract, inherited from FS::: the bool-returning members swallow I/O failures and
 // report them as false so a caller surfaces one failure message instead of unwinding; Write is
@@ -10,6 +10,7 @@
 // callers for display (failedPaths, the extracted-file lists) stay plain strings.
 
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.IO;
 
@@ -23,18 +24,18 @@ public static class FileOps
     /// leaves a partially written target behind.
     /// </summary>
     /// <exception cref="IOException">The folder could not be created or the data could not be written.</exception>
-    public static void Write(LocalPath file, ReadOnlySpan<byte> data)
+    public static void Write(AbsolutePath file, ReadOnlySpan<byte> data)
     {
         if (file.Parent is { Value.Length: > 0 } dir && !EnsureFolderPathExists(dir))
         {
             throw new IOException($"Unable to create folder {dir.FileName} ({dir.Value})");
         }
 
-        var temp = file.Value + "." + Guid.NewGuid().ToString("N")[..6];
+        var temp = new AbsolutePath(file.Value + "." + Guid.NewGuid().ToString("N")[..6]);
         try
         {
-            File.WriteAllBytes(temp, data);
-            File.Move(temp, file.Value, overwrite: true);
+            File.WriteAllBytes(temp.Value, data);
+            temp.Move(file, true);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException)
         {
@@ -47,13 +48,13 @@ public static class FileOps
     /// Port of FS::updateTimestamp: bump the last access and modification times of an
     /// existing file to now (utime(path, nullptr) equivalent).
     /// </summary>
-    public static bool UpdateTimestamp(LocalPath file)
+    public static bool UpdateTimestamp(AbsolutePath file)
     {
         try
         {
             var now = DateTime.Now;
-            File.SetLastAccessTime(file.Value, now);
-            File.SetLastWriteTime(file.Value, now);
+            file.SetLastAccessTime(now);
+            file.SetLastWriteTime(now);
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
@@ -69,19 +70,19 @@ public static class FileOps
     /// Port of FS::ensureFilePathExists: creates every folder leading up to the file; the
     /// last segment is the file name and is not created.
     /// </summary>
-    public static bool EnsureFilePathExists(LocalPath file)
+    public static bool EnsureFilePathExists(AbsolutePath file)
     {
         // an empty parent is the current directory (a bare file name): nothing to create
         return file.Parent is not { Value.Length: > 0 } dir || EnsureFolderPathExists(dir);
     }
 
     /// <summary>Port of FS::ensureFolderPathExists: creates the folder and all of its parents.</summary>
-    public static bool EnsureFolderPathExists(LocalPath folder)
+    public static bool EnsureFolderPathExists(AbsolutePath folder)
     {
         // no Directory.Exists pre-check: CreateDirectory is idempotent and thread-safe
         try
         {
-            Directory.CreateDirectory(folder.Value);
+            folder.CreateDirectory();
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
@@ -100,7 +101,7 @@ public static class FileOps
     /// path with '/' separators; a match is skipped in blacklist mode (whitelist=false) or kept
     /// in whitelist mode. Mirrors the C++ default of not overwriting existing destination files.
     /// </summary>
-    public static bool Copy(LocalPath src, LocalPath dst, Func<string, bool>? matcher = null, bool whitelist = false,
+    public static bool Copy(AbsolutePath src, AbsolutePath dst, Func<string, bool>? matcher = null, bool whitelist = false,
         bool overwrite = false, bool dryRun = false, List<string>? failedPaths = null)
     {
         var failed = false;
@@ -131,7 +132,7 @@ public static class FileOps
             }
         }
 
-        if (Directory.Exists(src.Value))
+        if (src.ExistsDirectory())
         {
             var options = new EnumerationOptions
             {
@@ -158,7 +159,7 @@ public static class FileOps
     }
 
     /// <summary>Port of FS::move: rename, falling back to copy + delete (e.g. across devices).</summary>
-    public static bool Move(LocalPath source, LocalPath dest)
+    public static bool Move(AbsolutePath source, AbsolutePath dest)
     {
         EnsureFilePathExists(dest);
         try
@@ -183,7 +184,7 @@ public static class FileOps
     }
 
     /// <summary>Port of FS::deletePath: delete a file or a folder recursively; a missing path is a success.</summary>
-    public static bool DeletePath(LocalPath path)
+    public static bool DeletePath(AbsolutePath path)
     {
         try
         {
@@ -234,13 +235,13 @@ public static class FileOps
         return ret;
     }
 
-    private static void TryDelete(string path)
+    private static void TryDelete(AbsolutePath path)
     {
         try
         {
-            if (File.Exists(path))
+            if (path.Exists())
             {
-                File.Delete(path);
+                path.Delete();
             }
         }
         catch (IOException)

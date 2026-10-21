@@ -363,7 +363,7 @@ public partial class Resource
             path += ".disabled";
             if (File.Exists(path) || Directory.Exists(path))
             {
-                path = FileNaming.GetUniqueResourceName(new LocalPath(path)).Value;
+                path = FileNaming.GetUniqueResourceName(new AbsolutePath(path)).Value;
             }
         }
 
@@ -392,7 +392,7 @@ public partial class Resource
     {
         Type = ResourceType.Unknown;
         _ = attemptTrash; // no portable trash; always delete directly
-        return FileOps.DeletePath(new LocalPath(Fileinfo.FullName));
+        return FileOps.DeletePath(new AbsolutePath(Fileinfo.FullName));
     }
 
     public bool IsSymLink => (File.GetAttributes(Fileinfo.FullName) & FileAttributes.ReparsePoint) != 0;

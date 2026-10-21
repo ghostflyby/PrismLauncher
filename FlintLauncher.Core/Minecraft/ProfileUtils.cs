@@ -148,7 +148,7 @@ public static class ProfileUtils
     {
         try
         {
-            FileOps.Write(new LocalPath(filename),
+            FileOps.Write(new AbsolutePath(filename),
                 Encoding.UTF8.GetBytes(
                     JsonSerializer.Serialize(doc, VersionFormatJsonContext.Default.VersionFileOutJson)));
             return true;

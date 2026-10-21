@@ -56,7 +56,7 @@ public class ResourceFolderModel
         _isIndexed = isIndexed;
         if (createDir)
         {
-            FileOps.EnsureFolderPathExists(new LocalPath(dir));
+            FileOps.EnsureFolderPathExists(new AbsolutePath(dir));
         }
     }
 
@@ -93,7 +93,7 @@ public class ResourceFolderModel
         // name, and resolve against the current directory so the self-overwrite check below
         // compares like with like (FS::NormalizePath kept cwd-relative paths relative; the
         // comparison only needs both sides in one canonical form).
-        originalPath = new LocalPath(originalPath).ResolveToCurrentDirectory().Value;
+        originalPath = new AbsolutePath(originalPath).Value;
         var fileInfo = new FileInfo(originalPath);
 
         var isDir = Directory.Exists(originalPath) && !File.Exists(originalPath);
@@ -111,7 +111,7 @@ public class ResourceFolderModel
             return false; // not a valid resource. Ignoring it.
         }
 
-        var newPath = (new LocalPath(_dir) / fileInfo.Name).ResolveToCurrentDirectory().Value;
+        var newPath = (new AbsolutePath(_dir) / fileInfo.Name).Value;
         if (originalPath == newPath)
         {
             return false; // overwriting the resource with itself makes no sense
@@ -125,7 +125,7 @@ public class ResourceFolderModel
             {
                 if (File.Exists(newPath) || File.Exists(newPath + ".disabled"))
                 {
-                    if (!FileOps.DeletePath(new LocalPath(newPath)))
+                    if (!FileOps.DeletePath(new AbsolutePath(newPath)))
                     {
                         return false; // cleaning up new location was unsuccessful
                     }
@@ -141,7 +141,7 @@ public class ResourceFolderModel
                     return false; // copy failed
                 }
 
-                FileOps.UpdateTimestamp(new LocalPath(newPath));
+                FileOps.UpdateTimestamp(new AbsolutePath(newPath));
 
                 resource.Fileinfo = new FileInfo(newPath);
 
@@ -159,7 +159,7 @@ public class ResourceFolderModel
                     return false; // it would merge with the existing folder
                 }
 
-                if (!FileOps.Copy(new LocalPath(originalPath), new LocalPath(newPath)))
+                if (!FileOps.Copy(new AbsolutePath(originalPath), new AbsolutePath(newPath)))
                 {
                     return false; // copy of folder (potentially partially) failed
                 }
@@ -258,10 +258,10 @@ public class ResourceFolderModel
         {
             var entryPath = filePath;
             // FS::getUniqueResourceName: rename x.disabled away when x exists
-            var newFilePath = FileNaming.GetUniqueResourceName(new LocalPath(entryPath)).Value;
+            var newFilePath = FileNaming.GetUniqueResourceName(new AbsolutePath(entryPath)).Value;
             if (newFilePath != entryPath)
             {
-                FileOps.Move(new LocalPath(entryPath), new LocalPath(newFilePath));
+                FileOps.Move(new AbsolutePath(entryPath), new AbsolutePath(newFilePath));
                 entryPath = newFilePath;
             }
 

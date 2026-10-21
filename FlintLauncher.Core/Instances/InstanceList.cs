@@ -94,7 +94,7 @@ public class InstanceList
         foreach (var dir in instDirs)
         {
             // Create and normalize path (QDir::current().mkpath(dir))
-            FileOps.EnsureFolderPathExists(new LocalPath(dir));
+            FileOps.EnsureFolderPathExists(new AbsolutePath(dir));
             // NOTE: canonicalPath requires the path to exist. Do not move this above the creation block!
             var canonical = QDirCanonicalPath(dir);
             if (canonical.Length != 0 && !_instDirs.Contains(canonical))
@@ -589,7 +589,7 @@ public class InstanceList
         _groups.RemoveMember(inst.Uuid);
         _groups.RemoveMember(inst.Id());
 
-        if (!FileOps.DeletePath(new LocalPath(inst.InstanceRoot())))
+        if (!FileOps.DeletePath(new AbsolutePath(inst.InstanceRoot())))
         {
             // qWarning: deletion not completely successful
             return;
@@ -631,7 +631,7 @@ public class InstanceList
             root = targetDir;
         }
 
-        var tempRoot = new LocalPath(root) / ".tmp";
+        var tempRoot = new AbsolutePath(root) / ".tmp";
         string result;
         var tries = 0;
         do
@@ -646,7 +646,7 @@ public class InstanceList
             result = (tempRoot / key).Value;
         } while (Directory.Exists(result) || File.Exists(result));
 
-        if (!FileOps.EnsureFolderPathExists(new LocalPath(result)))
+        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(result)))
         {
             return null;
         }
@@ -683,7 +683,7 @@ public class InstanceList
         }
         else
         {
-            instId = FileNaming.DirNameFromString(instanceTask.ModifiedName(), _instDirs.Select(dir => new LocalPath(dir)));
+            instId = FileNaming.DirNameFromString(instanceTask.ModifiedName(), _instDirs.Select(dir => new AbsolutePath(dir)));
         }
 
         if (instId.Length == 0)
@@ -697,12 +697,12 @@ public class InstanceList
         if (shouldOverride)
         {
             // FS::overrideFolder: merge-copy the staging folder over the destination
-            if (!FileOps.EnsureFolderPathExists(new LocalPath(destination)))
+            if (!FileOps.EnsureFolderPathExists(new AbsolutePath(destination)))
             {
                 return false;
             }
 
-            if (!FileOps.Copy(new LocalPath(path), new LocalPath(destination), overwrite: true))
+            if (!FileOps.Copy(new AbsolutePath(path), new AbsolutePath(destination), overwrite: true))
             {
                 // qWarning() << "Failed to override" << path << "to" << destination
                 return false;
@@ -710,7 +710,7 @@ public class InstanceList
         }
         else
         {
-            if (!FileOps.Move(new LocalPath(path), new LocalPath(destination)))
+            if (!FileOps.Move(new AbsolutePath(path), new AbsolutePath(destination)))
             {
                 // qWarning() << "Failed to move" << path << "to" << destination
                 return false;
@@ -753,7 +753,7 @@ public class InstanceList
                 continue;
             }
 
-            FileOps.EnsureFolderPathExists(new LocalPath(dir));
+            FileOps.EnsureFolderPathExists(new AbsolutePath(dir));
             var canonical = QDirCanonicalPath(dir);
             if (canonical.Length != 0 && !newDirs.Contains(canonical))
             {
@@ -1058,12 +1058,12 @@ public class InstanceList
 
             if (child.State == TaskState.AbortedByUser)
             {
-                FileOps.DeletePath(new LocalPath(_stagingPath));
+                FileOps.DeletePath(new AbsolutePath(_stagingPath));
                 EmitAborted();
                 return;
             }
 
-            FileOps.DeletePath(new LocalPath(_stagingPath));
+            FileOps.DeletePath(new AbsolutePath(_stagingPath));
             EmitFailed(child.FailReason);
         }
 

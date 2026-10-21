@@ -146,7 +146,7 @@ public static class IconFiles
             return false;
         }
 
-        if (!FileOps.EnsureFolderPathExists(new LocalPath(iconsDir)))
+        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(iconsDir)))
         {
             return false;
         }
@@ -193,7 +193,7 @@ public static class IconFiles
     public static bool DeleteIcon(string iconsDir, string key)
     {
         var file = GetIconFile(iconsDir, key);
-        return file.Length != 0 && FileOps.DeletePath(new LocalPath(file));
+        return file.Length != 0 && FileOps.DeletePath(new AbsolutePath(file));
     }
 
     // ------------------------------------------------------------------------ helpers

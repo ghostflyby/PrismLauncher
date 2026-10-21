@@ -37,7 +37,7 @@ public sealed class LocalResourceUpdateTask(
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         // Ensure a '.index' folder exists in the mods folder, and create it if it does not
-        if (!FileOps.EnsureFolderPathExists(new LocalPath(indexDir)))
+        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(indexDir)))
         {
             EmitFailed($"Unable to create index directory at {indexDir}!");
             return Task.CompletedTask;

@@ -87,7 +87,7 @@ public static class MmcZip
                 return false;
             }
 
-            FileOps.EnsureFilePathExists(new LocalPath(target));
+            FileOps.EnsureFilePathExists(new AbsolutePath(target));
             using var source = entry.Open();
             using var output = File.Create(target);
             source.CopyTo(output);
@@ -116,7 +116,7 @@ public static class MmcZip
         }
 
         var targetTopDir = Path.GetFullPath(target);
-        FileOps.EnsureFolderPathExists(new LocalPath(targetTopDir));
+        FileOps.EnsureFolderPathExists(new AbsolutePath(targetTopDir));
 
         foreach (var entry in entries)
         {
@@ -140,7 +140,7 @@ public static class MmcZip
             {
                 var sections = relativeFileName.Split('/');
                 subPath = string.Join('/', sections[..^1]) + '/';
-                FileOps.EnsureFolderPathExists((new LocalPath(target) / subPath));
+                FileOps.EnsureFolderPathExists((new AbsolutePath(target) / subPath));
                 relativeFileName = sections[^1];
             }
             else
@@ -173,7 +173,7 @@ public static class MmcZip
             if (relativeFileName.Length == 0 || relativeFileName.EndsWith('/'))
             {
                 // directory entry
-                if (!FileOps.EnsureFolderPathExists(new LocalPath(targetFilePath.TrimEnd('/'))))
+                if (!FileOps.EnsureFolderPathExists(new AbsolutePath(targetFilePath.TrimEnd('/'))))
                 {
                     FileOps.RemoveFiles(extracted);
                     return null;
@@ -185,7 +185,7 @@ public static class MmcZip
 
             try
             {
-                FileOps.EnsureFilePathExists(new LocalPath(targetFilePath));
+                FileOps.EnsureFilePathExists(new AbsolutePath(targetFilePath));
                 using var source = entry.Open();
                 using var output = File.Create(targetFilePath);
                 source.CopyTo(output);

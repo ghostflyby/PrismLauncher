@@ -126,7 +126,8 @@ public static class InstanceEndpoints
                 // the commit derives the folder from the display name: compute the expected
                 // id BEFORE running the task (after the commit the directory already exists
                 // and DirNameFromString would return "<name>(1)")
-                var expectedId = FileNaming.DirNameFromString(request.Name, new LocalPath(runtime.Instances.PrimaryDir()));
+                AbsolutePath inDir = new AbsolutePath(runtime.Instances.PrimaryDir());
+                var expectedId = FileNaming.DirNameFromString(request.Name, [inDir]);
                 await wrapped.StartAsync();
                 if (!wrapped.WasSuccessful)
                 {

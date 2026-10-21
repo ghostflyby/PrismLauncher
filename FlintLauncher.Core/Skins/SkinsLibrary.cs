@@ -66,7 +66,7 @@ public sealed class SkinsLibrary
         }
 
         var dir = _skinsDir();
-        if (!FileOps.EnsureFolderPathExists(new LocalPath(dir)))
+        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(dir)))
         {
             return false;
         }

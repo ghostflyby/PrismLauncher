@@ -4,11 +4,11 @@
 // (jar mod merging), ReconstructAssets (virtual assets folder rebuild) and AssetUpdateTask
 // (asset index + object downloads against a local HTTP stub).
 //
-// ReconstructAssets/AssetUpdateTask resolve the "assets/" root relative to the process
-// working directory (exactly like the C++ launcher, whose cwd is its install root). The
-// tests redirect that root with a directory symlink instead of mutating the cwd (a global
-// cwd swap would race the other test classes); all such tests live in this one class, which
-// xUnit keeps sequential.
+// AssetUpdateTask stamps its instance.Paths at AppContext.BaseDirectory, so the store-root
+// "assets" dir lands on the <BaseDirectory>/assets symlink, which redirects it to a temp
+// directory (a global cwd swap would race the other test classes); all such tests live in
+// this one class, which xUnit keeps sequential. ReconstructAssets anchors the store at the
+// fixture's injected Paths root instead (the CWD-relative "assets/" fallback is gone).
 
 using System.IO.Compression;
 using System.Net;
@@ -240,7 +240,7 @@ public class ExtractNativesTests
         return await reader.ReadToEndAsync();
     }
 
-    // ------------------------------------------------------- assets (cwd-relative roots)
+    // ------------------------------------------------------- assets (store-root anchored)
 
     [Fact]
     public async Task ReconstructAssets_RebuildsTheVirtualFolder()
@@ -248,31 +248,31 @@ public class ExtractNativesTests
         const string assetsId = "testassets";
         var body = Encoding.UTF8.GetBytes("virtual asset payload");
         var hash = Convert.ToHexString(SHA1.HashData(body)).ToLowerInvariant();
-        var previousCwd = Environment.CurrentDirectory;
-        // the redirect symlink lives at BaseDirectory/assets and the task reads "assets/..."
-        // CWD-relative — pin CWD back there so foreign chdir (API hosts) cannot break it
-        Environment.CurrentDirectory = AppContext.BaseDirectory;
-        using var assetsRoot = new AssetsRootRedirect();
-        // the index marks the assets virtual; the object file exists in assets/objects
+        using var fixture = new LaunchFixture();
+        var services = fixture.CreateServices();
+        // the step anchors the asset store at the injected Paths root: seed the index (which
+        // marks the assets virtual) and the object file there
+        var assetsRoot = services.Paths.AssetsRoot;
         var indexJson = """{"virtual":true,"objects":{"icon.png":{"hash":"HASH","size":LEN}}}"""
             .Replace("HASH", hash).Replace("LEN", body.Length.ToString());
-        assetsRoot.WriteIndex(assetsId, indexJson);
-        assetsRoot.WriteObject(hash, body);
+        Directory.CreateDirectory(services.Paths.AssetIndexesDir);
+        await File.WriteAllTextAsync(Path.Combine(services.Paths.AssetIndexesDir, assetsId + ".json"), indexJson);
+        var objectDir = Path.Combine(assetsRoot, "objects", hash[..2]);
+        Directory.CreateDirectory(objectDir);
+        await File.WriteAllBytesAsync(Path.Combine(objectDir, hash), body);
 
-        using var fixture = new LaunchFixture();
         var patch = LaunchFixture.DefaultPatchJson.Replace("\"assets\": \"5\"", $"\"assets\": \"{assetsId}\"");
         var instance = await fixture.CreateInstance(patch);
 
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = LaunchTask.Create(instance, services);
         task.AppendStep(new ReconstructAssets(task));
 
         await task.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, task.State);
-        var rebuilt = Path.Combine(assetsRoot.Root, "virtual", assetsId, "icon.png");
+        var rebuilt = Path.Combine(assetsRoot, "virtual", assetsId, "icon.png");
         Assert.True(File.Exists(rebuilt));
         Assert.Equal("virtual asset payload", await File.ReadAllTextAsync(rebuilt));
-        Environment.CurrentDirectory = previousCwd;
     }
 
     [Fact]
@@ -381,9 +381,9 @@ public static class ZipArchiveTestExtensions
 }
 
 /// <summary>
-/// Redirects the process-relative "assets" root (the launch pipeline resolves assets/
-/// against the working directory, like the C++ launcher) to a temp directory through a
-/// directory symlink. Falls back to a real directory when symlinks are unavailable.
+/// Redirects the store-root "assets" directory for tests that stamp their Paths at
+/// AppContext.BaseDirectory: the &lt;BaseDirectory&gt;/assets location becomes a directory
+/// symlink into a temp dir. Falls back to a real directory when symlinks are unavailable.
 /// </summary>
 internal sealed class AssetsRootRedirect : IDisposable
 {
@@ -421,20 +421,6 @@ internal sealed class AssetsRootRedirect : IDisposable
 
     /// <summary>The real root behind the "assets" symlink (the fallback root is the link path itself).</summary>
     public string Root => _target;
-
-    public void WriteIndex(string assetsId, string json)
-    {
-        var indexes = Path.Combine(Root, "indexes");
-        Directory.CreateDirectory(indexes);
-        File.WriteAllText(Path.Combine(indexes, assetsId + ".json"), json);
-    }
-
-    public void WriteObject(string hash, byte[] body)
-    {
-        var objectDir = Path.Combine(Root, "objects", hash[..2]);
-        Directory.CreateDirectory(objectDir);
-        File.WriteAllBytes(Path.Combine(objectDir, hash), body);
-    }
 
     public void Dispose()
     {

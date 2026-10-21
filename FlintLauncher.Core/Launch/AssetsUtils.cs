@@ -41,15 +41,15 @@ public sealed class AssetObject
     /// <summary>Port of AssetObject::getRelPath.</summary>
     public string GetRelPath() => (Hash.Length >= 2 ? Hash[..2] : Hash) + "/" + Hash;
 
-    /// <summary>Port of AssetObject::getLocalPath (upstream was CWD-relative "assets/objects";
+    /// <summary>Port of AssetObject::getAbsolutePath (upstream was CWD-relative "assets/objects";
     /// the assets root is injected here).</summary>
-    public string GetLocalPath(string assetsRoot) =>
+    public string GetAbsolutePath(string assetsRoot) =>
         Path.Combine(assetsRoot, "objects", GetRelPath());
 
     /// <summary>Port of AssetObject::getDownloadAction; null when the local file is present.</summary>
     public NetRequest? GetDownloadAction(string assetsRoot, string resourceUrl)
     {
-        var objectFile = new FileInfo(GetLocalPath(assetsRoot));
+        var objectFile = new FileInfo(GetAbsolutePath(assetsRoot));
         if (!objectFile.Exists || objectFile.Length != Size)
         {
             var objectDl = NetRequest.MakeFile(new Uri(resourceUrl + GetRelPath()), objectFile.FullName);
@@ -148,9 +148,9 @@ public static class AssetsUtils
     /// asset store (injected; upstream anchored at the launcher working directory).</summary>
     public static bool ReconstructAssets(string assetsId, string resourcesFolder, string assetsRoot)
     {
-        var indexDir = new LocalPath(assetsRoot) / "indexes";
-        var objectDir = new LocalPath(assetsRoot) / "objects";
-        var virtualDir = new LocalPath(assetsRoot) / "virtual";
+        var indexDir = new AbsolutePath(assetsRoot) / "indexes";
+        var objectDir = new AbsolutePath(assetsRoot) / "objects";
+        var virtualDir = new AbsolutePath(assetsRoot) / "virtual";
         var indexPath = (indexDir / (assetsId + ".json")).Value;
         var virtualRoot = (virtualDir / assetsId).Value;
 
@@ -202,7 +202,7 @@ public static class AssetsUtils
             var targetDir = Path.GetDirectoryName(Path.GetFullPath(targetPathForMap));
             if (targetDir is not null)
             {
-                FileOps.EnsureFolderPathExists(new LocalPath(targetDir));
+                FileOps.EnsureFolderPathExists(new AbsolutePath(targetDir));
             }
 
             try

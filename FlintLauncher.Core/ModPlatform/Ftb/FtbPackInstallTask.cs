@@ -335,10 +335,10 @@ public sealed class FtbPackInstallTask(
                 continue;
             }
 
-            var destPath = new LocalPath(StagingPath) / ".minecraft" / mod.TargetFolder / mod.Name;
+            var destPath = new AbsolutePath(StagingPath) / ".minecraft" / mod.TargetFolder / mod.Name;
             EmitStatus($"Copying Blocked Mods ({i} out of {total} are done)");
 
-            if (!FileOps.Copy(new LocalPath(mod.LocalPath), destPath))
+            if (!FileOps.Copy(new AbsolutePath(mod.LocalPath), destPath))
             {
                 // (the C++ only logs the failure)
             }

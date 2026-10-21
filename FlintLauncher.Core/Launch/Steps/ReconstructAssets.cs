@@ -19,8 +19,7 @@ public sealed class ReconstructAssets(LaunchTask parent) : LaunchStep(parent)
 
         var assets = profile.GetMinecraftAssets();
 
-        var assetsRoot = instance.Paths?.AssetsRoot
-                         ?? Path.Combine("assets", "");
+        var assetsRoot = instance.Paths?.AssetsRoot ?? Parent.Services.Paths.AssetsRoot;
         if (!AssetsUtils.ReconstructAssets(assets.Id, instance.ResourcesDir(), assetsRoot))
         {
             EmitLogLine("Failed to reconstruct Minecraft assets.", MessageLevel.Error);

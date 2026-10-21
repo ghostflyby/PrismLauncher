@@ -160,8 +160,8 @@ public static class ServersDat
     /// </summary>
     public static void Save(string path, IReadOnlyList<ServerEntry> servers)
     {
-        FileOps.EnsureFilePathExists(new LocalPath(path));
-        FileOps.Write(new LocalPath(path), Serialize(servers));
+        FileOps.EnsureFilePathExists(new AbsolutePath(path));
+        FileOps.Write(new AbsolutePath(path), Serialize(servers));
     }
 
     /// <summary>Serializes servers to the servers.dat NBT structure (raw bytes).</summary>

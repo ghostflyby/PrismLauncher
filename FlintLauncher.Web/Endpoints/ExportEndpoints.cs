@@ -66,7 +66,8 @@ public static class ExportEndpoints
                 Directory.CreateDirectory(instanceRoot);
                 // DirNameFromString strips characters that are invalid in paths (like the
                 // C++ export file-name suggestion)
-                var baseName = FileNaming.DirNameFromString($"{name}-{versionId}", new LocalPath(instanceRoot));
+                AbsolutePath inDir = new AbsolutePath(instanceRoot);
+                var baseName = FileNaming.DirNameFromString($"{name}-{versionId}", [inDir]);
                 var extension = format switch
                 {
                     "modrinth" => "mrpack",

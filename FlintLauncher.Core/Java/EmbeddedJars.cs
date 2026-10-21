@@ -50,7 +50,7 @@ public static class EmbeddedJars
             return "";
         }
 
-        FileOps.EnsureFilePathExists(new LocalPath(cached));
+        FileOps.EnsureFilePathExists(new AbsolutePath(cached));
         using var target = File.Create(cached);
         stream.CopyTo(target);
 

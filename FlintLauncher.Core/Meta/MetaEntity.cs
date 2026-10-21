@@ -200,7 +200,7 @@ public abstract class MetaEntity
                     // read failures all derive from it)
                     // qCritical() << "Unable to parse file ...";
                     // just make sure it's gone and we never consider it again.
-                    FileOps.DeletePath(new LocalPath(fname));
+                    FileOps.DeletePath(new AbsolutePath(fname));
                     entity._loadStatus = LoadStatus.NotLoaded;
                 }
             }

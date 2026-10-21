@@ -238,7 +238,7 @@ public sealed class World
         try
         {
             // putLevelDatDataToFS: gzip the rewritten NBT and save atomically (PSaveFile).
-            FileOps.Write(new LocalPath(levelDatPath), NbtIo.WriteCompoundGzip(worldData));
+            FileOps.Write(new AbsolutePath(levelDatPath), NbtIo.WriteCompoundGzip(worldData));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException)
         {
@@ -248,7 +248,8 @@ public sealed class World
         Name = newName;
 
         var parentDir = Path.GetDirectoryName(ContainerPath) ?? ".";
-        var dirName = FileNaming.DirNameFromString(Name, new LocalPath(parentDir));
+        AbsolutePath inDir = new AbsolutePath(parentDir);
+        var dirName = FileNaming.DirNameFromString(Name, [inDir]);
         var targetPath = Path.Combine(parentDir, dirName);
         if (!string.Equals(Path.GetFullPath(targetPath), Path.GetFullPath(ContainerPath), StringComparison.Ordinal))
         {
@@ -281,8 +282,9 @@ public sealed class World
             LoadMetadata();
         }
 
-        var finalPath = Path.Combine(to, FileNaming.DirNameFromString(Name, new LocalPath(to)));
-        if (!FileOps.EnsureFolderPathExists(new LocalPath(finalPath)))
+        AbsolutePath inDir = new AbsolutePath(to);
+        var finalPath = Path.Combine(to, FileNaming.DirNameFromString(Name, [inDir]));
+        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(finalPath)))
         {
             return false;
         }
@@ -297,7 +299,7 @@ public sealed class World
         }
         else if (Directory.Exists(ContainerPath))
         {
-            ok = FileOps.Copy(new LocalPath(ContainerPath), new LocalPath(finalPath));
+            ok = FileOps.Copy(new AbsolutePath(ContainerPath), new AbsolutePath(finalPath));
         }
         else
         {
@@ -330,7 +332,7 @@ public sealed class World
             return false;
         }
 
-        var success = FileOps.Copy(new LocalPath(with.ContainerPath), new LocalPath(targetDir));
+        var success = FileOps.Copy(new AbsolutePath(with.ContainerPath), new AbsolutePath(targetDir));
         if (success)
         {
             FolderName = with.FolderName;
@@ -348,7 +350,7 @@ public sealed class World
         }
 
         // FS::trash is not available in the ported core; delete directly instead.
-        return FileOps.DeletePath(new LocalPath(ContainerPath));
+        return FileOps.DeletePath(new AbsolutePath(ContainerPath));
     }
 
     /// <summary>Port of World::setSize.</summary>

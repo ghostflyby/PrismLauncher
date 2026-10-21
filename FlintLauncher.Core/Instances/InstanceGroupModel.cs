@@ -578,7 +578,7 @@ public sealed class InstanceGroupModel
         var toplevel = new GroupFileJson(GroupFormatVersion, groups, null);
         try
         {
-            FileOps.Write(new LocalPath(groupFileName),
+            FileOps.Write(new AbsolutePath(groupFileName),
                 JsonSerializer.SerializeToUtf8Bytes(toplevel, GroupJsonContext.Default.GroupFileJson));
             return true;
         }
@@ -623,7 +623,7 @@ public sealed class InstanceGroupModel
                     group => group.Key,
                     group => group.Value with { Hidden = null }, StringComparer.Ordinal),
                 ungrouped);
-            FileOps.Write(new LocalPath(groupFileName),
+            FileOps.Write(new AbsolutePath(groupFileName),
                 JsonSerializer.SerializeToUtf8Bytes(stripped, GroupJsonContext.Default.GroupFileJson));
         }
         catch (Exception e) when (e is JsonException or IOException

@@ -143,8 +143,8 @@ public static class FtbEndpoints
                 // compute the expected id BEFORE running the task: after the commit the
                 // directory already exists and DirNameFromString would return
                 // "<name>(1)"
-                var expectedId = FileNaming.DirNameFromString(task.Name(),
-                    new LocalPath(runtime.Instances.PrimaryDir()));
+                AbsolutePath inDir = new AbsolutePath(runtime.Instances.PrimaryDir());
+                var expectedId = FileNaming.DirNameFromString(task.Name(), [inDir]);
                 await wrapped.StartAsync();
                 if (!wrapped.WasSuccessful)
                 {

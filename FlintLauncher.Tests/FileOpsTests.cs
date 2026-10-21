@@ -41,8 +41,8 @@ public class FileOpsTests
         await CopyTestAsync(async folder =>
         {
             using var tempDirScope = new TempDirScope();
-            var targetDir = new LocalPath(tempDirScope.Path) / "test_folder";
-            Assert.True(FileOps.Copy(new LocalPath(folder), targetDir));
+            var targetDir = new AbsolutePath(tempDirScope.Path) / "test_folder";
+            Assert.True(FileOps.Copy(new AbsolutePath(folder), targetDir));
 
             var mcmeta = Path.Combine(targetDir.Value, "pack.mcmeta");
             Assert.True(File.Exists(mcmeta));
@@ -58,8 +58,8 @@ public class FileOpsTests
         await CopyTestAsync(async folder =>
         {
             using var tempDirScope = new TempDirScope();
-            var targetDir = new LocalPath(tempDirScope.Path) / "test_folder";
-            Assert.True(FileOps.Copy(new LocalPath(folder), targetDir, matcher: path => path.Contains("mcmeta")));
+            var targetDir = new AbsolutePath(tempDirScope.Path) / "test_folder";
+            Assert.True(FileOps.Copy(new AbsolutePath(folder), targetDir, matcher: path => path.Contains("mcmeta")));
 
             Assert.False(File.Exists(Path.Combine(targetDir.Value, "pack.mcmeta")));
             Assert.True(Directory.Exists(Path.Combine(targetDir.Value, "assets")));
@@ -75,8 +75,8 @@ public class FileOpsTests
         await CopyTestAsync(async folder =>
         {
             using var tempDirScope = new TempDirScope();
-            var targetDir = new LocalPath(tempDirScope.Path) / "test_folder";
-            Assert.True(FileOps.Copy(new LocalPath(folder), targetDir, matcher: path => path.Contains("mcmeta"), whitelist: true));
+            var targetDir = new AbsolutePath(tempDirScope.Path) / "test_folder";
+            Assert.True(FileOps.Copy(new AbsolutePath(folder), targetDir, matcher: path => path.Contains("mcmeta"), whitelist: true));
 
             var mcmeta = Path.Combine(targetDir.Value, "pack.mcmeta");
             Assert.True(File.Exists(mcmeta));
@@ -92,8 +92,8 @@ public class FileOpsTests
         await CopyTestAsync(async folder =>
         {
             using var tempDirScope = new TempDirScope();
-            var targetDir = new LocalPath(tempDirScope.Path) / "test_folder";
-            Assert.True(FileOps.Copy(new LocalPath(folder), targetDir));
+            var targetDir = new AbsolutePath(tempDirScope.Path) / "test_folder";
+            Assert.True(FileOps.Copy(new AbsolutePath(folder), targetDir));
 
             var secret = Path.Combine(targetDir.Value, ".secret_folder", ".secret_file.txt");
             Assert.True(Directory.Exists(Path.Combine(targetDir.Value, ".secret_folder")));
@@ -109,7 +109,7 @@ public class FileOpsTests
         using var tempDirScope = new TempDirScope();
         var file = Path.Combine(FixtureFolder(), "pack.mcmeta");
         var target = Path.Combine(tempDirScope.Path, "pack.mcmeta");
-        Assert.True(FileOps.Copy(new LocalPath(file), new LocalPath(target)));
+        Assert.True(FileOps.Copy(new AbsolutePath(file), new AbsolutePath(target)));
         Assert.Equal(await File.ReadAllBytesAsync(file), await File.ReadAllBytesAsync(target));
     }
 
@@ -122,11 +122,11 @@ public class FileOpsTests
         // nested folders are created by Write (ensureExists)
         var path = Path.Combine(tempDirScope.Path, "nested", "file.bin");
         var data = new byte[] { 1, 2, 3, 0xFF, 0, 4 };
-        FileOps.Write(new LocalPath(path), data);
+        FileOps.Write(new AbsolutePath(path), data);
         Assert.Equal(data, await File.ReadAllBytesAsync(path));
 
         // overwriting leaves no temp files behind
-        FileOps.Write(new LocalPath(path), new byte[] { 9 });
+        FileOps.Write(new AbsolutePath(path), new byte[] { 9 });
         Assert.Equal(new byte[] { 9 }, await File.ReadAllBytesAsync(path));
         Assert.Equal(["file.bin"], Directory.GetFiles(Path.Combine(tempDirScope.Path, "nested"))
             .Select(Path.GetFileName).OrderBy(n => n));
@@ -139,7 +139,7 @@ public class FileOpsTests
         var srcFile = Path.Combine(tempDirScope.Path, "a.txt");
         await File.WriteAllTextAsync(srcFile, "hello");
         var dstFile = Path.Combine(tempDirScope.Path, "sub", "b.txt");
-        Assert.True(FileOps.Move(new LocalPath(srcFile), new LocalPath(dstFile)));
+        Assert.True(FileOps.Move(new AbsolutePath(srcFile), new AbsolutePath(dstFile)));
         Assert.False(File.Exists(srcFile));
         Assert.Equal("hello", await File.ReadAllTextAsync(dstFile));
 
@@ -147,15 +147,15 @@ public class FileOpsTests
         Directory.CreateDirectory(Path.Combine(srcDir, "inner"));
         await File.WriteAllTextAsync(Path.Combine(srcDir, "inner", "c.txt"), "x");
         var dstDir = Path.Combine(tempDirScope.Path, "folder2");
-        Assert.True(FileOps.Move(new LocalPath(srcDir), new LocalPath(dstDir)));
+        Assert.True(FileOps.Move(new AbsolutePath(srcDir), new AbsolutePath(dstDir)));
         Assert.False(Directory.Exists(srcDir));
         Assert.True(File.Exists(Path.Combine(dstDir, "inner", "c.txt")));
 
-        Assert.True(FileOps.DeletePath(new LocalPath(dstDir)));
+        Assert.True(FileOps.DeletePath(new AbsolutePath(dstDir)));
         Assert.False(Directory.Exists(dstDir));
 
         // deleting a missing path succeeds (fs::remove_all semantics)
-        Assert.True(FileOps.DeletePath(new LocalPath(Path.Combine(tempDirScope.Path, "missing"))));
+        Assert.True(FileOps.DeletePath(new AbsolutePath(Path.Combine(tempDirScope.Path, "missing"))));
     }
 
     [Fact]
@@ -165,7 +165,7 @@ public class FileOpsTests
         var path = Path.Combine(tempDirScope.Path, "stamp.txt");
         await File.WriteAllTextAsync(path, "x");
         File.SetLastWriteTime(path, DateTime.Now.AddDays(-10));
-        Assert.True(FileOps.UpdateTimestamp(new LocalPath(path)));
+        Assert.True(FileOps.UpdateTimestamp(new AbsolutePath(path)));
         Assert.True((DateTime.Now - File.GetLastWriteTime(path)).Duration() < TimeSpan.FromMinutes(1));
     }
 

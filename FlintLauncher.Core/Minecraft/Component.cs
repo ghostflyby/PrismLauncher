@@ -398,7 +398,7 @@ public class Component : ProblemProvider
         }
 
         var filename = GetFilename();
-        if (!FileOps.EnsureFilePathExists(new LocalPath(filename)))
+        if (!FileOps.EnsureFilePathExists(new AbsolutePath(filename)))
         {
             return false;
         }
@@ -412,7 +412,7 @@ public class Component : ProblemProvider
                 return false;
             }
 
-            FileOps.Write(new LocalPath(filename), Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(vfile)));
+            FileOps.Write(new AbsolutePath(filename), Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(vfile)));
             File = vfile;
             MetaVersion = null;
             EmitDataChanged();
@@ -439,7 +439,7 @@ public class Component : ProblemProvider
         // just kill the file and reload
         if (System.IO.File.Exists(filename))
         {
-            result = FileOps.DeletePath(new LocalPath(filename));
+            result = FileOps.DeletePath(new AbsolutePath(filename));
         }
 
         if (result)

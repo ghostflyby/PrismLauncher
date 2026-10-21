@@ -28,7 +28,7 @@ public class FileSink(string filename) : Sink
             return false;
         }
 
-        if (!FileOps.EnsureFilePathExists(new LocalPath(filename)))
+        if (!FileOps.EnsureFilePathExists(new AbsolutePath(filename)))
         {
             FailReason = "Could not create folder for " + filename;
             return false;
