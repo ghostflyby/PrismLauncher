@@ -13,6 +13,7 @@
 //  - the OneSix removed-feature problems probe QJsonObject::contains semantics, so a
 //    JSON null member still counts as present (S5).
 
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Launch;
@@ -35,7 +36,7 @@ public class JsonNullToleranceTests
     [Fact]
     public void Atl_Configs_MissingSha1_FailsTheManifest()
     {
-        var e = Assert.Throws<JsonParseException>(() => AtLauncherApi.LoadPackVersion(
+        var e = Assert.Throws<JsonException>(() => AtLauncherApi.LoadPackVersion(
             """{"version":"1","minecraft":"1.12.2","noConfigs":false,"configs":{"filesize":10}}"""));
         Assert.Equal("'sha1' is not a string", e.Message);
     }
@@ -43,7 +44,7 @@ public class JsonNullToleranceTests
     [Fact]
     public void Atl_Loader_MissingType_FailsTheManifest()
     {
-        var e = Assert.Throws<JsonParseException>(() => AtLauncherApi.LoadPackVersion(
+        var e = Assert.Throws<JsonException>(() => AtLauncherApi.LoadPackVersion(
             """{"version":"1","minecraft":"1.12.2","noConfigs":true,"loader":{"choose":false,"metadata":{"latest":true}}}"""));
         Assert.Equal("'type' is not a string", e.Message);
     }
@@ -51,7 +52,7 @@ public class JsonNullToleranceTests
     [Fact]
     public void Atl_ModDecomp_WithoutDecompFile_FailsTheManifest()
     {
-        var e = Assert.Throws<JsonParseException>(() => AtLauncherApi.LoadPackVersion(
+        var e = Assert.Throws<JsonException>(() => AtLauncherApi.LoadPackVersion(
             """
             {"version":"1","minecraft":"1.12.2","noConfigs":true,
              "mods":[{"name":"D","version":"1","url":"u","file":"f.jar","md5":"m",
@@ -65,7 +66,7 @@ public class JsonNullToleranceTests
     [Fact]
     public void Solder_Build_NullMinecraft_FailsWithTheRequireText()
     {
-        var e = Assert.Throws<JsonParseException>(() => TechnicApi.LoadSolderPackBuild(
+        var e = Assert.Throws<JsonException>(() => TechnicApi.LoadSolderPackBuild(
             """{"minecraft":null,"mods":[]}"""));
         Assert.Equal("'minecraft' is not a string", e.Message);
     }
@@ -73,7 +74,7 @@ public class JsonNullToleranceTests
     [Fact]
     public void Solder_Build_NullModElement_FailsAsAnObjectCheck()
     {
-        var e = Assert.Throws<JsonParseException>(() => TechnicApi.LoadSolderPackBuild(
+        var e = Assert.Throws<JsonException>(() => TechnicApi.LoadSolderPackBuild(
             """{"minecraft":"1.0","mods":[null]}"""));
         Assert.Equal("Value is not an object", e.Message);
     }
@@ -101,7 +102,7 @@ public class JsonNullToleranceTests
     [Fact]
     public void OneSix_Libraries_NullElement_FailsAsAnObjectCheck()
     {
-        var e = Assert.Throws<JsonParseException>(() => OneSixVersionFormat.VersionFileFromJson(
+        var e = Assert.Throws<JsonException>(() => OneSixVersionFormat.VersionFileFromJson(
             Parse("""{"formatVersion":1,"uid":"u","version":"1","libraries":[null]}"""), "t.json", false));
         Assert.Equal("Value is not an object", e.Message);
     }
@@ -123,7 +124,7 @@ public class JsonNullToleranceTests
     {
         var downloadsNode = JsonNode.Parse("""{"downloads": {"client": null}}""");
         Assert.NotNull(downloadsNode);
-        var e = Assert.Throws<JsonParseException>(() =>
+        var e = Assert.Throws<JsonException>(() =>
             MojangVersionFormat.ReadVersionProperties(downloadsNode, new VersionFile()));
         Assert.Equal("Value is not an object", e.Message);
     }

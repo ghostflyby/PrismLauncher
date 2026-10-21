@@ -11,8 +11,8 @@
 // per-request derived client instead of mutating the shared one, so an override can never
 // leak into other requests (and needs no restore).
 
+using System.Text.Json;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
@@ -42,7 +42,7 @@ public static class FtbEndpoints
             {
                 ids = FtbApi.LoadModpackIndex(request.BodyAsString);
             }
-            catch (JsonParseException e)
+            catch (JsonException e)
             {
                 return ApiJson.Error("ftb_invalid_response",
                     $"ftb pack index is invalid: {e.Message}", 502);
@@ -105,7 +105,7 @@ public static class FtbEndpoints
                 {
                     pack = FtbApi.LoadModpack(fetchRequest.BodyAsString);
                 }
-                catch (JsonParseException e)
+                catch (JsonException e)
                 {
                     return ApiJson.Error("creation_failed",
                         $"could not understand pack manifest:\n{e.Message}", 500);
@@ -214,7 +214,7 @@ public static class FtbEndpoints
         {
             pack = FtbApi.LoadModpack(request.BodyAsString);
         }
-        catch (JsonParseException e)
+        catch (JsonException e)
         {
             return ApiJson.Error("ftb_invalid_response",
                 $"ftb pack manifest is invalid: {e.Message}", 502);

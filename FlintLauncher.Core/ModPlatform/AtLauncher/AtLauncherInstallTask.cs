@@ -30,11 +30,11 @@
 
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Net;
@@ -146,7 +146,7 @@ public sealed partial class AtLauncherPackInstallTask(
             // RequireDocument + LoadVersion reads; Normalize runs the load-time fixups)
             _configs = AtLauncherApi.LoadPackVersion(response);
         }
-        catch (JsonParseException e)
+        catch (JsonException e)
         {
             EmitFailed("Could not understand pack manifest:\n" + e.Message);
             return;

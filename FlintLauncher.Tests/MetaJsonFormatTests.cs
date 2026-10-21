@@ -5,7 +5,6 @@
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Meta;
 using Xunit;
 using FluentIndex = FlintLauncher.Core.Meta.Index;
@@ -185,10 +184,10 @@ public class MetaJsonFormatTests
         Assert.Empty(parsed);
 
         Assert.Equal("'requires' entry has no 'uid' string",
-            Assert.Throws<JsonParseException>(() =>
+            Assert.Throws<JsonException>(() =>
                 MetaJsonFormat.ParseRequires([new MetaRequireJson(null, null, null)], parsed)).Message);
         Assert.Equal("'conflicts' entry has no 'uid' string",
-            Assert.Throws<JsonParseException>(() =>
+            Assert.Throws<JsonException>(() =>
                 MetaJsonFormat.ParseRequires([null], parsed, "conflicts")).Message);
     }
 

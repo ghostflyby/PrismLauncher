@@ -15,7 +15,6 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Text;
 using JdkFind;
@@ -123,15 +122,17 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
 
     private static JavaRuntimeJson MapJavaMetaNode(JsonObject obj)
     {
+        JavaRuntimeJson? wire;
         try
         {
-            return obj.Deserialize(JavaJsonContext.Default.JavaRuntimeJson)
-                   ?? throw new JsonParseException("java runtime: Error parsing JSON: document is null");
+            wire = obj.Deserialize(JavaJsonContext.Default.JavaRuntimeJson);
         }
         catch (JsonException e)
         {
-            throw new JsonParseException("java runtime: Error parsing JSON: " + e.Message);
+            throw new JsonException("java runtime: Error parsing JSON: " + e.Message);
         }
+
+        return wire ?? throw new JsonException("java runtime: Error parsing JSON: document is null");
     }
 
     /// <summary>The version string the C++ JavaVersion(major, minor, security, build)

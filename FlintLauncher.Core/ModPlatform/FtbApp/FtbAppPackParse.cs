@@ -171,7 +171,7 @@ public static class FtbAppPackParse
                 }
             }
         }
-        catch (Exception e) when (e is JsonParseException or JsonException or FormatException)
+        catch (Exception e) when (e is JsonException or FormatException)
         {
             return new FtbAppModpack();
         }
@@ -233,7 +233,7 @@ public static class FtbAppPackParse
                 }
             }
         }
-        catch (Exception e) when (e is JsonParseException or JsonException or FormatException) { }
+        catch (Exception e) when (e is JsonException or FormatException) { }
 
         return null;
     }

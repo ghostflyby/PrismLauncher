@@ -23,10 +23,10 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Net;
@@ -221,7 +221,7 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
         {
             response = FlameMod.ParseResponse(responseBody, FlameModJsonContext.Default.FlameFingerprintResponseJson);
         }
-        catch (JsonParseException)
+        catch (JsonException)
         {
             return;
         }
@@ -310,17 +310,17 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
                 [
                     FlameMod.ParseResponse(projRequest.BodyAsString,
                         FlameModJsonContext.Default.FlameProjectEnvelopeJson).Data
-                    ?? throw new JsonParseException("'data' is not an object"),
+                    ?? throw new JsonException("'data' is not an object"),
                 ];
             }
             else
             {
                 entries = FlameMod.ParseResponse(projRequest.BodyAsString,
                               FlameModJsonContext.Default.FlameProjectListJson).Data
-                          ?? throw new JsonParseException("'data' is not an array");
+                          ?? throw new JsonException("'data' is not an array");
             }
         }
-        catch (JsonParseException) { }
+        catch (JsonException) { }
 
         if (entries is not null)
         {
@@ -355,7 +355,7 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
                         }
                     }
                 }
-                catch (JsonParseException) { }
+                catch (JsonException) { }
             }
         }
         await BuildZipAsync(cancellationToken);

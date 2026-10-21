@@ -23,7 +23,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Flame;
@@ -223,19 +222,19 @@ public class GetModDependenciesTask : SequentialTask
                     }
                     else
                     {
-                        throw new JsonParseException("'data' is not an object");
+                        throw new JsonException("'data' is not an object");
                     }
                 }
                 else
                 {
                     var root = JsonNode.Parse(request.BodyAsString)
-                               ?? throw new JsonParseException("empty response");
+                               ?? throw new JsonException("empty response");
                     var dto = ModrinthJson.ProjectFromNode(root)
-                              ?? throw new JsonParseException("project is not a JSON object");
+                              ?? throw new JsonException("project is not a JSON object");
                     ModrinthPackIndex.LoadIndexedPack(pDep.Pack, dto);
                 }
             }
-            catch (Exception e) when (e is JsonException or JsonParseException)
+            catch (Exception e) when (e is JsonException)
             {
                 // (upstream logs the parse error / the error cause)
                 RemovePack(pDep.Pack.AddonId);
@@ -325,10 +324,10 @@ public class GetModDependenciesTask : SequentialTask
                         {
                             Consider(FlameMod.LoadIndexedPackVersion(fileDto));
                         }
-                        catch (JsonParseException) { }
+                        catch (JsonException) { }
                     }
                 }
-                catch (JsonParseException)
+                catch (JsonException)
                 {
                     // like the C++ kind-failure path: degrade to an empty best match, which
                     // the resolution step turns into an explicit missing-dependency
@@ -377,9 +376,9 @@ public class GetModDependenciesTask : SequentialTask
                     try
                     {
                         file = ModrinthPackIndex.LoadIndexedPackVersion(ModrinthJson.VersionFromNode(entry)
-                                                                        ?? throw new JsonParseException("version is not a JSON object"));
+                                                                        ?? throw new JsonException("version is not a JSON object"));
                     }
-                    catch (JsonParseException)
+                    catch (JsonException)
                     {
                         continue;
                     }

@@ -13,7 +13,7 @@
 // the headless port does not carry the upstream hash column.
 
 using System.Globalization;
-using FlintLauncher.Core.Json;
+using System.Text.Json;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Tasks;
 
@@ -79,7 +79,7 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi? modr
         {
             doc = FlameMod.ParseResponse(responseBody, FlameModJsonContext.Default.FlameFileListJson);
         }
-        catch (JsonParseException)
+        catch (JsonException)
         {
             // "Non-JSON data returned from the CF API" (syntax and kind errors alike)
             EmitFailed("Invalid data returned from the API.");
@@ -101,7 +101,7 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi? modr
                 try
                 {
                     var version = FlameMod.LoadIndexedPackVersion(fileDto
-                                                                  ?? throw new JsonParseException("Value is not an object"));
+                                                                  ?? throw new JsonException("Value is not an object"));
                     var fileid = long.Parse(version.FileId, CultureInfo.InvariantCulture);
                     if (!toProcess.Files.TryGetValue(fileid, out var manifestFile))
                     {
@@ -115,7 +115,7 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi? modr
                         hashes.Add(version.Hash);
                     }
                 }
-                catch (JsonParseException)
+                catch (JsonException)
                 {
                     // "Non-JSON data returned from the CF API"
                     EmitFailed("Invalid data returned from the API.");
@@ -162,7 +162,7 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi? modr
                             var file = ModrinthPackIndex.LoadIndexedPackVersion(entry);
                             outFile.Version.DownloadUrl = file.DownloadUrl;
                         }
-                        catch (JsonParseException) { }
+                        catch (JsonException) { }
                     }
                 }
             }
@@ -193,7 +193,7 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi? modr
             doc = FlameMod.ParseResponse(response.BodyAsString,
                 FlameModJsonContext.Default.FlameProjectListJson);
         }
-        catch (JsonParseException) { }
+        catch (JsonException) { }
 
         if (doc is not null)
         {
@@ -221,7 +221,7 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi? modr
                     }
                 }
             }
-            catch (JsonParseException) { }
+            catch (JsonException) { }
         }
 
         EmitSucceeded();

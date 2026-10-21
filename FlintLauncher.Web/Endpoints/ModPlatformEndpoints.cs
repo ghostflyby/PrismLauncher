@@ -11,7 +11,6 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
@@ -287,14 +286,14 @@ public static class ModPlatformEndpoints
                                     pack.Versions.Add(version);
                                 }
                             }
-                            catch (JsonParseException)
+                            catch (JsonException)
                             {
                                 // skip malformed entries, like the dependency resolver
                             }
                         }
                     }
                 }
-                catch (JsonParseException e)
+                catch (JsonException e)
                 {
                     return ApiJson.Error($"{parsedProvider.ToString().ToLowerInvariant()}_invalid_response",
                         $"{provider} version list is invalid: {e.Message}", 502);
@@ -648,7 +647,7 @@ public static class ModPlatformEndpoints
                     {
                         FlameMod.LoadIndexedPack(pack, hitObj);
                     }
-                    catch (JsonParseException)
+                    catch (JsonException)
                     {
                         continue;
                     }

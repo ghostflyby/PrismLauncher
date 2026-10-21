@@ -8,7 +8,7 @@
 // Both are PURE derivations (StoreCompleteness): no downloads, no ledger writes. The inner
 // E5 layer (per-file ledger entry queries) is the metacache eviction surface that exists.
 
-using FlintLauncher.Core.Json;
+using System.Text.Json;
 using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Store;
@@ -31,7 +31,7 @@ public static class StoreEndpoints
                 report = StoreCompleteness.LibrariesStatus(runtime.Paths, runtime.MetaCache, versionRef,
                     new RuntimeContext());
             }
-            catch (Exception e) when (e is MetaParseException or JsonParseException)
+            catch (Exception e) when (e is MetaParseException or JsonException)
             {
                 return ApiJson.Error("invalid_version_manifest",
                     $"the version manifest for '{versionRef}' is not parseable: {e.Message}", 422);

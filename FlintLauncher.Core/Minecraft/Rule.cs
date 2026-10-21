@@ -4,7 +4,6 @@
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.Minecraft;
 
@@ -35,15 +34,15 @@ public class Rule
         RuleJson? dto;
         try
         {
-            dto = obj.Deserialize(VersionFormatJsonContext.Default.RuleJson)
-                  ?? throw new JsonParseException("Rule: Error parsing JSON: document is null");
+            dto = obj.Deserialize(VersionFormatJsonContext.Default.RuleJson);
         }
         catch (JsonException e)
         {
-            throw new JsonParseException("Rule: Error parsing JSON: " + e.Message);
+            throw new JsonException("Rule: Error parsing JSON: " + e.Message);
         }
 
-        return VersionFormatMapper.MapRule(dto);
+        return VersionFormatMapper.MapRule(
+            dto ?? throw new JsonException("Rule: Error parsing JSON: document is null"));
     }
 
     /// <summary>The typed-probe seam (RuleJson arrives from the version format readers).</summary>

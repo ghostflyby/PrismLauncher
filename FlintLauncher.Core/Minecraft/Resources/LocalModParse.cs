@@ -662,7 +662,7 @@ public static class ModUtils
         }
         catch (JsonException)
         {
-            // the former ParseJsonOrThrow → catch(JsonParseException) path: garbage leaves
+            // the former ParseJsonOrThrow → catch(JsonException) path: garbage leaves
             // filename-only details
             return new ModDetails();
         }

@@ -433,8 +433,8 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         // critical — the uid member is required (the former RequireString throw), and a
         // null list entry is the former "Component must be an object." throw
         var component = new Component(parent,
-            (wire ?? throw new JsonParseException("Component must be an object.")).Uid
-            ?? throw new JsonParseException("'uid' is not a string"))
+            (wire ?? throw new JsonException("Component must be an object.")).Uid
+            ?? throw new JsonException("'uid' is not a string"))
         {
             Version = wire.Version,
             DependencyOnly = wire.DependencyOnly,
@@ -511,13 +511,13 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
             var doc = JsonSerializer.Deserialize(data, PackConfigJsonContext.Default.PackConfigJson);
             if (doc is null)
             {
-                throw new JsonParseException("the document is null");
+                throw new JsonException("the document is null");
             }
 
             // check order file version.
             if (doc.FormatVersion != CurrentComponentsFileVersion)
             {
-                throw new JsonParseException($"Invalid component file version, expected {CurrentComponentsFileVersion}");
+                throw new JsonException($"Invalid component file version, expected {CurrentComponentsFileVersion}");
             }
 
             foreach (var componentWire in doc.Components ?? [])
@@ -525,7 +525,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
                 container.Add(ComponentFromJsonV1(parent, componentWire));
             }
         }
-        catch (Exception e) when (e is JsonParseException or JsonException)
+        catch (Exception e) when (e is JsonException)
         {
             container.Clear();
             return Result.Error($"Couldn't parse {filename} : bad file format");
@@ -1038,7 +1038,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
                 this._profile = applied;
             }
-            catch (Exception e) when (e is JsonParseException or MetaParseException or FileSystemException)
+            catch (Exception e) when (e is JsonException or MetaParseException or FileSystemException)
             {
                 return null;
             }

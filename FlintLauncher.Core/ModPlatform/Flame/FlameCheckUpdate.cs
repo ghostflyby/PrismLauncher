@@ -15,7 +15,6 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Net;
@@ -137,7 +136,7 @@ public sealed class FlameCheckUpdate(
 
                 FlameMod.LoadIndexedPackVersions(pack, versionsDoc.Data);
             }
-            catch (JsonParseException e)
+            catch (JsonException e)
             {
                 // "Failed to parse response from a version request."
                 EmitStatus(e.Message);
@@ -241,17 +240,17 @@ public sealed class FlameCheckUpdate(
                     [
                         FlameMod.ParseResponse(projRequest.BodyAsString,
                             FlameModJsonContext.Default.FlameProjectEnvelopeJson).Data
-                        ?? throw new JsonParseException("'data' is not an object"),
+                        ?? throw new JsonException("'data' is not an object"),
                     ];
                 }
                 else
                 {
                     entries = FlameMod.ParseResponse(projRequest.BodyAsString,
                                   FlameModJsonContext.Default.FlameProjectListJson).Data
-                              ?? throw new JsonParseException("'data' is not an array");
+                              ?? throw new JsonException("'data' is not an array");
                 }
             }
-            catch (JsonParseException) { }
+            catch (JsonException) { }
 
             if (entries is not null)
             {
@@ -279,7 +278,7 @@ public sealed class FlameCheckUpdate(
                             "Resource has a new update available, but is not downloadable using CurseForge.",
                             recoverUrl);
                     }
-                    catch (JsonParseException) { }
+                    catch (JsonException) { }
                 }
             }
         }

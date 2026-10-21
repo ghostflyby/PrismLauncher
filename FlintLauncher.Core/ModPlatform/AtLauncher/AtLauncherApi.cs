@@ -14,7 +14,6 @@
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.ModPlatform.AtLauncher;
@@ -94,7 +93,7 @@ public sealed class AtLauncherApi(NetStack? net = null)
         {
             // binding failures (a non-array root, a non-object entry, a missing required
             // member) keep the parse wrapper of the former per-entry Require reads
-            throw new JsonParseException("JSON response from ATLauncher: Error parsing JSON: " + e.Message);
+            throw new JsonException("JSON response from ATLauncher: Error parsing JSON: " + e.Message);
         }
     }
 
@@ -106,20 +105,21 @@ public sealed class AtLauncherApi(NetStack? net = null)
     public static ShareCode? LoadShareCode(string response, out string? errorMessage)
     {
         errorMessage = null;
-        AtlShareCodeResponseJson parsed;
+        AtlShareCodeResponseJson? parsed;
         try
         {
-            parsed = JsonSerializer.Deserialize(response, AtLauncherJsonContext.Default.AtlShareCodeResponseJson)
-                     ?? throw new JsonParseException(
-                         "JSON response from ATLauncher: Error parsing JSON: document is null");
+            parsed = JsonSerializer.Deserialize(response, AtLauncherJsonContext.Default.AtlShareCodeResponseJson);
         }
         catch (JsonException e)
         {
-            throw new JsonParseException("JSON response from ATLauncher: Error parsing JSON: " + e.Message);
+            throw new JsonException("JSON response from ATLauncher: Error parsing JSON: " + e.Message);
         }
 
         var shareCodeResponse = new ShareCodeResponse();
-        AtLauncherShareCode.LoadShareCodeResponse(shareCodeResponse, parsed);
+        AtLauncherShareCode.LoadShareCodeResponse(
+            shareCodeResponse,
+            parsed ?? throw new JsonException(
+                "JSON response from ATLauncher: Error parsing JSON: document is null"));
         if (shareCodeResponse.Error)
         {
             errorMessage = shareCodeResponse.Message;
@@ -138,12 +138,16 @@ public sealed class AtLauncherApi(NetStack? net = null)
         PackVersion? version;
         try
         {
-            version = root.Deserialize(AtLauncherJsonContext.Default.PackVersion)
-                      ?? throw new JsonParseException("Value is not an object");
+            version = root.Deserialize(AtLauncherJsonContext.Default.PackVersion);
         }
         catch (JsonException e)
         {
-            throw new JsonParseException("JSON response from ATLauncher: Error parsing JSON: " + e.Message);
+            throw new JsonException("JSON response from ATLauncher: Error parsing JSON: " + e.Message);
+        }
+
+        if (version is null)
+        {
+            throw new JsonException("Value is not an object");
         }
 
         AtLauncherPackManifest.Normalize(version);

@@ -14,7 +14,6 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 
@@ -68,7 +67,7 @@ public sealed class ManifestDownloadTask(Uri url, string finalPath, string check
             manifest = JsonSerializer.Deserialize(download.BodyAsString,
                 JavaManifestJsonContext.Default.JavaRuntimeManifestJson);
         }
-        catch (Exception e) when (e is JsonParseException or JsonException)
+        catch (Exception e) when (e is JsonException)
         {
             // qWarning() << "Error while parsing JSON response ..."
             EmitFailed(e.Message);

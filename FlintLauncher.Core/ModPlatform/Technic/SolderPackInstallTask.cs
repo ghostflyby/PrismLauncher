@@ -8,9 +8,9 @@
 // temporary folder under the system temp path that is removed afterwards.
 
 using System.Security.Cryptography;
+using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.ModPlatform.Technic;
@@ -47,7 +47,7 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
         {
             build = TechnicApi.LoadSolderPackBuild(response);
         }
-        catch (JsonParseException e)
+        catch (JsonException e)
         {
             EmitFailed("Could not understand pack manifest:\n" + e.Message);
             return;

@@ -28,7 +28,6 @@ using System.Text.Json;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Net;
@@ -283,19 +282,19 @@ public sealed class ModrinthCreationTask : InstanceTask
             }
             catch (JsonException e)
             {
-                throw new JsonParseException("modrinth.index.json: Error parsing JSON: " + e.Message);
+                throw new JsonException("modrinth.index.json: Error parsing JSON: " + e.Message);
             }
 
             var obj = parsed
-                      ?? throw new JsonParseException("modrinth.index.json: Error parsing JSON: document is null");
+                      ?? throw new JsonException("modrinth.index.json: Error parsing JSON: document is null");
             var formatVersion = obj.FormatVersion
-                                ?? throw new JsonParseException("modrinth.index.json is not an integer");
+                                ?? throw new JsonException("modrinth.index.json is not an integer");
             if (formatVersion == 1)
             {
-                var game = obj.Game ?? throw new JsonParseException("modrinth.index.json is not a string");
+                var game = obj.Game ?? throw new JsonException("modrinth.index.json is not a string");
                 if (game != "minecraft")
                 {
-                    throw new JsonParseException("Unknown game: " + game);
+                    throw new JsonException("Unknown game: " + game);
                 }
 
                 if (setInternalData)
@@ -308,7 +307,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                     _managedName = obj.Name ?? "";
                 }
 
-                var jsonFiles = obj.Files ?? throw new JsonParseException("'files' is not an array");
+                var jsonFiles = obj.Files ?? throw new JsonException("'files' is not an array");
                 var optionalFiles = new List<File>();
                 foreach (var modInfo in jsonFiles)
                 {
@@ -335,7 +334,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                     var hashes = ModrinthRequire.Object(modInfo.Hashes, "hashes");
                     file.Hash = hashes.TryGetValue("sha512", out var sha512)
                         ? sha512
-                        : throw new JsonParseException("'sha512' is not a string");
+                        : throw new JsonException("'sha512' is not a string");
                     file.HashAlgorithm = HashAlgorithmName.SHA512;
 
                     // Do not use a strict URL parser (the C++ uses QUrl's default TolerantMode,
@@ -351,7 +350,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                             {
                                 if (isLast && file.Downloads.Count == 0)
                                 {
-                                    throw new JsonParseException($"Download URL for {file.Path} is not a correctly formatted URL");
+                                    throw new JsonException($"Download URL for {file.Path} is not a correctly formatted URL");
                                 }
                             }
                             else
@@ -394,47 +393,47 @@ public sealed class ModrinthCreationTask : InstanceTask
                 if (setInternalData)
                 {
                     var dependencies = obj.Dependencies
-                                       ?? throw new JsonParseException("'dependencies' is not an object");
+                                       ?? throw new JsonException("'dependencies' is not an object");
                     foreach (var (name, dependency) in dependencies)
                     {
                         if (name == "minecraft")
                         {
                             _minecraftVersion = dependency
-                                                ?? throw new JsonParseException("Minecraft version is not a string");
+                                                ?? throw new JsonException("Minecraft version is not a string");
                         }
                         else if (name == "fabric-loader")
                         {
                             _fabricVersion = dependency
-                                             ?? throw new JsonParseException("Fabric Loader version is not a string");
+                                             ?? throw new JsonException("Fabric Loader version is not a string");
                         }
                         else if (name == "quilt-loader")
                         {
                             _quiltVersion = dependency
-                                            ?? throw new JsonParseException("Quilt Loader version is not a string");
+                                            ?? throw new JsonException("Quilt Loader version is not a string");
                         }
                         else if (name == "forge")
                         {
                             _forgeVersion = dependency
-                                            ?? throw new JsonParseException("Forge version is not a string");
+                                            ?? throw new JsonException("Forge version is not a string");
                         }
                         else if (name == "neoforge")
                         {
                             _neoForgeVersion = dependency
-                                               ?? throw new JsonParseException("NeoForge version is not a string");
+                                               ?? throw new JsonException("NeoForge version is not a string");
                         }
                         else
                         {
-                            throw new JsonParseException("Unknown dependency type: " + name);
+                            throw new JsonException("Unknown dependency type: " + name);
                         }
                     }
                 }
             }
             else
             {
-                throw new JsonParseException($"Unknown format version: {formatVersion}");
+                throw new JsonException($"Unknown format version: {formatVersion}");
             }
         }
-        catch (JsonParseException e)
+        catch (JsonException e)
         {
             EmitFailed("Could not understand pack index:\n" + e.Message);
             return false;

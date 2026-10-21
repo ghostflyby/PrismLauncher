@@ -100,10 +100,10 @@ public static class ProfileUtils
         try
         {
             return OneSixVersionFormat.VersionFileFromJson(
-                root as JsonObject ?? throw new JsonParseException("Value is not an object"),
+                root as JsonObject ?? throw new JsonException("Value is not an object"),
                 filepath, requireOrder);
         }
-        catch (Exception e) when (e is JsonParseException or JsonException)
+        catch (Exception e) when (e is JsonException)
         {
             return CreateErrorVersionFile(fileId, e.Message);
         }

@@ -8,7 +8,7 @@
 // (docs/JSON-MIGRATION.md, the Qt write-tail batch: patches and mmc-pack have no external
 // write consumer; the values are the contract).
 //
-// Failure behavior: the former Require* reads become document-level JsonParseException
+// Failure behavior: the former Require* reads become document-level JsonException
 // failures with the collapsed kind texts ("'sha1' is not a string"); per-field quirks with
 // external meaning are preserved (library 'name' missing keeps the upstream typo message,
 // assetIndex-absent synthesizes from 'assets', minimumLauncherVersion > 18 warns, the
@@ -17,7 +17,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.Java;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Meta;
 using JdkFind;
 
@@ -361,28 +360,28 @@ internal sealed record VersionFileOutJson
 internal sealed partial class VersionFormatJsonContext : JsonSerializerContext;
 
 /// <summary>The mappers from the version-format probes onto the domain objects. All shared
-/// helpers throw the collapsed JsonParseException kind texts — a malformed document fails
+/// helpers throw the collapsed JsonException kind texts — a malformed document fails
 /// whole (the reasonable failure behavior for format files; the consumers surface the
 /// message and the file can be fixed or refetched).</summary>
 internal static class VersionFormatMapper
 {
-    public static JsonParseException MissingInt(string key) => new($"'{key}' is not an integer");
+    public static JsonException MissingInt(string key) => new($"'{key}' is not an integer");
 
-    public static JsonParseException MissingString(string key) => new($"'{key}' is not a string");
+    public static JsonException MissingString(string key) => new($"'{key}' is not a string");
 
-    public static JsonParseException MissingObject(string key) => new($"'{key}' is not an object");
+    public static JsonException MissingObject(string key) => new($"'{key}' is not an object");
 
     public static string Require(string? value, string key) => value ?? throw MissingString(key);
 
     public static int Require(int? value, string key) => value ?? throw MissingInt(key);
 
-    public static JsonParseException MissingArray(string key) => new($"'{key}' is not an array");
+    public static JsonException MissingArray(string key) => new($"'{key}' is not an array");
 
     /// <summary>Collection/dictionary elements are not null-checked by STJ (even with
     /// RespectNullableAnnotations) — a JSON null element is the former "Value is not an
     /// object" binding failure.</summary>
     public static T RequireElement<T>(T? element) where T : class =>
-        element ?? throw new JsonParseException("Value is not an object");
+        element ?? throw new JsonException("Value is not an object");
 
     // ---------------------------------------------------------------- download info
 
@@ -390,7 +389,7 @@ internal static class VersionFormatMapper
     {
         if (dto is null)
         {
-            throw new JsonParseException("Value is not an object");
+            throw new JsonException("Value is not an object");
         }
 
         var info = new MojangDownloadInfo();
@@ -481,13 +480,13 @@ internal static class VersionFormatMapper
     {
         if (dto is null)
         {
-            throw new JsonParseException("Value is not an object");
+            throw new JsonException("Value is not an object");
         }
 
         if (dto.Name is null)
         {
             // the upstream typo of the missing space is preserved
-            throw new JsonParseException(filename + "contains a library that doesn't have a 'name' field");
+            throw new JsonException(filename + "contains a library that doesn't have a 'name' field");
         }
 
         var outLib = new Library();
@@ -577,12 +576,12 @@ internal static class VersionFormatMapper
     {
         if (dto is null)
         {
-            throw new JsonParseException("Value is not an object");
+            throw new JsonException("Value is not an object");
         }
 
         if (dto.Name is null)
         {
-            throw new JsonParseException(filename + "contains a jarmod that doesn't have a 'name' field");
+            throw new JsonException(filename + "contains a jarmod that doesn't have a 'name' field");
         }
 
         // it needs to be local, it is stored in the instance jarmods folder; the display

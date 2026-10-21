@@ -11,7 +11,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using Xunit;
@@ -196,22 +195,22 @@ public class FtbTests : IDisposable
     public void Manifest_ErrorMessages_KeepTheCppShapes()
     {
         // parse errors keep the "{what}: Error parsing JSON: ..." wrapper
-        var parseError = Assert.Throws<JsonParseException>(() => FtbApi.LoadModpack("not json"));
+        var parseError = Assert.Throws<JsonException>(() => FtbApi.LoadModpack("not json"));
         Assert.StartsWith("JSON response from FTB: Error parsing JSON: ", parseError.Message);
 
         // a non-object root document fails like the old Json::requireObject(doc)
-        var kindError = Assert.Throws<JsonParseException>(() => FtbApi.LoadModpack("[1,2]"));
+        var kindError = Assert.Throws<JsonException>(() => FtbApi.LoadModpack("[1,2]"));
         Assert.Equal("Document is not an object", kindError.Message);
 
         // a missing required key fails through the model's `required` members and rides the
         // same parse wrapper (deviation: the STJ "missing required properties" text replaced
         // the C++ "'key's parent does not contain 'key'" shape)
-        var missing = Assert.Throws<JsonParseException>(() => FtbApi.LoadModpack("""{"id":1}"""));
+        var missing = Assert.Throws<JsonException>(() => FtbApi.LoadModpack("""{"id":1}"""));
         Assert.StartsWith("JSON response from FTB: Error parsing JSON: ", missing.Message);
         Assert.Contains("name", missing.Message);
 
         // a non-integer for a required int fails the strict int binding the same way
-        var notInt = Assert.Throws<JsonParseException>(() => FtbApi.LoadVersion("""
+        var notInt = Assert.Throws<JsonException>(() => FtbApi.LoadVersion("""
                                                                                 {"id":1.5,"parent":0,"name":"n","type":"t",
                                                                                  "installs":0,"plays":0,"updated":0,"specs":{"id":1,"minimum":1,"recommended":1}}
                                                                                 """));

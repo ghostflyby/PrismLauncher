@@ -66,7 +66,7 @@ public sealed class FtbAppPaths(string? rootPath = null)
                 FtbAppSettingsJsonContext.Default.FtbAppSettingsJson);
             return settings?.InstanceLocation ?? "";
         }
-        catch (Exception e) when (e is JsonParseException or JsonException)
+        catch (Exception e) when (e is JsonException)
         {
             return "";
         }

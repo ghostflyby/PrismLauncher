@@ -12,8 +12,8 @@
 // instead of mutating the shared one, so an override can never leak into other requests
 // (and needs no restore).
 
+using System.Text.Json;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
@@ -166,7 +166,7 @@ public static class AtLauncherEndpoints
         {
             packs = AtLauncherApi.LoadPackIndex(request.BodyAsString);
         }
-        catch (JsonParseException e)
+        catch (JsonException e)
         {
             return ApiJson.Error("atlauncher_invalid_response",
                 $"atlauncher pack index is invalid: {e.Message}", 502);

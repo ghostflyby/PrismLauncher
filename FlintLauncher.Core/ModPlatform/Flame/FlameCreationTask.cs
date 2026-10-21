@@ -29,11 +29,11 @@
 //    cannot be loaded.
 //  - logWarning() becomes a Warnings entry + a status line (no warningLogged signal).
 
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Core.ModPlatform.Modrinth;
@@ -144,7 +144,7 @@ public sealed partial class FlameCreationTask : InstanceTask
             FileSystem.EnsureFilePathExists(newIndexPlace);
             FileSystem.Move(indexPath, newIndexPlace);
         }
-        catch (JsonParseException e)
+        catch (JsonException e)
         {
             EmitFailed("Could not understand pack manifest:\n" + e.Message);
             return;

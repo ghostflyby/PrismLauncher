@@ -9,8 +9,8 @@
 // class is serialized through the "FlameApi" collection and restores the defaults in Dispose.
 
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
@@ -542,11 +542,11 @@ public class FlameApiTests : IDisposable
     {
         var badType = Path.Combine(_root, "bad-type.json");
         File.WriteAllText(badType, """{"manifestType":"somethingElse","manifestVersion":1}""");
-        Assert.Throws<JsonParseException>(() => FlameManifest.LoadManifest(new FlameManifest(), badType));
+        Assert.Throws<JsonException>(() => FlameManifest.LoadManifest(new FlameManifest(), badType));
 
         var badVersion = Path.Combine(_root, "bad-version.json");
         File.WriteAllText(badVersion, """{"manifestType":"minecraftModpack","manifestVersion":42}""");
-        Assert.Throws<JsonParseException>(() => FlameManifest.LoadManifest(new FlameManifest(), badVersion));
+        Assert.Throws<JsonException>(() => FlameManifest.LoadManifest(new FlameManifest(), badVersion));
     }
 
     [Fact]

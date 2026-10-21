@@ -90,15 +90,17 @@ public sealed class FtbApi(NetStack? net = null)
     /// other parse failure).</summary>
     private static JsonNode RequireDocument(string json, string what)
     {
+        JsonNode? node;
         try
         {
-            return JsonNode.Parse(json)
-                   ?? throw new JsonParseException(what + ": Error parsing JSON: document is null");
+            node = JsonNode.Parse(json);
         }
         catch (JsonException e)
         {
-            throw new JsonParseException(what + ": Error parsing JSON: " + e.Message);
+            throw new JsonException(what + ": Error parsing JSON: " + e.Message);
         }
+
+        return node ?? throw new JsonException(what + ": Error parsing JSON: document is null");
     }
 
     /// <summary>The shared document root: parse (with the "{what}: Error parsing JSON: ..."
@@ -110,18 +112,20 @@ public sealed class FtbApi(NetStack? net = null)
         var root = RequireDocument(json, "JSON response from FTB");
         if (root is not JsonObject)
         {
-            throw new JsonParseException("Document is not an object");
+            throw new JsonException("Document is not an object");
         }
 
+        T? dto;
         try
         {
-            return root.Deserialize(typeInfo)
-                   ?? throw new JsonParseException("Document is not an object");
+            dto = root.Deserialize(typeInfo);
         }
         catch (JsonException e)
         {
-            throw new JsonParseException("JSON response from FTB: Error parsing JSON: " + e.Message);
+            throw new JsonException("JSON response from FTB: Error parsing JSON: " + e.Message);
         }
+
+        return dto ?? throw new JsonException("Document is not an object");
     }
 
     /// <summary>Parses the /modpack/all index (FtbListModel::requestFinished):

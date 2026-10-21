@@ -7,7 +7,6 @@
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.ModPlatform.Technic;
 
@@ -18,14 +17,16 @@ internal static class TechnicJson
     /// throws like any other parse failure).</summary>
     public static JsonNode RequireDocument(string json, string what)
     {
+        JsonNode? node;
         try
         {
-            return JsonNode.Parse(json)
-                   ?? throw new JsonParseException(what + ": Error parsing JSON: document is null");
+            node = JsonNode.Parse(json);
         }
         catch (JsonException e)
         {
-            throw new JsonParseException(what + ": Error parsing JSON: " + e.Message);
+            throw new JsonException(what + ": Error parsing JSON: " + e.Message);
         }
+
+        return node ?? throw new JsonException(what + ": Error parsing JSON: document is null");
     }
 }

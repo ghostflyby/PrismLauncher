@@ -20,28 +20,30 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Meta;
 
 /// <summary>The former RequireObject(RequireNode(...)) gate shared by the meta entity
-/// readers: a syntax-broken or non-object document fails as a JsonParseException like the
+/// readers: a syntax-broken or non-object document fails as a JsonException like the
 /// wrapper family.</summary>
 internal static class MetaDocumentParse
 {
     public static JsonObject ParseDocument(byte[] data, string fname)
     {
+        JsonObject? document;
         try
         {
-            return JsonNode.Parse(Encoding.UTF8.GetString([.. data])) as JsonObject
-                   ?? throw new JsonParseException(fname + ": Error parsing JSON: document is null or not an object");
+            document = JsonNode.Parse(Encoding.UTF8.GetString([.. data])) as JsonObject;
         }
         catch (JsonException e)
         {
-            throw new JsonParseException(fname + ": Error parsing JSON: " + e.Message);
+            throw new JsonException(fname + ": Error parsing JSON: " + e.Message);
         }
+
+        return document ?? throw new JsonException(
+            fname + ": Error parsing JSON: document is null or not an object");
     }
 }
 
@@ -145,7 +147,7 @@ public abstract class MetaEntity
                 entity.Parse(MetaDocumentParse.ParseDocument([.. _data], fname));
                 return true;
             }
-            catch (Exception e) when (e is JsonParseException or MetaParseException or FormatException)
+            catch (Exception e) when (e is JsonException or MetaParseException or FormatException)
             {
                 // qWarning() << "Unable to parse response:" << e.cause();
                 return false;
@@ -180,7 +182,7 @@ public abstract class MetaEntity
                     hashMatches = expected == actual;
                     if (mode == NetMode.Online && entity.Sha256.Length != 0 && !hashMatches)
                     {
-                        throw new JsonParseException(
+                        throw new JsonException(
                             $"Checksum mismatch, expected sha256: {expected}, got: {actual}");
                     }
 

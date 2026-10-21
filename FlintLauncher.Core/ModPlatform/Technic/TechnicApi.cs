@@ -186,15 +186,15 @@ public sealed class TechnicApi(NetStack? net = null)
         }
         catch (JsonException e)
         {
-            throw new JsonParseException(what + ": Error parsing JSON: " + e.Message);
+            throw new JsonException(what + ": Error parsing JSON: " + e.Message);
         }
     }
 
     private static string RequireMember(string? value, string key) =>
-        value ?? throw new JsonParseException("'" + key + "' is not a string");
+        value ?? throw new JsonException("'" + key + "' is not a string");
 
     private static List<T> RequireMember<T>(List<T>? value, string key) where T : class =>
-        value ?? throw new JsonParseException("'" + key + "' is not an array");
+        value ?? throw new JsonException("'" + key + "' is not an array");
 
     /// <summary>Port of ListModel::searchRequestFinished. Returns the parsed packs; an empty
     /// list mirrors the C++ parse-failure / "error" payload paths (nothing is appended).</summary>
@@ -274,7 +274,7 @@ public sealed class TechnicApi(NetStack? net = null)
                 }
             }
         }
-        catch (JsonParseException)
+        catch (JsonException)
         {
             return [];
         }
@@ -297,7 +297,7 @@ public sealed class TechnicApi(NetStack? net = null)
             obj = DeserializeDocument<TechnicMetadataJson>(response, "JSON response from Technic",
                 TechnicJsonContext.Default.TechnicMetadataJson);
         }
-        catch (JsonParseException)
+        catch (JsonException)
         {
             return false;
         }
@@ -334,25 +334,25 @@ public sealed class TechnicApi(NetStack? net = null)
             return DeserializeDocument<SolderPack>(response, "JSON response from Solder",
                 TechnicJsonContext.Default.SolderPack);
         }
-        catch (JsonParseException)
+        catch (JsonException)
         {
             return null;
         }
     }
 
     /// <summary>Port of TechnicSolder::loadPackBuild (the SolderPackInstallTask entry).
-    /// Throws <see cref="JsonParseException"/> with the Solder wrapper on any failure.</summary>
+    /// Throws <see cref="JsonException"/> with the Solder wrapper on any failure.</summary>
     public static SolderPackBuild LoadSolderPackBuild(string response)
     {
         var build = DeserializeDocument<SolderPackBuild>(response, "JSON response from Solder",
                         TechnicJsonContext.Default.SolderPackBuild)
-                    ?? throw new JsonParseException("JSON response from Solder: Error parsing JSON: document is null");
+                    ?? throw new JsonException("JSON response from Solder: Error parsing JSON: document is null");
 
         // JSON null members/elements are not enforced by the binding — surface them like the
         // former Require reads instead of letting them NRE the install task
         if (build.Minecraft is null)
         {
-            throw new JsonParseException("'minecraft' is not a string");
+            throw new JsonException("'minecraft' is not a string");
         }
 
         foreach (var mod in build.Mods)
@@ -360,7 +360,7 @@ public sealed class TechnicApi(NetStack? net = null)
             // a null ELEMENT or a null url both surface as the former RequireObject check
             if (mod?.Url is null)
             {
-                throw new JsonParseException("Value is not an object");
+                throw new JsonException("Value is not an object");
             }
         }
 

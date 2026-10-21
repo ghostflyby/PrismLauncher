@@ -30,7 +30,7 @@ public enum MetadataVersion
 }
 
 /// <summary>Port of Meta::ParseException. Routed to the same refetch path as
-/// JsonParseException by the metadata-document consumers (see MetaEntity.ParsingValidator,
+/// JsonException by the metadata-document consumers (see MetaEntity.ParsingValidator,
 /// whose filter used to miss this type); derives directly from Exception like the upstream
 /// ::Exception root.</summary>
 public sealed class MetaParseException(string message) : Exception(message)
@@ -229,7 +229,7 @@ public static class MetaJsonFormat
     }
 
     /// <summary>The requires/conflicts arrays of a parsed member (absent member -> empty).
-    /// The meta documents flow through here (not the JsonParseException ParseRequires);
+    /// The meta documents flow through here (not the JsonException ParseRequires);
     /// a null entry fails as a MetaParseException like the former node read.</summary>
     private static void MapRequires(List<MetaRequireJson?>? raw, SortedSet<Require> ptr)
     {
@@ -384,7 +384,7 @@ public static class MetaJsonFormat
             ptr.Add(new Require
             {
                 Uid = (req is not null ? req.Uid : null)
-                      ?? throw new JsonParseException("'" + keyName + "' entry has no 'uid' string"),
+                      ?? throw new JsonException("'" + keyName + "' entry has no 'uid' string"),
                 EqualsVersion = req?.EqualsVersion ?? "",
                 Suggests = req?.Suggests ?? "",
             });

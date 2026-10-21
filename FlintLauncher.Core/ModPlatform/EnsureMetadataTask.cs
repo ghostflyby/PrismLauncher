@@ -14,7 +14,6 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
@@ -94,13 +93,13 @@ public sealed class EnsureMetadataTask(
                 {
                     if (!versionEntries.TryGetValue(hash, out var entry))
                     {
-                        throw new JsonParseException(hash + " is not an object");
+                        throw new JsonException(hash + " is not an object");
                     }
 
                     EmitStatus($"Parsing API response from Modrinth for '{resource.Name}'...");
                     _tempVersions[hash] = ModrinthPackIndex.LoadIndexedPackVersion(entry);
                 }
-                catch (JsonParseException e)
+                catch (JsonException e)
                 {
                     EmitMetadataFailed(resource, e.Message);
                 }
@@ -176,7 +175,7 @@ public sealed class EnsureMetadataTask(
                     pack = new IndexedPack();
                     ModrinthPackIndex.LoadIndexedPack(pack, dto);
                 }
-                catch (JsonParseException)
+                catch (JsonException)
                 {
                     // Skip this entry, since it has problems
                     continue;
@@ -234,7 +233,7 @@ public sealed class EnsureMetadataTask(
             response = FlameMod.ParseResponse(request.BodyAsString,
                 FlameModJsonContext.Default.FlameFingerprintResponseJson);
         }
-        catch (JsonParseException)
+        catch (JsonException)
         {
             EmitFailed("Fingerprint response is not a JSON object");
             return;
@@ -269,7 +268,7 @@ public sealed class EnsureMetadataTask(
                 {
                     _tempVersions[fingerprint] = FlameMod.LoadIndexedPackVersion(fileObj);
                 }
-                catch (JsonParseException)
+                catch (JsonException)
                 {
                     EmitMetadataFailed(resource, "Invalid data returned from the API.");
                 }
@@ -321,7 +320,7 @@ public sealed class EnsureMetadataTask(
                 {
                     entries = FlameMod.ParseResponse(projectRequest.BodyAsString,
                                   FlameModJsonContext.Default.FlameProjectListJson).Data
-                              ?? throw new JsonParseException("'data' is not an array");
+                              ?? throw new JsonException("'data' is not an array");
                 }
                 else
                 {
@@ -329,11 +328,11 @@ public sealed class EnsureMetadataTask(
                     [
                         FlameMod.ParseResponse(projectRequest.BodyAsString,
                             FlameModJsonContext.Default.FlameProjectEnvelopeJson).Data
-                        ?? throw new JsonParseException("'data' is not an object"),
+                        ?? throw new JsonException("'data' is not an object"),
                     ];
                 }
             }
-            catch (JsonParseException)
+            catch (JsonException)
             {
                 return;
             }
@@ -358,7 +357,7 @@ public sealed class EnsureMetadataTask(
                     EmitStatus($"Parsing API response from CurseForge for '{resource.Name}'...");
                     FlameMod.LoadIndexedPack(pack, entry);
                 }
-                catch (JsonParseException)
+                catch (JsonException)
                 {
                     EmitMetadataFailed(resource, "Invalid data returned from the API.");
                     continue;

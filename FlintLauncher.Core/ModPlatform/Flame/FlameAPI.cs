@@ -15,7 +15,6 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Versioning;
@@ -197,7 +196,7 @@ public sealed class FlameApi(NetStack? net = null) : ResourceApi
                 categories.Add(new Category(cat.Name ?? "", (cat.Id ?? 0).ToString(CultureInfo.InvariantCulture)));
             }
         }
-        catch (JsonParseException)
+        catch (JsonException)
         {
             // "Failed to parse response from a version request." (logged upstream)
         }

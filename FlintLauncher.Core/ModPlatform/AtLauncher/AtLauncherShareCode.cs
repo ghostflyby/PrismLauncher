@@ -4,7 +4,7 @@
 // shape arrives as the AtlShareCodeResponseJson probe records (source-generated context in
 // this file); the loader validates the required members with the Json::require* messages.
 
-using FlintLauncher.Core.Json;
+using System.Text.Json;
 
 namespace FlintLauncher.Core.ModPlatform.AtLauncher;
 
@@ -60,12 +60,12 @@ public static class AtLauncherShareCode
 
         if (!r.Error)
         {
-            var data = obj.Data ?? throw new JsonParseException("'data' is not an object");
+            var data = obj.Data ?? throw new JsonException("'data' is not an object");
             r.Data.Pack = Require(data.Pack, "pack");
             r.Data.Version = Require(data.Version, "version");
 
-            var mods = data.Mods ?? throw new JsonParseException("'mods' is not an object");
-            var optional = mods.Optional ?? throw new JsonParseException("'optional' is not an array");
+            var mods = data.Mods ?? throw new JsonException("'mods' is not an object");
+            var optional = mods.Optional ?? throw new JsonException("'optional' is not an array");
             foreach (var mod in optional)
             {
                 r.Data.Mods.Add(new ShareCodeMod
@@ -78,9 +78,9 @@ public static class AtLauncherShareCode
     }
 
     private static string Require(string? value, string key) =>
-        value ?? throw new JsonParseException("'" + key + "' is not a string");
+        value ?? throw new JsonException("'" + key + "' is not a string");
 
     private static T Require<T>(T? value, string key) where T : struct =>
-        value ?? throw new JsonParseException(
+        value ?? throw new JsonException(
             "'" + key + "' is not a " + (typeof(T) == typeof(int) ? "integer" : typeof(T).Name.ToLowerInvariant()));
 }

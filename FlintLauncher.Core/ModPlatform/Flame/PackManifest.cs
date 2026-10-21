@@ -11,7 +11,6 @@
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
@@ -100,7 +99,7 @@ public sealed class FlameManifest
     public bool IsLoaded { get; set; }
 
     /// <summary>Port of Flame::loadManifest: parse the manifest.json at <paramref name="filepath"/>.
-    /// Throws <see cref="JsonParseException"/> for non-modpack manifests and unknown versions.</summary>
+    /// Throws <see cref="JsonException"/> for non-modpack manifests and unknown versions.</summary>
     public static void LoadManifest(FlameManifest m, string filepath)
     {
         FlameManifestJson? dto;
@@ -111,12 +110,12 @@ public sealed class FlameManifest
         }
         catch (JsonException e)
         {
-            throw new JsonParseException("manifest.json: Error parsing JSON: " + e.Message);
+            throw new JsonException("manifest.json: Error parsing JSON: " + e.Message);
         }
 
         if (dto is null)
         {
-            throw new JsonParseException("manifest.json is not an object");
+            throw new JsonException("manifest.json is not an object");
         }
 
         LoadManifestV1(m, dto);
@@ -127,16 +126,16 @@ public sealed class FlameManifest
         pack.ManifestType = Require(manifest.ManifestType, "manifestType");
         if (pack.ManifestType != "minecraftModpack")
         {
-            throw new JsonParseException("Not a modpack manifest!");
+            throw new JsonException("Not a modpack manifest!");
         }
 
         pack.ManifestVersion = Require(manifest.ManifestVersion, "manifestVersion");
         if (pack.ManifestVersion != 1)
         {
-            throw new JsonParseException($"Unknown manifest version ({pack.ManifestVersion})");
+            throw new JsonException($"Unknown manifest version ({pack.ManifestVersion})");
         }
 
-        var mc = manifest.Minecraft ?? throw new JsonParseException("'minecraft' is not an object");
+        var mc = manifest.Minecraft ?? throw new JsonException("'minecraft' is not an object");
         pack.Minecraft.Version = Require(mc.Version, "version");
         // (the manifest's extra "libraries" member — a 1.2.5 FTB retro curiosity with no
         // reader anywhere — is ignored on the read)
@@ -180,9 +179,9 @@ public sealed class FlameManifest
     // ------------------------------------------------- required-member checks
 
     private static string Require(string? value, string key) =>
-        value ?? throw new JsonParseException("'" + key + "' is not a string");
+        value ?? throw new JsonException("'" + key + "' is not a string");
 
     private static T Require<T>(T? value, string key) where T : struct =>
-        value ?? throw new JsonParseException(
+        value ?? throw new JsonException(
             "'" + key + "' is not a " + (typeof(T) == typeof(int) ? "integer" : typeof(T).Name.ToLowerInvariant()));
 }

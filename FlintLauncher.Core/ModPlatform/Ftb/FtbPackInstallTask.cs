@@ -14,10 +14,10 @@
 //    fetching game files, like the other creation tasks.
 
 using System.Security.Cryptography;
+using System.Text.Json;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Net;
 
@@ -91,7 +91,7 @@ public sealed class FtbPackInstallTask(
             // reads below only run after this assignment
             _manifest = FtbApi.LoadVersion(response);
         }
-        catch (JsonParseException e)
+        catch (JsonException e)
         {
             EmitFailed("Could not understand pack manifest:\n" + e.Message);
             return;

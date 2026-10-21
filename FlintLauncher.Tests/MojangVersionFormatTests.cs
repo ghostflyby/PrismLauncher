@@ -7,7 +7,6 @@
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using Xunit;
 
@@ -72,7 +71,7 @@ public class MojangVersionFormatTests
     [InlineData("\"text\"", " is not an object")]
     public void VersionFileFromJson_Rejects_NonObjectRoots(string json, string expectedSuffix)
     {
-        var e = Assert.Throws<JsonParseException>(() => MojangVersionFormat.VersionFileFromJson(JsonNode.Parse(json), "test.json"));
+        var e = Assert.Throws<JsonException>(() => MojangVersionFormat.VersionFileFromJson(JsonNode.Parse(json), "test.json"));
         Assert.Equal("test.json" + expectedSuffix, e.Message);
     }
 
@@ -158,7 +157,7 @@ public class MojangVersionFormatTests
 
     private static string ReadError(string json)
     {
-        return Assert.Throws<JsonParseException>(() => MojangVersionFormat.ReadVersionProperties(ParseNode(json), new VersionFile())).Message;
+        return Assert.Throws<JsonException>(() => MojangVersionFormat.ReadVersionProperties(ParseNode(json), new VersionFile())).Message;
     }
 
     // ------------------------------------------------------- library read behavior
@@ -207,7 +206,7 @@ public class MojangVersionFormatTests
     [Fact]
     public void LibraryFromJson_MissingName_KeepsTheUpstreamTypo()
     {
-        var e = Assert.Throws<JsonParseException>(() => MojangVersionFormat.LibraryFromJson(new ProblemContainer(), ParseNode("{}"), "lib.json"));
+        var e = Assert.Throws<JsonException>(() => MojangVersionFormat.LibraryFromJson(new ProblemContainer(), ParseNode("{}"), "lib.json"));
         // upstream typo preserved: no space between the filename and "contains"
         Assert.Equal("lib.jsoncontains a library that doesn't have a 'name' field", e.Message);
     }
@@ -238,6 +237,6 @@ public class MojangVersionFormatTests
 
     private static string LibraryError(string json)
     {
-        return Assert.Throws<JsonParseException>(() => MojangVersionFormat.LibraryFromJson(new ProblemContainer(), ParseNode(json), "lib.json")).Message;
+        return Assert.Throws<JsonException>(() => MojangVersionFormat.LibraryFromJson(new ProblemContainer(), ParseNode(json), "lib.json")).Message;
     }
 }

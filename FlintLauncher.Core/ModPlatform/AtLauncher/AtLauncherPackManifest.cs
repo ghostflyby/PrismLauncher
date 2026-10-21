@@ -17,6 +17,7 @@
 //  - the loader-time fixups (the "Minecraft Forge"-as-jar correction and the extractFolder
 //    %s% -> / rewrite) run in Normalize(PackVersion) after deserialization.
 
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.Json;
 
@@ -383,7 +384,7 @@ public static class AtLauncherPackManifest
 
             if (mod.DecompTypeRaw.Length != 0 && mod.DecompFile.Length == 0)
             {
-                throw new JsonParseException("'decompFile' is not a string");
+                throw new JsonException("'decompFile' is not a string");
             }
 
             mod.ExtractFolder = mod.ExtractFolder.Replace("%s%", "/");
@@ -391,12 +392,12 @@ public static class AtLauncherPackManifest
 
         if (version.LoaderRaw is { } loader && loader.Type.Length == 0)
         {
-            throw new JsonParseException("'type' is not a string");
+            throw new JsonException("'type' is not a string");
         }
 
         if (version.ConfigsRaw is { } configs && configs.Sha1.Length == 0)
         {
-            throw new JsonParseException("'sha1' is not a string");
+            throw new JsonException("'sha1' is not a string");
         }
     }
 }

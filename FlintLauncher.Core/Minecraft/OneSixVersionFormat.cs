@@ -10,7 +10,6 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Java;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Meta;
 
 namespace FlintLauncher.Core.Minecraft;
@@ -21,15 +20,17 @@ public static partial class OneSixVersionFormat
     /// parsing JSON: ..." wrapper family.</summary>
     private static T Probe<T>(JsonNode node, string what, JsonTypeInfo<T> typeInfo) where T : class
     {
+        T? dto;
         try
         {
-            return node.Deserialize(typeInfo)
-                   ?? throw new JsonParseException(what + ": Error parsing JSON: document is null");
+            dto = node.Deserialize(typeInfo);
         }
         catch (JsonException e)
         {
-            throw new JsonParseException(what + ": Error parsing JSON: " + e.Message);
+            throw new JsonException(what + ": Error parsing JSON: " + e.Message);
         }
+
+        return dto ?? throw new JsonException(what + ": Error parsing JSON: document is null");
     }
 
     public static Library LibraryFromJson(ProblemContainer problems, JsonObject libObj, string filename)
@@ -79,7 +80,7 @@ public static partial class OneSixVersionFormat
             case MetadataVersion.InitialRelease:
                 break;
             case MetadataVersion.Invalid:
-                throw new JsonParseException(filename + " does not contain a recognizable version of the metadata format.");
+                throw new JsonException(filename + " does not contain a recognizable version of the metadata format.");
         }
 
         if (requireOrder)

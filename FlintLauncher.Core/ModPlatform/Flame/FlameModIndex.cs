@@ -16,7 +16,6 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
@@ -121,41 +120,45 @@ internal sealed partial class FlameModJsonContext : JsonSerializerContext;
 // https://docs.curseforge.com/#tocS_Mod
 public static class FlameMod
 {
-    /// <summary>The probe read over a node: shape failures become JsonParseException like
+    /// <summary>The probe read over a node: shape failures become JsonException like
     /// the former Require* reads.</summary>
     private static T Probe<T>(JsonNode node, JsonTypeInfo<T> typeInfo) where T : class
     {
+        T? dto;
         try
         {
-            return node.Deserialize(typeInfo)
-                   ?? throw new JsonParseException("Value is not an object");
+            dto = node.Deserialize(typeInfo);
         }
         catch (JsonException e)
         {
-            throw new JsonParseException(e.Message);
+            throw new JsonException(e.Message);
         }
+
+        return dto ?? throw new JsonException("Value is not an object");
     }
 
     /// <summary>The response-body parse for the typed flow entries (the same
-    /// JsonParseException wrapper family).</summary>
+    /// JsonException wrapper family).</summary>
     internal static T ParseResponse<T>(string body, JsonTypeInfo<T> typeInfo) where T : class
     {
+        T? dto;
         try
         {
-            return JsonSerializer.Deserialize(body, typeInfo)
-                   ?? throw new JsonParseException("the document is null");
+            dto = JsonSerializer.Deserialize(body, typeInfo);
         }
         catch (JsonException e)
         {
-            throw new JsonParseException(e.Message);
+            throw new JsonException(e.Message);
         }
+
+        return dto ?? throw new JsonException("the document is null");
     }
 
     private static string Require(string? value, string key) =>
-        value ?? throw new JsonParseException("'" + key + "' is not a string");
+        value ?? throw new JsonException("'" + key + "' is not a string");
 
     private static int Require(int? value, string key) =>
-        value ?? throw new JsonParseException("'" + key + "' is not an integer");
+        value ?? throw new JsonException("'" + key + "' is not an integer");
 
     /// <summary>Port of FlameMod::loadIndexedPack (node entry).</summary>
     public static void LoadIndexedPack(IndexedPack pack, JsonNode obj) =>
@@ -241,7 +244,7 @@ public static class FlameMod
 
     /// <summary>The Web-facing typed version-list load: parses the {"data": [...]} response
     /// body and fills the pack (validated files, newest first). Returns false when the data
-    /// member is absent (the caller's "no data array" face); JsonParseException on a broken
+    /// member is absent (the caller's "no data array" face); JsonException on a broken
     /// body.</summary>
     public static bool LoadIndexedPackVersionsFromResponse(IndexedPack pack, string responseBody)
     {
@@ -263,7 +266,7 @@ public static class FlameMod
         {
             if (versionIter is null)
             {
-                throw new JsonParseException("file entry is not an object");
+                throw new JsonException("file entry is not an object");
             }
 
             var file = LoadIndexedPackVersion(versionIter);
@@ -297,7 +300,7 @@ public static class FlameMod
         // "" like the former AsString fallback (and simply misses every branch below)
         if (dto.GameVersions is not { ValueKind: JsonValueKind.Array } gameVersionsNode)
         {
-            throw new JsonParseException("'gameVersions' is not an array");
+            throw new JsonException("'gameVersions' is not an array");
         }
 
         var file = new IndexedVersion();

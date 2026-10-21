@@ -21,7 +21,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform;
@@ -117,7 +116,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             {
                 FlameMod.LoadIndexedPack(pack, data);
             }
-            catch (JsonParseException e)
+            catch (JsonException e)
             {
                 throw new ModResolveException($"the CurseForge project response for {projectId} is invalid: {e.Message}");
             }
@@ -144,7 +143,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
                           ?? throw new ModResolveException($"the Modrinth project {projectId} is not a JSON object");
                 ModrinthPackIndex.LoadIndexedPack(pack, dto);
             }
-            catch (JsonParseException e)
+            catch (JsonException e)
             {
                 throw new ModResolveException($"the Modrinth project response for {projectId} is invalid: {e.Message}");
             }
@@ -201,7 +200,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
                     $"the Modrinth version {versionId}", ModrinthJsonContext.Default.ModrinthVersionJson)
                 ?? throw new ModResolveException($"the Modrinth version {versionId} is not a JSON object"));
         }
-        catch (JsonParseException e)
+        catch (JsonException e)
         {
             throw new ModResolveException($"the response for version {versionId} is invalid: {e.Message}");
         }
@@ -246,7 +245,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
                     throw new ModResolveException($"the CurseForge version list of {pack.AddonId} has no data array");
                 }
             }
-            catch (JsonParseException e)
+            catch (JsonException e)
             {
                 throw new ModResolveException($"the CurseForge version list of {pack.AddonId} is invalid: {e.Message}");
             }
@@ -265,7 +264,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             {
                 file = ModrinthPackIndex.LoadIndexedPackVersion(dto);
             }
-            catch (JsonParseException)
+            catch (JsonException)
             {
                 continue;
             }

@@ -9,7 +9,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
-using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.Minecraft;
 
@@ -27,15 +26,17 @@ public static class MojangVersionFormat
     /// JSON: ..." wrapper family of the former RequireDocument reads.</summary>
     private static T Probe<T>(JsonNode node, string what, JsonTypeInfo<T> typeInfo) where T : class
     {
+        T? dto;
         try
         {
-            return node.Deserialize(typeInfo)
-                   ?? throw new JsonParseException(what + ": Error parsing JSON: document is null");
+            dto = node.Deserialize(typeInfo);
         }
         catch (JsonException e)
         {
-            throw new JsonParseException(what + ": Error parsing JSON: " + e.Message);
+            throw new JsonException(what + ": Error parsing JSON: " + e.Message);
         }
+
+        return dto ?? throw new JsonException(what + ": Error parsing JSON: document is null");
     }
 
     // ------------------------------------------------------------------ download info
@@ -102,12 +103,12 @@ public static class MojangVersionFormat
     {
         if (root is null)
         {
-            throw new JsonParseException(filename + " is empty or null");
+            throw new JsonException(filename + " is empty or null");
         }
 
         if (root is not JsonObject obj)
         {
-            throw new JsonParseException(filename + " is not an object");
+            throw new JsonException(filename + " is not an object");
         }
 
         return VersionFileFromJsonObject(obj, filename);

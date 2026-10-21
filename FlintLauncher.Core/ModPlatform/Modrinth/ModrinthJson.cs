@@ -16,7 +16,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
-using FlintLauncher.Core.Json;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
@@ -403,14 +402,14 @@ public static class ModrinthJson
 internal static class ModrinthRequire
 {
     public static string String(string? value, string key) =>
-        value ?? throw new JsonParseException("'" + key + "' is not a string");
+        value ?? throw new JsonException("'" + key + "' is not a string");
 
     public static bool Boolean(bool? value, string key) =>
-        value ?? throw new JsonParseException("'" + key + "' is not a bool");
+        value ?? throw new JsonException("'" + key + "' is not a bool");
 
     public static List<T> Array<T>(List<T>? value, string key) =>
-        value ?? throw new JsonParseException("'" + key + "' is not an array");
+        value ?? throw new JsonException("'" + key + "' is not an array");
 
     public static Dictionary<string, string> Object(Dictionary<string, string>? value, string key) =>
-        value ?? throw new JsonParseException("'" + key + "' is not an object");
+        value ?? throw new JsonException("'" + key + "' is not an object");
 }
