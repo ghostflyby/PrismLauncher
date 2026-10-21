@@ -3,6 +3,7 @@
 // pattern from NetStackTests): archive installs (zip + a hand-built ustar tar.gz), manifest
 // installs (files/directories/symlinks with sha1 validation) and the macOS SymlinkTask.
 
+using System.IO.Compression;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -357,8 +358,14 @@ public class JavaDownloadTests : IDisposable
         }
 
         tar.Write(new byte[1024]); // two zero blocks end the archive
-        GZip.Compress(tar.ToArray(), out var gz);
-        return gz;
+        using var gz = new MemoryStream();
+        tar.Position = 0;
+        using (var compressor = new GZipStream(gz, CompressionLevel.Optimal, leaveOpen: true))
+        {
+            tar.CopyTo(compressor);
+        }
+
+        return gz.ToArray();
     }
 
     private static byte[] BuildTarHeader(string name, char typeFlag, int mode, long size, string linkTarget)
