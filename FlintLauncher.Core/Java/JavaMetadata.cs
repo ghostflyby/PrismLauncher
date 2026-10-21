@@ -2,7 +2,7 @@
 // Port of launcher/java/JavaMetadata.{h,cpp}. The P2a parse-half (parseJavaMeta, DownloadType
 // and the Metadata record) lived in Minecraft/JavaMetadata.cs and has been MOVED here so the
 // whole java/ subsystem sits in the Java/ folder + FlintLauncher.Core.Java namespace; the
-// comparator operators (operator<, ==, > against another Metadata) are added on top.
+// comparison operators (<, >, <=, >= over CompareTo; == is the record's Equals) are added on top.
 // Java::Metadata descends from BaseVersion upstream — the trivial BaseVersion accessors
 // (descriptor/name/typeString) are inlined here.
 //
@@ -12,6 +12,7 @@
 // why this file uses classic block-scoped namespaces instead of the file-scoped form.
 
 using System.Globalization;
+using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -32,7 +33,8 @@ public enum JavaDownloadType
     Unknown,
 }
 
-public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMetadata>
+public sealed record JavaMetadata : IComparable<JavaMetadata>,
+    IComparisonOperators<JavaMetadata,JavaMetadata,bool>
 {
     /// <summary>Port of BaseVersion::descriptor().</summary>
     public string Descriptor() => Version.ToString();
@@ -57,7 +59,7 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
 
     public string PackageType { get; init; } = "";
 
-    public JvmVersion Version { get; set; } = JvmVersion.Unknown();
+    public JvmVersion Version { get; init; } = JvmVersion.Unknown();
 
     public string RuntimeOs { get; init; } = "";
 
@@ -89,7 +91,7 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
 
     /// <summary>The typed read over the runtime entry: the members keep their
     /// QJsonValue fallbacks (toString(default "") / toInteger(0)).</summary>
-    internal static JavaMetadata MapJavaMeta(JavaRuntimeJson dto)
+    private static JavaMetadata MapJavaMeta(JavaRuntimeJson dto)
     {
         var meta = new JavaMetadata
         {
@@ -110,11 +112,14 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
 
         if (dto.Version is { } version)
         {
-            meta.Version = JvmVersion.Parse(ComposeVersion(
-                version.Major ?? 0,
-                version.Minor ?? 0,
-                version.Security ?? 0,
-                version.Build ?? 0));
+            meta = meta with
+            {
+                Version = JvmVersion.Parse(ComposeVersion(
+                    version.Major ?? 0,
+                    version.Minor ?? 0,
+                    version.Security ?? 0,
+                    version.Build ?? 0))
+            };
         }
 
         return meta;
@@ -172,41 +177,39 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
 
     // ------------------------------------------------------------- comparators
 
-    /// <summary>Port of Metadata::operator&lt;: version, then release time, then name.</summary>
-    public bool LessThan(JavaMetadata rhs)
+    /// <summary>The Metadata ordering as a trichotomy — the port of Metadata::operator&lt;:
+    /// version, then release time, then name.</summary>
+    public int CompareTo(JavaMetadata? other)
     {
-        if (Version < rhs.Version)
+        if (other is null)
         {
-            return true;
+            return -1;
         }
 
-        if (rhs.Version < Version)
+        var versionCompare = Version.CompareTo(other.Version);
+        if (versionCompare != 0)
         {
-            return false;
+            return versionCompare;
         }
 
         var date = ReleaseTime;
-        var rhsDate = rhs.ReleaseTime;
+        var rhsDate = other.ReleaseTime;
         // Qt compares an invalid QDateTime as smaller than any valid one
         if (date.HasValue != rhsDate.HasValue)
         {
-            return !date.HasValue;
+            return date.HasValue ? 1 : -1;
         }
 
         if (date.HasValue && rhsDate.HasValue)
         {
-            if (date.Value < rhsDate.Value)
+            var dateCompare = date.Value.CompareTo(rhsDate.Value);
+            if (dateCompare != 0)
             {
-                return true;
-            }
-
-            if (rhsDate.Value < date.Value)
-            {
-                return false;
+                return dateCompare;
             }
         }
 
-        return StringUtils.NaturalCompare(Name, rhs.Name, ignoreCase: true) < 0;
+        return Math.Sign(StringUtils.NaturalCompare(Name, other.Name, ignoreCase: true));
     }
 
     /// <summary>Port of Metadata::operator==.</summary>
@@ -220,43 +223,34 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
         return Version == other.Version && Name == other.Name;
     }
 
-    /// <summary>Port of Metadata::operator&gt;.</summary>
-    public bool GreaterThan(JavaMetadata rhs) => !LessThan(rhs) && !Equals(rhs);
-
-    public int CompareTo(JavaMetadata? other)
-    {
-        if (other is null)
-        {
-            return -1;
-        }
-
-        if (LessThan(other))
-        {
-            return -1;
-        }
-
-        if (other.LessThan(this))
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-
-    public override bool Equals(object? obj) => Equals(obj as JavaMetadata);
-
     public override int GetHashCode() => HashCode.Combine(Version, Name);
 
     public static bool operator <(JavaMetadata left, JavaMetadata right)
     {
         ArgumentNullException.ThrowIfNull(left);
         ArgumentNullException.ThrowIfNull(right);
-        return left.LessThan(right);
+        return left.CompareTo(right) < 0;
     }
 
-    public static bool operator >(JavaMetadata left, JavaMetadata right) => left.GreaterThan(right);
+    public static bool operator >(JavaMetadata left, JavaMetadata right)
+    {
+        ArgumentNullException.ThrowIfNull(left);
+        ArgumentNullException.ThrowIfNull(right);
+        return left.CompareTo(right) > 0;
+    }
 
-    public static bool operator ==(JavaMetadata? left, JavaMetadata? right) => left?.Equals(right) ?? right is null;
+    public static bool operator <=(JavaMetadata left, JavaMetadata right)
+    {
+        ArgumentNullException.ThrowIfNull(left);
+        ArgumentNullException.ThrowIfNull(right);
+        return left.CompareTo(right) <= 0;
+    }
 
-    public static bool operator !=(JavaMetadata? left, JavaMetadata? right) => !(left == right);
+    public static bool operator >=(JavaMetadata left, JavaMetadata right)
+    {
+        ArgumentNullException.ThrowIfNull(left);
+        ArgumentNullException.ThrowIfNull(right);
+        return left.CompareTo(right) >= 0;
+    }
+
 }

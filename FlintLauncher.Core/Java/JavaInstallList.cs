@@ -78,13 +78,12 @@ public sealed class JavaInstallList
     }
 
     /// <summary>
-    /// Port of JavaInstallList::sortVersions() with the sortJavas predicate:
-    /// comp(left, right) = right &gt; left (trichotomy: left &lt; right) — an ASCENDING order by
-    /// JavaInstall::operator&lt; (architecture first, then version id, then path).
+    /// Port of JavaInstallList::sortVersions() with the sortJavas predicate: an ASCENDING order
+    /// by JavaInstall::CompareTo (architecture first, then version id, then path).
     /// </summary>
     public void SortVersions()
     {
-        _vlist.Sort((left, right) => right.GreaterThan(left) ? -1 : left.GreaterThan(right) ? 1 : 0);
+        _vlist.Sort();
     }
 }
 

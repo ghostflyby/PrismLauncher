@@ -5,12 +5,13 @@
 // comparison operators collapse onto the typed ones (the only polymorphic sibling in the java
 // layer is Java::Metadata, which is ordered independently).
 
+using System.Numerics;
 using FlintLauncher.Core.Text;
 using JdkFind;
 
 namespace FlintLauncher.Core.Java;
 
-public sealed class JavaInstall(JvmVersion id, string arch, string path) : IComparable<JavaInstall>, IEquatable<JavaInstall>
+public sealed class JavaInstall(JvmVersion id, string arch, string path) : IComparable<JavaInstall>, IEquatable<JavaInstall>, IComparisonOperators<JavaInstall, JavaInstall, bool>
 {
     public JavaInstall() : this(JvmVersion.Unknown(), "unknown", "") { }
 
@@ -37,26 +38,28 @@ public sealed class JavaInstall(JvmVersion id, string arch, string path) : IComp
 
     public bool Is64Bit { get; init; }
 
-    /// <summary>Port of JavaInstall::operator&lt;: architecture, then version id, then path.</summary>
-    public bool LessThan(JavaInstall rhs)
+    /// <summary>The JavaInstall ordering as a trichotomy — the port of JavaInstall::operator&lt;:
+    /// architecture, then version id, then path.</summary>
+    public int CompareTo(JavaInstall? other)
     {
-        var archCompare = StringUtils.NaturalCompare(Arch, rhs.Arch, ignoreCase: true);
+        if (other is null)
+        {
+            return 1;
+        }
+
+        var archCompare = Math.Sign(StringUtils.NaturalCompare(Arch, other.Arch, ignoreCase: true));
         if (archCompare != 0)
         {
-            return archCompare < 0;
+            return archCompare;
         }
 
-        if (Id < rhs.Id)
+        var idCompare = Id.CompareTo(other.Id);
+        if (idCompare != 0)
         {
-            return true;
+            return idCompare;
         }
 
-        if (rhs.Id < Id)
-        {
-            return false;
-        }
-
-        return StringUtils.NaturalCompare(Path, rhs.Path, ignoreCase: true) < 0;
+        return Math.Sign(StringUtils.NaturalCompare(Path, other.Path, ignoreCase: true));
     }
 
     /// <summary>Port of JavaInstall::operator==.</summary>
@@ -70,29 +73,6 @@ public sealed class JavaInstall(JvmVersion id, string arch, string path) : IComp
         return Arch == other.Arch && Id == other.Id && Path == other.Path;
     }
 
-    /// <summary>Port of JavaInstall::operator&gt;.</summary>
-    public bool GreaterThan(JavaInstall rhs) => !LessThan(rhs) && !Equals(rhs);
-
-    public int CompareTo(JavaInstall? other)
-    {
-        if (other is null)
-        {
-            return 1;
-        }
-
-        if (LessThan(other))
-        {
-            return -1;
-        }
-
-        if (other.LessThan(this))
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-
     public override bool Equals(object? obj) => Equals(obj as JavaInstall);
 
     public override int GetHashCode() => HashCode.Combine(Arch, Id, Path);
@@ -101,10 +81,29 @@ public sealed class JavaInstall(JvmVersion id, string arch, string path) : IComp
     {
         ArgumentNullException.ThrowIfNull(left);
         ArgumentNullException.ThrowIfNull(right);
-        return left.LessThan(right);
+        return left.CompareTo(right) < 0;
     }
 
-    public static bool operator >(JavaInstall left, JavaInstall right) => left.GreaterThan(right);
+    public static bool operator >(JavaInstall left, JavaInstall right)
+    {
+        ArgumentNullException.ThrowIfNull(left);
+        ArgumentNullException.ThrowIfNull(right);
+        return left.CompareTo(right) > 0;
+    }
+
+    public static bool operator <=(JavaInstall left, JavaInstall right)
+    {
+        ArgumentNullException.ThrowIfNull(left);
+        ArgumentNullException.ThrowIfNull(right);
+        return left.CompareTo(right) <= 0;
+    }
+
+    public static bool operator >=(JavaInstall left, JavaInstall right)
+    {
+        ArgumentNullException.ThrowIfNull(left);
+        ArgumentNullException.ThrowIfNull(right);
+        return left.CompareTo(right) >= 0;
+    }
 
     public static bool operator ==(JavaInstall? left, JavaInstall? right) => left?.Equals(right) ?? right is null;
 

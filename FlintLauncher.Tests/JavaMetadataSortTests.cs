@@ -151,8 +151,8 @@ public class JavaMetadataSortTests
         var lhs = Meta("same-name", lhsVersion, "2023-01-01T00:00:00+00:00");
         var rhs = Meta("same-name", rhsVersion, "2023-01-01T00:00:00+00:00");
 
-        Assert.Equal(lhsSmaller, lhs.LessThan(rhs));
-        Assert.Equal(!lhsSmaller && lhsVersion != rhsVersion, lhs.GreaterThan(rhs));
+        Assert.Equal(lhsSmaller, lhs < rhs);
+        Assert.Equal(!lhsSmaller && lhsVersion != rhsVersion, lhs > rhs);
         Assert.Equal(lhsVersion == rhsVersion, lhs == rhs);
     }
 
@@ -227,9 +227,9 @@ public class JavaMetadataSortTests
 
         Assert.Equal(3, list.Count);
         Assert.True(list.IsLoaded());
-        // JavaInstallList::sortVersions() sorts with sortJavas: comp(left, right) = right > left
-        // (trichotomy: left < right) — an ASCENDING order by operator<. Architecture compares
-        // first (aarch64 < x86_64), then the version id ascending, then the path.
+        // JavaInstallList::sortVersions() sorts ASCENDING by JavaInstall::CompareTo (the
+        // operator< trichotomy). Architecture compares first (aarch64 < x86_64), then the
+        // version id ascending, then the path.
         var versions = list.Versions();
         Assert.Equal("21.0.3", versions[0].Id.ToString());
         Assert.Equal("1.8.0_402", versions[1].Id.ToString());

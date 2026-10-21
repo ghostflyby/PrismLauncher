@@ -620,11 +620,14 @@ internal static class VersionFormatMapper
 
         if (dto.Version is { } version)
         {
-            meta.Version = JvmVersion.Parse(JavaMetadata.ComposeVersion(
-                version.Major ?? 0,
-                version.Minor ?? 0,
-                version.Security ?? 0,
-                version.Build ?? 0));
+            meta = meta with
+            {
+                Version = JvmVersion.Parse(JavaMetadata.ComposeVersion(
+                    version.Major ?? 0,
+                    version.Minor ?? 0,
+                    version.Security ?? 0,
+                    version.Build ?? 0))
+            };
         }
 
         return meta;
