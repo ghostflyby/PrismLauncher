@@ -11,13 +11,9 @@
 //  - Move: same-volume rename is O(1); cross-volume degrades to clone/copy + source delete
 //    after success.
 //
-// P/Invoke notes: path arguments travel as NUL-terminated UTF-8 byte arrays — blittable, so
-// no marshaler engine, no unsafe, and the declarations stay AOT-clean (LibraryImport would
-// force AllowUnsafeBlocks project-wide).
 
 using System.Runtime.InteropServices;
 using System.Security;
-using System.Text;
 
 namespace FlintLauncher.Core.IO;
 
@@ -46,7 +42,7 @@ public enum TransferMethod
     Copy,
 }
 
-public static class FileTransfer
+public static partial class FileTransfer
 {
     /// <summary>Transfers one file per mode. The destination is never overwritten; an
     /// existing destination returns SkippedDestinationExists (idempotent). Move degrades
@@ -248,8 +244,8 @@ public static class FileTransfer
     //
     // The instance addressing chain (DATA D2) needs the instance directory's inode: stable
     // across renames, zero-write, resolvable even when the instance cfg is broken. Same
-    // blittable convention as clonefile below (NUL-terminated UTF-8 byte[] args, plain
-    // DllImport, no marshaler, no unsafe). Windows has no libc binding and returns 0 — the
+    // LibraryImport convention as clonefile below (UTF-8 string marshalling, the stat
+    // buffer pinned in place). Windows has no libc binding and returns 0 — the
     // addressing chain skips the inode link there (NTFS FileId can come later, D2).
     //
     // The native side writes the WHOLE struct stat, so the managed buffer must be at least
@@ -273,7 +269,7 @@ public static class FileTransfer
         try
         {
             var buf = new byte[StatBufferSize];
-            return stat(NullTerminatedUtf8(path), buf) == 0 ? BitConverter.ToInt64(buf, 8) : 0;
+            return Stat(path, buf) == 0 ? BitConverter.ToInt64(buf, 8) : 0;
         }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {
@@ -281,23 +277,18 @@ public static class FileTransfer
         }
     }
 
-    [DllImport("libc", SetLastError = true)]
-    private static extern int stat(byte[] path, byte[] buf);
+    [LibraryImport("libc", EntryPoint = "stat", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
+    private static partial int Stat(string path, Span<byte> buf);
 
     // ------------------------------------------------------------------ macOS clonefile
-    //
-    // byte[] path args (UTF-8 + NUL) are blittable: no marshaler engine, no unsafe, and the
-    // P/Invoke stays AOT-clean (LibraryImport would force AllowUnsafeBlocks project-wide).
 
-    [DllImport("libc", SetLastError = true)]
-    private static extern int clonefile(byte[] src, byte[] dst, nint flags);
-
-    private static byte[] NullTerminatedUtf8(string path) => Encoding.UTF8.GetBytes(path + "\0");
+    [LibraryImport("libc", EntryPoint = "clonefile", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
+    private static partial int CloneFile(string src, string dst, int flags);
 
     private static bool CloneFileMacOs(string src, string dst)
     {
         // EEXIST (17): destination already there — idempotent success, like FS::copy
-        return clonefile(NullTerminatedUtf8(src), NullTerminatedUtf8(dst), 0) == 0
+        return CloneFile(src, dst, 0) == 0
                || Marshal.GetLastWin32Error() == 17;
     }
 
@@ -305,8 +296,8 @@ public static class FileTransfer
 
     private const ulong FicloneIoctl = 0x40049409;
 
-    [DllImport("libc", SetLastError = true)]
-    private static extern int ioctl(int fd, ulong request, int srcFd);
+    [LibraryImport("libc", EntryPoint = "ioctl", SetLastError = true)]
+    private static partial int Ioctl(int fd, ulong request, int srcFd);
 
     private static bool CloneLinux(string src, string dst)
     {
@@ -317,7 +308,7 @@ public static class FileTransfer
         {
             var srcFd = (int)srcHandle.SafeFileHandle.DangerousGetHandle();
             var dstFd = (int)dstHandle.SafeFileHandle.DangerousGetHandle();
-            cloned = ioctl(dstFd, FicloneIoctl, srcFd) == 0;
+            cloned = Ioctl(dstFd, FicloneIoctl, srcFd) == 0;
         }
 
         if (cloned)

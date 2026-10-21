@@ -3,6 +3,9 @@
   <PropertyGroup>
     <!-- Keep the domain core AOT/trimming clean; enforced by analyzers. -->
     <IsAotCompatible>true</IsAotCompatible>
+    <!-- The LibraryImport source generator emits pointer code for the libc/kernel32 P/Invoke
+         stubs (FileTransfer, HardwareInfo), so unsafe must be allowed project-wide. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -38,12 +41,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13"/>
     <!-- JVM enumeration (Apache-2.0, GPL-3.0-compatible): the provider suite backs the
          first discovery layer in JavaUtils.FindJavaPaths. -->
-    <PackageReference Include="JdkFind" Version="0.5.0" />
+    <PackageReference Include="JdkFind" Version="0.5.0"/>
     <PackageReference Include="TruePath" Version="1.12.0"/>
-    <PackageReference Include="TruePath.SystemIo" Version="1.12.0" />
+    <PackageReference Include="TruePath.SystemIo" Version="1.12.0"/>
   </ItemGroup>
 
   <Target Name="NewLaunchJar" Inputs="@(NewLaunchSource)" Outputs="$(JarOutputDir)NewLaunch.jar" Condition="'$(FlintSkipJarBuild)' != 'true'">

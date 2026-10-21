@@ -16,19 +16,20 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Security;
 using System.Text;
 using Microsoft.Win32;
 
 namespace FlintLauncher.Core.Launch;
 
-public static class HardwareInfo
+public static partial class HardwareInfo
 {
     public static string CpuInfo()
     {
         if (OperatingSystem.IsMacOS())
         {
-            if (SysCtlByName("machdep.cpu.brand_string", out var value) == 0)
+            if (SysCtlByName("machdep.cpu.brand_string", out var value))
             {
                 return value;
             }
@@ -75,7 +76,9 @@ public static class HardwareInfo
     {
         if (OperatingSystem.IsMacOS())
         {
-            if (SysCtlByName("hw.memsize", out var value) == 0 && ulong.TryParse(value, out var memsize))
+            // hw.memsize is a raw int64 (the C++ getSystemRam reads it the same way), not a
+            // string — the string SysCtlByName overload would decode binary bytes and fail
+            if (SysCtlByName("hw.memsize", out ulong memsize))
             {
                 // transforming bytes -> mib
                 return memsize / 1024 / 1024;
@@ -170,6 +173,7 @@ public static class HardwareInfo
     // ------------------------------------------------------------- MacOSHardwareInfo port
 
     /// <summary>Port of MacOSHardwareInfo::MemoryPressureLevel.</summary>
+    [SupportedOSPlatform("macos")]
     public enum MemoryPressureLevel : uint
     {
         Normal = 1,
@@ -177,9 +181,10 @@ public static class HardwareInfo
         Critical = 4,
     }
 
+    [SupportedOSPlatform("macos")]
     public static MemoryPressureLevel GetMemoryPressureLevel()
     {
-        if (OperatingSystem.IsMacOS() && SysCtlByNameRaw("kern.memorystatus_vm_pressure_level", out uint level) == 0 &&
+        if (SysCtlByName("kern.memorystatus_vm_pressure_level", out uint level) &&
             level is 1 or 2 or 4)
         {
             return (MemoryPressureLevel)level;
@@ -189,6 +194,7 @@ public static class HardwareInfo
     }
 
     /// <summary>Port of MacOSHardwareInfo::memoryPressureLevelName.</summary>
+    [SupportedOSPlatform("macos")]
     public static string MemoryPressureLevelName() => GetMemoryPressureLevel() switch
     {
         // The names are internal, users refer to levels by their graph colors in Activity Monitor
@@ -206,6 +212,7 @@ public static class HardwareInfo
         return index < 0 ? str.Trim() : str[(index + 2)..].Trim();
     }
 
+    [SupportedOSPlatform("linux")]
     private static ulong ReadMemInfo(string searchTarget)
     {
         try
@@ -278,47 +285,53 @@ public static class HardwareInfo
         }
     }
 
-    private static int SysCtlByName(string name, out string value)
+    [SupportedOSPlatform("macos")]
+    private static bool SysCtlByName(string name, out string value)
     {
         value = "";
-        if (!OperatingSystem.IsMacOS())
-        {
-            return -1;
-        }
 
-        var nameBytes = Encoding.UTF8.GetBytes(name);
         var buffer = new byte[512];
-        var size = (uint)buffer.Length;
-        var result = sysctlbyname(nameBytes, buffer, ref size, 0, 0);
+        var size = (nuint)buffer.Length;
+        var result = SysctlByName(name, buffer, ref size, 0, 0);
         if (result != 0)
         {
-            return result;
+            return false;
         }
 
-        value = Encoding.UTF8.GetString(buffer, 0, (int)Math.Min(size, buffer.Length)).TrimEnd('\0');
-        return 0;
+        value = Encoding.UTF8.GetString(buffer, 0, (int)Math.Min(size, (nuint)buffer.Length)).TrimEnd('\0');
+        return true;
     }
 
-    private static int SysCtlByNameRaw(string name, out uint value)
+    [SupportedOSPlatform("macos")]
+    private static unsafe bool SysCtlByName<T>(string name, out T value) where T : unmanaged
     {
-        value = 0;
-        if (!OperatingSystem.IsMacOS())
+        Span<T> t = stackalloc T[1];
+        var size = (nuint)sizeof(T);
+        if (SysctlByName(name, MemoryMarshal.AsBytes(t), ref size, 0, 0) == 0)
         {
-            return -1;
+            if (size != (nuint)sizeof(T))
+            {
+                value = default;
+                return false;
+            }
+            value = t[0];
+            return true;
         }
 
-        uint size = sizeof(uint);
-        return sysctlbyname(Encoding.UTF8.GetBytes(name), out value, ref size, 0, 0);
+        value = default;
+        return false;
     }
 
-    [DllImport("libc", SetLastError = false)]
-    private static extern int sysctlbyname(byte[] name, byte[] oldValue, ref uint oldSize, nint newValue, nuint newValueSize);
+    // oldSize is a size_t* on the C side (8 bytes on LP64) — a ref uint would let the kernel
+    // read/write 4 bytes past the managed slot
 
-    [DllImport("libc", SetLastError = false)]
-    private static extern int sysctlbyname(byte[] name, out uint oldValue, ref uint oldSize, nint newValue, nuint newValueSize);
+    [LibraryImport("libc", EntryPoint = "sysctlbyname", SetLastError = false, StringMarshalling = StringMarshalling.Utf8)]
+    [SupportedOSPlatform("macos")]
+    private static partial int SysctlByName(string name, Span<byte> oldValue, ref nuint oldSize, nint newValue, nuint newValueSize);
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct Memorystatusex
+    [SupportedOSPlatform("windows")]
+    private struct MemoryStatusEx
     {
         public uint dwLength;
         public uint dwMemoryLoad;
@@ -331,10 +344,15 @@ public static class HardwareInfo
         public ulong ullAvailExtendedVirtual;
     }
 
-    [DllImport("kernel32", SetLastError = true)]
-    private static extern bool GlobalMemoryStatusEx(out Memorystatusex buffer);
+    // ref, not out: the LibraryImport stub zeroes an out parameter before the call, which
+    // would wipe the caller-set dwLength GlobalMemoryStatusEx requires on entry
+    [LibraryImport("kernel32", SetLastError = true)]
+    [SupportedOSPlatform("windows")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GlobalMemoryStatusEx(ref MemoryStatusEx buffer);
 
-    private static bool TryGetMemoryStatus(out Memorystatusex status)
+    [SupportedOSPlatform("windows")]
+    private static bool TryGetMemoryStatus(out MemoryStatusEx status)
     {
         status = default;
         if (!OperatingSystem.IsWindows())
@@ -342,7 +360,7 @@ public static class HardwareInfo
             return false;
         }
 
-        status.dwLength = (uint)Marshal.SizeOf<Memorystatusex>();
-        return GlobalMemoryStatusEx(out status);
+        status.dwLength = (uint)Marshal.SizeOf<MemoryStatusEx>();
+        return GlobalMemoryStatusEx(ref status);
     }
 }
