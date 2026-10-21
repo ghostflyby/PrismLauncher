@@ -157,7 +157,7 @@ public static class MetaJsonFormat
         new($"The metadata document has no '{key}' member.");
 
     /// <summary>QJsonObject::contains(key) equivalent: true even when the member holds JSON null.</summary>
-    private static bool Has(JsonNode? node, string key) => node is JsonObject obj && obj.Contains(key);
+    private static bool Has(JsonNode? node, string key) => node is JsonObject obj && obj.ContainsKey(key);
 
     // ------------------------------------------------------------------ Index
 

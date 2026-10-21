@@ -25,10 +25,10 @@ public class MetaComponentParseTests
         var obj = JsonNode.Parse(data)?.AsObject();
         Assert.NotNull(obj);
 
-        Assert.True(obj.Contains("description"));
-        Assert.True(obj.Contains("expected_output"));
+        Assert.True(obj.ContainsKey("description"));
+        Assert.True(obj.ContainsKey("expected_output"));
 
-        var expected = obj.StringOr("expected_output");
+        var expected = obj["expected_output"]?.GetValue<string>() ?? "";
 
         // the renderer consumes the typed ChatComponentJson wire now
         var description = obj["description"];
