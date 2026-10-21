@@ -8,7 +8,6 @@ using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Settings;
 using Xunit;
-using TruePath;
 
 namespace FlintLauncher.Tests;
 

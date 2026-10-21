@@ -24,7 +24,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.ModPlatform.Packwiz;
-using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
 

@@ -2,8 +2,6 @@
 // Port of launcher/minecraft/launch/ReconstructAssets.{h,cpp}: rebuild the virtual assets
 // folder for the profile's asset index (see Launch/AssetsUtils.cs).
 
-using TruePath;
-
 namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class ReconstructAssets(LaunchTask parent) : LaunchStep(parent)

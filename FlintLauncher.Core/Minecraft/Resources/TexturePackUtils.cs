@@ -11,7 +11,6 @@
 
 using System.IO.Compression;
 using System.Text;
-using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
 

@@ -14,7 +14,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
-using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.FtbApp;
 

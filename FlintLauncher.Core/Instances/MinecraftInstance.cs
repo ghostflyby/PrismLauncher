@@ -52,7 +52,6 @@ using FlintLauncher.Core.State;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using Microsoft.Extensions.Logging.Abstractions;
-using TruePath;
 
 namespace FlintLauncher.Core.Instances;
 

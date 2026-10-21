@@ -8,7 +8,6 @@
 // build outputs produced by the BuildJavaJars MSBuild target (javac/jar via Exec) and are NOT committed.
 
 using FlintLauncher.Core.Java;
-using TruePath;
 
 namespace FlintLauncher.Core.Launch;
 

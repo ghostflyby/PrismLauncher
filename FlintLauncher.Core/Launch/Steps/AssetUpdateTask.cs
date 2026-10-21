@@ -10,7 +10,6 @@ using System.Security.Cryptography;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
-using TruePath;
 
 namespace FlintLauncher.Core.Launch.Steps;
 

@@ -9,7 +9,6 @@
 //    entry below the directory, case-insensitively).
 
 using System.IO.Compression;
-using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
 

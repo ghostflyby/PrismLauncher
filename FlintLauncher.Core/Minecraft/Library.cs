@@ -16,7 +16,6 @@
 using System.Security.Cryptography;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
-using TruePath;
 
 namespace FlintLauncher.Core.Minecraft;
 

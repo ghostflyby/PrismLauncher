@@ -20,7 +20,6 @@
 
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Tasks;
-using TruePath;
 
 namespace FlintLauncher.Core.Instances;
 

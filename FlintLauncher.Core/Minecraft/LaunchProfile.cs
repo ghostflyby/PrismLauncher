@@ -4,7 +4,6 @@
 // getProblems() FIXME (always empty upstream as well) stays as-is.
 
 using FlintLauncher.Core.Versioning;
-using TruePath;
 
 namespace FlintLauncher.Core.Minecraft;
 

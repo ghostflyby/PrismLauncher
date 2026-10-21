@@ -7,7 +7,6 @@
 // task re-runs only when the wanted bin path is missing anyway).
 
 using FlintLauncher.Core.Tasks;
-using TruePath;
 
 namespace FlintLauncher.Core.Java.Download;
 

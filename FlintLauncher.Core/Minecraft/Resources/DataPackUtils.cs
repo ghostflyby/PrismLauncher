@@ -22,7 +22,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.Json;
-using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
 

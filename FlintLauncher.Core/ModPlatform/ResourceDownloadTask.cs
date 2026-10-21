@@ -23,7 +23,6 @@ using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
-using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform;
 

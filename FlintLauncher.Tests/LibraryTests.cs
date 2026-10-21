@@ -5,7 +5,6 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 using Xunit;
-using TruePath;
 
 namespace FlintLauncher.Tests;
 
