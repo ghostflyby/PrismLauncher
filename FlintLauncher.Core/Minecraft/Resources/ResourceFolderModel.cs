@@ -30,6 +30,7 @@
 //    trigger; m_isIndexed/firstFolderLoad are kept for structure.
 
 using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
 
@@ -55,7 +56,7 @@ public class ResourceFolderModel
         _isIndexed = isIndexed;
         if (createDir)
         {
-            FileSystem.EnsureFolderPathExists(dir);
+            FileOps.EnsureFolderPathExists(new LocalPath(dir));
         }
     }
 
@@ -88,8 +89,11 @@ public class ResourceFolderModel
     /// </summary>
     public virtual bool InstallResource(string originalPath)
     {
-        // NOTE: fix for GH-1178: remove trailing slash to avoid issues with an empty file name
-        originalPath = FileSystem.NormalizePath(originalPath);
+        // NOTE: fix for GH-1178: normalize so a trailing slash can't leave an empty file
+        // name, and resolve against the current directory so the self-overwrite check below
+        // compares like with like (FS::NormalizePath kept cwd-relative paths relative; the
+        // comparison only needs both sides in one canonical form).
+        originalPath = new LocalPath(originalPath).ResolveToCurrentDirectory().Value;
         var fileInfo = new FileInfo(originalPath);
 
         var isDir = Directory.Exists(originalPath) && !File.Exists(originalPath);
@@ -107,7 +111,7 @@ public class ResourceFolderModel
             return false; // not a valid resource. Ignoring it.
         }
 
-        var newPath = FileSystem.NormalizePath(FileSystem.PathCombine(_dir, fileInfo.Name));
+        var newPath = (new LocalPath(_dir) / fileInfo.Name).ResolveToCurrentDirectory().Value;
         if (originalPath == newPath)
         {
             return false; // overwriting the resource with itself makes no sense
@@ -121,7 +125,7 @@ public class ResourceFolderModel
             {
                 if (File.Exists(newPath) || File.Exists(newPath + ".disabled"))
                 {
-                    if (!FileSystem.DeletePath(newPath))
+                    if (!FileOps.DeletePath(new LocalPath(newPath)))
                     {
                         return false; // cleaning up new location was unsuccessful
                     }
@@ -137,7 +141,7 @@ public class ResourceFolderModel
                     return false; // copy failed
                 }
 
-                FileSystem.UpdateTimestamp(newPath);
+                FileOps.UpdateTimestamp(new LocalPath(newPath));
 
                 resource.Fileinfo = new FileInfo(newPath);
 
@@ -155,7 +159,7 @@ public class ResourceFolderModel
                     return false; // it would merge with the existing folder
                 }
 
-                if (!FileSystem.Copy(originalPath, newPath))
+                if (!FileOps.Copy(new LocalPath(originalPath), new LocalPath(newPath)))
                 {
                     return false; // copy of folder (potentially partially) failed
                 }
@@ -254,10 +258,10 @@ public class ResourceFolderModel
         {
             var entryPath = filePath;
             // FS::getUniqueResourceName: rename x.disabled away when x exists
-            var newFilePath = FileSystem.GetUniqueResourceName(entryPath);
+            var newFilePath = FileNaming.GetUniqueResourceName(new LocalPath(entryPath)).Value;
             if (newFilePath != entryPath)
             {
-                FileSystem.Move(entryPath, newFilePath);
+                FileOps.Move(new LocalPath(entryPath), new LocalPath(newFilePath));
                 entryPath = newFilePath;
             }
 

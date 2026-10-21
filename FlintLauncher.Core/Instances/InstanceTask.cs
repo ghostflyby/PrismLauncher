@@ -19,8 +19,8 @@
 //  - the copy executes synchronously inside StartAsync (no QtConcurrent thread hop).
 
 using FlintLauncher.Core.Config;
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.Instances;
 
@@ -161,17 +161,17 @@ public abstract class InstanceTask : FlintTask
             }
         }
 
-        _filesToRemove.Add(FileSystem.PathCombine(dir, path));
+        _filesToRemove.Add(Path.Combine(dir, path));
         if (checkDisabled)
         {
             if (path.EndsWith(".disabled", StringComparison.Ordinal))
             {
                 // remove the twin without the suffix (it was enabled/disabled by the user)
-                _filesToRemove.Add(FileSystem.PathCombine(dir, path[..^9]));
+                _filesToRemove.Add(Path.Combine(dir, path[..^9]));
             }
             else
             {
-                _filesToRemove.Add(FileSystem.PathCombine(dir, path + ".disabled"));
+                _filesToRemove.Add(Path.Combine(dir, path + ".disabled"));
             }
         }
     }

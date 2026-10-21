@@ -8,7 +8,7 @@
 //  - the copy runs synchronously inside StartAsync (no QtConcurrent::run / QFutureWatcher;
 //    the C++ progress bookkeeping of the fileCopied() signal is dropped with it).
 //  - the symlink / hard-link / reflink transport modes are not portable here
-//    (FS::create_link and FS::clone are declared not ported in FileSystem.cs): the task
+//    (FS::create_link and FS::clone are not ported): the task
 //    fails with a clear message when they are requested. The link-only extras of
 //    copyFinished() (addLinkedInstanceId + allowed_symlinks.txt bookkeeping) are part of
 //    that path and are therefore not ported either. When it lands, it must pass
@@ -18,6 +18,7 @@
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Core.Instances;
 
@@ -66,7 +67,7 @@ public class InstanceCopyTask : InstanceTask
 
         if (_useClone)
         {
-            // FS::clone (reflink syscalls) is not ported — see FileSystem.cs.
+            // FS::clone (reflink syscalls) is not ported.
             EmitFailed("Reflink-based instance copies are not supported in this port.");
             return Task.CompletedTask;
         }
@@ -74,13 +75,13 @@ public class InstanceCopyTask : InstanceTask
         if (_useLinks || _useHardLinks || _linkRecursively)
         {
             // FS::create_link (symlinks/hard links, optional privilege elevation on Windows)
-            // is not ported — see FileSystem.cs.
+            // is not ported.
             EmitFailed("Link-based instance copies are not supported in this port.");
             return Task.CompletedTask;
         }
 
         Func<string, bool>? matcher = _matcher is null ? null : path => _matcher.IsMatch(path);
-        if (!FileSystem.Copy(_origInstance.InstanceRoot(), StagingPath, matcher))
+        if (!FileOps.Copy(new LocalPath(_origInstance.InstanceRoot()), new LocalPath(StagingPath), matcher))
         {
             EmitFailed("Instance folder copy failed.");
             return Task.CompletedTask;

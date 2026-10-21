@@ -5,6 +5,7 @@
 // outside this phase's edit scope).
 
 using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform;
 
@@ -17,13 +18,13 @@ public static class OverrideUtils
     /// </summary>
     public static void CreateOverrides(string name, string parentFolder, string overridePath)
     {
-        var filePath = FileSystem.PathCombine(parentFolder, name + ".txt");
+        var filePath = Path.Combine(parentFolder, name + ".txt");
         if (File.Exists(filePath))
         {
-            FileSystem.DeletePath(filePath);
+            FileOps.DeletePath(new LocalPath(filePath));
         }
 
-        FileSystem.EnsureFilePathExists(filePath);
+        FileOps.EnsureFilePathExists(new LocalPath(filePath));
 
         using var writer = new StreamWriter(filePath);
         foreach (var path in EnumerateOverrideFiles(overridePath))
@@ -40,7 +41,7 @@ public static class OverrideUtils
     /// </summary>
     public static List<string> ReadOverrides(string name, string parentFolder)
     {
-        var filePath = FileSystem.PathCombine(parentFolder, name + ".txt");
+        var filePath = Path.Combine(parentFolder, name + ".txt");
         if (!File.Exists(filePath))
         {
             return [];
@@ -63,7 +64,7 @@ public static class OverrideUtils
     /// </summary>
     public static bool OverrideFolder(string overwrittenPath, string overridePath)
     {
-        if (!FileSystem.EnsureFolderPathExists(overwrittenPath))
+        if (!FileOps.EnsureFolderPathExists(new LocalPath(overwrittenPath)))
         {
             return false;
         }
@@ -73,8 +74,8 @@ public static class OverrideUtils
             foreach (var source in Directory.EnumerateFiles(overridePath, "*", SearchOption.AllDirectories))
             {
                 var relative = Path.GetRelativePath(overridePath, source);
-                var target = Path.GetFullPath(FileSystem.PathCombine(overwrittenPath, relative));
-                FileSystem.EnsureFilePathExists(target);
+                var target = Path.GetFullPath(Path.Combine(overwrittenPath, relative));
+                FileOps.EnsureFilePathExists(new LocalPath(target));
                 File.Copy(source, target, overwrite: true);
             }
 

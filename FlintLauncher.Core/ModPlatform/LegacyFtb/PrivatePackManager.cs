@@ -7,6 +7,7 @@
 using System.Security;
 using System.Text;
 using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.LegacyFtb;
 
@@ -26,7 +27,7 @@ public sealed class PrivatePackManager(string? filename = null)
     {
         try
         {
-            var content = Encoding.UTF8.GetString(FileSystem.Read(_filename));
+            var content = Encoding.UTF8.GetString(File.ReadAllBytes(_filename));
             _currentPacks.Clear();
             foreach (var code in content.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
@@ -35,8 +36,7 @@ public sealed class PrivatePackManager(string? filename = null)
 
             _dirty = false;
         }
-        catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
-                                      or SecurityException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or SecurityException)
         {
             _currentPacks.Clear();
         }
@@ -53,11 +53,10 @@ public sealed class PrivatePackManager(string? filename = null)
 
         try
         {
-            FileSystem.Write(_filename, Encoding.UTF8.GetBytes(string.Join('\n', _currentPacks)));
+            FileOps.Write(new LocalPath(_filename), Encoding.UTF8.GetBytes(string.Join('\n', _currentPacks)));
             _dirty = false;
         }
-        catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
-                                      or SecurityException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or SecurityException)
         {
         }
     }

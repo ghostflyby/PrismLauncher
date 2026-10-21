@@ -18,6 +18,7 @@
 
 using System.Text.Json;
 using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Core.Auth;
 
@@ -190,7 +191,7 @@ public sealed class AccountList
         byte[] jsonData;
         try
         {
-            jsonData = FileSystem.Read(_listFilePath);
+            jsonData = File.ReadAllBytes(_listFilePath);
         }
         catch (Exception)
         {
@@ -305,7 +306,7 @@ public sealed class AccountList
         }
 
         // make sure the parent folder exists
-        if (!FileSystem.EnsureFilePathExists(_listFilePath))
+        if (!FileOps.EnsureFilePathExists(new LocalPath(_listFilePath)))
         {
             return false;
         }

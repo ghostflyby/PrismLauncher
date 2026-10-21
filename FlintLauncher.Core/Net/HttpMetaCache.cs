@@ -13,6 +13,7 @@ using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
+using TruePath;
 
 namespace FlintLauncher.Core.Net;
 
@@ -105,7 +106,7 @@ public sealed class MetaEntry
             "meta entry has no owning cache — resolve it through HttpMetaCache.ResolveEntry");
         var basePath = cache.GetBasePath(BaseId);
         return basePath.Length != 0
-            ? FileSystem.PathCombine(basePath, RelativePath)
+            ? Path.Combine(basePath, RelativePath)
             : throw new InvalidOperationException(
                 $"base '{BaseId}' is not registered on the owning meta cache — the composition root must register it");
     }
@@ -171,7 +172,7 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
     /// <summary>Get the entry from cache and verify that it isn't stale (within reason).</summary>
     public MetaEntry ResolveEntry(string baseId, string resourcePath, string expectedEtag = "")
     {
-        resourcePath = FileSystem.RemoveInvalidPathChars(resourcePath);
+        resourcePath = FileNaming.RemoveInvalidPathChars(resourcePath);
         var entry = GetEntry(baseId, resourcePath);
         if (entry is null)
         {
@@ -179,7 +180,7 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
         }
 
         var basePath = GetBasePath(baseId);
-        var realPath = FileSystem.PathCombine(basePath, resourcePath);
+        var realPath = Path.Combine(basePath, resourcePath);
 
         // is the file really there? if not -> stale
         if (!File.Exists(realPath))
@@ -462,7 +463,7 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
             var dir = Path.GetDirectoryName(_indexFile);
             if (dir is not null)
             {
-                _ = FileSystem.EnsureFolderPathExists(dir);
+                _ = FileOps.EnsureFolderPathExists(new LocalPath(dir));
             }
 
             // Qt's QJsonDocument writes `"` as `\"` and leaves unicode alone; match that so

@@ -11,7 +11,7 @@
 
 using System.IO.Compression;
 using System.Text;
-using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
 
@@ -43,7 +43,7 @@ public static class TexturePackUtils
     /// <summary>Port of TexturePackUtils::processFolder.</summary>
     public static bool ProcessFolder(TexturePack pack, TexturePackProcessingLevel level = TexturePackProcessingLevel.Full)
     {
-        var mcmetaFileInfo = new FileInfo(FileSystem.PathCombine(pack.Fileinfo.FullName, "pack.txt"));
+        var mcmetaFileInfo = new FileInfo(Path.Combine(pack.Fileinfo.FullName, "pack.txt"));
         if (mcmetaFileInfo.Exists && !mcmetaFileInfo.Attributes.HasFlag(FileAttributes.Directory))
         {
             string data;
@@ -73,7 +73,7 @@ public static class TexturePackUtils
             return true;
         }
 
-        var imageFileInfo = new FileInfo(FileSystem.PathCombine(pack.Fileinfo.FullName, "pack.png"));
+        var imageFileInfo = new FileInfo(Path.Combine(pack.Fileinfo.FullName, "pack.png"));
         if (imageFileInfo.Exists && !imageFileInfo.Attributes.HasFlag(FileAttributes.Directory))
         {
             byte[] data;
@@ -202,7 +202,7 @@ public static class TexturePackUtils
         {
             case ResourceType.Folder:
             {
-                var imageFileInfo = new FileInfo(FileSystem.PathCombine(pack.Fileinfo.FullName, "pack.png"));
+                var imageFileInfo = new FileInfo(Path.Combine(pack.Fileinfo.FullName, "pack.png"));
                 if (imageFileInfo.Exists && !imageFileInfo.Attributes.HasFlag(FileAttributes.Directory))
                 {
                     byte[] data;

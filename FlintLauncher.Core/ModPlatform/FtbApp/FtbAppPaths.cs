@@ -10,8 +10,8 @@
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.FtbApp;
 
@@ -38,10 +38,10 @@ public sealed class FtbAppPaths(string? rootPath = null)
         var partialPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         if (OperatingSystem.IsMacOS())
         {
-            partialPath = FileSystem.PathCombine(partialPath, "Library/Application Support");
+            partialPath = Path.Combine(partialPath, "Library/Application Support");
         }
 
-        return FileSystem.PathCombine(partialPath, ".ftba");
+        return Path.Combine(partialPath, ".ftba");
     }
 
     /// <summary>Port of getDynamicPath: the "instanceLocation" value of the FTB App
@@ -49,10 +49,10 @@ public sealed class FtbAppPaths(string? rootPath = null)
     /// parsed.</summary>
     public string GetDynamicInstancesPath()
     {
-        var settingsPath = FileSystem.PathCombine(RootPath, "storage", "settings.json");
+        var settingsPath = Path.Combine(RootPath, "storage", "settings.json");
         if (!File.Exists(settingsPath))
         {
-            settingsPath = FileSystem.PathCombine(RootPath, "bin", "settings.json");
+            settingsPath = Path.Combine(RootPath, "bin", "settings.json");
         }
 
         if (!File.Exists(settingsPath))
@@ -62,7 +62,7 @@ public sealed class FtbAppPaths(string? rootPath = null)
 
         try
         {
-            var settings = JsonSerializer.Deserialize(FileSystem.Read(settingsPath),
+            var settings = JsonSerializer.Deserialize(File.ReadAllBytes(settingsPath),
                 FtbAppSettingsJsonContext.Default.FtbAppSettingsJson);
             return settings?.InstanceLocation ?? "";
         }

@@ -13,6 +13,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
@@ -58,7 +59,7 @@ public sealed class LegacyFmlLibrariesTask(MinecraftInstance inst) : FlintTask
         // now check the lib folder inside the instance for files.
         foreach (var lib in libList)
         {
-            var libInfo = new FileInfo(FileSystem.PathCombine(inst1.LibDir(), lib.Filename));
+            var libInfo = new FileInfo(Path.Combine(inst1.LibDir(), lib.Filename));
             if (libInfo.Exists)
             {
                 continue;
@@ -120,8 +121,8 @@ public sealed class LegacyFmlLibrariesTask(MinecraftInstance inst) : FlintTask
             {
                 SetProgress(index, _fmlLibsToProcess.Count);
                 var entry = metacache.ResolveEntry("fmllibs", lib.Filename);
-                var path = FileSystem.PathCombine(inst1.LibDir(), lib.Filename);
-                if (!FileSystem.EnsureFilePathExists(path))
+                var path = new LocalPath(inst1.LibDir()) / lib.Filename;
+                if (!FileOps.EnsureFilePathExists(path))
                 {
                     EmitFailed("Failed creating FML library folder inside the instance.");
                     return;
@@ -129,7 +130,7 @@ public sealed class LegacyFmlLibrariesTask(MinecraftInstance inst) : FlintTask
 
                 try
                 {
-                    File.Copy(entry.GetFullPath(), FileSystem.PathCombine(inst1.LibDir(), lib.Filename), overwrite: true);
+                    File.Copy(entry.GetFullPath(), Path.Combine(inst1.LibDir(), lib.Filename), overwrite: true);
                 }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException)
                 {

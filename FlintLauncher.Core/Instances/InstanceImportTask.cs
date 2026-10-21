@@ -24,6 +24,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
+using TruePath;
 
 namespace FlintLauncher.Core.Instances;
 
@@ -97,8 +98,8 @@ public sealed partial class InstanceImportTask(
         else
         {
             // headless fallback: plain download into the staging folder
-            _archivePath = FileSystem.PathCombine(StagingPath, Path.GetFileName(sourceUrl.AbsolutePath));
-            FileSystem.EnsureFilePathExists(_archivePath);
+            _archivePath = Path.Combine(StagingPath, Path.GetFileName(sourceUrl.AbsolutePath));
+            FileOps.EnsureFilePathExists(new LocalPath(_archivePath));
             var request = NetRequest.MakeFile(sourceUrl, _archivePath);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
@@ -139,8 +140,8 @@ public sealed partial class InstanceImportTask(
                 if (fileName is "bin/modpack.jar" or "bin/version.json")
                 {
                     // process as Technic pack
-                    Directory.CreateDirectory(FileSystem.PathCombine(extractDir, "minecraft"));
-                    extractDir = FileSystem.PathCombine(extractDir, "minecraft");
+                    Directory.CreateDirectory(Path.Combine(extractDir, "minecraft"));
+                    extractDir = Path.Combine(extractDir, "minecraft");
                     _modpackType = ModpackType.Technic;
                     break;
                 }

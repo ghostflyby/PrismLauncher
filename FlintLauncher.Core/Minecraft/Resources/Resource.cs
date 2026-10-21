@@ -17,6 +17,7 @@
 
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
 
@@ -362,7 +363,7 @@ public partial class Resource
             path += ".disabled";
             if (File.Exists(path) || Directory.Exists(path))
             {
-                path = FileSystem.GetUniqueResourceName(path);
+                path = FileNaming.GetUniqueResourceName(new LocalPath(path)).Value;
             }
         }
 
@@ -391,7 +392,7 @@ public partial class Resource
     {
         Type = ResourceType.Unknown;
         _ = attemptTrash; // no portable trash; always delete directly
-        return FileSystem.DeletePath(Fileinfo.FullName);
+        return FileOps.DeletePath(new LocalPath(Fileinfo.FullName));
     }
 
     public bool IsSymLink => (File.GetAttributes(Fileinfo.FullName) & FileAttributes.ReparsePoint) != 0;

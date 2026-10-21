@@ -13,6 +13,7 @@
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.Technic;
 
@@ -50,7 +51,7 @@ public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVers
             //  headless fallback mirrors that with a temporary file)
             _archivePath = Path.Combine(Path.GetTempPath(), "flint-technic-" + Guid.NewGuid().ToString("N") +
                                                             Path.GetFileName(sourceUrl.AbsolutePath));
-            FileSystem.EnsureFilePathExists(_archivePath);
+            FileOps.EnsureFilePathExists(new LocalPath(_archivePath));
             var request = NetRequest.MakeFile(sourceUrl, _archivePath);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
@@ -66,8 +67,8 @@ public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVers
     private async Task DownloadSucceeded(CancellationToken cancellationToken)
     {
         EmitStatus("Extracting modpack");
-        var extractDir = FileSystem.PathCombine(StagingPath, "minecraft");
-        FileSystem.EnsureFolderPathExists(extractDir);
+        var extractDir = Path.Combine(StagingPath, "minecraft");
+        FileOps.EnsureFolderPathExists(new LocalPath(extractDir));
 
         var extracted = MmcZip.ExtractDir(_archivePath, "", extractDir);
         if (extracted is null)

@@ -12,9 +12,9 @@
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.FtbApp;
 
@@ -130,7 +130,7 @@ public static class FtbAppPackParse
     public static FtbAppModpack ParseDirectory(string path)
     {
         var modpack = new FtbAppModpack { Path = path };
-        var instanceFile = FileSystem.PathCombine(path, "instance.json");
+        var instanceFile = Path.Combine(path, "instance.json");
         if (!File.Exists(instanceFile))
         {
             return new FtbAppModpack();
@@ -138,7 +138,7 @@ public static class FtbAppPackParse
 
         try
         {
-            var wire = JsonSerializer.Deserialize(FileSystem.Read(instanceFile),
+            var wire = JsonSerializer.Deserialize(File.ReadAllBytes(instanceFile),
                            FtbAppJsonContext.Default.FtbAppInstanceJson)
                        ?? throw new JsonException("the document is null");
 
@@ -197,10 +197,10 @@ public static class FtbAppPackParse
     private static ModLoaderType? LegacyInstanceParsing(string path, out string loaderVersion)
     {
         loaderVersion = "";
-        var versionsFile = FileSystem.PathCombine(path, ".ftbapp", "version.json");
+        var versionsFile = Path.Combine(path, ".ftbapp", "version.json");
         if (!File.Exists(versionsFile))
         {
-            versionsFile = FileSystem.PathCombine(path, "version.json");
+            versionsFile = Path.Combine(path, "version.json");
         }
 
         if (!File.Exists(versionsFile))
@@ -210,7 +210,7 @@ public static class FtbAppPackParse
 
         try
         {
-            var wire = JsonSerializer.Deserialize(FileSystem.Read(versionsFile),
+            var wire = JsonSerializer.Deserialize(File.ReadAllBytes(versionsFile),
                            FtbAppJsonContext.Default.FtbAppVersionJson)
                        ?? throw new JsonException("the document is null");
 
@@ -242,7 +242,7 @@ public static class FtbAppPackParse
     /// mapping): folder.jpg wins, else .ftbapp/logo with its leading image-type byte.</summary>
     public static FtbAppIcon LoadFtbIcon(string path)
     {
-        var iconFile = FileSystem.PathCombine(path, "folder.jpg");
+        var iconFile = Path.Combine(path, "folder.jpg");
         if (File.Exists(iconFile))
         {
             return new FtbAppIcon { IconKind = FtbAppIcon.Kind.FolderJpg, FilePath = iconFile };
@@ -250,7 +250,7 @@ public static class FtbAppPackParse
 
         // the logo is a file that the first bit denotes the image tipe followed by the
         // actual image data
-        var logoPath = FileSystem.PathCombine(path, ".ftbapp", "logo");
+        var logoPath = Path.Combine(path, ".ftbapp", "logo");
         var icon = new FtbAppIcon { IconKind = FtbAppIcon.Kind.Logo, FilePath = logoPath };
         if (!File.Exists(logoPath))
         {

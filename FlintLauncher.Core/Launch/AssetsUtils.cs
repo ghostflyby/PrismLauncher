@@ -11,6 +11,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
+using TruePath;
 
 namespace FlintLauncher.Core.Launch;
 
@@ -43,7 +44,7 @@ public sealed class AssetObject
     /// <summary>Port of AssetObject::getLocalPath (upstream was CWD-relative "assets/objects";
     /// the assets root is injected here).</summary>
     public string GetLocalPath(string assetsRoot) =>
-        FileSystem.PathCombine(assetsRoot, "objects", GetRelPath());
+        Path.Combine(assetsRoot, "objects", GetRelPath());
 
     /// <summary>Port of AssetObject::getDownloadAction; null when the local file is present.</summary>
     public NetRequest? GetDownloadAction(string assetsRoot, string resourceUrl)
@@ -147,12 +148,11 @@ public static class AssetsUtils
     /// asset store (injected; upstream anchored at the launcher working directory).</summary>
     public static bool ReconstructAssets(string assetsId, string resourcesFolder, string assetsRoot)
     {
-        var indexDir = FileSystem.PathCombine(assetsRoot, "indexes");
-        var objectDir = FileSystem.PathCombine(assetsRoot, "objects");
-        var virtualDir = FileSystem.PathCombine(assetsRoot, "virtual");
-
-        var indexPath = FileSystem.PathCombine(indexDir, assetsId + ".json");
-        var virtualRoot = FileSystem.PathCombine(virtualDir, assetsId);
+        var indexDir = new LocalPath(assetsRoot) / "indexes";
+        var objectDir = new LocalPath(assetsRoot) / "objects";
+        var virtualDir = new LocalPath(assetsRoot) / "virtual";
+        var indexPath = (indexDir / (assetsId + ".json")).Value;
+        var virtualRoot = (virtualDir / assetsId).Value;
 
         if (!File.Exists(indexPath))
         {
@@ -185,9 +185,9 @@ public static class AssetsUtils
         var presentFiles = CollectPathsFromDir(targetPath);
         foreach (var (map, assetObject) in index.Objects)
         {
-            var targetPathForMap = FileSystem.PathCombine(targetPath, map);
+            var targetPathForMap = Path.Combine(targetPath, map);
             var tlk = assetObject.Hash.Length >= 2 ? assetObject.Hash[..2] : assetObject.Hash;
-            var originalPath = FileSystem.PathCombine(objectDir, tlk, assetObject.Hash);
+            var originalPath = (objectDir / tlk / assetObject.Hash).Value;
             if (!File.Exists(originalPath))
             {
                 continue;
@@ -202,7 +202,7 @@ public static class AssetsUtils
             var targetDir = Path.GetDirectoryName(Path.GetFullPath(targetPathForMap));
             if (targetDir is not null)
             {
-                FileSystem.EnsureFolderPathExists(targetDir);
+                FileOps.EnsureFolderPathExists(new LocalPath(targetDir));
             }
 
             try

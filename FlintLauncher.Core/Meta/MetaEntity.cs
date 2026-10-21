@@ -22,6 +22,7 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.Meta;
 
@@ -74,7 +75,7 @@ public abstract class MetaEntity
 
     /// <summary>Absolute path of a local metadata file under the "meta" base.</summary>
     protected string MetaPath(string localFile) =>
-        FileSystem.PathCombine(RequireCache().GetBasePath("meta"), localFile);
+        Path.Combine(RequireCache().GetBasePath("meta"), localFile);
 
     /// <summary>the expected sha256</summary>
     public string Sha256 = "";
@@ -172,7 +173,7 @@ public abstract class MetaEntity
                     if (entity._loadStatus == LoadStatus.NotLoaded || entity.FileSha256.Length == 0)
                     {
                         EmitStatus("Loading local file");
-                        fileData = FileSystem.Read(fname);
+                        fileData = File.ReadAllBytes(fname);
                         entity.FileSha256 = Convert.ToHexStringLower(SHA256.HashData(fileData));
                     }
 
@@ -199,7 +200,7 @@ public abstract class MetaEntity
                     // read failures all derive from it)
                     // qCritical() << "Unable to parse file ...";
                     // just make sure it's gone and we never consider it again.
-                    FileSystem.DeletePath(fname);
+                    FileOps.DeletePath(new LocalPath(fname));
                     entity._loadStatus = LoadStatus.NotLoaded;
                 }
             }

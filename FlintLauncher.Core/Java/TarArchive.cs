@@ -15,6 +15,7 @@
 using System.IO.Compression;
 using System.Text;
 using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Core.Java;
 
@@ -88,7 +89,7 @@ public static class TarArchive
         var targetTopDir = listOnly ? "" : Path.GetFullPath(targetDir);
         if (!listOnly)
         {
-            FileSystem.EnsureFolderPathExists(targetTopDir);
+            FileOps.EnsureFolderPathExists(new LocalPath(targetTopDir));
         }
 
         var header = new byte[BlockSize];
@@ -174,7 +175,7 @@ public static class TarArchive
                 var sections = relativeName.Split('/');
                 subPath = string.Join('/', sections[..^1]) + '/';
                 relativeName = sections[^1];
-                FileSystem.EnsureFolderPathExists(FileSystem.PathCombine(targetTopDir, subPath));
+                FileOps.EnsureFolderPathExists((new LocalPath(targetTopDir) / subPath));
             }
             else
             {
@@ -188,20 +189,20 @@ public static class TarArchive
             }
             else
             {
-                targetFilePath = FileSystem.PathCombine(targetTopDir, subPath, relativeName);
+                targetFilePath = Path.Combine(targetTopDir, subPath, relativeName);
             }
 
             // zip-slip check: the resolved target must stay inside the target directory
             if (!IsParentOf(targetTopDir, targetFilePath))
             {
-                FileSystem.RemoveFiles(extracted);
+                FileOps.RemoveFiles(extracted);
                 error = $"Extracting {relativeName} was cancelled, because it was effectively outside of the target path {targetTopDir}";
                 return null;
             }
 
             if (!ExtractEntry(stream, targetFilePath, typeFlag, effectiveSize, effectiveLink, mode, extracted, out error))
             {
-                FileSystem.RemoveFiles(extracted);
+                FileOps.RemoveFiles(extracted);
                 return null;
             }
         }
@@ -220,7 +221,7 @@ public static class TarArchive
                 case '5': // directory
                 {
                     var dir = targetFilePath.TrimEnd('/');
-                    if (!FileSystem.EnsureFolderPathExists(dir))
+                    if (!FileOps.EnsureFolderPathExists(new LocalPath(dir)))
                     {
                         error = $"Failed to create directory {dir}";
                         return false;
@@ -231,7 +232,7 @@ public static class TarArchive
                 }
                 case '0' or '\0' or '7': // regular file (the data payload follows)
                 {
-                    FileSystem.EnsureFilePathExists(targetFilePath);
+                    FileOps.EnsureFilePathExists(new LocalPath(targetFilePath));
                     using (var output = File.Create(targetFilePath))
                     {
                         CopyExactly(stream, output, size);
@@ -260,7 +261,7 @@ public static class TarArchive
                             return true;
                         }
 
-                        FileSystem.EnsureFilePathExists(targetFilePath);
+                        FileOps.EnsureFilePathExists(new LocalPath(targetFilePath));
                         File.CreateSymbolicLink(targetFilePath, linkTarget);
                     }
                     catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -274,10 +275,10 @@ public static class TarArchive
                 case '1': // hard link — best-effort copy from the already-extracted target
                 {
                     SkipData(stream, size);
-                    var sourcePath = FileSystem.PathCombine(Path.GetDirectoryName(targetFilePath) ?? "", linkTarget);
+                    var sourcePath = Path.Combine(Path.GetDirectoryName(targetFilePath) ?? "", linkTarget);
                     if (File.Exists(sourcePath))
                     {
-                        FileSystem.EnsureFilePathExists(targetFilePath);
+                        FileOps.EnsureFilePathExists(new LocalPath(targetFilePath));
                         File.Copy(sourcePath, targetFilePath, overwrite: true);
                         extracted.Add(targetFilePath);
                     }

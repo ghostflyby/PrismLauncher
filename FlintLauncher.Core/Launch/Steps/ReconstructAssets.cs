@@ -2,7 +2,7 @@
 // Port of launcher/minecraft/launch/ReconstructAssets.{h,cpp}: rebuild the virtual assets
 // folder for the profile's asset index (see Launch/AssetsUtils.cs).
 
-using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
@@ -22,7 +22,7 @@ public sealed class ReconstructAssets(LaunchTask parent) : LaunchStep(parent)
         var assets = profile.GetMinecraftAssets();
 
         var assetsRoot = instance.Paths?.AssetsRoot
-                         ?? FileSystem.PathCombine("assets", "");
+                         ?? Path.Combine("assets", "");
         if (!AssetsUtils.ReconstructAssets(assets.Id, instance.ResourcesDir(), assetsRoot))
         {
             EmitLogLine("Failed to reconstruct Minecraft assets.", MessageLevel.Error);

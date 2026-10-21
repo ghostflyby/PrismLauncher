@@ -11,6 +11,7 @@
 //  - findFiles does not exist in the current C++ MMCZip; nothing to port.
 
 using System.IO.Compression;
+using TruePath;
 
 namespace FlintLauncher.Core.IO;
 
@@ -86,7 +87,7 @@ public static class MmcZip
                 return false;
             }
 
-            FileSystem.EnsureFilePathExists(target);
+            FileOps.EnsureFilePathExists(new LocalPath(target));
             using var source = entry.Open();
             using var output = File.Create(target);
             source.CopyTo(output);
@@ -115,11 +116,11 @@ public static class MmcZip
         }
 
         var targetTopDir = Path.GetFullPath(target);
-        FileSystem.EnsureFolderPathExists(targetTopDir);
+        FileOps.EnsureFolderPathExists(new LocalPath(targetTopDir));
 
         foreach (var entry in entries)
         {
-            var fileName = FileSystem.RemoveInvalidPathChars(entry.FullName.Replace('\\', '/'));
+            var fileName = FileNaming.RemoveInvalidPathChars(entry.FullName.Replace('\\', '/'));
             if (!fileName.StartsWith(subdir, StringComparison.Ordinal))
             {
                 continue;
@@ -139,7 +140,7 @@ public static class MmcZip
             {
                 var sections = relativeFileName.Split('/');
                 subPath = string.Join('/', sections[..^1]) + '/';
-                FileSystem.EnsureFolderPathExists(FileSystem.PathCombine(target, subPath));
+                FileOps.EnsureFolderPathExists((new LocalPath(target) / subPath));
                 relativeFileName = sections[^1];
             }
             else
@@ -154,7 +155,7 @@ public static class MmcZip
             }
             else
             {
-                targetFilePath = FileSystem.PathCombine(targetTopDir, subPath, relativeFileName);
+                targetFilePath = Path.Combine(targetTopDir, subPath, relativeFileName);
                 if (relativeFileName.EndsWith('/') && !targetFilePath.EndsWith('/'))
                 {
                     targetFilePath += '/';
@@ -165,16 +166,16 @@ public static class MmcZip
             if (!IsParentOf(targetTopDir, targetFilePath))
             {
                 // Extracting was cancelled, because it was effectively outside of the target path
-                FileSystem.RemoveFiles(extracted);
+                FileOps.RemoveFiles(extracted);
                 return null;
             }
 
             if (relativeFileName.Length == 0 || relativeFileName.EndsWith('/'))
             {
                 // directory entry
-                if (!FileSystem.EnsureFolderPathExists(targetFilePath.TrimEnd('/')))
+                if (!FileOps.EnsureFolderPathExists(new LocalPath(targetFilePath.TrimEnd('/'))))
                 {
-                    FileSystem.RemoveFiles(extracted);
+                    FileOps.RemoveFiles(extracted);
                     return null;
                 }
 
@@ -184,7 +185,7 @@ public static class MmcZip
 
             try
             {
-                FileSystem.EnsureFilePathExists(targetFilePath);
+                FileOps.EnsureFilePathExists(new LocalPath(targetFilePath));
                 using var source = entry.Open();
                 using var output = File.Create(targetFilePath);
                 source.CopyTo(output);
@@ -193,7 +194,7 @@ public static class MmcZip
                                           or NotSupportedException)
             {
                 // Failed to extract file
-                FileSystem.RemoveFiles(extracted);
+                FileOps.RemoveFiles(extracted);
                 return null;
             }
 

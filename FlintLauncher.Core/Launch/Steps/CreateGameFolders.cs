@@ -3,6 +3,7 @@
 // folder for the instance and any other necessary folders.
 
 using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
@@ -12,7 +13,7 @@ public sealed class CreateGameFolders(LaunchTask parent) : LaunchStep(parent)
     {
         var instance = Parent.Instance;
 
-        if (!FileSystem.EnsureFolderPathExists(instance.GameRoot()))
+        if (!FileOps.EnsureFolderPathExists(new LocalPath(instance.GameRoot())))
         {
             EmitLogLine("Couldn't create the main game folder", MessageLevel.Error);
             EmitFailed("Couldn't create the main game folder");
@@ -20,7 +21,7 @@ public sealed class CreateGameFolders(LaunchTask parent) : LaunchStep(parent)
         }
 
         // HACK: this is a workaround for MCL-3732 - 'server-resource-packs' folder is created.
-        if (!FileSystem.EnsureFolderPathExists(FileSystem.PathCombine(instance.GameRoot(), "server-resource-packs")))
+        if (!FileOps.EnsureFolderPathExists((new LocalPath(instance.GameRoot()) / "server-resource-packs")))
         {
             EmitLogLine("Couldn't create the 'server-resource-packs' folder", MessageLevel.Error);
         }

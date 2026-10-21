@@ -39,6 +39,7 @@ using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
@@ -129,20 +130,20 @@ public sealed partial class FlameCreationTask : InstanceTask
 
     private async Task CreateInstanceAsync(CancellationToken cancellationToken)
     {
-        var parentFolder = FileSystem.PathCombine(StagingPath, "flame");
+        var parentFolder = Path.Combine(StagingPath, "flame");
 
         try
         {
-            var indexPath = FileSystem.PathCombine(StagingPath, "manifest.json");
+            var indexPath = Path.Combine(StagingPath, "manifest.json");
             if (!_pack.IsLoaded)
             {
                 FlameManifest.LoadManifest(_pack, indexPath);
             }
 
             // Keep index file in case we need it some other time (like when changing versions)
-            var newIndexPlace = FileSystem.PathCombine(parentFolder, "manifest.json");
-            FileSystem.EnsureFilePathExists(newIndexPlace);
-            FileSystem.Move(indexPath, newIndexPlace);
+            var newIndexPlace = new LocalPath(parentFolder) / "manifest.json";
+            FileOps.EnsureFilePathExists(newIndexPlace);
+            FileOps.Move(new LocalPath(indexPath), newIndexPlace);
         }
         catch (JsonException e)
         {
@@ -152,7 +153,7 @@ public sealed partial class FlameCreationTask : InstanceTask
 
         if (_pack.Overrides.Length != 0)
         {
-            var overridePath = FileSystem.PathCombine(StagingPath, _pack.Overrides);
+            var overridePath = Path.Combine(StagingPath, _pack.Overrides);
             // upstream #6183: the manifest is untrusted input — an override path that escapes
             // the staging root (absolute path or .. segments) is a security risk, abort
             if (!IsParentOf(StagingPath, overridePath))
@@ -167,8 +168,8 @@ public sealed partial class FlameCreationTask : InstanceTask
                 // Create a list of overrides in "overrides.txt" inside flame/
                 OverrideUtils.CreateOverrides("overrides", parentFolder, overridePath);
 
-                var mcPath = FileSystem.PathCombine(StagingPath, "minecraft");
-                if (!FileSystem.Move(overridePath, mcPath))
+                var mcPath = new LocalPath(StagingPath) / "minecraft";
+                if (!FileOps.Move(new LocalPath(overridePath), mcPath))
                 {
                     EmitFailed("Could not rename the overrides folder:\n" + _pack.Overrides);
                     return;
@@ -303,14 +304,14 @@ public sealed partial class FlameCreationTask : InstanceTask
             _newInstance.Settings.Set("MaxMemAlloc", recommendedRam);
         }
 
-        var jarmodsPath = FileSystem.PathCombine(StagingPath, "minecraft", "jarmods");
+        var jarmodsPath = Path.Combine(StagingPath, "minecraft", "jarmods");
         if (Directory.Exists(jarmodsPath))
         {
             // install all the jar mods
             var jarMods = Directory.EnumerateFiles(jarmodsPath).ToList();
             _ = _newInstance.GetPackProfile().InstallJarMods(jarMods);
             // nuke the original files
-            FileSystem.DeletePath(jarmodsPath);
+            FileOps.DeletePath(new LocalPath(jarmodsPath));
         }
 
         SetManagedPack(_newInstance);
@@ -397,8 +398,8 @@ public sealed partial class FlameCreationTask : InstanceTask
 
         var untrustedMods = new List<string>();
 
-        var mcDir = FileSystem.PathCombine(StagingPath, "minecraft");
-        var modsPath = FileSystem.PathCombine(StagingPath, "minecraft", "mods");
+        var mcDir = Path.Combine(StagingPath, "minecraft");
+        var modsPath = Path.Combine(StagingPath, "minecraft", "mods");
         if (Directory.Exists(modsPath))
         {
             foreach (var iter in Directory.EnumerateFiles(modsPath, "*", SearchOption.AllDirectories))
@@ -429,7 +430,7 @@ public sealed partial class FlameCreationTask : InstanceTask
         {
             if (!result.Required)
             {
-                optionalFiles.Add(FileSystem.PathCombine(result.TargetFolder, result.Version.FileName));
+                optionalFiles.Add(Path.Combine(result.TargetFolder, result.Version.FileName));
             }
         }
 
@@ -456,8 +457,8 @@ public sealed partial class FlameCreationTask : InstanceTask
                     LocalPath = "",
                     TargetFolder = result.TargetFolder,
                 };
-                var fileName = FileSystem.RemoveInvalidPathChars(result.Version.FileName);
-                var relpath = FileSystem.PathCombine(result.TargetFolder, fileName);
+                var fileName = FileNaming.RemoveInvalidPathChars(result.Version.FileName);
+                var relpath = Path.Combine(result.TargetFolder, fileName);
                 blockedMod.Disabled = !result.Required && !IsOptionalSelected(relpath);
 
                 blockedMods.Add(blockedMod);
@@ -505,16 +506,16 @@ public sealed partial class FlameCreationTask : InstanceTask
 
         foreach (var result in results)
         {
-            var fileName = FileSystem.RemoveInvalidPathChars(result.Version.FileName);
-            var relpath = FileSystem.PathCombine(result.TargetFolder, fileName);
+            var fileName = FileNaming.RemoveInvalidPathChars(result.Version.FileName);
+            var relpath = Path.Combine(result.TargetFolder, fileName);
 
             if (!result.Required && !IsOptionalSelected(relpath))
             {
                 relpath += ".disabled";
             }
 
-            relpath = FileSystem.PathCombine("minecraft", relpath);
-            var path = FileSystem.PathCombine(StagingPath, relpath);
+            relpath = Path.Combine("minecraft", relpath);
+            var path = Path.Combine(StagingPath, relpath);
 
             if (result.Version.DownloadUrl.Length != 0)
             {
@@ -555,7 +556,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                 continue;
             }
 
-            var destPath = FileSystem.PathCombine(StagingPath, "minecraft", mod.TargetFolder, mod.Name);
+            var destPath = Path.Combine(StagingPath, "minecraft", mod.TargetFolder, mod.Name);
             if (mod.Disabled)
             {
                 destPath += ".disabled";
@@ -567,7 +568,7 @@ public sealed partial class FlameCreationTask : InstanceTask
             // always copies (never moves) the user-picked local file
             try
             {
-                FileSystem.EnsureFilePathExists(destPath);
+                FileOps.EnsureFilePathExists(new LocalPath(destPath));
                 File.Copy(mod.LocalPath, destPath, overwrite: true);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
@@ -588,14 +589,14 @@ public sealed partial class FlameCreationTask : InstanceTask
         var results = modIdResolver.GetResults().Files.Values.ToList();
         foreach (var (fileName, targetFolder) in _otherResources)
         {
-            var localPath = FileSystem.PathCombine(StagingPath, "minecraft", targetFolder, fileName);
+            var localPath = Path.Combine(StagingPath, "minecraft", targetFolder, fileName);
 
             string ValidatePath(string name, string folder, string realTarget)
             {
                 if (folder != realTarget)
                 {
-                    var destPath = FileSystem.PathCombine(StagingPath, "minecraft", realTarget, name);
-                    if (FileSystem.Move(localPath, destPath))
+                    var destPath = Path.Combine(StagingPath, "minecraft", realTarget, name);
+                    if (FileOps.Move(new LocalPath(localPath), new LocalPath(destPath)))
                     {
                         return destPath;
                     }
@@ -635,7 +636,7 @@ public sealed partial class FlameCreationTask : InstanceTask
         _ = zipMods; // (see the header note: without identify() the zip-mod special case is inert)
 
         // ---------------------------------------------------------- write mod metadata
-        var folder = FileSystem.PathCombine(StagingPath, "minecraft", "mods", ".index");
+        var folder = Path.Combine(StagingPath, "minecraft", "mods", ".index");
         foreach (var file in results)
         {
             if (file.TargetFolder != "mods"
@@ -647,7 +648,7 @@ public sealed partial class FlameCreationTask : InstanceTask
 
             // LocalResourceUpdateTask::executeTask (create + write the .pw.toml index)
             var ver = file.Version;
-            ver.FileName = FileSystem.RemoveInvalidPathChars(ver.FileName);
+            ver.FileName = FileNaming.RemoveInvalidPathChars(ver.FileName);
             var pwMod = MetadataHandler.Create(folder, file.Pack, ver);
             if (pwMod.IsValid)
             {
@@ -686,7 +687,7 @@ public sealed partial class FlameCreationTask : InstanceTask
             return;
         }
 
-        _ = world.Install(FileSystem.PathCombine(StagingPath, "minecraft", "saves"));
+        _ = world.Install(Path.Combine(StagingPath, "minecraft", "saves"));
     }
 
     /// <summary>Port of FlameCreationTask::finishInstall (fresh-install branch).</summary>
@@ -707,7 +708,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                     continue;
                 }
 
-                if (!FileSystem.DeletePath(path))
+                if (!FileOps.DeletePath(new LocalPath(path)))
                 {
                     deleteFailed = true;
                 }

@@ -6,8 +6,8 @@
 // existing destinations are skipped (the C++ std::filesystem call would throw on them, but the
 // task re-runs only when the wanted bin path is missing anyway).
 
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.Java.Download;
 
@@ -16,7 +16,7 @@ public sealed class SymlinkTask(string finalPath) : FlintTask
     /// <summary>Port of the free function findBinPath: first &lt;root&gt;/&lt;pattern&gt;, then one level down.</summary>
     public static string FindBinPath(string root, string pattern)
     {
-        var path = FileSystem.PathCombine(root, pattern);
+        var path = Path.Combine(root, pattern);
         if (File.Exists(path) || Directory.Exists(path))
         {
             return path;
@@ -26,7 +26,7 @@ public sealed class SymlinkTask(string finalPath) : FlintTask
         {
             foreach (var entry in Directory.GetDirectories(root))
             {
-                path = FileSystem.PathCombine(Path.GetFullPath(entry), pattern);
+                path = Path.Combine(Path.GetFullPath(entry), pattern);
                 if (File.Exists(path) || Directory.Exists(path))
                 {
                     return path;
@@ -40,8 +40,8 @@ public sealed class SymlinkTask(string finalPath) : FlintTask
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Checking for Java binary path");
-        var binPath = FileSystem.PathCombine("bin", "java");
-        var wantedPath = FileSystem.PathCombine(finalPath, binPath);
+        var binPath = Path.Combine("bin", "java");
+        var wantedPath = Path.Combine(finalPath, binPath);
         if (File.Exists(wantedPath) || Directory.Exists(wantedPath))
         {
             EmitSucceeded();
@@ -49,7 +49,7 @@ public sealed class SymlinkTask(string finalPath) : FlintTask
         }
 
         EmitStatus("Searching for Java binary path");
-        var contentsPartialPath = FileSystem.PathCombine("Contents", "Home", binPath);
+        var contentsPartialPath = Path.Combine("Contents", "Home", binPath);
         var relativePathToBin = FindBinPath(finalPath, contentsPartialPath);
         if (relativePathToBin.Length == 0)
         {
@@ -69,7 +69,7 @@ public sealed class SymlinkTask(string finalPath) : FlintTask
         foreach (var entry in entries)
         {
             var source = Path.GetFullPath(entry);
-            var destination = FileSystem.PathCombine(finalPath, Path.GetFileName(entry));
+            var destination = Path.Combine(finalPath, Path.GetFileName(entry));
             var destinationExists = File.Exists(destination) || Directory.Exists(destination);
             if (!destinationExists)
             {

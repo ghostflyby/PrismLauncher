@@ -359,7 +359,7 @@ public static class FlameMod
         file.Date = Require(dto.FileDate, "fileDate");
         file.Version = Require(dto.DisplayName, "displayName");
         file.DownloadUrl = dto.DownloadUrl ?? "";
-        file.FileName = FileSystem.RemoveInvalidPathChars(Require(dto.FileName, "fileName"));
+        file.FileName = FileNaming.RemoveInvalidPathChars(Require(dto.FileName, "fileName"));
 
         file.VersionType = Require(dto.ReleaseType, "releaseType") switch
         {

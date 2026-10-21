@@ -19,6 +19,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.LegacyFtb;
 
@@ -74,8 +75,8 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
     private static string TempCachePath(string relativeName)
     {
         var dir = Path.Combine(Path.GetTempPath(), "flint-ftb-cache");
-        FileSystem.EnsureFolderPathExists(dir);
-        return FileSystem.PathCombine(dir, relativeName.Replace('/', '_'));
+        FileOps.EnsureFolderPathExists(new LocalPath(dir));
+        return Path.Combine(dir, relativeName.Replace('/', '_'));
     }
 
     private async Task Unzip(CancellationToken cancellationToken)
@@ -83,7 +84,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
         EmitStatus("Extracting modpack");
         SetProgress(2, 4);
 
-        var extractDir = FileSystem.PathCombine(StagingPath, "unzip");
+        var extractDir = Path.Combine(StagingPath, "unzip");
         if (MmcZip.ExtractDir(_archivePath, "", extractDir) is null)
         {
             EmitFailed("Failed to extract modpack");
@@ -98,11 +99,11 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
         EmitStatus("Installing modpack");
         SetProgress(3, 4);
 
-        var unzipMcDir = FileSystem.PathCombine(StagingPath, "unzip", "minecraft");
+        var unzipMcDir = Path.Combine(StagingPath, "unzip", "minecraft");
         if (Directory.Exists(unzipMcDir))
         {
             // ok, found minecraft dir, move contents to instance dir
-            if (!FileSystem.Move(unzipMcDir, FileSystem.PathCombine(StagingPath, "minecraft")))
+            if (!FileOps.Move(new LocalPath(unzipMcDir), (new LocalPath(StagingPath) / "minecraft")))
             {
                 EmitFailed("Failed to move unpacked Minecraft!");
                 return;
@@ -122,15 +123,15 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
             var fallback = true;
 
             // handle different versions
-            var packJsonPath = FileSystem.PathCombine(StagingPath, "minecraft", "pack.json");
-            var jarmodDir = FileSystem.PathCombine(StagingPath, "unzip", "instMods");
+            var packJsonPath = Path.Combine(StagingPath, "minecraft", "pack.json");
+            var jarmodDir = Path.Combine(StagingPath, "unzip", "instMods");
             if (File.Exists(packJsonPath))
             {
                 try
                 {
                     // the typed pack.json read (we only care about the libs); a malformed
                     // document fails into the same keep-the-file/fall-through path
-                    var packJson = JsonSerializer.Deserialize(FileSystem.Read(packJsonPath),
+                    var packJson = JsonSerializer.Deserialize(File.ReadAllBytes(packJsonPath),
                         LegacyFtbJsonContext.Default.LegacyFtbPackJson);
 
                     foreach (var library in packJson?.Libraries ?? [])
@@ -147,7 +148,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
                             : forgeSpecifier.Version.Replace(pack.McVersion, "").Replace("-", "");
                         await components.SetComponentVersion("net.minecraftforge", forgeVersion,
                             cancellationToken: cancellationToken);
-                        FileSystem.DeletePath(packJsonPath);
+                        FileOps.DeletePath(new LocalPath(packJsonPath));
                         fallback = false;
                         break;
                     }
@@ -167,7 +168,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
             }
 
             // just nuke unzip directory, it s not needed anymore
-            FileSystem.DeletePath(FileSystem.PathCombine(StagingPath, "unzip"));
+            FileOps.DeletePath((new LocalPath(StagingPath) / "unzip"));
 
             if (fallback)
             {

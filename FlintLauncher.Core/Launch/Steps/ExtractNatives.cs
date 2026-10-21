@@ -4,6 +4,7 @@
 
 using System.IO.Compression;
 using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
@@ -20,7 +21,7 @@ public sealed class ExtractNatives(LaunchTask parent) : LaunchStep(parent)
         }
 
         var outputPath = instance.GetNativePath();
-        FileSystem.EnsureFolderPathExists(outputPath);
+        FileOps.EnsureFolderPathExists(new LocalPath(outputPath));
         var jniHackEnabled = instance.GetJavaLanguageVersion() >= 8;
         foreach (var source in toExtract)
         {
@@ -39,7 +40,7 @@ public sealed class ExtractNatives(LaunchTask parent) : LaunchStep(parent)
     public override void FinalizeStep()
     {
         var instance = Parent.Instance;
-        var targetDir = FileSystem.PathCombine(instance.InstanceRoot(), "natives/");
+        var targetDir = Path.Combine(instance.InstanceRoot(), "natives");
         if (Directory.Exists(targetDir))
         {
             try
@@ -69,7 +70,7 @@ public sealed class ExtractNatives(LaunchTask parent) : LaunchStep(parent)
         {
             using var zip = ZipFile.OpenRead(source);
             var directory = Path.GetFullPath(targetFolder);
-            FileSystem.EnsureFolderPathExists(directory);
+            FileOps.EnsureFolderPathExists(new LocalPath(directory));
 
             foreach (var entry in zip.Entries)
             {
@@ -81,11 +82,11 @@ public sealed class ExtractNatives(LaunchTask parent) : LaunchStep(parent)
 
                 if (name.EndsWith('/'))
                 {
-                    FileSystem.EnsureFolderPathExists(FileSystem.PathCombine(directory, name));
+                    FileOps.EnsureFolderPathExists((new LocalPath(directory) / name));
                     continue;
                 }
 
-                var absFilePath = FileSystem.PathCombine(directory, name);
+                var absFilePath = Path.Combine(directory, name);
                 // zip-slip guard (same invariant as MMCZip::ExtractSubDir)
                 if (!absFilePath.StartsWith(directory, OperatingSystem.IsWindows()
                         ? StringComparison.OrdinalIgnoreCase
@@ -94,7 +95,7 @@ public sealed class ExtractNatives(LaunchTask parent) : LaunchStep(parent)
                     return false;
                 }
 
-                FileSystem.EnsureFilePathExists(absFilePath);
+                FileOps.EnsureFilePathExists(new LocalPath(absFilePath));
                 using var entryStream = entry.Open();
                 using var output = File.Create(absFilePath);
                 entryStream.CopyTo(output);

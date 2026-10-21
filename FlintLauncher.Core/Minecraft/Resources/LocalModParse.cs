@@ -23,8 +23,8 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Packwiz;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
 
@@ -228,7 +228,7 @@ public static class ModUtils
     /// <summary>Port of ModUtils::processFolder (mcmod.info in the folder root).</summary>
     public static bool ProcessFolder(Mod mod, ModProcessingLevel level = ModProcessingLevel.Full)
     {
-        var mcmodInfoPath = FileSystem.PathCombine(mod.Fileinfo.FullName, "mcmod.info");
+        var mcmodInfoPath = Path.Combine(mod.Fileinfo.FullName, "mcmod.info");
         var mcmodInfo = new FileInfo(mcmodInfoPath);
         if (mcmodInfo.Exists && !mcmodInfo.Attributes.HasFlag(FileAttributes.Directory))
         {

@@ -15,6 +15,7 @@
 //    (instDirPath() was purely instance-model glue)
 
 using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.Worlds;
 
@@ -26,7 +27,7 @@ public sealed class WorldList
     public WorldList(string dir)
     {
         Dir = dir;
-        FileSystem.EnsureFolderPathExists(Dir);
+        FileOps.EnsureFolderPathExists(new LocalPath(Dir));
     }
 
     /// <summary>The saves directory this list is rooted at (QDir m_dir).</summary>

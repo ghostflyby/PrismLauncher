@@ -8,9 +8,9 @@
 
 using System.Security.Cryptography;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
@@ -73,9 +73,7 @@ public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
 
         var assets = profile.GetMinecraftAssets();
 
-        var assetFname = FileSystem.PathCombine(
-            inst.Paths?.AssetIndexesDir ?? FileSystem.PathCombine("assets", "indexes"),
-            assets.Id + ".json");
+        var assetFname = Path.Combine(inst.Paths?.AssetIndexesDir ?? Path.Combine("assets", "indexes"), assets.Id + ".json");
         var index = new AssetsIndex();
         // FIXME: this looks like a job for a generic validator based on json schema?
         if (!AssetsUtils.LoadAssetsIndexJson(assets.Id, assetFname, index))
@@ -89,7 +87,7 @@ public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
         }
 
         var job = index.GetDownloadJob(ResourceUrl(), inst.Paths?.AssetsRoot
-                                                      ?? FileSystem.PathCombine("assets", ""));
+                                                      ?? Path.Combine("assets", ""));
         if (job is not null)
         {
             var resourceUrl = ResourceUrl();

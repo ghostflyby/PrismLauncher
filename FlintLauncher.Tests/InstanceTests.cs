@@ -6,9 +6,9 @@
 
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Settings;
 using Xunit;
+using TruePath;
 
 namespace FlintLauncher.Tests;
 
@@ -433,5 +433,5 @@ public class InstanceTests : IDisposable
     }
 
     private static string FileSystemPathCombine(string a, string b) =>
-        FileSystem.PathCombine(a, b).TrimEnd('/');
+        Path.Combine(a, b).TrimEnd('/');
 }

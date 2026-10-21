@@ -20,6 +20,7 @@ using System.Security;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.Migration;
 
@@ -146,13 +147,13 @@ public sealed class DataMigrationTask(string sourcePath, string targetPath, Func
 
     private bool CopyFile(string relative)
     {
-        var dstPath = FileSystem.PathCombine(targetPath, relative);
-        if (!FileSystem.EnsureFilePathExists(dstPath))
+        var dstPath = Path.Combine(targetPath, relative);
+        if (!FileOps.EnsureFilePathExists(new LocalPath(dstPath)))
         {
             return false;
         }
 
-        var srcPath = FileSystem.PathCombine(sourcePath, relative);
+        var srcPath = Path.Combine(sourcePath, relative);
         try
         {
             File.Copy(srcPath, dstPath, overwrite: false);
@@ -180,15 +181,15 @@ public static class DataMigration
 
     /// <summary>The marker file path inside the current data directory.</summary>
     public static string NoMigrateMarkerPath(string currentData, string name) =>
-        FileSystem.PathCombine(currentData, NoMigrateMarkerName(name));
+        Path.Combine(currentData, NoMigrateMarkerName(name));
 
     /// <summary>Config candidates looked for in the old data directory: the legacy launcher's
     /// own config first, then the Prism/Flint one ("it's possible that we already used that
     /// directory before").</summary>
     public static IReadOnlyList<string> OldConfigCandidates(string oldData, string configFile, string launcherConfigFile) =>
     [
-        FileSystem.PathCombine(oldData, configFile),
-        FileSystem.PathCombine(oldData, launcherConfigFile),
+        Path.Combine(oldData, configFile),
+        Path.Combine(oldData, launcherConfigFile),
     ];
 
     /// <summary>
@@ -259,7 +260,7 @@ public static class DataMigration
         }
 
         var currentExists = File.Exists(currentConfigFile ??
-                                        FileSystem.PathCombine(currentData, launcherConfigFile));
+                                        Path.Combine(currentData, launcherConfigFile));
         return currentExists ? MigrationDecision.CurrentDataExists : MigrationDecision.ReadyToMigrate;
     }
 

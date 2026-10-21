@@ -41,7 +41,6 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Launch.Steps;
@@ -53,6 +52,7 @@ using FlintLauncher.Core.State;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using Microsoft.Extensions.Logging.Abstractions;
+using TruePath;
 
 namespace FlintLauncher.Core.Instances;
 
@@ -230,19 +230,19 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     ////// Directories and files //////
 
-    public string JarModsDir() => QDirAbsolutePath(FileSystem.PathCombine(InstanceRoot(), "jarmods/"));
+    public string JarModsDir() => QDirAbsolutePath(Path.Combine(InstanceRoot(), "jarmods"));
 
-    public string ResourcePacksDir() => FileSystem.PathCombine(GameRoot(), "resourcepacks");
+    public string ResourcePacksDir() => Path.Combine(GameRoot(), "resourcepacks");
 
-    public string TexturePacksDir() => FileSystem.PathCombine(GameRoot(), "texturepacks");
+    public string TexturePacksDir() => Path.Combine(GameRoot(), "texturepacks");
 
-    public string ShaderPacksDir() => FileSystem.PathCombine(GameRoot(), "shaderpacks");
+    public string ShaderPacksDir() => Path.Combine(GameRoot(), "shaderpacks");
 
-    public override string ModsRoot() => FileSystem.PathCombine(GameRoot(), "mods");
+    public override string ModsRoot() => Path.Combine(GameRoot(), "mods");
 
-    public string CoreModsDir() => FileSystem.PathCombine(GameRoot(), "coremods");
+    public string CoreModsDir() => Path.Combine(GameRoot(), "coremods");
 
-    public string NilModsDir() => FileSystem.PathCombine(GameRoot(), "nilmods");
+    public string NilModsDir() => Path.Combine(GameRoot(), "nilmods");
 
     public string DataPacksDir()
     {
@@ -253,29 +253,29 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             relativePath = "datapacks";
         }
 
-        return FileSystem.PathCombine(GameRoot(), relativePath);
+        return Path.Combine(GameRoot(), relativePath);
     }
 
-    public string ModsCacheLocation() => FileSystem.PathCombine(InstanceRoot(), "mods.cache");
+    public string ModsCacheLocation() => Path.Combine(InstanceRoot(), "mods.cache");
 
-    public string LibDir() => FileSystem.PathCombine(GameRoot(), "lib");
+    public string LibDir() => Path.Combine(GameRoot(), "lib");
 
-    public string WorldDir() => FileSystem.PathCombine(GameRoot(), "saves");
+    public string WorldDir() => Path.Combine(GameRoot(), "saves");
 
-    public string ResourcesDir() => FileSystem.PathCombine(GameRoot(), "resources");
+    public string ResourcesDir() => Path.Combine(GameRoot(), "resources");
 
     /// <summary>QDir::current().absoluteFilePath("libraries").</summary>
     public string LibrariesPath() => Paths?.LibrariesRoot ?? QDirAbsolutePath("libraries");
 
     public string JarmodsPath() => JarModsDir();
 
-    public override string InstanceConfigFolder() => FileSystem.PathCombine(GameRoot(), "config");
+    public override string InstanceConfigFolder() => Path.Combine(GameRoot(), "config");
 
     /// <summary>Path to the instance's minecraft directory.</summary>
     public override string GameRoot()
     {
-        var mcDir = FileSystem.PathCombine(InstanceRoot(), "minecraft");
-        var dotMcDir = FileSystem.PathCombine(InstanceRoot(), ".minecraft");
+        var mcDir = Path.Combine(InstanceRoot(), "minecraft");
+        var dotMcDir = Path.Combine(InstanceRoot(), ".minecraft");
 
         if (FsExists(dotMcDir) && !FsExists(mcDir))
         {
@@ -286,13 +286,13 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     }
 
     /// <summary>Path to the instance's minecraft bin directory.</summary>
-    public string BinRoot() => FileSystem.PathCombine(GameRoot(), "bin");
+    public string BinRoot() => Path.Combine(GameRoot(), "bin");
 
     /// <summary>where to put the natives during/before launch</summary>
-    public string GetNativePath() => QDirAbsolutePath(FileSystem.PathCombine(InstanceRoot(), "natives/"));
+    public string GetNativePath() => QDirAbsolutePath(Path.Combine(InstanceRoot(), "natives"));
 
     /// <summary>where the instance-local libraries should be</summary>
-    public string GetLocalLibraryPath() => QDirAbsolutePath(FileSystem.PathCombine(InstanceRoot(), "libraries/"));
+    public string GetLocalLibraryPath() => QDirAbsolutePath(Path.Combine(InstanceRoot(), "libraries"));
 
     /// <summary>Returns whether the instance, with its version, has support for demo mode.</summary>
     public bool SupportsDemo()
@@ -339,7 +339,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         UpdateRuntimeContext();
         var process = LaunchTask.Create(this, launchServices);
 
-        launchServices.Ui.SaveIcon?.Invoke(IconKey(), FileSystem.PathCombine(GameRoot(), "icon.png"));
+        launchServices.Ui.SaveIcon?.Invoke(IconKey(), Path.Combine(GameRoot(), "icon.png"));
 
         // print a header
         process.AppendStep(new TextPrint(process, "Minecraft folder is:\n  " + GameRoot() + "\n",
@@ -1150,7 +1150,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
         var absRootDir = QDirAbsolutePath(GameRoot());
         result["game_directory"] = absRootDir;
-        var absAssetsDir = Paths?.AssetsRoot ?? QDirAbsolutePath("assets/");
+        var absAssetsDir = Paths?.AssetsRoot ?? QDirAbsolutePath("assets");
         var assets = profile.GetMinecraftAssets();
         result["game_assets"] = GetAssetsDir(assets.Id, ResourcesDir());
 
@@ -1167,8 +1167,8 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         return
         [
-            FileSystem.PathCombine(GameRoot(), "crash-reports"),
-            FileSystem.PathCombine(GameRoot(), "logs"),
+            Path.Combine(GameRoot(), "crash-reports"),
+            Path.Combine(GameRoot(), "logs"),
             GameRoot(),
         ];
     }
@@ -1396,9 +1396,9 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// </summary>
     private string GetAssetsDir(string assetsId, string resourcesFolder)
     {
-        var assetsDir = Paths?.AssetsRoot ?? QDirAbsolutePath("assets/");
-        var indexPath = FileSystem.PathCombine(assetsDir, "indexes", assetsId + ".json");
-        var virtualRoot = FileSystem.PathCombine(assetsDir, "virtual", assetsId);
+        var assetsDir = Paths?.AssetsRoot ?? QDirAbsolutePath("assets");
+        var indexPath = Path.Combine(assetsDir, "indexes", assetsId + ".json");
+        var virtualRoot = Path.Combine(assetsDir, "virtual", assetsId);
 
         if (!File.Exists(indexPath))
         {
@@ -1477,15 +1477,15 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         if (path.Length == 0)
         {
-            return FileSystem.PathCombine(Directory.GetCurrentDirectory(), "");
+            return Path.Combine(Directory.GetCurrentDirectory(), "");
         }
 
         if (path.StartsWith('/') || path is [_, ':', ..])
         {
-            return FileSystem.PathCombine(path, "");
+            return Path.Combine(path, "");
         }
 
-        return FileSystem.PathCombine(Directory.GetCurrentDirectory(), path);
+        return Path.Combine(Directory.GetCurrentDirectory(), path);
     }
 
     /// <summary>QFileInfo::exists(): file or directory.</summary>

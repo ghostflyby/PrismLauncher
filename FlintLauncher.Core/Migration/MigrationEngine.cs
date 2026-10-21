@@ -16,6 +16,7 @@ using System.Globalization;
 using System.Security;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Core.Migration;
 
@@ -414,16 +415,16 @@ public static class FlintLegacyMigration
                 // config side (the importer probes ConfigRoot first), the S2 token file is
                 // dead stock (zero-persistence), and the S3 markers move to the data root
                 // where DataMigration.Decide upgrades them to records
-                FileSystem.EnsureFolderPathExists(paths.InstancesDir);
+                FileOps.EnsureFolderPathExists(new LocalPath(paths.InstancesDir));
                 MoveChildren(sourceRoot, "instances", paths.InstancesDir, ref moved, ref bytes, ref failedFiles);
                 bytes += Transfer(Path.Combine(sourceRoot, "accounts.json"), paths.AccountsFile,
                     false, ref moved, ref failedFiles);
                 bytes += Transfer(Path.Combine(sourceRoot, "instgroups.json"), paths.InstgroupsFile,
                     false, ref moved, ref failedFiles);
-                FileSystem.EnsureFolderPathExists(Path.Combine(paths.DataRoot, "icons"));
+                FileOps.EnsureFolderPathExists(new LocalPath(Path.Combine(paths.DataRoot, "icons")));
                 MoveChildren(sourceRoot, "icons", Path.Combine(paths.DataRoot, "icons"),
                     ref moved, ref bytes, ref failedFiles);
-                FileSystem.EnsureFolderPathExists(Path.Combine(paths.DataRoot, "skins"));
+                FileOps.EnsureFolderPathExists(new LocalPath(Path.Combine(paths.DataRoot, "skins")));
                 MoveChildren(sourceRoot, "skins", Path.Combine(paths.DataRoot, "skins"),
                     ref moved, ref bytes, ref failedFiles);
                 foreach (var ini in FlintConfigImporter.IniChain)

@@ -32,6 +32,7 @@ using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
@@ -106,29 +107,29 @@ public sealed class ModrinthCreationTask : InstanceTask
     // https://docs.modrinth.com/docs/modpacks/format_definition/
     private async Task CreateInstanceAsync(CancellationToken cancellationToken)
     {
-        var parentFolder = FileSystem.PathCombine(StagingPath, "mrpack");
+        var parentFolder = Path.Combine(StagingPath, "mrpack");
 
-        var indexPath = FileSystem.PathCombine(StagingPath, "modrinth.index.json");
+        var indexPath = Path.Combine(StagingPath, "modrinth.index.json");
         if (_files.Count == 0 && !ParseManifest(indexPath, _files, setInternalData: true))
         {
             return;
         }
 
         // Keep index file in case we need it some other time (like when changing versions)
-        var newIndexPlace = FileSystem.PathCombine(parentFolder, "modrinth.index.json");
-        FileSystem.EnsureFilePathExists(newIndexPlace);
-        FileSystem.Move(indexPath, newIndexPlace);
+        var newIndexPlace = new LocalPath(parentFolder) / "modrinth.index.json";
+        FileOps.EnsureFilePathExists(newIndexPlace);
+        FileOps.Move(new LocalPath(indexPath), newIndexPlace);
 
-        var mcPath = FileSystem.PathCombine(StagingPath, _rootPath);
+        var mcPath = Path.Combine(StagingPath, _rootPath);
 
-        var overridePath = FileSystem.PathCombine(StagingPath, "overrides");
+        var overridePath = Path.Combine(StagingPath, "overrides");
         if (System.IO.File.Exists(overridePath) || Directory.Exists(overridePath))
         {
             // Create a list of overrides in "overrides.txt" inside mrpack/
             OverrideUtils.CreateOverrides("overrides", parentFolder, overridePath);
 
             // Apply the overrides
-            if (!FileSystem.Move(overridePath, mcPath))
+            if (!FileOps.Move(new LocalPath(overridePath), new LocalPath(mcPath)))
             {
                 EmitFailed("Could not rename the overrides folder:\n" + "overrides");
                 return;
@@ -136,7 +137,7 @@ public sealed class ModrinthCreationTask : InstanceTask
         }
 
         // Do client overrides
-        var clientOverridePath = FileSystem.PathCombine(StagingPath, "client-overrides");
+        var clientOverridePath = Path.Combine(StagingPath, "client-overrides");
         if (System.IO.File.Exists(clientOverridePath) || Directory.Exists(clientOverridePath))
         {
             // Create a list of overrides in "client-overrides.txt" inside mrpack/
@@ -207,15 +208,15 @@ public sealed class ModrinthCreationTask : InstanceTask
         newInstance.SaveNow();
 
         // ---------------------------------------------------------- download mods
-        var rootModpackPath = FileSystem.PathCombine(StagingPath, _rootPath);
+        var rootModpackPath = Path.Combine(StagingPath, _rootPath);
 
         var downloadJob = new ConcurrentTask("Mod Download Modrinth");
         var downloadTasks = new List<ModDownloadTask>();
 
         foreach (var file in _files)
         {
-            var fileName = FileSystem.RemoveInvalidPathChars(file.Path);
-            var filePath = FileSystem.PathCombine(rootModpackPath, fileName);
+            var fileName = FileNaming.RemoveInvalidPathChars(file.Path);
+            var filePath = Path.Combine(rootModpackPath, fileName);
             if (!IsParentOf(rootModpackPath, filePath))
             {
                 // This means we somehow got out of the root folder, so abort here to prevent exploits
@@ -444,7 +445,7 @@ public sealed class ModrinthCreationTask : InstanceTask
 
     private async Task EnsureMetaLoop(CancellationToken cancellationToken, MinecraftInstance newInstance)
     {
-        var folder = FileSystem.PathCombine(newInstance.ModsRoot(), ".index");
+        var folder = Path.Combine(newInstance.ModsRoot(), ".index");
         var ensureMetadataTask = new EnsureMetadataTask(_resources, folder, ResourceProvider.Modrinth, _modrinth)
         {
             // setUpdateLock(true): updates for mods coming from an installed modpack are locked
@@ -489,8 +490,8 @@ public sealed class ModrinthCreationTask : InstanceTask
             }
         }
 
-        var mcDir = FileSystem.PathCombine(StagingPath, _rootPath);
-        var modsPath = FileSystem.PathCombine(mcDir, "mods");
+        var mcDir = Path.Combine(StagingPath, _rootPath);
+        var modsPath = Path.Combine(mcDir, "mods");
         if (Directory.Exists(modsPath))
         {
             foreach (var iter in Directory.EnumerateFiles(modsPath, "*", SearchOption.AllDirectories))
@@ -539,7 +540,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                     continue;
                 }
 
-                if (!FileSystem.DeletePath(path))
+                if (!FileOps.DeletePath(new LocalPath(path)))
                 {
                     deleteFailed = true;
                 }
@@ -582,7 +583,7 @@ public sealed class ModrinthCreationTask : InstanceTask
     {
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            FileSystem.EnsureFilePathExists(filePath);
+            FileOps.EnsureFilePathExists(new LocalPath(filePath));
             var hashAlgorithm = file.HashAlgorithm;
 
             while (file.Downloads.Count > 0)

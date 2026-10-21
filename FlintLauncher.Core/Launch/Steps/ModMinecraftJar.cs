@@ -6,6 +6,7 @@
 using System.IO.Compression;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft.Resources;
+using TruePath;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
@@ -32,13 +33,13 @@ public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
         }
 
         // nuke obsolete stripped jar(s) if needed
-        if (!FileSystem.EnsureFolderPathExists(inst.BinRoot()))
+        if (!FileOps.EnsureFolderPathExists(new LocalPath(inst.BinRoot())))
         {
             EmitFailed("Couldn't create the bin folder for Minecraft.jar");
             return Task.CompletedTask;
         }
 
-        var finalJarPath = FileSystem.PathCombine(inst.BinRoot(), "minecraft.jar");
+        var finalJarPath = Path.Combine(inst.BinRoot(), "minecraft.jar");
         if (!RemoveJar())
         {
             EmitFailed($"Couldn't remove stale jar file: {finalJarPath}");
@@ -79,7 +80,7 @@ public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
     private bool RemoveJar()
     {
         var inst = Parent.Instance;
-        var finalJarPath = FileSystem.PathCombine(inst.BinRoot(), "minecraft.jar");
+        var finalJarPath = Path.Combine(inst.BinRoot(), "minecraft.jar");
         var finalJar = new FileInfo(finalJarPath);
         if (finalJar.Exists)
         {
@@ -126,7 +127,7 @@ public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
                     if (!MmcZip.MergeZipFiles(zipOut, mod.Fileinfo.FullName, addedFiles))
                     {
                         zipOut.Dispose();
-                        FileSystem.DeletePath(targetJarPath);
+                        FileOps.DeletePath(new LocalPath(targetJarPath));
                         return false;
                     }
                 }
@@ -152,7 +153,7 @@ public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
                     if (!MmcZip.CompressDirFiles(zipOut, parentDir, files))
                     {
                         zipOut.Dispose();
-                        FileSystem.DeletePath(targetJarPath);
+                        FileOps.DeletePath(new LocalPath(targetJarPath));
                         return false;
                     }
                 }
@@ -160,7 +161,7 @@ public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
                 {
                     // Make sure we do not continue launching when something is missing or undefined...
                     zipOut.Dispose();
-                    FileSystem.DeletePath(targetJarPath);
+                    FileOps.DeletePath(new LocalPath(targetJarPath));
                     return false;
                 }
             }
@@ -171,7 +172,7 @@ public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
                     key => !key.Contains("META-INF", StringComparison.Ordinal)))
             {
                 zipOut.Dispose();
-                FileSystem.DeletePath(targetJarPath);
+                FileOps.DeletePath(new LocalPath(targetJarPath));
                 return false;
             }
 
@@ -184,7 +185,7 @@ public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
             zipOut?.Dispose();
             try
             {
-                FileSystem.DeletePath(targetJarPath);
+                FileOps.DeletePath(new LocalPath(targetJarPath));
             }
             catch (Exception cleanupException) when (cleanupException is IOException or UnauthorizedAccessException)
             {

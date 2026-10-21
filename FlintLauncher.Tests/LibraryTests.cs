@@ -2,10 +2,10 @@
 // Port of tests/Library_test.cpp (testdata in TestData/Libraries).
 
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 using Xunit;
+using TruePath;
 
 namespace FlintLauncher.Tests;
 
@@ -33,7 +33,7 @@ public class LibraryTests
     /// <summary>get absolute path to expected storage, assuming default cache prefix</summary>
     private List<string> GetStorage(string relative)
     {
-        return [FileSystem.PathCombine(_cache.GetBasePath("libraries"), relative)];
+        return [Path.Combine(_cache.GetBasePath("libraries"), relative)];
     }
 
     private static RuntimeContext DummyContext(string system = "linux", string arch = "64", string realArch = "amd64")
@@ -121,7 +121,7 @@ public class LibraryTests
 
         GetApplicableFiles(test, r, out var jar, out var native, out var native32, out var native64, _dataDir);
         Assert.Equal(
-            [FileSystem.PathCombine(_dataDir, "codecwav-20101023.jar")],
+            [Path.Combine(_dataDir, "codecwav-20101023.jar")],
             jar);
         Assert.Empty(native);
         Assert.Empty(native32);
@@ -232,12 +232,12 @@ public class LibraryTests
             GetApplicableFiles(test, r, out var jar, out var native, out var native32, out var native64, _dataDir);
             Assert.Empty(jar);
             Assert.Empty(native);
-            Assert.Equal([FileSystem.PathCombine(_dataDir, "testname-testversion-linux-32.jar")], native32);
-            Assert.Equal([FileSystem.PathCombine(_dataDir, "testname-testversion-linux-64.jar")], native64);
+            Assert.Equal([Path.Combine(_dataDir, "testname-testversion-linux-32.jar")], native32);
+            Assert.Equal([Path.Combine(_dataDir, "testname-testversion-linux-64.jar")], native64);
             var failedFiles = new List<string>();
             var dls = test.GetDownloads(r, _cache, failedFiles, _dataDir);
             Assert.Empty(dls);
-            Assert.Equal([FileSystem.PathCombine(_dataDir, "testname-testversion-linux-64.jar")], failedFiles);
+            Assert.Equal([Path.Combine(_dataDir, "testname-testversion-linux-64.jar")], failedFiles);
         }
     }
 
@@ -265,7 +265,7 @@ public class LibraryTests
         test.Hint = "local";
         {
             GetApplicableFiles(test, r, out var jar, out var native, out var native32, out var native64, _dataDir);
-            Assert.Equal([FileSystem.PathCombine(_dataDir, "codecwav-20101023.jar")], jar);
+            Assert.Equal([Path.Combine(_dataDir, "codecwav-20101023.jar")], jar);
             Assert.Empty(native);
             Assert.Empty(native32);
             Assert.Empty(native64);
@@ -287,7 +287,7 @@ public class LibraryTests
         test.Hint = "local";
         {
             GetApplicableFiles(test, r, out var jar, out var native, out var native32, out var native64, _dataDir);
-            Assert.Equal([FileSystem.PathCombine(_dataDir, "codecwav-20101023.jar")], jar);
+            Assert.Equal([Path.Combine(_dataDir, "codecwav-20101023.jar")], jar);
             Assert.Empty(native);
             Assert.Empty(native32);
             Assert.Empty(native64);

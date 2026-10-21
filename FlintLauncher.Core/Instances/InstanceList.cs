@@ -9,8 +9,8 @@
 //  - the QFileSystemWatcher glue (suspendWatch/resumeWatch/instanceDirContentsChanged and
 //    the m_watchLevel/m_dirty bookkeeping) — callers re-run LoadList() themselves;
 //  - the trash flow (trashInstance/trashedSomething/undoTrashInstance and the
-//    TrashHistoryItem stack): FS::trash needs desktop-shell integration which FileSystem.cs
-//    declares not ported. DeleteInstance (hard delete) is ported;
+//    TrashHistoryItem stack): FS::trash needs desktop-shell integration and is not ported.
+//    DeleteInstance (hard delete) is ported;
 //  - on_GroupStateChanged stays as <see cref="SetGroupCollapsed"/> because it persists the
 //    group view state — since the C8/S5 split into launcher-state.json ("hidden" is machine-
 //    local state now; the group file carries the group definitions only).
@@ -53,6 +53,7 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.State;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.Instances;
 
@@ -93,7 +94,7 @@ public class InstanceList
         foreach (var dir in instDirs)
         {
             // Create and normalize path (QDir::current().mkpath(dir))
-            FileSystem.EnsureFolderPathExists(dir);
+            FileOps.EnsureFolderPathExists(new LocalPath(dir));
             // NOTE: canonicalPath requires the path to exist. Do not move this above the creation block!
             var canonical = QDirCanonicalPath(dir);
             if (canonical.Length != 0 && !_instDirs.Contains(canonical))
@@ -567,7 +568,7 @@ public class InstanceList
             legacy.Add(paths.InstgroupsFile);
         }
 
-        legacy.Add(FileSystem.PathCombine(PrimaryDir(), "instgroups.json"));
+        legacy.Add(Path.Combine(PrimaryDir(), "instgroups.json"));
         return legacy;
     }
 
@@ -588,7 +589,7 @@ public class InstanceList
         _groups.RemoveMember(inst.Uuid);
         _groups.RemoveMember(inst.Id());
 
-        if (!FileSystem.DeletePath(inst.InstanceRoot()))
+        if (!FileOps.DeletePath(new LocalPath(inst.InstanceRoot())))
         {
             // qWarning: deletion not completely successful
             return;
@@ -630,8 +631,7 @@ public class InstanceList
             root = targetDir;
         }
 
-        var tempRoot = FileSystem.PathCombine(root, ".tmp");
-
+        var tempRoot = new LocalPath(root) / ".tmp";
         string result;
         var tries = 0;
         do
@@ -643,10 +643,10 @@ public class InstanceList
 
             // QUuid::createUuid().toString(QUuid::Id128).left(6)
             var key = Guid.NewGuid().ToString("N")[..6];
-            result = FileSystem.PathCombine(tempRoot, key);
+            result = (tempRoot / key).Value;
         } while (Directory.Exists(result) || File.Exists(result));
 
-        if (!FileSystem.EnsureFolderPathExists(result))
+        if (!FileOps.EnsureFolderPathExists(new LocalPath(result)))
         {
             return null;
         }
@@ -683,7 +683,7 @@ public class InstanceList
         }
         else
         {
-            instId = FileSystem.DirNameFromString(instanceTask.ModifiedName(), _instDirs);
+            instId = FileNaming.DirNameFromString(instanceTask.ModifiedName(), _instDirs.Select(dir => new LocalPath(dir)));
         }
 
         if (instId.Length == 0)
@@ -692,17 +692,17 @@ public class InstanceList
             return false;
         }
 
-        var destination = FileSystem.PathCombine(targetDir, instId);
+        var destination = Path.Combine(targetDir, instId);
 
         if (shouldOverride)
         {
             // FS::overrideFolder: merge-copy the staging folder over the destination
-            if (!FileSystem.EnsureFolderPathExists(destination))
+            if (!FileOps.EnsureFolderPathExists(new LocalPath(destination)))
             {
                 return false;
             }
 
-            if (!FileSystem.Copy(path, destination, overwrite: true))
+            if (!FileOps.Copy(new LocalPath(path), new LocalPath(destination), overwrite: true))
             {
                 // qWarning() << "Failed to override" << path << "to" << destination
                 return false;
@@ -710,7 +710,7 @@ public class InstanceList
         }
         else
         {
-            if (!FileSystem.Move(path, destination))
+            if (!FileOps.Move(new LocalPath(path), new LocalPath(destination)))
             {
                 // qWarning() << "Failed to move" << path << "to" << destination
                 return false;
@@ -753,7 +753,7 @@ public class InstanceList
                 continue;
             }
 
-            FileSystem.EnsureFolderPathExists(dir);
+            FileOps.EnsureFolderPathExists(new LocalPath(dir));
             var canonical = QDirCanonicalPath(dir);
             if (canonical.Length != 0 && !newDirs.Contains(canonical))
             {
@@ -807,8 +807,8 @@ public class InstanceList
                 // D4 dual-track discovery: a Flint-format directory carries instance.json,
                 // a Prism-format one instance.cfg — both are instances (the cfg stays
                 // read-only until the instance's first write converts it)
-                if (!File.Exists(FileSystem.PathCombine(subDir, "instance.json")) &&
-                    !File.Exists(FileSystem.PathCombine(subDir, "instance.cfg")))
+                if (!File.Exists(Path.Combine(subDir, "instance.json")) &&
+                    !File.Exists(Path.Combine(subDir, "instance.cfg")))
                 {
                     continue;
                 }
@@ -858,7 +858,7 @@ public class InstanceList
                           throw new InvalidOperationException(
                               "InstanceList.Environment (the typed instance.json stack) must be stamped before LoadList.");
 
-        var instanceRoot = FileSystem.PathCombine(RootDirOf(id), id);
+        var instanceRoot = Path.Combine(RootDirOf(id), id);
         // the typed layer stack (D4): instance.json when present (Flint format), otherwise
         // the read-only instance.cfg import in memory — no write happens on discovery
         var instanceSettings = new InstanceJsonSettingsObject(instanceRoot, environment);
@@ -918,10 +918,10 @@ public class InstanceList
     {
         try
         {
-            var jsonPath = FileSystem.PathCombine(instanceRoot, "instance.json");
+            var jsonPath = Path.Combine(instanceRoot, "instance.json");
             if (File.Exists(jsonPath))
             {
-                using var doc = JsonDocument.Parse(FileSystem.Read(jsonPath));
+                using var doc = JsonDocument.Parse(File.ReadAllBytes(jsonPath));
                 if (doc.RootElement.ValueKind == JsonValueKind.Object &&
                     doc.RootElement.TryGetProperty("identity", out var identity) &&
                     identity.ValueKind == JsonValueKind.Object &&
@@ -934,15 +934,14 @@ public class InstanceList
                 return "";
             }
 
-            var cfgPath = FileSystem.PathCombine(instanceRoot, InstanceIniImporter.LegacyFileName);
+            var cfgPath = Path.Combine(instanceRoot, InstanceIniImporter.LegacyFileName);
             if (File.Exists(cfgPath))
             {
                 var ini = new IniFile();
                 return ini.LoadFile(cfgPath) ? ini.GetString("uuid", "") : "";
             }
         }
-        catch (Exception e) when (e is JsonException or FileSystemException or IOException
-                                      or UnauthorizedAccessException)
+        catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
         {
             // a broken commit payload simply loses its group assignment until the next load
         }
@@ -1059,12 +1058,12 @@ public class InstanceList
 
             if (child.State == TaskState.AbortedByUser)
             {
-                FileSystem.DeletePath(_stagingPath);
+                FileOps.DeletePath(new LocalPath(_stagingPath));
                 EmitAborted();
                 return;
             }
 
-            FileSystem.DeletePath(_stagingPath);
+            FileOps.DeletePath(new LocalPath(_stagingPath));
             EmitFailed(child.FailReason);
         }
 

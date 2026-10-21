@@ -22,6 +22,7 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
+using TruePath;
 
 namespace FlintLauncher.Web.Endpoints;
 
@@ -219,7 +220,7 @@ public static class TechnicEndpoints
                 var wrapped = runtime.Instances.WrapInstanceTask(task);
                 // compute the expected id BEFORE running the task: after the commit the
                 // directory already exists and DirNameFromString would return "<name>(1)"
-                var expectedId = FileSystem.DirNameFromString(task.Name(), runtime.Instances.PrimaryDir());
+                var expectedId = FileNaming.DirNameFromString(task.Name(), new LocalPath(runtime.Instances.PrimaryDir()));
                 await wrapped.StartAsync();
                 if (!wrapped.WasSuccessful)
                 {

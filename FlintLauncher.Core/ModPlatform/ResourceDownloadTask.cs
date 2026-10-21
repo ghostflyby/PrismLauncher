@@ -17,13 +17,13 @@
 
 using System.Security.Cryptography;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Dependencies;
 using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform;
 
@@ -65,7 +65,7 @@ public class ResourceDownloadTask : SequentialTask
         EmitStatus($"Downloading resource:\n{_packVersion.DownloadUrl}");
 
         var action = modrinth1.MakeFileRequest(_packVersion.DownloadUrl,
-            FileSystem.PathCombine(_packModel.Dir, GetFilename()),
+            Path.Combine(_packModel.Dir, GetFilename()),
             CreateModrinthMeta(instance, downloadReason, dependentOn));
         if (_packVersion.HashType.Length != 0 && _packVersion.Hash.Length != 0)
         {

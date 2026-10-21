@@ -4,6 +4,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Core.Net;
 
@@ -27,7 +28,7 @@ public class FileSink(string filename) : Sink
             return false;
         }
 
-        if (!FileSystem.EnsureFilePathExists(filename))
+        if (!FileOps.EnsureFilePathExists(new LocalPath(filename)))
         {
             FailReason = "Could not create folder for " + filename;
             return false;

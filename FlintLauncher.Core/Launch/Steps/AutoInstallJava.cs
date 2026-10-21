@@ -27,6 +27,7 @@ using FlintLauncher.Core.Java.Download;
 using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 using Index = FlintLauncher.Core.Meta.Index;
 
 namespace FlintLauncher.Core.Launch.Steps;
@@ -112,8 +113,8 @@ public sealed class AutoInstallJava : LaunchStep
         }
 
         var javaDir = Services.JavaRoot;
-        var relativeBinary = FileSystem.PathCombine(wantedJavaName, "bin", JavaUtils.JavaExecutable);
-        var wantedJavaPath = FileSystem.PathCombine(javaDir, relativeBinary);
+        var relativeBinary = Path.Combine(wantedJavaName, "bin", JavaUtils.JavaExecutable);
+        var wantedJavaPath = Path.Combine(javaDir, relativeBinary);
         if (File.Exists(wantedJavaPath) || Directory.Exists(wantedJavaPath))
         {
             SetJavaPathFromPartial();
@@ -157,8 +158,8 @@ public sealed class AutoInstallJava : LaunchStep
         // just checking if the executable is there should suffice
         // but if needed this can be achieved through refreshing the javalist
         // and retrieving the path that contains the java name
-        var relativeBinary = FileSystem.PathCombine(javaName, "bin", JavaUtils.JavaExecutable);
-        var finalPath = FileSystem.PathCombine(javaDir, relativeBinary);
+        var relativeBinary = Path.Combine(javaName, "bin", JavaUtils.JavaExecutable);
+        var finalPath = Path.Combine(javaDir, relativeBinary);
         if (File.Exists(finalPath))
         {
             SetJavaPath(finalPath);
@@ -179,7 +180,7 @@ public sealed class AutoInstallJava : LaunchStep
             if (java.RuntimeOs == _supportedArch && java.Name == javaName)
             {
                 var javaDir = Services.JavaRoot;
-                var finalPath = FileSystem.PathCombine(javaDir, java.Name);
+                var finalPath = Path.Combine(javaDir, java.Name);
                 switch (java.DownloadType)
                 {
                     case JavaDownloadType.Manifest:
@@ -194,7 +195,7 @@ public sealed class AutoInstallJava : LaunchStep
                         {
                             if (Directory.Exists(finalPath) || File.Exists(finalPath))
                             {
-                                FileSystem.DeletePath(finalPath);
+                                FileOps.DeletePath(new LocalPath(finalPath));
                             }
                         }
                         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }

@@ -10,6 +10,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
+using TruePath;
 
 namespace FlintLauncher.Web.Endpoints;
 
@@ -125,7 +126,7 @@ public static class InstanceEndpoints
                 // the commit derives the folder from the display name: compute the expected
                 // id BEFORE running the task (after the commit the directory already exists
                 // and DirNameFromString would return "<name>(1)")
-                var expectedId = FileSystem.DirNameFromString(request.Name, runtime.Instances.PrimaryDir());
+                var expectedId = FileNaming.DirNameFromString(request.Name, new LocalPath(runtime.Instances.PrimaryDir()));
                 await wrapped.StartAsync();
                 if (!wrapped.WasSuccessful)
                 {

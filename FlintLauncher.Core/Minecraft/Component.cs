@@ -18,6 +18,7 @@ using System.Text;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Net;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft;
 
@@ -397,7 +398,7 @@ public class Component : ProblemProvider
         }
 
         var filename = GetFilename();
-        if (!FileSystem.EnsureFilePathExists(filename))
+        if (!FileOps.EnsureFilePathExists(new LocalPath(filename)))
         {
             return false;
         }
@@ -411,7 +412,7 @@ public class Component : ProblemProvider
                 return false;
             }
 
-            FileSystem.Write(filename, Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(vfile)));
+            FileOps.Write(new LocalPath(filename), Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(vfile)));
             File = vfile;
             MetaVersion = null;
             EmitDataChanged();
@@ -438,7 +439,7 @@ public class Component : ProblemProvider
         // just kill the file and reload
         if (System.IO.File.Exists(filename))
         {
-            result = FileSystem.DeletePath(filename);
+            result = FileOps.DeletePath(new LocalPath(filename));
         }
 
         if (result)

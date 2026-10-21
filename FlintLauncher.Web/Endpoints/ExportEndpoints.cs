@@ -16,6 +16,7 @@ using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
 using FlintLauncher.Web.Services;
+using TruePath;
 
 namespace FlintLauncher.Web.Endpoints;
 
@@ -65,7 +66,7 @@ public static class ExportEndpoints
                 Directory.CreateDirectory(instanceRoot);
                 // DirNameFromString strips characters that are invalid in paths (like the
                 // C++ export file-name suggestion)
-                var baseName = FileSystem.DirNameFromString($"{name}-{versionId}", instanceRoot);
+                var baseName = FileNaming.DirNameFromString($"{name}-{versionId}", new LocalPath(instanceRoot));
                 var extension = format switch
                 {
                     "modrinth" => "mrpack",

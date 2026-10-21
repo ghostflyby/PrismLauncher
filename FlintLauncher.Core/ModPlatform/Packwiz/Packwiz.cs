@@ -15,6 +15,7 @@ using System.Text;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Versioning;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.Packwiz;
 
@@ -136,7 +137,7 @@ public static class Packwiz
         }
         else
         {
-            FileSystem.EnsureFilePathExists(normalizedPath);
+            FileOps.EnsureFilePathExists(new LocalPath(normalizedPath));
         }
 
         string update;

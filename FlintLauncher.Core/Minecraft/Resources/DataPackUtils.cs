@@ -21,8 +21,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
 
@@ -63,7 +63,7 @@ public static class DataPackUtils
             return false; // the mcmeta is not optional
         }
 
-        var mcmetaFileInfo = new FileInfo(FileSystem.PathCombine(pack.Fileinfo.FullName, "pack.mcmeta"));
+        var mcmetaFileInfo = new FileInfo(Path.Combine(pack.Fileinfo.FullName, "pack.mcmeta"));
         if (mcmetaFileInfo.Exists && !mcmetaFileInfo.Attributes.HasFlag(FileAttributes.Directory))
         {
             string data;
@@ -99,7 +99,7 @@ public static class DataPackUtils
             return true; // the png is optional
         }
 
-        var imageFileInfo = new FileInfo(FileSystem.PathCombine(pack.Fileinfo.FullName, "pack.png"));
+        var imageFileInfo = new FileInfo(Path.Combine(pack.Fileinfo.FullName, "pack.png"));
         if (imageFileInfo.Exists && !imageFileInfo.Attributes.HasFlag(FileAttributes.Directory))
         {
             byte[] data;
@@ -352,7 +352,7 @@ public static class DataPackUtils
         {
             case ResourceType.Folder:
             {
-                var imageFileInfo = new FileInfo(FileSystem.PathCombine(pack.Fileinfo.FullName, "pack.png"));
+                var imageFileInfo = new FileInfo(Path.Combine(pack.Fileinfo.FullName, "pack.png"));
                 if (imageFileInfo.Exists && !imageFileInfo.Attributes.HasFlag(FileAttributes.Directory))
                 {
                     byte[] data;

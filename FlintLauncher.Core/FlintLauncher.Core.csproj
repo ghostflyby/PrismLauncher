@@ -42,6 +42,7 @@
     <!-- JVM enumeration (Apache-2.0, GPL-3.0-compatible): the provider suite backs the
          first discovery layer in JavaUtils.FindJavaPaths. -->
     <PackageReference Include="JdkFind" Version="0.4.0"/>
+    <PackageReference Include="TruePath" Version="1.12.0"/>
   </ItemGroup>
 
   <Target Name="NewLaunchJar" Inputs="@(NewLaunchSource)" Outputs="$(JarOutputDir)NewLaunch.jar" Condition="'$(FlintSkipJarBuild)' != 'true'">

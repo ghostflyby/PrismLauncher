@@ -19,6 +19,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform;
 
@@ -385,7 +386,7 @@ public sealed class EnsureMetadataTask(
         }
 
         // LocalResourceUpdateTask: ensure a '.index' folder exists in the mods folder
-        if (!FileSystem.EnsureFolderPathExists(indexDir))
+        if (!FileOps.EnsureFolderPathExists(new LocalPath(indexDir)))
         {
             EmitMetadataFailed(resource, $"Unable to create index directory at {indexDir}!");
             return;

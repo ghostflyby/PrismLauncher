@@ -13,6 +13,7 @@
 // generation and the file watching — the API serves the stored data and the texture files.
 
 using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Core.Skins;
 
@@ -65,7 +66,7 @@ public sealed class SkinsLibrary
         }
 
         var dir = _skinsDir();
-        if (!FileSystem.EnsureFolderPathExists(dir))
+        if (!FileOps.EnsureFolderPathExists(new LocalPath(dir)))
         {
             return false;
         }

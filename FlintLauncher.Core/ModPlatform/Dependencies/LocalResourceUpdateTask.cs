@@ -15,6 +15,7 @@
 
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.Dependencies;
 
@@ -36,7 +37,7 @@ public sealed class LocalResourceUpdateTask(
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         // Ensure a '.index' folder exists in the mods folder, and create it if it does not
-        if (!FileSystem.EnsureFolderPathExists(indexDir))
+        if (!FileOps.EnsureFolderPathExists(new LocalPath(indexDir)))
         {
             EmitFailed($"Unable to create index directory at {indexDir}!");
             return Task.CompletedTask;

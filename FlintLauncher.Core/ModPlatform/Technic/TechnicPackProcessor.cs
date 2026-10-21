@@ -18,10 +18,10 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Settings;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.Technic;
 
@@ -40,7 +40,7 @@ public static class TechnicPackProcessor
         CancellationToken cancellationToken = default)
     {
         _ = isSolder; // (unused upstream too)
-        var minecraftPath = FileSystem.PathCombine(stagingPath, "minecraft");
+        var minecraftPath = new LocalPath(stagingPath) / "minecraft";
         // D4: the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
             new InstanceJsonSettingsObject(stagingPath, environment), stagingPath);
@@ -57,8 +57,8 @@ public static class TechnicPackProcessor
 
         string data;
 
-        var modpackJar = FileSystem.PathCombine(minecraftPath, "bin", "modpack.jar");
-        var versionJson = FileSystem.PathCombine(minecraftPath, "bin", "version.json");
+        var modpackJar = (minecraftPath / "bin" / "modpack.jar").Value;
+        var versionJson = (minecraftPath / "bin" / "version.json").Value;
         var fmlMinecraftVersion = "";
         if (File.Exists(modpackJar))
         {
@@ -148,7 +148,7 @@ public static class TechnicPackProcessor
         {
             try
             {
-                data = Encoding.UTF8.GetString(FileSystem.Read(versionJson));
+                data = Encoding.UTF8.GetString(File.ReadAllBytes(versionJson));
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {

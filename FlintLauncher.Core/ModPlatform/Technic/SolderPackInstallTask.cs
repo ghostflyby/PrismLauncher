@@ -12,6 +12,7 @@ using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.Technic;
 
@@ -105,8 +106,8 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
     private async Task DownloadSucceeded(string outputDir, int modCount, CancellationToken cancellationToken)
     {
         EmitStatus("Extracting modpack");
-        var extractDir = FileSystem.PathCombine(StagingPath, "minecraft");
-        FileSystem.EnsureFolderPathExists(extractDir);
+        var extractDir = Path.Combine(StagingPath, "minecraft");
+        FileOps.EnsureFolderPathExists(new LocalPath(extractDir));
 
         var i = 0;
         while (modCount > i)

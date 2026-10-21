@@ -357,7 +357,7 @@ public static partial class OneSixVersionFormat
             CompatibleJavaName = mojangHalf.CompatibleJavaName,
         };
 
-    /// <summary>The serialized patch text for the FileSystem.Write call sites (the former
+    /// <summary>The serialized patch text for the FileOps.Write call sites (the former
     /// QtJson.ToIndentedString(VersionFileToJson(...)) + "\n"; the typed write shape is
     /// standard indented JSON).</summary>
     internal static string SerializeVersionFile(VersionFile patch)

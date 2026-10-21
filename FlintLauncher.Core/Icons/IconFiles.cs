@@ -13,6 +13,7 @@
 //    bool. Like QFile::copy, it does not overwrite an existing target.
 
 using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Core.Icons;
 
@@ -145,12 +146,12 @@ public static class IconFiles
             return false;
         }
 
-        if (!FileSystem.EnsureFolderPathExists(iconsDir))
+        if (!FileOps.EnsureFolderPathExists(new LocalPath(iconsDir)))
         {
             return false;
         }
 
-        var target = FileSystem.PathCombine(iconsDir, name.Length == 0 ? Path.GetFileName(file) : name);
+        var target = Path.Combine(iconsDir, name.Length == 0 ? Path.GetFileName(file) : name);
         try
         {
             File.Copy(file, target, overwrite: false);
@@ -192,7 +193,7 @@ public static class IconFiles
     public static bool DeleteIcon(string iconsDir, string key)
     {
         var file = GetIconFile(iconsDir, key);
-        return file.Length != 0 && FileSystem.DeletePath(file);
+        return file.Length != 0 && FileOps.DeletePath(new LocalPath(file));
     }
 
     // ------------------------------------------------------------------------ helpers

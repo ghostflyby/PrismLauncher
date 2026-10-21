@@ -3,8 +3,8 @@
 // patches is applied to. The Qt model/ProblemProvider plumbing is kept; only the UI-facing
 // getProblems() FIXME (always empty upstream as well) stays as-is.
 
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Versioning;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft;
 
@@ -352,7 +352,7 @@ public class LaunchProfile : ProblemProvider
             // FIXME: HACK!! jar modding is weird and unsystematic!
             if (_jarMods.Count != 0 && addJarMods)
             {
-                jars.Add(Path.GetFullPath(FileSystem.PathCombine(tempPath, "minecraft.jar")));
+                jars.Add(Path.GetFullPath(Path.Combine(tempPath, "minecraft.jar")));
             }
             else
             {

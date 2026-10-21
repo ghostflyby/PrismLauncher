@@ -7,8 +7,8 @@
 // Linux "share/<launcher name>" variant) next to the application directory — the jars are
 // build outputs produced by the BuildJavaJars MSBuild target (javac/jar via Exec) and are NOT committed.
 
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Java;
+using TruePath;
 
 namespace FlintLauncher.Core.Launch;
 
@@ -30,17 +30,16 @@ public static class LauncherJars
         var potentialPaths = new List<string>();
         if (OperatingSystem.IsLinux() || OperatingSystem.IsFreeBSD())
         {
-            potentialPaths.Add(FileSystem.PathCombine(root, "share",
-                FlintConfig.Default.LauncherName));
+            potentialPaths.Add(Path.Combine(root, "share", FlintConfig.Default.LauncherName));
         }
 
-        potentialPaths.Add(FileSystem.PathCombine(root, "jars"));
-        potentialPaths.Add(FileSystem.PathCombine(AppContext.BaseDirectory, "jars"));
-        potentialPaths.Add(FileSystem.PathCombine(AppContext.BaseDirectory, "..", "jars")); // from inside build dir, for debugging
+        potentialPaths.Add(Path.Combine(root, "jars"));
+        potentialPaths.Add(Path.Combine(AppContext.BaseDirectory, "jars"));
+        potentialPaths.Add(Path.Combine(AppContext.BaseDirectory, "..", "jars")); // from inside build dir, for debugging
 
         foreach (var p in potentialPaths)
         {
-            var jarPath = FileSystem.PathCombine(p, jarFile);
+            var jarPath = Path.Combine(p, jarFile);
             if (File.Exists(jarPath))
             {
                 return jarPath;

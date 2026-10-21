@@ -7,7 +7,7 @@
 //    use the same completeBaseName() rule (everything up to the last '.').
 //  - The QJsonParseError line/column scan is replaced by the line info carried by
 //    System.Text.Json's JsonException (message texts differ).
-//  - saveJsonFile() writes through the atomic FileSystem.Write (QSaveFile equivalent).
+//  - saveJsonFile() writes through the atomic FileOps.Write (QSaveFile equivalent).
 //  - writeOverrideOrders() is declared in the C++ header but has no definition anywhere in
 //    this checkout; it is not ported (dead declaration upstream).
 
@@ -16,7 +16,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Json;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft;
 
@@ -148,12 +148,12 @@ public static class ProfileUtils
     {
         try
         {
-            FileSystem.Write(filename,
+            FileOps.Write(new LocalPath(filename),
                 Encoding.UTF8.GetBytes(
                     JsonSerializer.Serialize(doc, VersionFormatJsonContext.Default.VersionFileOutJson)));
             return true;
         }
-        catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                       or NotSupportedException)
         {
             // qWarning() << "Couldn't open/save" << filename

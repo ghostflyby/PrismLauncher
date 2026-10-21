@@ -21,6 +21,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Core.Skins;
 
@@ -124,7 +125,7 @@ public static class SkinListStore
 
         try
         {
-            var root = JsonSerializer.Deserialize(FileSystem.Read(manifestPath), SkinJsonContext.Default.SkinIndexJson);
+            var root = JsonSerializer.Deserialize(File.ReadAllBytes(manifestPath), SkinJsonContext.Default.SkinIndexJson);
             foreach (var entry in root?.Skins ?? [])
             {
                 var model = SkinModel.FromWire(skinsDir, entry);
@@ -148,7 +149,7 @@ public static class SkinListStore
         {
             Skins = skins.Select(skin => skin.ToWire()).ToArray(),
         };
-        FileSystem.Write(Path.Combine(skinsDir, "index.json"),
+        FileOps.Write(new LocalPath(Path.Combine(skinsDir, "index.json")),
             JsonSerializer.SerializeToUtf8Bytes(doc, SkinJsonContext.Default.SkinIndexJson));
     }
 

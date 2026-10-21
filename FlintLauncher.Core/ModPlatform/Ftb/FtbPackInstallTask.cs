@@ -20,6 +20,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Net;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.Ftb;
 
@@ -253,7 +254,7 @@ public sealed class FtbPackInstallTask(
         }
 
         // install any jar mods
-        var jarModsDir = FileSystem.PathCombine(StagingPath, "minecraft", "jarmods");
+        var jarModsDir = Path.Combine(StagingPath, "minecraft", "jarmods");
         if (Directory.Exists(jarModsDir))
         {
             var jarMods = Directory.EnumerateFiles(jarModsDir).ToList();
@@ -286,7 +287,7 @@ public sealed class FtbPackInstallTask(
                 continue;
             }
 
-            var path = FileSystem.PathCombine(StagingPath, ".minecraft", file.Path, file.Name);
+            var path = Path.Combine(StagingPath, ".minecraft", file.Path, file.Name);
 
             var dl = NetRequest.MakeFile(new Uri(file.Url), path);
             if (file.Sha1.Length != 0)
@@ -334,11 +335,10 @@ public sealed class FtbPackInstallTask(
                 continue;
             }
 
-            var destPath = FileSystem.PathCombine(StagingPath, ".minecraft", mod.TargetFolder, mod.Name);
-
+            var destPath = new LocalPath(StagingPath) / ".minecraft" / mod.TargetFolder / mod.Name;
             EmitStatus($"Copying Blocked Mods ({i} out of {total} are done)");
 
-            if (!FileSystem.Copy(mod.LocalPath, destPath))
+            if (!FileOps.Copy(new LocalPath(mod.LocalPath), destPath))
             {
                 // (the C++ only logs the failure)
             }

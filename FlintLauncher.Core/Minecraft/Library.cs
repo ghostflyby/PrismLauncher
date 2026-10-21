@@ -16,6 +16,7 @@
 using System.Security.Cryptography;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft;
 
@@ -199,12 +200,12 @@ public class Library
 
         string ActualPath(string relPath)
         {
-            relPath = FileSystem.RemoveInvalidPathChars(relPath);
-            var outPath = FileSystem.PathCombine(StoragePrefix(), relPath);
+            relPath = FileNaming.RemoveInvalidPathChars(relPath);
+            var outPath = Path.Combine(StoragePrefix(), relPath);
             if (local && overridePath.Length != 0)
             {
                 var fileName = Path.GetFileName(outPath);
-                return Path.GetFullPath(FileSystem.PathCombine(overridePath, fileName));
+                return Path.GetFullPath(Path.Combine(overridePath, fileName));
             }
 
             // the default prefix is the C++-era relative "libraries/", which anchored on
@@ -213,7 +214,7 @@ public class Library
             // storage base (the store root, E2) — never on the process CWD
             if (!Path.IsPathRooted(outPath) && storageBase.Length != 0)
             {
-                outPath = FileSystem.PathCombine(storageBase, outPath);
+                outPath = Path.Combine(storageBase, outPath);
             }
 
             return Path.GetFullPath(outPath);
@@ -258,7 +259,7 @@ public class Library
         void CheckLocalFile(string storage)
         {
             var fileName = Path.GetFileName(storage);
-            var fullPath = FileSystem.PathCombine(overridePath, fileName);
+            var fullPath = Path.Combine(overridePath, fileName);
             if (!File.Exists(fullPath))
             {
                 failedLocalFiles.Add(fullPath);

@@ -22,6 +22,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.State;
+using TruePath;
 
 namespace FlintLauncher.Core.Instances;
 
@@ -383,9 +384,9 @@ public sealed class InstanceGroupModel
         byte[] jsonData;
         try
         {
-            jsonData = FileSystem.Read(groupFileName);
+            jsonData = File.ReadAllBytes(groupFileName);
         }
-        catch (FileSystemException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException)
         {
             // qCritical: failed to read instance group file
             return false;
@@ -577,11 +578,11 @@ public sealed class InstanceGroupModel
         var toplevel = new GroupFileJson(GroupFormatVersion, groups, null);
         try
         {
-            FileSystem.Write(groupFileName,
+            FileOps.Write(new LocalPath(groupFileName),
                 JsonSerializer.SerializeToUtf8Bytes(toplevel, GroupJsonContext.Default.GroupFileJson));
             return true;
         }
-        catch (Exception e) when (e is FileSystemException or IOException or UnauthorizedAccessException
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                       or NotSupportedException)
         {
             // qCritical: failed to write instance group file — reported to the G4 ordering
@@ -622,10 +623,10 @@ public sealed class InstanceGroupModel
                     group => group.Key,
                     group => group.Value with { Hidden = null }, StringComparer.Ordinal),
                 ungrouped);
-            FileSystem.Write(groupFileName,
+            FileOps.Write(new LocalPath(groupFileName),
                 JsonSerializer.SerializeToUtf8Bytes(stripped, GroupJsonContext.Default.GroupFileJson));
         }
-        catch (Exception e) when (e is JsonException or FileSystemException or IOException
+        catch (Exception e) when (e is JsonException or IOException
                                       or UnauthorizedAccessException or NotSupportedException)
         {
             // best-effort — see the summary

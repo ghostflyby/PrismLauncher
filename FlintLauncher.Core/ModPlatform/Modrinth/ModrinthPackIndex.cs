@@ -191,7 +191,7 @@ public static class ModrinthPackIndex
         {
             file.DownloadUrl = ModrinthRequire.String(parent.Url, "url");
             var fileName = ModrinthRequire.String(parent.Filename, "filename");
-            file.FileName = FileSystem.RemoveInvalidPathChars(fileName);
+            file.FileName = FileNaming.RemoveInvalidPathChars(fileName);
             file.IsPreferred = ModrinthRequire.Boolean(parent.Primary, "primary") || fileCount == 1;
             var hashList = ModrinthRequire.Object(parent.Hashes, "hashes");
 

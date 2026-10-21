@@ -25,6 +25,7 @@
 using System.IO.Compression;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Nbt;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.Worlds;
 
@@ -237,7 +238,7 @@ public sealed class World
         try
         {
             // putLevelDatDataToFS: gzip the rewritten NBT and save atomically (PSaveFile).
-            FileSystem.Write(levelDatPath, NbtIo.WriteCompoundGzip(worldData));
+            FileOps.Write(new LocalPath(levelDatPath), NbtIo.WriteCompoundGzip(worldData));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException)
         {
@@ -247,8 +248,8 @@ public sealed class World
         Name = newName;
 
         var parentDir = Path.GetDirectoryName(ContainerPath) ?? ".";
-        var dirName = FileSystem.DirNameFromString(Name, parentDir);
-        var targetPath = FileSystem.PathCombine(parentDir, dirName);
+        var dirName = FileNaming.DirNameFromString(Name, new LocalPath(parentDir));
+        var targetPath = Path.Combine(parentDir, dirName);
         if (!string.Equals(Path.GetFullPath(targetPath), Path.GetFullPath(ContainerPath), StringComparison.Ordinal))
         {
             try
@@ -280,8 +281,8 @@ public sealed class World
             LoadMetadata();
         }
 
-        var finalPath = FileSystem.PathCombine(to, FileSystem.DirNameFromString(Name, to));
-        if (!FileSystem.EnsureFolderPathExists(finalPath))
+        var finalPath = Path.Combine(to, FileNaming.DirNameFromString(Name, new LocalPath(to)));
+        if (!FileOps.EnsureFolderPathExists(new LocalPath(finalPath)))
         {
             return false;
         }
@@ -296,7 +297,7 @@ public sealed class World
         }
         else if (Directory.Exists(ContainerPath))
         {
-            ok = FileSystem.Copy(ContainerPath, finalPath);
+            ok = FileOps.Copy(new LocalPath(ContainerPath), new LocalPath(finalPath));
         }
         else
         {
@@ -329,7 +330,7 @@ public sealed class World
             return false;
         }
 
-        var success = FileSystem.Copy(with.ContainerPath, targetDir);
+        var success = FileOps.Copy(new LocalPath(with.ContainerPath), new LocalPath(targetDir));
         if (success)
         {
             FolderName = with.FolderName;
@@ -347,7 +348,7 @@ public sealed class World
         }
 
         // FS::trash is not available in the ported core; delete directly instead.
-        return FileSystem.DeletePath(ContainerPath);
+        return FileOps.DeletePath(new LocalPath(ContainerPath));
     }
 
     /// <summary>Port of World::setSize.</summary>
@@ -508,7 +509,7 @@ public sealed class World
     /// <summary>Port of getDatDataFromFS: the contents of <paramref name="file"/> inside the world dir, or null.</summary>
     private static byte[]? GetDatDataFromFs(string root, string file)
     {
-        var fullFilePath = FileSystem.PathCombine(root, file);
+        var fullFilePath = Path.Combine(root, file);
         if (!File.Exists(fullFilePath))
         {
             return null;

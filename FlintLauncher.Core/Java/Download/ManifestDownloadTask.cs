@@ -16,6 +16,7 @@ using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.Java.Download;
 
@@ -86,7 +87,7 @@ public sealed class ManifestDownloadTask(Uri url, string finalPath, string check
     private async Task DownloadJava(JavaRuntimeManifestJson manifest, CancellationToken cancellationToken)
     {
         // valid json doc, begin making jre spot
-        FileSystem.EnsureFolderPathExists(finalPath);
+        FileOps.EnsureFolderPathExists(new LocalPath(finalPath));
         var toDownload = new List<ManifestFile>();
         if (manifest.Files is { } list)
         {
@@ -97,12 +98,12 @@ public sealed class ManifestDownloadTask(Uri url, string finalPath, string check
                     continue; // toObject() on a non-object yields an empty object with no type
                 }
 
-                var file = FileSystem.PathCombine(finalPath, paths);
+                var file = Path.Combine(finalPath, paths);
 
                 var type = meta.Type ?? "";
                 if (type == "directory")
                 {
-                    FileSystem.EnsureFolderPathExists(file);
+                    FileOps.EnsureFolderPathExists(new LocalPath(file));
                 }
                 else if (type == "link")
                 {
@@ -190,7 +191,7 @@ public sealed class ManifestDownloadTask(Uri url, string finalPath, string check
                 return;
             }
 
-            FileSystem.EnsureFilePathExists(linkPath);
+            FileOps.EnsureFilePathExists(new LocalPath(linkPath));
             if (!OperatingSystem.IsWindows())
             {
                 File.CreateSymbolicLink(linkPath, target);
