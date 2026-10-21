@@ -89,11 +89,11 @@ public sealed class SkinModel
 
     public string Path = "";
 
-    public string CapeId { get; set; } = "";
+    public string CapeId { get; init; } = "";
 
-    public SkinModelKind Model { get; set; } = SkinModelKind.Classic;
+    public SkinModelKind Model { get; init; } = SkinModelKind.Classic;
 
-    public string Url { get; set; } = "";
+    public string Url { get; init; } = "";
 
     /// <summary>QFileInfo::completeBaseName of the path.</summary>
     public string Name()

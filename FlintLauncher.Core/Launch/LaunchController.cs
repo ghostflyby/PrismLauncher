@@ -63,27 +63,27 @@ public class LaunchController : FlintTask
     /// its diagnostics logger from <see cref="LaunchServices.LoggerFactory"/> and hands the
     /// services down to the LaunchTask it builds. Null keeps the headless defaults (null
     /// decides like the former unset hooks).</summary>
-    public LaunchServices? Services { get; set; }
+    public LaunchServices? Services { get; init; }
 
     /// <summary>Diagnostics logger (flint.controller category). Resolved per call from the
     /// injected factory; null/unset or disposed factories degrade to silence.</summary>
     private ILogger Log => Diagnostics.Log.For(Services?.LoggerFactory, LogCategories.Controller);
 
-    public MinecraftInstance? Instance { get; set; }
+    public MinecraftInstance? Instance { get; init; }
 
-    public LaunchMode WantedLaunchMode { get; set; } = LaunchMode.Normal;
+    public LaunchMode WantedLaunchMode { get; init; } = LaunchMode.Normal;
 
     /// <summary>The offline/demo player name (C++ setOfflineName() + the offline-name dialog).</summary>
-    public string OfflineName { get; set; } = "";
+    public string OfflineName { get; init; } = "";
 
     /// <summary>C++ setAccountToUse(): pin the account instead of the decideAccount() lookup.</summary>
     public MinecraftAccount? AccountToUse { get; set; }
 
     /// <summary>C++ APPLICATION->accounts(); null behaves like an empty account list.</summary>
-    public Func<AccountList?>? AccountsProvider { get; set; }
+    public Func<AccountList?>? AccountsProvider { get; init; }
 
     /// <summary>C++ setTargetToJoin(): join this server/world instead of the instance setting.</summary>
-    public MinecraftTarget? TargetToJoin { get; set; }
+    public MinecraftTarget? TargetToJoin { get; init; }
 
     /// <summary>The launch mode the session ended up with (decideLaunchMode result).</summary>
     public LaunchMode ActualLaunchMode => _actualLaunchMode;
@@ -98,14 +98,14 @@ public class LaunchController : FlintTask
     /// returns the chosen name, or null when cancelled. Unset uses <see cref="OfflineName"/>
     /// (or the suggested name when that is empty) and never cancels.
     /// </summary>
-    public Func<string, string, string, string?>? AskOfflineNameHandler { get; set; }
+    public Func<string, string, string, string?>? AskOfflineNameHandler { get; init; }
 
     /// <summary>
     /// Whether ReadyForLaunch is answered with Proceed() automatically (the profiler-less
     /// default). Turn this off to gate the launch from the API; the consumer then subscribes
     /// to <see cref="Launch.LaunchTask.ReadyForLaunch"/> and calls Proceed() itself.
     /// </summary>
-    public bool AutoProceed { get; set; } = true;
+    public bool AutoProceed { get; init; } = true;
 
     // ------------------------------------------------------------------ Task (executeTask)
 

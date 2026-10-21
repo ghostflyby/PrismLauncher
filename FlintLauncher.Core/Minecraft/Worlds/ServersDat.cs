@@ -38,7 +38,7 @@ public sealed class ServerEntry
     public AcceptsTextures AcceptsTextures { get; set; } = AcceptsTextures.Ask;
 
     /// <summary>Decoded server icon bytes (Server::m_icon); null when absent.</summary>
-    public byte[]? Icon { get; set; }
+    public byte[]? Icon { get; init; }
 
     public ServerEntry() { }
 

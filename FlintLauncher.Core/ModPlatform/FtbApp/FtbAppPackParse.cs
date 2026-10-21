@@ -66,7 +66,7 @@ internal sealed partial class FtbAppJsonContext : JsonSerializerContext;
 /// (the C++ returns a default-constructed Modpack whose path is empty).</summary>
 public sealed class FtbAppModpack
 {
-    public string Path { get; set; } = "";
+    public string Path { get; init; } = "";
 
     // json data
     public string Uuid { get; set; } = "";

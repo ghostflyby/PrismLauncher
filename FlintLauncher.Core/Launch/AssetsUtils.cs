@@ -34,9 +34,9 @@ internal sealed partial class AssetsJsonContext : JsonSerializerContext;
 /// <summary>Port of AssetObject.</summary>
 public sealed class AssetObject
 {
-    public string Hash { get; set; } = "";
+    public string Hash { get; init; } = "";
 
-    public long Size { get; set; }
+    public long Size { get; init; }
 
     /// <summary>Port of AssetObject::getRelPath.</summary>
     public string GetRelPath() => (Hash.Length >= 2 ? Hash[..2] : Hash) + "/" + Hash;

@@ -31,8 +31,8 @@ public sealed record AtlShareCodeModJson(
 
 public sealed class ShareCodeMod
 {
-    public bool Selected { get; set; }
-    public string Name { get; set; } = "";
+    public bool Selected { get; init; }
+    public string Name { get; init; } = "";
 }
 
 public sealed class ShareCode

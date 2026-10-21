@@ -60,9 +60,9 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
         public long Version { get; init; }
         public bool Enabled { get; init; }
         public bool IsMod { get; init; }
-        public string Name { get; set; } = "";
-        public string Slug { get; set; } = "";
-        public string Authors { get; set; } = "";
+        public string Name { get; init; } = "";
+        public string Slug { get; init; } = "";
+        public string Authors { get; init; } = "";
     }
 
     private sealed class HashInfo

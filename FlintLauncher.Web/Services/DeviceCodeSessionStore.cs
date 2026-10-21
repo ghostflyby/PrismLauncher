@@ -25,7 +25,7 @@ public sealed class DeviceCodeSessionStore
     {
         public required string DeviceId { get; init; }
         public required MinecraftAccount Account { get; init; }
-        public required AuthFlow Flow { get; set; }
+        public required AuthFlow Flow { get; init; }
         public string UserCode { get; set; } = "";
         public string VerificationUri { get; set; } = "";
         public int ExpiresInSeconds { get; set; }

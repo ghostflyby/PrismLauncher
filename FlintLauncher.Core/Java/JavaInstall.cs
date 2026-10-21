@@ -35,7 +35,7 @@ public sealed class JavaInstall(JvmVersion id, string arch, string path) : IComp
 
     public string Path { get; } = path;
 
-    public bool Is64Bit { get; set; }
+    public bool Is64Bit { get; init; }
 
     /// <summary>Port of JavaInstall::operator&lt;: architecture, then version id, then path.</summary>
     public bool LessThan(JavaInstall rhs)

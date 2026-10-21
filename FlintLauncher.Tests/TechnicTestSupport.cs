@@ -166,23 +166,23 @@ internal sealed class StubTechnicServer : IDisposable
 internal sealed class TechnicZipPackBuilder
 {
     /// <summary>version.json content for the bin/version.json flavor (or inside modpack.jar).</summary>
-    public string VersionJson { get; set; } =
+    public string VersionJson { get; init; } =
         """{"inheritsFrom":"1.20.1","id":"technic-test","libraries":[{"name":"net.minecraftforge:forge:1.20.1-42.0.0"}]}""";
 
     /// <summary>fmlversion.properties content ("" = omit the file).</summary>
-    public string FmlVersionProperties { get; set; } = "";
+    public string FmlVersionProperties { get; init; } = "";
 
     /// <summary>forgeversion.properties content ("" = omit the file; jar flavor without version.json).</summary>
-    public string ForgeVersionProperties { get; set; } = "";
+    public string ForgeVersionProperties { get; init; } = "";
 
     /// <summary>Whether the pack carries bin/modpack.jar (instead of bin/version.json).</summary>
-    public bool WithModpackJar { get; set; }
+    public bool WithModpackJar { get; init; }
 
     /// <summary>Whether the pack carries bin/version.json (false + no jar = the "vanilla" flavor).</summary>
-    public bool WithVersionJson { get; set; } = true;
+    public bool WithVersionJson { get; init; } = true;
 
     /// <summary>Whether modpack.jar embeds its own version.json.</summary>
-    public bool JarEmbedsVersionJson { get; set; }
+    public bool JarEmbedsVersionJson { get; init; }
 
     public string OptionsTxt { get; set; } = "technic=1\n";
 

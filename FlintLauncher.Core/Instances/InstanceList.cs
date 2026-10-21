@@ -114,15 +114,15 @@ public class InstanceList
     /// plus the instance.json / instance-state.json type infos. The C++ passed the global
     /// SettingsObject here; the typed stack replaced it (CONFIG C6/C7). Must be stamped
     /// before LoadList — discovery cannot build instances without it.</summary>
-    public InstanceEnvironment? Environment { get; set; }
+    public InstanceEnvironment? Environment { get; init; }
 
     /// <summary>Injected data-directory layout — stamped onto discovered instances (their
     /// asset/library/java anchors) and used for instgroups.json. Set by the composition root.</summary>
-    public FlintPaths? Paths { get; set; }
+    public FlintPaths? Paths { get; init; }
 
     /// <summary>Injected metadata cache — stamped onto discovered instances (library and
     /// asset-index download caches, metadata entities).</summary>
-    public HttpMetaCache? MetaCache { get; set; }
+    public HttpMetaCache? MetaCache { get; init; }
 
     /// <summary>Injected launch-pipeline dependencies — stamped onto discovered instances
     /// (the base LaunchServices their CreateLaunchTask builds from). Set by the composition
@@ -156,7 +156,7 @@ public class InstanceList
     /// (FlintPaths.GroupsFile, C8) with the legacy data-root instgroups.json and the
     /// primary-instance-dir instgroups.json as read-compat fallbacks.
     /// </summary>
-    public string GroupFilePath { get; set; } = "";
+    public string GroupFilePath { get; init; } = "";
 
     // ------------------------------------------------------------------- list accessors
 

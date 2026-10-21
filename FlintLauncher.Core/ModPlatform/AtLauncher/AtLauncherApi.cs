@@ -32,10 +32,10 @@ public sealed class AtLauncherApi(NetStack? net = null)
 {
     /// <summary>BuildConfig.ATL_DOWNLOAD_SERVER_URL (per-instance; tests construct a client
     /// pointed at their stub).</summary>
-    public string DownloadServerUrl { get; set; } = FlintConfig.Default.AtlDownloadServerUrl;
+    public string DownloadServerUrl { get; init; } = FlintConfig.Default.AtlDownloadServerUrl;
 
     /// <summary>BuildConfig.ATL_API_BASE_URL (per-instance).</summary>
-    public string ApiBaseUrl { get; set; } = FlintConfig.Default.AtlApiBaseUrl;
+    public string ApiBaseUrl { get; init; } = FlintConfig.Default.AtlApiBaseUrl;
 
     /// <summary>The network stack this client's requests go through.</summary>
     public NetStack Net { get; } = net ?? NetStack.Default;

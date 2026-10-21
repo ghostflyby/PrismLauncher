@@ -52,11 +52,11 @@ internal sealed partial class FlameManifestJsonContext : JsonSerializerContext;
 /// <summary>Port of Flame::File.</summary>
 public sealed class FlameFile
 {
-    public long ProjectId { get; set; }
-    public long FileId { get; set; }
+    public long ProjectId { get; init; }
+    public long FileId { get; init; }
 
     // NOTE: the opposite to 'optional'
-    public bool Required { get; set; } = true;
+    public bool Required { get; init; } = true;
 
     public IndexedPack Pack { get; } = new();
     public IndexedVersion Version { get; set; } = new();
@@ -68,8 +68,8 @@ public sealed class FlameFile
 /// <summary>Port of Flame::Modloader.</summary>
 public sealed class FlameModloader
 {
-    public string Id { get; set; } = "";
-    public bool Primary { get; set; }
+    public string Id { get; init; } = "";
+    public bool Primary { get; init; }
 }
 
 /// <summary>Port of Flame::Minecraft (the never-read extra "libraries" member is not

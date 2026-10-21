@@ -43,7 +43,7 @@ public class Library
      * storage - by default the local libraries folder in Prism Launcher, but could be elsewhere
      * Prism Launcher specific, because of FTB.
      */
-    public string StoragePrefixValue { get; set; } = "";
+    public string StoragePrefixValue { get; init; } = "";
 
     /// true if the library had an extract/excludes section (even empty)
     public bool HasExcludes { get; set; }

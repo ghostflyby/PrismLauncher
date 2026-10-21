@@ -71,7 +71,7 @@ public abstract class InstanceTask : FlintTask
     public string Group { get; set; } = "";
 
     /// <summary>C++ m_targetDir + setTargetDir()/targetDir().</summary>
-    public string TargetDir { get; set; } = "";
+    public string TargetDir { get; init; } = "";
 
     /// <summary>C++ m_stagingPath + setStagingPath().</summary>
     public string StagingPath { get; set; } = "";

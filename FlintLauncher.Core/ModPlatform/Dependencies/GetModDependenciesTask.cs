@@ -37,8 +37,8 @@ public class GetModDependenciesTask : SequentialTask
 {
     public class PackDependency
     {
-        public Dependency? Dependency { get; set; }
-        public IndexedPack Pack { get; set; } = new();
+        public Dependency? Dependency { get; init; }
+        public IndexedPack Pack { get; init; } = new();
         public IndexedVersion Version { get; set; } = new();
 
         public PackDependency() { }

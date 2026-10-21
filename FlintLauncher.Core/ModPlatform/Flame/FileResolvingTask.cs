@@ -24,11 +24,11 @@ namespace FlintLauncher.Core.ModPlatform.Flame;
 /// display-only hash and the dialog's move/copy checkbox (always copies).</summary>
 public sealed class BlockedMod
 {
-    public string Name { get; set; } = "";
-    public string WebsiteUrl { get; set; } = "";
+    public string Name { get; init; } = "";
+    public string WebsiteUrl { get; init; } = "";
     public bool Matched { get; set; }
     public string LocalPath { get; set; } = "";
-    public string TargetFolder { get; set; } = "";
+    public string TargetFolder { get; init; } = "";
     public bool Disabled { get; set; }
 }
 
@@ -43,7 +43,7 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi? modr
     /// APPLICATION->settings()->get("FallbackMRBlockedMods") (upstream default: true): when
     /// set, files without a download URL are looked up on Modrinth by their sha1.
     /// </summary>
-    public bool FallbackMrBlockedMods { get; set; } = true;
+    public bool FallbackMrBlockedMods { get; init; } = true;
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {

@@ -11,7 +11,7 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class LookupServerAddress(LaunchTask parent, MinecraftTarget output) : LaunchStep(parent)
 {
-    public string LookupAddress { get; set; } = "";
+    public string LookupAddress { get; init; } = "";
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {

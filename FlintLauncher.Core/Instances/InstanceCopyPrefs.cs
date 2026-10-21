@@ -12,19 +12,19 @@ namespace FlintLauncher.Core.Instances;
 
 public sealed class InstanceCopyPrefs
 {
-    public bool CopySaves { get; set; } = true;
-    public bool KeepPlaytime { get; set; } = true;
-    public bool CopyGameOptions { get; set; } = true;
-    public bool CopyResourcePacks { get; set; } = true;
-    public bool CopyShaderPacks { get; set; } = true;
-    public bool CopyServers { get; set; } = true;
-    public bool CopyMods { get; set; } = true;
-    public bool CopyScreenshots { get; set; } = true;
-    public bool UseSymLinks { get; set; }
-    public bool LinkRecursively { get; set; }
-    public bool UseHardLinks { get; set; }
-    public bool DontLinkSaves { get; set; }
-    public bool UseClone { get; set; }
+    public bool CopySaves { get; init; } = true;
+    public bool KeepPlaytime { get; init; } = true;
+    public bool CopyGameOptions { get; init; } = true;
+    public bool CopyResourcePacks { get; init; } = true;
+    public bool CopyShaderPacks { get; init; } = true;
+    public bool CopyServers { get; init; } = true;
+    public bool CopyMods { get; init; } = true;
+    public bool CopyScreenshots { get; init; } = true;
+    public bool UseSymLinks { get; init; }
+    public bool LinkRecursively { get; init; }
+    public bool UseHardLinks { get; init; }
+    public bool DontLinkSaves { get; init; }
+    public bool UseClone { get; init; }
 
     /// <summary>Port of InstanceCopyPrefs::allTrue.</summary>
     public bool AllTrue()

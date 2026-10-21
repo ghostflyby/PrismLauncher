@@ -236,14 +236,14 @@ public static class ProviderCapabilities
 /// <summary>Port of ModPlatform::ModpackAuthor (the never-read author url is not ported).</summary>
 public sealed class ModpackAuthor
 {
-    public string Name { get; set; } = "";
+    public string Name { get; init; } = "";
 }
 
 /// <summary>Port of ModPlatform::Dependency.</summary>
 public sealed class Dependency
 {
     /// <summary>QVariant addonId: a string (possibly numeric for Flame) or "" for null.</summary>
-    public string AddonId { get; set; } = "";
+    public string AddonId { get; init; } = "";
 
     public DependencyType Type { get; set; } = DependencyType.Invalid;
     public string Version { get; set; } = "";
@@ -257,7 +257,7 @@ public sealed class IndexedVersion
     public string Version { get; set; } = "";
     public string VersionNumber { get; set; } = "";
     public IndexedVersionType VersionType { get; set; } = IndexedVersionType.Invalid;
-    public List<string> McVersion { get; set; } = [];
+    public List<string> McVersion { get; init; } = [];
     public string DownloadUrl { get; set; } = "";
     public string Date { get; set; } = "";
     public string FileName { get; set; } = "";
@@ -265,7 +265,7 @@ public sealed class IndexedVersion
     public string HashType { get; set; } = "";
     public string Hash { get; set; } = "";
     public bool IsPreferred { get; set; } = true;
-    public List<Dependency> Dependencies { get; set; } = [];
+    public List<Dependency> Dependencies { get; init; } = [];
     public SideType Side { get; set; } = SideType.Invalid; // this is for flame API
 
     // For internal use, not provided by APIs

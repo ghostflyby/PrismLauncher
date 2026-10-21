@@ -510,15 +510,15 @@ internal sealed class PackVersionConverter : JsonConverter<PackVersionJson?>
 [JsonConverter(typeof(ChatComponentConverter))]
 internal sealed record ChatComponentJson
 {
-    public string? Text { get; set; }
+    public string? Text { get; init; }
 
-    public bool? BoolValue { get; set; }
+    public bool? BoolValue { get; init; }
 
-    public double? NumberValue { get; set; }
+    public double? NumberValue { get; init; }
 
-    public List<ChatComponentJson>? Array { get; set; }
+    public List<ChatComponentJson>? Array { get; init; }
 
-    public ComponentObjectJson? Object { get; set; }
+    public ComponentObjectJson? Object { get; init; }
 }
 
 internal sealed class ChatComponentConverter : JsonConverter<ChatComponentJson?>

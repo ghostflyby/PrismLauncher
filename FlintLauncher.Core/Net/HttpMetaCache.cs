@@ -74,9 +74,9 @@ public sealed class MetaEntry
     /// table and the key → path resolution; the disk format never carried it anyway).</summary>
     private HttpMetaCache? _owner;
 
-    public string BaseId { get; set; } = "";
+    public string BaseId { get; init; } = "";
 
-    public string RelativePath { get; set; } = "";
+    public string RelativePath { get; init; } = "";
 
     public string Md5Sum { get; set; } = "";
 

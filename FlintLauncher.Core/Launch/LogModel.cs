@@ -19,7 +19,7 @@ public sealed class LogModel
     public int MaxLines
     {
         get;
-        set
+        init
         {
             // no-op
             if (value == field)
@@ -66,7 +66,7 @@ public sealed class LogModel
     private int _firstLine;
     private int _numLines;
     private bool _suspended;
-    public bool StopOnOverflow { get; set; }
+    public bool StopOnOverflow { get; init; }
     public string OverflowMessage { get; set; } = "";
 
     public LogModel()

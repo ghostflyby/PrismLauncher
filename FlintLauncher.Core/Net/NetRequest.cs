@@ -48,9 +48,9 @@ public sealed class NetRequest(
     private int _retryCount;
 
     /// <summary>Set for makeCached-style requests: the entry is re-registered after success.</summary>
-    internal HttpMetaCache? MetaCache { get; set; }
+    internal HttpMetaCache? MetaCache { get; init; }
 
-    internal MetaEntry? CachedEntry { get; set; }
+    internal MetaEntry? CachedEntry { get; init; }
 
     public string TaskName { get; } = name ?? url.ToString();
 

@@ -90,7 +90,7 @@ public sealed partial class FlameCreationTask : InstanceTask
     /// Stand-in for the BlockedModsDialog matching step: given a blocked mod, return the
     /// path of a matching local file (null when the user has none). null disables matching.
     /// </summary>
-    public Func<BlockedMod, string?>? BlockedModLocalFileResolver { get; set; }
+    public Func<BlockedMod, string?>? BlockedModLocalFileResolver { get; init; }
 
     /// <summary>
     /// Headless stand-in for the optional-mods dialog selection (fix-2d): keys are the
@@ -99,7 +99,7 @@ public sealed partial class FlameCreationTask : InstanceTask
     /// everything else keeps the non-dialog behavior (".disabled" suffix). Flagged Core
     /// addition: the C++ gets this from the dialog, so the property does not exist upstream.
     /// </summary>
-    public IReadOnlyDictionary<string, bool> OptionalModsSelection { get; set; } =
+    public IReadOnlyDictionary<string, bool> OptionalModsSelection { get; init; } =
         new Dictionary<string, bool>();
 
     /// <summary>The optional-mods selection check for a relative path against the headless
@@ -114,7 +114,7 @@ public sealed partial class FlameCreationTask : InstanceTask
     /// (loader uid, loader type, mc version) -> version descriptor. Per-task hook (DI):
     /// the caller sets it before StartAsync, so parallel creations cannot see each other's
     /// stub.</summary>
-    public Func<string, string, string, string?>? RecommendedVersionLookup { get; set; }
+    public Func<string, string, string, string?>? RecommendedVersionLookup { get; init; }
 
     private void LogWarning(string message)
     {

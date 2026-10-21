@@ -35,7 +35,7 @@ public sealed class EnsureMetadataTask(
     private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
     private readonly FlameApi _flame = flame ?? new FlameApi();
     private readonly Dictionary<string, IndexedVersion> _tempVersions = new(StringComparer.Ordinal);
-    public bool LockUpdate { get; set; }
+    public bool LockUpdate { get; init; }
 
     /// <summary>Port of the metadataReady(resource) signal, carrying the fresh metadata.</summary>
     public event Action<Resource, MetadataHandler.ModStruct>? MetadataReady;

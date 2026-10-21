@@ -29,7 +29,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
 
     /// <summary>BuildConfig.LEGACY_FTB_CDN_BASE_URL (per-instance; tests construct the task
     /// pointed at their stub).</summary>
-    public string CdnBaseUrl { get; set; } = FlintConfig.Default.LegacyFtbCdnBaseUrl;
+    public string CdnBaseUrl { get; init; } = FlintConfig.Default.LegacyFtbCdnBaseUrl;
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {

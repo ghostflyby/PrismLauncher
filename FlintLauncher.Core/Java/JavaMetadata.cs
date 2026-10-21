@@ -38,28 +38,28 @@ public sealed class JavaMetadata : IComparable<JavaMetadata>, IEquatable<JavaMet
     public string Descriptor() => Version.ToString();
 
     /// <summary>Port of BaseVersion::name().</summary>
-    public string Name { get; internal set; } = "";
+    public string Name { get; internal init; } = "";
 
     /// <summary>Port of BaseVersion::typeString().</summary>
     public string TypeString() => Vendor;
 
-    public string Vendor { get; set; } = "";
+    public string Vendor { get; init; } = "";
 
-    public string Url { get; set; } = "";
+    public string Url { get; init; } = "";
 
-    public DateTimeOffset? ReleaseTime { get; set; }
+    public DateTimeOffset? ReleaseTime { get; init; }
 
     public string ChecksumType { get; set; } = "";
 
     public string ChecksumHash { get; set; } = "";
 
-    public JavaDownloadType DownloadType { get; set; } = JavaDownloadType.Unknown;
+    public JavaDownloadType DownloadType { get; init; } = JavaDownloadType.Unknown;
 
-    public string PackageType { get; set; } = "";
+    public string PackageType { get; init; } = "";
 
     public JvmVersion Version { get; set; } = JvmVersion.Unknown();
 
-    public string RuntimeOs { get; set; } = "";
+    public string RuntimeOs { get; init; } = "";
 
     public static JavaDownloadType ParseDownloadType(string javaDownload)
     {

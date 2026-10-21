@@ -27,7 +27,7 @@ namespace FlintLauncher.Core.Minecraft.Resources;
 [JsonConverter(typeof(McModInfoRootConverter))]
 internal sealed record McModInfoDocument
 {
-    public List<McModEntryJson> Entries { get; set; } = [];
+    public List<McModEntryJson> Entries { get; init; } = [];
 }
 
 internal sealed record McModEntryJson

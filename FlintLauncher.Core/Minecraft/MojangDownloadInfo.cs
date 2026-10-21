@@ -66,9 +66,9 @@ public class MojangAssetIndexInfo : MojangDownloadInfo
         Known = false;
     }
 
-    public int TotalSize { get; set; }
+    public int TotalSize { get; init; }
 
-    public string Id { get; set; } = "";
+    public string Id { get; init; } = "";
 
     public bool Known { get; set; } = true;
 }

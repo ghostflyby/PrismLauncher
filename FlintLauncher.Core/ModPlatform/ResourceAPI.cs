@@ -24,24 +24,24 @@ public sealed record SortingMethod
 /// <summary>Port of ResourceAPI::SearchArgs.</summary>
 public sealed class SearchArgs
 {
-    public ResourceType Type { get; set; } = ResourceType.Unknown;
-    public int Offset { get; set; }
+    public ResourceType Type { get; init; } = ResourceType.Unknown;
+    public int Offset { get; init; }
 
-    public string? Search { get; set; }
-    public SortingMethod? Sorting { get; set; }
-    public ModLoaderType? Loaders { get; set; }
-    public List<McVersion>? Versions { get; set; }
-    public List<string>? CategoryIds { get; set; }
-    public bool OpenSource { get; set; }
+    public string? Search { get; init; }
+    public SortingMethod? Sorting { get; init; }
+    public ModLoaderType? Loaders { get; init; }
+    public List<McVersion>? Versions { get; init; }
+    public List<string>? CategoryIds { get; init; }
+    public bool OpenSource { get; init; }
 }
 
 /// <summary>Port of ResourceAPI::VersionSearchArgs.</summary>
 public sealed class VersionSearchArgs
 {
-    public required IndexedPack Pack { get; set; }
+    public required IndexedPack Pack { get; init; }
 
-    public List<McVersion>? McVersions { get; set; }
-    public ModLoaderType? Loaders { get; set; }
+    public List<McVersion>? McVersions { get; init; }
+    public ModLoaderType? Loaders { get; init; }
     public ResourceType ResourceType { get; set; } = ResourceType.Unknown;
 }
 

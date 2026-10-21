@@ -85,9 +85,9 @@ internal sealed partial class TechnicJsonContext : JsonSerializerContext;
 /// <summary>Port of Technic::Modpack (TechnicData.h).</summary>
 public sealed class TechnicModpack
 {
-    public string Slug { get; set; } = "";
+    public string Slug { get; init; } = "";
 
-    public string Name { get; set; } = "";
+    public string Name { get; init; } = "";
     public string LogoUrl { get; set; } = "";
     public string LogoName { get; set; } = "";
 
@@ -119,10 +119,10 @@ public sealed class TechnicApi(NetStack? net = null)
 {
     /// <summary>BuildConfig.TECHNIC_API_BASE_URL (per-instance; tests construct a client
     /// pointed at their stub).</summary>
-    public string BaseUrl { get; set; } = FlintConfig.Default.TechnicApiBaseUrl;
+    public string BaseUrl { get; init; } = FlintConfig.Default.TechnicApiBaseUrl;
 
     /// <summary>BuildConfig.TECHNIC_API_BUILD (per-instance).</summary>
-    public string ApiBuild { get; set; } = FlintConfig.Default.TechnicApiBuild;
+    public string ApiBuild { get; init; } = FlintConfig.Default.TechnicApiBuild;
 
     /// <summary>The network stack this client's requests go through.</summary>
     public NetStack Net { get; } = net ?? NetStack.Default;

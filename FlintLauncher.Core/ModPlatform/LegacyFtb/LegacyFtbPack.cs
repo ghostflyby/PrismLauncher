@@ -16,14 +16,14 @@ public enum PackType : byte
 /// <summary>Port of LegacyFTB::Modpack.</summary>
 public sealed class LegacyFtbModpack
 {
-    public string Name { get; set; } = "";
-    public string Description { get; set; } = "";
+    public string Name { get; init; } = "";
+    public string Description { get; init; } = "";
     public string Author { get; set; } = "";
     public List<string> OldVersions { get; } = [];
-    public string CurrentVersion { get; set; } = "";
-    public string McVersion { get; set; } = "";
-    public string Mods { get; set; } = "";
-    public string Logo { get; set; } = "";
+    public string CurrentVersion { get; init; } = "";
+    public string McVersion { get; init; } = "";
+    public string Mods { get; init; } = "";
+    public string Logo { get; init; } = "";
 
     // Technical data
     public string Dir { get; set; } = "";

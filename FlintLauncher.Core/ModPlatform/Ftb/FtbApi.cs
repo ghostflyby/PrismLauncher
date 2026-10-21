@@ -38,7 +38,7 @@ public sealed class FtbApi(NetStack? net = null)
 {
     /// <summary>BuildConfig.FTB_API_BASE_URL (per-instance; tests construct a client
     /// pointed at their stub).</summary>
-    public string BaseUrl { get; set; } = FlintConfig.Default.FtbApiBaseUrl;
+    public string BaseUrl { get; init; } = FlintConfig.Default.FtbApiBaseUrl;
 
     /// <summary>The network stack this client's requests go through.</summary>
     public NetStack Net { get; } = net ?? NetStack.Default;

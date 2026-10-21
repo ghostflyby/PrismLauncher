@@ -22,7 +22,7 @@ public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVers
     private string _archivePath = "";
 
     /// <summary>APPLICATION->metacache() hook ("general" base); null = plain download.</summary>
-    public HttpMetaCache? MetaCache { get; set; }
+    public HttpMetaCache? MetaCache { get; init; }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {

@@ -50,7 +50,7 @@ public sealed class FtbPackInstallTask(
 
     /// <summary>BlockedModsDialog stand-in: given a blocked mod, return a matching local file
     /// path (null when the user has none).</summary>
-    public Func<BlockedMod, string?>? BlockedModLocalFileResolver { get; set; }
+    public Func<BlockedMod, string?>? BlockedModLocalFileResolver { get; init; }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
