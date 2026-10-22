@@ -11,6 +11,7 @@
 
 namespace FlintLauncher.Core.ModPlatform;
 
+using TruePath;
 using PackwizModel = Packwiz.Packwiz;
 
 public static class MetadataHandler
@@ -20,31 +21,31 @@ public static class MetadataHandler
     }
 
     /// <summary>Port of Metadata::create.</summary>
-    public static ModStruct Create(string indexDir, IndexedPack modPack, IndexedVersion modVersion)
+    public static ModStruct Create(AbsolutePath indexDir, IndexedPack modPack, IndexedVersion modVersion)
     {
         return Copy(PackwizModel.CreateModFormat(modPack, modVersion));
     }
 
     /// <summary>Port of Metadata::update.</summary>
-    public static void Update(string indexDir, ModStruct mod)
+    public static void Update(AbsolutePath indexDir, ModStruct mod)
     {
         PackwizModel.UpdateModIndex(indexDir, mod);
     }
 
     /// <summary>Port of Metadata::remove.</summary>
-    public static void Remove(string indexDir, string modSlug)
+    public static void Remove(AbsolutePath indexDir, string modSlug)
     {
         PackwizModel.DeleteModIndex(indexDir, modSlug);
     }
 
     /// <summary>Port of Metadata::get(index_dir, mod_slug).</summary>
-    public static ModStruct Get(string indexDir, string modSlug)
+    public static ModStruct Get(AbsolutePath indexDir, string modSlug)
     {
         return Copy(PackwizModel.GetIndexForMod(indexDir, modSlug));
     }
 
     /// <summary>Port of Metadata::get(index_dir, mod_id).</summary>
-    public static ModStruct Get(string indexDir, object modId)
+    public static ModStruct Get(AbsolutePath indexDir, object modId)
     {
         return Copy(PackwizModel.GetIndexForModById(indexDir, modId.ToString() ?? ""));
     }

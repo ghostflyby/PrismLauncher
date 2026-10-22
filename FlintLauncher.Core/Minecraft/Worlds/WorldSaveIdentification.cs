@@ -14,6 +14,7 @@
 //    any entry under that directory) is mirrored semantically over the entry list.
 
 using System.IO.Compression;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.Worlds;
 
@@ -155,8 +156,8 @@ public static class WorldSaveIdentification
                 return FolderContainsLevelDat(entry, true);
             }
 
-            var levelDat = Path.Combine(entry, "level.dat");
-            if (File.Exists(levelDat))
+            var levelDat = new AbsolutePath(entry) / "level.dat";
+            if (File.Exists(levelDat.Value))
             {
                 return (true, fileName, saves);
             }

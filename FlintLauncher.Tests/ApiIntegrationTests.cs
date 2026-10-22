@@ -31,6 +31,7 @@ using FlintLauncher.Web;
 using FlintLauncher.Web.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -563,7 +564,7 @@ public class FlintApiIntegrationTests
                 ],
                 // the launch pipeline's jar lookups resolve against this install root (the former
                 // JavaUtils.LauncherRootPath static test hook, now LaunchServices.Paths.InstallRoot)
-                paths: FlintPaths.FromHomeDir(dataDir) with { InstallRoot = launcherRoot });
+                paths: FlintPaths.FromHomeDir(new AbsolutePath(dataDir)) with { InstallRoot = launcherRoot });
             await app.StartAsync();
             using var client = new HttpClient();
             client.BaseAddress = new Uri(app.Urls.First());

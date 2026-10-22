@@ -19,6 +19,7 @@
 using System.Text.Json;
 using FlintLauncher.Core.IO;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Auth;
 
@@ -175,23 +176,18 @@ public sealed class AccountList
         return false;
     }
 
-    public void SetListFilePath(string path, bool enableAutosave = false)
+    public void SetListFilePath(AbsolutePath path, bool enableAutosave = false)
     {
         _listFilePath = path;
-        this._autosave = enableAutosave;
+        _autosave = enableAutosave;
     }
 
     public bool LoadList()
     {
-        if (string.IsNullOrEmpty(_listFilePath))
-        {
-            return false;
-        }
-
         byte[] jsonData;
         try
         {
-            jsonData = File.ReadAllBytes(_listFilePath);
+            jsonData = _listFilePath.ReadAllBytes();
         }
         catch (Exception)
         {
@@ -231,7 +227,7 @@ public sealed class AccountList
         // Attempt to rename the old version.
         try
         {
-            File.Move(_listFilePath, Path.Combine(Path.GetDirectoryName(_listFilePath) ?? "", newName));
+            File.Move(_listFilePath.Value, Path.Combine(Path.GetDirectoryName(_listFilePath.Value) ?? "", newName));
         }
         catch (Exception)
         {
@@ -300,23 +296,24 @@ public sealed class AccountList
 
     public bool SaveList()
     {
-        if (string.IsNullOrEmpty(_listFilePath))
+        // no path is set yet (the C++ empty-string check); default(AbsolutePath) carries null
+        if (_listFilePath.Value is not { Length: > 0 })
         {
             return false;
         }
 
         // make sure the parent folder exists
-        if (!FileOps.EnsureFilePathExists(new AbsolutePath(_listFilePath)))
+        if (!FileOps.EnsureFilePathExists(_listFilePath))
         {
             return false;
         }
 
         // make sure the file wasn't overwritten with a folder before (fixes a bug)
-        if (Directory.Exists(_listFilePath))
+        if (_listFilePath.ExistsDirectory())
         {
             try
             {
-                Directory.Delete(_listFilePath, recursive: true);
+                _listFilePath.DeleteDirectoryRecursively();
             }
             catch (Exception)
             {
@@ -347,18 +344,20 @@ public sealed class AccountList
         try
         {
             // QSaveFile: write to a temporary file and atomically rename over the target
-            var tmpPath = _listFilePath + ".tmp";
-            using (var stream = new FileStream(tmpPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            var tmpPath = _listFilePath.Parent is { } parent
+                ? parent / (_listFilePath.FileName + ".tmp")
+                : new AbsolutePath(_listFilePath.Value + ".tmp");
+            using (var stream = tmpPath.Open(FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 stream.Write(bytes);
             }
 
             if (!OperatingSystem.IsWindows())
             {
-                File.SetUnixFileMode(tmpPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                File.SetUnixFileMode(tmpPath.Value, UnixFileMode.UserRead | UnixFileMode.UserWrite);
             }
 
-            File.Move(tmpPath, _listFilePath, overwrite: true);
+            tmpPath.Move(_listFilePath, overwrite: true);
         }
         catch (Exception)
         {
@@ -399,6 +398,6 @@ public sealed class AccountList
 
     private readonly List<MinecraftAccount> _accounts = [];
     private MinecraftAccount? _defaultAccount;
-    private string _listFilePath = "";
+    private AbsolutePath _listFilePath;
     private bool _autosave;
 }

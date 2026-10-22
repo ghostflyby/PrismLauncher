@@ -8,6 +8,7 @@
 
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using TruePath;
 
 namespace FlintLauncher.Core.Secrets;
 
@@ -49,12 +50,12 @@ public sealed record SecretsFile
 /// <summary>The transitional file backend (C4): &lt;data-root&gt;/secrets.json, 0600 on unix,
 /// atomic temp+rename writes. Not thread-safe across instances; the host keeps exactly one
 /// and serializes through it (a single file, a single writer).</summary>
-public sealed class FileSecretStore(string filePath, JsonTypeInfo<SecretsFile> typeInfo) : ISecretStore
+public sealed class FileSecretStore(AbsolutePath filePath, JsonTypeInfo<SecretsFile> typeInfo) : ISecretStore
 {
     private readonly TypedJsonFile<SecretsFile> _file = new(filePath, typeInfo);
 
     /// <summary>The backing file (data-root/secrets.json for the host's instance).</summary>
-    public string FilePath => _file.FilePath;
+    public AbsolutePath FilePath => _file.FilePath;
 
     public string? Get(string name)
     {

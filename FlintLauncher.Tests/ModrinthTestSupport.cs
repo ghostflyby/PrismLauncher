@@ -8,6 +8,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
+using TruePath;
 
 namespace FlintLauncher.Tests;
 
@@ -355,7 +356,7 @@ internal sealed class MrPackBuilder
                 File.WriteAllBytes(Path.Combine(dir, "mods", "optional.jar"), optionalBytes);
             }
 
-            return MmcZip.CompressDir(path, dir);
+            return MmcZip.CompressDir(new AbsolutePath(path), new AbsolutePath(dir));
         }
         finally
         {

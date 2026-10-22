@@ -14,6 +14,8 @@ using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
 using FlintLauncher.Web.Services;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Web.Endpoints;
 
@@ -665,12 +667,12 @@ public static class InstanceContentEndpoints
                 foreach (var name in request.Names)
                 {
                     var path = ResolveScreenshotPath(dir, name);
-                    if (path is null)
+                    if (path is not { } some)
                     {
                         return ApiJson.NotFound("screenshot_not_found", $"no screenshot '{name}'");
                     }
 
-                    shots.Add(new ScreenShot(path));
+                    shots.Add(new ScreenShot(some));
                 }
 
                 // test/hermetic hook: the imgur endpoint + client id are overridable like the
@@ -712,14 +714,14 @@ public static class InstanceContentEndpoints
                 }
 
                 var path = ResolveScreenshotPath(ScreenshotsDir(instance), name);
-                if (path is null)
+                if (path is not { } exists)
                 {
                     return ApiJson.NotFound("screenshot_not_found", $"no screenshot '{name}'");
                 }
 
                 try
                 {
-                    File.Delete(path);
+                    exists.Delete();
                 }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException)
                 {
@@ -750,7 +752,7 @@ public static class InstanceContentEndpoints
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
 
-                var options = new GameOptions(Path.Combine(instance.GameRoot(), "options.txt"));
+                var options = new GameOptions((instance.GameRoot / "options.txt"));
                 return Results.Ok(options.Contents.Select(item =>
                     new GameOptionView(item.Key, item.Value)).ToArray());
             }
@@ -778,9 +780,9 @@ public static class InstanceContentEndpoints
 
                 // the save target is <gameRoot>/options.txt; the game root may not exist
                 // yet on a fresh instance (the C++ game folder appears on first launch)
-                var gameRoot = instance.GameRoot();
-                Directory.CreateDirectory(gameRoot);
-                var options = new GameOptions(Path.Combine(gameRoot, "options.txt"));
+                var gameRoot = instance.GameRoot;
+                gameRoot.CreateDirectory();
+                var options = new GameOptions(gameRoot / "options.txt");
                 foreach (var option in request.Options)
                 {
                     options.Set(option.Key, option.Value);
@@ -805,8 +807,8 @@ public static class InstanceContentEndpoints
     private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string reference) =>
         runtime.Instances.ResolveInstance(reference) as MinecraftInstance;
 
-    private static string ServersPath(MinecraftInstance instance) =>
-        Path.Combine(instance.GameRoot(), "servers.dat");
+    private static AbsolutePath ServersPath(MinecraftInstance instance) =>
+        (instance.GameRoot / "servers.dat");
 
     /// <summary>servers.dat of the game root; a missing file is an empty list (like the C++
     /// model, which starts empty and saves on the first change).</summary>
@@ -853,13 +855,13 @@ public static class InstanceContentEndpoints
         type switch
         {
             "mods" => instance.LoaderModList(),
-            "resourcepacks" => new ResourceFolderModel(instance.ResourcePacksDir(), isIndexed: false,
+            "resourcepacks" => new ResourceFolderModel(instance.ResourcePacksDir, isIndexed: false,
                 createDir: true),
-            "texturepacks" => new ResourceFolderModel(instance.TexturePacksDir(), isIndexed: false,
+            "texturepacks" => new ResourceFolderModel(instance.TexturePacksDir, isIndexed: false,
                 createDir: true),
-            "shaderpacks" => new ResourceFolderModel(instance.ShaderPacksDir(), isIndexed: false,
+            "shaderpacks" => new ResourceFolderModel(instance.ShaderPacksDir, isIndexed: false,
                 createDir: true),
-            "datapacks" => new ResourceFolderModel(Path.Combine(instance.GameRoot(), "datapacks"),
+            "datapacks" => new ResourceFolderModel((instance.GameRoot / "datapacks"),
                 isIndexed: false, createDir: true),
             _ => null,
         };
@@ -893,24 +895,24 @@ public static class InstanceContentEndpoints
         resource.SizeInfo,
         new DateTimeOffset(resource.DateTimeChanged).ToUnixTimeMilliseconds());
 
-    private static string ScreenshotsDir(MinecraftInstance instance) =>
-        Path.Combine(instance.GameRoot(), "screenshots");
+    private static AbsolutePath ScreenshotsDir(MinecraftInstance instance) =>
+        (instance.GameRoot / "screenshots");
 
     private static readonly string[] ScreenshotExtensions = [".png", ".jpg", ".jpeg"];
 
     private static List<ScreenshotView> ListScreenshots(MinecraftInstance instance)
     {
         var dir = ScreenshotsDir(instance);
-        if (!Directory.Exists(dir))
+        if (!dir.ExistsDirectory())
         {
             return [];
         }
 
         var result = new List<ScreenshotView>();
-        IEnumerable<string> files;
+        IEnumerable<AbsolutePath> files;
         try
         {
-            files = Directory.EnumerateFiles(dir);
+            files = dir.EnumerateFiles();
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
@@ -919,12 +921,12 @@ public static class InstanceContentEndpoints
 
         foreach (var file in files)
         {
-            if (!ScreenshotExtensions.Contains(Path.GetExtension(file.ToLowerInvariant())))
+            if (!ScreenshotExtensions.Contains(file.GetExtensionWithDot()))
             {
                 continue;
             }
 
-            var info = new FileInfo(file);
+            var info = new FileInfo(file.Value);
             result.Add(new ScreenshotView(info.Name, info.Length,
                 new DateTimeOffset(info.LastWriteTimeUtc).ToUnixTimeMilliseconds()));
         }
@@ -934,19 +936,11 @@ public static class InstanceContentEndpoints
 
     /// <summary>Resolves a listed screenshot name inside the screenshots folder, refusing
     /// anything with path separators or outside the folder (path traversal guard).</summary>
-    private static string? ResolveScreenshotPath(string dir, string name)
+    private static AbsolutePath? ResolveScreenshotPath(AbsolutePath dir, string name)
     {
-        if (string.IsNullOrWhiteSpace(name) ||
-            name.Contains('/') || name.Contains('\\') || name.Contains("..", StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        var path = Path.Combine(dir, name);
-        var fullDir = Path.GetFullPath(dir);
-        var full = Path.GetFullPath(path);
-        return File.Exists(full) && full.StartsWith(fullDir + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-            ? full
+        var path = dir / name;
+        return path.Exists() && path.StartsWith(dir)
+            ? path
             : null;
     }
 }

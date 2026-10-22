@@ -21,6 +21,7 @@ using System.Text.RegularExpressions;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Tasks;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Migration;
 
@@ -65,7 +66,7 @@ public static class Filters
 /// destination files are not overwritten), after a dry run that counts the files for the
 /// progress bar.
 /// </summary>
-public sealed class DataMigrationTask(string sourcePath, string targetPath, Func<string, bool> pathMatcher) : FlintTask
+public sealed class DataMigrationTask(AbsolutePath sourcePath, AbsolutePath targetPath, Func<string, bool> pathMatcher) : FlintTask
 {
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -87,11 +88,11 @@ public sealed class DataMigrationTask(string sourcePath, string targetPath, Func
         {
             cancellationToken.ThrowIfCancellationRequested();
             copied++;
-            var shortenedName = relative;
+            var shortenedName = relative.Value;
             // shorten the filename to hopefully fit into one line
             if (shortenedName.Length > 50)
             {
-                shortenedName = relative[..20] + "…" + relative[^29..];
+                shortenedName = shortenedName[..20] + "…" + shortenedName[^29..];
             }
 
             SetProgress(copied, toCopy);
@@ -125,38 +126,38 @@ public sealed class DataMigrationTask(string sourcePath, string targetPath, Func
     /// pipeline never reaches this — Decide requires an existing old config first. File
     /// symlinks are matched (and copied by content below — the C++ ResolveSymlinks walk);
     /// directory links are not descended into.</summary>
-    private bool Walk(out List<string> matched)
+    private bool Walk(out List<LocalPath> matched)
     {
         matched = [];
-        if (!Directory.Exists(sourcePath))
+        if (!sourcePath.ExistsDirectory())
         {
             return false;
         }
 
         foreach (var file in FileTransfer.EnumerateFilesDeep(sourcePath))
         {
-            var relative = Path.GetRelativePath(sourcePath, file).Replace('\\', '/');
+            var relative = Path.GetRelativePath(sourcePath.Value, file).Replace('\\', '/');
             if (pathMatcher(relative))
             {
-                matched.Add(relative);
+                matched.Add(new LocalPath(relative));
             }
         }
 
         return true;
     }
 
-    private bool CopyFile(string relative)
+    private bool CopyFile(LocalPath relative)
     {
-        var dstPath = Path.Combine(targetPath, relative);
+        var dstPath = targetPath / relative;
         if (!FileOps.EnsureFilePathExists(new AbsolutePath(dstPath)))
         {
             return false;
         }
 
-        var srcPath = Path.Combine(sourcePath, relative);
+        var srcPath = sourcePath / relative;
         try
         {
-            File.Copy(srcPath, dstPath, overwrite: false);
+            srcPath.Copy(dstPath, overwrite: false);
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
@@ -180,16 +181,19 @@ public static class DataMigration
     public static string NoMigrateMarkerName(string name) => name + "_nomigrate.txt";
 
     /// <summary>The marker file path inside the current data directory.</summary>
-    public static string NoMigrateMarkerPath(string currentData, string name) =>
-        Path.Combine(currentData, NoMigrateMarkerName(name));
+    public static AbsolutePath NoMigrateMarkerPath(AbsolutePath currentData, string name)
+    {
+        string a1 = NoMigrateMarkerName(name);
+        return currentData / a1;
+    }
 
     /// <summary>Config candidates looked for in the old data directory: the legacy launcher's
     /// own config first, then the Prism/Flint one ("it's possible that we already used that
     /// directory before").</summary>
-    public static IReadOnlyList<string> OldConfigCandidates(string oldData, string configFile, string launcherConfigFile) =>
+    public static IReadOnlyList<AbsolutePath> OldConfigCandidates(AbsolutePath oldData, string configFile, string launcherConfigFile) =>
     [
-        Path.Combine(oldData, configFile),
-        Path.Combine(oldData, launcherConfigFile),
+        oldData / configFile,
+        oldData / launcherConfigFile,
     ];
 
     /// <summary>
@@ -245,13 +249,13 @@ public static class DataMigration
     /// <c>&lt;currentData&gt;/&lt;launcherConfigFile&gt;</c> is probed (bare fixtures). The
     /// C++ existing-data protection (Application.cpp:1994-1999, 2029, 2055-2057: "Migration
     /// was skipped, due to existing data") keys off exactly this probe.</summary>
-    public static MigrationDecision Decide(string currentData, string oldData, string name, string configFile,
-        string launcherConfigFile, MigrationDecisionStore? decisions = null, string? currentConfigFile = null)
+    public static MigrationDecision Decide(AbsolutePath currentData, AbsolutePath oldData, string name, string configFile,
+        string launcherConfigFile, MigrationDecisionStore? decisions = null, AbsolutePath? currentConfigFile = null)
     {
         var configExists = false;
         foreach (var configPath in OldConfigCandidates(oldData, configFile, launcherConfigFile))
         {
-            configExists |= File.Exists(configPath);
+            configExists |= File.Exists(configPath.Value);
         }
 
         if (!configExists || DecisionAlreadyMade(currentData, name, decisions))
@@ -259,8 +263,7 @@ public static class DataMigration
             return configExists ? MigrationDecision.MarkerPresent : MigrationDecision.NoOldConfig;
         }
 
-        var currentExists = File.Exists(currentConfigFile ??
-                                        Path.Combine(currentData, launcherConfigFile));
+        var currentExists = File.Exists((currentConfigFile ?? currentData / launcherConfigFile).Value);
         return currentExists ? MigrationDecision.CurrentDataExists : MigrationDecision.ReadyToMigrate;
     }
 
@@ -273,7 +276,7 @@ public static class DataMigration
     /// tolerance PrismImportTask's record write has): the marker on disk already encodes the
     /// decision, so a failed record write keeps it in place and the decision still
     /// holds.</summary>
-    internal static bool DecisionAlreadyMade(string currentData, string name, MigrationDecisionStore? decisions)
+    internal static bool DecisionAlreadyMade(AbsolutePath currentData, string name, MigrationDecisionStore? decisions)
     {
         if (decisions is not null && decisions.Read(name) is not null)
         {
@@ -281,7 +284,7 @@ public static class DataMigration
         }
 
         var legacyMarker = FindLegacyMarker(currentData, name);
-        if (legacyMarker is null)
+        if (legacyMarker is not { } marker)
         {
             return false;
         }
@@ -300,7 +303,7 @@ public static class DataMigration
                     Decision = MigrationDecisionRecord.Declined,
                     At = MigrationDecisionRecord.UnknownAt,
                 });
-                File.Delete(legacyMarker);
+                marker.Delete();
             }
             catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException
                                           or NotSupportedException or SecurityException)
@@ -318,22 +321,22 @@ public static class DataMigration
     /// name ("PolyMC"/"MultiMC", Application.cpp:599/604+1977) while this port's source ids
     /// are lowercase (PrismImport.KnownLaunchers), and only a case-insensitive match keeps a
     /// C++-era decision honored on case-sensitive filesystems.</summary>
-    private static string? FindLegacyMarker(string currentData, string name)
+    private static AbsolutePath? FindLegacyMarker(AbsolutePath currentData, string name)
     {
         var exact = NoMigrateMarkerPath(currentData, name);
-        if (File.Exists(exact))
+        if (File.Exists(exact.Value))
         {
             return exact;
         }
 
-        if (Directory.Exists(currentData))
+        if (Directory.Exists(currentData.Value))
         {
-            foreach (var file in Directory.EnumerateFiles(currentData, "*_nomigrate.txt"))
+            foreach (var file in Directory.EnumerateFiles(currentData.Value, "*_nomigrate.txt"))
             {
                 if (string.Equals(Path.GetFileName(file), NoMigrateMarkerName(name),
                         StringComparison.OrdinalIgnoreCase))
                 {
-                    return file;
+                    return new AbsolutePath(file);
                 }
             }
         }

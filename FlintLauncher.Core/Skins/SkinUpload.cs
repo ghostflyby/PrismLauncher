@@ -17,6 +17,7 @@ using System.Text;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.Skins;
 
@@ -38,10 +39,10 @@ public sealed class SkinUpload : FlintTask
     }
 
     /// <summary>Port of SkinUpload::make(token, path, variant) — the file is read eagerly.</summary>
-    public static SkinUpload Make(string token, string path, string variant,
+    public static SkinUpload Make(string token, AbsolutePath path, string variant,
         AuthEndpointsOptions? auth = null, NetStack? net = null)
     {
-        return Make(token, File.ReadAllBytes(path), variant, auth, net);
+        return Make(token, File.ReadAllBytes(path.Value), variant, auth, net);
     }
 
     /// <summary>Body-bytes variant (FS::read(m_path) upstream).</summary>

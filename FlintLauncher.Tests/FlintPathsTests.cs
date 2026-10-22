@@ -7,6 +7,8 @@
 
 using FlintLauncher.Core;
 using FlintLauncher.Web;
+using TruePath;
+using TruePath.SystemIo;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -47,15 +49,15 @@ public class FlintPathsTests : IDisposable
     [Fact]
     public void FromHomeDir_Is_The_Home_Layout_Five_Roots_As_Children()
     {
-        var home = Path.Combine(Path.GetTempPath(), $"flint-home-{Guid.NewGuid():N}");
+        AbsolutePath home = Temporary.SystemTempDirectory() / $"flint-home-{Guid.NewGuid():N}";
 
         var paths = FlintPaths.FromHomeDir(home);
 
-        Assert.Equal(Path.Combine(home, "config"), paths.ConfigRoot);
-        Assert.Equal(Path.Combine(home, "data"), paths.DataRoot);
-        Assert.Equal(Path.Combine(home, "store"), paths.StoreRoot);
-        Assert.Equal(Path.Combine(home, "cache"), paths.CacheRoot);
-        Assert.Equal(Path.Combine(home, "state"), paths.StateRoot);
+        Assert.Equal(home / "config", paths.ConfigRoot);
+        Assert.Equal(home / "data", paths.DataRoot);
+        Assert.Equal(home / "store", paths.StoreRoot);
+        Assert.Equal(home / "cache", paths.CacheRoot);
+        Assert.Equal(home / "state", paths.StateRoot);
         // the DataDir compat alias IS the data root
         Assert.Equal(paths.DataRoot, paths.DataDir);
     }
@@ -63,40 +65,47 @@ public class FlintPathsTests : IDisposable
     [Fact]
     public void Anchors_Follow_Their_Five_Root_Owners_And_Logs_The_State_Root()
     {
-        var paths = FlintPaths.FromHomeDir("/tmp/flint-anchor-probe");
+        var paths = FlintPaths.FromHomeDir(new AbsolutePath("/tmp/flint-anchor-probe"));
 
         // data-root anchors (the user-owned half, DATA §2)
-        Assert.Equal(Path.Combine(paths.DataRoot, "instances"), paths.InstancesDir);
-        Assert.Equal(Path.Combine(paths.DataRoot, "accounts.json"), paths.AccountsFile);
+        Assert.Equal(paths.DataRoot / "instances", paths.InstancesDir);
+        Assert.Equal(paths.DataRoot / "accounts.json", paths.AccountsFile);
         // C8: the group definitions moved to the config side (members are uuid refs, D3);
         // the data-root instgroups.json anchor survives only as the legacy import fallback
-        Assert.Equal(Path.Combine(paths.ConfigRoot, "groups.json"), paths.GroupsFile);
-        Assert.Equal(Path.Combine(paths.DataRoot, "instgroups.json"), paths.InstgroupsFile);
+        Assert.Equal(paths.ConfigRoot / "groups.json", paths.GroupsFile);
+        Assert.Equal(paths.DataRoot / "instgroups.json", paths.InstgroupsFile);
         // store anchors (CACHE E2: shared installed content)
-        Assert.Equal(Path.Combine(paths.StoreRoot, "libraries"), paths.LibrariesRoot);
-        Assert.Equal(Path.Combine(paths.StoreRoot, "assets"), paths.AssetsRoot);
-        Assert.Equal(Path.Combine(paths.StoreRoot, "assets", "indexes"), paths.AssetIndexesDir);
-        Assert.Equal(Path.Combine(paths.StoreRoot, "java"), paths.JavaRoot);
+        Assert.Equal(paths.StoreRoot / "libraries", paths.LibrariesRoot);
+        Assert.Equal(paths.StoreRoot / "assets", paths.AssetsRoot);
+        Assert.Equal(paths.StoreRoot / "assets" / "indexes", paths.AssetIndexesDir);
+        Assert.Equal(paths.StoreRoot / "java", paths.JavaRoot);
         // cache anchors (CACHE E3: the ledger + the metadata content moved off the data root)
-        Assert.Equal(Path.Combine(paths.CacheRoot, "metacache.json"), paths.MetacacheFile);
-        Assert.Equal(Path.Combine(paths.CacheRoot, "meta"), paths.MetaDir);
-        Assert.Equal(Path.Combine(paths.CacheRoot, "fmllibs"), paths.FmllibsCacheDir);
+        Assert.Equal(paths.CacheRoot / "metacache.json", paths.MetacacheFile);
+        Assert.Equal(paths.CacheRoot / "meta", paths.MetaDir);
+        Assert.Equal(paths.CacheRoot / "fmllibs", paths.FmllibsCacheDir);
         // S4: the logger anchor moved to the state root
-        Assert.Equal(Path.Combine(paths.StateRoot, "logs"), paths.LogsDir);
-        Assert.Equal(Path.Combine(paths.StateRoot, "migration"), paths.MigrationDir);
-        Assert.Equal(Path.Combine(paths.StateRoot, "launcher-state.json"), paths.LauncherStateFile);
+        Assert.Equal(paths.StateRoot / "logs", paths.LogsDir);
+        Assert.Equal(paths.StateRoot / "migration", paths.MigrationDir);
+        Assert.Equal(paths.StateRoot / "launcher-state.json", paths.LauncherStateFile);
     }
 
     [Fact]
     public void FromRoots_Keeps_The_Five_Roots_Independently()
     {
-        var paths = FlintPaths.FromRoots("/c", "/d", "/s", "/k", "/st");
+        var paths = new FlintPaths()
+        {
+            ConfigRoot = new AbsolutePath("/c"),
+            DataRoot = new AbsolutePath("/d"),
+            StoreRoot = new AbsolutePath("/s"),
+            CacheRoot = new AbsolutePath("/k"),
+            StateRoot = new AbsolutePath("/st"),
+        };
 
-        Assert.Equal("/c", paths.ConfigRoot);
-        Assert.Equal("/d", paths.DataRoot);
-        Assert.Equal("/s", paths.StoreRoot);
-        Assert.Equal("/k", paths.CacheRoot);
-        Assert.Equal("/st", paths.StateRoot);
+        Assert.Equal("/c", paths.ConfigRoot.Value);
+        Assert.Equal("/d", paths.DataRoot.Value);
+        Assert.Equal("/s", paths.StoreRoot.Value);
+        Assert.Equal("/k", paths.CacheRoot.Value);
+        Assert.Equal("/st", paths.StateRoot.Value);
     }
 
     // ------------------------------------------------------------------- S4 logs anchor
@@ -104,9 +113,16 @@ public class FlintPathsTests : IDisposable
     [Fact]
     public void LogsDir_Pins_To_The_Injected_State_Root_Even_On_MacOS()
     {
-        var paths = FlintPaths.FromRoots("/c", "/d", "/s", "/k", "/my/state");
+        var paths = new FlintPaths()
+        {
+            ConfigRoot = new AbsolutePath("/c"),
+            DataRoot = new AbsolutePath("/d"),
+            StoreRoot = new AbsolutePath("/s"),
+            CacheRoot = new AbsolutePath("/k"),
+            StateRoot = new AbsolutePath("/my/state"),
+        };
 
-        Assert.Equal(Path.Combine("/my/state", "logs"), paths.LogsDir);
+        Assert.Equal(new AbsolutePath("/my/state") / "logs", paths.LogsDir);
     }
 
     [Fact]
@@ -117,11 +133,18 @@ public class FlintPathsTests : IDisposable
             return; // the exception only exists in the macOS platform derivation
         }
 
-        var paths = FlintPaths.FromRoots("/c", "/d", "/s", "/k",
-            FlintPaths.PlatformDefaultStateRoot());
+        AbsolutePath stateRoot = FlintPaths.PlatformDefaultStateRoot();
+        var paths = new FlintPaths()
+        {
+            ConfigRoot = new AbsolutePath("/c"),
+            DataRoot = new AbsolutePath("/d"),
+            StoreRoot = new AbsolutePath("/s"),
+            CacheRoot = new AbsolutePath("/k"),
+            StateRoot = stateRoot,
+        };
 
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        Assert.Equal(Path.Combine(home, "Library", "Logs", "Flint"), paths.LogsDir);
+        AbsolutePath home = new AbsolutePath(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        Assert.Equal(home / "Library" / "Logs" / "Flint", paths.LogsDir);
     }
 
     // --------------------------------------------------------------------- G1 fail-fast
@@ -130,10 +153,20 @@ public class FlintPathsTests : IDisposable
     public void EnsureUsable_Creates_All_Five_Roots()
     {
         // re-point at fresh (nonexistent) children to prove the EnsureDir half
-        var baseDir = Path.Combine(Path.GetTempPath(), $"flint-ensure-{Guid.NewGuid():N}");
-        var paths = FlintPaths.FromRoots(
-            Path.Combine(baseDir, "c"), Path.Combine(baseDir, "d"), Path.Combine(baseDir, "s"),
-            Path.Combine(baseDir, "k"), Path.Combine(baseDir, "st"));
+        AbsolutePath baseDir = Temporary.SystemTempDirectory() / $"flint-ensure-{Guid.NewGuid():N}";
+        AbsolutePath configRoot = baseDir / "c";
+        AbsolutePath dataRoot = baseDir / "d";
+        AbsolutePath storeRoot = baseDir / "s";
+        AbsolutePath cacheRoot = baseDir / "k";
+        AbsolutePath stateRoot = baseDir / "st";
+        var paths = new FlintPaths()
+        {
+            ConfigRoot = configRoot,
+            DataRoot = dataRoot,
+            StoreRoot = storeRoot,
+            CacheRoot = cacheRoot,
+            StateRoot = stateRoot,
+        };
 
         paths.EnsureUsable();
 
@@ -142,10 +175,10 @@ public class FlintPathsTests : IDisposable
                      paths.ConfigRoot, paths.DataRoot, paths.StoreRoot, paths.CacheRoot, paths.StateRoot,
                  })
         {
-            Assert.True(Directory.Exists(root), root);
+            Assert.True(root.ExistsDirectory(), root.Value);
         }
 
-        Directory.Delete(baseDir, recursive: true);
+        baseDir.DeleteDirectoryRecursively();
     }
 
     [Fact]
@@ -164,7 +197,14 @@ public class FlintPathsTests : IDisposable
         try
         {
             // config is probed first: the exception names it
-            var paths = FlintPaths.FromRoots(readOnly, "/d", "/s", "/k", "/st");
+            var paths = new FlintPaths()
+            {
+                ConfigRoot = new AbsolutePath(readOnly),
+                DataRoot = new AbsolutePath("/d"),
+                StoreRoot = new AbsolutePath("/s"),
+                CacheRoot = new AbsolutePath("/k"),
+                StateRoot = new AbsolutePath("/st"),
+            };
 
             var error = Assert.Throws<InvalidOperationException>(paths.EnsureUsable);
             Assert.Contains("'config'", error.Message);
@@ -201,7 +241,7 @@ public class FlintPathsTests : IDisposable
 
         var paths = WebHostBuilder.ResolveFlintPaths(["--home-dir", home]);
 
-        Assert.Equal(FlintPaths.FromHomeDir(home), paths);
+        Assert.Equal(FlintPaths.FromHomeDir(new AbsolutePath(home)), paths);
     }
 
     [Fact]
@@ -213,12 +253,12 @@ public class FlintPathsTests : IDisposable
 
         var paths = WebHostBuilder.ResolveFlintPaths(["--home-dir", home, "--data-dir", data]);
 
-        Assert.Equal(data, paths.DataRoot);
+        Assert.Equal(data, paths.DataRoot.Value);
         // zero sibling implication: the rest stay on the home layout
-        Assert.Equal(Path.Combine(home, "config"), paths.ConfigRoot);
-        Assert.Equal(Path.Combine(home, "store"), paths.StoreRoot);
-        Assert.Equal(Path.Combine(home, "cache"), paths.CacheRoot);
-        Assert.Equal(Path.Combine(home, "state"), paths.StateRoot);
+        Assert.Equal(Path.Combine(home, "config"), paths.ConfigRoot.Value);
+        Assert.Equal(Path.Combine(home, "store"), paths.StoreRoot.Value);
+        Assert.Equal(Path.Combine(home, "cache"), paths.CacheRoot.Value);
+        Assert.Equal(Path.Combine(home, "state"), paths.StateRoot.Value);
     }
 
     [Fact]
@@ -229,7 +269,7 @@ public class FlintPathsTests : IDisposable
 
         var paths = WebHostBuilder.ResolveFlintPaths(["--data-dir", data]);
 
-        Assert.Equal(data, paths.DataRoot);
+        Assert.Equal(data, paths.DataRoot.Value);
         // G1 破格: --data-dir no longer implies the other roots (the old total-directory
         // semantics); uncovered roots go to the platform defaults, NOT <data>/config etc.
         Assert.Equal(FlintPaths.PlatformDefaultConfigRoot(), paths.ConfigRoot);
@@ -246,7 +286,7 @@ public class FlintPathsTests : IDisposable
         var paths = WebHostBuilder.ResolveFlintPaths(
             ["--state-dir=" + first, "--state-dir", second]);
 
-        Assert.Equal(second, paths.StateRoot);
+        Assert.Equal(second, paths.StateRoot.Value);
     }
 
     [Fact]
@@ -263,13 +303,13 @@ public class FlintPathsTests : IDisposable
         Environment.SetEnvironmentVariable("FLINT_HOME", home);
         Environment.SetEnvironmentVariable("FLINT_DATA_DIR", envData);
         var envOnly = WebHostBuilder.ResolveFlintPaths([]);
-        Assert.Equal(envData, envOnly.DataRoot);
-        Assert.Equal(Path.Combine(home, "config"), envOnly.ConfigRoot);
+        Assert.Equal(envData, envOnly.DataRoot.Value);
+        Assert.Equal(Path.Combine(home, "config"), envOnly.ConfigRoot.Value);
 
         // the CLI precise flag beats the env precise flag
         var withCli = WebHostBuilder.ResolveFlintPaths(["--data-dir", cliData]);
-        Assert.Equal(cliData, withCli.DataRoot);
-        Assert.Equal(Path.Combine(home, "state"), withCli.StateRoot);
+        Assert.Equal(cliData, withCli.DataRoot.Value);
+        Assert.Equal(Path.Combine(home, "state"), withCli.StateRoot.Value);
     }
 
     [Fact]
@@ -292,11 +332,11 @@ public class FlintPathsTests : IDisposable
 
         var paths = WebHostBuilder.ResolveFlintPaths([]);
 
-        Assert.Equal(roots["FLINT_CONFIG_DIR"], paths.ConfigRoot);
-        Assert.Equal(roots["FLINT_DATA_DIR"], paths.DataRoot);
-        Assert.Equal(roots["FLINT_STORE_DIR"], paths.StoreRoot);
-        Assert.Equal(roots["FLINT_CACHE_DIR"], paths.CacheRoot);
-        Assert.Equal(roots["FLINT_STATE_DIR"], paths.StateRoot);
+        Assert.Equal(roots["FLINT_CONFIG_DIR"], paths.ConfigRoot.Value);
+        Assert.Equal(roots["FLINT_DATA_DIR"], paths.DataRoot.Value);
+        Assert.Equal(roots["FLINT_STORE_DIR"], paths.StoreRoot.Value);
+        Assert.Equal(roots["FLINT_CACHE_DIR"], paths.CacheRoot.Value);
+        Assert.Equal(roots["FLINT_STATE_DIR"], paths.StateRoot.Value);
     }
 
     [Fact]
@@ -323,10 +363,10 @@ public class FlintPathsTests : IDisposable
         }
 
         using var fixture = TestFlintPaths.UnderHome();
-        var homeRoot = fixture.HomeRoot;
+        var homeRoot = fixture.HomeRoot?.Value;
         Assert.NotNull(homeRoot);
-        var unixMode = File.GetUnixFileMode(fixture.Paths.ConfigRoot);
-        File.SetUnixFileMode(fixture.Paths.ConfigRoot,
+        var unixMode = File.GetUnixFileMode(fixture.Paths.ConfigRoot.Value);
+        File.SetUnixFileMode(fixture.Paths.ConfigRoot.Value,
             UnixFileMode.UserRead | UnixFileMode.UserExecute);
         try
         {
@@ -336,7 +376,7 @@ public class FlintPathsTests : IDisposable
         }
         finally
         {
-            File.SetUnixFileMode(fixture.Paths.ConfigRoot, unixMode);
+            File.SetUnixFileMode(fixture.Paths.ConfigRoot.Value, unixMode);
         }
     }
 
@@ -344,14 +384,13 @@ public class FlintPathsTests : IDisposable
     public void BuildWebApplication_Starts_On_The_Home_Layout_And_Logs_Under_The_State_Root()
     {
         using var fixture = TestFlintPaths.UnderHome();
-        var homeRoot = fixture.HomeRoot;
+        var homeRoot = fixture.HomeRoot?.Value;
         Assert.NotNull(homeRoot);
         using var app = WebHostBuilder.BuildWebApplication(["--home-dir", homeRoot]);
         // the S4 anchor: the rolling provider opened its file under <state>/logs before any
         // service ran, and the old data-root anchor is gone
-        Assert.True(Directory.Exists(Path.Combine(fixture.Paths.StateRoot, "logs")));
-        Assert.True(File.Exists(
-            Path.Combine(fixture.Paths.StateRoot, "logs", "Flint-0.log")));
-        Assert.False(Directory.Exists(Path.Combine(fixture.DataDir, "logs")));
+        Assert.True((fixture.Paths.StateRoot / "logs").ExistsDirectory());
+        Assert.True((fixture.Paths.StateRoot / "logs" / "Flint-0.log").ExistsFile());
+        Assert.False((fixture.DataDir / "logs").ExistsDirectory());
     }
 }

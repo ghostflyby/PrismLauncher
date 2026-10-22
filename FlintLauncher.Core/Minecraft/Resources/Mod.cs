@@ -12,6 +12,7 @@
 
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Versioning;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
 
@@ -22,7 +23,7 @@ public class Mod : Resource
     private int _requiredByCount;
     private int _requiresCount;
 
-    public Mod(string filePath) : this(new FileInfo(filePath)) { }
+    public Mod(AbsolutePath filePath) : this(new FileInfo(filePath.Value)) { }
 
     public Mod(FileInfo file) : base(file)
     {

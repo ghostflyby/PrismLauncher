@@ -14,6 +14,7 @@
 
 using FlintLauncher.Core.IO;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Icons;
 
@@ -32,11 +33,11 @@ public static class IconFiles
     /// Port of IconUtils::findBestIconIn: given a folder and an icon key, find the icon with
     /// the given key in there and return its path ("" when there is none).
     /// </summary>
-    public static string FindBestIconIn(string folder, string iconKey)
+    public static AbsolutePath? FindBestIconIn(AbsolutePath folder, string iconKey)
     {
-        if (!Directory.Exists(folder))
+        if (!folder.ExistsDirectory())
         {
-            return "";
+            return null;
         }
 
         // QDirIterator(folder, NoDotAndDotDot | Files, NoIteratorFlags): files, non-recursive
@@ -46,26 +47,25 @@ public static class IconFiles
             IgnoreInaccessible = true,
             RecurseSubdirectories = false,
         };
-        foreach (var file in Directory.EnumerateFiles(folder, "*", options))
+        foreach (var file in folder.EnumerateFiles("*", options))
         {
-            var fileName = Path.GetFileName(file);
-            if ((CompleteBaseName(fileName) == iconKey || fileName == iconKey) && IsIconSuffix(Suffix(fileName)))
+            if ((file.GetFilenameWithoutExtension() == iconKey || file.FileName == iconKey) && IsIconSuffix(file.GetExtensionWithoutDot()))
             {
                 return file;
             }
         }
 
-        return "";
+        return null;
     }
 
     /// <summary>
     /// Port of IconList::getIconFilePaths: every icon file in the directory tree,
     /// breadth-first (directories first, files collected per level).
     /// </summary>
-    public static List<string> GetIconFilePaths(string directory)
+    public static IEnumerable<AbsolutePath> GetIconFilePaths(AbsolutePath directory)
     {
-        var iconFiles = new List<string>();
-        var directories = new Queue<string>();
+        var iconFiles = new List<AbsolutePath>();
+        var directories = new Queue<AbsolutePath>();
         directories.Enqueue(directory);
         var options = new EnumerationOptions
         {
@@ -76,22 +76,23 @@ public static class IconFiles
         while (directories.Count != 0)
         {
             var first = directories.Dequeue();
-            if (!Directory.Exists(first))
+            if (!first.ExistsDirectory())
             {
                 continue;
             }
 
-            foreach (var entry in Directory.EnumerateFileSystemEntries(first, "*", options)
-                         .OrderBy(p => p, StringComparer.Ordinal))
+            foreach (var entry in Directory
+                         .EnumerateFileSystemEntries(first.Value, "*", options)
+                         .OrderBy(p => p, StringComparer.Ordinal)
+                         .Select(p => new AbsolutePath(p)))
             {
-                if (Directory.Exists(entry) && !File.Exists(entry))
+                if (entry.ExistsDirectory() && !entry.ExistsFile())
                 {
                     directories.Enqueue(entry);
+                    continue;
                 }
-                else
-                {
-                    iconFiles.Add(entry);
-                }
+
+                iconFiles.Add(entry);
             }
         }
 
@@ -102,29 +103,28 @@ public static class IconFiles
     /// Port of the IconList key derivation: QFileInfo(dir.relativeFilePath(file))
     /// .completeBaseName() — the file name up to the last dot, without any directory parts.
     /// </summary>
-    public static string IconKeyForFile(string iconsDir, string filePath)
+    public static string IconKeyForFile(AbsolutePath iconsDir, AbsolutePath filePath)
     {
-        var relative = Path.GetRelativePath(iconsDir, filePath).Replace('\\', '/');
-        return CompleteBaseName(Path.GetFileName(relative));
+        // the C++ derived the key from the relative path's completeBaseName — the directory
+        // part never survives GetFileName, so the basename alone is the whole story
+        return filePath.GetFilenameWithoutExtension();
     }
 
     /// <summary>
     /// Port of the formatName() helper (display label of an icon file): the base name at the
     /// root, or "&lt;relative dir&gt; » &lt;base name&gt;" for icons in subdirectories.
     /// </summary>
-    public static string IconDisplayName(string iconsDir, string filePath)
+    public static string IconDisplayName(AbsolutePath iconsDir, AbsolutePath filePath)
     {
         const string delimiter = " » ";
-        var baseName = CompleteBaseName(Path.GetFileName(filePath));
-        var iconsDirFull = Path.TrimEndingDirectorySeparator(Path.GetFullPath(iconsDir));
-        var dir = Path.TrimEndingDirectorySeparator(Path.GetDirectoryName(Path.GetFullPath(filePath)) ?? "");
-        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        if (string.Equals(dir, iconsDirFull, comparison))
+        var baseName = filePath.GetFilenameWithoutExtension();
+        var iconsDirFull = iconsDir.Canonicalize();
+        var dir = filePath.Parent?.Canonicalize();
+        if (dir == iconsDirFull)
         {
             return baseName;
         }
-
-        var relativeDir = Path.GetRelativePath(iconsDirFull, dir).Replace('\\', '/');
+        var relativeDir = dir?.RelativeTo(iconsDirFull);
         return relativeDir + delimiter + baseName;
     }
 
@@ -134,27 +134,28 @@ public static class IconFiles
     /// source is not a readable icon file, when the suffix is not supported, or when the
     /// target already exists (QFile::copy semantics).
     /// </summary>
-    public static bool InstallIcon(string iconsDir, string file, string name = "")
+    public static bool InstallIcon(AbsolutePath iconsDir, AbsolutePath file, string name = "")
     {
-        if (!File.Exists(file) || Directory.Exists(file))
+        if (!file.ExistsFile() || file.ExistsDirectory())
         {
             return false; // QFileInfo::isFile()/isReadable()
         }
 
-        if (!IsIconSuffix(Suffix(Path.GetFileName(file))))
+        if (!IsIconSuffix(file.GetExtensionWithoutDot()))
         {
             return false;
         }
 
-        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(iconsDir)))
+        if (!FileOps.EnsureFolderPathExists(iconsDir))
         {
             return false;
         }
 
-        var target = Path.Combine(iconsDir, name.Length == 0 ? Path.GetFileName(file) : name);
+        string a1 = name.Length == 0 ? file.FileName : name;
+        var target = iconsDir / a1;
         try
         {
-            File.Copy(file, target, overwrite: false);
+            file.Copy(target, overwrite: false);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException)
         {
@@ -171,13 +172,13 @@ public static class IconFiles
     /// later duplicate key replaces an earlier one. The "default" key aliases to "grass",
     /// like the upstream fallback.
     /// </summary>
-    public static string GetIconFile(string iconsDir, string key)
+    public static AbsolutePath? GetIconFile(AbsolutePath iconsDir, string key)
     {
         var resolvedKey = key == "default" ? "grass" : key;
-        var match = "";
+        AbsolutePath? match = null;
         foreach (var file in GetIconFilePaths(iconsDir))
         {
-            if (IconKeyForFile(iconsDir, file) == resolvedKey && IsIconSuffix(Suffix(Path.GetFileName(file))))
+            if (IconKeyForFile(iconsDir, file) == resolvedKey && IsIconSuffix(file.GetExtensionWithoutDot()))
             {
                 match = file; // addIcon() replaces the entry of an existing key
             }
@@ -187,28 +188,11 @@ public static class IconFiles
     }
 
     /// <summary>Port of IconList::iconFileExists (file-based).</summary>
-    public static bool IconFileExists(string iconsDir, string key) => GetIconFile(iconsDir, key).Length != 0;
+    public static bool IconFileExists(AbsolutePath iconsDir, string key) => GetIconFile(iconsDir, key) is not null;
 
     /// <summary>Port of IconList::deleteIcon.</summary>
-    public static bool DeleteIcon(string iconsDir, string key)
+    public static bool DeleteIcon(AbsolutePath iconsDir, string key)
     {
-        var file = GetIconFile(iconsDir, key);
-        return file.Length != 0 && FileOps.DeletePath(new AbsolutePath(file));
-    }
-
-    // ------------------------------------------------------------------------ helpers
-
-    /// <summary>QFileInfo::completeBaseName(): the file name up to the last dot.</summary>
-    private static string CompleteBaseName(string fileName)
-    {
-        var dot = fileName.LastIndexOf('.');
-        return dot > 0 ? fileName[..dot] : fileName;
-    }
-
-    /// <summary>QFileInfo::suffix(): the part after the last dot ("" when there is none).</summary>
-    private static string Suffix(string fileName)
-    {
-        var dot = fileName.LastIndexOf('.');
-        return dot > 0 ? fileName[(dot + 1)..] : "";
+        return GetIconFile(iconsDir, key) is { } file && FileOps.DeletePath(file);
     }
 }

@@ -21,6 +21,7 @@ using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.ModPlatform.Technic;
+using TruePath;
 using Xunit;
 using MetaIndex = FlintLauncher.Core.Meta.Index;
 
@@ -138,7 +139,7 @@ public class JsonNullToleranceTests
         try
         {
             var index = new AssetsIndex();
-            Assert.True(AssetsUtils.LoadAssetsIndexJson("test", path, index));
+            Assert.True(AssetsUtils.LoadAssetsIndexJson("test", new AbsolutePath(path), index));
             Assert.True(index.Objects.ContainsKey("x"));
             Assert.Equal("", index.Objects["x"].Hash);
         }

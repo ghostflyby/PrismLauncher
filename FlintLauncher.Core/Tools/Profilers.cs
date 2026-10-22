@@ -14,6 +14,8 @@
 
 using System.Globalization;
 using FlintLauncher.Core.Settings;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Tools;
 
@@ -37,13 +39,13 @@ public abstract class ProfilerFactory
     public abstract bool Check(SettingsObject settings, out string error);
 
     /// <summary>Port of check(const QString& path, QString* error).</summary>
-    public abstract bool Check(string path, out string error);
+    public abstract bool Check(AbsolutePath? path, out string error);
 
     /// <summary>
     /// Port of beginProfilingImpl(): the program and arguments the profiler would be started
     /// with (no process is spawned here). <paramref name="pid"/> is the game process id.
     /// </summary>
-    public abstract (string Program, IReadOnlyList<string> Arguments) BuildCommand(SettingsObject settings, int pid);
+    public abstract (AbsolutePath Program, IReadOnlyList<string> Arguments) BuildCommand(SettingsObject settings, int pid);
 }
 
 /// <summary>Port of JProfilerFactory / JProfiler::beginProfilingImpl.</summary>
@@ -62,30 +64,33 @@ public sealed class JProfilerFactory : ProfilerFactory
         settings.RegisterSetting(PortKey, DefaultPort);
     }
 
-    public override bool Check(SettingsObject settings, out string error) =>
-        Check(settings.Get(PathKey)?.ToString() ?? "", out error);
+    public override bool Check(SettingsObject settings, out string error)
+    {
+        var raw = settings.Get(PathKey)?.ToString();
+        return Check(string.IsNullOrEmpty(raw) ? null : new AbsolutePath(raw), out error);
+    }
 
-    public override bool Check(string path, out string error)
+    public override bool Check(AbsolutePath? path, out string error)
     {
         error = "";
-        if (path.IsEmpty())
+        if (path is not { } some)
         {
             error = "Empty path";
             return false;
         }
 
-        if (!Directory.Exists(path))
+        if (!PathIo.Exists(some))
         {
             error = "Path does not exist";
             return false;
         }
 
         // dir.exists("bin") && (bin/jprofiler || bin/jprofiler.exe) && bin/agent.jar
-        var bin = Path.Combine(path, "bin");
-        if (!Directory.Exists(bin) ||
-            !(FsExists(Path.Combine(bin, "jprofiler")) ||
-              FsExists(Path.Combine(bin, "jprofiler.exe"))) ||
-            !FsExists(Path.Combine(bin, "agent.jar")))
+        var bin = some / "bin";
+        if (!bin.Exists() ||
+            !((bin / "jprofiler").Exists() ||
+              (bin / "jprofiler.exe").Exists()) ||
+            !(bin / "agent.jar").Exists())
         {
             error = "Invalid JProfiler install";
             return false;
@@ -94,16 +99,16 @@ public sealed class JProfilerFactory : ProfilerFactory
         return true;
     }
 
-    /// <summary>QDir::exists accepts files and directories.</summary>
-    private static bool FsExists(string fsPath) => File.Exists(fsPath) || Directory.Exists(fsPath);
-
-    public override (string Program, IReadOnlyList<string> Arguments) BuildCommand(SettingsObject settings, int pid)
+    public override (AbsolutePath Program, IReadOnlyList<string> Arguments) BuildCommand(SettingsObject settings, int pid)
     {
         var listeningPort = settings.Get(PortKey).AsIntSetting(DefaultPort);
-        var basePath = settings.Get(PathKey)?.ToString() ?? "";
+        var basePath = settings.Get(PathKey)?.ToString();
         // QDir(basePath).absoluteFilePath("bin/jpenable[.exe]")
-        var profilerProgram = Path.Combine(basePath, OperatingSystem.IsWindows() ? "bin/jpenable.exe" : "bin/jpenable");
-        var arguments = new[] { "-d", pid.ToStringInvariant(), "--gui", "-p", listeningPort.ToStringInvariant() };
+        string a1 = OperatingSystem.IsWindows() ? "bin/jpenable.exe" : "bin/jpenable";
+        AbsolutePath profilerProgram = string.IsNullOrEmpty(basePath)
+            ? default
+            : new AbsolutePath(basePath) / a1;
+        var arguments = new[] { "-d", pid.ToString(), "--gui", "-p", listeningPort.ToString() };
         return (profilerProgram, arguments);
     }
 }
@@ -118,29 +123,27 @@ public sealed class JVisualVmFactory : ProfilerFactory
 
     public override void RegisterSettings(SettingsObject settings)
     {
-        var defaultValue = FindExecutable("jvisualvm");
-        if (defaultValue.Length == 0)
-        {
-            defaultValue = FindExecutable("visualvm");
-        }
+        var defaultValue = FindExecutable("jvisualvm") ?? FindExecutable("visualvm");
 
         settings.RegisterSetting(PathKey, defaultValue);
     }
 
-    public override bool Check(SettingsObject settings, out string error) =>
-        Check(settings.Get(PathKey)?.ToString() ?? "", out error);
+    public override bool Check(SettingsObject settings, out string error)
+    {
+        var raw = settings.Get(PathKey)?.ToString();
+        return Check(string.IsNullOrEmpty(raw) ? null : new AbsolutePath(raw), out error);
+    }
 
-    public override bool Check(string path, out string error)
+    public override bool Check(AbsolutePath? path, out string error)
     {
         error = "";
-        if (path.IsEmpty())
+        if (path is not { } some)
         {
             error = "Empty path";
             return false;
         }
 
-        // QFileInfo::isExecutable() && fileName().contains("visualvm")
-        if (!IsExecutable(path) || !Path.GetFileName(path).Contains("visualvm", StringComparison.Ordinal))
+        if (!IsExecutable(some) || !some.FileName.Contains("visualvm", StringComparison.Ordinal))
         {
             error = "Invalid path to VisualVM";
             return false;
@@ -149,56 +152,66 @@ public sealed class JVisualVmFactory : ProfilerFactory
         return true;
     }
 
-    public override (string Program, IReadOnlyList<string> Arguments) BuildCommand(SettingsObject settings, int pid)
+    public override (AbsolutePath Program, IReadOnlyList<string> Arguments) BuildCommand(SettingsObject settings, int pid)
     {
-        var programPath = settings.Get(PathKey)?.ToString() ?? "";
-        return (programPath, new[] { "--openpid", pid.ToStringInvariant() });
+        var programPath = settings.Get(PathKey)?.ToString();
+        return (string.IsNullOrEmpty(programPath) ? default(AbsolutePath) : new AbsolutePath(programPath),
+            new[] { "--openpid", pid.ToString() });
     }
 
     /// <summary>The QStandardPaths::findExecutable default.</summary>
-    public static string FindExecutable(string executableName)
+    public static AbsolutePath? FindExecutable(string executableName)
     {
         var pathEnv = Environment.GetEnvironmentVariable("PATH");
         if (string.IsNullOrEmpty(pathEnv))
         {
-            return "";
+            return null;
         }
 
         var names = OperatingSystem.IsWindows()
             ? new[] { executableName + ".exe", executableName }
             : new[] { executableName };
-        foreach (var dir in pathEnv.Split(Path.PathSeparator))
+        foreach (var dir in pathEnv.Split(Path.PathSeparator).Select(ResolvePathEntry))
         {
-            if (dir.Length == 0)
+            if (dir is not { } scanDir)
             {
                 continue;
             }
 
             foreach (var name in names)
             {
-                var candidate = Path.Combine(dir, name);
-                if (File.Exists(candidate))
+                var candidate = scanDir / name;
+                if (candidate.ExistsFile())
                 {
                     return candidate;
                 }
             }
         }
 
-        return "";
+        return null;
     }
 
-    private static bool IsExecutable(string path)
+    /// <summary>A PATH entry as a scannable directory: an empty entry anchors on the
+    /// process CWD (the POSIX convention the string-era scan inherited); "~"-style shell
+    /// shortcuts are skipped (the string-era File.Exists never found a file under a
+    /// literal '~' directory either).</summary>
+    private static AbsolutePath? ResolvePathEntry(string entry) =>
+        entry.Length == 0 ? AbsolutePath.CurrentWorkingDirectory
+        : Path.IsPathRooted(entry) ? new AbsolutePath(entry)
+        : null;
+
+    private static bool IsExecutable(AbsolutePath path)
     {
         try
         {
-            if (!File.Exists(path))
+            if (!path.ExistsFile())
             {
                 return false;
             }
 
             if (!OperatingSystem.IsWindows())
             {
-                var mode = File.GetUnixFileMode(path);
+                var mode = path.GetUnixFileMode();
                 return mode.HasFlag(UnixFileMode.UserExecute) || mode.HasFlag(UnixFileMode.GroupExecute) ||
                        mode.HasFlag(UnixFileMode.OtherExecute);
             }
@@ -230,14 +243,14 @@ public sealed class GenericProfilerFactory : ProfilerFactory
         return true;
     }
 
-    public override bool Check(string path, out string error)
+    public override bool Check(AbsolutePath? path, out string error)
     {
         error = "";
         return true;
     }
 
-    public override (string Program, IReadOnlyList<string> Arguments) BuildCommand(SettingsObject settings, int pid) =>
-        ("", []);
+    public override (AbsolutePath Program, IReadOnlyList<string> Arguments) BuildCommand(SettingsObject settings, int pid) =>
+        (default(AbsolutePath), []);
 }
 
 /// <summary>Port of Application's profiler registry: m_profilers and profilers().</summary>
@@ -269,10 +282,6 @@ public static class Profilers
 
 internal static class ProfilerStringExtensions
 {
-    public static bool IsEmpty(this string s) => s.Length == 0;
-
-    public static string ToStringInvariant(this int value) => value.ToString(CultureInfo.InvariantCulture);
-
     public static int AsIntSetting(this object? value, int fallback)
     {
         try

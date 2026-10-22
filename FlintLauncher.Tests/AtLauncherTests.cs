@@ -13,6 +13,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -64,7 +65,7 @@ public class AtLauncherTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList([instancesDir]) { Environment = _global };
+        return new InstanceList([new AbsolutePath(instancesDir)]) { Environment = _global };
     }
 
     /// <summary>The (uid, version) component list of the created instance's mmc-pack.json;
@@ -359,8 +360,8 @@ public class AtLauncherTests : IDisposable
         fixture.Register(_server);
 
         var cacheDir = Path.Combine(_root, "cache");
-        var cache = new HttpMetaCache(Path.Combine(_root, "metacache"));
-        cache.AddBase("ATLauncherPacks", cacheDir);
+        var cache = new HttpMetaCache(new AbsolutePath(Path.Combine(_root, "metacache")));
+        cache.AddBase("ATLauncherPacks", new AbsolutePath(cacheDir));
 
         var list = CreateList();
         var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api)

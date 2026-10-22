@@ -7,6 +7,7 @@
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Settings;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -36,9 +37,9 @@ public class InstanceTests : IDisposable
     private string StatePath => Path.Combine(_root, "instance-state.json");
 
     private InstanceJsonSettingsObject Settings() =>
-        new(_root, TestInstanceEnvironment.Default(_global.Store));
+        new(new AbsolutePath(_root), TestInstanceEnvironment.Default(_global.Store));
 
-    private MinecraftInstance CreateInstance() => new(Settings(), _root);
+    private MinecraftInstance CreateInstance() => new(Settings(), new AbsolutePath(_root));
 
     [Fact]
     public void Defaults_MatchUpstream()
@@ -66,7 +67,7 @@ public class InstanceTests : IDisposable
         Assert.False(File.Exists(_cfgPath)); // nothing ever wrote an instance.cfg
         Assert.Contains("My Test", File.ReadAllText(JsonPath));
 
-        var reloaded = new MinecraftInstance(Settings(), _root);
+        var reloaded = new MinecraftInstance(Settings(), new AbsolutePath(_root));
         Assert.Equal("My Test", reloaded.Name());
         Assert.Equal("custom-icon", reloaded.IconKey());
         Assert.Equal("some notes\nwith a newline", reloaded.Notes());
@@ -103,7 +104,7 @@ public class InstanceTests : IDisposable
         Assert.True(Variant.AsBool(instance.Settings.Get("OverrideCommands")));
 
         // persisted to instance.json and reloaded
-        var reloaded = new MinecraftInstance(Settings(), _root);
+        var reloaded = new MinecraftInstance(Settings(), new AbsolutePath(_root));
         Assert.Equal("echo local", reloaded.GetPreLaunchCommand());
 
         // reset -> member null -> inherits the user layer again
@@ -137,28 +138,28 @@ public class InstanceTests : IDisposable
     {
         var instance = CreateInstance();
         // nothing exists yet -> planned "minecraft" layout
-        Assert.Equal(FileSystemPathCombine(_root, "minecraft"), instance.GameRoot());
+        Assert.Equal(FileSystemPathCombine(_root, "minecraft"), instance.GameRoot.Value);
 
         // legacy layout: only .minecraft exists
         Directory.CreateDirectory(Path.Combine(_root, ".minecraft"));
-        Assert.Equal(FileSystemPathCombine(_root, ".minecraft"), instance.GameRoot());
+        Assert.Equal(FileSystemPathCombine(_root, ".minecraft"), instance.GameRoot.Value);
     }
 
     [Fact]
     public void PathAccessors_MatchUpstreamComposition()
     {
         var instance = CreateInstance();
-        var gameRoot = instance.GameRoot();
+        var gameRoot = instance.GameRoot;
 
-        Assert.Equal(FileSystemPathCombine(gameRoot, "mods"), instance.ModsRoot());
-        Assert.Equal(FileSystemPathCombine(gameRoot, "coremods"), instance.CoreModsDir());
-        Assert.Equal(FileSystemPathCombine(gameRoot, "resourcepacks"), instance.ResourcePacksDir());
-        Assert.Equal(FileSystemPathCombine(gameRoot, "shaderpacks"), instance.ShaderPacksDir());
-        Assert.Equal(FileSystemPathCombine(gameRoot, "bin"), instance.BinRoot());
+        Assert.Equal(FileSystemPathCombine(gameRoot.Value, "mods"), instance.ModsRoot.Value);
+        Assert.Equal(FileSystemPathCombine(gameRoot.Value, "coremods"), instance.CoreModsDir.Value);
+        Assert.Equal(FileSystemPathCombine(gameRoot.Value, "resourcepacks"), instance.ResourcePacksDir.Value);
+        Assert.Equal(FileSystemPathCombine(gameRoot.Value, "shaderpacks"), instance.ShaderPacksDir.Value);
+        Assert.Equal(FileSystemPathCombine(gameRoot.Value, "bin"), instance.BinRoot().Value);
         // these live under the instance root, not gameRoot
-        Assert.Equal(FileSystemPathCombine(_root, "jarmods"), instance.JarModsDir());
-        Assert.Equal(FileSystemPathCombine(_root, "natives"), instance.GetNativePath());
-        Assert.Equal(FileSystemPathCombine(_root, "libraries"), instance.GetLocalLibraryPath());
+        Assert.Equal(FileSystemPathCombine(_root, "jarmods"), instance.JarModsDir.Value);
+        Assert.Equal(FileSystemPathCombine(_root, "natives"), instance.GetNativePath().Value);
+        Assert.Equal(FileSystemPathCombine(_root, "libraries"), instance.GetLocalLibraryPath().Value);
     }
 
     [Fact]
@@ -211,7 +212,7 @@ public class InstanceTests : IDisposable
         Assert.True(Variant.AsLong(instance.Settings.Get("lastTimePlayed")) >= 0);
 
         // the trio survives a reload (instance-state.json, not instance.json)
-        var reloaded = new MinecraftInstance(Settings(), _root);
+        var reloaded = new MinecraftInstance(Settings(), new AbsolutePath(_root));
         Assert.Equal(instance.TotalTimePlayed(), reloaded.TotalTimePlayed());
         Assert.Equal(instance.LastLaunch(), reloaded.LastLaunch());
     }
@@ -270,7 +271,7 @@ public class InstanceTests : IDisposable
             "lastTimePlayed=120",
         ]);
 
-        var instance = new MinecraftInstance(Settings(), _root);
+        var instance = new MinecraftInstance(Settings(), new AbsolutePath(_root));
         // reads come from the in-memory cfg import (C7 gate honored: gate=true keeps the value)
         Assert.Equal("Prism Inst", instance.Name());
         Assert.Equal("grass", instance.IconKey());
@@ -293,7 +294,7 @@ public class InstanceTests : IDisposable
         // the cfg is never rewritten or deleted (read-compat), but instance.json now wins
         Assert.Contains("name=Prism Inst", File.ReadAllText(_cfgPath));
 
-        var reloaded = new MinecraftInstance(Settings(), _root);
+        var reloaded = new MinecraftInstance(Settings(), new AbsolutePath(_root));
         Assert.Equal("converted", reloaded.Notes());
         Assert.Equal("0123456789abcdef0123456789abcdef", reloaded.Uuid);
         Assert.Equal(2048, Variant.AsInt(reloaded.Settings.Get("MaxMemAlloc")));
@@ -312,7 +313,7 @@ public class InstanceTests : IDisposable
             "MaxMemAlloc=2048",
         ]);
 
-        var instance = new MinecraftInstance(Settings(), _root);
+        var instance = new MinecraftInstance(Settings(), new AbsolutePath(_root));
         Assert.False(Variant.AsBool(instance.Settings.Get("OverrideMemory")));
         Assert.Equal(4096, Variant.AsInt(instance.Settings.Get("MaxMemAlloc"))); // user layer
     }
@@ -332,7 +333,7 @@ public class InstanceTests : IDisposable
             "MaxMemAlloc=2048",
         ]);
 
-        var instance = new MinecraftInstance(Settings(), _root);
+        var instance = new MinecraftInstance(Settings(), new AbsolutePath(_root));
         Assert.True(Variant.AsBool(instance.Settings.Get("OverrideMemory")));
         Assert.Equal(2048, Variant.AsInt(instance.Settings.Get("MaxMemAlloc"))); // kept, not the user layer's 4096
     }
@@ -358,7 +359,7 @@ public class InstanceTests : IDisposable
             "OverrideMemory=true",
         ]);
 
-        var instance = new MinecraftInstance(Settings(), _root);
+        var instance = new MinecraftInstance(Settings(), new AbsolutePath(_root));
         Assert.Equal("/opt/jdk-21/bin/java", Variant.AsString(instance.Settings.Get("JavaPath")));
         Assert.Equal("-Xss1m", Variant.AsString(instance.Settings.Get("JvmArgs")));
         Assert.Equal(8192, Variant.AsInt(instance.Settings.Get("MaxMemAlloc")));
@@ -382,7 +383,7 @@ public class InstanceTests : IDisposable
             "OverrideMemory=false",
         ]);
 
-        var instance = new MinecraftInstance(Settings(), _root);
+        var instance = new MinecraftInstance(Settings(), new AbsolutePath(_root));
         Assert.False(Variant.AsBool(instance.Settings.Get("OverrideMemory")));
         // the orphaned value was dropped (gate=false), the seeded user-layer default applies
         Assert.True(Variant.AsBool(instance.Settings.Get("LowMemWarning")));
@@ -400,7 +401,7 @@ public class InstanceTests : IDisposable
             "MaxMemAlloc=8192",
         ]);
 
-        var instance = new MinecraftInstance(Settings(), _root);
+        var instance = new MinecraftInstance(Settings(), new AbsolutePath(_root));
         Assert.False(Variant.AsBool(instance.Settings.Get("OverrideMemory")));
         Assert.Equal(4096, Variant.AsInt(instance.Settings.Get("MaxMemAlloc"))); // user layer
     }
@@ -417,7 +418,7 @@ public class InstanceTests : IDisposable
         Assert.True(instance.IsLinkedToInstanceId("22222222222222222222222222222222"));
         Assert.Contains("22222222222222222222222222222222", File.ReadAllText(JsonPath));
 
-        var reloaded = new MinecraftInstance(Settings(), _root);
+        var reloaded = new MinecraftInstance(Settings(), new AbsolutePath(_root));
         Assert.Equal(2, reloaded.GetLinkedInstances().Count);
         Assert.True(reloaded.RemoveLinkedInstanceId("11111111111111111111111111111111"));
         Assert.Single(reloaded.GetLinkedInstances());
@@ -426,7 +427,7 @@ public class InstanceTests : IDisposable
     [Fact]
     public void NullInstance_IsBrokenByDefault()
     {
-        var instance = new NullInstance(Settings(), _root);
+        var instance = new NullInstance(Settings(), new AbsolutePath(_root));
         Assert.True(instance.HasVersionBroken);
         Assert.False(instance.CanLaunch());
     }

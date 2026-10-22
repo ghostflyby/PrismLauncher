@@ -15,6 +15,7 @@ using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.State;
 using Microsoft.Extensions.Logging;
+using TruePath;
 
 namespace FlintLauncher.Core.Launch;
 
@@ -54,11 +55,11 @@ public sealed class LaunchServices
     /// setting under STORE semantics — relative joins the store root). The host provides it
     /// so AutoInstallJava installs into the configured store location; null keeps the
     /// Paths.JavaRoot anchor (the store/java default).</summary>
-    public Func<string>? JavaRootProvider { get; init; }
+    public Func<AbsolutePath>? JavaRootProvider { get; init; }
 
     /// <summary>The effective java root: the provider's resolution when wired, else the
     /// store-root java anchor (the same store semantics with the default dir name).</summary>
-    public string JavaRoot => JavaRootProvider?.Invoke() ?? Paths.JavaRoot;
+    public AbsolutePath JavaRoot => JavaRootProvider?.Invoke() ?? Paths.JavaRoot;
 
     /// <summary>GUI-only interaction points (dialogs, window management). Unset members keep
     /// the headless defaults — the C++ GUI host would set them.</summary>
@@ -87,7 +88,7 @@ public sealed class LaunchUiHooks
 
     /// <summary>Copy the instance icon into the game root (icon path, target path)
     /// (MinecraftInstance; C++ APPLICATION->icons()->saveIcon).</summary>
-    public Action<string, string>? SaveIcon;
+    public Action<string, AbsolutePath>? SaveIcon;
 
     /// <summary>Primary screen available size for maximized launch scripts; unset falls back
     /// to the configured window size (MinecraftInstance).</summary>

@@ -39,7 +39,7 @@ public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
             return Task.CompletedTask;
         }
 
-        var finalJarPath = Path.Combine(inst.BinRoot(), "minecraft.jar");
+        var finalJarPath = inst.BinRoot() / "minecraft.jar";
         if (!RemoveJar())
         {
             EmitFailed($"Couldn't remove stale jar file: {finalJarPath}");
@@ -57,14 +57,14 @@ public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
                 return Task.CompletedTask;
             }
 
-            var jars = new List<string>();
-            var temp1 = new List<string>();
-            var temp2 = new List<string>();
-            var temp3 = new List<string>();
+            var jars = new List<AbsolutePath>();
+            var temp1 = new List<AbsolutePath>();
+            var temp2 = new List<AbsolutePath>();
+            var temp3 = new List<AbsolutePath>();
             mainJar.GetApplicableFiles(inst.RuntimeContext, jars, temp1, temp2, temp3, inst.GetLocalLibraryPath(),
                 inst.LibraryStorageBase());
             var sourceJarPath = jars[0];
-            if (!CreateModdedJar(sourceJarPath, finalJarPath, jarMods))
+            if (!CreateModdedJar(sourceJarPath.Value, finalJarPath.Value, jarMods))
             {
                 EmitFailed("Failed to create the custom Minecraft jar file.");
                 return Task.CompletedTask;
@@ -80,8 +80,8 @@ public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
     private bool RemoveJar()
     {
         var inst = Parent.Instance;
-        var finalJarPath = Path.Combine(inst.BinRoot(), "minecraft.jar");
-        var finalJar = new FileInfo(finalJarPath);
+        var finalJarPath = inst.BinRoot() / "minecraft.jar";
+        var finalJar = new FileInfo(finalJarPath.Value);
         if (finalJar.Exists)
         {
             try
@@ -146,7 +146,7 @@ public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
                     var whatToZip = filename.FullName;
                     var parentDir = Path.GetDirectoryName(Path.GetFullPath(whatToZip)) ?? "";
                     var files = new List<string>();
-                    MmcZip.CollectFileListRecursively(whatToZip, null, files);
+                    MmcZip.CollectFileListRecursively(new AbsolutePath(whatToZip), null, files);
 
                     files.RemoveAll(file => addedFiles.Contains(file));
 

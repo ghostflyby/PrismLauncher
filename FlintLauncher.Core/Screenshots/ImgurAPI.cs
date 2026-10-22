@@ -21,6 +21,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Screenshots;
 
@@ -96,7 +97,7 @@ public sealed class ImgurUpload(
         byte[] fileData;
         try
         {
-            fileData = await File.ReadAllBytesAsync(shot.FilePath, cancellationToken).ConfigureAwait(false);
+            fileData = await shot.FilePath.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException
                                       or ArgumentException or SecurityException)

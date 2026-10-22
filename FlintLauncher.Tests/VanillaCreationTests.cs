@@ -7,6 +7,7 @@ using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Instances.Creation;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -36,7 +37,11 @@ public class VanillaCreationTests : IDisposable
     }
 
     private InstanceList CreateList() =>
-        new([_instancesDir]) { Environment = _global, GroupFilePath = _groupFile };
+        new([new AbsolutePath(_instancesDir)])
+        {
+            Environment = _global,
+            GroupFilePath = new AbsolutePath(_groupFile),
+        };
 
     private VanillaCreationTask CreateTask(string version, string name)
     {
@@ -151,8 +156,8 @@ public class VanillaCreationTests : IDisposable
     {
         var task = new VanillaCreationTask("1.20.1");
         task.SetName("Orphan");
-        task.StagingPath = Path.Combine(_root, "orphan");
-        Directory.CreateDirectory(task.StagingPath);
+        task.StagingPath = new AbsolutePath(Path.Combine(_root, "orphan"));
+        Directory.CreateDirectory(task.StagingPath.Value);
 
         await task.StartAsync();
         Assert.Equal(TaskState.Failed, task.State);

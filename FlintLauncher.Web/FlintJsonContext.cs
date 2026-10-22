@@ -3,6 +3,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.Config;
+using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.Secrets;
 using FlintLauncher.Core.State;
@@ -16,7 +17,8 @@ namespace FlintLauncher.Web;
 // (no reflection), so they are deliberately NOT registered here — registering them trips
 // SYSLIB1030/1031.
 
-[JsonSourceGenerationOptions(WriteIndented = false, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSourceGenerationOptions(WriteIndented = false, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    Converters = [typeof(AbsolutePathJsonConverter)])]
 [JsonSerializable(typeof(InfoResponse))]
 [JsonSerializable(typeof(HealthResponse))]
 [JsonSerializable(typeof(ErrorResponse))]

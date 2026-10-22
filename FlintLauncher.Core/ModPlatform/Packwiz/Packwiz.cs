@@ -16,6 +16,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Versioning;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.ModPlatform.Packwiz;
 
@@ -108,7 +109,7 @@ public static class Packwiz
     /// <summary>
     /// Port of V1::updateModIndex: updates (creates if needed) the mod's .pw.toml index file.
     /// </summary>
-    public static void UpdateModIndex(string indexDir, Mod mod)
+    public static void UpdateModIndex(AbsolutePath indexDir, Mod mod)
     {
         if (!mod.IsValid)
         {
@@ -119,21 +120,21 @@ public static class Packwiz
         // Ensure the corresponding mod's info exists, and create it if not
         var normalizedFname = IndexFileName(mod.Slug);
         var realFname = GetRealIndexName(indexDir, normalizedFname);
-        var realPath = Path.Combine(indexDir, realFname);
-        var normalizedPath = Path.Combine(indexDir, normalizedFname);
+        var realPath = indexDir / realFname;
+        var normalizedPath = indexDir / normalizedFname;
 
-        if (realFname != normalizedFname && File.Exists(realPath))
+        if (realFname != normalizedFname && realPath.ExistsFile())
         {
-            File.Move(realPath, normalizedPath);
+            realPath.Move(normalizedPath);
         }
 
         // There's already data on there!
         // TODO: We should do more stuff here, as the user is likely trying to
         // override a file. In this case, check versions and ask the user what
         // they want to do!
-        if (File.Exists(normalizedPath))
+        if (normalizedPath.Exists())
         {
-            File.Delete(normalizedPath);
+            normalizedPath.Delete();
         }
         else
         {
@@ -219,14 +220,14 @@ public static class Packwiz
         // trailing newline like toml++'s formatted output
         toml.AppendLine("");
 
-        File.WriteAllText(normalizedPath, toml.ToString());
+        normalizedPath.WriteAllText(toml.ToString());
     }
 
     /// <summary>
     /// Port of V1::deleteModIndex: deletes the metadata for the mod with the given slug.
     /// If the metadata doesn't exist, it does nothing.
     /// </summary>
-    public static void DeleteModIndex(string indexDir, string modSlug)
+    public static void DeleteModIndex(AbsolutePath indexDir, string modSlug)
     {
         var normalizedFname = IndexFileName(modSlug);
         var realFname = GetRealIndexName(indexDir, normalizedFname);
@@ -235,21 +236,21 @@ public static class Packwiz
             return;
         }
 
-        var path = Path.Combine(indexDir, realFname);
-        if (!File.Exists(path))
+        var path = indexDir / realFname;
+        if (!path.ExistsFile())
         {
             // "Tried to delete non-existent mod metadata for {slug}!"
             return;
         }
 
-        File.Delete(path);
+        path.Delete();
     }
 
     /// <summary>
     /// Port of V1::getIndexForMod(index_dir, slug): gets the metadata for a mod with a
     /// particular slug. If the mod doesn't have metadata, an empty Mod is returned.
     /// </summary>
-    public static Mod GetIndexForMod(string indexDir, string slug)
+    public static Mod GetIndexForMod(AbsolutePath indexDir, string slug)
     {
         var mod = new Mod();
 
@@ -260,7 +261,7 @@ public static class Packwiz
             return mod;
         }
 
-        var path = Path.Combine(indexDir, realFname);
+        var path = indexDir / realFname;
         TomlTable table;
         try
         {
@@ -367,7 +368,7 @@ public static class Packwiz
     /// Port of V1::getIndexForMod(index_dir, mod_id): scans the index directory for the
     /// metadata of a mod with the given provider id. Empty Mod when not found.
     /// </summary>
-    public static Mod GetIndexForModById(string indexDir, string modId)
+    public static Mod GetIndexForModById(AbsolutePath indexDir, string modId)
     {
         foreach (var fileName in ListFiles(indexDir))
         {
@@ -395,10 +396,10 @@ public static class Packwiz
     }
 
     /// <summary>Port of the getRealIndexName helper.</summary>
-    private static string GetRealIndexName(string indexDir, string normalizedFname, bool shouldFindMatch = false)
+    private static string GetRealIndexName(AbsolutePath indexDir, string normalizedFname, bool shouldFindMatch = false)
     {
         var realFname = normalizedFname;
-        if (!File.Exists(Path.Combine(indexDir, normalizedFname)))
+        if (!(indexDir / normalizedFname).ExistsFile())
         {
             // Tries to get similar entries
             foreach (var fileName in ListFiles(indexDir))
@@ -420,11 +421,11 @@ public static class Packwiz
         return realFname;
     }
 
-    private static List<string> ListFiles(string indexDir)
+    private static List<string> ListFiles(AbsolutePath indexDir)
     {
         try
         {
-            return Directory.EnumerateFiles(indexDir).Select(Path.GetFileName).OfType<string>().ToList();
+            return indexDir.EnumerateFiles().Select(path => path.FileName).ToList();
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
         {

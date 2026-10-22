@@ -7,6 +7,8 @@ using System.Security.Cryptography;
 using System.Text;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
+using TruePath.SystemIo;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -69,8 +71,8 @@ public class NetStackTests : IDisposable
 
         long timestamp;
         {
-            using var cache = new HttpMetaCache(indexPath);
-            cache.AddBase("META", basePath);
+            using var cache = new HttpMetaCache(new AbsolutePath(indexPath));
+            cache.AddBase("META", new AbsolutePath(basePath));
 
             var file = Path.Combine(basePath, "net.minecraft/index.json");
             var fileDir = Path.GetDirectoryName(file);
@@ -97,7 +99,7 @@ public class NetStackTests : IDisposable
             // a non-ASCII base rides the same write: QJsonDocument leaves unicode alone, so
             // the relaxed encoder must not turn it into \uXXXX escapes
             const string unicodeBase = "路径/é/日本語";
-            cache.AddBase(unicodeBase, basePath);
+            cache.AddBase(unicodeBase, new AbsolutePath(basePath));
             var unicodeEntry = cache.ResolveEntry(unicodeBase, "net.minecraft/index.json");
             unicodeEntry.IsStale = false;
             unicodeEntry.IsEternal = true;
@@ -115,8 +117,8 @@ public class NetStackTests : IDisposable
         Assert.Contains("\"base\":\"路径/é/日本語\"", json);
         Assert.DoesNotContain("\\u8DEF", json);
 
-        using var cache2 = new HttpMetaCache(indexPath);
-        cache2.AddBase("META", basePath);
+        using var cache2 = new HttpMetaCache(new AbsolutePath(indexPath));
+        cache2.AddBase("META", new AbsolutePath(basePath));
         cache2.Load();
 
         var resolved = cache2.ResolveEntry("META", "net.minecraft/index.json", "\"abc123\"");
@@ -134,8 +136,8 @@ public class NetStackTests : IDisposable
         var file = Path.Combine(basePath, "f.json");
         File.WriteAllText(file, "{}");
 
-        using var cache = new HttpMetaCache(indexPath);
-        cache.AddBase("general", basePath);
+        using var cache = new HttpMetaCache(new AbsolutePath(indexPath));
+        cache.AddBase("general", new AbsolutePath(basePath));
         var entry = cache.ResolveEntry("general", "f.json");
         entry.IsStale = false;
         entry.Etag = "\"old\"";
@@ -169,9 +171,9 @@ public class NetStackTests : IDisposable
         File.WriteAllText(file, "{}");
 
         // seed a valid ledger exactly like MetaCache_SaveLoad_RoundTrip
-        using (var cache = new HttpMetaCache(indexPath))
+        using (var cache = new HttpMetaCache(new AbsolutePath(indexPath)))
         {
-            cache.AddBase("general", basePath);
+            cache.AddBase("general", new AbsolutePath(basePath));
             var entry = cache.ResolveEntry("general", "f.json");
             entry.IsStale = false;
             entry.Etag = "\"seed\"";
@@ -187,8 +189,8 @@ public class NetStackTests : IDisposable
         // ledger file (here: chmod 000) must not make the host fail to start.
         File.SetUnixFileMode(indexPath, UnixFileMode.None);
 
-        var cache2 = new HttpMetaCache(indexPath);
-        cache2.AddBase("general", basePath);
+        var cache2 = new HttpMetaCache(new AbsolutePath(indexPath));
+        cache2.AddBase("general", new AbsolutePath(basePath));
         var ex = Record.Exception(cache2.Load);
         Assert.Null(ex);
 
@@ -211,9 +213,9 @@ public class NetStackTests : IDisposable
         File.WriteAllText(file, "{}");
 
         // seed a valid ledger (as above) so the test can tell "skipped" from "loaded"
-        using (var cache = new HttpMetaCache(indexPath))
+        using (var cache = new HttpMetaCache(new AbsolutePath(indexPath)))
         {
-            cache.AddBase("general", basePath);
+            cache.AddBase("general", new AbsolutePath(basePath));
             var entry = cache.ResolveEntry("general", "f.json");
             entry.IsStale = false;
             entry.Etag = "\"seed\"";
@@ -228,8 +230,8 @@ public class NetStackTests : IDisposable
         // ledger held under an exclusive handle (FileShare.None) must not make Load() throw.
         using (File.Open(indexPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
         {
-            using var cache2 = new HttpMetaCache(indexPath);
-            cache2.AddBase("general", basePath);
+            using var cache2 = new HttpMetaCache(new AbsolutePath(indexPath));
+            cache2.AddBase("general", new AbsolutePath(basePath));
             var ex = Record.Exception(cache2.Load);
             Assert.Null(ex);
 
@@ -259,8 +261,8 @@ public class NetStackTests : IDisposable
         File.WriteAllText(file, "{}");
 
         // seed a valid entry exactly like MetaCache_SaveLoad_RoundTrip
-        using var cache = new HttpMetaCache(indexPath);
-        cache.AddBase("general", basePath);
+        using var cache = new HttpMetaCache(new AbsolutePath(indexPath));
+        cache.AddBase("general", new AbsolutePath(basePath));
         var entry = cache.ResolveEntry("general", "locked.json");
         entry.IsStale = false;
         entry.Etag = "\"seed\"";
@@ -295,7 +297,7 @@ public class NetStackTests : IDisposable
         });
 
         var target = TempPath("download.bin");
-        var request = NetRequest.MakeFile(new Uri(server.Url + "/file"), target);
+        var request = NetRequest.MakeFile(new Uri(server.Url + "/file"), new AbsolutePath(target));
         request.AddValidator(ChecksumValidator.FromHex(
             HashAlgorithmName.SHA1,
             Convert.ToHexString(SHA1.HashData("file-content-0123456789"u8.ToArray())).ToLowerInvariant()));
@@ -330,8 +332,8 @@ public class NetStackTests : IDisposable
         var indexPath = TempPath("metacache");
         var basePath = TempPath("cache");
         Directory.CreateDirectory(basePath);
-        var cache = new HttpMetaCache(indexPath);
-        cache.AddBase("general", basePath);
+        var cache = new HttpMetaCache(new AbsolutePath(indexPath));
+        cache.AddBase("general", new AbsolutePath(basePath));
 
         // first fetch: downloads and records the entry
         var entry = cache.ResolveEntry("general", "thing.txt");
@@ -339,7 +341,7 @@ public class NetStackTests : IDisposable
         await first.StartAsync();
         Assert.Equal(TaskState.Succeeded, first.State);
         Assert.Equal(1, requestCount);
-        Assert.Equal("cached-body", await File.ReadAllTextAsync(entry.GetFullPath()));
+        Assert.Equal("cached-body", await entry.GetFullPath().ReadAllTextAsync());
         Assert.Equal("\"v1\"", entry.Etag);
 
         // second fetch: server answers 304, local data is used (no rewrite)
@@ -349,7 +351,7 @@ public class NetStackTests : IDisposable
         await second.StartAsync();
         Assert.Equal(TaskState.Succeeded, second.State);
         Assert.Equal(2, requestCount);
-        Assert.Equal("cached-body", await File.ReadAllTextAsync(entry2.GetFullPath()));
+        Assert.Equal("cached-body", await entry2.GetFullPath().ReadAllTextAsync());
     }
 
     [Fact]

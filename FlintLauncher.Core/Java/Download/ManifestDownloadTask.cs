@@ -43,7 +43,7 @@ public sealed record JavaRuntimeRawJson(
 [JsonSerializable(typeof(JavaRuntimeManifestJson))]
 internal sealed partial class JavaManifestJsonContext : JsonSerializerContext;
 
-public sealed class ManifestDownloadTask(Uri url, string finalPath, string checksumType = "", string checksumHash = "")
+public sealed class ManifestDownloadTask(Uri url, AbsolutePath finalPath, string checksumType = "", string checksumHash = "")
     : FlintTask
 {
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -98,7 +98,7 @@ public sealed class ManifestDownloadTask(Uri url, string finalPath, string check
                     continue; // toObject() on a non-object yields an empty object with no type
                 }
 
-                var file = Path.Combine(finalPath, paths);
+                var file = (AbsolutePath)finalPath / paths;
 
                 var type = meta.Type ?? "";
                 if (type == "directory")
@@ -111,7 +111,7 @@ public sealed class ManifestDownloadTask(Uri url, string finalPath, string check
                     var path = meta.Target ?? "";
                     if (path.Length != 0)
                     {
-                        CreateLink(path, file);
+                        CreateLink(path, file.Value);
                     }
                 }
                 else if (type == "file")
@@ -146,7 +146,7 @@ public sealed class ManifestDownloadTask(Uri url, string finalPath, string check
             var target = file.Path;
             if (file.IsExec)
             {
-                dl.Succeeded += _ => SetExecutable(target);
+                dl.Succeeded += _ => SetExecutable(target.Value);
             }
 
             elementDownload.AddNetRequest(dl);
@@ -210,7 +210,7 @@ public sealed class ManifestDownloadTask(Uri url, string finalPath, string check
 
     private sealed class ManifestFile
     {
-        public string Path { get; init; } = "";
+        public AbsolutePath Path { get; init; }
 
         public Uri Url { get; init; } = new("about:blank");
 

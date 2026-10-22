@@ -7,6 +7,7 @@
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using TruePath;
 
 namespace FlintLauncher.Core.Json;
 
@@ -165,4 +166,38 @@ public sealed class QtCoercingIntListConverter : JsonConverter<List<int>>
 
         writer.WriteEndArray();
     }
+}
+
+/// <summary>TruePath <see cref="AbsolutePath"/> as its plain string form (the wire shape of
+/// the migration surface's source paths stays a JSON string, unchanged from the pre-typed
+/// era). Read direction: a JSON null reads null; anything not a string token — or a string
+/// that is not an absolute path — is a JsonException, the ordinary
+/// deserialization-failure semantics (no silent coercion).</summary>
+public sealed class AbsolutePathJsonConverter : JsonConverter<AbsolutePath>
+{
+    public override AbsolutePath Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType is not JsonTokenType.String)
+        {
+            throw new JsonException($"expected an absolute path string, found {reader.TokenType}");
+        }
+
+        var value = reader.GetString();
+        if (value is null)
+        {
+            throw new JsonException("expected an absolute path string, found null");
+        }
+
+        try
+        {
+            return new AbsolutePath(value);
+        }
+        catch (ArgumentException e)
+        {
+            throw new JsonException($"'{value}' is not an absolute path", e);
+        }
+    }
+
+    public override void Write(Utf8JsonWriter writer, AbsolutePath value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value.Value);
 }

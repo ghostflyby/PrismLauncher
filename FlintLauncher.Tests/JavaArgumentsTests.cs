@@ -119,7 +119,7 @@ public class JavaArgumentsTests
         Assert.Equal(string.Join(" ", instance.JavaArguments()), variables["INST_JAVA_ARGS"]);
         Assert.Equal(instance.Name(), variables["INST_NAME"]);
         Assert.Equal("1", variables["NO_COLOR"]);
-        Assert.Equal(instance.InstanceRoot(), variables["INST_DIR"]);
-        Assert.Equal(instance.GameRoot(), variables["INST_MC_DIR"]);
+        Assert.Equal(instance.InstanceRoot.Value, variables["INST_DIR"]);
+        Assert.Equal(instance.GameRoot.Value, variables["INST_MC_DIR"]);
     }
 }

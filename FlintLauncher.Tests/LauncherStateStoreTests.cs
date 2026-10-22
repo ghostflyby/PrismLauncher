@@ -9,6 +9,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.State;
 using FlintLauncher.Web;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -28,7 +29,7 @@ public class LauncherStateStoreTests : IDisposable
 
     private string StateFile => Path.Combine(_dir, "launcher-state.json");
 
-    private LauncherStateStore Store() => new(StateFile, FlintJsonContext.Default.LauncherState);
+    private LauncherStateStore Store() => new(new AbsolutePath(StateFile), FlintJsonContext.Default.LauncherState);
 
     [Fact]
     public void Missing_File_Yields_The_Schema_Default()

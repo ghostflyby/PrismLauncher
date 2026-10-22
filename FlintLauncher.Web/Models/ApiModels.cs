@@ -4,6 +4,7 @@
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using TruePath;
 
 namespace FlintLauncher.Web.Models;
 
@@ -118,7 +119,7 @@ public sealed record TaskResultView(
     IReadOnlyList<ModUpdateEntryView>? Updates,
     IReadOnlyList<ModInstallEntryView>? Installed,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? OutputPath = null);
+    AbsolutePath? OutputPath = null);
 
 public sealed record TaskView(
     string Id,

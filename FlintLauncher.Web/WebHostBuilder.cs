@@ -22,6 +22,7 @@ using FlintLauncher.Web.Logging;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
 using FlintLauncher.Web.Services;
+using TruePath;
 
 // extension-method log events (HttpLog.Request/Probe) live in the Core Diagnostics namespace
 
@@ -262,21 +263,28 @@ public static class WebHostBuilder
         var state = FlintPaths.PlatformDefaultStateRoot();
 
         var home = FlagValue(args, "--home-dir", "FLINT_HOME");
-        if (home is not null)
+        if (home is { } homeRoot)
         {
-            config = Path.Combine(home, "config");
-            data = Path.Combine(home, "data");
-            store = Path.Combine(home, "store");
-            cache = Path.Combine(home, "cache");
-            state = Path.Combine(home, "state");
+            config = homeRoot / "config";
+            data = homeRoot / "data";
+            store = homeRoot / "store";
+            cache = homeRoot / "cache";
+            state = homeRoot / "state";
         }
 
-        var roots = FlintPaths.FromRoots(
-            FlagValue(args, "--config-dir", "FLINT_CONFIG_DIR") ?? config,
-            FlagValue(args, "--data-dir", "FLINT_DATA_DIR") ?? data,
-            FlagValue(args, "--store-dir", "FLINT_STORE_DIR") ?? store,
-            FlagValue(args, "--cache-dir", "FLINT_CACHE_DIR") ?? cache,
-            FlagValue(args, "--state-dir", "FLINT_STATE_DIR") ?? state);
+        AbsolutePath configRoot = FlagValue(args, "--config-dir", "FLINT_CONFIG_DIR") ?? config;
+        AbsolutePath dataRoot = FlagValue(args, "--data-dir", "FLINT_DATA_DIR") ?? data;
+        AbsolutePath storeRoot = FlagValue(args, "--store-dir", "FLINT_STORE_DIR") ?? store;
+        AbsolutePath cacheRoot = FlagValue(args, "--cache-dir", "FLINT_CACHE_DIR") ?? cache;
+        AbsolutePath stateRoot = FlagValue(args, "--state-dir", "FLINT_STATE_DIR") ?? state;
+        var roots = new FlintPaths()
+        {
+            ConfigRoot = configRoot,
+            DataRoot = dataRoot,
+            StoreRoot = storeRoot,
+            CacheRoot = cacheRoot,
+            StateRoot = stateRoot,
+        };
 
         // G1: home mode records its origin so the flint-legacy probe can find the
         // pre-reform flat files at the home root (the fresh X/data child cannot)
@@ -289,7 +297,7 @@ public static class WebHostBuilder
     /// <summary>The last occurrence of &lt;flag&gt; &lt;value&gt; / &lt;flag&gt;=&lt;value&gt;
     /// wins, else &lt;envName&gt; when non-empty; the result is made absolute. Null when
     /// neither layer speaks.</summary>
-    private static string? FlagValue(string[] args, string flag, string envName)
+    private static AbsolutePath? FlagValue(string[] args, string flag, string envName)
     {
         string? value = null;
         for (var i = 0; i < args.Length; i++)
@@ -313,7 +321,7 @@ public static class WebHostBuilder
             }
         }
 
-        return value is null ? null : Path.GetFullPath(value);
+        return value is null ? null : new AbsolutePath(Path.GetFullPath(value));
     }
 
     /// <summary>--log-level &lt;level&gt; (or --log-level=&lt;level&gt;) wins, then

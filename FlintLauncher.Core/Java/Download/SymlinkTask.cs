@@ -7,57 +7,59 @@
 // task re-runs only when the wanted bin path is missing anyway).
 
 using FlintLauncher.Core.Tasks;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Java.Download;
 
-public sealed class SymlinkTask(string finalPath) : FlintTask
+public sealed class SymlinkTask(AbsolutePath finalPath) : FlintTask
 {
     /// <summary>Port of the free function findBinPath: first &lt;root&gt;/&lt;pattern&gt;, then one level down.</summary>
-    public static string FindBinPath(string root, string pattern)
+    public static AbsolutePath? FindBinPath(AbsolutePath root, LocalPath pattern)
     {
-        var path = Path.Combine(root, pattern);
-        if (File.Exists(path) || Directory.Exists(path))
+        var path = root / pattern;
+        if (path.Exists())
         {
             return path;
         }
 
-        if (Directory.Exists(root))
+        if (root.ExistsDirectory())
         {
-            foreach (var entry in Directory.GetDirectories(root))
+            foreach (var entry in root.GetDirectories())
             {
-                path = Path.Combine(Path.GetFullPath(entry), pattern);
-                if (File.Exists(path) || Directory.Exists(path))
+                path = new AbsolutePath(entry) / pattern;
+                if (path.Exists())
                 {
                     return path;
                 }
             }
         }
 
-        return "";
+        return null;
     }
 
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Checking for Java binary path");
-        var binPath = Path.Combine("bin", "java");
-        var wantedPath = Path.Combine(finalPath, binPath);
-        if (File.Exists(wantedPath) || Directory.Exists(wantedPath))
+        var binPath = new LocalPath("bin/java");
+        var wantedPath = finalPath / binPath;
+        if (wantedPath.Exists())
         {
             EmitSucceeded();
             return Task.CompletedTask;
         }
 
         EmitStatus("Searching for Java binary path");
-        var contentsPartialPath = Path.Combine("Contents", "Home", binPath);
+        var contentsPartialPath = new LocalPath("Contents") / "Home" / binPath;
         var relativePathToBin = FindBinPath(finalPath, contentsPartialPath);
-        if (relativePathToBin.Length == 0)
+        if (relativePathToBin is null)
         {
             EmitFailed("Failed to find Java binary path");
             return Task.CompletedTask;
         }
 
         // relativePathToBin ends with ".../bin/java": chop the "bin/java" tail off
-        var folderToLink = relativePathToBin[..^binPath.Length];
+        var folderToLink = relativePathToBin.Value.Value[..^binPath.Value.Length];
 
         EmitStatus("Collecting folders to symlink");
         var entries = Directory.GetFileSystemEntries(folderToLink);
@@ -68,13 +70,14 @@ public sealed class SymlinkTask(string finalPath) : FlintTask
         foreach (var entry in entries)
         {
             var source = Path.GetFullPath(entry);
-            var destination = Path.Combine(finalPath, Path.GetFileName(entry));
-            var destinationExists = File.Exists(destination) || Directory.Exists(destination);
+            string a1 = Path.GetFileName(entry);
+            var destination = finalPath / a1;
+            var destinationExists = destination.Exists();
             if (!destinationExists)
             {
                 try
                 {
-                    File.CreateSymbolicLink(destination, source);
+                    File.CreateSymbolicLink(destination.Value, source);
                 }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException)
                 {

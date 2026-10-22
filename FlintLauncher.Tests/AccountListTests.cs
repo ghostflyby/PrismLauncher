@@ -5,6 +5,7 @@
 
 using System.Text.Json;
 using FlintLauncher.Core.Auth;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -103,7 +104,7 @@ public class AccountListTests : IDisposable
         var path = TempPath(fileName);
         File.WriteAllText(path, UpstreamAccountsJson);
         var list = new AccountList();
-        list.SetListFilePath(path);
+        list.SetListFilePath(new AbsolutePath(path));
         Assert.True(list.LoadList());
         return list;
     }
@@ -131,7 +132,7 @@ public class AccountListTests : IDisposable
     {
         var list = LoadedList();
         var savePath = TempPath("saved.json");
-        list.SetListFilePath(savePath);
+        list.SetListFilePath(new AbsolutePath(savePath));
         Assert.True(list.SaveList());
 
         // the written file is the typed wire: formatVersion 3, both accounts, the default
@@ -165,11 +166,11 @@ public class AccountListTests : IDisposable
     {
         var list = LoadedList();
         var savePath = TempPath("roundtrip.json");
-        list.SetListFilePath(savePath);
+        list.SetListFilePath(new AbsolutePath(savePath));
         Assert.True(list.SaveList());
 
         var reloaded = new AccountList();
-        reloaded.SetListFilePath(savePath);
+        reloaded.SetListFilePath(new AbsolutePath(savePath));
         Assert.True(reloaded.LoadList());
 
         Assert.Equal(list.Count, reloaded.Count);
@@ -189,7 +190,7 @@ public class AccountListTests : IDisposable
         var path = TempPath("accounts.json");
         File.WriteAllText(path, """{"accounts": [], "formatVersion": 2}""");
         var list = new AccountList();
-        list.SetListFilePath(path);
+        list.SetListFilePath(new AbsolutePath(path));
         Assert.False(list.LoadList());
         // the old file is renamed out of the way
         Assert.False(File.Exists(path));
@@ -203,7 +204,7 @@ public class AccountListTests : IDisposable
         var path = TempPath("accounts.json");
         File.WriteAllText(path, """{"accounts": [], "formatVersion": "3"}""");
         var list = new AccountList();
-        list.SetListFilePath(path);
+        list.SetListFilePath(new AbsolutePath(path));
         Assert.True(list.LoadList());
     }
 
@@ -224,7 +225,7 @@ public class AccountListTests : IDisposable
                                 }
                                 """);
         var list = new AccountList();
-        list.SetListFilePath(path);
+        list.SetListFilePath(new AbsolutePath(path));
         Assert.True(list.LoadList());
         Assert.Equal(1, list.Count);
         Assert.Equal("Fine", list.At(0).ProfileName());
@@ -245,7 +246,7 @@ public class AccountListTests : IDisposable
                                 }
                                 """);
         var list = new AccountList();
-        list.SetListFilePath(path);
+        list.SetListFilePath(new AbsolutePath(path));
         Assert.True(list.LoadList());
         Assert.Equal(1, list.Count);
         Assert.Null(list.DefaultAccount); // junk flag is simply not the default marker
@@ -255,7 +256,7 @@ public class AccountListTests : IDisposable
     public void Missing_File_Fails()
     {
         var list = new AccountList();
-        list.SetListFilePath(TempPath("nope.json"));
+        list.SetListFilePath(new AbsolutePath(TempPath("nope.json")));
         Assert.False(list.LoadList());
     }
 
@@ -281,7 +282,7 @@ public class AccountListTests : IDisposable
                                 }
                                 """);
         var list = new AccountList();
-        list.SetListFilePath(path);
+        list.SetListFilePath(new AbsolutePath(path));
         Assert.True(list.LoadList());
         Assert.Equal(1, list.Count);
         Assert.Equal("First", list.At(0).ProfileName());
@@ -364,7 +365,7 @@ public class AccountListTests : IDisposable
         var path = TempPath("autosave.json");
         File.WriteAllText(path, UpstreamAccountsJson);
         var list = new AccountList();
-        list.SetListFilePath(path, enableAutosave: true);
+        list.SetListFilePath(new AbsolutePath(path), enableAutosave: true);
         Assert.True(list.LoadList());
 
         var changed = false;
@@ -373,7 +374,7 @@ public class AccountListTests : IDisposable
         Assert.True(changed);
 
         var reloaded = new AccountList();
-        reloaded.SetListFilePath(path);
+        reloaded.SetListFilePath(new AbsolutePath(path));
         Assert.True(reloaded.LoadList());
         Assert.Equal(3, reloaded.Count);
     }

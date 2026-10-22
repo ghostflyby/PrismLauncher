@@ -6,6 +6,7 @@
 using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Launch;
 using Microsoft.Extensions.Logging;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -249,7 +250,7 @@ public class LoggedProcessTests
         Directory.CreateDirectory(workDir);
         try
         {
-            process.SetWorkingDirectory(workDir);
+            process.SetWorkingDirectory(new AbsolutePath(workDir));
             await RunAsync(process, "/bin/pwd");
 
             Assert.Equal([workDir], collector.LinesOf(MessageLevel.StdOut));

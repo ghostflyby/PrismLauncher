@@ -5,6 +5,7 @@
 
 using FlintLauncher.Web.Logging;
 using Microsoft.Extensions.Logging;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -41,7 +42,7 @@ public class RollingFileLoggerProviderTests : IDisposable
         File.WriteAllText(PathOf(3), "gen3\n");
         File.WriteAllText(PathOf(4), "gen4-oldest\n");
 
-        using var provider = new RollingFileLoggerProvider(_dir);
+        using var provider = new RollingFileLoggerProvider(new AbsolutePath(_dir));
         using (var factory = LoggerFactory.Create(builder =>
                {
                    builder.SetMinimumLevel(LogLevel.Information);
@@ -71,7 +72,7 @@ public class RollingFileLoggerProviderTests : IDisposable
         var filePath = Path.Combine(_dir, "not-a-directory");
         File.WriteAllText(filePath, "occupied");
 
-        using var provider = new RollingFileLoggerProvider(filePath);
+        using var provider = new RollingFileLoggerProvider(new AbsolutePath(filePath));
         var logger = provider.CreateLogger("any");
         logger.LogInformation("dropped");
     }

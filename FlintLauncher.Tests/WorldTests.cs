@@ -6,6 +6,7 @@
 using System.IO.Compression;
 using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Nbt;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -196,7 +197,7 @@ public class WorldTests : IDisposable
 
         var target = Path.Combine(_tempDir, "saves");
         var world = new World(zipPath);
-        Assert.True(world.Install(target, "Installed World"));
+        Assert.True(world.Install(new AbsolutePath(target), "Installed World"));
 
         // a folder named "Installed World" appears (renamed during install)
         var installed = new World(Path.Combine(target, "Installed World"));
@@ -287,7 +288,7 @@ public class WorldTests : IDisposable
         Directory.CreateDirectory(Path.Combine(saves, "not_a_world")); // no level.dat
         File.WriteAllBytes(Path.Combine(saves, "stray.zip"), []);      // files are skipped
 
-        var list = new WorldList(saves);
+        var list = new WorldList(new AbsolutePath(saves));
         Assert.True(list.Update());
         Assert.Equal(2, list.Count);
         Assert.Equal("alpha", list[0].FolderName); // name sorted
@@ -302,7 +303,7 @@ public class WorldTests : IDisposable
         WriteWorldInto(saves, "alpha", "Alpha");
         WriteWorldInto(saves, "beta", "Beta");
 
-        var list = new WorldList(saves);
+        var list = new WorldList(new AbsolutePath(saves));
         Assert.True(list.Update());
         await list.LoadWorldsAsync();
 
@@ -318,7 +319,7 @@ public class WorldTests : IDisposable
         var saves = MakeSavesDir();
         WriteWorldInto(saves, "alpha", "Alpha");
 
-        var list = new WorldList(saves);
+        var list = new WorldList(new AbsolutePath(saves));
         list.Update();
 
         // copy with a new display name (CopyWorldTask)
@@ -347,7 +348,7 @@ public class WorldTests : IDisposable
         WriteWorldInto(saves, "two", "Two");
         WriteWorldInto(saves, "three", "Three");
 
-        var list = new WorldList(saves);
+        var list = new WorldList(new AbsolutePath(saves));
         list.Update();
         Assert.True(list.DeleteWorlds(0, 1));
         Assert.Equal(1, list.Count);
@@ -375,7 +376,7 @@ public class WorldTests : IDisposable
     [Fact]
     public void WorldList_InvalidDir_UpdateFails()
     {
-        var list = new WorldList(Path.Combine(_tempDir, "never-created"));
+        var list = new WorldList(new AbsolutePath(Path.Combine(_tempDir, "never-created")));
         Directory.Delete(Path.Combine(_tempDir, "never-created")); // ctor created it; remove again
         Assert.False(list.IsValid());
         Assert.False(list.Update());

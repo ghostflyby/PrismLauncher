@@ -74,10 +74,10 @@ public class LauncherPartLaunchTests : IDisposable
     {
         // JavaPath is the (gate-controlled) global override; the stub applies in both cases
         fixture.Global.StubSet("JavaPath", javaPath);
-        Directory.CreateDirectory(instance.GameRoot()); // the step's working directory
+        Directory.CreateDirectory(instance.GameRoot.Value); // the step's working directory
         var task = LaunchTask.Create(instance, fixture.CreateServices(installRoot: installRoot ?? _root));
         step = new LauncherPartLaunch(task);
-        step.SetWorkingDirectory(instance.GameRoot());
+        step.SetWorkingDirectory(instance.GameRoot);
         task.AppendStep(step);
         return task;
     }

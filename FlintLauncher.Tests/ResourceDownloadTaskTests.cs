@@ -10,6 +10,7 @@ using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 using Xunit;
 using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
 
@@ -47,7 +48,7 @@ public class ResourceDownloadTaskTests : IDisposable
 
     private ModFolderModel CreateModel()
     {
-        var model = new ModFolderModel(ModsDir, isIndexed: true, createDir: true);
+        var model = new ModFolderModel(new AbsolutePath(ModsDir), isIndexed: true, createDir: true);
         return model;
     }
 
@@ -101,7 +102,7 @@ public class ResourceDownloadTaskTests : IDisposable
         Assert.Equal(_jarBytes, await File.ReadAllBytesAsync(jar));
 
         // the per-mod metadata was written before the download ran
-        var metadata = MetadataHandler.Get(IndexDir, "test-mod");
+        var metadata = MetadataHandler.Get(new AbsolutePath(IndexDir), "test-mod");
         Assert.True(metadata.IsValid);
         Assert.Equal("test-mod", metadata.Slug);
         Assert.Equal("test.jar", metadata.Filename);
@@ -158,7 +159,7 @@ public class ResourceDownloadTaskTests : IDisposable
         Directory.CreateDirectory(IndexDir);
         var oldBytes = "old jar bytes"u8.ToArray();
         await File.WriteAllBytesAsync(Path.Combine(ModsDir, "old.jar"), oldBytes);
-        PackwizModel.UpdateModIndex(IndexDir, new PackwizModel.Mod
+        PackwizModel.UpdateModIndex(new AbsolutePath(IndexDir), new PackwizModel.Mod
         {
             Slug = "test-mod",
             Name = "Test Mod",
@@ -183,7 +184,7 @@ public class ResourceDownloadTaskTests : IDisposable
         Assert.NotNull(FindMod(model, "new.jar"));
 
         // the metadata now points at the new file (same slug -> same index entry, refreshed)
-        var metadata = MetadataHandler.Get(IndexDir, "test-mod");
+        var metadata = MetadataHandler.Get(new AbsolutePath(IndexDir), "test-mod");
         Assert.True(metadata.IsValid);
         Assert.Equal("new.jar", metadata.Filename);
         Assert.Equal("verId1", metadata.FileId);

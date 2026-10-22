@@ -72,7 +72,7 @@ public static class AtLauncherEndpoints
             {
                 var task = new AtLauncherPackInstallTask(request.Name, request.Version, api: atlauncher)
                 {
-                    TargetDir = "",
+                    TargetDir = default,
                     Group = request.Group ?? "",
                     OptionalModsSelection = request.OptionalMods ?? new Dictionary<string, bool>(),
                     // the headless runtime registers no "ATLauncherPacks" meta-cache base, so
@@ -94,7 +94,7 @@ public static class AtLauncherEndpoints
                 var wrapped = runtime.Instances.WrapInstanceTask(task);
                 // compute the expected id BEFORE running the task: after the commit the
                 // directory already exists and DirNameFromString would return "<name>(1)"
-                AbsolutePath inDir = new AbsolutePath(runtime.Instances.PrimaryDir());
+                AbsolutePath inDir = runtime.Instances.PrimaryDir();
                 var expectedId = FileNaming.DirNameFromString(request.Name, [inDir]);
                 await wrapped.StartAsync();
                 if (!wrapped.WasSuccessful)

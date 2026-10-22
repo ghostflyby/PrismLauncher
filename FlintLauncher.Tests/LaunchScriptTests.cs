@@ -21,8 +21,8 @@ public class LaunchScriptTests
         var script = instance.CreateLaunchScript(session, null);
         var lines = script.Split('\n');
 
-        var gameDir = instance.GameRoot();
-        var assetsRoot = Directory.GetCurrentDirectory() + "/assets"; // QDir("assets/").absolutePath()
+        var gameDir = instance.GameRoot;
+        var assetsRoot = instance.Paths.AssetsRoot; // the five-root reform: <store>/assets (E2)
         var expected = new[]
         {
             "mainClass net.minecraft.client.main.Main",
@@ -141,8 +141,8 @@ public class LaunchScriptTests
         [
             "--username", "Steve",
             "--version", "1.20.1",
-            "--gameDir", instance.GameRoot(),
-            "--assetsDir", Directory.GetCurrentDirectory() + "/assets",
+            "--gameDir", instance.GameRoot.Value,
+            "--assetsDir", instance.Paths.AssetsRoot.Value,
             "--assetIndex", "5",
             "--uuid", session.Uuid,
             "--accessToken", "0",
@@ -215,7 +215,7 @@ public class LaunchScriptTests
 
         Assert.Equal(4, args.Count);
         Assert.Equal("-cp", args[0]);
-        Assert.Equal(instance.InstanceRoot(), args[1]);
+        Assert.Equal(instance.InstanceRoot.Value, args[1]);
         Assert.Equal("My Instance", args[2]);
         Assert.Equal("%INST_NAME%", args[3]); // only $VAR/${VAR} are expanded
     }

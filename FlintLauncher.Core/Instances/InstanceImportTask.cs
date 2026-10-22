@@ -25,6 +25,7 @@ using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Instances;
 
@@ -48,7 +49,7 @@ public sealed partial class InstanceImportTask(
     private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
     private readonly FlameApi _flame = flame ?? new FlameApi();
     private readonly IReadOnlyDictionary<string, string> _extraInfo = extraInfo ?? new Dictionary<string, string>();
-    private string _archivePath = "";
+    private AbsolutePath _archivePath;
     private ModpackType _modpackType = ModpackType.Unknown;
 
     /// <summary>APPLICATION->metacache() hook; used for the download-from-URL path.</summary>
@@ -66,7 +67,7 @@ public sealed partial class InstanceImportTask(
     {
         if (sourceUrl.IsFile)
         {
-            _archivePath = sourceUrl.LocalPath;
+            _archivePath = new AbsolutePath(sourceUrl.LocalPath);
             await ProcessZipPack(cancellationToken);
         }
         else
@@ -84,7 +85,7 @@ public sealed partial class InstanceImportTask(
 
             var entry = MetaCache.ResolveEntry("general", path);
             entry.IsStale = true;
-            _archivePath = entry.GetFullPath();
+            _archivePath = new AbsolutePath(entry.GetFullPath());
 
             var filesNetJob = new NetJob("Modpack download");
             filesNetJob.AddNetRequest(NetRequest.MakeCached(MetaCache, sourceUrl, entry));
@@ -98,8 +99,9 @@ public sealed partial class InstanceImportTask(
         else
         {
             // headless fallback: plain download into the staging folder
-            _archivePath = Path.Combine(StagingPath, Path.GetFileName(sourceUrl.AbsolutePath));
-            FileOps.EnsureFilePathExists(new AbsolutePath(_archivePath));
+            string a1 = Path.GetFileName(sourceUrl.AbsolutePath);
+            _archivePath = StagingPath / a1;
+            FileOps.EnsureFilePathExists(_archivePath);
             var request = NetRequest.MakeFile(sourceUrl, _archivePath);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
@@ -125,7 +127,7 @@ public sealed partial class InstanceImportTask(
         var root = "";
         try
         {
-            using var packZip = ZipFile.OpenRead(_archivePath);
+            await using var packZip = await ZipFile.OpenReadAsync(_archivePath.Value, cancellationToken);
             foreach (var entry in packZip.Entries)
             {
                 var fileName = entry.FullName.Replace('\\', '/');
@@ -140,8 +142,8 @@ public sealed partial class InstanceImportTask(
                 if (fileName is "bin/modpack.jar" or "bin/version.json")
                 {
                     // process as Technic pack
-                    Directory.CreateDirectory(Path.Combine(extractDir, "minecraft"));
-                    extractDir = Path.Combine(extractDir, "minecraft");
+                    (extractDir / "minecraft").CreateDirectory();
+                    extractDir /= "minecraft";
                     _modpackType = ModpackType.Technic;
                     break;
                 }

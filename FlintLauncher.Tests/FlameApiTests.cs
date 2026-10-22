@@ -17,6 +17,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -518,7 +519,7 @@ public class FlameApiTests : IDisposable
         File.WriteAllText(path, pack.ManifestJson);
 
         var manifest = new FlameManifest();
-        FlameManifest.LoadManifest(manifest, path);
+        FlameManifest.LoadManifest(manifest, new AbsolutePath(path));
 
         Assert.True(manifest.IsLoaded);
         Assert.Equal("minecraftModpack", manifest.ManifestType);
@@ -542,11 +543,11 @@ public class FlameApiTests : IDisposable
     {
         var badType = Path.Combine(_root, "bad-type.json");
         File.WriteAllText(badType, """{"manifestType":"somethingElse","manifestVersion":1}""");
-        Assert.Throws<JsonException>(() => FlameManifest.LoadManifest(new FlameManifest(), badType));
+        Assert.Throws<JsonException>(() => FlameManifest.LoadManifest(new FlameManifest(), new AbsolutePath(badType)));
 
         var badVersion = Path.Combine(_root, "bad-version.json");
         File.WriteAllText(badVersion, """{"manifestType":"minecraftModpack","manifestVersion":42}""");
-        Assert.Throws<JsonException>(() => FlameManifest.LoadManifest(new FlameManifest(), badVersion));
+        Assert.Throws<JsonException>(() => FlameManifest.LoadManifest(new FlameManifest(), new AbsolutePath(badVersion)));
     }
 
     [Fact]

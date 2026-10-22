@@ -20,12 +20,13 @@ using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.ModPlatform.LegacyFtb;
 
 public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string version) : InstanceTask
 {
-    private string _archivePath = "";
+    private AbsolutePath _archivePath;
 
     /// <summary>BuildConfig.LEGACY_FTB_CDN_BASE_URL (per-instance; tests construct the task
     /// pointed at their stub).</summary>
@@ -44,7 +45,6 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
         var path = $"{pack.Dir}/{version.Replace(".", "_")}/{pack.File}";
 
         string url;
-        NetRequest request;
         if (pack.Type == PackType.Private)
         {
             url = CdnBaseUrl + "privatepacks/" + path;
@@ -57,7 +57,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
         // (the C++ routed this through APPLICATION->metacache()'s "FTBPacks" base; nothing
         // in the port wires a cache here, so the download always goes to a temp file)
         _archivePath = TempCachePath(path);
-        request = NetRequest.MakeFile(new Uri(url), _archivePath);
+        var request = NetRequest.MakeFile(new Uri(url), _archivePath);
 
         var job = new NetJob("Download FTB Pack");
         job.AddNetRequest(request);
@@ -72,11 +72,12 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
         await Unzip(cancellationToken);
     }
 
-    private static string TempCachePath(string relativeName)
+    private static AbsolutePath TempCachePath(string relativeName)
     {
-        var dir = Path.Combine(Path.GetTempPath(), "flint-ftb-cache");
-        FileOps.EnsureFolderPathExists(new AbsolutePath(dir));
-        return Path.Combine(dir, relativeName.Replace('/', '_'));
+        var dir = Temporary.CreateTempFolder() / "flint-ftb-cache";
+        FileOps.EnsureFolderPathExists(dir);
+        string a1 = relativeName.Replace('/', '_');
+        return dir / a1;
     }
 
     private async Task Unzip(CancellationToken cancellationToken)
@@ -84,7 +85,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
         EmitStatus("Extracting modpack");
         SetProgress(2, 4);
 
-        var extractDir = Path.Combine(StagingPath, "unzip");
+        var extractDir = StagingPath / "unzip";
         if (MmcZip.ExtractDir(_archivePath, "", extractDir) is null)
         {
             EmitFailed("Failed to extract modpack");
@@ -99,11 +100,11 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
         EmitStatus("Installing modpack");
         SetProgress(3, 4);
 
-        var unzipMcDir = Path.Combine(StagingPath, "unzip", "minecraft");
-        if (Directory.Exists(unzipMcDir))
+        var unzipMcDir = StagingPath / "unzip" / "minecraft";
+        if (unzipMcDir.ExistsDirectory())
         {
             // ok, found minecraft dir, move contents to instance dir
-            if (!FileOps.Move(new AbsolutePath(unzipMcDir), (new AbsolutePath(StagingPath) / "minecraft")))
+            if (!FileOps.Move(unzipMcDir, StagingPath / "minecraft"))
             {
                 EmitFailed("Failed to move unpacked Minecraft!");
                 return;
@@ -123,15 +124,15 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
             var fallback = true;
 
             // handle different versions
-            var packJsonPath = Path.Combine(StagingPath, "minecraft", "pack.json");
-            var jarmodDir = Path.Combine(StagingPath, "unzip", "instMods");
-            if (File.Exists(packJsonPath))
+            var packJsonPath = StagingPath / "minecraft" / "pack.json";
+            var jarmodDir = StagingPath / "unzip" / "instMods";
+            if (packJsonPath.ExistsFile())
             {
                 try
                 {
                     // the typed pack.json read (we only care about the libs); a malformed
                     // document fails into the same keep-the-file/fall-through path
-                    var packJson = JsonSerializer.Deserialize(File.ReadAllBytes(packJsonPath),
+                    var packJson = JsonSerializer.Deserialize(await packJsonPath.ReadAllBytesAsync(cancellationToken),
                         LegacyFtbJsonContext.Default.LegacyFtbPackJson);
 
                     foreach (var library in packJson?.Libraries ?? [])
@@ -160,9 +161,9 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
                 }
             }
 
-            if (Directory.Exists(jarmodDir))
+            if ((jarmodDir.ExistsDirectory()))
             {
-                var jarmods = Directory.EnumerateFiles(jarmodDir).ToList();
+                var jarmods = jarmodDir.EnumerateFiles().ToList();
                 _ = components.InstallJarMods(jarmods);
                 fallback = false;
             }

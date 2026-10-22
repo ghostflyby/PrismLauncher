@@ -5,12 +5,13 @@
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.Instances;
 
 public class NullInstance : BaseInstance
 {
-    public NullInstance(SettingsObject settings, string rootDir)
+    public NullInstance(SettingsObject settings, AbsolutePath rootDir)
         : base(settings, rootDir)
     {
         SetVersionBroken(true);
@@ -24,7 +25,7 @@ public class NullInstance : BaseInstance
 
     public override IReadOnlySet<string> Traits() => new HashSet<string>();
 
-    public override string InstanceConfigFolder() => InstanceRoot();
+    public override AbsolutePath InstanceConfigFolder() => InstanceRoot;
 
     public override LaunchTask? CreateLaunchTask(AuthSession? account, MinecraftTarget? targetToJoin) => null;
 
@@ -36,7 +37,7 @@ public class NullInstance : BaseInstance
 
     public override SortedDictionary<string, string> GetVariables() => [];
 
-    public override IReadOnlyList<string> GetLogFileSearchPaths() => [];
+    public override IReadOnlyList<AbsolutePath> GetLogFileSearchPaths() => [];
 
     public override bool CanExport() => false;
 
@@ -49,7 +50,7 @@ public class NullInstance : BaseInstance
         return ["Null instance - placeholder."];
     }
 
-    public override string ModsRoot() => "";
+    public override AbsolutePath ModsRoot => new("");
 
     public override void UpdateRuntimeContext()
     {

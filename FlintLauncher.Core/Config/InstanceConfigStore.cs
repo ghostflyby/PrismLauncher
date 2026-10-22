@@ -15,6 +15,8 @@
 // instance settings surface relies on that).
 
 using System.Text.Json.Serialization.Metadata;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Config;
 
@@ -23,21 +25,21 @@ public sealed class InstanceConfigStore
     private readonly Lock _lock = new();
     private readonly TypedJsonFile<InstanceConfigFile> _file;
 
-    public InstanceConfigStore(string instanceRoot, JsonTypeInfo<InstanceConfigFile> typeInfo)
+    public InstanceConfigStore(AbsolutePath instanceRoot, JsonTypeInfo<InstanceConfigFile> typeInfo)
     {
-        ConfigPath = Path.Combine(instanceRoot, "instance.json");
+        ConfigPath = instanceRoot / "instance.json";
         _file = new TypedJsonFile<InstanceConfigFile>(ConfigPath, typeInfo);
 
         // the format marker is the FILE'S EXISTENCE (ask item 3): instance.json present ->
         // Flint format; else read-only instance.cfg (imported in memory, converted on write)
-        IsFlintFormat = File.Exists(ConfigPath);
+        IsFlintFormat = ConfigPath.ExistsFile();
         Current = IsFlintFormat
             ? _file.LoadOrDefault(InstanceConfigFile.Default) // raw payload — nulls are the layer
-            : InstanceIniImporter.Import(Path.Combine(instanceRoot, InstanceIniImporter.LegacyFileName));
+            : InstanceIniImporter.Import(instanceRoot / InstanceIniImporter.LegacyFileName);
     }
 
     /// <summary>The instance.json path (the format marker and the only write target).</summary>
-    public string ConfigPath { get; }
+    public AbsolutePath ConfigPath { get; }
 
     /// <summary>True once the instance layer is JSON-backed. False means the initial payload
     /// came from the read-only instance.cfg import and the next write converts.</summary>

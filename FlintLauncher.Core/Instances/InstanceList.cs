@@ -44,6 +44,7 @@
 //  - CommitStagedInstance's override path re-implements FS::overrideFolder as an
 //    overwrite-copy of the staging folder over the destination.
 
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using FlintLauncher.Core.Config;
@@ -54,6 +55,7 @@ using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.State;
 using FlintLauncher.Core.Tasks;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Instances;
 
@@ -69,12 +71,12 @@ public class InstanceList
     private const int MinBackoff = 1;
     private const int MaxBackoff = 16;
 
-    private readonly List<string> _instDirs = [];
+    private readonly List<AbsolutePath> _instDirs = [];
 
     private readonly List<BaseInstance> _instances = [];
 
     // C++ m_instanceRootDirMap: id -> instance dir that provided it
-    private readonly Dictionary<string, string> _instanceRootDirMap = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, AbsolutePath> _instanceRootDirMap = new(StringComparer.Ordinal);
 
     // D2 inode index: instance uuid <-> the stat(2) inode of its instance dir. Rebuilt on
     // every LoadList ("索引随 LoadList 重建"); empty on platforms without inode support
@@ -89,17 +91,15 @@ public class InstanceList
     private bool _groupsLoaded;
     private bool _instancesProbed;
 
-    public InstanceList(IEnumerable<string> instDirs)
+    public InstanceList(IEnumerable<AbsolutePath> instDirs)
     {
         foreach (var dir in instDirs)
         {
-            // Create and normalize path (QDir::current().mkpath(dir))
-            FileOps.EnsureFolderPathExists(new AbsolutePath(dir));
+            FileOps.EnsureFolderPathExists(dir);
             // NOTE: canonicalPath requires the path to exist. Do not move this above the creation block!
-            var canonical = QDirCanonicalPath(dir);
-            if (canonical.Length != 0 && !_instDirs.Contains(canonical))
+            if (!_instDirs.Contains(dir))
             {
-                _instDirs.Add(canonical);
+                _instDirs.Add(dir);
             }
         }
 
@@ -156,14 +156,14 @@ public class InstanceList
     /// (FlintPaths.GroupsFile, C8) with the legacy data-root instgroups.json and the
     /// primary-instance-dir instgroups.json as read-compat fallbacks.
     /// </summary>
-    public string GroupFilePath { get; init; } = "";
+    public AbsolutePath? GroupFilePath { get; init; }
 
     // ------------------------------------------------------------------- list accessors
 
-    public string PrimaryDir() => _instDirs.Count == 0 ? "" : _instDirs[0];
+    public AbsolutePath PrimaryDir() => _instDirs.FirstOrDefault();
 
     /// <summary>Port of InstanceList::instanceDirs (all configured instance roots).</summary>
-    public IReadOnlyList<string> InstanceDirs() => _instDirs;
+    public IReadOnlyList<AbsolutePath> InstanceDirs() => _instDirs;
 
     /// <summary>C++ m_instances (in list order).</summary>
     public IReadOnlyList<BaseInstance> Instances => _instances;
@@ -297,7 +297,7 @@ public class InstanceList
         _uuidByInode.Clear();
         foreach (var inst in _instances)
         {
-            var inode = FileTransfer.StatInode(inst.InstanceRoot());
+            var inode = FileTransfer.StatInode(inst.InstanceRoot);
             if (inode == 0)
             {
                 continue; // platform without inode support (Windows) or a vanished dir
@@ -540,11 +540,11 @@ public class InstanceList
     /// <summary>The canonical C8 groups file (the model's write target): the GroupFilePath
     /// override when pinned, else the config-side groups.json, else the legacy CWD anchor
     /// of bare fixtures.</summary>
-    private string CanonicalGroupFile()
+    private AbsolutePath CanonicalGroupFile()
     {
-        if (GroupFilePath.Length != 0)
+        if (GroupFilePath is { } group)
         {
-            return GroupFilePath;
+            return group;
         }
 
         if (Paths is { } paths)
@@ -552,23 +552,21 @@ public class InstanceList
             return paths.GroupsFile;
         }
 
-        // legacy CWD anchor — bare fixtures only (the process working directory is not
-        // load-bearing anywhere else)
-        return Path.Combine(Directory.GetCurrentDirectory(), "groups.json");
+        throw new UnreachableException("must have a group file");
     }
 
     /// <summary>The read-compat instgroups.json anchors, probed in order when the canonical
     /// file is missing: the pre-C8 data-root copy (the Prism import target) and the
     /// primary-instance-dir copy upstream used before there was a launcher data dir.</summary>
-    private IReadOnlyList<string> LegacyGroupFiles()
+    private List<AbsolutePath> LegacyGroupFiles()
     {
-        var legacy = new List<string>();
+        var legacy = new List<AbsolutePath>();
         if (Paths is { } paths)
         {
             legacy.Add(paths.InstgroupsFile);
         }
 
-        legacy.Add(Path.Combine(PrimaryDir(), "instgroups.json"));
+        legacy.Add(PrimaryDir() / "instgroups.json");
         return legacy;
     }
 
@@ -589,7 +587,7 @@ public class InstanceList
         _groups.RemoveMember(inst.Uuid);
         _groups.RemoveMember(inst.Id());
 
-        if (!FileOps.DeletePath(new AbsolutePath(inst.InstanceRoot())))
+        if (!FileOps.DeletePath(new AbsolutePath(inst.InstanceRoot)))
         {
             // qWarning: deletion not completely successful
             return;
@@ -617,12 +615,14 @@ public class InstanceList
     /// Create a new empty staging area for instance creation and return its path
     /// (null when no staging folder could be created).
     /// </summary>
-    public string? GetStagedInstancePath(string targetDir)
+    public AbsolutePath? GetStagedInstancePath(AbsolutePath targetDir)
     {
         var root = PrimaryDir();
-        if (targetDir.Length != 0)
+        if (root.Value is not { Length: > 0 })
+            return null;
+        if (targetDir.Value is { Length: > 0 })
         {
-            if (!_instDirs.Contains(targetDir) || !Directory.Exists(targetDir))
+            if (!_instDirs.Contains(targetDir) || !targetDir.Exists())
             {
                 // qCritical: requested instance directory is no longer configured or accessible
                 return null;
@@ -631,8 +631,8 @@ public class InstanceList
             root = targetDir;
         }
 
-        var tempRoot = new AbsolutePath(root) / ".tmp";
-        string result;
+        var tempRoot = root / ".tmp";
+        AbsolutePath result;
         var tries = 0;
         do
         {
@@ -643,10 +643,10 @@ public class InstanceList
 
             // QUuid::createUuid().toString(QUuid::Id128).left(6)
             var key = Guid.NewGuid().ToString("N")[..6];
-            result = (tempRoot / key).Value;
-        } while (Directory.Exists(result) || File.Exists(result));
+            result = tempRoot / key;
+        } while (result.Exists());
 
-        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(result)))
+        if (!FileOps.EnsureFolderPathExists(result))
         {
             return null;
         }
@@ -666,13 +666,13 @@ public class InstanceList
         var shouldOverride = instanceTask.ShouldOverride;
 
         var targetDir = instanceTask.TargetDir;
-        if (targetDir.Length != 0 && !_instDirs.Contains(targetDir))
+        if (targetDir.Value is { Length: > 0 } && !_instDirs.Contains(targetDir))
         {
             // qCritical: target directory for instance is no longer configured or accessible
             return false;
         }
 
-        if (targetDir.Length == 0)
+        if (targetDir.Value is not { Length: > 0 })
         {
             targetDir = PrimaryDir();
         }
@@ -692,7 +692,7 @@ public class InstanceList
             return false;
         }
 
-        var destination = Path.Combine(targetDir, instId);
+        var destination = targetDir / instId;
 
         if (shouldOverride)
         {
@@ -743,25 +743,28 @@ public class InstanceList
     // -------------------------------------------------------------- instance dirs change
 
     /// <summary>Port of the on_InstFolderChanged slot as an explicit method.</summary>
-    public void SetInstanceDirs(IEnumerable<string> dirs)
+    public void SetInstanceDirs(IEnumerable<AbsolutePath> dirs)
     {
-        var newDirs = new List<string>();
+        var newDirs = new List<AbsolutePath>();
         foreach (var dir in dirs)
         {
-            if (dir.Length == 0)
+            if (dir.Value is not { Length: > 0 })
             {
                 continue;
             }
 
-            FileOps.EnsureFolderPathExists(new AbsolutePath(dir));
-            var canonical = QDirCanonicalPath(dir);
-            if (canonical.Length != 0 && !newDirs.Contains(canonical))
+            FileOps.EnsureFolderPathExists(dir);
+            // the string-era QDirCanonicalPath normalized (GetFullPath) WITHOUT resolving
+            // symlinks, so the stored roots stay verbatim (/var/... on macOS is NOT
+            // rewritten to /private/var/...) — TruePath's Canonicalize() would, so it must
+            // not be used here
+            if (!newDirs.Contains(dir))
             {
-                newDirs.Add(canonical);
+                newDirs.Add(dir);
             }
         }
 
-        if (newDirs.SequenceEqual(_instDirs, StringComparer.Ordinal))
+        if (newDirs.SequenceEqual(_instDirs))
         {
             return;
         }
@@ -788,7 +791,7 @@ public class InstanceList
         _instanceRootDirMap.Clear();
         foreach (var rootDir in _instDirs)
         {
-            var rootInfo = new DirectoryInfo(rootDir);
+            var rootInfo = new DirectoryInfo(rootDir.Value);
             if (!rootInfo.Exists)
             {
                 continue;
@@ -807,8 +810,8 @@ public class InstanceList
                 // D4 dual-track discovery: a Flint-format directory carries instance.json,
                 // a Prism-format one instance.cfg — both are instances (the cfg stays
                 // read-only until the instance's first write converts it)
-                if (!File.Exists(Path.Combine(subDir, "instance.json")) &&
-                    !File.Exists(Path.Combine(subDir, "instance.cfg")))
+                if (!File.Exists((new AbsolutePath(subDir) / "instance.json").Value) &&
+                    !File.Exists((new AbsolutePath(subDir) / "instance.cfg").Value))
                 {
                     continue;
                 }
@@ -820,7 +823,7 @@ public class InstanceList
                     var targetCanonical = QDirCanonicalPath(finalTarget.FullName);
                     var pointsIntoAnyRoot = _instDirs.Any(otherRoot =>
                     {
-                        var canonicalRoot = QDirCanonicalPath(otherRoot);
+                        var canonicalRoot = QDirCanonicalPath(otherRoot.Value);
                         return canonicalRoot.Length != 0 &&
                                targetCanonical.StartsWith(canonicalRoot, StringComparison.Ordinal);
                     });
@@ -847,7 +850,7 @@ public class InstanceList
         return outList;
     }
 
-    private string RootDirOf(string id)
+    private AbsolutePath RootDirOf(string id)
     {
         return _instanceRootDirMap.GetValueOrDefault(id, PrimaryDir());
     }
@@ -858,7 +861,7 @@ public class InstanceList
                           throw new InvalidOperationException(
                               "InstanceList.Environment (the typed instance.json stack) must be stamped before LoadList.");
 
-        var instanceRoot = Path.Combine(RootDirOf(id), id);
+        var instanceRoot = RootDirOf(id) / id;
         // the typed layer stack (D4): instance.json when present (Flint format), otherwise
         // the read-only instance.cfg import in memory — no write happens on discovery
         var instanceSettings = new InstanceJsonSettingsObject(instanceRoot, environment);
@@ -881,7 +884,7 @@ public class InstanceList
         {
             inst = new MinecraftInstance(instanceSettings, instanceRoot)
             {
-                Paths = Paths,
+                Paths = Paths ?? FlintPaths.FromHomeDir(AbsolutePath.CurrentWorkingDirectory),
                 MetaCache = MetaCache,
                 LaunchServices = LaunchServices,
                 LauncherState = LauncherState,
@@ -914,14 +917,14 @@ public class InstanceList
     /// metadata (instance.json identity.uuid first, else the imported instance.cfg uuid
     /// key — the same precedence discovery uses). Empty = unresolvable: the group member
     /// is then written under the raw dirname and converted at the next group load.</summary>
-    private static string ProbeInstanceUuid(string instanceRoot)
+    private static string ProbeInstanceUuid(AbsolutePath instanceRoot)
     {
         try
         {
-            var jsonPath = Path.Combine(instanceRoot, "instance.json");
-            if (File.Exists(jsonPath))
+            var jsonPath = instanceRoot / "instance.json";
+            if (File.Exists(jsonPath.Value))
             {
-                using var doc = JsonDocument.Parse(File.ReadAllBytes(jsonPath));
+                using var doc = JsonDocument.Parse(File.ReadAllBytes(jsonPath.Value));
                 if (doc.RootElement.ValueKind == JsonValueKind.Object &&
                     doc.RootElement.TryGetProperty("identity", out var identity) &&
                     identity.ValueKind == JsonValueKind.Object &&
@@ -934,8 +937,8 @@ public class InstanceList
                 return "";
             }
 
-            var cfgPath = Path.Combine(instanceRoot, InstanceIniImporter.LegacyFileName);
-            if (File.Exists(cfgPath))
+            var cfgPath = instanceRoot / InstanceIniImporter.LegacyFileName;
+            if (File.Exists(cfgPath.Value))
             {
                 var ini = new IniFile();
                 return ini.LoadFile(cfgPath) ? ini.GetString("uuid", "") : "";
@@ -1015,17 +1018,17 @@ public class InstanceList
     /// </summary>
     private sealed class InstanceStaging(InstanceList parent, InstanceTask child) : FlintTask
     {
-        private readonly string _stagingPath = parent.GetStagedInstancePath(child.TargetDir) ?? "";
+        private readonly AbsolutePath? _stagingPath = parent.GetStagedInstancePath(child.TargetDir);
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            if (_stagingPath.Length == 0)
+            if (_stagingPath is not { } stagingPath)
             {
                 EmitFailed("Could not create staging folder");
                 return;
             }
 
-            child.StagingPath = _stagingPath;
+            child.StagingPath = stagingPath;
             // D4: the typed instance environment (user flint.json store + instance.json
             // type infos) replaces the former parent SettingsObject handle
             child.SetParentEnvironment(parent.Environment ??
@@ -1039,7 +1042,7 @@ public class InstanceList
                 var backoff = MinBackoff;
                 while (true)
                 {
-                    if (parent.CommitStagedInstance(_stagingPath, child, child.Group))
+                    if (parent.CommitStagedInstance(stagingPath.Value, child, child.Group))
                     {
                         EmitSucceeded();
                         return;
@@ -1058,12 +1061,12 @@ public class InstanceList
 
             if (child.State == TaskState.AbortedByUser)
             {
-                FileOps.DeletePath(new AbsolutePath(_stagingPath));
+                FileOps.DeletePath(stagingPath);
                 EmitAborted();
                 return;
             }
 
-            FileOps.DeletePath(new AbsolutePath(_stagingPath));
+            FileOps.DeletePath(stagingPath);
             EmitFailed(child.FailReason);
         }
 

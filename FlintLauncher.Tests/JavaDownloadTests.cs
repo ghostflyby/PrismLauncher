@@ -11,6 +11,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Java.Download;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -48,7 +49,7 @@ public class JavaDownloadTests : IDisposable
         Directory.CreateDirectory(Path.Combine(sourceDir, "Contents/Home/bin"));
         await File.WriteAllTextAsync(Path.Combine(sourceDir, "Contents/Home/bin/java"), "java-binary");
         await File.WriteAllTextAsync(Path.Combine(sourceDir, "release"), "JAVA_VERSION=\"17.0.9\"");
-        Assert.True(MmcZip.CompressDir(zipPath, TempPath("jdk-src")));
+        Assert.True(MmcZip.CompressDir(new AbsolutePath(zipPath), new AbsolutePath(TempPath("jdk-src"))));
 
         using var server = new TestHttpServer(ctx =>
         {
@@ -59,7 +60,7 @@ public class JavaDownloadTests : IDisposable
         });
 
         var finalPath = TempPath("install-zip");
-        var task = new ArchiveDownloadTask(new Uri($"{server.Url}/jdk-17.0.9.zip"), finalPath);
+        var task = new ArchiveDownloadTask(new Uri($"{server.Url}/jdk-17.0.9.zip"), new AbsolutePath(finalPath));
 
         await task.StartAsync();
 
@@ -81,7 +82,7 @@ public class JavaDownloadTests : IDisposable
         });
 
         var finalPath = TempPath("install-bad-sha");
-        var task = new ArchiveDownloadTask(new Uri($"{server.Url}/jdk.zip"), finalPath,
+        var task = new ArchiveDownloadTask(new Uri($"{server.Url}/jdk.zip"), new AbsolutePath(finalPath),
             "sha1", new string('0', 40));
 
         await task.StartAsync();
@@ -118,7 +119,7 @@ public class JavaDownloadTests : IDisposable
         var names = TarArchive.ListTarGzFile(tarPath, out var listError);
         Assert.True(names is not null, $"ListTarGzFile failed: {listError}");
         Assert.Equal("jdk-17.0.9/", names[0]);
-        var task = new ArchiveDownloadTask(new Uri($"{server.Url}/jdk-17.0.9.tar.gz"), finalPath);
+        var task = new ArchiveDownloadTask(new Uri($"{server.Url}/jdk-17.0.9.tar.gz"), new AbsolutePath(finalPath));
 
         await task.StartAsync();
 
@@ -210,7 +211,7 @@ public class JavaDownloadTests : IDisposable
                                                 """;
 
         var finalPath = TempPath("install-manifest");
-        var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), finalPath);
+        var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), new AbsolutePath(finalPath));
 
         await task.StartAsync();
 
@@ -242,7 +243,7 @@ public class JavaDownloadTests : IDisposable
         });
 
         var finalPath = TempPath("install-manifest-bad");
-        var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), finalPath,
+        var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), new AbsolutePath(finalPath),
             "sha1", new string('1', 40));
 
         await task.StartAsync();
@@ -284,7 +285,7 @@ public class JavaDownloadTests : IDisposable
                          """;
 
         var finalPath = TempPath("install-manifest-badfile");
-        var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), finalPath);
+        var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), new AbsolutePath(finalPath));
 
         await task.StartAsync();
 
@@ -304,7 +305,7 @@ public class JavaDownloadTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(home, "lib/native.dylib"), "dylib");
         await File.WriteAllTextAsync(Path.Combine(home, "release"), "JAVA_VERSION=17");
 
-        var task = new SymlinkTask(target);
+        var task = new SymlinkTask(new AbsolutePath(target));
         await task.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, task.State);
@@ -326,13 +327,13 @@ public class JavaDownloadTests : IDisposable
         Directory.CreateDirectory(Path.Combine(target, "bin"));
         await File.WriteAllTextAsync(Path.Combine(target, "bin/java"), "java-binary");
 
-        var alreadyThere = new SymlinkTask(target);
+        var alreadyThere = new SymlinkTask(new AbsolutePath(target));
         await alreadyThere.StartAsync();
         Assert.Equal(TaskState.Succeeded, alreadyThere.State);
 
         var emptyDir = TempPath("symlink-empty");
         Directory.CreateDirectory(emptyDir);
-        var empty = new SymlinkTask(emptyDir);
+        var empty = new SymlinkTask(new AbsolutePath(emptyDir));
         await empty.StartAsync();
         Assert.Equal(TaskState.Failed, empty.State);
         Assert.Contains("Failed to find Java binary path", empty.FailReason);

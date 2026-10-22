@@ -14,6 +14,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -45,7 +46,7 @@ public class TechnicTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList([instancesDir]) { Environment = _global };
+        return new InstanceList([new AbsolutePath(instancesDir)]) { Environment = _global };
     }
 
     private async Task<SingleZipPackInstallTask> RunZipInstall(TechnicZipPackBuilder pack, string minecraftVersion = "",

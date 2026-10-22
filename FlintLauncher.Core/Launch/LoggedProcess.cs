@@ -36,6 +36,7 @@ using System.Text;
 using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Instances;
 using Microsoft.Extensions.Logging;
+using TruePath;
 
 namespace FlintLauncher.Core.Launch;
 
@@ -128,9 +129,9 @@ public sealed class LoggedProcess : IDisposable
     }
 
     /// <summary>Port of QProcess::setWorkingDirectory.</summary>
-    public void SetWorkingDirectory(string directory)
+    public void SetWorkingDirectory(AbsolutePath directory)
     {
-        _process.StartInfo.WorkingDirectory = directory;
+        _process.StartInfo.WorkingDirectory = directory.Value;
     }
 
     /// <summary>Port of QProcess::setProcessEnvironment (the instance ProcessEnvironment).</summary>

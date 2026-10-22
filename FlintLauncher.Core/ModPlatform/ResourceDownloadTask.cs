@@ -23,6 +23,7 @@ using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform;
 
@@ -63,8 +64,9 @@ public class ResourceDownloadTask : SequentialTask
         _filesNetJob = new NetJob("Resource download");
         EmitStatus($"Downloading resource:\n{_packVersion.DownloadUrl}");
 
+        string a1 = GetFilename();
         var action = modrinth1.MakeFileRequest(_packVersion.DownloadUrl,
-            Path.Combine(_packModel.Dir, GetFilename()),
+            (AbsolutePath)_packModel.Dir / a1,
             CreateModrinthMeta(instance, downloadReason, dependentOn));
         if (_packVersion.HashType.Length != 0 && _packVersion.Hash.Length != 0)
         {

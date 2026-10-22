@@ -7,6 +7,7 @@
 using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -17,7 +18,7 @@ public class DataMigrationTests : IDisposable
 
     /// <summary>The S3 decision store over a throwaway migration directory.</summary>
     private MigrationDecisionStore Decisions() =>
-        new(Path.Combine(_dir, Guid.NewGuid().ToString("N"), "migration"),
+        new(new AbsolutePath(Path.Combine(_dir, Guid.NewGuid().ToString("N"), "migration")),
             FlintJsonContext.Default.MigrationDecisionRecord);
 
     public void Dispose()
@@ -99,7 +100,7 @@ public class DataMigrationTests : IDisposable
         Assert.Equal("PolyMC_nomigrate.txt", DataMigration.NoMigrateMarkerName("PolyMC"));
         var current = Path.Combine(_dir, "current");
         Assert.Equal(Path.Combine(current, "MultiMC_nomigrate.txt"),
-            DataMigration.NoMigrateMarkerPath(current, "MultiMC"));
+            DataMigration.NoMigrateMarkerPath(new AbsolutePath(current), "MultiMC").Value);
     }
 
     [Fact]
@@ -128,7 +129,7 @@ public class DataMigrationTests : IDisposable
         var old = MakeDir(PolyMcConfigFile, "instances/1.20/a.zip", "accounts.json");
 
         Assert.Equal(DataMigration.MigrationDecision.ReadyToMigrate,
-            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile));
+            DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(old), "PolyMC", PolyMcConfigFile, LauncherConfigFile));
     }
 
     // the old location accepts either the legacy config or the Prism config we already wrote there
@@ -138,11 +139,11 @@ public class DataMigrationTests : IDisposable
         var current = MakeDir();
         var old = MakeDir(LauncherConfigFile); // previously used as a Prism dir
         Assert.Equal(DataMigration.MigrationDecision.ReadyToMigrate,
-            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile));
+            DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(old), "PolyMC", PolyMcConfigFile, LauncherConfigFile));
 
         var oldEmpty = MakeDir();
         Assert.Equal(DataMigration.MigrationDecision.NoOldConfig,
-            DataMigration.Decide(current, oldEmpty, "PolyMC", PolyMcConfigFile, LauncherConfigFile));
+            DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(oldEmpty), "PolyMC", PolyMcConfigFile, LauncherConfigFile));
     }
 
     [Fact]
@@ -158,7 +159,7 @@ public class DataMigrationTests : IDisposable
         var old = MakeDir(PolyMcConfigFile, "instances/a.zip");
 
         Assert.Equal(DataMigration.MigrationDecision.MarkerPresent,
-            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
+            DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(old), "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
     }
 
     [Fact]
@@ -168,9 +169,9 @@ public class DataMigrationTests : IDisposable
         var old = MakeDir(PolyMcConfigFile, "instances/a.zip");
 
         Assert.Equal(DataMigration.MigrationDecision.MarkerPresent,
-            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile));
+            DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(old), "PolyMC", PolyMcConfigFile, LauncherConfigFile));
         // without a store the marker is left alone (nothing upgrades it away)
-        Assert.True(File.Exists(DataMigration.NoMigrateMarkerPath(current, "PolyMC")));
+        Assert.True(File.Exists(DataMigration.NoMigrateMarkerPath(new AbsolutePath(current), "PolyMC").Value));
     }
 
     // S3: a legacy empty marker upgrades in place on first sight — declined@unknown record,
@@ -183,9 +184,9 @@ public class DataMigrationTests : IDisposable
         var old = MakeDir(PolyMcConfigFile, "instances/a.zip");
 
         Assert.Equal(DataMigration.MigrationDecision.MarkerPresent,
-            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
+            DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(old), "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
 
-        Assert.False(File.Exists(DataMigration.NoMigrateMarkerPath(current, "PolyMC")));
+        Assert.False(File.Exists(DataMigration.NoMigrateMarkerPath(new AbsolutePath(current), "PolyMC").Value));
         var record = decisions.Read("PolyMC");
         Assert.NotNull(record);
         Assert.Equal(MigrationDecisionRecord.Declined, record.Decision);
@@ -195,7 +196,7 @@ public class DataMigrationTests : IDisposable
         // the upgraded record carries the decision from here on
         var current2 = MakeDir();
         Assert.Equal(DataMigration.MigrationDecision.MarkerPresent,
-            DataMigration.Decide(current2, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
+            DataMigration.Decide(new AbsolutePath(current2), new AbsolutePath(old), "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
     }
 
     // C++ wrote the marker under the DISPLAY launcher name (PolyMC/MultiMC,
@@ -210,7 +211,7 @@ public class DataMigrationTests : IDisposable
         var old = MakeDir(PolyMcConfigFile, "instances/a.zip");
 
         Assert.Equal(DataMigration.MigrationDecision.MarkerPresent,
-            DataMigration.Decide(current, old, "polymc", PolyMcConfigFile, LauncherConfigFile, decisions));
+            DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(old), "polymc", PolyMcConfigFile, LauncherConfigFile, decisions));
 
         // the upgrade ran: the display-case marker is deleted and the lowercase-id record
         // carries the declined@unknown decision
@@ -230,7 +231,7 @@ public class DataMigrationTests : IDisposable
         var old = MakeDir(PolyMcConfigFile, "instances/a.zip");
 
         Assert.Equal(DataMigration.MigrationDecision.MarkerPresent,
-            DataMigration.Decide(current, old, "polymc", PolyMcConfigFile, LauncherConfigFile));
+            DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(old), "polymc", PolyMcConfigFile, LauncherConfigFile));
         Assert.True(File.Exists(Path.Combine(current, "PolyMC_nomigrate.txt")));
     }
 
@@ -244,11 +245,11 @@ public class DataMigrationTests : IDisposable
         // a FILE occupies the migration records path, so every store Write throws
         var blocker = Path.Combine(_dir, "blocked-store-" + Guid.NewGuid().ToString("N"));
         File.WriteAllText(blocker, "a file blocks the migration records directory");
-        var decisions = new MigrationDecisionStore(blocker, FlintJsonContext.Default.MigrationDecisionRecord);
+        var decisions = new MigrationDecisionStore(new AbsolutePath(blocker), FlintJsonContext.Default.MigrationDecisionRecord);
 
         Assert.Equal(DataMigration.MigrationDecision.MarkerPresent,
-            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
-        Assert.True(File.Exists(DataMigration.NoMigrateMarkerPath(current, "PolyMC")));
+            DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(old), "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
+        Assert.True(File.Exists(DataMigration.NoMigrateMarkerPath(new AbsolutePath(current), "PolyMC").Value));
     }
 
     // idempotency: after a successful migration the decision record exists, so re-running is
@@ -261,9 +262,9 @@ public class DataMigrationTests : IDisposable
         var old = MakeDir(PolyMcConfigFile, "accounts.json", "instances/1.21/world/level.dat");
 
         Assert.Equal(DataMigration.MigrationDecision.ReadyToMigrate,
-            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
+            DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(old), "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
 
-        var task = new DataMigrationTask(old, current, DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
+        var task = new DataMigrationTask(new AbsolutePath(old), new AbsolutePath(current), DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
         await task.StartAsync();
         Assert.Equal(TaskState.Succeeded, task.State);
         Assert.True(File.Exists(Path.Combine(current, "polymc.cfg")));
@@ -279,7 +280,7 @@ public class DataMigrationTests : IDisposable
         });
 
         Assert.Equal(DataMigration.MigrationDecision.MarkerPresent,
-            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
+            DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(old), "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
     }
 
     // an existing flint.cfg in the current directory skips the copy entirely
@@ -290,7 +291,7 @@ public class DataMigrationTests : IDisposable
         var old = MakeDir(PolyMcConfigFile, "instances/a.zip");
 
         Assert.Equal(DataMigration.MigrationDecision.CurrentDataExists,
-            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile));
+            DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(old), "PolyMC", PolyMcConfigFile, LauncherConfigFile));
     }
 
     // A3: post-reform the authoritative own-config position is the CONFIG root's flint.json
@@ -308,14 +309,14 @@ public class DataMigrationTests : IDisposable
 
         // no own config yet → ready to migrate
         Assert.Equal(DataMigration.MigrationDecision.ReadyToMigrate,
-            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile,
-                currentConfigFile: flintJson));
+            DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(old), "PolyMC", PolyMcConfigFile, LauncherConfigFile,
+                currentConfigFile: new AbsolutePath(flintJson)));
 
         // flint.json appears (Flint configured / INI imported) → the protection fires
         File.WriteAllText(flintJson, "{}");
         Assert.Equal(DataMigration.MigrationDecision.CurrentDataExists,
-            DataMigration.Decide(current, old, "PolyMC", PolyMcConfigFile, LauncherConfigFile,
-                currentConfigFile: flintJson));
+            DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(old), "PolyMC", PolyMcConfigFile, LauncherConfigFile,
+                currentConfigFile: new AbsolutePath(flintJson)));
     }
 
     // ---------------------------------------------------------------- task flow
@@ -347,7 +348,7 @@ public class DataMigrationTests : IDisposable
 
         var progress = new List<(long current, long total)>();
         var statuses = new List<string>();
-        var task = new DataMigrationTask(source, target, DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
+        var task = new DataMigrationTask(new AbsolutePath(source), new AbsolutePath(target), DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
         task.Progress += (_, p) => progress.Add((p.Current, p.Total));
         task.StatusChanged += (_, s) => statuses.Add(s);
 
@@ -389,7 +390,7 @@ public class DataMigrationTests : IDisposable
         var target = MakeDir("polymc.cfg");
         await File.WriteAllTextAsync(Path.Combine(target, "polymc.cfg"), "target version");
 
-        var task = new DataMigrationTask(source, target, DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
+        var task = new DataMigrationTask(new AbsolutePath(source), new AbsolutePath(target), DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
         await task.StartAsync();
 
         // C++ semantics: copy_options::none reports an error for existing destination files, so
@@ -403,7 +404,7 @@ public class DataMigrationTests : IDisposable
     public async Task Missing_Source_Fails_With_The_Cpp_Message()
     {
         var target = Path.Combine(_dir, "target-" + Guid.NewGuid().ToString("N"));
-        var task = new DataMigrationTask(Path.Combine(_dir, "does-not-exist"), target,
+        var task = new DataMigrationTask(new AbsolutePath(Path.Combine(_dir, "does-not-exist")), new AbsolutePath(target),
             DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
         await task.StartAsync();
 
@@ -432,7 +433,7 @@ public class DataMigrationTests : IDisposable
         var target = Path.Combine(_dir, "target-" + Guid.NewGuid().ToString("N"));
 
         var progress = new List<(long current, long total)>();
-        var task = new DataMigrationTask(source, target,
+        var task = new DataMigrationTask(new AbsolutePath(source), new AbsolutePath(target),
             DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
         task.Progress += (_, p) => progress.Add((p.Current, p.Total));
         await task.StartAsync();
@@ -453,7 +454,7 @@ public class DataMigrationTests : IDisposable
         var target = Path.Combine(_dir, "target-" + Guid.NewGuid().ToString("N"));
 
         var statuses = new List<string>();
-        var task = new DataMigrationTask(source, target,
+        var task = new DataMigrationTask(new AbsolutePath(source), new AbsolutePath(target),
             DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
         task.StatusChanged += (_, s) => statuses.Add(s);
         await task.StartAsync();

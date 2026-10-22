@@ -13,6 +13,7 @@ using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Dependencies;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
+using TruePath;
 using Xunit;
 using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
 
@@ -51,7 +52,7 @@ public class GetModDependenciesTaskTests : IDisposable
         {
             Directory.CreateDirectory(IndexDir);
             File.WriteAllBytes(Path.Combine(ModsDir, "c.jar"), "c jar bytes"u8.ToArray());
-            PackwizModel.UpdateModIndex(IndexDir, new PackwizModel.Mod
+            PackwizModel.UpdateModIndex(new AbsolutePath(IndexDir), new PackwizModel.Mod
             {
                 Slug = "c-mod",
                 Name = "C Mod",
@@ -64,7 +65,7 @@ public class GetModDependenciesTaskTests : IDisposable
             });
         }
 
-        var model = new ModFolderModel(ModsDir, isIndexed: true, createDir: true);
+        var model = new ModFolderModel(new AbsolutePath(ModsDir), isIndexed: true, createDir: true);
         model.Update();
 
         var instance = _env.CreateInstance("1.20.1", ModLoaderType.Fabric, "0.14.21");
@@ -281,7 +282,7 @@ public class GetModDependenciesFlameTests : IDisposable
     public async Task FlameDependency_ResolvedThroughFileIds()
     {
         var modsDir = Path.Combine(_root, "mods");
-        var model = new ModFolderModel(modsDir, isIndexed: true, createDir: true);
+        var model = new ModFolderModel(new AbsolutePath(modsDir), isIndexed: true, createDir: true);
         model.Update();
         var instance = _env.CreateInstance("1.18.2", ModLoaderType.Forge, "40.1.0");
 

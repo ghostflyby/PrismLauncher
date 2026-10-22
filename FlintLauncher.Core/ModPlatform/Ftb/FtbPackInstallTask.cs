@@ -21,6 +21,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Net;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.ModPlatform.Ftb;
 
@@ -254,10 +255,10 @@ public sealed class FtbPackInstallTask(
         }
 
         // install any jar mods
-        var jarModsDir = Path.Combine(StagingPath, "minecraft", "jarmods");
-        if (Directory.Exists(jarModsDir))
+        var jarModsDir = StagingPath / "minecraft" / "jarmods";
+        if (jarModsDir.ExistsDirectory())
         {
-            var jarMods = Directory.EnumerateFiles(jarModsDir).ToList();
+            var jarMods = jarModsDir.EnumerateFiles().ToList();
             _ = components.InstallJarMods(jarMods);
         }
 
@@ -287,7 +288,7 @@ public sealed class FtbPackInstallTask(
                 continue;
             }
 
-            var path = Path.Combine(StagingPath, ".minecraft", file.Path, file.Name);
+            var path = StagingPath / ".minecraft" / file.Path / file.Name;
 
             var dl = NetRequest.MakeFile(new Uri(file.Url), path);
             if (file.Sha1.Length != 0)

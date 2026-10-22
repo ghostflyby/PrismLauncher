@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Hashing;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -360,7 +361,7 @@ internal sealed class FlamePackBuilder
             File.WriteAllText(Path.Combine(dir, "overrides", "options.txt"), OptionsTxt);
             File.WriteAllText(Path.Combine(dir, "overrides", "config", "settings.txt"), ConfigTxt);
             File.WriteAllBytes(Path.Combine(dir, "overrides", "mods", "override.jar"), ModBytes);
-            return MmcZip.CompressDir(path, dir);
+            return MmcZip.CompressDir(new AbsolutePath(path), new AbsolutePath(dir));
         }
         finally
         {

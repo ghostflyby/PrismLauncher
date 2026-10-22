@@ -43,16 +43,20 @@ public sealed class AssetObject
 
     /// <summary>Port of AssetObject::getAbsolutePath (upstream was CWD-relative "assets/objects";
     /// the assets root is injected here).</summary>
-    public string GetAbsolutePath(string assetsRoot) =>
-        Path.Combine(assetsRoot, "objects", GetRelPath());
+    public string GetAbsolutePath(AbsolutePath assetsRoot)
+    {
+        string a2 = GetRelPath();
+        return (assetsRoot / "objects" / a2).Value;
+    }
 
     /// <summary>Port of AssetObject::getDownloadAction; null when the local file is present.</summary>
-    public NetRequest? GetDownloadAction(string assetsRoot, string resourceUrl)
+    public NetRequest? GetDownloadAction(AbsolutePath assetsRoot, string resourceUrl)
     {
         var objectFile = new FileInfo(GetAbsolutePath(assetsRoot));
         if (!objectFile.Exists || objectFile.Length != Size)
         {
-            var objectDl = NetRequest.MakeFile(new Uri(resourceUrl + GetRelPath()), objectFile.FullName);
+            var objectDl = NetRequest.MakeFile(new Uri(resourceUrl + GetRelPath()),
+                new AbsolutePath(objectFile.FullName));
             if (Hash.Length != 0)
             {
                 objectDl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, Hash));
@@ -78,7 +82,7 @@ public sealed class AssetsIndex
 
     /// <summary>Port of AssetsIndex::getDownloadJob; null when everything is already present.
     /// <paramref name="assetsRoot"/> anchors the local object store (injected).</summary>
-    public NetJob? GetDownloadJob(string resourceUrl, string assetsRoot)
+    public NetJob? GetDownloadJob(string resourceUrl, AbsolutePath assetsRoot)
     {
         var job = new NetJob($"Assets for {Id}");
         foreach (var @object in Objects.Values)
@@ -97,12 +101,12 @@ public sealed class AssetsIndex
 public static class AssetsUtils
 {
     /// <summary>Port of AssetsUtils::loadAssetsIndexJson.</summary>
-    public static bool LoadAssetsIndexJson(string assetsId, string path, AssetsIndex index)
+    public static bool LoadAssetsIndexJson(string assetsId, AbsolutePath path, AssetsIndex index)
     {
         AssetsIndexFileJson? document;
         try
         {
-            document = JsonSerializer.Deserialize(File.ReadAllText(path),
+            document = JsonSerializer.Deserialize(File.ReadAllText(path.Value),
                 AssetsJsonContext.Default.AssetsIndexFileJson);
         }
         catch (Exception e) when (e is JsonException or IOException)
@@ -146,15 +150,15 @@ public static class AssetsUtils
     /// <summary>Port of AssetsUtils::reconstructAssets: rebuild a virtual assets folder (or the
     /// resources folder) for the given assets ID. <paramref name="assetsRoot"/> anchors the
     /// asset store (injected; upstream anchored at the launcher working directory).</summary>
-    public static bool ReconstructAssets(string assetsId, string resourcesFolder, string assetsRoot)
+    public static bool ReconstructAssets(string assetsId, AbsolutePath resourcesFolder, AbsolutePath assetsRoot)
     {
-        var indexDir = new AbsolutePath(assetsRoot) / "indexes";
-        var objectDir = new AbsolutePath(assetsRoot) / "objects";
-        var virtualDir = new AbsolutePath(assetsRoot) / "virtual";
-        var indexPath = (indexDir / (assetsId + ".json")).Value;
+        var indexDir = assetsRoot / "indexes";
+        var objectDir = assetsRoot / "objects";
+        var virtualDir = assetsRoot / "virtual";
+        var indexPath = indexDir / (assetsId + ".json");
         var virtualRoot = (virtualDir / assetsId).Value;
 
-        if (!File.Exists(indexPath))
+        if (!File.Exists(indexPath.Value))
         {
             return false;
         }
@@ -174,7 +178,7 @@ public static class AssetsUtils
         }
         else if (index.MapToResources)
         {
-            targetPath = resourcesFolder;
+            targetPath = resourcesFolder.Value;
         }
 
         if (targetPath is null)
@@ -185,7 +189,7 @@ public static class AssetsUtils
         var presentFiles = CollectPathsFromDir(targetPath);
         foreach (var (map, assetObject) in index.Objects)
         {
-            var targetPathForMap = Path.Combine(targetPath, map);
+            var targetPathForMap = new AbsolutePath(targetPath) / map;
             var tlk = assetObject.Hash.Length >= 2 ? assetObject.Hash[..2] : assetObject.Hash;
             var originalPath = (objectDir / tlk / assetObject.Hash).Value;
             if (!File.Exists(originalPath))
@@ -193,13 +197,13 @@ public static class AssetsUtils
                 continue;
             }
 
-            presentFiles.Remove(targetPathForMap);
-            if (File.Exists(targetPathForMap))
+            presentFiles.Remove(targetPathForMap.Value);
+            if (File.Exists(targetPathForMap.Value))
             {
                 continue;
             }
 
-            var targetDir = Path.GetDirectoryName(Path.GetFullPath(targetPathForMap));
+            var targetDir = Path.GetDirectoryName(Path.GetFullPath(targetPathForMap.Value));
             if (targetDir is not null)
             {
                 FileOps.EnsureFolderPathExists(new AbsolutePath(targetDir));
@@ -207,7 +211,7 @@ public static class AssetsUtils
 
             try
             {
-                File.Copy(originalPath, targetPathForMap);
+                File.Copy(originalPath, targetPathForMap.Value);
             }
             catch (IOException)
             {

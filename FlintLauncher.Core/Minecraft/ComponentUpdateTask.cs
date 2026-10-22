@@ -108,13 +108,13 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
 
         LoadResult result;
         var customPatchFilename = component.GetFilename();
-        if (File.Exists(customPatchFilename))
+        if (customPatchFilename is { } patchFile && File.Exists(patchFile.Value))
         {
             // if local file exists...
 
             // check for uid problems inside...
             var fileChanged = false;
-            var file = ProfileUtils.ParseJsonFile(customPatchFilename, requireOrder: false);
+            var file = ProfileUtils.ParseJsonFile(patchFile.Value, requireOrder: false);
             if (file.Uid != component.Uid)
             {
                 file.Uid = component.Uid;
@@ -124,7 +124,7 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
             if (fileChanged)
             {
                 // FIXME upstream @QUALITY: do not ignore return value
-                ProfileUtils.SaveJsonFile(OneSixVersionFormat.VersionFileToJson(file), customPatchFilename);
+                ProfileUtils.SaveJsonFile(OneSixVersionFormat.VersionFileToJson(file), patchFile.Value);
             }
 
             component.File = file;

@@ -12,6 +12,7 @@ using System.Collections.Concurrent;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.State;
 using FlintLauncher.Web;
+using TruePath;
 
 namespace FlintLauncher.Tests;
 
@@ -74,7 +75,7 @@ internal sealed class TestGlobalSettings
 
     /// <summary>A throwaway user-layer store (fresh flint.json at the record defaults).</summary>
     public static FlintConfigStore CreateStore() =>
-        new(Path.Combine(Path.GetTempPath(), $"flint-user-{Guid.NewGuid():N}", "flint.json"),
+        new(Temporary.SystemTempDirectory() / $"flint-user-{Guid.NewGuid():N}" / "flint.json",
             FlintJsonContext.Default.FlintConfigFile);
 }
 
@@ -119,7 +120,7 @@ internal static class TestLauncherState
         }
 
         Dirs.Add(dir);
-        return new(Path.Combine(dir, "launcher-state.json"),
+        return new(new AbsolutePath(Path.Combine(dir, "launcher-state.json")),
             FlintJsonContext.Default.LauncherState);
     }
 }

@@ -5,6 +5,7 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.Net;
 
@@ -104,7 +105,7 @@ public sealed class NetRequest(
         };
     }
 
-    public static NetRequest MakeFile(Uri url, string path, RequestOptions options = RequestOptions.NoOptions, NetStack? stack = null)
+    public static NetRequest MakeFile(Uri url, AbsolutePath path, RequestOptions options = RequestOptions.NoOptions, NetStack? stack = null)
     {
         return new NetRequest(url, options, stack: stack)
         {

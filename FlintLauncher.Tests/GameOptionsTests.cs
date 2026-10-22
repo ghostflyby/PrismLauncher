@@ -4,6 +4,8 @@
 // the whole-file rewrite through a save file and the edit helpers.
 
 using FlintLauncher.Core.Minecraft.GameOptions;
+using TruePath;
+using TruePath.SystemIo;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -21,12 +23,12 @@ public class GameOptionsTests : IDisposable
         catch (DirectoryNotFoundException) { }
     }
 
-    private string OptionsPath(string content)
+    private AbsolutePath OptionsPath(string content)
     {
         Directory.CreateDirectory(_dir);
         var path = Path.Combine(_dir, "options.txt");
         File.WriteAllText(path, content);
-        return path;
+        return new AbsolutePath(path);
     }
 
     // ---------------------------------------------------------------- load
@@ -106,7 +108,7 @@ public class GameOptionsTests : IDisposable
     [Fact]
     public void Missing_File_Is_Not_Loaded()
     {
-        var options = new GameOptions(Path.Combine(_dir, "missing", "options.txt"));
+        var options = new GameOptions(new AbsolutePath(Path.Combine(_dir, "missing", "options.txt")));
         Assert.False(options.IsLoaded);
         Assert.Empty(options.Contents);
         Assert.Equal(0, options.Version);
@@ -122,7 +124,7 @@ public class GameOptionsTests : IDisposable
         Assert.True(options.Save());
 
         // the "version:" line comes FIRST (when non-zero), then every item as key:value\n
-        Assert.Equal("version:3583\nlang:en_us\nmusic:0.53212\n", File.ReadAllText(path));
+        Assert.Equal("version:3583\nlang:en_us\nmusic:0.53212\n", path.ReadAllText());
     }
 
     [Fact]
@@ -131,7 +133,7 @@ public class GameOptionsTests : IDisposable
         var path = OptionsPath("a:1\n");
         var options = new GameOptions(path);
         Assert.True(options.Save());
-        Assert.Equal("a:1\n", File.ReadAllText(path));
+        Assert.Equal("a:1\n", path.ReadAllText());
     }
 
     [Fact]
@@ -154,7 +156,7 @@ public class GameOptionsTests : IDisposable
         var pathDir = Path.GetDirectoryName(path);
         Assert.NotNull(pathDir);
         Directory.CreateDirectory(pathDir);
-        var options = new GameOptions(path);
+        var options = new GameOptions(new AbsolutePath(path));
         Assert.False(options.IsLoaded);
         Assert.True(options.Save());
         Assert.Equal("", File.ReadAllText(path));
@@ -167,7 +169,7 @@ public class GameOptionsTests : IDisposable
         var path = OptionsPath(original);
         var options = new GameOptions(path);
         Assert.True(options.Save());
-        Assert.Equal(original, File.ReadAllText(path));
+        Assert.Equal(original, path.ReadAllText());
     }
 
     // ---------------------------------------------------------------- edit helpers
@@ -187,7 +189,7 @@ public class GameOptionsTests : IDisposable
         options.Set("fov", "0.75");
         Assert.Equal(2, options.RowCount());
         Assert.True(options.Save());
-        Assert.Equal("lang:de_de\nfov:0.75\n", File.ReadAllText(path));
+        Assert.Equal("lang:de_de\nfov:0.75\n", path.ReadAllText());
     }
 
     [Fact]
@@ -200,7 +202,7 @@ public class GameOptionsTests : IDisposable
         Assert.False(options.Remove("lang"));
         Assert.Single(options.Contents);
         Assert.True(options.Save());
-        Assert.Equal("music:1.0\n", File.ReadAllText(path));
+        Assert.Equal("music:1.0\n", path.ReadAllText());
     }
 
     [Fact]
@@ -208,7 +210,7 @@ public class GameOptionsTests : IDisposable
     {
         var path = OptionsPath("a:1\n");
         var options = new GameOptions(path);
-        File.WriteAllText(path, "version:9\nb:2\n");
+        path.WriteAllText("version:9\nb:2\n");
         Assert.True(options.Reload());
         Assert.Equal(9, options.Version);
         Assert.Equal("b", Assert.Single(options.Contents).Key);

@@ -11,6 +11,7 @@
 //    port exercises the same update() folder scan directly.
 
 using FlintLauncher.Core.Minecraft.Resources;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -60,7 +61,7 @@ public class ResourceFolderModelTests : IDisposable
             var folder = source;
             var tempDir = NewTempDir("gh1178_a");
 
-            var m = new ModFolderModel(tempDir, isIndexed: false, createDir: true);
+            var m = new ModFolderModel(new AbsolutePath(tempDir), isIndexed: false, createDir: true);
 
             Assert.True(m.InstallResource(folder));
 
@@ -72,7 +73,7 @@ public class ResourceFolderModelTests : IDisposable
             var folder = source + '/';
             var tempDir = NewTempDir("gh1178_b");
 
-            var m = new ModFolderModel(tempDir, isIndexed: false, createDir: true);
+            var m = new ModFolderModel(new AbsolutePath(tempDir), isIndexed: false, createDir: true);
 
             Assert.True(m.InstallResource(folder));
 
@@ -84,7 +85,7 @@ public class ResourceFolderModelTests : IDisposable
     public void Test_addFromWatch()
     {
         var source = TestDataDir();
-        var model = new ModFolderModel(source, isIndexed: false, createDir: true);
+        var model = new ModFolderModel(new AbsolutePath(source), isIndexed: false, createDir: true);
 
         Assert.Equal(0, model.Size);
 
@@ -101,7 +102,7 @@ public class ResourceFolderModelTests : IDisposable
         var fileMod = Path.Combine(TestDataDir(), "supercoolmod.jar");
 
         var tmp = NewTempDir("remove_resource");
-        var model = new ResourceFolderModel(tmp, isIndexed: false, createDir: false);
+        var model = new ResourceFolderModel(new AbsolutePath(tmp), isIndexed: false, createDir: false);
 
         Assert.Equal(0, model.Size);
 
@@ -137,7 +138,7 @@ public class ResourceFolderModelTests : IDisposable
         var fileMod = Path.Combine(TestDataDir(), "supercoolmod.jar");
 
         var tmp = NewTempDir("enable_disable");
-        var model = new ResourceFolderModel(tmp, isIndexed: false, createDir: false);
+        var model = new ResourceFolderModel(new AbsolutePath(tmp), isIndexed: false, createDir: false);
 
         Assert.Equal(0, model.Size);
 
@@ -203,15 +204,15 @@ public class ResourceFolderModelTests : IDisposable
         Assert.True(small.Enable(EnableAction.Toggle)); // back to enabled
 
         // Mod version comparator (McVersion-based)
-        var modA = new Mod(Path.Combine(tmp, "moda.jar"));
-        var modB = new Mod(Path.Combine(tmp, "modb.jar"));
+        var modA = new Mod(new AbsolutePath(Path.Combine(tmp, "moda.jar")));
+        var modB = new Mod(new AbsolutePath(Path.Combine(tmp, "modb.jar")));
         modA.SetDetails(new ModDetails { ModId = "a", Version = "1.0.0" });
         modB.SetDetails(new ModDetails { ModId = "b", Version = "1.2.0" });
         Assert.True(modA.Compare(modB, SortType.Version) < 0);
         Assert.True(modB.Compare(modA, SortType.Version) > 0);
         // two mods without resolved details share the empty version string, so the version key ties
-        var unresolvedA = new Mod(Path.Combine(tmp, "modc.jar"));
-        var unresolvedB = new Mod(Path.Combine(tmp, "modd.jar"));
+        var unresolvedA = new Mod(new AbsolutePath(Path.Combine(tmp, "modc.jar")));
+        var unresolvedB = new Mod(new AbsolutePath(Path.Combine(tmp, "modd.jar")));
         Assert.Equal(0, unresolvedA.Compare(unresolvedB, SortType.Version));
     }
 }

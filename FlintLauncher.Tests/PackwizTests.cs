@@ -5,6 +5,7 @@
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Packwiz;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -29,7 +30,7 @@ public class PackwizTests
         var fileName = slugMod + ".pw.toml";
         Assert.Contains(fileName, Directory.GetFiles(indexDir).Select(Path.GetFileName));
 
-        var metadata = Packwiz.GetIndexForMod(indexDir, slugMod);
+        var metadata = Packwiz.GetIndexForMod(new AbsolutePath(indexDir), slugMod);
 
         Assert.True(metadata.IsValid);
 
@@ -58,7 +59,7 @@ public class PackwizTests
         // Try without the .pw.toml at the end
         nameMod = nameMod[..^8];
 
-        var metadata = Packwiz.GetIndexForMod(indexDir, nameMod);
+        var metadata = Packwiz.GetIndexForMod(new AbsolutePath(indexDir), nameMod);
 
         Assert.True(metadata.IsValid);
 
@@ -161,13 +162,13 @@ public class PackwizTests
         var mod = Packwiz.CreateModFormat(pack, version);
         mod.Dependencies.Add(new Dependency { AddonId = "P7dR8mSH", Type = DependencyType.FromString("REQUIRED") });
 
-        Packwiz.UpdateModIndex(dir, mod);
+        Packwiz.UpdateModIndex(new AbsolutePath(dir), mod);
 
         var indexFile = Path.Combine(dir, "borderless-mining.pw.toml");
         Assert.True(File.Exists(indexFile));
 
         // the written file parses through the MiniToml subset and round-trips
-        var loaded = Packwiz.GetIndexForMod(dir, "borderless-mining");
+        var loaded = Packwiz.GetIndexForMod(new AbsolutePath(dir), "borderless-mining");
         Assert.True(loaded.IsValid);
         Assert.Equal(mod.Name, loaded.Name);
         Assert.Equal(mod.Filename, loaded.Filename);
@@ -197,18 +198,18 @@ public class PackwizTests
         var (pack, version) = ModrinthSample();
         var mod = Packwiz.CreateModFormat(pack, version);
         mod.LockUpdate = true;
-        Packwiz.UpdateModIndex(dir, mod);
+        Packwiz.UpdateModIndex(new AbsolutePath(dir), mod);
 
         var toml = File.ReadAllText(Path.Combine(dir, "borderless-mining.pw.toml"));
         Assert.Contains("x-prismlauncher-lock-update = true", toml);
 
-        var loaded = Packwiz.GetIndexForMod(dir, "borderless-mining");
+        var loaded = Packwiz.GetIndexForMod(new AbsolutePath(dir), "borderless-mining");
         Assert.True(loaded.IsValid);
         Assert.True(loaded.LockUpdate);
 
         // and unlocking it writes false again
         loaded.LockUpdate = false;
-        Packwiz.UpdateModIndex(dir, loaded);
+        Packwiz.UpdateModIndex(new AbsolutePath(dir), loaded);
         Assert.Contains("x-prismlauncher-lock-update = false",
             File.ReadAllText(Path.Combine(dir, "borderless-mining.pw.toml")));
     }
@@ -232,9 +233,9 @@ public class PackwizTests
             Url = "https://edge.forgecdn.net/files/3509/43/screenshot-to-clipboard-1.0.7-fabric.jar",
             Mode = "metadata:curseforge",
         };
-        Packwiz.UpdateModIndex(dir, mod);
+        Packwiz.UpdateModIndex(new AbsolutePath(dir), mod);
 
-        var loaded = Packwiz.GetIndexForMod(dir, "screenshot-to-clipboard-fabric");
+        var loaded = Packwiz.GetIndexForMod(new AbsolutePath(dir), "screenshot-to-clipboard-fabric");
         Assert.True(loaded.IsValid);
         Assert.Equal(ResourceProvider.Flame, loaded.Provider);
         Assert.Equal("3509043", loaded.FileId);
@@ -247,7 +248,7 @@ public class PackwizTests
         var dir = Path.Combine(Path.GetTempPath(), $"flint-packwiz-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
 
-        Packwiz.UpdateModIndex(dir, new Packwiz.Mod()); // no slug/project id: silently dropped
+        Packwiz.UpdateModIndex(new AbsolutePath(dir), new Packwiz.Mod()); // no slug/project id: silently dropped
 
         Assert.Empty(Directory.GetFiles(dir));
     }
@@ -259,14 +260,14 @@ public class PackwizTests
         Directory.CreateDirectory(dir);
 
         var (pack, version) = ModrinthSample();
-        Packwiz.UpdateModIndex(dir, Packwiz.CreateModFormat(pack, version));
+        Packwiz.UpdateModIndex(new AbsolutePath(dir), Packwiz.CreateModFormat(pack, version));
         Assert.True(File.Exists(Path.Combine(dir, "borderless-mining.pw.toml")));
 
-        Packwiz.DeleteModIndex(dir, "borderless-mining");
+        Packwiz.DeleteModIndex(new AbsolutePath(dir), "borderless-mining");
         Assert.False(File.Exists(Path.Combine(dir, "borderless-mining.pw.toml")));
 
         // deleting a non-existent index does nothing
-        Packwiz.DeleteModIndex(dir, "does-not-exist");
+        Packwiz.DeleteModIndex(new AbsolutePath(dir), "does-not-exist");
     }
 
     [Fact]
@@ -276,15 +277,15 @@ public class PackwizTests
         Directory.CreateDirectory(dir);
 
         var (pack, version) = ModrinthSample();
-        Packwiz.UpdateModIndex(dir, Packwiz.CreateModFormat(pack, version));
+        Packwiz.UpdateModIndex(new AbsolutePath(dir), Packwiz.CreateModFormat(pack, version));
 
-        var byId = Packwiz.GetIndexForModById(dir, "kYq5qkSL");
+        var byId = Packwiz.GetIndexForModById(new AbsolutePath(dir), "kYq5qkSL");
         Assert.True(byId.IsValid);
         // (upstream quirk kept: the by-id scan passes the file name as the slug)
         Assert.Equal("kYq5qkSL", byId.ModId());
         Assert.Equal("Borderless Mining", byId.Name);
 
-        Assert.False(Packwiz.GetIndexForModById(dir, "unknown-id").IsValid);
+        Assert.False(Packwiz.GetIndexForModById(new AbsolutePath(dir), "unknown-id").IsValid);
     }
 
     [Fact]
@@ -293,8 +294,8 @@ public class PackwizTests
         var dir = Path.Combine(Path.GetTempPath(), $"flint-packwiz-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
 
-        Assert.False(Packwiz.GetIndexForMod(dir, "nope").IsValid);
-        Assert.False(Packwiz.GetIndexForMod(dir, "alsonope.pw.toml").IsValid);
+        Assert.False(Packwiz.GetIndexForMod(new AbsolutePath(dir), "nope").IsValid);
+        Assert.False(Packwiz.GetIndexForMod(new AbsolutePath(dir), "alsonope.pw.toml").IsValid);
     }
 
     [Fact]

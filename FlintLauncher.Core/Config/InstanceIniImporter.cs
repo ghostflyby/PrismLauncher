@@ -23,6 +23,8 @@
 // the probe cache is launcher-state.json's path-keyed map.
 
 using FlintLauncher.Core.Settings;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Config;
 
@@ -33,10 +35,10 @@ public static class InstanceIniImporter
 
     /// <summary>Import one instance.cfg into the typed instance layer. A missing/unreadable
     /// file yields an empty payload (the record defaults take over through the fold).</summary>
-    public static InstanceConfigFile Import(string iniPath)
+    public static InstanceConfigFile Import(AbsolutePath iniPath)
     {
         var result = new InstanceConfigFile();
-        if (!File.Exists(iniPath))
+        if (!iniPath.ExistsFile())
         {
             return result;
         }

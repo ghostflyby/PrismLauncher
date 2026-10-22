@@ -14,6 +14,7 @@
 
 using System.Runtime.InteropServices;
 using System.Security;
+using TruePath;
 
 namespace FlintLauncher.Core.IO;
 
@@ -163,10 +164,10 @@ public static partial class FileTransfer
     /// (silently pruning them from the import), and <c>AttributesToSkip = 0</c> would
     /// descend directory links and loop on link cycles, so the recursion is driven by
     /// hand.</summary>
-    internal static IEnumerable<string> EnumerateFilesDeep(string dir)
+    internal static IEnumerable<string> EnumerateFilesDeep(AbsolutePath dir)
     {
         var pending = new Stack<string>();
-        pending.Push(dir);
+        pending.Push(dir.Value);
         while (pending.Count > 0)
         {
             var current = pending.Pop();
@@ -259,7 +260,7 @@ public static partial class FileTransfer
     /// <summary>The unix inode of <paramref name="path"/>; 0 when unavailable (Windows, a
     /// missing path, or a libc without a plain "stat" export — older glibc routed stat(2)
     /// through __xstat). A 0 result simply skips the inode link of the D2 chain.</summary>
-    public static long StatInode(string path)
+    public static long StatInode(AbsolutePath path)
     {
         if (OperatingSystem.IsWindows() || (!OperatingSystem.IsMacOS() && !OperatingSystem.IsLinux()))
         {
@@ -269,7 +270,7 @@ public static partial class FileTransfer
         try
         {
             var buf = new byte[StatBufferSize];
-            return Stat(path, buf) == 0 ? BitConverter.ToInt64(buf, 8) : 0;
+            return Stat(path.Value, buf) == 0 ? BitConverter.ToInt64(buf, 8) : 0;
         }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {

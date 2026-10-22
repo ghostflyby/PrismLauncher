@@ -14,6 +14,7 @@ using FlintLauncher.Core.State;
 using FlintLauncher.Web;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -32,7 +33,8 @@ public class GlobalLaunchSettingsStub
         var configDir = Path.Combine(Path.GetTempPath(), $"flint-user-{Guid.NewGuid():N}");
         Directory.CreateDirectory(configDir);
         Store = new FlintConfigStore(
-            Path.Combine(configDir, "flint.json"), FlintJsonContext.Default.FlintConfigFile);
+            new AbsolutePath(Path.Combine(configDir, "flint.json")),
+            FlintJsonContext.Default.FlintConfigFile);
 
         StubSet("ShowGameTime", true);
         StubSet("ShowGameTimeWithoutDays", false);
@@ -116,10 +118,10 @@ public sealed class LaunchFixture : IDisposable
     {
         Directory.CreateDirectory(Root);
         State = new LauncherStateStore(
-            Path.Combine(_paths.Paths.StateRoot, "launcher-state.json"),
+            _paths.Paths.StateRoot / "launcher-state.json",
             FlintJsonContext.Default.LauncherState);
         MetaCache = new HttpMetaCache(
-            Path.Combine(_paths.Paths.CacheRoot, "metacache.json"));
+            _paths.Paths.CacheRoot / "metacache.json");
         MetaCache.AddBase("meta", _paths.Paths.MetaDir);
         MetaCache.AddBase("libraries", _paths.Paths.LibrariesRoot);
         MetaCache.AddBase("asset_indexes", _paths.Paths.AssetIndexesDir);
@@ -203,18 +205,20 @@ public sealed class LaunchFixture : IDisposable
 
         // the typed instance layer (D4): the adapter over the fixture root folds the
         // fixture's user-layer store (Global) with the instance's own instance.json
+        var services = CreateServices();
         var instance = new MinecraftInstance(
             new InstanceJsonSettingsObject(
-                instanceRoot, new InstanceEnvironment(
+                new AbsolutePath(instanceRoot), new InstanceEnvironment(
                     Global.Store, FlintJsonContext.Default.InstanceConfigFile,
                     FlintJsonContext.Default.InstanceStateFile)),
-            instanceRoot)
+            new AbsolutePath(instanceRoot))
         {
             // the composition-root stamp (InstanceList does the same in the host): the
             // CreateLaunchTask path builds its per-launch services from these, the launcher
             // runtime state carries the java probe cache (S5), and the fixture meta cache
             // (E6 fixture injection) feeds the metadata/library/asset-index downloads
-            LaunchServices = CreateServices(),
+            LaunchServices = services,
+            Paths = services.Paths,
             LauncherState = State,
             MetaCache = MetaCache,
         };

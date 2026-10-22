@@ -16,26 +16,28 @@
 //  - installIcon() returned void upstream (failures silently ignored); the port returns
 //    bool, like <see cref="IconFiles.InstallIcon"/> (QFile::copy semantics — no overwrite).
 
+using TruePath;
+
 namespace FlintLauncher.Core.Icons;
 
 /// <summary>One indexed icon: its key (completeBaseName of the file, subdirectory icons
 /// included), its file path and the display label ("dir » name" for nested icons).</summary>
-public sealed record IconEntry(string Key, string Path, string DisplayName);
+public sealed record IconEntry(string Key, AbsolutePath Path, string DisplayName);
 
 public sealed class IconPool
 {
-    private readonly Func<string> _iconsDir;
-    private readonly Dictionary<string, string> _byKey = new(StringComparer.Ordinal);
+    private readonly Func<AbsolutePath> _iconsDir;
+    private readonly Dictionary<string, AbsolutePath> _byKey = new(StringComparer.Ordinal);
 
     /// <summary><paramref name="iconsDir"/> is a provider, not a value: the IconsDir
     /// setting can change at runtime (PUT /settings) and the pool follows it.</summary>
-    public IconPool(Func<string> iconsDir)
+    public IconPool(Func<AbsolutePath> iconsDir)
     {
         _iconsDir = iconsDir;
     }
 
     /// <summary>The library root the provider currently resolves to.</summary>
-    public string IconsDir => _iconsDir();
+    public AbsolutePath IconsDir => _iconsDir();
 
     // ------------------------------------------------------------------ lookups (index)
 
@@ -43,15 +45,15 @@ public sealed class IconPool
     /// getIcon/getIconIndex the scan covers the whole tree (subdirectory icons carry their
     /// base-name key, a later duplicate replaces an earlier one) and "default" aliases to
     /// "grass". Rescans first — the C++ refreshed its model through the file watcher.</summary>
-    public string GetIconFile(string key)
+    public AbsolutePath? GetIconFile(string key)
     {
         Rescan();
         var resolvedKey = key == "default" ? "grass" : key;
-        return _byKey.GetValueOrDefault(resolvedKey, "");
+        return _byKey.TryGetValue(resolvedKey, out var file) ? file : null;
     }
 
     /// <summary>Port of IconList::iconFileExists.</summary>
-    public bool IconFileExists(string key) => GetIconFile(key).Length != 0;
+    public bool IconFileExists(string key) => GetIconFile(key) is not null;
 
     /// <summary>The index, freshly scanned (the listing source for GET /icons).</summary>
     public List<IconEntry> Entries()
@@ -73,7 +75,7 @@ public sealed class IconPool
         var dir = _iconsDir();
         foreach (var file in IconFiles.GetIconFilePaths(dir))
         {
-            if (!IconFiles.IsIconSuffix(Suffix(Path.GetFileName(file))))
+            if (!IconFiles.IsIconSuffix(file.GetExtensionWithoutDot()))
             {
                 continue;
             }
@@ -88,7 +90,7 @@ public sealed class IconPool
     /// under <paramref name="name"/> (its own file name when empty) and refreshes the
     /// index. Returns false when the source is not a readable icon file, the suffix is
     /// unsupported, or the target exists (QFile::copy semantics).</summary>
-    public bool Install(string file, string name = "")
+    public bool Install(AbsolutePath file, string name = "")
     {
         if (!IconFiles.InstallIcon(_iconsDir(), file, name))
         {

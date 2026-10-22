@@ -25,7 +25,7 @@ namespace FlintLauncher.Core.ModPlatform;
 
 public sealed class EnsureMetadataTask(
     Dictionary<string, Resource> resources,
-    string indexDir,
+    AbsolutePath indexDir,
     ResourceProvider provider,
     ModrinthApi? modrinth = null,
     FlameApi? flame = null)
@@ -386,7 +386,7 @@ public sealed class EnsureMetadataTask(
         }
 
         // LocalResourceUpdateTask: ensure a '.index' folder exists in the mods folder
-        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(indexDir)))
+        if (!FileOps.EnsureFolderPathExists(indexDir))
         {
             EmitMetadataFailed(resource, $"Unable to create index directory at {indexDir}!");
             return;

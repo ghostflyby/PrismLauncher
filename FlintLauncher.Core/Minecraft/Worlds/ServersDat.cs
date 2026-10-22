@@ -110,11 +110,11 @@ public static class ServersDat
     /// Port of ServersModel::load + parseServersDat: reads &lt;instance&gt;/servers.dat.
     /// A missing or unreadable file, or unparseable contents, yields an empty list.
     /// </summary>
-    public static List<ServerEntry> Load(string path)
+    public static List<ServerEntry> Load(AbsolutePath path)
     {
         try
         {
-            return Parse(File.ReadAllBytes(path));
+            return Parse(File.ReadAllBytes(path.Value));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NbtParseException)
         {
@@ -158,7 +158,7 @@ public static class ServersDat
     /// Port of ServersModel::save_internal + serializeServerDat: builds the compound and
     /// writes it as raw NBT (atomically, like FS::write/QSaveFile).
     /// </summary>
-    public static void Save(string path, IReadOnlyList<ServerEntry> servers)
+    public static void Save(AbsolutePath path, IReadOnlyList<ServerEntry> servers)
     {
         FileOps.EnsureFilePathExists(new AbsolutePath(path));
         FileOps.Write(new AbsolutePath(path), Serialize(servers));

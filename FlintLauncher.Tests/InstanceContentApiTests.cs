@@ -20,6 +20,7 @@ using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Nbt;
 using FlintLauncher.Web;
 using Microsoft.AspNetCore.Builder;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -531,7 +532,7 @@ public class ServerApiTests : IAsyncDisposable
         // persistence: the list round-trips through the servers.dat file on disk
         var serversPath = Path.Combine(_host.GameRootOf("servers-inst"), "servers.dat");
         Assert.True(File.Exists(serversPath));
-        var persisted = ServersDat.Load(serversPath);
+        var persisted = ServersDat.Load(new AbsolutePath(serversPath));
         Assert.Equal(2, persisted.Count);
         Assert.Equal("mc.hypixel.net", persisted[0].Address);
 

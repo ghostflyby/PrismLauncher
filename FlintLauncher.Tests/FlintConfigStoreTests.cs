@@ -15,23 +15,25 @@ using FlintLauncher.Core.Secrets;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.State;
 using FlintLauncher.Web;
+using TruePath;
+using TruePath.SystemIo;
 using Xunit;
 
 namespace FlintLauncher.Tests;
 
 public class FlintConfigStoreTests : IDisposable
 {
-    private readonly string _dir = Path.Combine(Path.GetTempPath(), $"flint-config-{Guid.NewGuid():N}");
+    private readonly AbsolutePath _dir = Temporary.SystemTempDirectory() / $"flint-config-{Guid.NewGuid():N}";
 
-    private string ConfigPath => Path.Combine(_dir, "flint.json");
+    private AbsolutePath ConfigPath => _dir / "flint.json";
 
-    public FlintConfigStoreTests() => Directory.CreateDirectory(_dir);
+    public FlintConfigStoreTests() => _dir.CreateDirectory();
 
     public void Dispose()
     {
         try
         {
-            Directory.Delete(_dir, recursive: true);
+            _dir.DeleteDirectoryRecursively();
         }
         catch (DirectoryNotFoundException) { }
     }
@@ -94,13 +96,13 @@ public class FlintConfigStoreTests : IDisposable
     [Fact]
     public void Store_Missing_File_Yields_Defaults_And_First_Write_Seals_The_File()
     {
-        Assert.False(File.Exists(ConfigPath));
+        Assert.False(ConfigPath.ExistsFile());
         var store = NewStore();
         Assert.Equal(512, store.Current.Memory.MinMemAlloc);
-        Assert.False(File.Exists(ConfigPath)); // a load without writes creates nothing
+        Assert.False(ConfigPath.ExistsFile()); // a load without writes creates nothing
 
         store.Set("MinMemAlloc", 3072);
-        Assert.True(File.Exists(ConfigPath));
+        Assert.True(ConfigPath.ExistsFile());
         Assert.Equal(3072, store.Current.Memory.MinMemAlloc);
 
         // reload from disk: the resolved shape round-trips (Flint-only write side, C5)
@@ -126,7 +128,7 @@ public class FlintConfigStoreTests : IDisposable
     {
         // a payload written by an older schema (fewer members) keeps its stored values and
         // takes the record defaults for the absent ones — no nulls reach the resolved view
-        File.WriteAllText(ConfigPath,
+        ConfigPath.WriteAllText(
             """{"launcher":{"numberOfConcurrentTasks":3},"memory":{"minMemAlloc":768}}""");
         var store = NewStore();
         Assert.Equal(3, store.Current.Launcher.NumberOfConcurrentTasks);
@@ -157,7 +159,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Equal("/usr/bin/java", Variant.AsString(store.Get("JavaPath")));
         store.Reset("JavaPath");
         Assert.Equal("", Variant.AsString(store.Get("JavaPath")));
-        Assert.True(File.Exists(ConfigPath)); // every mutation persisted (flint.json, not INI)
+        Assert.True(ConfigPath.ExistsFile()); // every mutation persisted (flint.json, not INI)
     }
 
     // ------------------------------------------------------------------------ importer (C5)
@@ -165,23 +167,38 @@ public class FlintConfigStoreTests : IDisposable
     /// <summary>Secrets + state over the fixture roots (the import's two side destinations).</summary>
     private (FileSecretStore Secrets, LauncherStateStore State) NewSideStores()
     {
-        var secrets = new FileSecretStore(Path.Combine(_dir, "secrets.json"),
+        var secrets = new FileSecretStore(_dir / "secrets.json",
             FlintJsonContext.Default.SecretsFile);
-        var state = new LauncherStateStore(Path.Combine(_dir, "launcher-state.json"),
+        var state = new LauncherStateStore(_dir / "launcher-state.json",
             FlintJsonContext.Default.LauncherState);
         return (secrets, state);
     }
 
-    private FlintPaths Paths =>
-        FlintPaths.FromRoots(_dir, Path.Combine(_dir, "data"), Path.Combine(_dir, "store"),
-            Path.Combine(_dir, "cache"), Path.Combine(_dir, "state"));
+    private FlintPaths Paths
+    {
+        get
+        {
+            AbsolutePath dataRoot = _dir / "data";
+            AbsolutePath storeRoot = _dir / "store";
+            AbsolutePath cacheRoot = _dir / "cache";
+            AbsolutePath stateRoot = _dir / "state";
+            return (FlintPaths)new()
+            {
+                ConfigRoot = _dir,
+                DataRoot = dataRoot,
+                StoreRoot = storeRoot,
+                CacheRoot = cacheRoot,
+                StateRoot = stateRoot,
+            };
+        }
+    }
 
     [Fact]
     public void Import_Maps_The_Ini_Chain_Into_Records_Secrets_And_State()
     {
         var paths = Paths;
-        Directory.CreateDirectory(paths.DataRoot);
-        File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"), """
+        paths.DataRoot.CreateDirectory();
+        (paths.DataRoot / "prismlauncher.cfg").WriteAllText("""
                                                                              [General]
                                                                              ConfigVersion=1.3
                                                                              NumberOfConcurrentTasks=4
@@ -208,7 +225,7 @@ public class FlintConfigStoreTests : IDisposable
 
         // the chain file that won + the one-shot seal
         Assert.EndsWith("prismlauncher.cfg", imported.ImportedIni);
-        Assert.True(File.Exists(ConfigPath));
+        Assert.True(ConfigPath.ExistsFile());
 
         // (3) record domains — the recognized keys landed, unknown keys did not
         Assert.Equal(4, store.Current.Launcher.NumberOfConcurrentTasks);
@@ -220,8 +237,8 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Equal("corpus", store.Current.Proxy.ProxyUser);
         Assert.Equal("zh_CN", store.Current.Language.Language);
         // secrets must NOT be config members (C4: the format carries no secret fields)
-        Assert.DoesNotContain("hunter2", File.ReadAllText(ConfigPath));
-        Assert.DoesNotContain("mr-token", File.ReadAllText(ConfigPath));
+        Assert.DoesNotContain("hunter2", ConfigPath.ReadAllText());
+        Assert.DoesNotContain("mr-token", ConfigPath.ReadAllText());
 
         // (1) the secret trio → the store
         Assert.Equal("hunter2", secrets.Get("ProxyPass"));
@@ -241,23 +258,23 @@ public class FlintConfigStoreTests : IDisposable
         // preference order: flint.cfg > prismlauncher.cfg > polymc.cfg > multimc.cfg | mmc.cfg
         Assert.Null(FlintConfigImporter.FindChainFile(Paths));
         var paths = Paths;
-        Directory.CreateDirectory(paths.DataRoot);
+        paths.DataRoot.CreateDirectory();
 
-        File.WriteAllText(Path.Combine(paths.DataRoot, "mmc.cfg"), "[General]\nLanguage=from-mmc\n");
-        Assert.EndsWith("mmc.cfg", FlintConfigImporter.FindChainFile(paths));
+        (paths.DataRoot / "mmc.cfg").WriteAllText("[General]\nLanguage=from-mmc\n");
+        Assert.EndsWith("mmc.cfg", FlintConfigImporter.FindChainFile(paths)?.Value);
 
-        File.WriteAllText(Path.Combine(paths.DataRoot, "multimc.cfg"), "[General]\nLanguage=from-multimc\n");
-        Assert.EndsWith("multimc.cfg", FlintConfigImporter.FindChainFile(paths));
+        (paths.DataRoot / "multimc.cfg").WriteAllText("[General]\nLanguage=from-multimc\n");
+        Assert.EndsWith("multimc.cfg", FlintConfigImporter.FindChainFile(paths)?.Value);
 
-        File.WriteAllText(Path.Combine(paths.DataRoot, "polymc.cfg"), "[General]\nLanguage=from-polymc\n");
-        Assert.EndsWith("polymc.cfg", FlintConfigImporter.FindChainFile(paths));
+        (paths.DataRoot / "polymc.cfg").WriteAllText("[General]\nLanguage=from-polymc\n");
+        Assert.EndsWith("polymc.cfg", FlintConfigImporter.FindChainFile(paths)?.Value);
 
-        File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"), "[General]\nLanguage=from-prism\n");
-        Assert.EndsWith("prismlauncher.cfg", FlintConfigImporter.FindChainFile(paths));
+        (paths.DataRoot / "prismlauncher.cfg").WriteAllText("[General]\nLanguage=from-prism\n");
+        Assert.EndsWith("prismlauncher.cfg", FlintConfigImporter.FindChainFile(paths)?.Value);
 
         // the config root outranks the flat data root for the same name
-        File.WriteAllText(Path.Combine(paths.ConfigRoot, "flint.cfg"), "[General]\nLanguage=from-flint\n");
-        Assert.EndsWith("flint.cfg", FlintConfigImporter.FindChainFile(paths));
+        (paths.ConfigRoot / "flint.cfg").WriteAllText("[General]\nLanguage=from-flint\n");
+        Assert.EndsWith("flint.cfg", FlintConfigImporter.FindChainFile(paths)?.Value);
 
         var store = NewStore();
         var (secrets, state) = NewSideStores();
@@ -270,8 +287,8 @@ public class FlintConfigStoreTests : IDisposable
     public void Import_Is_One_Shot_On_The_FlintJson_Guard()
     {
         var paths = Paths;
-        Directory.CreateDirectory(paths.DataRoot);
-        File.WriteAllText(Path.Combine(paths.DataRoot, "flint.cfg"),
+        paths.DataRoot.CreateDirectory();
+        (paths.DataRoot / "flint.cfg").WriteAllText(
             "[General]\nMaxMemAlloc=4096\nProxyPass=first\n");
         var store = NewStore();
         var (secrets, state) = NewSideStores();
@@ -280,7 +297,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Equal(4096, store.Current.Memory.MaxMemAlloc);
 
         // a later INI change must not win: flint.json now exists and is authoritative
-        File.WriteAllText(Path.Combine(paths.DataRoot, "flint.cfg"),
+        (paths.DataRoot / "flint.cfg").WriteAllText(
             "[General]\nMaxMemAlloc=1111\nProxyPass=second\n");
         Assert.Null(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
         Assert.Equal(4096, store.Current.Memory.MaxMemAlloc);
@@ -291,8 +308,8 @@ public class FlintConfigStoreTests : IDisposable
     public void Import_Drops_The_Java_Probe_Quintet_And_Needs_No_State_Keys()
     {
         var paths = Paths;
-        Directory.CreateDirectory(paths.DataRoot);
-        File.WriteAllText(Path.Combine(paths.DataRoot, "flint.cfg"), """
+        paths.DataRoot.CreateDirectory();
+        (paths.DataRoot / "flint.cfg").WriteAllText("""
                                                                      [General]
                                                                      JavaSignature=abc
                                                                      JavaArchitecture=64
@@ -310,7 +327,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Equal("", state.Current.Java.LastHostname);
         // the ordinary config key still landed and the seal was written
         Assert.Equal(2, store.Current.Launcher.NumberOfManualRetries);
-        Assert.True(File.Exists(ConfigPath));
+        Assert.True(ConfigPath.ExistsFile());
     }
 
     [Fact]
@@ -320,8 +337,8 @@ public class FlintConfigStoreTests : IDisposable
         // a hand-edited "True" reads true, so the playtime one-shot seal holds (no re-migration)
         // and the wizard question stays asked. The strict "true"/"1" match read these false.
         var paths = Paths;
-        Directory.CreateDirectory(paths.DataRoot);
-        File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"), """
+        paths.DataRoot.CreateDirectory();
+        (paths.DataRoot / "prismlauncher.cfg").WriteAllText("""
                                                                              [General]
                                                                              TotalPlayTime=999
                                                                              TotalPlayTimeMigrated=True
@@ -385,8 +402,8 @@ public class FlintConfigStoreTests : IDisposable
         // primary (record domains; secret aliases redirect with the primary, C4), not drop
         // on the single pass's exact match
         var paths = Paths;
-        Directory.CreateDirectory(paths.DataRoot);
-        File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"), """
+        paths.DataRoot.CreateDirectory();
+        (paths.DataRoot / "prismlauncher.cfg").WriteAllText("""
                                                                              [General]
                                                                              ConfigVersion=1.3
                                                                              MCWindowMaximize=true
@@ -426,7 +443,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Null(secrets.Get("ProxyPassword"));
         Assert.Null(secrets.Get("CFKeyOverride"));
         // and never reach flint.json
-        var flintJson = File.ReadAllText(ConfigPath);
+        var flintJson = ConfigPath.ReadAllText();
         Assert.DoesNotContain("oldpass", flintJson);
         Assert.DoesNotContain("cf-old", flintJson);
     }
@@ -435,8 +452,8 @@ public class FlintConfigStoreTests : IDisposable
     public void Import_Primary_Spelling_Wins_When_A_File_Carries_Both_Spellings()
     {
         var paths = Paths;
-        Directory.CreateDirectory(paths.DataRoot);
-        File.WriteAllText(Path.Combine(paths.DataRoot, "flint.cfg"), """
+        paths.DataRoot.CreateDirectory();
+        (paths.DataRoot / "flint.cfg").WriteAllText("""
                                                                      [General]
                                                                      MinMemAlloc=1111
                                                                      MinMemoryAlloc=2222
@@ -463,10 +480,10 @@ public class FlintConfigStoreTests : IDisposable
         // the relative name resolves against the chdir'd data root), never in the cfg chain;
         // a real Prism import takes the pair from the separate file
         var paths = Paths;
-        Directory.CreateDirectory(paths.DataRoot);
-        File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"),
+        paths.DataRoot.CreateDirectory();
+        (paths.DataRoot / "prismlauncher.cfg").WriteAllText(
             "[General]\nLanguage=zh_CN\n");
-        File.WriteAllText(Path.Combine(paths.DataRoot, "playtime.cfg"), """
+        (paths.DataRoot / "playtime.cfg").WriteAllText("""
                                                                         [General]
                                                                         TotalPlayTime=654321
                                                                         TotalPlayTimeMigrated=true
@@ -485,15 +502,15 @@ public class FlintConfigStoreTests : IDisposable
     public void Import_PlaytimeCfg_Ouranks_The_In_Chain_Compat_Pair_Per_Member()
     {
         var paths = Paths;
-        Directory.CreateDirectory(paths.DataRoot);
-        File.WriteAllText(Path.Combine(paths.DataRoot, "flint.cfg"), """
+        paths.DataRoot.CreateDirectory();
+        (paths.DataRoot / "flint.cfg").WriteAllText("""
                                                                      [General]
                                                                      TotalPlayTime=111
                                                                      TotalPlayTimeMigrated=true
                                                                      """);
         // a half-populated playtime.cfg: only the total — the migrated flag falls back to
         // the in-chain branch, member by member
-        File.WriteAllText(Path.Combine(paths.DataRoot, "playtime.cfg"),
+        (paths.DataRoot / "playtime.cfg").WriteAllText(
             "[General]\nTotalPlayTime=222\n");
         var store = NewStore();
         var (secrets, state) = NewSideStores();
@@ -513,8 +530,8 @@ public class FlintConfigStoreTests : IDisposable
         // the pair must land false, or the auto-java machinery would override the pinned
         // JVM on the next launch (AutoInstallJava / BaseInstance consult this value)
         var paths = Paths;
-        Directory.CreateDirectory(paths.DataRoot);
-        File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"),
+        paths.DataRoot.CreateDirectory();
+        (paths.DataRoot / "prismlauncher.cfg").WriteAllText(
             "[General]\nJavaPath=/opt/pinned-jdk\n");
         var store = NewStore();
         var (secrets, state) = NewSideStores();
@@ -524,7 +541,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.False(store.Current.Java.AutomaticJavaDownload);
         // the derived pair materialized into flint.json (the one-shot seal), from where the
         // launch path's UserLayer reads it
-        var written = JsonDocument.Parse(File.ReadAllText(ConfigPath)).RootElement;
+        var written = JsonDocument.Parse(ConfigPath.ReadAllText()).RootElement;
         Assert.False(written.GetProperty("java").GetProperty("automaticJavaSwitch").GetBoolean());
         Assert.False(written.GetProperty("java").GetProperty("automaticJavaDownload").GetBoolean());
     }
@@ -533,8 +550,8 @@ public class FlintConfigStoreTests : IDisposable
     public void Import_Explicit_Automatic_Java_Keys_Win_Over_The_Derived_Default_Per_Key()
     {
         var paths = Paths;
-        Directory.CreateDirectory(paths.DataRoot);
-        File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"), """
+        paths.DataRoot.CreateDirectory();
+        (paths.DataRoot / "prismlauncher.cfg").WriteAllText("""
                                                                              [General]
                                                                              JavaPath=/opt/pinned-jdk
                                                                              AutomaticJavaSwitch=true
@@ -551,8 +568,8 @@ public class FlintConfigStoreTests : IDisposable
     public void Import_Empty_JavaPath_Keeps_The_Automatic_Java_Pair_True()
     {
         var paths = Paths;
-        Directory.CreateDirectory(paths.DataRoot);
-        File.WriteAllText(Path.Combine(paths.DataRoot, "prismlauncher.cfg"),
+        paths.DataRoot.CreateDirectory();
+        (paths.DataRoot / "prismlauncher.cfg").WriteAllText(
             "[General]\nLanguage=en\n");
         var store = NewStore();
         var (secrets, state) = NewSideStores();
@@ -568,8 +585,8 @@ public class FlintConfigStoreTests : IDisposable
         // flint.json exists → the one-shot guard: Idle (neither imported nor unreadable) —
         // the host logs Idle as silence, a failure only when UnreadableIni is set
         var paths = Paths;
-        Directory.CreateDirectory(paths.DataRoot);
-        File.WriteAllText(Path.Combine(paths.DataRoot, "flint.cfg"), "[General]\nLanguage=x\n");
+        paths.DataRoot.CreateDirectory();
+        (paths.DataRoot / "flint.cfg").WriteAllText("[General]\nLanguage=x\n");
         var store = NewStore();
         var (secrets, state) = NewSideStores();
         Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);

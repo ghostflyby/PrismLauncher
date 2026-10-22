@@ -8,6 +8,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Text;
 using FlintLauncher.Core.IO;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -207,7 +208,7 @@ internal sealed class TechnicZipPackBuilder
                 File.WriteAllText(Path.Combine(dir, "bin", "version.json"), VersionJson);
             }
 
-            return MmcZip.CompressDir(path, dir);
+            return MmcZip.CompressDir(new AbsolutePath(path), new AbsolutePath(dir));
         }
         finally
         {
@@ -257,7 +258,7 @@ internal sealed class TechnicZipPackBuilder
             Directory.CreateDirectory(innerDir);
             File.WriteAllBytes(inner, content);
             var zipPath = Path.Combine(dir, "mod.zip");
-            Assert.True(MmcZip.CompressDir(zipPath, dir));
+            Assert.True(MmcZip.CompressDir(new AbsolutePath(zipPath), new AbsolutePath(dir)));
             return File.ReadAllBytes(zipPath);
         }
         finally

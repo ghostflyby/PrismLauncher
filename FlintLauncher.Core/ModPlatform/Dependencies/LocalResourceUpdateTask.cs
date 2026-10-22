@@ -20,7 +20,7 @@ using TruePath;
 namespace FlintLauncher.Core.ModPlatform.Dependencies;
 
 public sealed class LocalResourceUpdateTask(
-    string indexDir,
+    AbsolutePath indexDir,
     IndexedPack project,
     IndexedVersion version,
     bool lockUpdate = false)
@@ -37,7 +37,7 @@ public sealed class LocalResourceUpdateTask(
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         // Ensure a '.index' folder exists in the mods folder, and create it if it does not
-        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(indexDir)))
+        if (!FileOps.EnsureFolderPathExists(indexDir))
         {
             EmitFailed($"Unable to create index directory at {indexDir}!");
             return Task.CompletedTask;

@@ -22,6 +22,7 @@ using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Settings;
 using Microsoft.Extensions.Logging;
+using TruePath;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
@@ -63,7 +64,7 @@ public sealed class LauncherPartLaunch : LaunchStep
         EmitLogLines(lines, level);
     }
 
-    public void SetWorkingDirectory(string workingDirectory) => _process.SetWorkingDirectory(workingDirectory);
+    public void SetWorkingDirectory(AbsolutePath workingDirectory) => _process.SetWorkingDirectory(workingDirectory);
 
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -104,11 +105,11 @@ public sealed class LauncherPartLaunch : LaunchStep
         _process.SetDetachable(true);
 
         var classPath = instance.GetClassPath();
-        classPath.Insert(0, jarPath);
+        classPath.Insert(0, new AbsolutePath(jarPath));
 
         if (legacyJarPath.Length != 0)
         {
-            classPath.Insert(0, legacyJarPath);
+            classPath.Insert(0, new AbsolutePath(legacyJarPath));
         }
 
         var natPath = instance.GetNativePath();

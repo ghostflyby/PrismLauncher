@@ -8,6 +8,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -134,9 +135,10 @@ public class RealLaunchSmokeTests
         var global = new GlobalLaunchSettingsStub();
         // D4: the real Prism instance loads read-only through the typed layer stack (the
         // instance.cfg imports in memory; nothing materializes)
+        var instanceRootPath = new AbsolutePath(instanceDir);
         var instance = new MinecraftInstance(
-            new InstanceJsonSettingsObject(instanceDir, global.Environment),
-            instanceDir);
+            new InstanceJsonSettingsObject(instanceRootPath, global.Environment),
+            instanceRootPath);
         _ = instance.Settings;
         var reload = await instance.GetPackProfile().ReloadAsync(NetMode.Offline);
         if (!reload.Ok)

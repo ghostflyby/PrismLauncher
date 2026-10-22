@@ -7,29 +7,31 @@
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Web;
+using TruePath;
+using TruePath.SystemIo;
 using Xunit;
 
 namespace FlintLauncher.Tests;
 
 public class SettingsObjectTests : IDisposable
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-settings-{Guid.NewGuid():N}");
+    private readonly AbsolutePath _root = new(Path.Combine(Path.GetTempPath(), $"flint-settings-{Guid.NewGuid():N}"));
 
     public SettingsObjectTests()
     {
-        Directory.CreateDirectory(_root);
+        _root.CreateDirectory();
     }
 
     public void Dispose()
     {
         try
         {
-            Directory.Delete(_root, recursive: true);
+            _root.DeleteDirectoryRecursively();
         }
         catch (DirectoryNotFoundException) { }
     }
 
-    private string JsonPath => Path.Combine(_root, "instance.json");
+    private AbsolutePath JsonPath => _root / "instance.json";
 
     private InstanceJsonSettingsObject Settings(FlintConfigStore? user = null) =>
         new(_root, new InstanceEnvironment(user, FlintJsonContext.Default.InstanceConfigFile,
@@ -53,8 +55,8 @@ public class SettingsObjectTests : IDisposable
 
         Assert.True(settings.Set("MaxMemAlloc", 8192));
         Assert.Equal(8192, Variant.AsInt(settings.Get("MaxMemAlloc")));
-        Assert.Contains("8192", File.ReadAllText(JsonPath)); // instance.json, not INI
-        Assert.False(File.Exists(Path.Combine(_root, "instance.cfg")));
+        Assert.Contains("8192", JsonPath.ReadAllText()); // instance.json, not INI
+        Assert.False((_root / "instance.cfg").ExistsFile());
 
         settings.Reset("MaxMemAlloc");
         Assert.Equal(4096, Variant.AsInt(settings.Get("MaxMemAlloc")));
@@ -157,8 +159,8 @@ public class SettingsObjectTests : IDisposable
         settings.Set("lastTimePlayed", 120L);
 
         // the trio NEVER lands in instance.json — it is instance-state.json (D4)
-        Assert.False(File.Exists(JsonPath));
-        Assert.True(File.Exists(Path.Combine(_root, "instance-state.json")));
+        Assert.False(JsonPath.ExistsFile());
+        Assert.True((_root / "instance-state.json").ExistsFile());
 
         // a fresh adapter reloads the trio from the state file
         var reloaded = Settings();
@@ -173,7 +175,7 @@ public class SettingsObjectTests : IDisposable
     [Fact]
     public void DualTrack_CfgImport_ConvertsOnFirstWrite()
     {
-        File.WriteAllLines(Path.Combine(_root, "instance.cfg"),
+        (_root / "instance.cfg").WriteAllLines(
         [
             "[General]",
             "name=Legacy",
@@ -187,12 +189,12 @@ public class SettingsObjectTests : IDisposable
         settings.RegisterSetting("name", "Unnamed Instance");
         settings.RegisterSetting("notes", "");
         Assert.Equal("Legacy", Variant.AsString(settings.Get("name")));
-        Assert.False(File.Exists(JsonPath));
+        Assert.False(JsonPath.ExistsFile());
 
         // the first write converts (uuid carried over verbatim — the D2 addressing chain)
         settings.Set("notes", "now flint");
-        Assert.True(File.Exists(JsonPath));
-        Assert.Contains("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", File.ReadAllText(JsonPath));
-        Assert.Contains("1280", File.ReadAllText(JsonPath));
+        Assert.True(JsonPath.ExistsFile());
+        Assert.Contains("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", JsonPath.ReadAllText());
+        Assert.Contains("1280", JsonPath.ReadAllText());
     }
 }

@@ -15,6 +15,7 @@ using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Packwiz;
 using FlintLauncher.Core.Versioning;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -51,7 +52,7 @@ public class ModUpdateTaskTests : IDisposable
     {
         Directory.CreateDirectory(IndexDir);
         File.WriteAllBytes(Path.Combine(ModsDir, "test.jar"), oldBytes);
-        Packwiz.UpdateModIndex(IndexDir, new Packwiz.Mod
+        Packwiz.UpdateModIndex(new AbsolutePath(IndexDir), new Packwiz.Mod
         {
             Slug = "test-mod",
             Name = "Test Mod",
@@ -66,7 +67,7 @@ public class ModUpdateTaskTests : IDisposable
             Loaders = ModLoaderType.Forge,
         });
 
-        var model = new ModFolderModel(ModsDir, isIndexed: true, createDir: true);
+        var model = new ModFolderModel(new AbsolutePath(ModsDir), isIndexed: true, createDir: true);
         model.Update();
         var mod = model.AllMods().First(m => m.Fileinfo.Name == "test.jar");
         var instance = _env.CreateInstance("1.18.2", ModLoaderType.Forge, "40.1.0");
@@ -93,13 +94,13 @@ public class ModUpdateTaskTests : IDisposable
 
         // 1. check: the Flame update pass finds the newer file 789
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
-            _ => MetadataHandler.Get(IndexDir, "test-mod"), flame: _flameApi);
+            _ => MetadataHandler.Get(new AbsolutePath(IndexDir), "test-mod"), flame: _flameApi);
         await check.StartAsync();
         Assert.True(check.WasSuccessful, check.FailReason);
         var update = Assert.Single(check.GetUpdates());
 
         // 2. apply: the fake pack of the C++ check task + a ResourceDownloadTask per update
-        var metadata = MetadataHandler.Get(IndexDir, "test-mod");
+        var metadata = MetadataHandler.Get(new AbsolutePath(IndexDir), "test-mod");
         var pack = new IndexedPack
         {
             AddonId = metadata.ProjectId,
@@ -117,7 +118,7 @@ public class ModUpdateTaskTests : IDisposable
         Assert.Equal(newBytes, await File.ReadAllBytesAsync(Path.Combine(ModsDir, "test.jar")));
 
         // the metadata was refreshed to the new file id/version
-        var refreshed = MetadataHandler.Get(IndexDir, "test-mod");
+        var refreshed = MetadataHandler.Get(new AbsolutePath(IndexDir), "test-mod");
         Assert.True(refreshed.IsValid);
         Assert.Equal("789", refreshed.FileId);
         Assert.Equal("Test Mod 2.0", refreshed.VersionNumber);

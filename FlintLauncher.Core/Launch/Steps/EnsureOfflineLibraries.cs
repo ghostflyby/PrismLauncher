@@ -3,6 +3,8 @@
 // clear message when the instance's libraries are missing (offline mode has no downloads).
 
 using FlintLauncher.Core.Instances;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
@@ -17,14 +19,14 @@ public sealed class EnsureOfflineLibraries(LaunchTask parent, MinecraftInstance 
             return Task.CompletedTask;
         }
 
-        var allJars = new List<string>();
+        var allJars = new List<AbsolutePath>();
         profile.GetLibraryFiles(instance.RuntimeContext, allJars, allJars, instance.GetLocalLibraryPath(),
             instance.BinRoot(), false, storageBase: instance.LibraryStorageBase());
 
-        var missing = new List<string>();
+        var missing = new List<AbsolutePath>();
         foreach (var jar in allJars)
         {
-            if (!File.Exists(jar))
+            if (!jar.ExistsFile())
             {
                 missing.Add(jar);
             }

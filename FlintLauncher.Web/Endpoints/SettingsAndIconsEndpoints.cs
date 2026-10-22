@@ -18,6 +18,8 @@ using FlintLauncher.Core.Settings;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
 using FlintLauncher.Web.Services;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Web.Endpoints;
 
@@ -233,7 +235,7 @@ public static class SettingsAndIconsEndpoints
 
         api.MapGet("/icons", (IconPool icons) =>
         {
-            Directory.CreateDirectory(icons.IconsDir);
+            icons.IconsDir.CreateDirectory();
             return Results.Ok(icons.Entries()
                 .Select(entry => new IconView(entry.Key, entry.DisplayName))
                 .ToArray());
@@ -246,7 +248,7 @@ public static class SettingsAndIconsEndpoints
                 return ApiJson.Error("invalid_request", "multipart file field is required", 400);
             }
 
-            Directory.CreateDirectory(icons.IconsDir);
+            icons.IconsDir.CreateDirectory();
             var installed = new List<string>();
             foreach (var file in request.Form.Files)
             {
@@ -256,8 +258,9 @@ public static class SettingsAndIconsEndpoints
                     return ApiJson.Error("invalid_icon", $"unsupported icon type: {file.FileName}", 400);
                 }
 
-                var temp = Path.Combine(Path.GetTempPath(), $"flint-icon-{Guid.NewGuid():N}{Path.GetExtension(file.FileName)}");
-                await using (var stream = File.Create(temp))
+                var temp = new AbsolutePath(Path.GetTempPath())
+                           / $"flint-icon-{Guid.NewGuid():N}{Path.GetExtension(file.FileName)}";
+                await using (var stream = temp.Create())
                 {
                     await file.CopyToAsync(stream);
                 }
@@ -290,10 +293,11 @@ public static class SettingsAndIconsEndpoints
             string key;
             if (request is { HasFormContentType: true, Form.Files.Count: > 0 })
             {
-                Directory.CreateDirectory(runtime.Icons.IconsDir);
+                runtime.Icons.IconsDir.CreateDirectory();
                 var file = request.Form.Files[0];
-                var temp = Path.Combine(Path.GetTempPath(), $"flint-icon-{Guid.NewGuid():N}{Path.GetExtension(file.FileName)}");
-                await using (var stream = File.Create(temp))
+                var temp = new AbsolutePath(Path.GetTempPath())
+                           / $"flint-icon-{Guid.NewGuid():N}{Path.GetExtension(file.FileName)}";
+                await using (var stream = temp.Create())
                 {
                     await file.CopyToAsync(stream);
                 }

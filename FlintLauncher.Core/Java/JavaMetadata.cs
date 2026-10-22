@@ -34,7 +34,7 @@ public enum JavaDownloadType
 }
 
 public sealed record JavaMetadata : IComparable<JavaMetadata>,
-    IComparisonOperators<JavaMetadata,JavaMetadata,bool>
+    IComparisonOperators<JavaMetadata, JavaMetadata, bool>
 {
     /// <summary>Port of BaseVersion::descriptor().</summary>
     public string Descriptor() => Version.ToString();
@@ -252,5 +252,4 @@ public sealed record JavaMetadata : IComparable<JavaMetadata>,
         ArgumentNullException.ThrowIfNull(right);
         return left.CompareTo(right) >= 0;
     }
-
 }

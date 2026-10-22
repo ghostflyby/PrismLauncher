@@ -5,6 +5,7 @@
 using System.IO.Compression;
 using FlintLauncher.Core.IO;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
@@ -21,11 +22,11 @@ public sealed class ExtractNatives(LaunchTask parent) : LaunchStep(parent)
         }
 
         var outputPath = instance.GetNativePath();
-        FileOps.EnsureFolderPathExists(new AbsolutePath(outputPath));
+        FileOps.EnsureFolderPathExists(outputPath);
         var jniHackEnabled = instance.GetJavaLanguageVersion() >= 8;
         foreach (var source in toExtract)
         {
-            if (!UnzipNatives(source, outputPath, jniHackEnabled))
+            if (!UnzipNatives(source, outputPath.Value, jniHackEnabled))
             {
                 EmitLogLine($"Couldn't extract native jar '{source}' to destination '{outputPath}'", MessageLevel.Fatal);
                 EmitFailed($"Couldn't extract native jar '{source}' to destination '{outputPath}'");
@@ -40,12 +41,12 @@ public sealed class ExtractNatives(LaunchTask parent) : LaunchStep(parent)
     public override void FinalizeStep()
     {
         var instance = Parent.Instance;
-        var targetDir = Path.Combine(instance.InstanceRoot(), "natives");
-        if (Directory.Exists(targetDir))
+        var targetDir = instance.InstanceRoot / "natives";
+        if (targetDir.ExistsDirectory())
         {
             try
             {
-                Directory.Delete(targetDir, recursive: true);
+                targetDir.DeleteDirectoryRecursively();
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
@@ -64,11 +65,11 @@ public sealed class ExtractNatives(LaunchTask parent) : LaunchStep(parent)
         return target[..^suffix.Length] + replacement;
     }
 
-    private static bool UnzipNatives(string source, string targetFolder, bool applyJnilibHack)
+    private static bool UnzipNatives(AbsolutePath source, string targetFolder, bool applyJnilibHack)
     {
         try
         {
-            using var zip = ZipFile.OpenRead(source);
+            using var zip = ZipFile.OpenRead(source.Value);
             var directory = Path.GetFullPath(targetFolder);
             FileOps.EnsureFolderPathExists(new AbsolutePath(directory));
 
@@ -86,18 +87,18 @@ public sealed class ExtractNatives(LaunchTask parent) : LaunchStep(parent)
                     continue;
                 }
 
-                var absFilePath = Path.Combine(directory, name);
+                var absFilePath = new AbsolutePath(directory) / name;
                 // zip-slip guard (same invariant as MMCZip::ExtractSubDir)
-                if (!absFilePath.StartsWith(directory, OperatingSystem.IsWindows()
+                if (!absFilePath.Value.StartsWith(directory, OperatingSystem.IsWindows()
                         ? StringComparison.OrdinalIgnoreCase
                         : StringComparison.Ordinal))
                 {
                     return false;
                 }
 
-                FileOps.EnsureFilePathExists(new AbsolutePath(absFilePath));
+                FileOps.EnsureFilePathExists(absFilePath);
                 using var entryStream = entry.Open();
-                using var output = File.Create(absFilePath);
+                using var output = File.Create(absFilePath.Value);
                 entryStream.CopyTo(output);
             }
 

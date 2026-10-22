@@ -7,6 +7,8 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Minecraft;
+using TruePath;
+using TruePath.SystemIo;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -94,7 +96,7 @@ public class PackProfileTests : IDisposable
         // a custom patch file for one component must make it "custom" once loaded
         WriteFile("patches/org.lwjgl3.json", VersionFileJson("org.lwjgl3", "3.1.2", "LWJGL 3"));
 
-        using var profile = new PackProfile(_root);
+        using var profile = new PackProfile(new AbsolutePath(_root));
         var result = profile.Load();
         Assert.True(result.Ok, result.ErrorMessage);
 
@@ -126,7 +128,7 @@ public class PackProfileTests : IDisposable
         // a JSON null where a component object belongs fails the whole file (the former
         // "Component must be an object." throw), never a silently-shortened list
         WriteFile("mmc-pack.json", """{"formatVersion": 1, "components": [null, {"uid": "net.minecraft"}]}""");
-        using var profile = new PackProfile(_root);
+        using var profile = new PackProfile(new AbsolutePath(_root));
         var result = profile.Load();
         Assert.False(result.Ok);
     }
@@ -134,7 +136,7 @@ public class PackProfileTests : IDisposable
     [Fact]
     public void SaveProducesQtCompatibleJson()
     {
-        using var profile = new PackProfile(_root);
+        using var profile = new PackProfile(new AbsolutePath(_root));
         profile.BuildingFromScratch();
 
         var minecraft = new Component(profile, "net.minecraft")
@@ -194,7 +196,7 @@ public class PackProfileTests : IDisposable
     public void LoadRejectsUnknownFormatVersion()
     {
         WriteFile("mmc-pack.json", """{ "formatVersion": 99, "components": [] }""");
-        using var profile = new PackProfile(_root);
+        using var profile = new PackProfile(new AbsolutePath(_root));
         var result = profile.Load();
         Assert.False(result.Ok);
         Assert.Contains("bad file format", result.ErrorMessage);
@@ -213,7 +215,7 @@ public class PackProfileTests : IDisposable
                 ]
             }
             """);
-        using var profile = new PackProfile(_root);
+        using var profile = new PackProfile(new AbsolutePath(_root));
         var result = profile.Load();
         Assert.True(result.Ok, result.ErrorMessage);
         Assert.Single(profile.Components);
@@ -225,7 +227,7 @@ public class PackProfileTests : IDisposable
     [Fact]
     public void MoveReordersComponents()
     {
-        using var profile = new PackProfile(_root);
+        using var profile = new PackProfile(new AbsolutePath(_root));
         profile.BuildingFromScratch();
         var a = new Component(profile, "test.a");
         var b = new Component(profile, "test.b");
@@ -248,19 +250,19 @@ public class PackProfileTests : IDisposable
         File.WriteAllText(jarmodSource, "not a real jar");
         try
         {
-            using var profile = new PackProfile(_root);
+            using var profile = new PackProfile(new AbsolutePath(_root));
             profile.BuildingFromScratch();
-            Assert.True(profile.InstallJarMods([jarmodSource]));
+            Assert.True(profile.InstallJarMods([new AbsolutePath(jarmodSource)]));
 
             var jarmodComponent = profile.Components.Single(c => c.GetId().StartsWith("custom.jarmod."));
             var jarmodPatch = profile.PatchFilePathForUid(jarmodComponent.GetId());
             var jarmodFile = Directory.EnumerateFiles(Path.Combine(_root, "jarmods")).Single();
-            Assert.True(File.Exists(jarmodPatch));
+            Assert.True(jarmodPatch.ExistsFile());
             Assert.True(File.Exists(jarmodFile));
 
             // removing the jar mod component deletes both the patch record and the copied jar
             Assert.True(profile.Remove(jarmodComponent.GetId()));
-            Assert.False(File.Exists(jarmodPatch));
+            Assert.False(jarmodPatch.ExistsFile());
             Assert.False(File.Exists(jarmodFile));
             Assert.DoesNotContain(profile.Components, c => c.GetId() == jarmodComponent.GetId());
         }
@@ -279,9 +281,9 @@ public class PackProfileTests : IDisposable
         File.WriteAllText(source, "not a real jar");
         try
         {
-            using var profile = new PackProfile(_root);
+            using var profile = new PackProfile(new AbsolutePath(_root));
             profile.BuildingFromScratch();
-            Assert.True(profile.InstallCustomJar(source));
+            Assert.True(profile.InstallCustomJar(new AbsolutePath(source)));
 
             var component = profile.Components.Single();
             Assert.Equal("customjar", component.GetId());
@@ -291,7 +293,7 @@ public class PackProfileTests : IDisposable
             // the jar is copied into <instance>/libraries/customjar-1.jar
             Assert.True(File.Exists(Path.Combine(_root, "libraries", "customjar-1.jar")));
 
-            var patch = ParseNode(File.ReadAllText(profile.PatchFilePathForUid("customjar"))).AsObject();
+            var patch = ParseNode(profile.PatchFilePathForUid("customjar").ReadAllText()).AsObject();
             Assert.Equal("customjar", patch["uid"]?.ToString());
             Assert.NotNull(patch["mainJar"]);
 
@@ -314,9 +316,9 @@ public class PackProfileTests : IDisposable
         File.WriteAllText(source, "not a real agent");
         try
         {
-            using var profile = new PackProfile(_root);
+            using var profile = new PackProfile(new AbsolutePath(_root));
             profile.BuildingFromScratch();
-            Assert.True(profile.InstallAgents([source]));
+            Assert.True(profile.InstallAgents([new AbsolutePath(source)]));
 
             var component = profile.Components.Single();
             Assert.StartsWith("custom.agent.", component.GetId());
@@ -325,7 +327,7 @@ public class PackProfileTests : IDisposable
             // the agent jar is copied into <instance>/libraries/<guid>.jar
             Assert.Single(Directory.EnumerateFiles(Path.Combine(_root, "libraries")));
 
-            var patch = ParseNode(File.ReadAllText(profile.PatchFilePathForUid(component.GetId()))).AsObject();
+            var patch = ParseNode(profile.PatchFilePathForUid(component.GetId()).ReadAllText()).AsObject();
             var agents = patch["+agents"]?.AsArray();
             Assert.NotNull(agents);
             Assert.Single(agents);
@@ -340,7 +342,7 @@ public class PackProfileTests : IDisposable
     [Fact]
     public void InstallEmpty()
     {
-        using var profile = new PackProfile(_root);
+        using var profile = new PackProfile(new AbsolutePath(_root));
         profile.BuildingFromScratch();
         Assert.True(profile.InstallEmpty("org.quiltmc.quilt-loader", "Quilt Loader"));
 
@@ -349,7 +351,7 @@ public class PackProfileTests : IDisposable
         Assert.Equal("Quilt Loader", component.GetName());
         Assert.True(component.IsCustom());
 
-        var patch = ParseNode(File.ReadAllText(profile.PatchFilePathForUid("org.quiltmc.quilt-loader")));
+        var patch = ParseNode(profile.PatchFilePathForUid("org.quiltmc.quilt-loader").ReadAllText());
         Assert.Equal("org.quiltmc.quilt-loader", patch["uid"]?.ToString());
         Assert.Equal("1", patch["version"]?.ToString());
     }
@@ -359,7 +361,7 @@ public class PackProfileTests : IDisposable
     [Fact]
     public void GetModLoaders()
     {
-        using var profile = new PackProfile(_root);
+        using var profile = new PackProfile(new AbsolutePath(_root));
         profile.BuildingFromScratch();
 
         var minecraft = new Component(profile, "net.minecraft") { Version = "1.20.1" };

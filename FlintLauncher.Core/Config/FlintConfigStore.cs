@@ -13,6 +13,7 @@
 // reference swap away (the same shape as LauncherStateStore).
 
 using System.Text.Json.Serialization.Metadata;
+using TruePath;
 
 namespace FlintLauncher.Core.Config;
 
@@ -24,7 +25,7 @@ public sealed class FlintConfigStore
     /// <summary>Build (and load) the store for one flint.json. A missing file yields the
     /// record defaults; the payload is folded over a fresh default before it becomes
     /// <see cref="Current"/>.</summary>
-    public FlintConfigStore(string filePath, JsonTypeInfo<FlintConfigFile> typeInfo)
+    public FlintConfigStore(AbsolutePath filePath, JsonTypeInfo<FlintConfigFile> typeInfo)
     {
         _file = new TypedJsonFile<FlintConfigFile>(filePath, typeInfo);
         Current = Load();
@@ -34,7 +35,7 @@ public sealed class FlintConfigStore
     /// <see cref="Update"/>/<see cref="Set"/>.</summary>
     public FlintConfigFile Current { get; private set; }
 
-    public string FilePath => _file.FilePath;
+    public AbsolutePath FilePath => _file.FilePath;
 
     /// <summary>The fresh-install default (every domain record at its property defaults).</summary>
     public static FlintConfigFile CurrentDefault() => FlintConfigFile.Default();

@@ -12,6 +12,7 @@
 // JVM drop instead of listing as unknown.
 
 using JdkFind;
+using TruePath;
 
 namespace FlintLauncher.Core.Java;
 
@@ -34,7 +35,7 @@ public static class JavaDetection
     /// primary layer is skipped and only the launcher-managed java root is probed (no
     /// production caller passes it; kept for upstream parity).</summary>
     public static async Task<IReadOnlyList<JavaCandidate>> DetectAsync(
-        string? javaRoot = null,
+        AbsolutePath? javaRoot = null,
         CancellationToken cancellationToken = default,
         IReadOnlyList<IJvmProvider>? providers = null,
         bool managedOnly = false)

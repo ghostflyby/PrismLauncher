@@ -59,7 +59,7 @@ public sealed class LegacyFmlLibrariesTask(MinecraftInstance inst) : FlintTask
         // now check the lib folder inside the instance for files.
         foreach (var lib in libList)
         {
-            var libInfo = new FileInfo(Path.Combine(inst1.LibDir(), lib.Filename));
+            var libInfo = new FileInfo((inst1.LibDir() / lib.Filename).Value);
             if (libInfo.Exists)
             {
                 continue;
@@ -130,7 +130,7 @@ public sealed class LegacyFmlLibrariesTask(MinecraftInstance inst) : FlintTask
 
                 try
                 {
-                    File.Copy(entry.GetFullPath(), Path.Combine(inst1.LibDir(), lib.Filename), overwrite: true);
+                    File.Copy(entry.GetFullPath().Value, (inst1.LibDir() / lib.Filename).Value, overwrite: true);
                 }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException)
                 {

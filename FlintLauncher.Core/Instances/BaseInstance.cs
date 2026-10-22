@@ -41,6 +41,7 @@ using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.State;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Text;
+using TruePath;
 
 namespace FlintLauncher.Core.Instances;
 
@@ -68,9 +69,9 @@ public abstract class BaseInstance
         Gone, // either nuked or invalidated
     }
 
-    protected BaseInstance(SettingsObject settings, string rootDir)
+    protected BaseInstance(SettingsObject settings, AbsolutePath rootDir)
     {
-        RootDir = rootDir;
+        InstanceRoot = rootDir;
         InstanceSettings = settings;
 
         InstanceSettings.RegisterSetting("name", "Unnamed Instance");
@@ -100,7 +101,7 @@ public abstract class BaseInstance
         }
         else
         {
-            _uuid = savedUuid;
+            Uuid = savedUuid;
         }
 
         // Game time override family (C7: the gate key stays readable; its value is derived
@@ -221,16 +222,16 @@ public abstract class BaseInstance
     /// The instance's ID. The ID SHALL be determined by LAUNCHER internally. The ID IS
     /// guaranteed to be unique.
     /// </summary>
-    public string Id() => Path.GetFileName(InstanceRoot());
+    public string Id() => InstanceRoot.FileName;
 
-    public string Uuid => _uuid;
+    public string Uuid { get; private set; } = "";
 
     public void RegenerateUuid()
     {
         // QUuid::createUuid().toString(QUuid::Id128): 32 hexadecimal digits without separators
         var newUuid = Guid.NewGuid().ToString("N");
         InstanceSettings.Set("uuid", newUuid);
-        _uuid = newUuid;
+        Uuid = newUuid;
     }
 
     public void SetMinecraftRunning(bool running)
@@ -317,13 +318,13 @@ public abstract class BaseInstance
     public string InstanceType() => Variant.AsString(InstanceSettings.Get("InstanceType"));
 
     /// <summary>Path to the instance's root directory.</summary>
-    public string InstanceRoot() => RootDir;
+    public AbsolutePath InstanceRoot { get; }
 
     /// <summary>Path to the instance's game root directory.</summary>
-    public virtual string GameRoot() => InstanceRoot();
+    public virtual AbsolutePath GameRoot => InstanceRoot;
 
     /// <summary>Path to the instance's mods directory.</summary>
-    public abstract string ModsRoot();
+    public abstract AbsolutePath ModsRoot { get; }
 
     public string Name() => Variant.AsString(InstanceSettings.Get("name"));
 
@@ -560,12 +561,12 @@ public abstract class BaseInstance
     public abstract ProcessEnvironment CreateLaunchEnvironment();
 
     /// <summary>Returns the root folder to use for looking up log files.</summary>
-    public abstract IReadOnlyList<string> GetLogFileSearchPaths();
+    public abstract IReadOnlyList<AbsolutePath> GetLogFileSearchPaths();
 
     public abstract string GetStatusbarDescription();
 
     /// <summary>FIXME upstream: this really should be elsewhere...</summary>
-    public abstract string InstanceConfigFolder();
+    public abstract AbsolutePath InstanceConfigFolder();
 
     /// <summary>get variables this instance exports</summary>
     public abstract SortedDictionary<string, string> GetVariables();
@@ -697,8 +698,6 @@ public abstract class BaseInstance
 
     // ---------------------------------------------------------------------- data
 
-    protected readonly string RootDir;
-
     /// <summary>The backing store of <see cref="Settings"/>; shared with subclasses that
     /// register their instance-type keys (MinecraftInstance).</summary>
     protected readonly SettingsObject InstanceSettings;
@@ -721,7 +720,6 @@ public abstract class BaseInstance
     /// references append verbatim; the LoadList conversion pass is the backstop.</summary>
     internal Func<string, string?>? UuidResolver { get; set; }
 
-    private string _uuid = "";
     private Status _status = Status.Present;
     private bool _crashed;
     private bool _hasUpdate;

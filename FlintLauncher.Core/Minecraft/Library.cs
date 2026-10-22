@@ -16,6 +16,7 @@
 using System.Security.Cryptography;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft;
 
@@ -188,35 +189,35 @@ public class Library
     /// </summary>
     public void GetApplicableFiles(
         RuntimeContext runtimeContext,
-        List<string> jar,
-        List<string> native,
-        List<string> native32,
-        List<string> native64,
-        string overridePath,
-        string storageBase = "")
+        List<AbsolutePath> jar,
+        List<AbsolutePath> native,
+        List<AbsolutePath> native32,
+        List<AbsolutePath> native64,
+        AbsolutePath overridePath,
+        AbsolutePath storageBase = default)
     {
         var local = IsLocal();
 
-        string ActualPath(string relPath)
+        AbsolutePath ActualPath(string relPath)
         {
             relPath = FileNaming.RemoveInvalidPathChars(relPath);
-            var outPath = Path.Combine(StoragePrefix(), relPath);
-            if (local && overridePath.Length != 0)
+            var outPath = new LocalPath(StoragePrefix()) / relPath;
+            if (local && overridePath.Value is { Length: > 0 })
             {
-                var fileName = Path.GetFileName(outPath);
-                return Path.GetFullPath(Path.Combine(overridePath, fileName));
+                var fileName = Path.GetFileName(outPath.Value);
+                return new AbsolutePath(Path.GetFullPath((overridePath / fileName).Value));
             }
 
             // the default prefix is the C++-era relative "libraries/", which anchored on
             // the C++ process CWD (the application chdir'd into its data dir at startup);
             // the port has no chdir (DI-B), so an unstamped prefix must anchor on the
             // storage base (the store root, E2) — never on the process CWD
-            if (!Path.IsPathRooted(outPath) && storageBase.Length != 0)
+            if (!Path.IsPathRooted(outPath.Value) && storageBase.Value is { Length: > 0 })
             {
-                outPath = Path.Combine(storageBase, outPath);
+                outPath = storageBase / outPath;
             }
 
-            return Path.GetFullPath(outPath);
+            return new AbsolutePath(Path.GetFullPath(outPath.Value));
         }
 
         var rawStorage = StorageSuffix(runtimeContext);
@@ -258,7 +259,11 @@ public class Library
         void CheckLocalFile(string storage)
         {
             var fileName = Path.GetFileName(storage);
-            var fullPath = Path.Combine(overridePath, fileName);
+            // an empty override keeps the bare relative name (the string-era
+            // Path.Combine("", name) behavior); callers pass "" for "no override"
+            var fullPath = overridePath.Length > 0
+                ? (new AbsolutePath(overridePath) / fileName).Value
+                : fileName;
             if (!File.Exists(fullPath))
             {
                 failedLocalFiles.Add(fullPath);

@@ -17,6 +17,8 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Web;
 using FlintLauncher.Web.Services;
+using TruePath;
+using TruePath.SystemIo;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -31,7 +33,7 @@ public class CoverageFixCoreTests
     {
         var dir = Path.Combine(Path.GetTempPath(), $"flint-config-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
-        return new FlintConfigStore(Path.Combine(dir, "flint.json"),
+        return new FlintConfigStore(new AbsolutePath(Path.Combine(dir, "flint.json")),
             FlintJsonContext.Default.FlintConfigFile);
     }
 
@@ -106,7 +108,7 @@ public class CoverageFixCoreTests
         // into flint.json (the authoritative global source, C5)
         store.Set("LowMemWarning", false);
         Assert.False(Variant.AsBool(store.Get("LowMemWarning")));
-        Assert.True(File.Exists(store.FilePath));
+        Assert.True(store.FilePath.ExistsFile());
         var reloaded = new FlintConfigStore(store.FilePath, FlintJsonContext.Default.FlintConfigFile);
         Assert.NotNull(reloaded.Current.Memory.LowMemWarning);
         Assert.False(reloaded.Current.Memory.LowMemWarning.Value);
@@ -194,7 +196,7 @@ public class CoverageFixCoreTests
         var previousTimeout = NetStack.Default.RequestTimeout;
         try
         {
-            var runtime = new LauncherRuntime(FlintPaths.FromHomeDir(dataDir));
+            var runtime = new LauncherRuntime(FlintPaths.FromHomeDir(new AbsolutePath(dataDir)));
             runtime.Config.Set("ProxyType", "HTTP");
             runtime.Config.Set("ProxyAddr", "10.1.2.3");
             runtime.Config.Set("ProxyPort", 8118);
@@ -255,8 +257,8 @@ public class CoverageFixCoreTests
         Directory.CreateDirectory(dir);
         try
         {
-            var cache = new HttpMetaCache(Path.Combine(dir, "metacache.json"));
-            cache.AddBase("general", Path.Combine(dir, "cache"));
+            var cache = new HttpMetaCache(new AbsolutePath(Path.Combine(dir, "metacache.json")));
+            cache.AddBase("general", new AbsolutePath(Path.Combine(dir, "cache")));
             Directory.CreateDirectory(Path.Combine(dir, "cache"));
             var file = Path.Combine(dir, "cache", "thing.bin");
             File.WriteAllBytes(file, [1, 2, 3]);

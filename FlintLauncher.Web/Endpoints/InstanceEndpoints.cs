@@ -116,7 +116,7 @@ public static class InstanceEndpoints
                 // endpoint runs it synchronously and returns the committed instance id.
                 var task = new VanillaCreationTask(request.McVersion)
                 {
-                    TargetDir = "",
+                    TargetDir = default,
                     Group = request.Group ?? "",
                 };
                 task.SetName(request.Name);
@@ -238,7 +238,7 @@ public static class InstanceEndpoints
 
                 var task = new InstanceCopyTask(original, prefs)
                 {
-                    TargetDir = "",
+                    TargetDir = default,
                     Group = request.Group ?? "",
                 };
                 task.SetName(request.Name);
@@ -467,7 +467,7 @@ public static class InstanceEndpoints
             inst.IsRunning,
             InstanceType(inst),
             inst.Notes(),
-            inst.GameRoot());
+            inst.GameRoot.Value);
     }
 
     private static string InstanceType(BaseInstance inst) =>

@@ -3,6 +3,7 @@
 
 using System.IO.Compression;
 using FlintLauncher.Core.IO;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -45,11 +46,11 @@ public class MmcZipTests : IDisposable
     {
         var src = MakeSourceDir();
         var zipPath = Path.Combine(_tempDir, "out.zip");
-        Assert.True(MmcZip.CompressDir(zipPath, src));
+        Assert.True(MmcZip.CompressDir(new AbsolutePath(zipPath), new AbsolutePath(src)));
         Assert.True(File.Exists(zipPath));
 
         var dst = Path.Combine(_tempDir, "dst");
-        var extracted = MmcZip.ExtractDir(zipPath, dst);
+        var extracted = MmcZip.ExtractDir(zipPath, new AbsolutePath(dst));
         Assert.NotNull(extracted);
         Assert.Contains(Path.Combine(dst, "a.txt"), extracted);
         Assert.Equal("alpha", File.ReadAllText(Path.Combine(dst, "a.txt")));
@@ -63,10 +64,10 @@ public class MmcZipTests : IDisposable
     {
         var src = MakeSourceDir();
         var zipPath = Path.Combine(_tempDir, "out.zip");
-        Assert.True(MmcZip.CompressDir(zipPath, src));
+        Assert.True(MmcZip.CompressDir(new AbsolutePath(zipPath), new AbsolutePath(src)));
 
         var dst = Path.Combine(_tempDir, "dst-sub");
-        var extracted = MmcZip.ExtractDir(zipPath, "sub/", dst);
+        var extracted = MmcZip.ExtractDir(new AbsolutePath(zipPath), "sub/", new AbsolutePath(dst));
         Assert.NotNull(extracted);
         Assert.False(File.Exists(Path.Combine(dst, "a.txt")));
         Assert.Equal("beta", File.ReadAllText(Path.Combine(dst, "b.txt")));
@@ -77,7 +78,7 @@ public class MmcZipTests : IDisposable
     {
         var src = MakeSourceDir();
         var zipPath = Path.Combine(_tempDir, "out.zip");
-        Assert.True(MmcZip.CompressDir(zipPath, src));
+        Assert.True(MmcZip.CompressDir(new AbsolutePath(zipPath), new AbsolutePath(src)));
 
         var target = Path.Combine(_tempDir, "only-a.txt");
         Assert.True(MmcZip.ExtractFile(zipPath, "a.txt", target));
@@ -146,7 +147,7 @@ public class MmcZipTests : IDisposable
         }
 
         var dst = Path.Combine(_tempDir, "dst-slip");
-        var extracted = MmcZip.ExtractDir(zipPath, dst);
+        var extracted = MmcZip.ExtractDir(zipPath, new AbsolutePath(dst));
         Assert.Null(extracted);
         Assert.False(File.Exists(Path.Combine(_tempDir, "evil.txt")));
     }
@@ -162,7 +163,7 @@ public class MmcZipTests : IDisposable
         }
 
         Assert.Equal(22, new FileInfo(zipPath).Length);
-        var extracted = MmcZip.ExtractDir(zipPath, Path.Combine(_tempDir, "dst-empty"));
+        var extracted = MmcZip.ExtractDir(zipPath, new AbsolutePath(Path.Combine(_tempDir, "dst-empty")));
         Assert.NotNull(extracted);
         Assert.Empty(extracted);
     }

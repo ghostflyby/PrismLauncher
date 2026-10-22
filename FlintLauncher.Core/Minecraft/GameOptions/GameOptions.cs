@@ -19,6 +19,7 @@
 using System.Globalization;
 using System.Security;
 using System.Text;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.GameOptions;
 
@@ -28,14 +29,14 @@ public sealed class GameOptions
 {
     private readonly List<GameOptionItem> _contents = [];
 
-    public GameOptions(string path)
+    public GameOptions(AbsolutePath path)
     {
         Path = path;
         Reload();
     }
 
     /// <summary>The options.txt path (m_path).</summary>
-    public string Path { get; }
+    public AbsolutePath Path { get; }
 
     /// <summary>Port of isLoaded(): whether the last load opened and parsed the file.</summary>
     public bool IsLoaded { get; private set; }
@@ -95,13 +96,13 @@ public sealed class GameOptions
 
     // ---------------------------------------------------------------- implementation
 
-    private static bool Load(string path, List<GameOptionItem> contents, out int version)
+    private static bool Load(AbsolutePath path, List<GameOptionItem> contents, out int version)
     {
         version = 0;
         string content;
         try
         {
-            content = File.ReadAllText(path);
+            content = File.ReadAllText(path.Value);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
                                       or NotSupportedException or SecurityException)
@@ -149,12 +150,15 @@ public sealed class GameOptions
         return 0;
     }
 
-    private static bool Save(string path, List<GameOptionItem> mapping, int version)
+    private static bool Save(AbsolutePath path, List<GameOptionItem> mapping, int version)
     {
-        var tempPath = path + ".flint-tmp";
+        // QSaveFile: the temporary file sits next to the target (same directory, suffixed name)
+        var tempPath = path.Parent is { } parent
+            ? parent / (path.FileName + ".flint-tmp")
+            : new AbsolutePath(path.Value + ".flint-tmp");
         try
         {
-            using (var @out = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            using (var @out = new FileStream(tempPath.Value, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 if (version != 0)
                 {
@@ -171,7 +175,7 @@ public sealed class GameOptions
                 }
             }
 
-            File.Move(tempPath, path, overwrite: true);
+            File.Move(tempPath.Value, path.Value, overwrite: true);
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
@@ -179,7 +183,7 @@ public sealed class GameOptions
         {
             try
             {
-                File.Delete(tempPath);
+                File.Delete(tempPath.Value);
             }
             catch (Exception)
             {

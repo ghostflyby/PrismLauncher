@@ -2,6 +2,8 @@
 // Port of launcher/launch/steps/LaunchCommand.{h,cpp}: run the pre-load/pre-launch/post-exit
 // command through a LoggedProcess with the instance environment.
 
+using TruePath;
+
 namespace FlintLauncher.Core.Launch.Steps;
 
 public sealed class LaunchCommand : LaunchStep
@@ -71,7 +73,7 @@ public sealed class LaunchCommand : LaunchStep
         }
     }
 
-    public void SetWorkingDirectory(string workingDirectory) => _process.SetWorkingDirectory(workingDirectory);
+    public void SetWorkingDirectory(AbsolutePath workingDirectory) => _process.SetWorkingDirectory(workingDirectory);
 
     public override bool CanAbort() => true;
 

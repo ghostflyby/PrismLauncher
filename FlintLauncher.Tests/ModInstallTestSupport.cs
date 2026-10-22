@@ -7,6 +7,7 @@
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft;
+using TruePath;
 
 namespace FlintLauncher.Tests;
 
@@ -26,7 +27,8 @@ internal sealed class ModInstallTestEnv : IDisposable
     {
         // D4: the typed instance adapter over the env root (instance.json)
         var instance = new MinecraftInstance(
-            new InstanceJsonSettingsObject(_root, _global.Environment), _root);
+            new InstanceJsonSettingsObject(new AbsolutePath(_root), _global.Environment),
+            new AbsolutePath(_root));
         _ = instance.Settings; // force the specific-settings load, like the C++ first touch
         var profile = instance.GetPackProfile();
         profile.AppendComponent(new Component(profile, "net.minecraft") { CachedVersion = mcVersion });

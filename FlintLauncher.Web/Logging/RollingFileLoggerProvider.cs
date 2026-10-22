@@ -8,6 +8,8 @@
 
 using System.Globalization;
 using System.Security;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Web.Logging;
 
@@ -18,24 +20,24 @@ public sealed class RollingFileLoggerProvider : ILoggerProvider
     private readonly StreamWriter? _writer;
     private readonly object _lock = new();
 
-    public RollingFileLoggerProvider(string directory)
+    public RollingFileLoggerProvider(AbsolutePath directory)
     {
         try
         {
-            Directory.CreateDirectory(directory);
+            directory.CreateDirectory();
             for (var generation = Generations - 2; generation >= 0; generation--)
             {
-                var source = Path.Combine(directory, FileName(generation));
-                if (!File.Exists(source))
+                var source = directory / FileName(generation);
+                if (!source.ExistsFile())
                 {
                     continue;
                 }
 
-                File.Move(source, Path.Combine(directory, FileName(generation + 1)), overwrite: true);
+                source.Move(directory / FileName(generation + 1), overwrite: true);
             }
 
             _writer = new StreamWriter(
-                File.Open(Path.Combine(directory, FileName(0)), FileMode.Create, FileAccess.Write, FileShare.Read))
+                (directory / FileName(0)).Open(FileMode.Create, FileAccess.Write, FileShare.Read))
             {
                 AutoFlush = true,
             };

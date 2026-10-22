@@ -13,6 +13,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -70,7 +71,7 @@ public class FlameImportTests : IDisposable
     {
         var instancesDir = TempPath("instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList([instancesDir]) { Environment = _global };
+        return new InstanceList([new AbsolutePath(instancesDir)]) { Environment = _global };
     }
 
     // ------------------------------------------------------------- dispatch (e2e)
@@ -138,9 +139,9 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(staging);
         var zipPath = TempPath("pack-fabric.zip");
         Assert.True(pack.WriteZip(zipPath));
-        Assert.NotNull(MmcZip.ExtractDir(zipPath, "", staging));
+        Assert.NotNull(MmcZip.ExtractDir(new AbsolutePath(zipPath), "", new AbsolutePath(staging)));
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
+        var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, flame: _flameApi);
         task.SetName("Fabric Flame");
         await task.StartAsync();
 
@@ -164,9 +165,9 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(staging);
         var zipPath = TempPath("pack-blocked.zip");
         Assert.True(pack.WriteZip(zipPath));
-        Assert.NotNull(MmcZip.ExtractDir(zipPath, "", staging));
+        Assert.NotNull(MmcZip.ExtractDir(new AbsolutePath(zipPath), "", new AbsolutePath(staging)));
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
+        var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, flame: _flameApi);
         task.SetName("Blocked Pack");
         await task.StartAsync();
 
@@ -190,12 +191,12 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(staging);
         var zipPath = TempPath("pack-matched.zip");
         Assert.True(pack.WriteZip(zipPath));
-        Assert.NotNull(MmcZip.ExtractDir(zipPath, "", staging));
+        Assert.NotNull(MmcZip.ExtractDir(new AbsolutePath(zipPath), "", new AbsolutePath(staging)));
 
         var localCopy = TempPath("local-test.jar");
         await File.WriteAllBytesAsync(localCopy, _downloadBytes);
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi)
+        var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, flame: _flameApi)
         {
             // stand-in for the BlockedModsDialog matching step
             BlockedModLocalFileResolver = _ => localCopy,
@@ -222,9 +223,9 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(staging);
         var zipPath = TempPath("pack-untrusted.zip");
         Assert.True(pack.WriteZip(zipPath));
-        Assert.NotNull(MmcZip.ExtractDir(zipPath, "", staging));
+        Assert.NotNull(MmcZip.ExtractDir(new AbsolutePath(zipPath), "", new AbsolutePath(staging)));
 
-        var task = new FlameCreationTask(staging, trustedSource: false, _global, flame: _flameApi);
+        var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: false, _global, flame: _flameApi);
         task.SetName("Untrusted Pack");
         await task.StartAsync();
 
@@ -242,9 +243,9 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(staging);
         var zipPath = TempPath("pack-trusted.zip");
         Assert.True(pack.WriteZip(zipPath));
-        Assert.NotNull(MmcZip.ExtractDir(zipPath, "", staging));
+        Assert.NotNull(MmcZip.ExtractDir(new AbsolutePath(zipPath), "", new AbsolutePath(staging)));
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
+        var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, flame: _flameApi);
         task.SetName("Trusted Pack");
         await task.StartAsync();
 
@@ -263,7 +264,7 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(staging);
         await File.WriteAllTextAsync(Path.Combine(staging, "manifest.json"), pack.ManifestJson);
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
+        var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, flame: _flameApi);
         task.SetName("Unknown Loader");
         await task.StartAsync();
 
@@ -294,7 +295,7 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(outsideMarker);
         await File.WriteAllTextAsync(Path.Combine(outsideMarker, "sentinel.txt"), "must stay");
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
+        var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, flame: _flameApi);
         task.SetName("Traversal");
         await task.StartAsync();
 
@@ -326,7 +327,7 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(staging);
         await File.WriteAllTextAsync(Path.Combine(staging, "manifest.json"), manifestObj.ToJsonString());
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
+        var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, flame: _flameApi);
         task.SetName("Recommended");
         await task.StartAsync();
 
@@ -337,7 +338,7 @@ public class FlameImportTests : IDisposable
         var staging2 = TempPath("staging-recommended2");
         Directory.CreateDirectory(staging2);
         await File.WriteAllTextAsync(Path.Combine(staging2, "manifest.json"), manifestObj.ToJsonString());
-        var task2 = new FlameCreationTask(staging2, trustedSource: true, _global, flame: _flameApi)
+        var task2 = new FlameCreationTask(new AbsolutePath(staging2), trustedSource: true, _global, flame: _flameApi)
         {
             RecommendedVersionLookup = (uid, loaderType, mcVersion) =>
             {
@@ -365,7 +366,7 @@ public class FlameImportTests : IDisposable
         Directory.CreateDirectory(staging);
         await File.WriteAllTextAsync(Path.Combine(staging, "manifest.json"), pack.ManifestJson);
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
+        var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, flame: _flameApi);
         task.SetName("Missing Overrides");
         await task.StartAsync();
 
@@ -381,7 +382,7 @@ public class FlameImportTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(staging, "manifest.json"),
             """{"manifestType":"minecraftModpack","manifestVersion":9}""");
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
+        var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, flame: _flameApi);
         task.SetName("Bad Manifest");
         await task.StartAsync();
 
@@ -410,7 +411,7 @@ public class FlameImportTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(staging, "manifest.json"), manifestObj.ToJsonString());
 
         RegisterResolvedMod();
-        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
+        var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, flame: _flameApi);
         task.SetName("Optional Pack");
         await task.StartAsync();
 

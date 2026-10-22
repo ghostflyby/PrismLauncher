@@ -12,6 +12,7 @@ using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -62,9 +63,9 @@ public class FlameExportTests : IDisposable
         Assert.True(pack.WriteZip(zipPath));
         var staging = TempPath($"staging-{name}");
         Directory.CreateDirectory(staging);
-        Assert.NotNull(MmcZip.ExtractDir(zipPath, "", staging));
+        Assert.NotNull(MmcZip.ExtractDir(new AbsolutePath(zipPath), "", new AbsolutePath(staging)));
 
-        var task = new FlameCreationTask(staging, trustedSource: true, _global, flame: _flameApi);
+        var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, flame: _flameApi);
         task.SetName(name);
         await task.StartAsync();
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -99,7 +100,7 @@ public class FlameExportTests : IDisposable
         // the export reads the instance through the typed settings stack (D4) — the staged
         // instance is Flint format (instance.json), written by the import task itself
         var instance = new MinecraftInstance(
-            new InstanceJsonSettingsObject(staging, _global.Environment), staging);
+            new InstanceJsonSettingsObject(new AbsolutePath(staging), _global.Environment), new AbsolutePath(staging));
         var output = TempPath("exported.zip");
         var export = new FlamePackExportTask(new FlamePackExportTask.Options
         {
@@ -109,7 +110,7 @@ public class FlameExportTests : IDisposable
             Author = "exporter",
             OptionalFiles = true,
             Instance = instance,
-            Output = output,
+            Output = new AbsolutePath(output),
         });
         await export.StartAsync();
 
@@ -191,7 +192,7 @@ public class FlameExportTests : IDisposable
         _server.FingerprintJson = """{"data":{"exactMatches":[]}}""";
 
         var instance = new MinecraftInstance(
-            new InstanceJsonSettingsObject(staging, _global.Environment), staging);
+            new InstanceJsonSettingsObject(new AbsolutePath(staging), _global.Environment), new AbsolutePath(staging));
         var output = TempPath("exported-unresolved.zip");
         var export = new FlamePackExportTask(new FlamePackExportTask.Options
         {
@@ -201,7 +202,7 @@ public class FlameExportTests : IDisposable
             Author = "exporter",
             OptionalFiles = false,
             Instance = instance,
-            Output = output,
+            Output = new AbsolutePath(output),
         });
         await export.StartAsync();
 

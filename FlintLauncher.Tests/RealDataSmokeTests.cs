@@ -7,6 +7,7 @@
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Web;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -44,11 +45,12 @@ public class RealDataSmokeTests
             }
 
             found++;
+            var instancePath = new AbsolutePath(dir);
             var instance = new MinecraftInstance(
-                new InstanceJsonSettingsObject(dir, environment), dir);
+                new InstanceJsonSettingsObject(instancePath, environment), instancePath);
             Assert.Equal("OneSix", instance.InstanceType());
             Assert.False(string.IsNullOrEmpty(instance.Uuid));
-            Assert.NotNull(instance.GameRoot());
+            Assert.True(instance.GameRoot.Value is { Length: > 0 });
             // read-only: the dual-track load must not materialize anything in the real dir
             Assert.False(File.Exists(Path.Combine(dir, "instance.json")));
 

@@ -10,6 +10,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -199,7 +200,7 @@ internal sealed class AtlPackFixture
             Directory.CreateDirectory(Path.Combine(srcDir, "config"));
             File.WriteAllText(Path.Combine(srcDir, "config", "test.cfg"), fixture.ConfigTxt);
             var zipPath = Path.Combine(srcDir, "Configs.zip");
-            Assert.True(MmcZip.CompressDir(zipPath, srcDir));
+            Assert.True(MmcZip.CompressDir(new AbsolutePath(zipPath), new AbsolutePath(srcDir)));
             fixture.ConfigsZipBytes = File.ReadAllBytes(zipPath);
         }
         finally

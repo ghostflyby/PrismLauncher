@@ -140,13 +140,13 @@ public sealed class World
         }
         else if (Directory.Exists(full))
         {
-            var assumedIconPath = Path.Combine(full, "icon.png");
-            if (File.Exists(assumedIconPath))
+            var assumedIconPath = new AbsolutePath(full) / "icon.png";
+            if (File.Exists(assumedIconPath.Value))
             {
-                IconFile = Path.GetFullPath(assumedIconPath);
+                IconFile = Path.GetFullPath(assumedIconPath.Value);
             }
 
-            IsValid = File.Exists(Path.Combine(full, "level.dat"));
+            IsValid = File.Exists((new AbsolutePath(full) / "level.dat").Value);
         }
         else
         {
@@ -206,8 +206,8 @@ public sealed class World
             return false; // the C++ refuses to rename zipped worlds
         }
 
-        var levelDatPath = Path.Combine(ContainerPath, "level.dat");
-        if (!File.Exists(levelDatPath))
+        var levelDatPath = new AbsolutePath(ContainerPath) / "level.dat";
+        if (!File.Exists(levelDatPath.Value))
         {
             return false;
         }
@@ -215,7 +215,7 @@ public sealed class World
         byte[] data;
         try
         {
-            data = File.ReadAllBytes(levelDatPath);
+            data = File.ReadAllBytes(levelDatPath.Value);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
@@ -250,13 +250,13 @@ public sealed class World
         var parentDir = Path.GetDirectoryName(ContainerPath) ?? ".";
         AbsolutePath inDir = new AbsolutePath(parentDir);
         var dirName = FileNaming.DirNameFromString(Name, [inDir]);
-        var targetPath = Path.Combine(parentDir, dirName);
-        if (!string.Equals(Path.GetFullPath(targetPath), Path.GetFullPath(ContainerPath), StringComparison.Ordinal))
+        var targetPath = new AbsolutePath(parentDir) / dirName;
+        if (!string.Equals(Path.GetFullPath(targetPath.Value), Path.GetFullPath(ContainerPath), StringComparison.Ordinal))
         {
             try
             {
-                Directory.Move(ContainerPath, targetPath);
-                ContainerPath = Path.GetFullPath(targetPath);
+                Directory.Move(ContainerPath, targetPath.Value);
+                ContainerPath = Path.GetFullPath(targetPath.Value);
                 FolderName = Path.GetFileName(ContainerPath);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -272,7 +272,7 @@ public sealed class World
     /// Port of World::install: copy this world (folder or zip) into <paramref name="to"/>
     /// under a directory named after it, optionally renaming it afterwards.
     /// </summary>
-    public bool Install(string to, string name = "")
+    public bool Install(AbsolutePath to, string name = "")
     {
         // The C++ installed from unloaded World objects, deriving the target folder from
         // an empty name (FS::DirNameFromString("") -> "(1)"); loading the metadata here
@@ -282,9 +282,9 @@ public sealed class World
             LoadMetadata();
         }
 
-        AbsolutePath inDir = new AbsolutePath(to);
-        var finalPath = Path.Combine(to, FileNaming.DirNameFromString(Name, [inDir]));
-        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(finalPath)))
+        string a1 = FileNaming.DirNameFromString(Name, [to]);
+        var finalPath = to / a1;
+        if (!FileOps.EnsureFolderPathExists(finalPath))
         {
             return false;
         }
@@ -299,7 +299,7 @@ public sealed class World
         }
         else if (Directory.Exists(ContainerPath))
         {
-            ok = FileOps.Copy(new AbsolutePath(ContainerPath), new AbsolutePath(finalPath));
+            ok = FileOps.Copy(new AbsolutePath(ContainerPath), finalPath);
         }
         else
         {
@@ -308,7 +308,7 @@ public sealed class World
 
         if (ok && name.Length > 0 && Name != name)
         {
-            var newWorld = new World(finalPath);
+            var newWorld = new World(finalPath.Value);
             if (newWorld.IsValid)
             {
                 newWorld.Rename(name);
@@ -511,15 +511,15 @@ public sealed class World
     /// <summary>Port of getDatDataFromFS: the contents of <paramref name="file"/> inside the world dir, or null.</summary>
     private static byte[]? GetDatDataFromFs(string root, string file)
     {
-        var fullFilePath = Path.Combine(root, file);
-        if (!File.Exists(fullFilePath))
+        var fullFilePath = new AbsolutePath(root) / file;
+        if (!File.Exists(fullFilePath.Value))
         {
             return null;
         }
 
         try
         {
-            return File.ReadAllBytes(fullFilePath);
+            return File.ReadAllBytes(fullFilePath.Value);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {

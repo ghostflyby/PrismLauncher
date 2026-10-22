@@ -11,6 +11,8 @@
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
@@ -100,12 +102,12 @@ public sealed class FlameManifest
 
     /// <summary>Port of Flame::loadManifest: parse the manifest.json at <paramref name="filepath"/>.
     /// Throws <see cref="JsonException"/> for non-modpack manifests and unknown versions.</summary>
-    public static void LoadManifest(FlameManifest m, string filepath)
+    public static void LoadManifest(FlameManifest m, AbsolutePath filepath)
     {
         FlameManifestJson? dto;
         try
         {
-            dto = JsonSerializer.Deserialize(File.ReadAllText(filepath),
+            dto = JsonSerializer.Deserialize(filepath.ReadAllText(),
                 FlameManifestJsonContext.Default.FlameManifestJson);
         }
         catch (JsonException e)

@@ -19,6 +19,7 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 using Xunit;
 using Index = FlintLauncher.Core.Meta.Index;
 
@@ -37,8 +38,8 @@ public class ComponentUpdateTaskTests : IDisposable
         // replacing the former CWD-anchored static fallback; every profile gets it via
         // SetMetadataCache so metadata entities resolve files under <_root>/meta
         _metaCache = new HttpMetaCache(
-            Path.Combine(_root, "metacache.json"));
-        _metaCache.AddBase("meta", Path.Combine(_root, "meta"));
+            new AbsolutePath(Path.Combine(_root, "metacache.json")));
+        _metaCache.AddBase("meta", new AbsolutePath(Path.Combine(_root, "meta")));
     }
 
     public void Dispose()
@@ -55,7 +56,7 @@ public class ComponentUpdateTaskTests : IDisposable
     /// (the SetMetadataCache call the composition root performs through the instance).</summary>
     private PackProfile NewProfile()
     {
-        var profile = new PackProfile(_root);
+        var profile = new PackProfile(new AbsolutePath(_root));
         profile.SetMetadataCache(_metaCache);
         return profile;
     }

@@ -21,13 +21,14 @@ using FlintLauncher.Core.Secrets;
 using FlintLauncher.Core.Skins;
 using FlintLauncher.Core.State;
 using FlintLauncher.Web.Models;
+using TruePath;
 
 namespace FlintLauncher.Web.Services;
 
 public sealed class LauncherRuntime
 {
     public FlintPaths Paths { get; }
-    public string DataDir => Paths.DataDir;
+    public AbsolutePath DataDir => Paths.DataDir;
 
     /// <summary>The network stack this runtime's activity flows through (defaults to the
     /// canonical process-wide stack; tests may isolate by constructing their own).</summary>
@@ -158,10 +159,10 @@ public sealed class LauncherRuntime
         MetaCache.AddBase("asset_indexes", paths.AssetIndexesDir); // store/assets/indexes (E2)
         MetaCache.AddBase("java", paths.JavaRoot);                 // store/java (E2)
         MetaCache.AddBase("general", paths.CacheRoot);             // import staging etc.
-        MetaCache.AddBase("icons", Path.Combine(paths.CacheRoot, "icons"));
+        MetaCache.AddBase("icons", paths.CacheRoot / "icons");
         MetaCache.AddBase("fmllibs", paths.FmllibsCacheDir); // cache/fmllibs (E3)
-        MetaCache.AddBase("ATLauncherPacks", Path.Combine(paths.CacheRoot, "ATLauncherPacks"));
-        MetaCache.AddBase("FTBPacks", Path.Combine(paths.CacheRoot, "FTBPacks"));
+        MetaCache.AddBase("ATLauncherPacks", paths.CacheRoot / "ATLauncherPacks");
+        MetaCache.AddBase("FTBPacks", paths.CacheRoot / "FTBPacks");
         // E6: the ledger is READ at startup again (the "write-only ledger" defect — entries
         // re-downloaded on every run because nothing ever loaded the persisted index)
         MetaCache.Load();
@@ -208,22 +209,22 @@ public sealed class LauncherRuntime
     /// empty/null falls back to the store/java anchor. Consumed by the java scan
     /// (JavaUtils.FindJavaPaths), the JavaInstallList managed-versions probe and the
     /// launch pipeline's AutoInstallJava (through LaunchServices.JavaRoot).</summary>
-    public string JavaRoot =>
+    public AbsolutePath JavaRoot =>
         string.IsNullOrWhiteSpace(Config.Current.Dirs.JavaDir)
             ? Paths.JavaRoot
             : Path.IsPathRooted(Config.Current.Dirs.JavaDir)
-                ? Config.Current.Dirs.JavaDir
-                : Path.Combine(Paths.StoreRoot, Config.Current.Dirs.JavaDir);
+                ? new AbsolutePath(Config.Current.Dirs.JavaDir)
+                : Paths.StoreRoot / Config.Current.Dirs.JavaDir;
 
     /// <summary>A dir-kind setting (IconsDir/SkinsDir — the C++ "relative to the data dir"
     /// convention, CONFIG matrix A): absolute wins as-is, relative joins the data root,
     /// empty/null falls back to the C++ default name.</summary>
-    private string ResolveDataRelativeDir(string? configured, string fallbackName) =>
+    private AbsolutePath ResolveDataRelativeDir(string? configured, string fallbackName) =>
         string.IsNullOrWhiteSpace(configured)
-            ? Path.Combine(DataDir, fallbackName)
+            ? DataDir / fallbackName
             : Path.IsPathRooted(configured)
-                ? configured
-                : Path.Combine(DataDir, configured);
+                ? new AbsolutePath(configured)
+                : DataDir / configured;
 }
 
 /// <summary>Small JSON helpers shared by the endpoints (AOT-safe: explicit nodes).</summary>

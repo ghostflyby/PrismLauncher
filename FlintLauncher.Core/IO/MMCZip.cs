@@ -12,6 +12,7 @@
 
 using System.IO.Compression;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.IO;
 
@@ -24,7 +25,7 @@ public static class MmcZip
     /// Port of MMCZip::extractDir(fileCompressed, dir): extract a whole archive.
     /// Returns the full paths of extracted entries, or null on failure.
     /// </summary>
-    public static List<string>? ExtractDir(string fileCompressed, string dir)
+    public static List<string>? ExtractDir(string fileCompressed, AbsolutePath dir)
     {
         // check if this is a minimum size empty zip file...
         if (new FileInfo(fileCompressed).Length == 22)
@@ -48,16 +49,16 @@ public static class MmcZip
     /// Port of MMCZip::extractDir(fileCompressed, subdir, dir): extract a subdirectory of
     /// an archive. Returns the full paths of extracted entries, or null on failure.
     /// </summary>
-    public static List<string>? ExtractDir(string fileCompressed, string subdir, string dir)
+    public static List<string>? ExtractDir(AbsolutePath fileCompressed, string subdir, AbsolutePath dir)
     {
-        if (new FileInfo(fileCompressed).Length == 22)
+        if (new FileInfo(fileCompressed.Value).Length == 22)
         {
             return [];
         }
 
         try
         {
-            using var zip = ZipFile.OpenRead(fileCompressed);
+            using var zip = ZipFile.OpenRead(fileCompressed.Value);
             return ExtractSubDir(zip, subdir, dir);
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
@@ -105,7 +106,7 @@ public static class MmcZip
     /// into <paramref name="target"/>. Includes zip-slip protection matching the C++
     /// QUrl::isParentOf check. Returns null on failure (after removing what was written).
     /// </summary>
-    public static List<string>? ExtractSubDir(ZipArchive zip, string subdir, string target)
+    public static List<string>? ExtractSubDir(ZipArchive zip, string subdir, AbsolutePath target)
     {
         var extracted = new List<string>();
         var entries = zip.Entries;
@@ -115,8 +116,7 @@ public static class MmcZip
             return extracted;
         }
 
-        var targetTopDir = Path.GetFullPath(target);
-        FileOps.EnsureFolderPathExists(new AbsolutePath(targetTopDir));
+        FileOps.EnsureFolderPathExists(target);
 
         foreach (var entry in entries)
         {
@@ -148,22 +148,18 @@ public static class MmcZip
                 subPath = "";
             }
 
-            string targetFilePath;
+            AbsolutePath targetFilePath;
             if (relativeFileName.Length == 0)
             {
-                targetFilePath = targetTopDir + '/';
+                targetFilePath = target;
             }
             else
             {
-                targetFilePath = Path.Combine(targetTopDir, subPath, relativeFileName);
-                if (relativeFileName.EndsWith('/') && !targetFilePath.EndsWith('/'))
-                {
-                    targetFilePath += '/';
-                }
+                targetFilePath = target / subPath / relativeFileName;
             }
 
             // zip-slip check: the resolved target must stay inside the target directory
-            if (!IsParentOf(targetTopDir, targetFilePath))
+            if (!IsParentOf(target.Value, targetFilePath.Value))
             {
                 // Extracting was cancelled, because it was effectively outside of the target path
                 FileOps.RemoveFiles(extracted);
@@ -173,21 +169,21 @@ public static class MmcZip
             if (relativeFileName.Length == 0 || relativeFileName.EndsWith('/'))
             {
                 // directory entry
-                if (!FileOps.EnsureFolderPathExists(new AbsolutePath(targetFilePath.TrimEnd('/'))))
+                if (!FileOps.EnsureFolderPathExists(targetFilePath))
                 {
                     FileOps.RemoveFiles(extracted);
                     return null;
                 }
 
-                extracted.Add(targetFilePath);
+                extracted.Add(targetFilePath.Value + "/"); // the trailing '/' marks directory entries
                 continue;
             }
 
             try
             {
-                FileOps.EnsureFilePathExists(new AbsolutePath(targetFilePath));
+                FileOps.EnsureFilePathExists(targetFilePath);
                 using var source = entry.Open();
-                using var output = File.Create(targetFilePath);
+                using var output = File.Create(targetFilePath.Value);
                 source.CopyTo(output);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
@@ -198,7 +194,7 @@ public static class MmcZip
                 return null;
             }
 
-            extracted.Add(targetFilePath);
+            extracted.Add(targetFilePath.Value);
         }
 
         return extracted;
@@ -210,18 +206,18 @@ public static class MmcZip
     /// <paramref name="zipFile"/>. The optional filter receives paths relative to dir and
     /// returns true to exclude a file. Folder entries are preserved.
     /// </summary>
-    public static bool CompressDir(string zipFile, string dir, FilterFunction? excludeFilter = null)
+    public static bool CompressDir(AbsolutePath zipFile, AbsolutePath dir, FilterFunction? excludeFilter = null)
     {
         var files = new List<string>();
         if (!CollectFileListRecursively(dir, null, files,
-                excludeFilter != null ? (Func<FileSystemInfo, bool>)(f => excludeFilter(GetRelativePath(dir, f.FullName))) : null))
+                excludeFilter != null ? (Func<FileSystemInfo, bool>)(f => excludeFilter(GetRelativePath(dir.Value, f.FullName))) : null))
         {
             return false;
         }
 
-        using var stream = File.Create(zipFile);
+        using var stream = File.Create(zipFile.Value);
         using var zip = new ZipArchive(stream, ZipArchiveMode.Create);
-        return CompressDirFiles(zip, dir, files) && AddDirectoryEntries(zip, dir, excludeFilter);
+        return CompressDirFiles(zip, dir.Value, files) && AddDirectoryEntries(zip, dir.Value, excludeFilter);
     }
 
     /// <summary>
@@ -298,15 +294,15 @@ public static class MmcZip
     /// absolute file paths under subDir (recursing first into directories, like the C++).
     /// The exclude filter receives the FileInfo and returns true to skip the file.
     /// </summary>
-    public static bool CollectFileListRecursively(string rootDir, string? subDir, List<string> files,
+    public static bool CollectFileListRecursively(AbsolutePath rootDir, string? subDir, List<string> files,
         Func<FileSystemInfo, bool>? excludeFilter = null)
     {
-        if (!Directory.Exists(rootDir))
+        if (!Directory.Exists(rootDir.Value))
         {
             return false;
         }
 
-        var directory = subDir ?? rootDir;
+        var directory = subDir ?? rootDir.Value;
         if (!Directory.Exists(directory))
         {
             return false; // shouldn't ever happen

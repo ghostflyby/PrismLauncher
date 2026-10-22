@@ -75,7 +75,10 @@ public abstract class MetaEntity
 
     /// <summary>Absolute path of a local metadata file under the "meta" base.</summary>
     protected string MetaPath(string localFile) =>
-        Path.Combine(RequireCache().GetBasePath("meta"), localFile);
+        RequireCache().GetBasePath("meta") is { } basePath
+            ? (basePath / localFile).Value
+            : throw new InvalidOperationException(
+                "base 'meta' is not registered on the stamped meta cache — the composition root must register it");
 
     /// <summary>the expected sha256</summary>
     public string Sha256 = "";

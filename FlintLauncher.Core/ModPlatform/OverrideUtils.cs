@@ -6,6 +6,7 @@
 
 using FlintLauncher.Core.IO;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.ModPlatform;
 
@@ -16,17 +17,18 @@ public static class OverrideUtils
     /// that holds information about which overrides are in <paramref name="overridePath"/>.
     /// If there's already an existing such file, it will be overwritten.
     /// </summary>
-    public static void CreateOverrides(string name, string parentFolder, string overridePath)
+    public static void CreateOverrides(string name, AbsolutePath parentFolder, AbsolutePath overridePath)
     {
-        var filePath = Path.Combine(parentFolder, name + ".txt");
-        if (File.Exists(filePath))
+        string a1 = name + ".txt";
+        var filePath = parentFolder / a1;
+        if (filePath.ExistsFile())
         {
             FileOps.DeletePath(new AbsolutePath(filePath));
         }
 
         FileOps.EnsureFilePathExists(new AbsolutePath(filePath));
 
-        using var writer = new StreamWriter(filePath);
+        using var writer = new StreamWriter(filePath.Value);
         foreach (var path in EnumerateOverrideFiles(overridePath))
         {
             // Absolute path with temp directory -> relative path
@@ -39,16 +41,17 @@ public static class OverrideUtils
     /// list of overrides. If there's no such file in <paramref name="parentFolder"/>, an
     /// empty list is returned.
     /// </summary>
-    public static List<string> ReadOverrides(string name, string parentFolder)
+    public static List<string> ReadOverrides(string name, AbsolutePath parentFolder)
     {
-        var filePath = Path.Combine(parentFolder, name + ".txt");
-        if (!File.Exists(filePath))
+        string a1 = name + ".txt";
+        var filePath = parentFolder / a1;
+        if (!filePath.ExistsFile())
         {
             return [];
         }
 
         var previousOverrides = new List<string>();
-        using var reader = new StreamReader(filePath);
+        using var reader = new StreamReader(filePath.Value);
         while (reader.ReadLine() is { } entry)
         {
             previousOverrides.Add(entry.Trim());
@@ -62,7 +65,7 @@ public static class OverrideUtils
     /// over <paramref name="overwrittenPath"/> without deleting files that already exist
     /// (recursive, overwrite-existing).
     /// </summary>
-    public static bool OverrideFolder(string overwrittenPath, string overridePath)
+    public static bool OverrideFolder(AbsolutePath overwrittenPath, AbsolutePath overridePath)
     {
         if (!FileOps.EnsureFolderPathExists(new AbsolutePath(overwrittenPath)))
         {
@@ -71,12 +74,12 @@ public static class OverrideUtils
 
         try
         {
-            foreach (var source in Directory.EnumerateFiles(overridePath, "*", SearchOption.AllDirectories))
+            foreach (var source in overridePath.EnumerateFiles("*", SearchOption.AllDirectories))
             {
-                var relative = Path.GetRelativePath(overridePath, source);
-                var target = Path.GetFullPath(Path.Combine(overwrittenPath, relative));
-                FileOps.EnsureFilePathExists(new AbsolutePath(target));
-                File.Copy(source, target, overwrite: true);
+                var relative = source.RelativeTo(overridePath);
+                var target = overwrittenPath / relative;
+                FileOps.EnsureFilePathExists(target);
+                source.Copy(target, overwrite: true);
             }
 
             return true;
@@ -91,16 +94,16 @@ public static class OverrideUtils
     // strips everything up to the last occurrence of the override folder's *directory
     // name* and drops one separator. Doing the same with plain relative paths is
     // equivalent for the actual callers (the folder name is the last component).
-    private static IEnumerable<string> EnumerateOverrideFiles(string overridePath)
+    private static IEnumerable<string> EnumerateOverrideFiles(AbsolutePath overridePath)
     {
-        foreach (var path in Directory.EnumerateFiles(overridePath, "*", SearchOption.AllDirectories))
+        foreach (var path in overridePath.EnumerateFiles("*", SearchOption.AllDirectories))
         {
-            var relative = Path.GetRelativePath(overridePath, path).Replace('\\', '/');
-            var splitIndex = relative.LastIndexOf(Path.GetFileName(overridePath.TrimEnd('/')), StringComparison.Ordinal);
+            var relative = path.RelativeTo(overridePath).Value.Replace('\\', '/');
+            var splitIndex = relative.LastIndexOf(Path.GetFileName(overridePath.Value.TrimEnd('/')), StringComparison.Ordinal);
             if (splitIndex >= 0)
             {
                 // C++: split(name).last().remove(0, 1) -> drop the matched name and one separator
-                var after = relative[(splitIndex + Path.GetFileName(overridePath.TrimEnd('/')).Length)..];
+                var after = relative[(splitIndex + Path.GetFileName(overridePath.Value.TrimEnd('/')).Length)..];
                 yield return after.Length != 0 && after[0] == '/' ? after[1..] : after;
             }
             else

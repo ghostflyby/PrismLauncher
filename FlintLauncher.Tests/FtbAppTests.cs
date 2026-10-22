@@ -12,6 +12,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform.FtbApp;
 using FlintLauncher.Core.Settings;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -40,7 +41,7 @@ public class FtbAppTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList([instancesDir]) { Environment = _global };
+        return new InstanceList([new AbsolutePath(instancesDir)]) { Environment = _global };
     }
 
     private static List<(string? Uid, string? Version)> Components(string staging)
@@ -67,7 +68,7 @@ public class FtbAppTests : IDisposable
         var packPath = Path.Combine(_instancesPath, "my-ftb-pack");
         Directory.CreateDirectory(packPath);
         populate(packPath);
-        _paths = new FtbAppPaths(ftbRoot);
+        _paths = new FtbAppPaths(new AbsolutePath(ftbRoot));
         return packPath;
     }
 
@@ -111,7 +112,7 @@ public class FtbAppTests : IDisposable
         Directory.CreateDirectory(Path.Combine(ftbRoot, "bin"));
         File.WriteAllText(Path.Combine(ftbRoot, "bin", "settings.json"),
             $$"""{"instanceLocation": "{{binInstancesPath.Replace("\\", "\\\\")}}"}""");
-        var binPaths = new FtbAppPaths(ftbRoot);
+        var binPaths = new FtbAppPaths(new AbsolutePath(ftbRoot));
 
         Assert.Equal(binInstancesPath, binPaths.GetDynamicInstancesPath());
     }
@@ -119,7 +120,7 @@ public class FtbAppTests : IDisposable
     [Fact]
     public void GetDynamicInstancesPath_MissingSettings_ReturnsEmpty()
     {
-        var binPaths = new FtbAppPaths(Path.Combine(_root, "nonexistent-ftba"));
+        var binPaths = new FtbAppPaths(new AbsolutePath(Path.Combine(_root, "nonexistent-ftba")));
         Assert.Equal("", binPaths.GetDynamicInstancesPath());
     }
 
@@ -262,8 +263,8 @@ public class FtbAppTests : IDisposable
         // OverrideJavaArgs gate reads true because JvmArgs is set)
         Assert.Equal(95514, // ms -> s
             Variant.AsLong(new MinecraftInstance(
-                new InstanceJsonSettingsObject(staging, _global.Environment),
-                staging).Settings.Get("totalTimePlayed")));
+                new InstanceJsonSettingsObject(new AbsolutePath(staging), _global.Environment),
+                new AbsolutePath(staging)).Settings.Get("totalTimePlayed")));
         var instanceJson = await File.ReadAllTextAsync(Path.Combine(staging, "instance.json"));
         Assert.Contains("jvmArgs", instanceJson); // camelCase wire shape
         Assert.Contains("-Xmx2G -Dtest=1", instanceJson);

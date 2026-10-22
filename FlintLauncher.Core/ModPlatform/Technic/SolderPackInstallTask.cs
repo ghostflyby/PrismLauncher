@@ -13,6 +13,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.ModPlatform.Technic;
 
@@ -59,10 +60,11 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
             _minecraftVersion = build.Minecraft;
         }
 
-        var outputDir = Path.Combine(Path.GetTempPath(), $"flint-solder-{Guid.NewGuid():N}");
+        string a1 = $"flint-solder-{Guid.NewGuid():N}";
+        var outputDir = Temporary.CreateTempFolder() / a1;
         try
         {
-            Directory.CreateDirectory(outputDir);
+            outputDir.CreateDirectory();
 
             var filesJob = new NetJob("Downloading modpack");
             var modCount = build.Mods.Count;
@@ -72,7 +74,7 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
                 // LoadSolderPackBuild rejects null elements and null urls before this runs
                 var modUrl = mod?.Url
                              ?? throw new InvalidOperationException("the Solder build carries an unvalidated mod");
-                var path = Path.Combine(outputDir, i.ToString());
+                var path = outputDir / i.ToString();
                 var dl = NetRequest.MakeFile(new Uri(modUrl), path);
                 if (mod.Md5.Length != 0)
                 {
@@ -97,22 +99,22 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
         {
             try
             {
-                Directory.Delete(outputDir, recursive: true);
+                outputDir.DeleteDirectoryRecursively();
             }
             catch (DirectoryNotFoundException) { }
         }
     }
 
-    private async Task DownloadSucceeded(string outputDir, int modCount, CancellationToken cancellationToken)
+    private async Task DownloadSucceeded(AbsolutePath outputDir, int modCount, CancellationToken cancellationToken)
     {
         EmitStatus("Extracting modpack");
-        var extractDir = Path.Combine(StagingPath, "minecraft");
+        var extractDir = StagingPath / "minecraft";
         FileOps.EnsureFolderPathExists(new AbsolutePath(extractDir));
 
         var i = 0;
         while (modCount > i)
         {
-            var path = Path.Combine(outputDir, i.ToString());
+            var path = outputDir / i.ToString();
             if (MmcZip.ExtractDir(path, "", extractDir) is null)
             {
                 EmitFailed("Failed to extract modpack");

@@ -22,6 +22,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Skins;
 
@@ -59,17 +60,17 @@ public sealed class SkinModel
 {
     public SkinModel() { }
 
-    public SkinModel(string skinsDir, string name, string capeId = "", string url = "",
+    public SkinModel(AbsolutePath skinsDir, string name, string capeId = "", string url = "",
         SkinModelKind model = SkinModelKind.Classic)
     {
-        Path = System.IO.Path.Combine(skinsDir, name + ".png");
+        Path = (skinsDir / $"{name}.png");
         CapeId = capeId;
         Url = url;
         Model = model;
     }
 
     /// <summary>The wire entry → model (the C++ SkinModel(QJsonObject) read).</summary>
-    internal static SkinModel FromWire(string skinsDir, SkinEntryJson entry)
+    internal static SkinModel FromWire(AbsolutePath skinsDir, SkinEntryJson entry)
     {
         return new SkinModel(skinsDir, entry.Name ?? "", entry.CapeId ?? "", entry.Url ?? "",
             entry.Model == "SLIM" ? SkinModelKind.Slim : SkinModelKind.Classic);
@@ -87,7 +88,7 @@ public sealed class SkinModel
         };
     }
 
-    public string Path = "";
+    public AbsolutePath Path;
 
     public string CapeId { get; init; } = "";
 
@@ -98,9 +99,7 @@ public sealed class SkinModel
     /// <summary>QFileInfo::completeBaseName of the path.</summary>
     public string Name()
     {
-        var fileName = System.IO.Path.GetFileName(Path);
-        var dot = fileName.LastIndexOf('.');
-        return dot <= 0 ? fileName : fileName[..dot];
+        return Path.GetFilenameWithoutExtension();
     }
 
     public string GetModelString() => Model switch
@@ -114,18 +113,18 @@ public sealed class SkinModel
 /// <summary>Persistence half of SkinList: the &{"skins": [...]} index.json in the skins folder.</summary>
 public static class SkinListStore
 {
-    public static List<SkinModel> Load(string skinsDir)
+    public static List<SkinModel> Load(AbsolutePath skinsDir)
     {
         var newSkins = new List<SkinModel>();
-        var manifestPath = Path.Combine(skinsDir, "index.json");
-        if (!File.Exists(manifestPath))
+        var manifestPath = skinsDir / "index.json";
+        if (!manifestPath.ExistsFile())
         {
             return newSkins;
         }
 
         try
         {
-            var root = JsonSerializer.Deserialize(File.ReadAllBytes(manifestPath), SkinJsonContext.Default.SkinIndexJson);
+            var root = JsonSerializer.Deserialize(manifestPath.ReadAllBytes(), SkinJsonContext.Default.SkinIndexJson);
             foreach (var entry in root?.Skins ?? [])
             {
                 var model = SkinModel.FromWire(skinsDir, entry);
@@ -143,13 +142,13 @@ public static class SkinListStore
         return newSkins;
     }
 
-    public static void Save(string skinsDir, IReadOnlyList<SkinModel> skins)
+    public static void Save(AbsolutePath skinsDir, IReadOnlyList<SkinModel> skins)
     {
         var doc = new SkinIndexJson
         {
             Skins = skins.Select(skin => skin.ToWire()).ToArray(),
         };
-        FileOps.Write(new AbsolutePath(Path.Combine(skinsDir, "index.json")),
+        FileOps.Write(skinsDir / "index.json",
             JsonSerializer.SerializeToUtf8Bytes(doc, SkinJsonContext.Default.SkinIndexJson));
     }
 

@@ -11,6 +11,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Migration;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
+using TruePath;
 
 namespace FlintLauncher.Web.Endpoints;
 
@@ -59,7 +60,10 @@ public static class MigrationEndpoints
                 return ApiJson.NotFound("source_not_found", $"source directory '{source}' does not exist");
             }
 
-            var plan = PrismImportPlanner.Plan(source, runtime.Paths.DataDir, importMode);
+            // the one HTTP-boundary parse: the request DTO stays an unvalidated string,
+            // everything below is the typed domain
+            AbsolutePath sourceDir = new(source);
+            var plan = PrismImportPlanner.Plan(sourceDir, runtime.Paths.DataDir, importMode);
             var totalFiles = plan.Sum(item => item.Files);
             var totalBytes = plan.Sum(item => item.Bytes);
             return Results.Ok(new PrismImportPlanResponse(source, importMode.ToString(), totalFiles, totalBytes,
@@ -87,9 +91,13 @@ public static class MigrationEndpoints
                     $"source directory '{request.Source}' is not a known launcher data directory", 400);
             }
 
+            // the one HTTP-boundary parse: the request DTO stays an unvalidated string,
+            // everything below is the typed domain
+            AbsolutePath sourceDir = new(request.Source);
+
             if (request.DryRun)
             {
-                var plan = PrismImportPlanner.Plan(request.Source, runtime.Paths.DataDir, importMode);
+                var plan = PrismImportPlanner.Plan(sourceDir, runtime.Paths.DataDir, importMode);
                 return Results.Ok(new PrismImportDryRunResponse(
                     DryRun: true,
                     TotalFiles: plan.Sum(item => item.Files),
@@ -101,7 +109,7 @@ public static class MigrationEndpoints
             // already carries its own launcher config — post-reform the config root's
             // flint.json — never migrates ("Migration was skipped, due to existing data").
             // The dry-run preview above stays open: it is the "what would be imported" view.
-            if (File.Exists(runtime.Paths.ConfigFile))
+            if (File.Exists(runtime.Paths.ConfigFile.Value))
             {
                 return ApiJson.Conflict("target_has_own_config",
                     "the target already has its own launcher config; migrate yourself or decline the source");
@@ -109,7 +117,7 @@ public static class MigrationEndpoints
 
             // S7: the task files its decision record under the ACTUAL legacy source name
             // (prism/polymc/multimc) — the old code hardcoded "prism"
-            var task = new PrismImportTask(request.Source, runtime.Paths.DataDir, importMode,
+            var task = new PrismImportTask(sourceDir, runtime.Paths.DataDir, importMode,
                 sourceName, runtime.MigrationDecisions);
             // every terminal state completes the single pass (GLOBAL G2): the C++ task emitted
             // finished() after emitAborted() too (Task.cpp:133-146), so a cancelled import ran

@@ -7,6 +7,7 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Skins;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -42,7 +43,7 @@ public class SkinApiTests : IDisposable
         var pngBytes = "PNGDATA-0123456789-abcdef"u8.ToArray();
         await File.WriteAllBytesAsync(skinPath, pngBytes);
 
-        var request = SkinUpload.Make("SKIN_TOKEN", skinPath, "classic", _auth);
+        var request = SkinUpload.Make("SKIN_TOKEN", new AbsolutePath(skinPath), "classic", _auth);
         await request.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, request.State);
@@ -144,13 +145,13 @@ public class SkinApiTests : IDisposable
         {
             new()
             {
-                Path = Path.Combine(_dir, "myskin.png"),
+                Path = new AbsolutePath(Path.Combine(_dir, "myskin.png")),
                 CapeId = "cape-id",
                 Model = SkinModelKind.Slim,
                 Url = "https://textures.minecraft.net/texture/abc",
             },
         };
-        SkinListStore.Save(_dir, skins);
+        SkinListStore.Save(new AbsolutePath(_dir), skins);
 
         // {"skins": [{"name": ..., "capeId": ..., "url": ..., "model": ...}]}
         var indexNode = JsonNode.Parse(File.ReadAllText(Path.Combine(_dir, "index.json")));
@@ -166,19 +167,19 @@ public class SkinApiTests : IDisposable
         Assert.Equal("https://textures.minecraft.net/texture/abc", entry["url"]?.GetValue<string>());
         Assert.Equal("SLIM", entry["model"]?.GetValue<string>());
 
-        var loaded = SkinListStore.Load(_dir);
+        var loaded = SkinListStore.Load(new AbsolutePath(_dir));
         var skin = Assert.Single(loaded);
         Assert.Equal("myskin", skin.Name());
         Assert.Equal("cape-id", skin.CapeId);
         Assert.Equal(SkinModelKind.Slim, skin.Model);
         Assert.Equal("https://textures.minecraft.net/texture/abc", skin.Url);
-        Assert.Equal(Path.Combine(_dir, "myskin.png"), skin.Path);
+        Assert.Equal(Path.Combine(_dir, "myskin.png"), skin.Path.Value);
     }
 
     [Fact]
     public void SkinIndex_Missing_File_Loads_Empty()
     {
         Directory.CreateDirectory(_dir);
-        Assert.Empty(SkinListStore.Load(_dir));
+        Assert.Empty(SkinListStore.Load(new AbsolutePath(_dir)));
     }
 }

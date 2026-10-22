@@ -24,6 +24,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.ModPlatform.Packwiz;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
 
@@ -283,7 +284,7 @@ public static class ModUtils
     /// <summary>Port of ModUtils::validate: whether a file is valid as a mod or not.</summary>
     public static bool Validate(string file)
     {
-        var mod = new Mod(file);
+        var mod = new Mod(new AbsolutePath(file));
         return Process(mod, ModProcessingLevel.BasicInfoOnly) && mod.Valid;
     }
 

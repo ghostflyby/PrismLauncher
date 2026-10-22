@@ -189,7 +189,7 @@ public static class TarArchive
             }
             else
             {
-                targetFilePath = Path.Combine(targetTopDir, subPath, relativeName);
+                targetFilePath = (new AbsolutePath(targetTopDir) / subPath / relativeName).Value;
             }
 
             // zip-slip check: the resolved target must stay inside the target directory
@@ -275,11 +275,11 @@ public static class TarArchive
                 case '1': // hard link — best-effort copy from the already-extracted target
                 {
                     SkipData(stream, size);
-                    var sourcePath = Path.Combine(Path.GetDirectoryName(targetFilePath) ?? "", linkTarget);
-                    if (File.Exists(sourcePath))
+                    var sourcePath = new AbsolutePath(Path.GetDirectoryName(targetFilePath) ?? "") / linkTarget;
+                    if (File.Exists(sourcePath.Value))
                     {
                         FileOps.EnsureFilePathExists(new AbsolutePath(targetFilePath));
-                        File.Copy(sourcePath, targetFilePath, overwrite: true);
+                        File.Copy(sourcePath.Value, targetFilePath, overwrite: true);
                         extracted.Add(targetFilePath);
                     }
 

@@ -19,6 +19,8 @@ using FlintLauncher.Core.Skins;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
 using FlintLauncher.Web.Services;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Web.Endpoints;
 
@@ -70,8 +72,9 @@ public static class SkinLibraryEndpoints
 
             // stage the upload with its original suffix (Install re-checks readability; the
             // texture is stored as <name>.png regardless)
-            var temp = Path.Combine(Path.GetTempPath(), $"flint-skin-{Guid.NewGuid():N}{Path.GetExtension(file.FileName)}");
-            await using (var stream = File.Create(temp))
+            var temp = new AbsolutePath(Path.GetTempPath())
+                       / $"flint-skin-{Guid.NewGuid():N}{Path.GetExtension(file.FileName)}";
+            await using (var stream = temp.Create())
             {
                 await file.CopyToAsync(stream);
             }
@@ -82,7 +85,7 @@ public static class SkinLibraryEndpoints
                     ? Results.Created($"/api/v1/skins/{Uri.EscapeDataString(name)}",
                         new SkinStoredResponse(name))
                     : ApiJson.Error("skin_store_failed",
-                        File.Exists(Path.Combine(runtime.Skins.SkinsDir, name + ".png"))
+                        (runtime.Skins.SkinsDir / (name + ".png")).ExistsFile()
                             ? $"a skin named '{name}' already exists (delete it first to replace)"
                             : $"could not store skin '{name}'", 409);
             }
@@ -90,7 +93,7 @@ public static class SkinLibraryEndpoints
             {
                 try
                 {
-                    File.Delete(temp);
+                    temp.Delete();
                 }
                 catch (IOException) { }
             }
@@ -118,7 +121,7 @@ public static class SkinLibraryEndpoints
             }
 
             var texture = runtime.Skins.TextureFileOf(skin);
-            if (texture.Length == 0)
+            if (texture.Value is not { Length: > 0 })
             {
                 return ApiJson.Error("skin_texture_missing",
                     $"the texture of skin '{name}' is missing from {runtime.Skins.SkinsDir}", 409);
@@ -146,7 +149,7 @@ public static class SkinLibraryEndpoints
         skin.GetModelString(),
         skin.CapeId,
         skin.Url,
-        File.Exists(skin.Path));
+        skin.Path.ExistsFile());
 
     /// <summary>The form/body model field: "classic"/"slim" (the account upload spelling);
     /// omitted/empty = classic (the SkinManageDialog default).</summary>

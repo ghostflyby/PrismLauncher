@@ -5,6 +5,7 @@
 
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Auth;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -33,7 +34,7 @@ public class RealAccountSmokeTests : IDisposable
         }
 
         var list = new AccountList();
-        list.SetListFilePath(RealAccountsPath); // autosave stays off: read-only access
+        list.SetListFilePath(new AbsolutePath(RealAccountsPath)); // autosave stays off: read-only access
         Assert.True(list.LoadList(), "the real accounts.json must load");
 
         Assert.True(list.Count >= 0);
@@ -59,7 +60,7 @@ public class RealAccountSmokeTests : IDisposable
         // re-save into a temp file and compare the JSON structure
         Directory.CreateDirectory(_dir);
         var savedPath = Path.Combine(_dir, "accounts-copy.json");
-        list.SetListFilePath(savedPath);
+        list.SetListFilePath(new AbsolutePath(savedPath));
         Assert.True(list.SaveList());
 
         var originalNode = JsonNode.Parse(File.ReadAllText(RealAccountsPath));

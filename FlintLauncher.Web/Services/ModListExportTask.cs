@@ -13,12 +13,13 @@ using System.Security;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.Helpers;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Web.Services;
 
 public sealed class ModListExportTask(
     MinecraftInstance instance,
-    string outputPath,
+    AbsolutePath? outputPath,
     ModListFormat format,
     OptionalData extraData)
     : FlintTask
@@ -34,7 +35,7 @@ public sealed class ModListExportTask(
         };
 
     /// <summary>The written file (exposed through the task view's result payload).</summary>
-    public string OutputPath => outputPath;
+    public AbsolutePath? OutputPath => outputPath;
 
     /// <summary>Maps the API format2 key ("html"|"markdown"|"plain"|"json"|"csv") to the
     /// core format + file extension; null when the key is unknown.</summary>
@@ -82,9 +83,15 @@ public sealed class ModListExportTask(
         }
 
         EmitStatus("Writing the mod list...");
+        if (outputPath is not { } target)
+        {
+            EmitFailed("No output path was provided for the mod list export");
+            return Task.CompletedTask;
+        }
+
         try
         {
-            File.WriteAllText(outputPath, ExportToModList.ExportModsToString(mods, format, extraData));
+            File.WriteAllText(target.Value, ExportToModList.ExportModsToString(mods, format, extraData));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException
                                       or SecurityException)

@@ -6,6 +6,7 @@
 // half and its byte-level round-trip tests retired with the instance.cfg write path).
 
 using FlintLauncher.Core.Settings;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -89,7 +90,7 @@ public class IniFileGoldenTests
             File.WriteAllText(path, fileContent);
 
             var f1 = new IniFile();
-            Assert.True(f1.LoadFile(path));
+            Assert.True(f1.LoadFile(new AbsolutePath(path)));
             Assert.Equal("\"$INST_JAVA\" -jar packwiz-installer-bootstrap.jar link", f1.GetString("PreLaunchCommand", "NOT SET"));
             Assert.Equal("\"$INST_JAVA\" -jar packwiz-installer-bootstrap.jar link =", f1.GetString("Wrapperommand", "NOT SET"));
             Assert.Equal("1.3", f1.GetString("ConfigVersion", "NOT SET"));
@@ -117,7 +118,7 @@ public class IniFileGoldenTests
             File.WriteAllText(path, fileContent);
 
             var f1 = new IniFile();
-            Assert.True(f1.LoadFile(path));
+            Assert.True(f1.LoadFile(new AbsolutePath(path)));
             Assert.Equal("env mesa=true", f1.GetString("PreLaunchCommand", "NOT SET"));
             Assert.Equal("1.3", f1.GetString("ConfigVersion", "NOT SET"));
         }

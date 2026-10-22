@@ -24,14 +24,14 @@ public sealed class WorldList
 {
     private readonly List<World> _worlds = [];
 
-    public WorldList(string dir)
+    public WorldList(AbsolutePath dir)
     {
         Dir = dir;
-        FileOps.EnsureFolderPathExists(new AbsolutePath(Dir));
+        FileOps.EnsureFolderPathExists(Dir);
     }
 
     /// <summary>The saves directory this list is rooted at (QDir m_dir).</summary>
-    public string Dir { get; }
+    public AbsolutePath Dir { get; }
 
     /// <summary>The worlds of the last Update(), in directory order (m_worlds).</summary>
     public IReadOnlyList<World> Worlds => _worlds;
@@ -56,7 +56,7 @@ public sealed class WorldList
         try
         {
             // QDir filter Readable|NoDotAndDotDot|Files|Dirs, sorting Name|IgnoreCase|LocaleAware.
-            entries = Directory.EnumerateDirectories(Dir).OrderBy(e => e, StringComparer.CurrentCultureIgnoreCase);
+            entries = Directory.EnumerateDirectories(Dir.Value).OrderBy(e => e, StringComparer.CurrentCultureIgnoreCase);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
@@ -80,7 +80,7 @@ public sealed class WorldList
     /// <summary>Port of WorldList::isValid.</summary>
     public bool IsValid()
     {
-        return Directory.Exists(Dir);
+        return Directory.Exists(Dir.Value);
     }
 
     /// <summary>
@@ -102,9 +102,9 @@ public sealed class WorldList
     /// Port of WorldList::removeWorldFromModel: drop a world that was already deleted
     /// from the list.
     /// </summary>
-    public bool RemoveWorld(string sourcePath)
+    public bool RemoveWorld(AbsolutePath sourcePath)
     {
-        var sourceFullPath = Path.GetFullPath(sourcePath);
+        var sourceFullPath = Path.GetFullPath(sourcePath.Value);
         for (var i = 0; i < _worlds.Count; i++)
         {
             if (!string.Equals(Path.GetFullPath(_worlds[i].ContainerPath), sourceFullPath, StringComparison.Ordinal))
@@ -201,7 +201,7 @@ public sealed class WorldList
         var ok = world.Destroy();
         if (ok)
         {
-            RemoveWorld(world.ContainerPath);
+            RemoveWorld(new AbsolutePath(world.ContainerPath));
         }
 
         return Task.FromResult(ok);

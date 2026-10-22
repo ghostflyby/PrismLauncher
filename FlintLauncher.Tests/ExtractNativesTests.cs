@@ -21,6 +21,8 @@ using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
+using TruePath;
+using TruePath.SystemIo;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -69,16 +71,15 @@ public class ExtractNativesTests
         public override bool CanAbort() => true;
     }
 
-    private static void WriteNativeJars(string localLibraryPath, string dylib, string jnilib)
+    private static void WriteNativeJars(AbsolutePath localLibraryPath, string dylib, string jnilib)
     {
         // one synthetic jar per OS classifier; the runtime context picks the current one
         foreach (var classifier in new[] { "osx", "linux", "windows" })
         {
-            var jarPath = Path.Combine(localLibraryPath, $"testnatives-1.0-natives-{classifier}.jar");
-            var jarDir = Path.GetDirectoryName(jarPath);
-            Assert.NotNull(jarDir);
-            Directory.CreateDirectory(jarDir);
-            using var zip = new ZipArchive(File.Create(jarPath), ZipArchiveMode.Create);
+            var jarPath = localLibraryPath / $"testnatives-1.0-natives-{classifier}.jar";
+            var jarDir = Assert.NotNull(jarPath.Parent);
+            jarDir.CreateDirectory();
+            using var zip = new ZipArchive(jarPath.Create(), ZipArchiveMode.Create);
             zip.CreateEntryFromBytes(dylib, "liblwjgl.dylib");
             zip.CreateEntryFromBytes(jnilib, "libtest.jnilib");
             zip.CreateEntryFromBytes("meta", "META-INF/MANIFEST.MF");
@@ -106,19 +107,19 @@ public class ExtractNativesTests
 
         // the natives are extracted at this point (ExtractNatives succeeded before the gate)
         var natives = instance.GetNativePath();
-        Assert.True(Directory.Exists(natives));
-        Assert.Equal("dylib-bytes", await File.ReadAllTextAsync(Path.Combine(natives, "liblwjgl.dylib")));
+        Assert.True(natives.ExistsDirectory());
+        Assert.Equal("dylib-bytes", await (natives / "liblwjgl.dylib").ReadAllTextAsync());
         // the .jnilib -> .dylib rename of the Java 8+ hack
-        Assert.Equal("jnilib-bytes", await File.ReadAllTextAsync(Path.Combine(natives, "libtest.dylib")));
-        Assert.False(File.Exists(Path.Combine(natives, "libtest.jnilib")));
-        Assert.Equal("meta", await File.ReadAllTextAsync(Path.Combine(natives, "META-INF/MANIFEST.MF")));
+        Assert.Equal("jnilib-bytes", await (natives / "libtest.dylib").ReadAllTextAsync());
+        Assert.False((natives / "libtest.jnilib").ExistsFile());
+        Assert.Equal("meta", await (natives / "META-INF/MANIFEST.MF").ReadAllTextAsync());
 
         gate.Release.TrySetResult();
         await run;
 
         Assert.Equal(TaskState.Succeeded, task.State);
         // ExtractNatives::finalize removes the whole natives folder again
-        Assert.False(Directory.Exists(natives));
+        Assert.False(natives.ExistsDirectory());
     }
 
     [Fact]
@@ -132,7 +133,7 @@ public class ExtractNativesTests
         await task.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, task.State);
-        Assert.False(Directory.Exists(instance.GetNativePath()));
+        Assert.False(instance.GetNativePath().ExistsDirectory());
     }
 
     // ------------------------------------------------------------------ ModMinecraftJar
@@ -155,11 +156,10 @@ public class ExtractNativesTests
     private static void WriteJarModInputs(MinecraftInstance instance)
     {
         // the "minecraft client jar" the mods get merged into
-        var clientJar = Path.Combine(instance.GetLocalLibraryPath(), "client.jar");
-        var clientDir = Path.GetDirectoryName(clientJar);
-        Assert.NotNull(clientDir);
-        Directory.CreateDirectory(clientDir);
-        using (var zip = new ZipArchive(File.Create(clientJar), ZipArchiveMode.Create))
+        var clientJar = instance.GetLocalLibraryPath() / "client.jar";
+        var clientDir = Assert.NotNull(clientJar.Parent);
+        clientDir.CreateDirectory();
+        using (var zip = new ZipArchive(clientJar.Create(), ZipArchiveMode.Create))
         {
             zip.CreateEntryFromBytes("source-common", "common.txt");
             zip.CreateEntryFromBytes("source-only", "src/only.txt");
@@ -167,11 +167,10 @@ public class ExtractNativesTests
         }
 
         // the jar mod: one new file plus one entry that overrides the source's
-        var jarMod = Path.Combine(instance.JarModsDir(), "jarmod.zip");
-        var jarModDir = Path.GetDirectoryName(jarMod);
-        Assert.NotNull(jarModDir);
-        Directory.CreateDirectory(jarModDir);
-        using (var zip = new ZipArchive(File.Create(jarMod), ZipArchiveMode.Create))
+        var jarMod = instance.JarModsDir / "jarmod.zip";
+        var jarModDir = Assert.NotNull(jarMod.Parent);
+        jarModDir.CreateDirectory();
+        using (var zip = new ZipArchive(jarMod.Create(), ZipArchiveMode.Create))
         {
             zip.CreateEntryFromBytes("mod-new", "aaa/new.txt");
             zip.CreateEntryFromBytes("mod-common", "common.txt");
@@ -198,9 +197,9 @@ public class ExtractNativesTests
         }
 
         // the modded jar exists while the launch runs
-        var finalJar = Path.Combine(instance.BinRoot(), "minecraft.jar");
-        Assert.True(File.Exists(finalJar));
-        using (var zip = new ZipArchive(File.OpenRead(finalJar), ZipArchiveMode.Read))
+        var finalJar = instance.BinRoot() / "minecraft.jar";
+        Assert.True(finalJar.ExistsFile());
+        using (var zip = new ZipArchive(finalJar.OpenRead(), ZipArchiveMode.Read))
         {
             Assert.Equal("mod-new", await ReadEntry(zip, "aaa/new.txt"));
             // the jar mod's entry wins over the source jar's (mods merge first)
@@ -215,7 +214,7 @@ public class ExtractNativesTests
 
         Assert.Equal(TaskState.Succeeded, task.State);
         // ModMinecraftJar::finalize removes the temporary stripped jar
-        Assert.False(File.Exists(finalJar));
+        Assert.False(finalJar.ExistsFile());
     }
 
     [Fact]
@@ -229,7 +228,7 @@ public class ExtractNativesTests
         await task.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, task.State);
-        Assert.False(Directory.Exists(instance.BinRoot()));
+        Assert.False(instance.BinRoot().ExistsDirectory());
     }
 
     private static async Task<string> ReadEntry(ZipArchive zip, string name)
@@ -255,11 +254,11 @@ public class ExtractNativesTests
         var assetsRoot = services.Paths.AssetsRoot;
         var indexJson = """{"virtual":true,"objects":{"icon.png":{"hash":"HASH","size":LEN}}}"""
             .Replace("HASH", hash).Replace("LEN", body.Length.ToString());
-        Directory.CreateDirectory(services.Paths.AssetIndexesDir);
-        await File.WriteAllTextAsync(Path.Combine(services.Paths.AssetIndexesDir, assetsId + ".json"), indexJson);
-        var objectDir = Path.Combine(assetsRoot, "objects", hash[..2]);
-        Directory.CreateDirectory(objectDir);
-        await File.WriteAllBytesAsync(Path.Combine(objectDir, hash), body);
+        services.Paths.AssetIndexesDir.CreateDirectory();
+        await (services.Paths.AssetIndexesDir / (assetsId + ".json")).WriteAllTextAsync(indexJson);
+        var objectDir = assetsRoot / "objects" / hash[..2];
+        objectDir.CreateDirectory();
+        await (objectDir / hash).WriteAllBytesAsync(body);
 
         var patch = LaunchFixture.DefaultPatchJson.Replace("\"assets\": \"5\"", $"\"assets\": \"{assetsId}\"");
         var instance = await fixture.CreateInstance(patch);
@@ -270,9 +269,9 @@ public class ExtractNativesTests
         await task.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, task.State);
-        var rebuilt = Path.Combine(assetsRoot, "virtual", assetsId, "icon.png");
-        Assert.True(File.Exists(rebuilt));
-        Assert.Equal("virtual asset payload", await File.ReadAllTextAsync(rebuilt));
+        var rebuilt = assetsRoot / "virtual" / assetsId / "icon.png";
+        Assert.True(rebuilt.ExistsFile());
+        Assert.Equal("virtual asset payload", await rebuilt.ReadAllTextAsync());
     }
 
     [Fact]
@@ -329,11 +328,17 @@ public class ExtractNativesTests
         // instance stamp reads its assets anchors through the <BaseDirectory>/assets symlink
         // (the CWD-lexical fallback of FILE-LAYOUT §1.5), so the STORE root is BaseDirectory
         // (E2: assets hang off the store root)
-        var instanceCache = new HttpMetaCache();
-        instanceCache.AddBase("asset_indexes", Path.Combine(assetsRoot.Root, "indexes"));
+        var instanceCache = new HttpMetaCache(Temporary.SystemTempDirectory() / $"flint-asset-indexes-{Guid.NewGuid():N}" / "metacache.json");
+        instanceCache.AddBase("asset_indexes", new AbsolutePath(Path.Combine(assetsRoot.Root, "indexes")));
         instance.MetaCache = instanceCache;
-        instance.Paths = FlintPaths.FromRoots(AppContext.BaseDirectory, AppContext.BaseDirectory,
-            AppContext.BaseDirectory, AppContext.BaseDirectory, AppContext.BaseDirectory);
+        instance.Paths = new()
+        {
+            ConfigRoot = new AbsolutePath(AppContext.BaseDirectory),
+            DataRoot = new AbsolutePath(AppContext.BaseDirectory),
+            StoreRoot = new AbsolutePath(AppContext.BaseDirectory),
+            CacheRoot = new AbsolutePath(AppContext.BaseDirectory),
+            StateRoot = new AbsolutePath(AppContext.BaseDirectory),
+        };
         // the resource URL override rides the instance-stamped LaunchServices (the former
         // AssetUpdateTask.ResourceUrlOverride static hook)
         instance.LaunchServices = new LaunchServices

@@ -4,6 +4,7 @@
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -16,8 +17,8 @@ public class LibraryTests
 
     public LibraryTests()
     {
-        _cache = new HttpMetaCache();
-        _cache.AddBase("libraries", Path.GetFullPath("libraries"));
+        _cache = new HttpMetaCache(Temporary.SystemTempDirectory() / $"flint-libraries-{Guid.NewGuid():N}" / "metacache.json");
+        _cache.AddBase("libraries", new AbsolutePath(Path.GetFullPath("libraries")));
         _dataDir = Path.Combine(AppContext.BaseDirectory, "TestData", "Libraries");
     }
 
@@ -30,9 +31,15 @@ public class LibraryTests
     }
 
     /// <summary>get absolute path to expected storage, assuming default cache prefix</summary>
-    private List<string> GetStorage(string relative)
+    private List<AbsolutePath> GetStorage(string relative)
     {
-        return [Path.Combine(_cache.GetBasePath("libraries"), relative)];
+        var libraries = _cache.GetBasePath("libraries");
+        return
+        [
+            libraries is { } baseDir
+                ? baseDir / relative
+                : throw new InvalidOperationException("the 'libraries' base is not registered on the cache")
+        ];
     }
 
     private static RuntimeContext DummyContext(string system = "linux", string arch = "64", string realArch = "amd64")
@@ -49,17 +56,18 @@ public class LibraryTests
     private void GetApplicableFiles(
         Library test,
         RuntimeContext r,
-        out List<string> jar,
-        out List<string> native,
-        out List<string> native32,
-        out List<string> native64,
+        out List<AbsolutePath> jar,
+        out List<AbsolutePath> native,
+        out List<AbsolutePath> native32,
+        out List<AbsolutePath> native64,
         string overridePath)
     {
         jar = [];
         native = [];
         native32 = [];
         native64 = [];
-        test.GetApplicableFiles(r, jar, native, native32, native64, overridePath);
+        test.GetApplicableFiles(r, jar, native, native32, native64,
+            overridePath.Length > 0 ? new AbsolutePath(overridePath) : default);
     }
 
     [Fact]
@@ -120,7 +128,7 @@ public class LibraryTests
 
         GetApplicableFiles(test, r, out var jar, out var native, out var native32, out var native64, _dataDir);
         Assert.Equal(
-            [Path.Combine(_dataDir, "codecwav-20101023.jar")],
+            [new AbsolutePath(_dataDir) / "codecwav-20101023.jar"],
             jar);
         Assert.Empty(native);
         Assert.Empty(native32);
@@ -231,8 +239,8 @@ public class LibraryTests
             GetApplicableFiles(test, r, out var jar, out var native, out var native32, out var native64, _dataDir);
             Assert.Empty(jar);
             Assert.Empty(native);
-            Assert.Equal([Path.Combine(_dataDir, "testname-testversion-linux-32.jar")], native32);
-            Assert.Equal([Path.Combine(_dataDir, "testname-testversion-linux-64.jar")], native64);
+            Assert.Equal([new AbsolutePath(_dataDir) / "testname-testversion-linux-32.jar"], native32);
+            Assert.Equal([new AbsolutePath(_dataDir) / "testname-testversion-linux-64.jar"], native64);
             var failedFiles = new List<string>();
             var dls = test.GetDownloads(r, _cache, failedFiles, _dataDir);
             Assert.Empty(dls);
@@ -264,7 +272,7 @@ public class LibraryTests
         test.Hint = "local";
         {
             GetApplicableFiles(test, r, out var jar, out var native, out var native32, out var native64, _dataDir);
-            Assert.Equal([Path.Combine(_dataDir, "codecwav-20101023.jar")], jar);
+            Assert.Equal([new AbsolutePath(_dataDir) / "codecwav-20101023.jar"], jar);
             Assert.Empty(native);
             Assert.Empty(native32);
             Assert.Empty(native64);
@@ -286,7 +294,7 @@ public class LibraryTests
         test.Hint = "local";
         {
             GetApplicableFiles(test, r, out var jar, out var native, out var native32, out var native64, _dataDir);
-            Assert.Equal([Path.Combine(_dataDir, "codecwav-20101023.jar")], jar);
+            Assert.Equal([new AbsolutePath(_dataDir) / "codecwav-20101023.jar"], jar);
             Assert.Empty(native);
             Assert.Empty(native32);
             Assert.Empty(native64);

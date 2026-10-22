@@ -31,6 +31,7 @@ using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
@@ -50,7 +51,7 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
         public required string Author { get; init; }
         public bool OptionalFiles { get; init; }
         public required MinecraftInstance Instance { get; init; }
-        public required string Output { get; init; }
+        public required AbsolutePath? Output { get; init; }
         public FlameApi? Flame { get; init; }
     }
 
@@ -73,7 +74,7 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
         public bool IsMod { get; init; }
     }
 
-    private readonly string _gameRoot = options.Instance.GameRoot();
+    private readonly AbsolutePath _gameRoot = options.Instance.GameRoot;
     private readonly FlameApi _flame = options.Flame ?? new FlameApi();
 
     private readonly List<string> _files = [];
@@ -97,7 +98,7 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
     private bool CollectFiles()
     {
         _files.Clear();
-        if (!MmcZip.CollectFileListRecursively(options.Instance.GameRoot(), null, _files))
+        if (!MmcZip.CollectFileListRecursively(options.Instance.GameRoot, null, _files))
         {
             EmitFailed("Could not search for files");
             return false;
@@ -114,7 +115,7 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
         SetProgress(1, 5);
 
         // instance->loaderModList()->update()
-        var modList = new ModFolderModel(options.Instance.ModsRoot());
+        var modList = new ModFolderModel(options.Instance.ModsRoot);
         modList.Update();
         var allMods = modList.AllMods();
 
@@ -367,15 +368,22 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
         EmitStatus("Adding files...");
         SetProgress(4, 5);
 
+        var outputPath = options.Output?.Value;
+        if (string.IsNullOrEmpty(outputPath))
+        {
+            EmitFailed("No output path given for the export zip.");
+            return;
+        }
+
         try
         {
-            using var stream = File.Create(options.Output);
+            using var stream = File.Create(outputPath);
             using var zip = new ZipArchive(stream, ZipArchiveMode.Create);
 
             // the ExportToZipTask layout: everything under the game root, prefixed with
             // "overrides/", minus the files that the manifest references by id
             var exclude = _resolvedFiles.Keys
-                .Select(path => Path.GetRelativePath(_gameRoot, path).Replace('\\', '/'))
+                .Select(path => Path.GetRelativePath(_gameRoot.Value, path).Replace('\\', '/'))
                 .ToHashSet();
 
             foreach (var file in _files)
@@ -524,7 +532,7 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
 
     private string GetRelativePath(string file)
     {
-        return Path.GetRelativePath(_gameRoot, file).Replace('\\', '/');
+        return Path.GetRelativePath(_gameRoot.Value, file).Replace('\\', '/');
     }
 
     private static long ParseLong(string value)

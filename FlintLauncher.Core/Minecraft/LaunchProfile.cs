@@ -4,6 +4,7 @@
 // getProblems() FIXME (always empty upstream as well) stays as-is.
 
 using FlintLauncher.Core.Versioning;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft;
 
@@ -329,15 +330,15 @@ public class LaunchProfile : ProblemProvider
 
     public void GetLibraryFiles(
         RuntimeContext runtimeContext,
-        List<string> jars,
-        List<string> nativeJars,
-        string overridePath,
-        string tempPath,
+        List<AbsolutePath> jars,
+        List<AbsolutePath> nativeJars,
+        AbsolutePath overridePath,
+        AbsolutePath tempPath,
         bool addJarMods = true,
-        string storageBase = "")
+        AbsolutePath storageBase = default)
     {
-        var native32 = new List<string>();
-        var native64 = new List<string>();
+        var native32 = new List<AbsolutePath>();
+        var native64 = new List<AbsolutePath>();
         jars.Clear();
         nativeJars.Clear();
         foreach (var lib in GetLibraries())
@@ -351,7 +352,7 @@ public class LaunchProfile : ProblemProvider
             // FIXME: HACK!! jar modding is weird and unsystematic!
             if (_jarMods.Count != 0 && addJarMods)
             {
-                jars.Add(Path.GetFullPath(Path.Combine(tempPath, "minecraft.jar")));
+                jars.Add(tempPath / "minecraft.jar");
             }
             else
             {

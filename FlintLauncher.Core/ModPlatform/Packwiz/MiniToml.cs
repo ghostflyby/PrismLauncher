@@ -17,6 +17,8 @@
 
 using System.Globalization;
 using System.Text;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.ModPlatform.Packwiz;
 
@@ -140,7 +142,7 @@ public sealed class TomlTable
 public static class MiniToml
 {
     /// <summary>toml::parse_file equivalent: parse the file content into its root table.</summary>
-    public static TomlTable ParseFile(string path) => Parse(Encoding.UTF8.GetString(File.ReadAllBytes(path)));
+    public static TomlTable ParseFile(AbsolutePath path) => Parse(path.ReadAllText());
 
     /// <summary>toml::parse equivalent for the documented subset.</summary>
     public static TomlTable Parse(string text)

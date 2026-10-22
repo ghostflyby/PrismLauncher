@@ -30,6 +30,8 @@
 using FlintLauncher.Core.Secrets;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.State;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Config;
 
@@ -85,7 +87,7 @@ public static class FlintConfigImporter
     public static ImportResult ImportIfNeeded(FlintPaths paths, FlintConfigStore config,
         ISecretStore secrets, LauncherStateStore state)
     {
-        if (File.Exists(config.FilePath))
+        if (config.FilePath.ExistsFile())
         {
             return ImportResult.Idle; // flint.json is authoritative — the one-shot already happened
         }
@@ -100,7 +102,7 @@ public static class FlintConfigImporter
         {
             // the INI exists but cannot be parsed: flint.json stays default — report it
             // instead of dying silently (the INI is kept on disk; C5 reads JSON only)
-            return new ImportResult(null, iniPath);
+            return new ImportResult(null, iniPath.Value);
         }
 
         // ---- single pass over the INI: sort every key to its destination -------------------
@@ -266,19 +268,19 @@ public static class FlintConfigImporter
         // write flint.json even when the INI carried no recognized key: the file's existence
         // IS the one-shot guard, so a re-ordered probe can't resurrect stale INI values later
         config.Update(_ => resolved);
-        return new ImportResult(iniPath, null);
+        return new ImportResult(iniPath.Value, null);
     }
 
     /// <summary>The first existing chain file: the config root (the new authoritative home)
     /// wins over the pre-reform flat data root, chain order as declared.</summary>
-    public static string? FindChainFile(FlintPaths paths)
+    public static AbsolutePath? FindChainFile(FlintPaths paths)
     {
         foreach (var dir in new[] { paths.ConfigRoot, paths.DataRoot })
         {
             foreach (var name in IniChain)
             {
-                var candidate = Path.Combine(dir, name);
-                if (File.Exists(candidate))
+                var candidate = new AbsolutePath(dir) / name;
+                if (candidate.ExistsFile())
                 {
                     return candidate;
                 }
@@ -299,8 +301,8 @@ public static class FlintConfigImporter
     /// silent, exactly like the C++ defaults of 0/false behind a missing file).</summary>
     private static PlaytimePair? ReadPlaytimeFile(FlintPaths paths)
     {
-        var file = Path.Combine(paths.DataRoot, "playtime.cfg");
-        if (!File.Exists(file))
+        AbsolutePath file = paths.DataRoot / "playtime.cfg";
+        if (!file.ExistsFile())
         {
             return null;
         }

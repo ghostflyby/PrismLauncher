@@ -21,6 +21,8 @@ using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Tasks;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
@@ -30,7 +32,7 @@ public sealed class ModrinthPackExportTask(
     string summary,
     bool optionalFiles,
     MinecraftInstance instance,
-    string output,
+    AbsolutePath output,
     MmcZip.FilterFunction? filter = null,
     ModrinthApi? modrinth = null)
     : FlintTask
@@ -38,7 +40,7 @@ public sealed class ModrinthPackExportTask(
     private static readonly string[] Prefixes = ["mods/", "coremods/", "resourcepacks/", "texturepacks/", "shaderpacks/"];
     private static readonly string[] FileExtensions = ["jar", "litemod", "zip"];
 
-    private readonly string _gameRoot = instance.GameRoot();
+    private readonly AbsolutePath _gameRoot = instance.GameRoot;
 
     private readonly List<string> _files = [];
     private readonly Dictionary<string, string> _pendingHashes = new(StringComparer.Ordinal);
@@ -63,7 +65,7 @@ public sealed class ModrinthPackExportTask(
     private bool CollectFiles()
     {
         _files.Clear();
-        if (!MmcZip.CollectFileListRecursively(instance.GameRoot(), null, _files,
+        if (!MmcZip.CollectFileListRecursively(instance.GameRoot, null, _files,
                 filter != null ? (Func<FileSystemInfo, bool>)(f => filter(GetRelativePath(f.FullName))) : null))
         {
             EmitFailed("Could not search for files");
@@ -80,7 +82,7 @@ public sealed class ModrinthPackExportTask(
         EmitStatus("Finding file hashes...");
 
         // instance->loaderModList()->update()
-        var modList = new ModFolderModel(instance.ModsRoot());
+        var modList = new ModFolderModel(instance.ModsRoot);
         modList.Update();
 
         foreach (var file in _files)
@@ -203,7 +205,7 @@ public sealed class ModrinthPackExportTask(
 
         try
         {
-            using var stream = File.Create(output);
+            using var stream = PathIo.Create(output);
             using var zip = new ZipArchive(stream, ZipArchiveMode.Create);
 
             // the ExportToZipTask layout: everything under the game root, prefixed with
@@ -328,6 +330,6 @@ public sealed class ModrinthPackExportTask(
 
     private string GetRelativePath(string file)
     {
-        return Path.GetRelativePath(_gameRoot, file).Replace('\\', '/');
+        return Path.GetRelativePath(_gameRoot.Value, file).Replace('\\', '/');
     }
 }

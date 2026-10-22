@@ -9,6 +9,7 @@
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -55,11 +56,15 @@ public class InstanceCopyTests : IDisposable
     }
 
     private MinecraftInstance CreateSource() =>
-        new(new InstanceJsonSettingsObject(_sourceDir, _global.Environment),
-            _sourceDir);
+        new(new InstanceJsonSettingsObject(new AbsolutePath(_sourceDir), _global.Environment),
+            new AbsolutePath(_sourceDir));
 
     private InstanceList CreateList() =>
-        new([_instancesDir]) { Environment = _global, GroupFilePath = _groupFile };
+        new([new AbsolutePath(_instancesDir)])
+        {
+            Environment = _global,
+            GroupFilePath = new AbsolutePath(_groupFile),
+        };
 
     // ------------------------------------------------------------------ prefs/filters
 
@@ -176,7 +181,8 @@ public class InstanceCopyTests : IDisposable
             await File.ReadAllTextAsync(Path.Combine(copyDir, "instance.cfg")));
         // …but the authoritative state file is zeroed
         var copy = new MinecraftInstance(
-            new InstanceJsonSettingsObject(copyDir, _global.Environment), copyDir);
+            new InstanceJsonSettingsObject(new AbsolutePath(copyDir), _global.Environment),
+            new AbsolutePath(copyDir));
         Assert.Equal(0, copy.TotalTimePlayed());
         Assert.Equal(0, copy.LastTimePlayed());
     }

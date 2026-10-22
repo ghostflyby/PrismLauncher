@@ -14,6 +14,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.FtbApp;
 
@@ -129,15 +130,15 @@ public static class FtbAppPackParse
     public static FtbAppModpack ParseDirectory(string path)
     {
         var modpack = new FtbAppModpack { Path = path };
-        var instanceFile = Path.Combine(path, "instance.json");
-        if (!File.Exists(instanceFile))
+        var instanceFile = new AbsolutePath(path) / "instance.json";
+        if (!File.Exists(instanceFile.Value))
         {
             return new FtbAppModpack();
         }
 
         try
         {
-            var wire = JsonSerializer.Deserialize(File.ReadAllBytes(instanceFile),
+            var wire = JsonSerializer.Deserialize(File.ReadAllBytes(instanceFile.Value),
                            FtbAppJsonContext.Default.FtbAppInstanceJson)
                        ?? throw new JsonException("the document is null");
 
@@ -196,20 +197,20 @@ public static class FtbAppPackParse
     private static ModLoaderType? LegacyInstanceParsing(string path, out string loaderVersion)
     {
         loaderVersion = "";
-        var versionsFile = Path.Combine(path, ".ftbapp", "version.json");
-        if (!File.Exists(versionsFile))
+        var versionsFile = new AbsolutePath(path) / ".ftbapp" / "version.json";
+        if (!File.Exists(versionsFile.Value))
         {
-            versionsFile = Path.Combine(path, "version.json");
+            versionsFile = new AbsolutePath(path) / "version.json";
         }
 
-        if (!File.Exists(versionsFile))
+        if (!File.Exists(versionsFile.Value))
         {
             return null;
         }
 
         try
         {
-            var wire = JsonSerializer.Deserialize(File.ReadAllBytes(versionsFile),
+            var wire = JsonSerializer.Deserialize(File.ReadAllBytes(versionsFile.Value),
                            FtbAppJsonContext.Default.FtbAppVersionJson)
                        ?? throw new JsonException("the document is null");
 
@@ -241,24 +242,24 @@ public static class FtbAppPackParse
     /// mapping): folder.jpg wins, else .ftbapp/logo with its leading image-type byte.</summary>
     public static FtbAppIcon LoadFtbIcon(string path)
     {
-        var iconFile = Path.Combine(path, "folder.jpg");
-        if (File.Exists(iconFile))
+        var iconFile = new AbsolutePath(path) / "folder.jpg";
+        if (File.Exists(iconFile.Value))
         {
-            return new FtbAppIcon { IconKind = FtbAppIcon.Kind.FolderJpg, FilePath = iconFile };
+            return new FtbAppIcon { IconKind = FtbAppIcon.Kind.FolderJpg, FilePath = iconFile.Value };
         }
 
         // the logo is a file that the first bit denotes the image tipe followed by the
         // actual image data
-        var logoPath = Path.Combine(path, ".ftbapp", "logo");
-        var icon = new FtbAppIcon { IconKind = FtbAppIcon.Kind.Logo, FilePath = logoPath };
-        if (!File.Exists(logoPath))
+        var logoPath = new AbsolutePath(path) / ".ftbapp" / "logo";
+        var icon = new FtbAppIcon { IconKind = FtbAppIcon.Kind.Logo, FilePath = logoPath.Value };
+        if (!File.Exists(logoPath.Value))
         {
             return icon;
         }
 
         try
         {
-            using var stream = File.OpenRead(logoPath);
+            using var stream = File.OpenRead(logoPath.Value);
             var type = stream.ReadByte();
             if (type < 0)
             {

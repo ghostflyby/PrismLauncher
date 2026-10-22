@@ -113,13 +113,13 @@ public sealed partial class AtLauncherPackInstallTask(
     private PackVersion Configs => _configs
                                    ?? throw new InvalidOperationException("the pack configs have not been downloaded");
 
-    private string _archivePath = "";
-    private readonly List<string> _jarMods = [];
+    private AbsolutePath _archivePath;
+    private readonly List<AbsolutePath> _jarMods = [];
     private VersionFile? _minecraftVersionData;
     private readonly Dictionary<string, string> _componentsToInstall = new();
-    private readonly Dictionary<string, VersionMod> _modsToExtract = new();
-    private readonly Dictionary<string, VersionMod> _modsToDecomp = new();
-    private readonly Dictionary<string, string> _modsToCopy = new();
+    private readonly Dictionary<AbsolutePath, VersionMod> _modsToExtract = new();
+    private readonly Dictionary<AbsolutePath, VersionMod> _modsToDecomp = new();
+    private readonly Dictionary<AbsolutePath, AbsolutePath> _modsToCopy = new();
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -225,9 +225,9 @@ public sealed partial class AtLauncherPackInstallTask(
         keeps.Files.AddRange(Configs.Keeps.Files);
         keeps.Folders.AddRange(Configs.Keeps.Folders);
 
-        string GetPathForBase(string baseName)
+        AbsolutePath GetPathForBase(string baseName)
         {
-            var minecraftPath = Path.Combine(StagingPath, "minecraft");
+            var minecraftPath = StagingPath / "minecraft";
 
             if (baseName == "root")
             {
@@ -236,7 +236,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
             if (baseName == "config")
             {
-                return Path.Combine(minecraftPath, "config");
+                return minecraftPath / "config";
             }
 
             return minecraftPath;
@@ -247,12 +247,13 @@ public sealed partial class AtLauncherPackInstallTask(
             return path.Replace("%s%", Path.DirectorySeparatorChar.ToString());
         }
 
-        bool ShouldKeep(string fullPath)
+        bool ShouldKeep(AbsolutePath fullPath)
         {
             foreach (var item in keeps.Files)
             {
-                var path = Path.Combine(GetPathForBase(item.Base), ConvertToSystemPath(item.Target));
-                if (fullPath == path)
+                string a1 = ConvertToSystemPath(item.Target);
+                var path = GetPathForBase(item.Base) / a1;
+                if (fullPath.Value == path.Value)
                 {
                     return true;
                 }
@@ -260,8 +261,9 @@ public sealed partial class AtLauncherPackInstallTask(
 
             foreach (var item in keeps.Folders)
             {
-                var path = Path.Combine(GetPathForBase(item.Base), ConvertToSystemPath(item.Target));
-                if (fullPath.StartsWith(path, StringComparison.Ordinal))
+                string a1 = ConvertToSystemPath(item.Target);
+                var path = GetPathForBase(item.Base) / a1;
+                if (fullPath.Value.StartsWith(path.Value, StringComparison.Ordinal))
                 {
                     return true;
                 }
@@ -271,11 +273,12 @@ public sealed partial class AtLauncherPackInstallTask(
         }
 
         // Keep track of files to delete
-        var filesToDelete = new HashSet<string>();
+        var filesToDelete = new HashSet<AbsolutePath>();
 
         foreach (var item in deletes.Files)
         {
-            var fullPath = Path.Combine(GetPathForBase(item.Base), ConvertToSystemPath(item.Target));
+            string a1 = ConvertToSystemPath(item.Target);
+            var fullPath = GetPathForBase(item.Base) / a1;
 
             if (ShouldKeep(fullPath))
             {
@@ -287,27 +290,28 @@ public sealed partial class AtLauncherPackInstallTask(
 
         foreach (var item in deletes.Folders)
         {
-            var fullPath = Path.Combine(GetPathForBase(item.Base), ConvertToSystemPath(item.Target));
-            if (!Directory.Exists(fullPath))
+            string a1 = ConvertToSystemPath(item.Target);
+            var fullPath = GetPathForBase(item.Base) / a1;
+            if (!Directory.Exists(fullPath.Value))
             {
                 continue;
             }
 
-            foreach (var path in Directory.EnumerateFileSystemEntries(fullPath, "*", SearchOption.AllDirectories))
+            foreach (var path in Directory.EnumerateFileSystemEntries(fullPath.Value, "*", SearchOption.AllDirectories))
             {
-                if (ShouldKeep(path))
+                if (ShouldKeep(new AbsolutePath(path)))
                 {
                     continue;
                 }
 
-                filesToDelete.Add(path);
+                filesToDelete.Add(new AbsolutePath(path));
             }
         }
 
         // Delete the files
         foreach (var item in filesToDelete)
         {
-            FileOps.DeletePath(new AbsolutePath(item));
+            FileOps.DeletePath(item);
         }
     }
 
@@ -333,11 +337,11 @@ public sealed partial class AtLauncherPackInstallTask(
             case ModType.Flan:
                 return "Flan";
             case ModType.Dependency:
-                return Path.Combine("mods", Configs.Minecraft);
+                return $"mods/{Configs.Minecraft}";
             case ModType.Ic2Lib:
-                return Path.Combine("mods", "ic2");
+                return "mods/ic2";
             case ModType.DenLib:
-                return Path.Combine("mods", "denlib");
+                return "mods/denlib";
             case ModType.Coremods:
                 return "coremods";
             case ModType.Plugins:
@@ -440,7 +444,7 @@ public sealed partial class AtLauncherPackInstallTask(
         return "org.multimc.atlauncher:" + library.Md5 + ":1";
     }
 
-    private bool CreateLibrariesComponent(string instanceRoot, PackProfile profile)
+    private bool CreateLibrariesComponent(AbsolutePath instanceRoot, PackProfile profile)
     {
         if (Configs.Libraries.Count == 0)
         {
@@ -471,7 +475,7 @@ public sealed partial class AtLauncherPackInstallTask(
         var id = Guid.NewGuid().ToString(); // QUuid::createUuid().toString(QUuid::WithoutBraces)
         var targetId = "org.multimc.atlauncher." + id;
 
-        var patchDir = new AbsolutePath(instanceRoot) / "patches";
+        var patchDir = instanceRoot / "patches";
         if (!FileOps.EnsureFolderPathExists(patchDir))
         {
             return false;
@@ -547,7 +551,7 @@ public sealed partial class AtLauncherPackInstallTask(
         return true;
     }
 
-    private bool CreatePackComponent(string instanceRoot, PackProfile profile)
+    private bool CreatePackComponent(AbsolutePath instanceRoot, PackProfile profile)
     {
         if (Configs.MainClass.MainClass.Length == 0 && Configs.ExtraArguments.Arguments.Length == 0)
         {
@@ -586,7 +590,7 @@ public sealed partial class AtLauncherPackInstallTask(
         var id = Guid.NewGuid().ToString();
         var targetId = "org.multimc.atlauncher." + id;
 
-        var patchDir = new AbsolutePath(instanceRoot) / "patches";
+        var patchDir = instanceRoot / "patches";
         if (!FileOps.EnsureFolderPathExists(patchDir))
         {
             return false;
@@ -701,7 +705,7 @@ public sealed partial class AtLauncherPackInstallTask(
     {
         EmitStatus("Extracting configs...");
 
-        var extractDir = Path.Combine(StagingPath, "minecraft");
+        var extractDir = StagingPath / "minecraft";
         // (the C++ does not check the extraction result here — it proceeds to the mods)
         _ = MmcZip.ExtractDir(_archivePath, "", extractDir);
 
@@ -811,7 +815,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
                 var cachePath = CachePathFor(cacheName, url, modJob, downloadRequests, mod);
 
-                var path = Path.Combine(StagingPath, "minecraft", relpath, mod.File);
+                var path = StagingPath / "minecraft" / relpath / mod.File;
 
                 if (mod.Type == ModType.Forge)
                 {
@@ -853,11 +857,11 @@ public sealed partial class AtLauncherPackInstallTask(
 
                     if (mod.Type is ModType.Extract or ModType.TexturePackExtract or ModType.ResourcePackExtract)
                     {
-                        _modsToExtract[localPath] = mod;
+                        _modsToExtract[new AbsolutePath(localPath)] = mod;
                     }
                     else if (mod.Type == ModType.Decomp)
                     {
-                        _modsToDecomp[localPath] = mod;
+                        _modsToDecomp[new AbsolutePath(localPath)] = mod;
                     }
                     else
                     {
@@ -872,7 +876,7 @@ public sealed partial class AtLauncherPackInstallTask(
                             continue;
                         }
 
-                        var path = Path.Combine(StagingPath, "minecraft", relpath, mod.File);
+                        var path = StagingPath / "minecraft" / relpath / mod.File;
 
                         if (mod.Type == ModType.Forge)
                         {
@@ -891,7 +895,7 @@ public sealed partial class AtLauncherPackInstallTask(
                             _jarMods.Add(path);
                         }
 
-                        _modsToCopy[localPath] = path;
+                        _modsToCopy[new AbsolutePath(localPath)] = path;
                     }
                 }
             }
@@ -935,10 +939,10 @@ public sealed partial class AtLauncherPackInstallTask(
     }
 
     /// <summary>Queue a mod download; returns the local path the file lands in.</summary>
-    private string CachePathFor(string cacheName, string url, NetJob modJob, List<NetRequest> downloadRequests,
+    private AbsolutePath CachePathFor(string cacheName, string url, NetJob modJob, List<NetRequest> downloadRequests,
         VersionMod mod)
     {
-        string cachePath;
+        AbsolutePath cachePath;
         NetRequest dl;
         if (MetaCache is not null)
         {
@@ -963,11 +967,12 @@ public sealed partial class AtLauncherPackInstallTask(
         return cachePath;
     }
 
-    private static string TempCachePath(string relativeName)
+    private static AbsolutePath TempCachePath(string relativeName)
     {
-        var dir = Path.Combine(Path.GetTempPath(), "flint-atl-cache");
-        FileOps.EnsureFolderPathExists(new AbsolutePath(dir));
-        return Path.Combine(dir, relativeName.Replace("%s%", "_").Replace('/', '_'));
+        var dir = new AbsolutePath(Path.GetTempPath()) / "flint-atl-cache";
+        FileOps.EnsureFolderPathExists(dir);
+        string a1 = relativeName.Replace("%s%", "_").Replace('/', '_');
+        return dir / a1;
     }
 
     private bool ExtractMods()
@@ -988,18 +993,18 @@ public sealed partial class AtLauncherPackInstallTask(
             }
             else if (mod.Type == ModType.TexturePackExtract)
             {
-                extractToDir = Path.Combine("texturepacks", "extracted");
+                extractToDir = "texturepacks/extracted";
             }
             else if (mod.Type == ModType.ResourcePackExtract)
             {
-                extractToDir = Path.Combine("resourcepacks", "extracted");
+                extractToDir = "resourcepacks/extracted";
             }
             else
             {
                 continue;
             }
 
-            var extractToPath = Path.Combine(StagingPath, "minecraft", extractToDir);
+            var extractToPath = StagingPath / "minecraft" / extractToDir;
 
             var folderToExtract = "";
             if (mod.Type == ModType.Extract)
@@ -1028,15 +1033,15 @@ public sealed partial class AtLauncherPackInstallTask(
                 return false;
             }
 
-            var extractToPath = Path.Combine(StagingPath, "minecraft", dir, mod.DecompFile);
+            var extractToPath = StagingPath / "minecraft" / dir / mod.DecompFile;
 
-            if (IsPathTraversal(Path.Combine(StagingPath, "minecraft", dir), mod.DecompFile))
+            if (IsPathTraversal(StagingPath / "minecraft" / dir, mod.DecompFile))
             {
                 EmitStatus("Blocked path traversal in decompFile " + mod.DecompFile);
                 return false;
             }
 
-            if (!MmcZip.ExtractFile(modPath, mod.DecompFile, extractToPath))
+            if (!MmcZip.ExtractFile(modPath.Value, mod.DecompFile, extractToPath.Value))
             {
                 return false;
             }
@@ -1046,13 +1051,13 @@ public sealed partial class AtLauncherPackInstallTask(
         {
             // If the file already exists, assume the mod is the correct copy - and remove
             // the copy from the Configs.zip
-            if (File.Exists(to) && !FileOps.DeletePath(new AbsolutePath(to)))
+            if (File.Exists(to.Value) && !FileOps.DeletePath(to))
             {
                 EmitStatus("Failed to delete " + to);
                 return false;
             }
 
-            if (!File.Exists(from) || !FileOps.Copy(new AbsolutePath(from), new AbsolutePath(to)))
+            if (!File.Exists(from.Value) || !FileOps.Copy(from, to))
             {
                 EmitStatus($"Failed to copy {from} to {to}");
                 return false;
@@ -1076,7 +1081,7 @@ public sealed partial class AtLauncherPackInstallTask(
             components.BuildingFromScratch();
 
             // Use a component to add libraries BEFORE Minecraft
-            if (!CreateLibrariesComponent(instance.InstanceRoot(), components))
+            if (!CreateLibrariesComponent(instance.InstanceRoot, components))
             {
                 EmitFailed("Failed to create libraries component");
                 return;
@@ -1131,7 +1136,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
             // Use a component to fill in the rest of the data
             // todo: use more detection
-            if (!CreatePackComponent(instance.InstanceRoot(), components))
+            if (!CreatePackComponent(instance.InstanceRoot, components))
             {
                 EmitFailed("Failed to create pack component");
                 return;
@@ -1153,12 +1158,12 @@ public sealed partial class AtLauncherPackInstallTask(
     }
 
     /// <summary>Port of the isPathTraversal helper.</summary>
-    private static bool IsPathTraversal(string basePath, string entryName)
+    private static bool IsPathTraversal(AbsolutePath basePath, string entryName)
     {
         var safeName = FileNaming.RemoveInvalidPathChars(entryName);
-        var fullPath = Path.Combine(basePath, safeName);
-        var fullRoot = Path.GetFullPath(fullPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var baseRoot = Path.GetFullPath(basePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var fullPath = basePath / safeName;
+        var fullRoot = Path.GetFullPath(fullPath.Value).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var baseRoot = Path.GetFullPath(basePath.Value).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         return fullRoot != baseRoot && !fullRoot.StartsWith(baseRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal);
     }
 

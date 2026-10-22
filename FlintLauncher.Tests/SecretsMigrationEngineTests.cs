@@ -10,6 +10,8 @@ using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Secrets;
 using FlintLauncher.Web;
+using TruePath;
+using TruePath.SystemIo;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -28,7 +30,7 @@ public class FileSecretStoreTests : IDisposable
     }
 
     private FileSecretStore Store() =>
-        new(Path.Combine(_dir, "secrets.json"), FlintJsonContext.Default.SecretsFile);
+        new(new AbsolutePath(Path.Combine(_dir, "secrets.json")), FlintJsonContext.Default.SecretsFile);
 
     private static ISecretStore AsInterface(FileSecretStore store) => store;
 
@@ -86,24 +88,19 @@ public class FileSecretStoreTests : IDisposable
 
 public class MigrationEngineTests : IDisposable
 {
-    private readonly string _dir = Path.Combine(Path.GetTempPath(), $"flint-engine-{Guid.NewGuid():N}");
-
-    public MigrationEngineTests()
-    {
-        Directory.CreateDirectory(_dir);
-    }
+    private readonly AbsolutePath _dir = Temporary.CreateTempFolder();
 
     public void Dispose()
     {
         try
         {
-            Directory.Delete(_dir, recursive: true);
+            _dir.DeleteDirectoryRecursively();
         }
         catch (DirectoryNotFoundException) { }
     }
 
     private MigrationDecisionStore Decisions() =>
-        new(Path.Combine(_dir, "state", "migration"), FlintJsonContext.Default.MigrationDecisionRecord);
+        new(_dir / "state" / "migration", FlintJsonContext.Default.MigrationDecisionRecord);
 
     [Fact]
     public void Default_Engine_Carries_Both_G2_Profiles()
@@ -125,11 +122,21 @@ public class MigrationEngineTests : IDisposable
     public void PrismFamily_Detects_Platform_Candidates_And_Plans()
     {
         var engine = new MigrationEngine([new PrismFamilyMigrationProfile([_dir])]);
-        var prismDir = Path.Combine(_dir, "PrismLauncher");
-        Directory.CreateDirectory(Path.Combine(prismDir, "instances", "one"));
-        File.WriteAllText(Path.Combine(prismDir, "prismlauncher.cfg"), "x");
-        var paths = FlintPaths.FromRoots(_dir, Path.Combine(_dir, "data"), Path.Combine(_dir, "store"),
-            Path.Combine(_dir, "cache"), Path.Combine(_dir, "state"));
+        var prismDir = (_dir / "PrismLauncher");
+        (prismDir / "instances" / "one").CreateDirectory();
+        (prismDir / "prismlauncher.cfg").WriteAllText("x");
+        AbsolutePath dataRoot = (_dir / "data");
+        AbsolutePath storeRoot = (_dir / "store");
+        AbsolutePath cacheRoot = (_dir / "cache");
+        AbsolutePath stateRoot = (_dir / "state");
+        var paths = new FlintPaths()
+        {
+            ConfigRoot = _dir,
+            DataRoot = dataRoot,
+            StoreRoot = storeRoot,
+            CacheRoot = cacheRoot,
+            StateRoot = stateRoot,
+        };
 
         var profile = engine.Find("prism-family");
         Assert.NotNull(profile);
@@ -151,18 +158,28 @@ public class MigrationEngineTests : IDisposable
     [Fact]
     public void PrismFamily_Detects_MultiMC_Under_Both_Config_Names()
     {
-        var parent1 = Path.Combine(_dir, "p1");
-        var parent2 = Path.Combine(_dir, "p2");
-        Directory.CreateDirectory(parent1);
-        Directory.CreateDirectory(parent2);
+        var parent1 = _dir / "p1";
+        var parent2 = _dir / "p2";
+        parent1.CreateDirectory();
+        parent2.CreateDirectory();
         var dirName = PrismSourceDetector.NameToDirectory("multimc");
-        Directory.CreateDirectory(Path.Combine(parent1, dirName));
-        File.WriteAllText(Path.Combine(parent1, dirName, "multimc.cfg"), "x");
-        Directory.CreateDirectory(Path.Combine(parent2, dirName));
-        File.WriteAllText(Path.Combine(parent2, dirName, "mmc.cfg"), "x");
+        (parent1 / dirName).CreateDirectory();
+        (parent1 / dirName / "multimc.cfg").WriteAllText("x");
+        (parent2 / dirName).CreateDirectory();
+        (parent2 / dirName / "mmc.cfg").WriteAllText("x");
         var engine = new MigrationEngine([new PrismFamilyMigrationProfile([parent1, parent2])]);
-        var paths = FlintPaths.FromRoots(_dir, Path.Combine(_dir, "data"), Path.Combine(_dir, "store"),
-            Path.Combine(_dir, "cache"), Path.Combine(_dir, "state"));
+        AbsolutePath dataRoot = _dir / "data";
+        AbsolutePath storeRoot = _dir / "store";
+        AbsolutePath cacheRoot = _dir / "cache";
+        AbsolutePath stateRoot = _dir / "state";
+        var paths = new FlintPaths()
+        {
+            ConfigRoot = _dir,
+            DataRoot = dataRoot,
+            StoreRoot = storeRoot,
+            CacheRoot = cacheRoot,
+            StateRoot = stateRoot,
+        };
 
         var profile = engine.Find("prism-family");
         Assert.NotNull(profile);
@@ -173,7 +190,7 @@ public class MigrationEngineTests : IDisposable
         {
             Assert.Equal("multimc", candidate.SourceId);
             Assert.Equal(PrismSourceDetector.NameToDirectory("multimc"),
-                Path.GetFileName(candidate.Path));
+                candidate.Path.FileName);
         });
     }
 
@@ -181,10 +198,19 @@ public class MigrationEngineTests : IDisposable
     public async Task FlintLegacy_Detects_Root_Anchors_And_AutoRuns_Once()
     {
         var engine = MigrationEngine.CreateDefault();
-        var data = Path.Combine(_dir, "data");
-        Directory.CreateDirectory(data);
-        var paths = FlintPaths.FromRoots(_dir, data, Path.Combine(_dir, "store"),
-            Path.Combine(_dir, "cache"), Path.Combine(_dir, "state"));
+        var data = _dir / "data";
+        data.CreateDirectory();
+        AbsolutePath storeRoot = _dir / "store";
+        AbsolutePath cacheRoot = _dir / "cache";
+        AbsolutePath stateRoot = _dir / "state";
+        var paths = new FlintPaths()
+        {
+            ConfigRoot = _dir,
+            DataRoot = data,
+            StoreRoot = storeRoot,
+            CacheRoot = cacheRoot,
+            StateRoot = stateRoot,
+        };
 
         var legacy = engine.Find("flint-legacy");
         Assert.NotNull(legacy);
@@ -193,7 +219,7 @@ public class MigrationEngineTests : IDisposable
         Assert.Empty(legacy.Detect(paths, Decisions()));
 
         // the old flat layout appears (flint.cfg at the root layer)
-        await File.WriteAllTextAsync(Path.Combine(data, "flint.cfg"), "k=v");
+        await (data / "flint.cfg").WriteAllTextAsync("k=v");
 
         var decisions = Decisions();
         var candidates = legacy.Detect(paths, decisions);
@@ -220,8 +246,8 @@ public class MigrationEngineTests : IDisposable
         Assert.Equal(PlannedMethod.RenameDirectory, cfgItem.Method);
 
         // an old in-data cache area plans its children 1:1 under the cache root
-        Directory.CreateDirectory(Path.Combine(data, "cache", "icons"));
-        await File.WriteAllTextAsync(Path.Combine(data, "cache", "icons", "i.png"), "x");
+        (data / "cache" / "icons").CreateDirectory();
+        await (data / "cache" / "icons" / "i.png").WriteAllTextAsync("x");
         var planWithCache = legacy.Plan(data, paths, ImportMode.Move);
         Assert.NotNull(planWithCache);
         Assert.Contains(planWithCache, item => item is { Name: "icons", IsDirectory: true });
@@ -230,41 +256,47 @@ public class MigrationEngineTests : IDisposable
     [Fact]
     public async Task FlintLegacy_Eager_Pass_Remounts_Once_And_Cleans_The_Bare_Ledger()
     {
-        var home = Path.Combine(_dir, "roots");
-        var data = Path.Combine(home, "data");
-        var config = Path.Combine(home, "config");
-        var store = Path.Combine(home, "store");
-        var cache = Path.Combine(home, "cache");
-        var state = Path.Combine(home, "state");
-        var paths = FlintPaths.FromRoots(config, data, store, cache, state);
+        var home = _dir / "roots";
+        var data = home / "data";
+        var config = home / "config";
+        var store = home / "store";
+        var cache = home / "cache";
+        var state = home / "state";
+        var paths = new FlintPaths()
+        {
+            ConfigRoot = config,
+            DataRoot = data,
+            StoreRoot = store,
+            CacheRoot = cache,
+            StateRoot = state,
+        };
         foreach (var root in new[] { config, data, store, cache, state })
         {
-            Directory.CreateDirectory(root);
+            root.CreateDirectory();
         }
 
-        var decisions = new MigrationDecisionStore(Path.Combine(state, "migration"),
+        var decisions = new MigrationDecisionStore(state / "migration",
             FlintJsonContext.Default.MigrationDecisionRecord);
 
         // the old flat layout: config file, a ledger WITH a real entry, meta content, store
         // content, the old in-data cache area, and the Prism bare ledger (E8 dead stock)
-        await File.WriteAllTextAsync(Path.Combine(data, "flint.cfg"), "JavaPath=old");
-        var metaFile = Path.Combine(data, "meta", "net.minecraft", "index.json");
-        var metaDir = Path.GetDirectoryName(metaFile);
-        Assert.NotNull(metaDir);
-        Directory.CreateDirectory(metaDir);
+        await (data / "flint.cfg").WriteAllTextAsync("JavaPath=old");
+        var metaFile = data / "meta" / "net.minecraft" / "index.json";
+        var metaDir = Assert.NotNull(metaFile.Parent);
+        metaDir.CreateDirectory();
         const string metaBody = "{}";
-        await File.WriteAllTextAsync(metaFile, metaBody);
+        await metaFile.WriteAllTextAsync(metaBody);
         var md5 = Convert.ToHexString(MD5.HashData("{}"u8.ToArray()))
             .ToLowerInvariant();
         var ledgerJson = """
                          {"version":"1","entries":[{"base":"meta","path":"net.minecraft/index.json","md5sum":"MD5","etag":"","last_changed_timestamp":0,"eternal":true}]}
                          """.Replace("MD5", md5);
-        await File.WriteAllTextAsync(Path.Combine(data, "metacache.json"), ledgerJson);
-        Directory.CreateDirectory(Path.Combine(data, "assets", "indexes"));
-        await File.WriteAllTextAsync(Path.Combine(data, "assets", "indexes", "5.json"), "{}");
-        Directory.CreateDirectory(Path.Combine(data, "cache", "fmllibs"));
-        await File.WriteAllTextAsync(Path.Combine(data, "cache", "fmllibs", "lib.jar"), "j");
-        await File.WriteAllTextAsync(Path.Combine(data, "metacache"), "prism-ledger");
+        await (data / "metacache.json").WriteAllTextAsync(ledgerJson);
+        (data / "assets" / "indexes").CreateDirectory();
+        await (data / "assets" / "indexes" / "5.json").WriteAllTextAsync("{}");
+        (data / "cache" / "fmllibs").CreateDirectory();
+        await (data / "cache" / "fmllibs" / "lib.jar").WriteAllTextAsync("j");
+        await (data / "metacache").WriteAllTextAsync("prism-ledger");
 
         var result = FlintLegacyMigration.ExecuteIfNeeded(paths, decisions);
 
@@ -272,12 +304,12 @@ public class MigrationEngineTests : IDisposable
         Assert.True(result.Ran);
         Assert.Null(result.Error);
         Assert.True(result.LegacyLedgerCleaned);
-        Assert.False(File.Exists(Path.Combine(data, "metacache")));      // E8
-        Assert.True(File.Exists(Path.Combine(config, "flint.cfg")));     // config root
-        Assert.True(File.Exists(Path.Combine(cache, "metacache.json"))); // cache root (E3)
-        Assert.True(File.Exists(Path.Combine(cache, "meta", "net.minecraft", "index.json")));
-        Assert.True(File.Exists(Path.Combine(store, "assets", "indexes", "5.json"))); // store (E2)
-        Assert.True(File.Exists(Path.Combine(cache, "fmllibs", "lib.jar")));          // cache (E3)
+        Assert.False((data / "metacache").ExistsFile());      // E8
+        Assert.True((config / "flint.cfg").ExistsFile());     // config root
+        Assert.True((cache / "metacache.json").ExistsFile()); // cache root (E3)
+        Assert.True((cache / "meta" / "net.minecraft" / "index.json").ExistsFile());
+        Assert.True((store / "assets" / "indexes" / "5.json").ExistsFile()); // store (E2)
+        Assert.True((cache / "fmllibs" / "lib.jar").ExistsFile());           // cache (E3)
 
         // the pass sealed itself with the S3 record — a second run is a no-op
         var record = decisions.Read(FlintLegacyMigrationProfile.ProfileName);
@@ -301,7 +333,7 @@ public class MigrationEngineTests : IDisposable
         Assert.False(loaded.IsStale);
         var resolved = ledger.ResolveEntry("meta", "net.minecraft/index.json");
         Assert.False(resolved.IsStale);
-        Assert.Equal(metaBody, await File.ReadAllTextAsync(resolved.GetFullPath()));
+        Assert.Equal(metaBody, await resolved.GetFullPath().ReadAllTextAsync());
     }
 
     [Fact]
@@ -313,33 +345,33 @@ public class MigrationEngineTests : IDisposable
         // (instances/accounts/instgroups/icons/skins) move per child into X/data, the INI
         // chain fallbacks land on the config side, the S2 token file is deleted, and the
         // S3 markers move to the data root where DataMigration.Decide upgrades them.
-        var home = Path.Combine(_dir, "homedir");
-        Directory.CreateDirectory(Path.Combine(home, "instances", "GTN"));
-        Directory.CreateDirectory(Path.Combine(home, "cache", "icons"));
-        Directory.CreateDirectory(Path.Combine(home, "meta"));
-        Directory.CreateDirectory(Path.Combine(home, "assets", "indexes"));
-        Directory.CreateDirectory(Path.Combine(home, "libraries"));
-        Directory.CreateDirectory(Path.Combine(home, "icons"));
-        Directory.CreateDirectory(Path.Combine(home, "skins"));
+        var home = _dir / "homedir";
+        (home / "instances" / "GTN").CreateDirectory();
+        (home / "cache" / "icons").CreateDirectory();
+        (home / "meta").CreateDirectory();
+        (home / "assets" / "indexes").CreateDirectory();
+        (home / "libraries").CreateDirectory();
+        (home / "icons").CreateDirectory();
+        (home / "skins").CreateDirectory();
 
-        File.WriteAllText(Path.Combine(home, "flint.cfg"), "Language=zh");
-        File.WriteAllText(Path.Combine(home, "instances", "GTN", "instance.cfg"), "InstanceType=OneSix\nname=GTN\n");
-        File.WriteAllText(Path.Combine(home, "accounts.json"), "[]");
-        File.WriteAllText(Path.Combine(home, "instgroups.json"), "{}");
-        File.WriteAllText(Path.Combine(home, "api-token"), "tok");
-        File.WriteAllText(Path.Combine(home, "prism_nomigrate.txt"), "");
-        File.WriteAllText(Path.Combine(home, "metacache"), "prism-ledger");
-        File.WriteAllText(Path.Combine(home, "cache", "icons", "i.png"), "png");
-        File.WriteAllText(Path.Combine(home, "meta", "index.json"), "{}");
-        File.WriteAllText(Path.Combine(home, "assets", "indexes", "5.json"), "{}");
-        File.WriteAllText(Path.Combine(home, "libraries", "x.jar"), "jar");
-        File.WriteAllText(Path.Combine(home, "icons", "default.png"), "png");
-        File.WriteAllText(Path.Combine(home, "skins", "steve.png"), "png");
-        File.WriteAllText(Path.Combine(home, "prismlauncher.cfg"), "k=v");
+        (home / "flint.cfg").WriteAllText("Language=zh");
+        (home / "instances" / "GTN" / "instance.cfg").WriteAllText("InstanceType=OneSix\nname=GTN\n");
+        (home / "accounts.json").WriteAllText("[]");
+        (home / "instgroups.json").WriteAllText("{}");
+        (home / "api-token").WriteAllText("tok");
+        (home / "prism_nomigrate.txt").WriteAllText("");
+        (home / "metacache").WriteAllText("prism-ledger");
+        (home / "cache" / "icons" / "i.png").WriteAllText("png");
+        (home / "meta" / "index.json").WriteAllText("{}");
+        (home / "assets" / "indexes" / "5.json").WriteAllText("{}");
+        (home / "libraries" / "x.jar").WriteAllText("jar");
+        (home / "icons" / "default.png").WriteAllText("png");
+        (home / "skins" / "steve.png").WriteAllText("png");
+        (home / "prismlauncher.cfg").WriteAllText("k=v");
 
         var paths = FlintPaths.FromHomeDir(home);
         Assert.Equal(home, paths.HomeRoot);
-        var decisions = new MigrationDecisionStore(Path.Combine(paths.StateRoot, "migration"),
+        var decisions = new MigrationDecisionStore(paths.StateRoot / "migration",
             FlintJsonContext.Default.MigrationDecisionRecord);
 
         var result = FlintLegacyMigration.ExecuteIfNeeded(paths, decisions);
@@ -347,22 +379,22 @@ public class MigrationEngineTests : IDisposable
         Assert.True(result.Ran);
         Assert.Null(result.Error);
         Assert.True(result.LegacyLedgerCleaned);
-        Assert.False(File.Exists(Path.Combine(home, "flint.cfg")));
-        Assert.True(File.Exists(Path.Combine(paths.ConfigRoot, "flint.cfg")));
-        Assert.True(File.Exists(Path.Combine(paths.DataRoot, "instances", "GTN", "instance.cfg")));
-        Assert.True(File.Exists(Path.Combine(paths.DataRoot, "accounts.json")));
-        Assert.True(File.Exists(Path.Combine(paths.DataRoot, "instgroups.json")));
-        Assert.True(File.Exists(Path.Combine(paths.DataRoot, "icons", "default.png")));
-        Assert.True(File.Exists(Path.Combine(paths.DataRoot, "skins", "steve.png")));
-        Assert.True(File.Exists(Path.Combine(paths.ConfigRoot, "prismlauncher.cfg")));
-        Assert.True(File.Exists(Path.Combine(paths.DataRoot, "prism_nomigrate.txt")));
-        Assert.False(File.Exists(Path.Combine(home, "api-token"))); // S2: dead stock, deleted
-        Assert.False(File.Exists(Path.Combine(home, "metacache"))); // E8: bare ledger, deleted
+        Assert.False((home / "flint.cfg").ExistsFile());
+        Assert.True((paths.ConfigRoot / "flint.cfg").ExistsFile());
+        Assert.True((paths.DataRoot / "instances" / "GTN" / "instance.cfg").ExistsFile());
+        Assert.True((paths.DataRoot / "accounts.json").ExistsFile());
+        Assert.True((paths.DataRoot / "instgroups.json").ExistsFile());
+        Assert.True((paths.DataRoot / "icons" / "default.png").ExistsFile());
+        Assert.True((paths.DataRoot / "skins" / "steve.png").ExistsFile());
+        Assert.True((paths.ConfigRoot / "prismlauncher.cfg").ExistsFile());
+        Assert.True((paths.DataRoot / "prism_nomigrate.txt").ExistsFile());
+        Assert.False((home / "api-token").ExistsFile()); // S2: dead stock, deleted
+        Assert.False((home / "metacache").ExistsFile()); // E8: bare ledger, deleted
         // under a home source the old cache root IS the new cache root — children stay
-        Assert.True(File.Exists(Path.Combine(paths.CacheRoot, "icons", "i.png")));
-        Assert.True(File.Exists(Path.Combine(paths.CacheRoot, "meta", "index.json")));
-        Assert.True(File.Exists(Path.Combine(paths.StoreRoot, "assets", "indexes", "5.json")));
-        Assert.True(File.Exists(Path.Combine(paths.StoreRoot, "libraries", "x.jar")));
+        Assert.True((paths.CacheRoot / "icons" / "i.png").ExistsFile());
+        Assert.True((paths.CacheRoot / "meta" / "index.json").ExistsFile());
+        Assert.True((paths.StoreRoot / "assets" / "indexes" / "5.json").ExistsFile());
+        Assert.True((paths.StoreRoot / "libraries" / "x.jar").ExistsFile());
 
         // the pass sealed itself with the S3 record — a second run is a no-op
         var record = decisions.Read(FlintLegacyMigrationProfile.ProfileName);
@@ -377,24 +409,33 @@ public class MigrationEngineTests : IDisposable
     {
         // the upgraded-user steady state: the startup pass already ran and sealed the S3
         // record — the record gates the STARTUP auto-run only, never the remount itself
-        var home = Path.Combine(_dir, "sealed");
-        var data = Path.Combine(home, "data");
-        var store = Path.Combine(home, "store");
-        var paths = FlintPaths.FromRoots(Path.Combine(home, "config"), data, store,
-            Path.Combine(home, "cache"), Path.Combine(home, "state"));
+        var home = _dir / "sealed";
+        var data = home / "data";
+        var store = home / "store";
+        AbsolutePath configRoot = home / "config";
+        AbsolutePath cacheRoot = home / "cache";
+        AbsolutePath stateRoot = home / "state";
+        var paths = new FlintPaths()
+        {
+            ConfigRoot = configRoot,
+            DataRoot = data,
+            StoreRoot = store,
+            CacheRoot = cacheRoot,
+            StateRoot = stateRoot,
+        };
         foreach (var root in new[]
                  {
                      paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
                      paths.CacheRoot, paths.StateRoot
                  })
         {
-            Directory.CreateDirectory(root);
+            root.CreateDirectory();
         }
 
-        var decisions = new MigrationDecisionStore(Path.Combine(paths.StateRoot, "migration"),
+        var decisions = new MigrationDecisionStore(paths.StateRoot / "migration",
             FlintJsonContext.Default.MigrationDecisionRecord);
-        Directory.CreateDirectory(Path.Combine(data, "assets", "indexes"));
-        await File.WriteAllTextAsync(Path.Combine(data, "assets", "indexes", "5.json"), "{}");
+        (data / "assets" / "indexes").CreateDirectory();
+        await (data / "assets" / "indexes" / "5.json").WriteAllTextAsync("{}");
 
         Assert.True(FlintLegacyMigration.ExecuteIfNeeded(paths, decisions).Ran);
         var sealedRecord = decisions.Read(FlintLegacyMigrationProfile.ProfileName);
@@ -402,17 +443,17 @@ public class MigrationEngineTests : IDisposable
 
         // the gated startup entry now skips (the :244 pin), even with fresh data-root
         // content waiting — which is exactly why the hook must not call it
-        Directory.CreateDirectory(Path.Combine(data, "libraries", "com", "mojang"));
-        await File.WriteAllTextAsync(Path.Combine(data, "libraries", "com", "mojang", "x.jar"), "j");
+        (data / "libraries" / "com" / "mojang").CreateDirectory();
+        await (data / "libraries" / "com" / "mojang" / "x.jar").WriteAllTextAsync("j");
         Assert.False(FlintLegacyMigration.ExecuteIfNeeded(paths, decisions).Ran);
-        Assert.False(File.Exists(Path.Combine(store, "libraries", "com", "mojang", "x.jar")));
+        Assert.False((store / "libraries" / "com" / "mojang" / "x.jar").ExistsFile());
 
         // the record-less entry (the prism import-finished hook) remounts what just landed
         var remount = FlintLegacyMigration.Execute(paths);
         Assert.True(remount.Ran);
         Assert.Null(remount.Error);
-        Assert.True(File.Exists(Path.Combine(store, "libraries", "com", "mojang", "x.jar")));
-        Assert.False(Directory.Exists(Path.Combine(data, "libraries")));
+        Assert.True((store / "libraries" / "com" / "mojang" / "x.jar").ExistsFile());
+        Assert.False((data / "libraries").ExistsDirectory());
 
         // and it never touches the decision record — the seal is the startup gate's business
         var after = decisions.Read(FlintLegacyMigrationProfile.ProfileName);
@@ -426,54 +467,72 @@ public class MigrationEngineTests : IDisposable
     {
         // a first-prism-import user with NO flint-legacy record: the hook's remount does
         // the transfer but must not fabricate the startup seal over work it did not gate
-        var home = Path.Combine(_dir, "unsealed");
-        var data = Path.Combine(home, "data");
-        var paths = FlintPaths.FromRoots(Path.Combine(home, "config"), data,
-            Path.Combine(home, "store"), Path.Combine(home, "cache"), Path.Combine(home, "state"));
+        var home = _dir / "unsealed";
+        var data = home / "data";
+        AbsolutePath configRoot = home / "config";
+        AbsolutePath storeRoot = home / "store";
+        AbsolutePath cacheRoot = home / "cache";
+        AbsolutePath stateRoot = home / "state";
+        var paths = new FlintPaths()
+        {
+            ConfigRoot = configRoot,
+            DataRoot = data,
+            StoreRoot = storeRoot,
+            CacheRoot = cacheRoot,
+            StateRoot = stateRoot,
+        };
         foreach (var root in new[]
                  {
                      paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
                      paths.CacheRoot, paths.StateRoot
                  })
         {
-            Directory.CreateDirectory(root);
+            root.CreateDirectory();
         }
 
-        Directory.CreateDirectory(Path.Combine(data, "assets", "indexes"));
-        await File.WriteAllTextAsync(Path.Combine(data, "assets", "indexes", "5.json"), "{}");
+        (data / "assets" / "indexes").CreateDirectory();
+        await (data / "assets" / "indexes" / "5.json").WriteAllTextAsync("{}");
 
         var remount = FlintLegacyMigration.Execute(paths);
 
         Assert.True(remount.Ran);
-        Assert.True(File.Exists(Path.Combine(paths.StoreRoot, "assets", "indexes", "5.json")));
-        Assert.False(File.Exists(Path.Combine(paths.StateRoot, "migration",
-            FlintLegacyMigrationProfile.ProfileName + ".json")));
+        Assert.True((paths.StoreRoot / "assets" / "indexes" / "5.json").ExistsFile());
+        Assert.False((paths.StateRoot / "migration" / (FlintLegacyMigrationProfile.ProfileName + ".json")).ExistsFile());
     }
 
     [Fact]
     public void FlintLegacy_Eager_Pass_Leaves_The_Record_Unsealed_On_Transfer_Failure()
     {
-        var home = Path.Combine(_dir, "failing");
-        var data = Path.Combine(home, "data");
-        var store = Path.Combine(home, "store");
-        var paths = FlintPaths.FromRoots(Path.Combine(home, "config"), data, store,
-            Path.Combine(home, "cache"), Path.Combine(home, "state"));
+        var home = _dir / "failing";
+        var data = home / "data";
+        var store = home / "store";
+        AbsolutePath configRoot = home / "config";
+        AbsolutePath cacheRoot = home / "cache";
+        AbsolutePath stateRoot = home / "state";
+        var paths = new FlintPaths()
+        {
+            ConfigRoot = configRoot,
+            DataRoot = data,
+            StoreRoot = store,
+            CacheRoot = cacheRoot,
+            StateRoot = stateRoot,
+        };
         // NOTE: the store root is deliberately NOT created — a FILE occupies its path, so
         // every directory-creation attempt for the assets destination fails
         foreach (var root in new[] { paths.ConfigRoot, paths.DataRoot, paths.CacheRoot, paths.StateRoot })
         {
-            Directory.CreateDirectory(root);
+            root.CreateDirectory();
         }
 
-        File.WriteAllText(store, "a file blocks the store assets root");
-        var decisions = new MigrationDecisionStore(Path.Combine(paths.StateRoot, "migration"),
+        store.WriteAllText("a file blocks the store assets root");
+        var decisions = new MigrationDecisionStore(paths.StateRoot / "migration",
             FlintJsonContext.Default.MigrationDecisionRecord);
 
         // a transfer that cannot succeed: the assets mount wants <store>/assets but the
         // store path is a file — both the whole-rename and the per-file walk fail, which
         // the pass must report instead of sealing over
-        Directory.CreateDirectory(Path.Combine(data, "assets"));
-        File.WriteAllText(Path.Combine(data, "assets", "5.json"), "x");
+        (data / "assets").CreateDirectory();
+        (data / "assets" / "5.json").WriteAllText("x");
 
         var result = FlintLegacyMigration.ExecuteIfNeeded(paths, decisions);
 
@@ -489,69 +548,87 @@ public class MigrationEngineTests : IDisposable
     [Fact]
     public void FlintLegacy_DirectoryDestinationExists_ResumesTheMergeFileByFile()
     {
-        var home = Path.Combine(_dir, "resume");
-        var data = Path.Combine(home, "data");
-        var store = Path.Combine(home, "store");
-        var paths = FlintPaths.FromRoots(Path.Combine(home, "config"), data, store,
-            Path.Combine(home, "cache"), Path.Combine(home, "state"));
-        Directory.CreateDirectory(paths.ConfigRoot);
-        Directory.CreateDirectory(paths.DataRoot);
-        Directory.CreateDirectory(paths.CacheRoot);
-        Directory.CreateDirectory(paths.StateRoot);
+        var home = _dir / "resume";
+        var data = home / "data";
+        var store = home / "store";
+        AbsolutePath configRoot = home / "config";
+        AbsolutePath cacheRoot = home / "cache";
+        AbsolutePath stateRoot = home / "state";
+        var paths = new FlintPaths()
+        {
+            ConfigRoot = configRoot,
+            DataRoot = data,
+            StoreRoot = store,
+            CacheRoot = cacheRoot,
+            StateRoot = stateRoot,
+        };
+        paths.ConfigRoot.CreateDirectory();
+        paths.DataRoot.CreateDirectory();
+        paths.CacheRoot.CreateDirectory();
+        paths.StateRoot.CreateDirectory();
 
         // source content: one file lands, one is blocked — the remount fails halfway
-        Directory.CreateDirectory(Path.Combine(data, "assets", "sub"));
-        File.WriteAllText(Path.Combine(data, "assets", "first.txt"), "first");
-        File.WriteAllText(Path.Combine(data, "assets", "sub", "late.txt"), "late");
+        (data / "assets" / "sub").CreateDirectory();
+        (data / "assets" / "first.txt").WriteAllText("first");
+        (data / "assets" / "sub" / "late.txt").WriteAllText("late");
         // a FILE occupies the <store>/assets/sub path, so sub/late.txt cannot transfer —
         // the exact shape of a half-done earlier pass (some files in, some stranded)
-        Directory.CreateDirectory(Path.Combine(store, "assets"));
-        File.WriteAllText(Path.Combine(store, "assets", "sub"), "a file blocks the subtree");
+        (store / "assets").CreateDirectory();
+        (store / "assets" / "sub").WriteAllText("a file blocks the subtree");
 
         var first = FlintLegacyMigration.Execute(paths, data);
 
         // honest half-failure: the pass reports incomplete, first.txt is in, late.txt is not
         Assert.True(first.Ran);
         Assert.NotNull(first.Error);
-        Assert.Equal("first", File.ReadAllText(Path.Combine(store, "assets", "first.txt")));
-        Assert.False(File.Exists(Path.Combine(store, "assets", "sub", "late.txt")));
-        Assert.True(File.Exists(Path.Combine(data, "assets", "sub", "late.txt"))); // source intact
+        Assert.Equal("first", (store / "assets" / "first.txt").ReadAllText());
+        Assert.False((store / "assets" / "sub" / "late.txt").ExistsFile());
+        Assert.True((data / "assets" / "sub" / "late.txt").ExistsFile()); // source intact
 
         // the blocker clears (operator or a later pass) — the rerun must now complete the
         // leftovers THROUGH the existing destination directory
-        File.Delete(Path.Combine(store, "assets", "sub"));
+        (store / "assets" / "sub").Delete();
         var second = FlintLegacyMigration.Execute(paths, data);
 
         Assert.True(second.Ran);
         Assert.Null(second.Error);
-        Assert.Equal("late", File.ReadAllText(Path.Combine(store, "assets", "sub", "late.txt")));
-        Assert.Equal("first", File.ReadAllText(Path.Combine(store, "assets", "first.txt"))); // kept
+        Assert.Equal("late", (store / "assets" / "sub" / "late.txt").ReadAllText());
+        Assert.Equal("first", (store / "assets" / "first.txt").ReadAllText()); // kept
     }
 
     [Fact]
     public void FlintLegacy_Eager_Pass_Is_A_Noop_For_A_Fresh_Install()
     {
-        var home = Path.Combine(_dir, "fresh");
-        var paths = FlintPaths.FromRoots(
-            Path.Combine(home, "config"), Path.Combine(home, "data"), Path.Combine(home, "store"),
-            Path.Combine(home, "cache"), Path.Combine(home, "state"));
+        var home = _dir / "fresh";
+        AbsolutePath configRoot = home / "config";
+        AbsolutePath dataRoot = home / "data";
+        AbsolutePath storeRoot = home / "store";
+        AbsolutePath cacheRoot = home / "cache";
+        AbsolutePath stateRoot = home / "state";
+        var paths = new FlintPaths()
+        {
+            ConfigRoot = configRoot,
+            DataRoot = dataRoot,
+            StoreRoot = storeRoot,
+            CacheRoot = cacheRoot,
+            StateRoot = stateRoot,
+        };
         foreach (var root in new[]
                  {
                      paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
                      paths.CacheRoot, paths.StateRoot
                  })
         {
-            Directory.CreateDirectory(root);
+            root.CreateDirectory();
         }
 
         // no legacy anchor (a bare instances/ directory is NOT one — discovery creates it
         // on every install) → skipped, and no decision record is written
-        Directory.CreateDirectory(Path.Combine(paths.DataRoot, "instances"));
+        (paths.DataRoot / "instances").CreateDirectory();
         var result = FlintLegacyMigration.ExecuteIfNeeded(paths, null);
 
         Assert.False(result.Ran);
-        Assert.False(File.Exists(Path.Combine(paths.StateRoot, "migration",
-            FlintLegacyMigrationProfile.ProfileName + ".json")));
+        Assert.False((paths.StateRoot / "migration" / (FlintLegacyMigrationProfile.ProfileName + ".json")).ExistsFile());
     }
 
     // a failing decision-store write must not escape the eager pass: the seal is
@@ -560,32 +637,42 @@ public class MigrationEngineTests : IDisposable
     [Fact]
     public async Task FlintLegacy_Eager_Pass_Tolerates_A_Failing_Decision_Store()
     {
-        var home = Path.Combine(_dir, "blockedstore");
-        var data = Path.Combine(home, "data");
-        var paths = FlintPaths.FromRoots(Path.Combine(home, "config"), data,
-            Path.Combine(home, "store"), Path.Combine(home, "cache"), Path.Combine(home, "state"));
+        var home = _dir / "blockedstore";
+        var data = home / "data";
+        AbsolutePath configRoot = home / "config";
+        AbsolutePath storeRoot = home / "store";
+        AbsolutePath cacheRoot = home / "cache";
+        AbsolutePath stateRoot = home / "state";
+        var paths = new FlintPaths()
+        {
+            ConfigRoot = configRoot,
+            DataRoot = data,
+            StoreRoot = storeRoot,
+            CacheRoot = cacheRoot,
+            StateRoot = stateRoot,
+        };
         foreach (var root in new[]
                  {
                      paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
                      paths.CacheRoot, paths.StateRoot
                  })
         {
-            Directory.CreateDirectory(root);
+            root.CreateDirectory();
         }
 
         // a FILE occupies the migration records path, so the seal write throws
-        var blocker = Path.Combine(paths.StateRoot, "migration");
-        await File.WriteAllTextAsync(blocker, "a file blocks the migration records directory");
+        var blocker = paths.StateRoot / "migration";
+        await blocker.WriteAllTextAsync("a file blocks the migration records directory");
         var decisions = new MigrationDecisionStore(blocker, FlintJsonContext.Default.MigrationDecisionRecord);
-        Directory.CreateDirectory(Path.Combine(data, "assets", "indexes"));
-        await File.WriteAllTextAsync(Path.Combine(data, "assets", "indexes", "5.json"), "{}");
+        (data / "assets" / "indexes").CreateDirectory();
+        await (data / "assets" / "indexes" / "5.json").WriteAllTextAsync("{}");
 
         var result = FlintLegacyMigration.ExecuteIfNeeded(paths, decisions);
 
         // the remount itself completed and reported success — the failed seal was swallowed
         Assert.True(result.Ran);
         Assert.Null(result.Error);
-        Assert.True(File.Exists(Path.Combine(paths.StoreRoot, "assets", "indexes", "5.json")));
+        Assert.True((paths.StoreRoot / "assets" / "indexes" / "5.json").ExistsFile());
     }
 
     // the double-legacy state: BOTH roots carry old flat-layout anchors (a prism import
@@ -595,13 +682,12 @@ public class MigrationEngineTests : IDisposable
     [Fact]
     public void FlintLegacy_Dual_Legacy_Roots_Both_Remount_Under_One_Seal()
     {
-        var home = Path.Combine(_dir, "dual");
-        Directory.CreateDirectory(Path.Combine(home, "instances", "GTN"));
-        Directory.CreateDirectory(Path.Combine(home, "assets", "indexes"));
-        File.WriteAllText(Path.Combine(home, "flint.cfg"), "Language=zh");
-        File.WriteAllText(Path.Combine(home, "instances", "GTN", "instance.cfg"),
-            "InstanceType=OneSix\nname=GTN\n");
-        File.WriteAllText(Path.Combine(home, "assets", "indexes", "5.json"), "{}");
+        var home = _dir / "dual";
+        (home / "instances" / "GTN").CreateDirectory();
+        (home / "assets" / "indexes").CreateDirectory();
+        (home / "flint.cfg").WriteAllText("Language=zh");
+        (home / "instances" / "GTN" / "instance.cfg").WriteAllText("InstanceType=OneSix\nname=GTN\n");
+        (home / "assets" / "indexes" / "5.json").WriteAllText("{}");
 
         var paths = FlintPaths.FromHomeDir(home);
         foreach (var root in new[]
@@ -610,14 +696,14 @@ public class MigrationEngineTests : IDisposable
                      paths.CacheRoot, paths.StateRoot
                  })
         {
-            Directory.CreateDirectory(root);
+            root.CreateDirectory();
         }
 
         // the import-landed half sits at the data root: shared content the remount hook
         // never moved (the process died before OnImportFinished ran)
-        Directory.CreateDirectory(Path.Combine(paths.DataRoot, "assets", "indexes"));
-        File.WriteAllText(Path.Combine(paths.DataRoot, "assets", "indexes", "17.json"), "{}");
-        var decisions = new MigrationDecisionStore(Path.Combine(paths.StateRoot, "migration"),
+        (paths.DataRoot / "assets" / "indexes").CreateDirectory();
+        (paths.DataRoot / "assets" / "indexes" / "17.json").WriteAllText("{}");
+        var decisions = new MigrationDecisionStore(paths.StateRoot / "migration",
             FlintJsonContext.Default.MigrationDecisionRecord);
 
         var result = FlintLegacyMigration.ExecuteIfNeeded(paths, decisions);
@@ -626,13 +712,13 @@ public class MigrationEngineTests : IDisposable
         Assert.Null(result.Error);
         // BOTH roots remounted: the data-root assets onto the store root AND the home
         // root's instances/GTN into the fresh data directory, flint.cfg on the config side
-        Assert.True(File.Exists(Path.Combine(paths.StoreRoot, "assets", "indexes", "17.json")));
-        Assert.True(File.Exists(Path.Combine(paths.StoreRoot, "assets", "indexes", "5.json")));
-        Assert.True(File.Exists(Path.Combine(paths.DataRoot, "instances", "GTN", "instance.cfg")));
-        Assert.True(File.Exists(Path.Combine(paths.ConfigRoot, "flint.cfg")));
+        Assert.True((paths.StoreRoot / "assets" / "indexes" / "17.json").ExistsFile());
+        Assert.True((paths.StoreRoot / "assets" / "indexes" / "5.json").ExistsFile());
+        Assert.True((paths.DataRoot / "instances" / "GTN" / "instance.cfg").ExistsFile());
+        Assert.True((paths.ConfigRoot / "flint.cfg").ExistsFile());
         // exactly ONE profile-level record seals the whole pass
         Assert.NotNull(decisions.Read(FlintLegacyMigrationProfile.ProfileName));
-        Assert.Single(Directory.EnumerateFiles(Path.Combine(paths.StateRoot, "migration")));
+        Assert.Single((paths.StateRoot / "migration").EnumerateFiles());
         // and the seal gates the next startup probe again
         Assert.False(FlintLegacyMigration.ExecuteIfNeeded(paths, decisions).Ran);
     }
@@ -644,25 +730,24 @@ public class MigrationEngineTests : IDisposable
     [Fact]
     public void FlintLegacy_Dual_Root_Failure_Seals_No_Record_And_Keeps_The_Done_Root_Done()
     {
-        var home = Path.Combine(_dir, "dualfail");
-        Directory.CreateDirectory(Path.Combine(home, "instances", "GTN"));
-        File.WriteAllText(Path.Combine(home, "flint.cfg"), "Language=zh");
-        File.WriteAllText(Path.Combine(home, "instances", "GTN", "instance.cfg"),
-            "InstanceType=OneSix\nname=GTN\n");
+        var home = _dir / "dualfail";
+        (home / "instances" / "GTN").CreateDirectory();
+        (home / "flint.cfg").WriteAllText("Language=zh");
+        (home / "instances" / "GTN" / "instance.cfg").WriteAllText("InstanceType=OneSix\nname=GTN\n");
 
         var paths = FlintPaths.FromHomeDir(home);
         foreach (var root in new[] { paths.DataRoot, paths.StoreRoot, paths.CacheRoot, paths.StateRoot })
         {
-            Directory.CreateDirectory(root);
+            root.CreateDirectory();
         }
 
         // the placeholder-file method: a FILE occupies the config root so the home pass's
         // flint.cfg mount cannot transfer
-        File.WriteAllText(paths.ConfigRoot, "a file blocks the config root");
+        paths.ConfigRoot.WriteAllText("a file blocks the config root");
         // the data-root half that must complete regardless: import-landed shared content
-        Directory.CreateDirectory(Path.Combine(paths.DataRoot, "assets", "indexes"));
-        File.WriteAllText(Path.Combine(paths.DataRoot, "assets", "indexes", "17.json"), "{}");
-        var decisions = new MigrationDecisionStore(Path.Combine(paths.StateRoot, "migration"),
+        (paths.DataRoot / "assets" / "indexes").CreateDirectory();
+        (paths.DataRoot / "assets" / "indexes" / "17.json").WriteAllText("{}");
+        var decisions = new MigrationDecisionStore(paths.StateRoot / "migration",
             FlintJsonContext.Default.MigrationDecisionRecord);
 
         var result = FlintLegacyMigration.ExecuteIfNeeded(paths, decisions);
@@ -672,7 +757,7 @@ public class MigrationEngineTests : IDisposable
         Assert.NotNull(result.Error);
         Assert.Null(decisions.Read(FlintLegacyMigrationProfile.ProfileName));
         // the data-root half already completed; the home half's flint.cfg is still waiting
-        Assert.True(File.Exists(Path.Combine(paths.StoreRoot, "assets", "indexes", "17.json")));
-        Assert.True(File.Exists(Path.Combine(home, "flint.cfg")));
+        Assert.True((paths.StoreRoot / "assets" / "indexes" / "17.json").ExistsFile());
+        Assert.True((home / "flint.cfg").ExistsFile());
     }
 }

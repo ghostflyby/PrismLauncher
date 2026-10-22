@@ -12,6 +12,7 @@ using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.LegacyFtb;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -45,7 +46,7 @@ public class LegacyFtbTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList([instancesDir]) { Environment = _global };
+        return new InstanceList([new AbsolutePath(instancesDir)]) { Environment = _global };
     }
 
     private static List<(string? Uid, string? Version)> Components(string staging)
@@ -207,7 +208,7 @@ public class LegacyFtbTests : IDisposable
         Directory.CreateDirectory(srcDir);
         populate(srcDir);
         var zipPath = path;
-        Assert.True(MmcZip.CompressDir(zipPath, srcDir));
+        Assert.True(MmcZip.CompressDir(new AbsolutePath(zipPath), new AbsolutePath(srcDir)));
         try
         {
             Directory.Delete(srcDir, recursive: true);

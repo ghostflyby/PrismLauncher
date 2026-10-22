@@ -10,6 +10,7 @@
 // type-info handle, so no reflection ever enters the picture (AOT red line).
 
 using System.Text.Json.Serialization.Metadata;
+using TruePath;
 
 namespace FlintLauncher.Core.State;
 
@@ -21,7 +22,7 @@ public sealed class LauncherStateStore
     /// <summary>Build (and load) the store for one state file. A missing file yields the
     /// default; the on-disk record is folded over a fresh default (see <see cref="Load"/>)
     /// and version-gated before it becomes <see cref="Current"/>.</summary>
-    public LauncherStateStore(string filePath, JsonTypeInfo<LauncherState> typeInfo)
+    public LauncherStateStore(AbsolutePath filePath, JsonTypeInfo<LauncherState> typeInfo)
     {
         _file = new TypedJsonFile<LauncherState>(filePath, typeInfo);
         Current = Load();
@@ -32,7 +33,7 @@ public sealed class LauncherStateStore
     /// edited in place.</summary>
     public LauncherState Current { get; private set; }
 
-    public string FilePath => _file.FilePath;
+    public AbsolutePath FilePath => _file.FilePath;
 
     /// <summary>The fresh-install default (S5 schema version 1).</summary>
     public static LauncherState CurrentDefault() => new() { StateVersion = LauncherState.CurrentVersion };

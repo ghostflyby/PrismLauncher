@@ -12,63 +12,76 @@ using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Store;
 using FlintLauncher.Web;
+using TruePath;
+using TruePath.SystemIo;
 using Xunit;
 
 namespace FlintLauncher.Tests;
 
 public class StoreCompletenessTests : IDisposable
 {
-    private readonly string _home = Path.Combine(Path.GetTempPath(), $"flint-store-{Guid.NewGuid():N}");
+    private readonly AbsolutePath _home = Temporary.CreateTempFolder() / $"flint-store-{Guid.NewGuid():N}";
 
     public StoreCompletenessTests()
     {
-        Directory.CreateDirectory(_home);
+        _home.CreateDirectory();
     }
 
     public void Dispose()
     {
         try
         {
-            Directory.Delete(_home, recursive: true);
+            _home.DeleteDirectoryRecursively();
         }
         catch (DirectoryNotFoundException) { }
     }
 
-    private FlintPaths Paths() => FlintPaths.FromRoots(
-        Path.Combine(_home, "config"), Path.Combine(_home, "data"), Path.Combine(_home, "store"),
-        Path.Combine(_home, "cache"), Path.Combine(_home, "state"));
+    private FlintPaths Paths()
+    {
+        var configRoot = _home / "config";
+        var dataRoot = _home / "data";
+        var storeRoot = _home / "store";
+        var cacheRoot = _home / "cache";
+        var stateRoot = _home / "state";
+        return new FlintPaths
+        {
+            ConfigRoot = configRoot,
+            DataRoot = dataRoot,
+            StoreRoot = storeRoot,
+            CacheRoot = cacheRoot,
+            StateRoot = stateRoot,
+        };
+    }
 
     /// <summary>A cache loaded from the given ledger body (entries load non-stale — the same
     /// mechanism the startup MetaCache.Load() provides).</summary>
     private HttpMetaCache CacheWithLedger(string body)
     {
-        var cacheFile = Path.Combine(_home, "cache", "metacache.json");
-        var cacheDir = Path.GetDirectoryName(cacheFile);
-        Assert.NotNull(cacheDir);
-        Directory.CreateDirectory(cacheDir);
-        File.WriteAllText(cacheFile, body);
+        var cacheFile = (_home / "cache" / "metacache.json");
+        var cacheDir = Assert.NotNull(cacheFile.Parent);
+        cacheDir.CreateDirectory();
+        cacheFile.WriteAllText(body);
         var cache = new HttpMetaCache(cacheFile);
         cache.AddBase("libraries", Paths().LibrariesRoot);
         cache.Load();
         return cache;
     }
 
-    private static void WriteVersionManifest(string metaDir, string version, string librariesJson)
+    private static void WriteVersionManifest(AbsolutePath metaDir, string version, string librariesJson)
     {
-        Directory.CreateDirectory(Path.Combine(metaDir, "net.minecraft"));
-        File.WriteAllText(Path.Combine(metaDir, "net.minecraft", version + ".json"), $$"""
+        (metaDir / "net.minecraft").CreateDirectory();
+        (metaDir / "net.minecraft" / $"{version}.json").WriteAllText($$"""
                                                                                        {"formatVersion":1,"uid":"net.minecraft","version":"{{version}}",
                                                                                         "releaseTime":"2024-12-03T10:15:07+00:00","type":"release",
                                                                                         "libraries":{{librariesJson}}}
                                                                                        """);
     }
 
-    private static void WriteFile(string path, string content)
+    private static void WriteFile(AbsolutePath path, string content)
     {
-        var dir = Path.GetDirectoryName(path);
-        Assert.NotNull(dir);
-        Directory.CreateDirectory(dir);
-        File.WriteAllText(path, content);
+        var dir = Assert.NotNull(path.Parent);
+        dir.CreateDirectory();
+        path.WriteAllText(content);
     }
 
     private static RuntimeContext Context() => new();
@@ -82,7 +95,7 @@ public class StoreCompletenessTests : IDisposable
         WriteVersionManifest(paths.MetaDir, "1.21.4",
             """[{"name":"com.mojang:brigadier:1.0.18"},{"name":"com.mojang:datafixerupper:8.0.16"}]""");
         // brigadier: file on the store root AND a live ledger entry → counted
-        WriteFile(Path.Combine(paths.LibrariesRoot, brigadier), "jar!");
+        WriteFile(paths.LibrariesRoot / brigadier, "jar!");
         using var cache = CacheWithLedger($$"""
                                             {"version":"1","entries":[
                                               {"base":"libraries","path":"{{brigadier}}","md5sum":"","etag":"","last_changed_timestamp":0,"eternal":true}]}
@@ -105,7 +118,7 @@ public class StoreCompletenessTests : IDisposable
         var paths = Paths();
         const string brigadier = "com/mojang/brigadier/1.0.18/brigadier-1.0.18.jar";
         WriteVersionManifest(paths.MetaDir, "1.21.4", """[{"name":"com.mojang:brigadier:1.0.18"}]""");
-        WriteFile(Path.Combine(paths.LibrariesRoot, brigadier), "jar!");
+        WriteFile((paths.LibrariesRoot / brigadier), "jar!");
         using var cache = CacheWithLedger("""{"version":"1","entries":[]}""");
 
         var report = StoreCompleteness.LibrariesStatus(paths, cache, "1.21.4", Context());
@@ -149,14 +162,14 @@ public class StoreCompletenessTests : IDisposable
         var paths = Paths();
         const string hash1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
         const string hash2 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-        Directory.CreateDirectory(paths.AssetIndexesDir);
-        File.WriteAllText(Path.Combine(paths.AssetIndexesDir, "17.json"),
+        paths.AssetIndexesDir.CreateDirectory();
+        PathIo.WriteAllText(paths.AssetIndexesDir / "17.json",
             "{\"objects\":{\"minecraft/icons/icon_16x16.png\":{\"hash\":\"" + hash1 + "\",\"size\":3}," +
             "\"minecraft/sounds/missing.ogg\":{\"hash\":\"" + hash2 + "\",\"size\":999}}}");
-        WriteFile(Path.Combine(paths.AssetsRoot, "objects", hash1[..2], hash1), "abc");
+        WriteFile(paths.AssetsRoot / "objects" / hash1[..2] / hash1, "abc");
         // a present file with the WRONG size is as missing as an absent one (the
         // GetDownloadAction re-download condition)
-        WriteFile(Path.Combine(paths.AssetsRoot, "objects", hash2[..2], hash2), "too small");
+        WriteFile(paths.AssetsRoot / "objects" / hash2[..2] / hash2, "too small");
 
         var report = StoreCompleteness.AssetsStatus(paths, "17");
 
@@ -175,42 +188,51 @@ public class StoreStatusApiTests
     [Fact]
     public async Task Store_Status_Routes_Derive_From_Manifests_And_Store()
     {
-        var home = Path.Combine(Path.GetTempPath(), $"flint-store-api-{Guid.NewGuid():N}");
+        AbsolutePath home = Temporary.SystemTempDirectory() / $"flint-store-api-{Guid.NewGuid():N}";
         try
         {
-            Directory.CreateDirectory(home);
-            var paths = FlintPaths.FromRoots(Path.Combine(home, "config"), Path.Combine(home, "data"),
-                Path.Combine(home, "store"), Path.Combine(home, "cache"), Path.Combine(home, "state"));
+            home.CreateDirectory();
+            AbsolutePath configRoot = home / "config";
+            AbsolutePath dataRoot = home / "data";
+            AbsolutePath storeRoot = home / "store";
+            AbsolutePath cacheRoot = home / "cache";
+            AbsolutePath stateRoot = home / "state";
+            var paths = new FlintPaths()
+            {
+                ConfigRoot = configRoot,
+                DataRoot = dataRoot,
+                StoreRoot = storeRoot,
+                CacheRoot = cacheRoot,
+                StateRoot = stateRoot,
+            };
             const string brigadier = "com/mojang/brigadier/1.0.18/brigadier-1.0.18.jar";
             const string dfu = "com/mojang/datafixerupper/8.0.16/datafixerupper-8.0.16.jar";
-            Directory.CreateDirectory(Path.Combine(paths.MetaDir, "net.minecraft"));
-            await File.WriteAllTextAsync(Path.Combine(paths.MetaDir, "net.minecraft", "1.21.4.json"), """
+            (paths.MetaDir / "net.minecraft").CreateDirectory();
+            await (paths.MetaDir / "net.minecraft" / "1.21.4.json").WriteAllTextAsync("""
                                                                                                       {"formatVersion":1,"uid":"net.minecraft","version":"1.21.4",
                                                                                                        "releaseTime":"2024-12-03T10:15:07+00:00","type":"release",
                                                                                                        "libraries":[{"name":"com.mojang:brigadier:1.0.18"},{"name":"com.mojang:datafixerupper:8.0.16"}]}
                                                                                                       """);
-            var libraryDir = Path.GetDirectoryName(Path.Combine(paths.LibrariesRoot, brigadier));
-            Assert.NotNull(libraryDir);
-            Directory.CreateDirectory(libraryDir);
-            await File.WriteAllTextAsync(Path.Combine(paths.LibrariesRoot, brigadier), "jar!");
-            var metacacheDir = Path.GetDirectoryName(paths.MetacacheFile);
-            Assert.NotNull(metacacheDir);
-            Directory.CreateDirectory(metacacheDir);
-            await File.WriteAllTextAsync(paths.MetacacheFile, $$"""
+            var libraryDir = Assert.NotNull((paths.LibrariesRoot / brigadier).Parent);
+            libraryDir.CreateDirectory();
+            await (paths.LibrariesRoot / brigadier).WriteAllTextAsync("jar!");
+            var metacacheDir = Assert.NotNull(paths.MetacacheFile.Parent);
+            metacacheDir.CreateDirectory();
+            await paths.MetacacheFile.WriteAllTextAsync($$"""
                                                                 {"version":"1","entries":[
                                                                   {"base":"libraries","path":"{{brigadier}}","md5sum":"","etag":"","last_changed_timestamp":0,"eternal":true}]}
                                                                 """);
             const string hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-            Directory.CreateDirectory(paths.AssetIndexesDir);
-            await File.WriteAllTextAsync(Path.Combine(paths.AssetIndexesDir, "17.json"),
+            paths.AssetIndexesDir.CreateDirectory();
+            await (paths.AssetIndexesDir / "17.json").WriteAllTextAsync(
                 "{\"objects\":{\"minecraft/icons/icon_16x16.png\":{\"hash\":\"" + hash + "\",\"size\":3}}}");
-            Directory.CreateDirectory(Path.Combine(paths.AssetsRoot, "objects", hash[..2]));
-            await File.WriteAllTextAsync(Path.Combine(paths.AssetsRoot, "objects", hash[..2], hash), "abc");
+            (paths.AssetsRoot / "objects" / hash[..2]).CreateDirectory();
+            await (paths.AssetsRoot / "objects" / hash[..2] / hash).WriteAllTextAsync("abc");
 
             var token = Guid.NewGuid().ToString("N");
             using var app = WebHostBuilder.BuildWebApplication(
             [
-                "--home-dir", home,
+                "--home-dir", home.Value,
                 "--api-token", token,
                 "--urls", "http://127.0.0.1:0",
             ]);
@@ -240,7 +262,7 @@ public class StoreStatusApiTests
         {
             try
             {
-                Directory.Delete(home, recursive: true);
+                home.DeleteDirectoryRecursively();
             }
             catch (DirectoryNotFoundException) { }
         }

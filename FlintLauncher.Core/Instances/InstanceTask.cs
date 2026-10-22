@@ -20,6 +20,7 @@
 
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.Instances;
 
@@ -48,7 +49,7 @@ public enum ShouldDeleteSaves : byte
 
 public abstract class InstanceTask : FlintTask
 {
-    private readonly List<string> _filesToRemove = [];
+    private readonly List<AbsolutePath> _filesToRemove = [];
 
     private string _originalName = "";
     private string _originalVersion = "";
@@ -71,17 +72,16 @@ public abstract class InstanceTask : FlintTask
     public string Group { get; set; } = "";
 
     /// <summary>C++ m_targetDir + setTargetDir()/targetDir().</summary>
-    public string TargetDir { get; init; } = "";
+    public AbsolutePath TargetDir { get; init; }
 
-    /// <summary>C++ m_stagingPath + setStagingPath().</summary>
-    public string StagingPath { get; set; } = "";
+    public AbsolutePath StagingPath { get; set; }
 
     /// <summary>C++ m_shouldDeleteSaves (upstream: the answer of a GUI dialog, asked on
     /// demand from scheduleToDelete()).</summary>
     public ShouldDeleteSaves ShouldDeleteSaves { get; set; } = ShouldDeleteSaves.NotAsked;
 
     /// <summary>C++ m_filesToRemove (consumed by the import/update flows).</summary>
-    protected IReadOnlyList<string> FilesToRemove => _filesToRemove;
+    protected IReadOnlyList<AbsolutePath> FilesToRemove => _filesToRemove;
 
     public void SetParentEnvironment(InstanceEnvironment environment) => Environment = environment;
 
@@ -160,17 +160,19 @@ public abstract class InstanceTask : FlintTask
             }
         }
 
-        _filesToRemove.Add(Path.Combine(dir, path));
+        _filesToRemove.Add(new AbsolutePath(dir) / path);
         if (checkDisabled)
         {
             if (path.EndsWith(".disabled", StringComparison.Ordinal))
             {
                 // remove the twin without the suffix (it was enabled/disabled by the user)
-                _filesToRemove.Add(Path.Combine(dir, path[..^9]));
+                string a1 = path[..^9];
+                _filesToRemove.Add(new AbsolutePath(dir) / a1);
             }
             else
             {
-                _filesToRemove.Add(Path.Combine(dir, path + ".disabled"));
+                string a1 = path + ".disabled";
+                _filesToRemove.Add(new AbsolutePath(dir) / a1);
             }
         }
     }

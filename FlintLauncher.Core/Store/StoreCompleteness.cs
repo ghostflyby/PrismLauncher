@@ -13,6 +13,8 @@ using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Store;
 
@@ -44,8 +46,9 @@ public static class StoreCompleteness
             return null;
         }
 
-        var manifestPath = Path.Combine(paths.MetaDir, "net.minecraft", versionRef + ".json");
-        if (!File.Exists(manifestPath))
+        string a2 = versionRef + ".json";
+        var manifestPath = paths.MetaDir / "net.minecraft" / a2;
+        if (!manifestPath.ExistsFile())
         {
             return null;
         }
@@ -83,7 +86,7 @@ public static class StoreCompleteness
                     continue;
                 }
 
-                var file = new FileInfo(Path.Combine(paths.LibrariesRoot, storage));
+                var file = new FileInfo((paths.LibrariesRoot / storage).Value);
                 var entry = metaCache.GetEntry("libraries", storage);
                 if (!file.Exists || entry is null || entry.IsStale)
                 {
@@ -109,8 +112,9 @@ public static class StoreCompleteness
             return null;
         }
 
-        var indexPath = Path.Combine(paths.AssetIndexesDir, assetsId + ".json");
-        if (!File.Exists(indexPath))
+        string a1 = assetsId + ".json";
+        var indexPath = paths.AssetIndexesDir / a1;
+        if (!indexPath.ExistsFile())
         {
             return null;
         }
@@ -160,11 +164,11 @@ public static class StoreCompleteness
     /// <summary>The version-manifest document read (the former RequireObject-of-
     /// RequireNodeFromFile): a broken or non-object manifest fails as a MetaParseException
     /// like every other manifest consumer here.</summary>
-    private static JsonObject ParseManifest(string manifestPath)
+    private static JsonObject ParseManifest(AbsolutePath manifestPath)
     {
         try
         {
-            return JsonNode.Parse(File.ReadAllText(manifestPath)) as JsonObject
+            return JsonNode.Parse(manifestPath.ReadAllText()) as JsonObject
                    ?? throw new MetaParseException($"the version manifest '{manifestPath}' is not an object");
         }
         catch (JsonException e)

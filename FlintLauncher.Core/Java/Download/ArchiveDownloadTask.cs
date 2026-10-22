@@ -19,12 +19,13 @@ using System.Security.Cryptography;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.Java.Download;
 
 public sealed class ArchiveDownloadTask(
     Uri url,
-    string finalPath,
+    AbsolutePath finalPath,
     string checksumType = "",
     string checksumHash = "",
     HttpMetaCache? cache = null)
@@ -35,7 +36,7 @@ public sealed class ArchiveDownloadTask(
         // JRE found ! download the zip
         EmitStatus("Downloading Java");
 
-        string fullPath;
+        AbsolutePath fullPath;
         NetRequest action;
         var tempDownload = false;
         if (cache is not null)
@@ -46,7 +47,8 @@ public sealed class ArchiveDownloadTask(
         }
         else
         {
-            fullPath = Path.Combine(Path.GetTempPath(), $"flint-java-{Guid.NewGuid():N}-{FileName()}");
+            string a1 = $"flint-java-{Guid.NewGuid():N}-{FileName()}";
+            fullPath = Temporary.CreateTempFolder() / a1;
             action = NetRequest.MakeFile(url, fullPath);
             tempDownload = true;
         }
@@ -65,15 +67,15 @@ public sealed class ArchiveDownloadTask(
                 return;
             }
 
-            ExtractJava(fullPath);
+            ExtractJava(fullPath.Value);
         }
         finally
         {
-            if (tempDownload && File.Exists(fullPath))
+            if (tempDownload && File.Exists(fullPath.Value))
             {
                 try
                 {
-                    File.Delete(fullPath);
+                    File.Delete(fullPath.Value);
                 }
                 catch (IOException)
                 {
@@ -110,7 +112,7 @@ public sealed class ArchiveDownloadTask(
         List<string>? extracted;
         if (IsTarGz(input))
         {
-            extracted = TarArchive.ExtractTarGzFile(input, finalPath, firstFolder, out var error);
+            extracted = TarArchive.ExtractTarGzFile(input, finalPath.Value, firstFolder, out var error);
             if (extracted is null)
             {
                 EmitFailed(error);

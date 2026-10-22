@@ -14,22 +14,23 @@
 
 using FlintLauncher.Core.IO;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Skins;
 
 public sealed class SkinsLibrary
 {
-    private readonly Func<string> _skinsDir;
+    private readonly Func<AbsolutePath> _skinsDir;
 
     /// <summary><paramref name="skinsDir"/> is a provider, not a value: the SkinsDir
     /// setting can change at runtime (PUT /settings) and the library follows it.</summary>
-    public SkinsLibrary(Func<string> skinsDir)
+    public SkinsLibrary(Func<AbsolutePath> skinsDir)
     {
         _skinsDir = skinsDir;
     }
 
     /// <summary>The library root the provider currently resolves to.</summary>
-    public string SkinsDir => _skinsDir();
+    public AbsolutePath SkinsDir => _skinsDir();
 
     /// <summary>The stored skins (the index.json order). Entries whose texture file went
     /// missing stay listed with the caller checking <see cref="SkinModel.Path"/> — the C++
@@ -51,16 +52,16 @@ public sealed class SkinsLibrary
     }
 
     /// <summary>The texture file of a stored skin, when it exists on disk ("" otherwise).</summary>
-    public string TextureFileOf(SkinModel skin) => File.Exists(skin.Path) ? skin.Path : "";
+    public AbsolutePath TextureFileOf(SkinModel skin) => skin.Path.ExistsFile() ? skin.Path : default;
 
     /// <summary>Store one skin texture: copies <paramref name="sourceFile"/> into the
     /// library as &lt;name&gt;.png and upserts the index entry. Returns false when the
     /// source is unreadable, the name is not a plain file name, or an entry with the name
     /// already exists (no overwrite — consistent with the icon install semantics; DELETE
     /// first to replace).</summary>
-    public bool Install(string sourceFile, string name, SkinModelKind model)
+    public bool Install(AbsolutePath sourceFile, string name, SkinModelKind model)
     {
-        if (!IsPlainName(name) || !File.Exists(sourceFile))
+        if (!IsPlainName(name) || !sourceFile.ExistsFile())
         {
             return false;
         }
@@ -71,15 +72,16 @@ public sealed class SkinsLibrary
             return false;
         }
 
-        var target = Path.Combine(dir, name + ".png");
-        if (File.Exists(target))
+        string a1 = name + ".png";
+        var target = dir / a1;
+        if (target.ExistsFile())
         {
             return false;
         }
 
         try
         {
-            File.Copy(sourceFile, target, overwrite: false);
+            sourceFile.Copy(target, overwrite: false);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException)
         {
@@ -110,12 +112,13 @@ public sealed class SkinsLibrary
         }
 
         SkinListStore.Save(dir, skins);
-        var texture = Path.Combine(dir, name + ".png");
-        if (File.Exists(texture))
+        string a1 = name + ".png";
+        var texture = dir / a1;
+        if (texture.ExistsFile())
         {
             try
             {
-                File.Delete(texture);
+                texture.Delete();
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {

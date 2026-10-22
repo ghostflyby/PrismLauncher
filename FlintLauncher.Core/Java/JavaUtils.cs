@@ -154,7 +154,7 @@ public static class JavaUtils
     /// fallback and launcher-owned candidates only.
     /// <paramref name="javaRoot"/> is the launcher-managed java dir (FlintPaths.JavaRoot);
     /// the default keeps the C++ cwd-relative "java" behaviour for bare fixtures.</summary>
-    public static List<string> FindJavaPaths(string? javaRoot = null)
+    public static List<string> FindJavaPaths(AbsolutePath? javaRoot = null)
     {
         List<string> javas;
         if (OperatingSystem.IsWindows())
@@ -195,33 +195,33 @@ public static class JavaUtils
         var libraryJvmDir = "/Library/Java/JavaVirtualMachines/";
         foreach (var java in DirectoryNames(libraryJvmDir))
         {
-            javas.Add(Path.Combine(libraryJvmDir, java, "Contents/Home/bin/java"));
-            javas.Add(Path.Combine(libraryJvmDir, java, "Contents/Home/jre/bin/java"));
+            javas.Add((new AbsolutePath(libraryJvmDir) / java / "Contents/Home/bin/java").Value);
+            javas.Add((new AbsolutePath(libraryJvmDir) / java / "Contents/Home/jre/bin/java").Value);
         }
 
         var home = Environment.GetEnvironmentVariable("HOME") ?? "";
 
         // javas downloaded by sdkman
-        var sdkmanDir = Environment.GetEnvironmentVariable("SDKMAN_DIR") ?? Path.Combine(home, ".sdkman");
-        var sdkmanJavaDir = Path.Combine(sdkmanDir, "candidates/java");
-        foreach (var java in DirectoryNames(sdkmanJavaDir))
+        var sdkmanDir = Environment.GetEnvironmentVariable("SDKMAN_DIR") ?? (new AbsolutePath(home) / ".sdkman").Value;
+        var sdkmanJavaDir = new AbsolutePath(sdkmanDir) / "candidates/java";
+        foreach (var java in DirectoryNames(sdkmanJavaDir.Value))
         {
-            javas.Add(Path.Combine(sdkmanJavaDir, java, "bin/java"));
+            javas.Add((sdkmanJavaDir / java / "bin/java").Value);
         }
 
         // javas downloaded by asdf
-        var asdfDataDir = Environment.GetEnvironmentVariable("ASDF_DATA_DIR") ?? Path.Combine(home, ".asdf");
-        var asdfJavaDir = Path.Combine(asdfDataDir, "installs/java");
-        foreach (var java in DirectoryNames(asdfJavaDir))
+        var asdfDataDir = Environment.GetEnvironmentVariable("ASDF_DATA_DIR") ?? (new AbsolutePath(home) / ".asdf").Value;
+        var asdfJavaDir = new AbsolutePath(asdfDataDir) / "installs/java";
+        foreach (var java in DirectoryNames(asdfJavaDir.Value))
         {
-            javas.Add(Path.Combine(asdfJavaDir, java, "bin/java"));
+            javas.Add((asdfJavaDir / java / "bin/java").Value);
         }
 
         // java in user library folder (like from intellij downloads)
-        var userLibraryJvmDir = Path.Combine(home, "Library/Java/JavaVirtualMachines");
-        foreach (var java in DirectoryNames(userLibraryJvmDir))
+        var userLibraryJvmDir = new AbsolutePath(home) / "Library/Java/JavaVirtualMachines";
+        foreach (var java in DirectoryNames(userLibraryJvmDir.Value))
         {
-            javas.Add(Path.Combine(userLibraryJvmDir, java, "Contents/Home/bin/java"));
+            javas.Add((userLibraryJvmDir / java / "Contents/Home/bin/java").Value);
         }
 
         return javas;
@@ -271,9 +271,9 @@ public static class JavaUtils
                     continue;
                 }
 
-                var prefix = CanonicalPath(Path.Combine(dirPath, entry));
-                javas.Add(Path.Combine(prefix, "jre/bin/java"));
-                javas.Add(Path.Combine(prefix, "bin/java"));
+                var prefix = CanonicalPath((new LocalPath(dirPath) / entry).Value);
+                javas.Add((new AbsolutePath(prefix) / "jre/bin/java").Value);
+                javas.Add((new AbsolutePath(prefix) / "bin/java").Value);
             }
         }
 
@@ -283,7 +283,7 @@ public static class JavaUtils
             ScanJavaDir(dirPath, filter);
             if (snap is not null)
             {
-                ScanJavaDir(Path.Combine(snap, dirPath), filter);
+                ScanJavaDir((new AbsolutePath(snap) / dirPath).Value, filter);
             }
         }
 
@@ -326,16 +326,16 @@ public static class JavaUtils
         var home = Environment.GetEnvironmentVariable("HOME") ?? "";
 
         // javas downloaded by IntelliJ
-        ScanJavaDirs(Path.Combine(home, ".jdks"));
+        ScanJavaDirs((new AbsolutePath(home) / ".jdks").Value);
         // javas downloaded by sdkman
-        var sdkmanDir = Environment.GetEnvironmentVariable("SDKMAN_DIR") ?? Path.Combine(home, ".sdkman");
-        ScanJavaDirs(Path.Combine(sdkmanDir, "candidates/java"));
+        var sdkmanDir = Environment.GetEnvironmentVariable("SDKMAN_DIR") ?? (new AbsolutePath(home) / ".sdkman").Value;
+        ScanJavaDirs((new AbsolutePath(sdkmanDir) / "candidates/java").Value);
         // javas downloaded by asdf
-        var asdfDataDir = Environment.GetEnvironmentVariable("ASDF_DATA_DIR") ?? Path.Combine(home, ".asdf");
-        ScanJavaDirs(Path.Combine(asdfDataDir, "installs/java"));
+        var asdfDataDir = Environment.GetEnvironmentVariable("ASDF_DATA_DIR") ?? (new AbsolutePath(home) / ".asdf").Value;
+        ScanJavaDirs((new AbsolutePath(asdfDataDir) / "installs/java").Value);
         // javas downloaded by gradle (toolchains)
-        var gradleUserHome = Environment.GetEnvironmentVariable("GRADLE_USER_HOME") ?? Path.Combine(home, ".gradle");
-        ScanJavaDirs(Path.Combine(gradleUserHome, "jdks"));
+        var gradleUserHome = Environment.GetEnvironmentVariable("GRADLE_USER_HOME") ?? (new AbsolutePath(home) / ".gradle").Value;
+        ScanJavaDirs((new AbsolutePath(gradleUserHome) / "jdks").Value);
 
         return javas;
     }
@@ -347,12 +347,12 @@ public static class JavaUtils
         var home = Environment.GetEnvironmentVariable("HOME") ?? "";
         if (OperatingSystem.IsMacOS())
         {
-            processpaths.Add(Path.Combine(home, "Library/Application Support/minecraft/runtime"));
+            processpaths.Add((new AbsolutePath(home) / "Library/Application Support/minecraft/runtime").Value);
         }
         else if (OperatingSystem.IsWindows())
         {
             var appDataPath = Environment.GetEnvironmentVariable("APPDATA") ?? "";
-            processpaths.Add(Path.Combine(Path.GetFullPath(appDataPath), ".minecraft", "runtime"));
+            processpaths.Add((new AbsolutePath(Path.GetFullPath(appDataPath)) / ".minecraft" / "runtime").Value);
 
             // add the microsoft store version of the launcher to the search. the current path is:
             // C:\Users\USERNAME\AppData\Local\Packages\Microsoft.4297127D64EC6_8wekyb3d8bbwe\LocalCache\Local\runtime
@@ -362,7 +362,7 @@ public static class JavaUtils
         }
         else
         {
-            processpaths.Add(Path.Combine(home, ".minecraft", "runtime"));
+            processpaths.Add((new AbsolutePath(home) / ".minecraft" / "runtime").Value);
         }
 
         var javas = new List<string>();
@@ -381,7 +381,7 @@ public static class JavaUtils
             {
                 if (Path.GetFileName(entry) == "bin")
                 {
-                    javas.Add(Path.Combine(CanonicalPath(entry), JavaExecutable));
+                    javas.Add((new AbsolutePath(CanonicalPath(entry)) / JavaExecutable).Value);
                     binFound = true;
                     break;
                 }
@@ -399,31 +399,31 @@ public static class JavaUtils
     /// <summary>Port of getPrismJavaBundle: locate the JVMs inside the launcher-managed java
     /// dir (<paramref name="javaRoot"/> = FlintPaths.JavaRoot; default keeps the C++
     /// cwd-relative "java" behaviour for bare fixtures).</summary>
-    public static List<string> GetPrismJavaBundle(string? javaRoot = null)
+    public static List<string> GetPrismJavaBundle(AbsolutePath? javaRoot = null)
     {
         var javas = new List<string>();
 
         void ScanDir(string prefix)
         {
-            javas.Add(Path.Combine(prefix, "jre", "bin", JavaExecutable));
-            javas.Add(Path.Combine(prefix, "bin", JavaExecutable));
-            javas.Add(Path.Combine(prefix, JavaExecutable));
+            javas.Add((new AbsolutePath(prefix) / "jre" / "bin" / JavaExecutable).Value);
+            javas.Add((new AbsolutePath(prefix) / "bin" / JavaExecutable).Value);
+            javas.Add((new AbsolutePath(prefix) / JavaExecutable).Value);
         }
 
-        void ScanJavaDir(string dirPath)
+        void ScanJavaDir(AbsolutePath dirPath)
         {
-            if (!Directory.Exists(dirPath))
+            if (!Directory.Exists(dirPath.Value))
             {
                 return;
             }
 
-            foreach (var entry in Directory.GetDirectories(dirPath))
+            foreach (var entry in Directory.GetDirectories(dirPath.Value))
             {
                 ScanDir(CanonicalPath(entry));
             }
         }
 
-        ScanJavaDir(javaRoot ?? Path.GetFullPath("java"));
+        ScanJavaDir(javaRoot ?? new AbsolutePath(Path.GetFullPath("java")));
 
         return javas;
     }

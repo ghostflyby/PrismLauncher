@@ -19,7 +19,7 @@ namespace FlintLauncher.Core.ModPlatform.Technic;
 
 public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVersion) : InstanceTask
 {
-    private string _archivePath = "";
+    private AbsolutePath _archivePath;
 
     /// <summary>APPLICATION->metacache() hook ("general" base); null = plain download.</summary>
     public HttpMetaCache? MetaCache { get; init; }
@@ -49,9 +49,10 @@ public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVers
         {
             // (the C++ downloads through the global cache — outside the instance folder; the
             //  headless fallback mirrors that with a temporary file)
-            _archivePath = Path.Combine(Path.GetTempPath(), "flint-technic-" + Guid.NewGuid().ToString("N") +
-                                                            Path.GetFileName(sourceUrl.AbsolutePath));
-            FileOps.EnsureFilePathExists(new AbsolutePath(_archivePath));
+            string a1 = "flint-technic-" + Guid.NewGuid().ToString("N") +
+                        Path.GetFileName(sourceUrl.AbsolutePath);
+            _archivePath = Temporary.CreateTempFolder() / a1;
+            FileOps.EnsureFilePathExists(_archivePath);
             var request = NetRequest.MakeFile(sourceUrl, _archivePath);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
@@ -67,7 +68,7 @@ public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVers
     private async Task DownloadSucceeded(CancellationToken cancellationToken)
     {
         EmitStatus("Extracting modpack");
-        var extractDir = Path.Combine(StagingPath, "minecraft");
+        var extractDir = StagingPath / "minecraft";
         FileOps.EnsureFolderPathExists(new AbsolutePath(extractDir));
 
         var extracted = MmcZip.ExtractDir(_archivePath, "", extractDir);

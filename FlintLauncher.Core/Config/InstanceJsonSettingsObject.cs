@@ -19,10 +19,11 @@
 // and, together with the typed user stack, retires the S2 FlintConfigSettings adapter.
 
 using FlintLauncher.Core.Settings;
+using TruePath;
 
 namespace FlintLauncher.Core.Config;
 
-public sealed class InstanceJsonSettingsObject(string instanceRoot, InstanceEnvironment environment) : SettingsObject
+public sealed class InstanceJsonSettingsObject(AbsolutePath instanceRoot, InstanceEnvironment environment) : SettingsObject
 {
     private readonly FlintConfigStore? _userConfig = environment.UserConfig;
 

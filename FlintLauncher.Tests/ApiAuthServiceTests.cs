@@ -7,6 +7,7 @@
 // guards that catch a regression back to file-backed tokens.
 
 using FlintLauncher.Web.Services;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -72,9 +73,9 @@ public class ApiAuthServiceTests : IDisposable
         Assert.True(auth.TokenGenerated);
 
         // the startup cleanup (WebHostBuilder) removes the dead weight, idempotently
-        ApiAuthService.RemoveLegacyTokenFile(DataRoot);
+        ApiAuthService.RemoveLegacyTokenFile(new AbsolutePath(DataRoot));
         Assert.False(File.Exists(leftover));
-        ApiAuthService.RemoveLegacyTokenFile(DataRoot);
+        ApiAuthService.RemoveLegacyTokenFile(new AbsolutePath(DataRoot));
     }
 
     [Fact]

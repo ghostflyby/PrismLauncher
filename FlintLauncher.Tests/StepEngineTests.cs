@@ -8,6 +8,7 @@ using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Tasks;
 using Microsoft.Extensions.Logging;
+using TruePath.SystemIo;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -291,10 +292,10 @@ public class StepEngineTests
 
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        Directory.CreateDirectory(instance.GameRoot()); // normally created by CreateGameFolders
+        instance.GameRoot.CreateDirectory(); // normally created by CreateGameFolders
         var task = LaunchTask.Create(instance, fixture.CreateServices());
         var step = new LaunchCommand(task, "/bin/echo hello-from-echo", "Pre-Load");
-        step.SetWorkingDirectory(instance.GameRoot());
+        step.SetWorkingDirectory(instance.GameRoot);
         task.AppendStep(step);
 
         await task.StartAsync();

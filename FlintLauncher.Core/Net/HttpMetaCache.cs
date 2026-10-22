@@ -14,6 +14,7 @@ using System.Text.Json.Serialization.Metadata;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Json;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Net;
 
@@ -100,13 +101,13 @@ public sealed class MetaEntry
     /// the entry has no owning cache or its base is not registered — the silent fallback
     /// to a process-CWD-relative path is exactly the E6 defect shape (② lazy bases → CWD
     /// landing) and must not come back through a side door.</summary>
-    public string GetFullPath()
+    public AbsolutePath GetFullPath()
     {
-        var cache = this._owner ?? throw new InvalidOperationException(
+        var cache = _owner ?? throw new InvalidOperationException(
             "meta entry has no owning cache — resolve it through HttpMetaCache.ResolveEntry");
         var basePath = cache.GetBasePath(BaseId);
-        return basePath.Length != 0
-            ? Path.Combine(basePath, RelativePath)
+        return basePath is { } path
+            ? path / RelativePath
             : throw new InvalidOperationException(
                 $"base '{BaseId}' is not registered on the owning meta cache — the composition root must register it");
     }
@@ -116,15 +117,14 @@ public sealed class MetaEntry
     internal void SetOwner(HttpMetaCache? owner) => this._owner = owner;
 }
 
-public sealed class HttpMetaCache(string? path = null) : IDisposable
+public sealed class HttpMetaCache(AbsolutePath path) : IDisposable
 {
     private readonly Lock _lock = new();
 
     private readonly Dictionary<string, Dictionary<string, MetaEntry>> _entries =
         new(StringComparer.Ordinal);
 
-    private readonly Dictionary<string, string> _basePaths = new(StringComparer.Ordinal);
-    private readonly string? _indexFile = string.IsNullOrEmpty(path) ? null : path;
+    private readonly Dictionary<string, AbsolutePath> _basePaths = new(StringComparer.Ordinal);
     private Timer? _saveTimer;
 
     public void Dispose()
@@ -134,7 +134,7 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
         SaveNow();
     }
 
-    public void AddBase(string baseId, string basePath)
+    public void AddBase(string baseId, AbsolutePath basePath)
     {
         lock (_lock)
         {
@@ -147,11 +147,11 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
         }
     }
 
-    public string GetBasePath(string baseId)
+    public AbsolutePath? GetBasePath(string baseId)
     {
         lock (_lock)
         {
-            return _basePaths.GetValueOrDefault(baseId, "");
+            return _basePaths.GetValueOrDefault(baseId);
         }
     }
 
@@ -180,10 +180,12 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
         }
 
         var basePath = GetBasePath(baseId);
-        var realPath = Path.Combine(basePath, resourcePath);
+        var realPath = basePath is { } knownBase
+            ? knownBase / resourcePath
+            : throw new InvalidOperationException($"base '{baseId}' is not registered on the owning meta cache — the composition root must register it");
 
         // is the file really there? if not -> stale
-        if (!File.Exists(realPath))
+        if (!realPath.ExistsFile())
         {
             Disown(baseId, resourcePath);
             return StaleEntry(baseId, resourcePath);
@@ -196,7 +198,7 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
         // QFileInfo::isReadable (stat+access).
         try
         {
-            using var probe = File.OpenRead(realPath);
+            using var probe = realPath.OpenRead();
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or SecurityException)
         {
@@ -211,13 +213,13 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
         }
 
         // if the file changed, check md5sum
-        var fileLastChanged = new DateTimeOffset(File.GetLastWriteTimeUtc(realPath)).ToUnixTimeMilliseconds();
+        var fileLastChanged = new DateTimeOffset(realPath.GetLastWriteTimeUtc()).ToUnixTimeMilliseconds();
         if (fileLastChanged != entry.LocalChangedTimestamp)
         {
             string md5Sum;
             try
             {
-                using var stream = File.OpenRead(realPath);
+                using var stream = realPath.OpenRead();
                 md5Sum = Convert.ToHexStringLower(MD5.HashData(stream));
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or SecurityException)
@@ -298,14 +300,14 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
                 }
 
                 map.Clear();
-                var basePath = _basePaths.GetValueOrDefault(baseId, "");
-                if (basePath.Length > 0 && Directory.Exists(basePath))
+                var basePath = GetBasePath(baseId);
+                if (basePath is { } knownBasePath && knownBasePath.Exists())
                 {
                     try
                     {
-                        foreach (var file in Directory.EnumerateFiles(basePath))
+                        foreach (var file in knownBasePath.EnumerateFiles())
                         {
-                            File.Delete(file);
+                            file.Delete();
                         }
                     }
                     catch (IOException)
@@ -344,7 +346,7 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
 
     public void Load()
     {
-        if (_indexFile is null || !File.Exists(_indexFile))
+        if (!path.ExistsFile())
         {
             return;
         }
@@ -352,7 +354,7 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
         MetaCacheFileJson? root;
         try
         {
-            root = JsonSerializer.Deserialize(File.ReadAllText(_indexFile),
+            root = JsonSerializer.Deserialize(path.ReadAllText(),
                 MetaCacheJsonContext.Default.MetaCacheFileJson);
         }
         catch (JsonException)
@@ -419,11 +421,6 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
 
     public void SaveNow()
     {
-        if (_indexFile is null)
-        {
-            return;
-        }
-
         MetaCacheFileJson entriesRoot;
         lock (_lock)
         {
@@ -460,17 +457,14 @@ public sealed class HttpMetaCache(string? path = null) : IDisposable
 
         try
         {
-            var dir = Path.GetDirectoryName(_indexFile);
-            if (dir is not null)
+            if (path.Parent is { } known)
             {
-                _ = FileOps.EnsureFolderPathExists(new AbsolutePath(dir));
+                _ = FileOps.EnsureFolderPathExists(known);
             }
 
             // Qt's QJsonDocument writes `"` as `\"` and leaves unicode alone; match that so
             // metacache files stay byte-compatible with PrismLauncher's.
-            File.WriteAllText(
-                _indexFile,
-                JsonSerializer.Serialize(entriesRoot, MetaCacheJson.WriterTypeInfo));
+            path.WriteAllText(JsonSerializer.Serialize(entriesRoot, MetaCacheJson.WriterTypeInfo));
         }
         catch (IOException) { }
     }

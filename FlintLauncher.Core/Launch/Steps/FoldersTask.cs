@@ -12,12 +12,12 @@ public sealed class FoldersTask(MinecraftInstance inst) : FlintTask
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         // Make directories
-        var mcDir = inst.GameRoot();
-        if (!Directory.Exists(mcDir))
+        var mcDir = inst.GameRoot;
+        if (!Directory.Exists(mcDir.Value))
         {
             try
             {
-                Directory.CreateDirectory(mcDir);
+                Directory.CreateDirectory(mcDir.Value);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {

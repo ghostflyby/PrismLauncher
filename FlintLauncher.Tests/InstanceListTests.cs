@@ -8,6 +8,7 @@ using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.State;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -37,7 +38,11 @@ public class InstanceListTests : IDisposable
     }
 
     private InstanceList CreateList() =>
-        new([_instancesDir]) { Environment = _global, GroupFilePath = _groupFile };
+        new([new AbsolutePath(_instancesDir)])
+        {
+            Environment = _global,
+            GroupFilePath = new AbsolutePath(_groupFile),
+        };
 
     private void MakeInstanceDir(string id, string instanceType = "OneSix", string? name = null)
     {
@@ -81,9 +86,9 @@ public class InstanceListTests : IDisposable
         Assert.Equal("B", bbb.Name());
         // id = folder name
         Assert.Equal("aaa", aaa.Id());
-        Assert.Equal(Path.Combine(_instancesDir, "aaa"), aaa.InstanceRoot());
-        Assert.Equal(Path.Combine(_instancesDir, "bbb"), bbb.InstanceRoot());
-        Assert.Equal(Path.Combine(_instancesDir, "ccc"), ccc.InstanceRoot());
+        Assert.Equal(Path.Combine(_instancesDir, "aaa"), aaa.InstanceRoot.Value);
+        Assert.Equal(Path.Combine(_instancesDir, "bbb"), bbb.InstanceRoot.Value);
+        Assert.Equal(Path.Combine(_instancesDir, "ccc"), ccc.InstanceRoot.Value);
     }
 
     [Fact]
@@ -179,12 +184,13 @@ public class InstanceListTests : IDisposable
         var list = CreateList();
         Assert.Equal(InstListError.NoError, list.LoadList());
 
-        var staging = list.GetStagedInstancePath("");
-        Assert.NotNull(staging);
+        var stagingPath = list.GetStagedInstancePath(default);
+        Assert.NotNull(stagingPath);
+        var staging = stagingPath.Value.Value;
         File.WriteAllText(Path.Combine(staging, "instance.cfg"),
             "InstanceType=OneSix\nname=Uuid Staged\nuuid=abc123def456\n");
 
-        var task = new StubInstanceTask { TargetDir = "", Group = "UuidGroup" };
+        var task = new StubInstanceTask { TargetDir = default, Group = "UuidGroup" };
         task.SetName("Uuid Staged");
         Assert.True(list.CommitStagedInstance(staging, task, task.Group));
 
@@ -562,10 +568,10 @@ public class InstanceListTests : IDisposable
         // a group-file path whose parent is a FILE: every group-file write fails
         var blocker = Path.Combine(_root, "blocker");
         File.WriteAllText(blocker, "x");
-        var list = new InstanceList([_instancesDir])
+        var list = new InstanceList([new AbsolutePath(_instancesDir)])
         {
             Environment = _global,
-            GroupFilePath = Path.Combine(blocker, "instgroups.json"),
+            GroupFilePath = new AbsolutePath(Path.Combine(blocker, "instgroups.json")),
             LauncherState = state,
         };
         list.LoadList();
@@ -597,10 +603,10 @@ public class InstanceListTests : IDisposable
         // a group-file path whose parent is a FILE: every group-file write fails
         var blocker = Path.Combine(_root, "blocker");
         File.WriteAllText(blocker, "x");
-        var list = new InstanceList([_instancesDir])
+        var list = new InstanceList([new AbsolutePath(_instancesDir)])
         {
             Environment = _global,
-            GroupFilePath = Path.Combine(blocker, "instgroups.json"),
+            GroupFilePath = new AbsolutePath(Path.Combine(blocker, "instgroups.json")),
             LauncherState = state,
         };
         list.LoadList();
@@ -732,16 +738,17 @@ public class InstanceListTests : IDisposable
         // can persist the group into instgroups.json
         Assert.Equal(InstListError.NoError, list.LoadList());
 
-        Assert.Null(list.GetStagedInstancePath(Path.Combine(_root, "not-configured")));
+        Assert.Null(list.GetStagedInstancePath(new AbsolutePath(Path.Combine(_root, "not-configured"))));
 
-        var staging = list.GetStagedInstancePath("");
-        Assert.NotNull(staging);
+        var stagingPath = list.GetStagedInstancePath(default);
+        Assert.NotNull(stagingPath);
+        var staging = stagingPath.Value.Value;
         Assert.Contains(".tmp", staging);
         Assert.True(Directory.Exists(staging));
 
         File.WriteAllText(Path.Combine(staging, "instance.cfg"), "InstanceType=OneSix\nname=Staged Instance\n");
 
-        var task = new StubInstanceTask { TargetDir = "", Group = "StagedGroup" };
+        var task = new StubInstanceTask { TargetDir = default, Group = "StagedGroup" };
         task.SetName("Staged Instance");
         Assert.True(list.CommitStagedInstance(staging, task, task.Group));
 
@@ -804,7 +811,7 @@ public class InstanceListTests : IDisposable
     public void CommitStagedInstance_RejectsUnconfiguredTargetDir()
     {
         var list = CreateList();
-        var task = new StubInstanceTask { TargetDir = Path.Combine(_root, "elsewhere") };
+        var task = new StubInstanceTask { TargetDir = new AbsolutePath(Path.Combine(_root, "elsewhere")) };
         task.SetName("X");
         var staging = Path.Combine(_root, "fake-staging");
         Directory.CreateDirectory(staging);
@@ -819,8 +826,9 @@ public class InstanceListTests : IDisposable
         var task = new StubInstanceTask();
         task.SetName("Taken");
 
-        var staging = list.GetStagedInstancePath("");
-        Assert.NotNull(staging);
+        var stagingPath = list.GetStagedInstancePath(default);
+        Assert.NotNull(stagingPath);
+        var staging = stagingPath.Value.Value;
         File.WriteAllText(Path.Combine(staging, "instance.cfg"), "InstanceType=OneSix\nname=Taken\n");
 
         Assert.True(list.CommitStagedInstance(staging, task, ""));
@@ -855,9 +863,9 @@ public class InstanceListTests : IDisposable
         Directory.CreateDirectory(Path.Combine(otherDir, "in-new"));
         File.WriteAllText(Path.Combine(otherDir, "in-new", "instance.cfg"), "InstanceType=OneSix\nname=New\n");
 
-        list.SetInstanceDirs([otherDir]);
+        list.SetInstanceDirs([new AbsolutePath(otherDir)]);
 
-        Assert.Equal(otherDir, list.PrimaryDir());
+        Assert.Equal(otherDir, list.PrimaryDir().Value);
         Assert.Equal(1, list.Count);
         Assert.Null(list.GetInstanceById("in-old"));
         Assert.NotNull(list.GetInstanceById("in-new"));

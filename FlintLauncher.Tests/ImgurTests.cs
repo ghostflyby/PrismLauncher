@@ -10,6 +10,7 @@ using System.Text.Json;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Screenshots;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -30,12 +31,12 @@ public class ImgurTests : IDisposable
         catch (DirectoryNotFoundException) { }
     }
 
-    private string TempPng(byte[] bytes)
+    private AbsolutePath TempPng(byte[] bytes)
     {
         Directory.CreateDirectory(_dir);
         var path = Path.Combine(_dir, "2026-09-13_10.11.12.png");
         File.WriteAllBytes(path, bytes);
-        return path;
+        return new AbsolutePath(path);
     }
 
     // ---------------------------------------------------------------- ScreenShot model
@@ -43,8 +44,8 @@ public class ImgurTests : IDisposable
     [Fact]
     public void ScreenShot_FileInfo_Semantics()
     {
-        var shot = new ScreenShot("/instances/a/screens/2026-09-13_10.11.12.png");
-        Assert.Equal("/instances/a/screens/2026-09-13_10.11.12.png", shot.FilePath);
+        var shot = new ScreenShot(new AbsolutePath("/instances/a/screens/2026-09-13_10.11.12.png"));
+        Assert.Equal("/instances/a/screens/2026-09-13_10.11.12.png", shot.FilePath.Value);
         // QFileInfo::fileName()
         Assert.Equal("2026-09-13_10.11.12.png", shot.FileName());
         // QFileInfo::baseName(): everything before the first '.'
@@ -174,7 +175,7 @@ public class ImgurTests : IDisposable
     [Fact]
     public async Task Upload_Fails_When_File_Missing()
     {
-        var shot = new ScreenShot(Path.Combine(_dir, "does-not-exist.png"));
+        var shot = new ScreenShot(new AbsolutePath(Path.Combine(_dir, "does-not-exist.png")));
         var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
         await upload.StartAsync();
 
@@ -185,7 +186,7 @@ public class ImgurTests : IDisposable
 
     // ---------------------------------------------------------------- ImgurAlbumCreation
 
-    private static ScreenShot ShotWithHash(string deleteHash) => new("unused.png")
+    private static ScreenShot ShotWithHash(string deleteHash) => new(new AbsolutePath(Path.Combine(Path.GetTempPath(), "unused.png")))
     {
         ImgurId = "id-" + deleteHash,
         Url = "https://i.imgur.com/" + deleteHash + ".png",

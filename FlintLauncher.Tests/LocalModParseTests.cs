@@ -9,6 +9,7 @@
 using System.IO.Compression;
 using System.Text;
 using FlintLauncher.Core.Minecraft.Resources;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -42,7 +43,7 @@ public class LocalModParseTests : IDisposable
 
     private static Mod Parsed(string path)
     {
-        var mod = new Mod(path);
+        var mod = new Mod(new AbsolutePath(path));
         ModUtils.Process(mod);
         return mod;
     }
@@ -122,7 +123,7 @@ public class LocalModParseTests : IDisposable
         var jar = TempFile("garbage.jar");
         WriteJar(jar, ("fabric.mod.json", "{{{ not json"));
 
-        var mod = new Mod(jar);
+        var mod = new Mod(new AbsolutePath(jar));
 
         // the parse "succeeds" (a metadata candidate was found) but yields no details
         Assert.True(ModUtils.Process(mod));
@@ -493,7 +494,7 @@ public class LocalModParseTests : IDisposable
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "some.txt"), "hi");
 
-        var mod = new Mod(dir);
+        var mod = new Mod(new AbsolutePath(dir));
 
         Assert.False(ModUtils.Process(mod));
         Assert.Equal("", mod.Details.ModId);
@@ -531,7 +532,7 @@ public class LocalModParseTests : IDisposable
         File.WriteAllText(Path.Combine(folderMod, "mcmod.info"),
             """[ { "modid": "foldermod", "name": "Folder Mod", "version": "0.5" } ]""");
 
-        var model = new ModFolderModel(modsDir, isIndexed: false, createDir: true);
+        var model = new ModFolderModel(new AbsolutePath(modsDir), isIndexed: false, createDir: true);
         Assert.True(model.Update());
 
         Assert.Equal(2, model.Size);

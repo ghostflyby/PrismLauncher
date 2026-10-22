@@ -13,6 +13,7 @@ using System.Text.RegularExpressions;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -50,7 +51,7 @@ public class FtbTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList([instancesDir]) { Environment = _global };
+        return new InstanceList([new AbsolutePath(instancesDir)]) { Environment = _global };
     }
 
     private static List<(string? Uid, string? Version)> Components(string staging)

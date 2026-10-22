@@ -6,6 +6,8 @@
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Minecraft;
+using TruePath;
+using TruePath.SystemIo;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -42,7 +44,7 @@ public class ComponentTests : IDisposable
     [Fact]
     public void EnableDisableFlagMatrix()
     {
-        using var profile = new PackProfile(_root);
+        using var profile = new PackProfile(new AbsolutePath(_root));
         var normal = new Component(profile, "test.normal");
         Assert.True(normal.IsEnabled());
         Assert.True(normal.CanBeDisabled());
@@ -73,7 +75,7 @@ public class ComponentTests : IDisposable
     [Fact]
     public void KnownModloaders()
     {
-        using var profile = new PackProfile(_root);
+        using var profile = new PackProfile(new AbsolutePath(_root));
         var fabric = new Component(profile, "net.fabricmc.fabric-loader");
         Assert.True(fabric.IsKnownModloader());
         Assert.Contains("net.minecraftforge", fabric.KnownConflictingComponents());
@@ -86,7 +88,7 @@ public class ComponentTests : IDisposable
     [Fact]
     public void UpdateCachedDataCopiesRequires()
     {
-        using var profile = new PackProfile(_root);
+        using var profile = new PackProfile(new AbsolutePath(_root));
         var component = new Component(profile, "test.a");
 
         var file = MakeVersionFile("test.a", "1.0", "Test A");
@@ -110,7 +112,7 @@ public class ComponentTests : IDisposable
     [Fact]
     public void ProblemsReportedForUnloadedPatch()
     {
-        using var profile = new PackProfile(_root);
+        using var profile = new PackProfile(new AbsolutePath(_root));
         var component = new Component(profile, "test.a");
 
         // without a version file only the "not loaded" placeholder is reported (C++ semantics)
@@ -134,7 +136,7 @@ public class ComponentTests : IDisposable
     [Fact]
     public void CustomizeWritesPatchFileAndRevertDeletesIt()
     {
-        using var profile = new PackProfile(_root);
+        using var profile = new PackProfile(new AbsolutePath(_root));
         var component = new Component(profile, "net.minecraft");
 
         // meta-backed component: customization materializes the version file into patches/
@@ -155,22 +157,22 @@ public class ComponentTests : IDisposable
         Assert.Null(component.GetMeta());
 
         var patchPath = profile.PatchFilePathForUid("net.minecraft");
-        Assert.True(File.Exists(patchPath));
-        var patchNode = JsonNode.Parse(File.ReadAllText(patchPath));
+        Assert.True(patchPath.ExistsFile());
+        var patchNode = JsonNode.Parse(patchPath.ReadAllText());
         Assert.NotNull(patchNode);
         Assert.Equal("net.minecraft", patchNode["uid"]?.ToString());
         Assert.Equal("1.12.2", patchNode["version"]?.ToString());
 
         // reverting deletes the file again
         Assert.True(component.Revert());
-        Assert.False(File.Exists(patchPath));
+        Assert.False(patchPath.ExistsFile());
         Assert.False(component.IsCustom());
     }
 
     [Fact]
     public void RevertOnNonCustomComponentIsNoOp()
     {
-        using var profile = new PackProfile(_root);
+        using var profile = new PackProfile(new AbsolutePath(_root));
         var component = new Component(profile, "test.a");
         Assert.True(component.Revert());
     }
@@ -178,7 +180,7 @@ public class ComponentTests : IDisposable
     [Fact]
     public void UpdateActionVariantRoundTrip()
     {
-        using var profile = new PackProfile(_root);
+        using var profile = new PackProfile(new AbsolutePath(_root));
         var component = new Component(profile, "test.a");
 
         Assert.IsType<UpdateAction.None>(component.GetUpdateAction());
@@ -204,7 +206,7 @@ public class ComponentTests : IDisposable
     [Fact]
     public void ApplyToSkipsDisabledComponents()
     {
-        using var profile = new PackProfile(_root);
+        using var profile = new PackProfile(new AbsolutePath(_root));
         var component = new Component(profile, "test.a", MakeVersionFile("test.a", "1.0", "Test A"));
         component.SetEnabled(false);
 

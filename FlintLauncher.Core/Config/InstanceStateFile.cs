@@ -7,6 +7,8 @@
 
 using System.Text.Json.Serialization.Metadata;
 using FlintLauncher.Core.Settings;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Config;
 
@@ -36,11 +38,11 @@ public sealed class InstanceStateStore
     private readonly object _lock = new();
     private readonly TypedJsonFile<InstanceStateFile> _file;
 
-    public InstanceStateStore(string instanceRoot, JsonTypeInfo<InstanceStateFile> typeInfo)
+    public InstanceStateStore(AbsolutePath instanceRoot, JsonTypeInfo<InstanceStateFile> typeInfo)
     {
-        FilePath = Path.Combine(instanceRoot, "instance-state.json");
+        FilePath = instanceRoot / "instance-state.json";
         _file = new TypedJsonFile<InstanceStateFile>(FilePath, typeInfo);
-        if (File.Exists(FilePath))
+        if (FilePath.ExistsFile())
         {
             Current = Load();
             return;
@@ -49,7 +51,7 @@ public sealed class InstanceStateStore
         // the read-only seed from the legacy cfg (zeros when there is none): the C++ kept
         // the trio inside instance.cfg, and the D4 split must not lose it on a load that
         // performs no write — the first mutation materializes instance-state.json
-        var legacyCfg = Path.Combine(instanceRoot, InstanceIniImporter.LegacyFileName);
+        var legacyCfg = instanceRoot / InstanceIniImporter.LegacyFileName;
         var ini = new IniFile();
         Current = ini.LoadFile(legacyCfg)
             ? new InstanceStateFile
@@ -68,7 +70,7 @@ public sealed class InstanceStateStore
     /// <summary>The current in-memory snapshot. Treat as immutable — mutate through Update.</summary>
     public InstanceStateFile Current { get; private set; }
 
-    public string FilePath { get; }
+    public AbsolutePath FilePath { get; }
 
     public static InstanceStateFile CurrentDefault() => new() { StateVersion = InstanceStateFile.CurrentVersion };
 
@@ -76,7 +78,7 @@ public sealed class InstanceStateStore
 
     /// <summary>Whether the state file exists yet — false means the in-memory snapshot came
     /// from the legacy cfg seed (or zeros) and nothing was persisted.</summary>
-    public bool Exists => File.Exists(FilePath);
+    public bool Exists => FilePath.ExistsFile();
 
     public void Update(Func<InstanceStateFile, InstanceStateFile> mutate)
     {

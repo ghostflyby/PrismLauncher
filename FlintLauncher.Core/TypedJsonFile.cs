@@ -10,6 +10,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.Security;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core;
 
@@ -23,10 +25,10 @@ public interface IStateVersioned
 
 /// <summary>A single strongly-typed JSON file. Not thread-safe: callers own serialization
 /// (the runtime keeps one writer per domain, e.g. LauncherRuntime.InstanceLock).</summary>
-public sealed class TypedJsonFile<T>(string filePath, JsonTypeInfo<T> typeInfo)
+public sealed class TypedJsonFile<T>(AbsolutePath filePath, JsonTypeInfo<T> typeInfo)
     where T : class
 {
-    public string FilePath { get; } = filePath;
+    public AbsolutePath FilePath { get; } = filePath;
 
     /// <summary>load-or-default: a missing (or unreadable/corrupt) file yields the factory
     /// default. A corrupt payload is preserved next to the file as <c>&lt;name&gt;.corrupt</c>
@@ -57,37 +59,36 @@ public sealed class TypedJsonFile<T>(string filePath, JsonTypeInfo<T> typeInfo)
     /// replaces.</summary>
     public void Save(T value, UnixFileMode? unixFileMode = null)
     {
-        var directory = Path.GetDirectoryName(FilePath);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
+        var directory = FilePath.Parent
+                        ?? throw new InvalidOperationException(
+                            $"typed file '{FilePath.Value}' sits at the filesystem root");
+        directory.CreateDirectory();
 
-        var temp = FilePath + ".tmp-" + Guid.NewGuid().ToString("N");
+        var temp = directory / (FilePath.FileName + $".tmp-{Guid.NewGuid():N}");
         try
         {
-            using (var stream = File.Create(temp))
+            using (var stream = temp.Create())
             {
                 // narrow the permissions BEFORE the payload is written: the temp file lives
                 // for the duration of the serialize, and a 0600 payload (accounts/secrets)
                 // must never be world-readable even for that window
                 if (unixFileMode is { } mode && !OperatingSystem.IsWindows())
                 {
-                    File.SetUnixFileMode(temp, mode);
+                    File.SetUnixFileMode(temp.Value, mode);
                 }
 
                 JsonSerializer.Serialize(stream, value, typeInfo);
             }
 
-            File.Move(temp, FilePath, overwrite: true);
+            temp.Move(FilePath, overwrite: true);
         }
         finally
         {
-            if (File.Exists(temp))
+            if (temp.ExistsFile())
             {
                 try
                 {
-                    File.Delete(temp);
+                    temp.Delete();
                 }
                 catch (IOException)
                 {
@@ -100,7 +101,7 @@ public sealed class TypedJsonFile<T>(string filePath, JsonTypeInfo<T> typeInfo)
     private bool TryLoad([NotNullWhen(true)] out T? value)
     {
         value = null;
-        if (!File.Exists(FilePath))
+        if (!FilePath.ExistsFile())
         {
             return false;
         }
@@ -108,7 +109,7 @@ public sealed class TypedJsonFile<T>(string filePath, JsonTypeInfo<T> typeInfo)
         string json;
         try
         {
-            json = File.ReadAllText(FilePath);
+            json = File.ReadAllText(FilePath.Value);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                       or SecurityException or NotSupportedException)
@@ -125,7 +126,7 @@ public sealed class TypedJsonFile<T>(string filePath, JsonTypeInfo<T> typeInfo)
         {
             try
             {
-                File.Copy(FilePath, FilePath + ".corrupt", overwrite: true);
+                File.Copy(FilePath.Value, FilePath.Value + ".corrupt", overwrite: true);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                           or SecurityException or NotSupportedException)

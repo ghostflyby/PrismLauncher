@@ -9,6 +9,8 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Settings;
 
@@ -43,9 +45,9 @@ public sealed class IniFile
 
     // ------------------------------------------------------------------- file io
 
-    public bool LoadFile(string fileName)
+    public bool LoadFile(AbsolutePath fileName)
     {
-        if (!File.Exists(fileName))
+        if (!fileName.ExistsFile())
         {
             return false;
         }
@@ -53,7 +55,7 @@ public sealed class IniFile
         string text;
         try
         {
-            text = File.ReadAllText(fileName, Encoding.UTF8);
+            text = fileName.ReadAllText(Encoding.UTF8);
         }
         catch (IOException)
         {

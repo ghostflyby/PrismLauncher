@@ -15,6 +15,7 @@ using System.Text.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Versioning;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
@@ -494,7 +495,7 @@ public sealed class ModrinthApi(NetStack? net = null) : ResourceApi
     }
 
     /// <summary>makeFile() with the Modrinth header proxy applied (downloads from the cdn).</summary>
-    public NetRequest MakeFileRequest(string url, string path, DownloadMeta meta = default)
+    public NetRequest MakeFileRequest(string url, AbsolutePath path, DownloadMeta meta = default)
     {
         var request = NetRequest.MakeFile(new Uri(url), path, stack: Net);
         AddApiHeaders(request, meta);

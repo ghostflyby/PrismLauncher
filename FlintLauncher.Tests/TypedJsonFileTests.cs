@@ -6,6 +6,7 @@
 
 using System.Text.Json.Serialization;
 using FlintLauncher.Core;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -26,7 +27,7 @@ public class TypedJsonFileTests : IDisposable
     private string FilePath(string name = "state.json") => Path.Combine(_dir, name);
 
     private TypedJsonFile<SampleState> File(string name = "state.json") =>
-        new(FilePath(name), TypedJsonTestContext.Default.SampleState);
+        new(new AbsolutePath(FilePath(name)), TypedJsonTestContext.Default.SampleState);
 
     // ------------------------------------------------------------------ load-or-default
 
@@ -108,7 +109,7 @@ public class TypedJsonFileTests : IDisposable
     [Fact]
     public void Save_Creates_Missing_Parent_Directories()
     {
-        var file = new TypedJsonFile<SampleState>(Path.Combine(_dir, "nested", "deeper", "state.json"),
+        var file = new TypedJsonFile<SampleState>(new AbsolutePath(Path.Combine(_dir, "nested", "deeper", "state.json")),
             TypedJsonTestContext.Default.SampleState);
 
         file.Save(new SampleState { StateVersion = 2, Name = "deep" });

@@ -17,6 +17,7 @@ using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
 using FlintLauncher.Web.Services;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Web.Endpoints;
 
@@ -62,12 +63,11 @@ public static class ExportEndpoints
                 // instance's identity; the file lands in the instance directory
                 var name = string.IsNullOrWhiteSpace(request.Name) ? instance.Name() : request.Name.Trim();
                 var versionId = string.IsNullOrWhiteSpace(request.VersionId) ? "1.0" : request.VersionId.Trim();
-                var instanceRoot = instance.InstanceRoot();
-                Directory.CreateDirectory(instanceRoot);
+                var instanceRoot = instance.InstanceRoot;
+                instanceRoot.CreateDirectory();
                 // DirNameFromString strips characters that are invalid in paths (like the
                 // C++ export file-name suggestion)
-                AbsolutePath inDir = new AbsolutePath(instanceRoot);
-                var baseName = FileNaming.DirNameFromString($"{name}-{versionId}", [inDir]);
+                var baseName = FileNaming.DirNameFromString($"{name}-{versionId}", instanceRoot);
                 var extension = format switch
                 {
                     "modrinth" => "mrpack",
@@ -76,9 +76,9 @@ public static class ExportEndpoints
                     // default file suggestion)
                     _ => "",
                 };
-                var output = format == "modlist"
-                    ? ""
-                    : Path.Combine(instanceRoot, baseName + "." + extension);
+                AbsolutePath output = format == "modlist"
+                    ? default
+                    : instanceRoot / $"{baseName}.{extension}";
 
                 FlintTask task;
                 var kind = format switch
@@ -113,7 +113,7 @@ public static class ExportEndpoints
                             return ApiJson.Error("invalid_body",
                                 "'format2' must be one of: html, markdown, plain, json, csv", 400);
                         }
-                        output = Path.Combine(instanceRoot, baseName + "-mods." + modlistExtension);
+                        output = instanceRoot / $"{baseName}-mods.{modlistExtension}";
                         task = new ModListExportTask(instance, output, modlistFormat,
                             OptionalData.Version | OptionalData.FileName);
                         break;
@@ -175,7 +175,7 @@ public static class ExportEndpoints
                     return ApiJson.NotFound("log_not_found", $"no log file '{name}' in '{dir}'");
                 }
 
-                return Results.Text(ReadTail(path, MaxLogBytes), "text/plain",
+                return Results.Text(ReadTail(path.Value, MaxLogBytes), "text/plain",
                     Encoding.UTF8);
             }
             finally
@@ -192,8 +192,8 @@ public static class ExportEndpoints
     private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string reference) =>
         runtime.Instances.ResolveInstance(reference) as MinecraftInstance;
 
-    private static string LogDir(MinecraftInstance instance, string dir) =>
-        Path.Combine(instance.GameRoot(), dir);
+    private static AbsolutePath LogDir(MinecraftInstance instance, string dir) =>
+        (instance.GameRoot / dir);
 
     private static List<LogFileView> ListLogFiles(MinecraftInstance instance)
     {
@@ -201,15 +201,15 @@ public static class ExportEndpoints
         foreach (var dir in new[] { "logs", "crash-reports" })
         {
             var path = LogDir(instance, dir);
-            if (!Directory.Exists(path))
+            if (!path.ExistsDirectory())
             {
                 continue;
             }
 
-            IEnumerable<string> files;
+            IEnumerable<AbsolutePath> files;
             try
             {
-                files = Directory.EnumerateFiles(path);
+                files = path.EnumerateFiles();
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
@@ -218,7 +218,7 @@ public static class ExportEndpoints
 
             foreach (var file in files)
             {
-                var info = new FileInfo(file);
+                var info = new FileInfo(file.Value);
                 if ((info.Attributes & FileAttributes.Directory) != 0)
                 {
                     continue;
@@ -241,30 +241,20 @@ public static class ExportEndpoints
 
     /// <summary>Resolves a listed log name inside the given folder, refusing anything with
     /// path separators or outside the folder (path traversal guard).</summary>
-    private static string? ResolveLogFile(string dir, string name)
+    private static AbsolutePath? ResolveLogFile(AbsolutePath dir, string name)
     {
-        if (string.IsNullOrWhiteSpace(name) ||
-            name.Contains('/') || name.Contains('\\') || name.Contains("..", StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        var path = Path.Combine(dir, name);
-        var fullDir = Path.GetFullPath(dir);
-        var full = Path.GetFullPath(path);
-        return File.Exists(full) && full.StartsWith(fullDir + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-            ? full
-            : null;
+        var path = dir / name;
+        return path.Exists() && path.StartsWith(dir) ? path : null;
     }
 
     /// <summary>The last <paramref name="maxBytes"/> of a text file, starting on a line
     /// boundary; the whole file when it is smaller than the cap.</summary>
-    private static string ReadTail(string path, int maxBytes)
+    private static string ReadTail(AbsolutePath path, int maxBytes)
     {
-        var length = new FileInfo(path).Length;
+        var length = new FileInfo(path.Value).Length;
         try
         {
-            using var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var stream = File.Open(path.Value, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             if (length <= maxBytes)
             {
                 using var reader = new StreamReader(stream, Encoding.UTF8);

@@ -5,20 +5,21 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.IO;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Net;
 
 /// <summary>Writes the response body to a file via an atomic temp file + rename (PSaveFile).</summary>
-public class FileSink(string filename) : Sink
+public class FileSink(AbsolutePath filename) : Sink
 {
     private bool _wroteAnyData;
 
     /// <summary>Writable by MetaCacheSink (C++: protected member access).</summary>
     private protected bool WroteAnyData => _wroteAnyData;
 
-    private string? _tempFile;
+    private AbsolutePath? _tempFile;
 
-    public string Filename => filename;
+    public AbsolutePath Filename => filename;
 
     public override bool Init(NetRequestSpec request)
     {
@@ -35,10 +36,12 @@ public class FileSink(string filename) : Sink
         }
 
         _wroteAnyData = false;
-        _tempFile = filename + ".flint-tmp";
+        _tempFile = filename.Parent is { } parent
+            ? parent / (filename.FileName + ".flint-tmp")
+            : new AbsolutePath(filename.Value + ".flint-tmp");
         try
         {
-            File.Create(_tempFile).Dispose();
+            _tempFile?.Create().Dispose();
         }
         catch (IOException e)
         {
@@ -58,7 +61,7 @@ public class FileSink(string filename) : Sink
 
     public override bool Write(byte[] data)
     {
-        if (_tempFile is null)
+        if (_tempFile is not { } tempFile)
         {
             FailReason = "Writing into a closed file sink";
             return false;
@@ -66,7 +69,7 @@ public class FileSink(string filename) : Sink
 
         try
         {
-            using var stream = File.Open(_tempFile, FileMode.Append, FileAccess.Write);
+            using var stream = tempFile.Open(FileMode.Append, FileAccess.Write);
             stream.Write(data);
         }
         catch (IOException e)
@@ -112,11 +115,11 @@ public class FileSink(string filename) : Sink
                 return false;
             }
 
-            if (_tempFile is not null)
+            if (_tempFile is { } tempFile)
             {
                 try
                 {
-                    File.Move(_tempFile, filename, overwrite: true);
+                    tempFile.Move(filename, overwrite: true);
                 }
                 catch (IOException e)
                 {
@@ -135,17 +138,17 @@ public class FileSink(string filename) : Sink
 
     public override bool HasLocalData()
     {
-        var info = new FileInfo(filename);
+        var info = new FileInfo(filename.Value);
         return info.Exists && info.Length != 0;
     }
 
     private void CancelWriting()
     {
-        if (_tempFile is not null)
+        if (_tempFile is { } tempFile)
         {
             try
             {
-                File.Delete(_tempFile);
+                tempFile.Delete();
             }
             catch (IOException) { }
 
@@ -172,7 +175,7 @@ public sealed class MetaCacheSink(MetaEntry entry, ChecksumValidator md5Sum, boo
 
     public override bool HasLocalData()
     {
-        var info = new FileInfo(entry.GetFullPath());
+        var info = new FileInfo(entry.GetFullPath().Value);
         return info.Exists && info.Length != 0;
     }
 
@@ -218,8 +221,8 @@ public sealed class MetaCacheSink(MetaEntry entry, ChecksumValidator md5Sum, boo
         }
 
         var fullPath = entry.GetFullPath();
-        entry.LocalChangedTimestamp = File.Exists(fullPath)
-            ? new DateTimeOffset(File.GetLastWriteTimeUtc(fullPath)).ToUnixTimeMilliseconds()
+        entry.LocalChangedTimestamp = fullPath.ExistsFile()
+            ? new DateTimeOffset(fullPath.GetLastWriteTimeUtc()).ToUnixTimeMilliseconds()
             : 0;
 
         if (isEternal)

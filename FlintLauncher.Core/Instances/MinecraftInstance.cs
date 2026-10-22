@@ -52,6 +52,8 @@ using FlintLauncher.Core.State;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using Microsoft.Extensions.Logging.Abstractions;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Instances;
 
@@ -59,7 +61,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 {
     private static readonly Regex TokenRegex = new(@"\$\{(.+?)\}", RegexOptions.CultureInvariant); // InvertedGreediness
 
-    public MinecraftInstance(SettingsObject settings, string rootDir)
+    public MinecraftInstance(SettingsObject settings, AbsolutePath rootDir)
         : base(settings, rootDir)
     {
         Components = new PackProfile(this);
@@ -93,9 +95,9 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     }
 
     /// <summary>Injected data-directory layout (assets/libraries/java roots, instgroups.json).
-    /// Null keeps the legacy CWD-anchored behavior for bare fixtures; hosts always set it
-    /// (InstanceList stamps it at discovery).</summary>
-    public FlintPaths? Paths { get; set; }
+    /// Defaults to the legacy CWD-anchored layout for bare fixtures; hosts always stamp it
+    /// (InstanceList at discovery, tests directly).</summary>
+    public FlintPaths Paths { get; set; } = FlintPaths.FromHomeDir(AbsolutePath.CurrentWorkingDirectory);
 
     /// <summary>Injected launch-pipeline dependencies (paths, logger factory, global settings,
     /// install root, UI hooks — the former static hooks). Stamped by the composition root
@@ -229,21 +231,21 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     ////// Directories and files //////
 
-    public string JarModsDir() => QDirAbsolutePath(Path.Combine(InstanceRoot(), "jarmods"));
+    public AbsolutePath JarModsDir => InstanceRoot / "jarmods";
 
-    public string ResourcePacksDir() => Path.Combine(GameRoot(), "resourcepacks");
+    public AbsolutePath ResourcePacksDir => GameRoot / "resourcepacks";
 
-    public string TexturePacksDir() => Path.Combine(GameRoot(), "texturepacks");
+    public AbsolutePath TexturePacksDir => GameRoot / "texturepacks";
 
-    public string ShaderPacksDir() => Path.Combine(GameRoot(), "shaderpacks");
+    public AbsolutePath ShaderPacksDir => GameRoot / "shaderpacks";
 
-    public override string ModsRoot() => Path.Combine(GameRoot(), "mods");
+    public override AbsolutePath ModsRoot => GameRoot / "mods";
 
-    public string CoreModsDir() => Path.Combine(GameRoot(), "coremods");
+    public AbsolutePath CoreModsDir => GameRoot / "coremods";
 
-    public string NilModsDir() => Path.Combine(GameRoot(), "nilmods");
+    public AbsolutePath NilModsDir => GameRoot / "nilmods";
 
-    public string DataPacksDir()
+    public AbsolutePath DataPacksDir()
     {
         var relativePath = Variant.AsString(Settings.Get("GlobalDataPacksPath"));
 
@@ -252,46 +254,47 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             relativePath = "datapacks";
         }
 
-        return Path.Combine(GameRoot(), relativePath);
+        return GameRoot / relativePath;
     }
 
-    public string ModsCacheLocation() => Path.Combine(InstanceRoot(), "mods.cache");
+    public AbsolutePath ModsCacheLocation() => InstanceRoot / "mods.cache";
 
-    public string LibDir() => Path.Combine(GameRoot(), "lib");
+    public AbsolutePath LibDir() => GameRoot / "lib";
 
-    public string WorldDir() => Path.Combine(GameRoot(), "saves");
+    public AbsolutePath WorldDir() => GameRoot / "saves";
 
-    public string ResourcesDir() => Path.Combine(GameRoot(), "resources");
+    public AbsolutePath ResourcesDir() => GameRoot / "resources";
 
     /// <summary>QDir::current().absoluteFilePath("libraries").</summary>
-    public string LibrariesPath() => Paths?.LibrariesRoot ?? QDirAbsolutePath("libraries");
+    public AbsolutePath LibrariesPath() => Paths.LibrariesRoot;
 
-    public string JarmodsPath() => JarModsDir();
-
-    public override string InstanceConfigFolder() => Path.Combine(GameRoot(), "config");
+    public override AbsolutePath InstanceConfigFolder() => GameRoot / "config";
 
     /// <summary>Path to the instance's minecraft directory.</summary>
-    public override string GameRoot()
+    public override AbsolutePath GameRoot
     {
-        var mcDir = Path.Combine(InstanceRoot(), "minecraft");
-        var dotMcDir = Path.Combine(InstanceRoot(), ".minecraft");
-
-        if (FsExists(dotMcDir) && !FsExists(mcDir))
+        get
         {
-            return dotMcDir;
-        }
+            var mcDir = InstanceRoot / "minecraft";
+            var dotMcDir = InstanceRoot / ".minecraft";
 
-        return mcDir;
+            if (dotMcDir.Exists() && !mcDir.Exists())
+            {
+                return dotMcDir;
+            }
+
+            return mcDir;
+        }
     }
 
     /// <summary>Path to the instance's minecraft bin directory.</summary>
-    public string BinRoot() => Path.Combine(GameRoot(), "bin");
+    public AbsolutePath BinRoot() => GameRoot / "bin";
 
     /// <summary>where to put the natives during/before launch</summary>
-    public string GetNativePath() => QDirAbsolutePath(Path.Combine(InstanceRoot(), "natives"));
+    public AbsolutePath GetNativePath() => InstanceRoot / "natives";
 
     /// <summary>where the instance-local libraries should be</summary>
-    public string GetLocalLibraryPath() => QDirAbsolutePath(Path.Combine(InstanceRoot(), "libraries"));
+    public AbsolutePath GetLocalLibraryPath() => InstanceRoot / "libraries";
 
     /// <summary>Returns whether the instance, with its version, has support for demo mode.</summary>
     public bool SupportsDemo()
@@ -338,10 +341,10 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         UpdateRuntimeContext();
         var process = LaunchTask.Create(this, launchServices);
 
-        launchServices.Ui.SaveIcon?.Invoke(IconKey(), Path.Combine(GameRoot(), "icon.png"));
+        launchServices.Ui.SaveIcon?.Invoke(IconKey(), GameRoot / "icon.png");
 
         // print a header
-        process.AppendStep(new TextPrint(process, "Minecraft folder is:\n  " + GameRoot() + "\n",
+        process.AppendStep(new TextPrint(process, "Minecraft folder is:\n  " + GameRoot + "\n",
             MessageLevel.Launcher));
 
         // create the .minecraft folder and server-resource-packs (workaround for Minecraft bug MCL-3732)
@@ -378,7 +381,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         if (GetPreLoadCommand().Length != 0)
         {
             var step = new LaunchCommand(process, GetPreLoadCommand(), "Pre-Load");
-            step.SetWorkingDirectory(GameRoot());
+            step.SetWorkingDirectory(GameRoot);
             process.AppendStep(step);
         }
 
@@ -400,7 +403,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         if (GetPreLaunchCommand().Length != 0)
         {
             var step = new LaunchCommand(process, GetPreLaunchCommand(), "Pre-Launch");
-            step.SetWorkingDirectory(GameRoot());
+            step.SetWorkingDirectory(GameRoot);
             process.AppendStep(step);
         }
 
@@ -439,7 +442,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             // actually launch the game
             var step = new LauncherPartLaunch(process);
-            step.SetWorkingDirectory(GameRoot());
+            step.SetWorkingDirectory(GameRoot);
             step.Session = session;
             step.TargetToJoin = targetToJoin;
             process.AppendStep(step);
@@ -449,7 +452,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         if (GetPostExitCommand().Length != 0)
         {
             var step = new LaunchCommand(process, GetPostExitCommand(), "Post-Launch");
-            step.SetWorkingDirectory(GameRoot());
+            step.SetWorkingDirectory(GameRoot);
             process.AppendStep(step);
         }
 
@@ -473,7 +476,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// settings — the same behavior the former unset static hooks produced.</summary>
     private LaunchServices BuildLaunchServices() => new()
     {
-        Paths = Paths ?? FlintPaths.FromHomeDir(Directory.GetCurrentDirectory()),
+        Paths = Paths,
         LoggerFactory = NullLoggerFactory.Instance,
         Config = UserConfigStore,
     };
@@ -617,10 +620,10 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
             foreach (var agent in profile.GetAgents())
             {
-                var jar = new List<string>();
-                var temp1 = new List<string>();
-                var temp2 = new List<string>();
-                var temp3 = new List<string>();
+                var jar = new List<AbsolutePath>();
+                var temp1 = new List<AbsolutePath>();
+                var temp2 = new List<AbsolutePath>();
+                var temp3 = new List<AbsolutePath>();
                 agent.Library.GetApplicableFiles(RuntimeContext, jar, temp1, temp2, temp3, GetLocalLibraryPath());
                 list.Add("-javaagent:" + jar[0] + (agent.Argument.Length == 0 ? "" : "=" + agent.Argument));
             }
@@ -766,9 +769,13 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             ["INST_NAME"] = Name(),
             ["INST_ID"] = Id(),
-            ["INST_DIR"] = ToNativeSeparators(QDirAbsolutePath(InstanceRoot())),
-            ["INST_MC_DIR"] = ToNativeSeparators(QDirAbsolutePath(GameRoot())),
-            ["INST_JAVA"] = ToNativeSeparators(QDirAbsolutePath(Variant.AsString(Settings.Get("JavaPath")))),
+            ["INST_DIR"] = InstanceRoot.Value,
+            ["INST_MC_DIR"] = GameRoot.Value,
+            // the C++ QDir::absoluteFilePath anchored a relative JavaPath (a PATH-lookup
+            // command like "java") on the process CWD — TruePath's division keeps exactly
+            // that (an absolute right side passes through untouched)
+            ["INST_JAVA"] = (AbsolutePath.CurrentWorkingDirectory
+                             / Variant.AsString(Settings.Get("JavaPath"))).Value,
             ["INST_JAVA_ARGS"] = string.Join(" ", JavaArguments()),
             ["NO_COLOR"] = "1"
         };
@@ -1045,8 +1052,8 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         if (profile is not null)
         {
             outList.Add("Libraries:");
-            var jars = new List<string>();
-            var nativeJars = new List<string>();
+            var jars = new List<AbsolutePath>();
+            var nativeJars = new List<AbsolutePath>();
             profile.GetLibraryFiles(RuntimeContext, jars, nativeJars, GetLocalLibraryPath(), BinRoot());
             foreach (var file in jars)
             {
@@ -1147,28 +1154,28 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             ["version_type"] = profile.GetMinecraftVersionType()
         };
 
-        var absRootDir = QDirAbsolutePath(GameRoot());
-        result["game_directory"] = absRootDir;
-        var absAssetsDir = Paths?.AssetsRoot ?? QDirAbsolutePath("assets");
+        var absRootDir = GameRoot;
+        result["game_directory"] = absRootDir.Value;
+        var absAssetsDir = Paths.AssetsRoot;
         var assets = profile.GetMinecraftAssets();
-        result["game_assets"] = GetAssetsDir(assets.Id, ResourcesDir());
+        result["game_assets"] = GetAssetsDir(assets.Id, ResourcesDir()).Value;
 
         // 1.7.3+ assets tokens
-        result["assets_root"] = absAssetsDir;
+        result["assets_root"] = absAssetsDir.Value;
         result["assets_index_name"] = assets.Id;
 
-        result["library_directory"] = MetaCache?.GetBasePath("libraries") ?? "";
+        result["library_directory"] = MetaCache?.GetBasePath("libraries")?.Value ?? "";
 
         return result;
     }
 
-    public override IReadOnlyList<string> GetLogFileSearchPaths()
+    public override IReadOnlyList<AbsolutePath> GetLogFileSearchPaths()
     {
         return
         [
-            Path.Combine(GameRoot(), "crash-reports"),
-            Path.Combine(GameRoot(), "logs"),
-            GameRoot(),
+            GameRoot / "crash-reports",
+            GameRoot / "logs",
+            GameRoot,
         ];
     }
 
@@ -1215,20 +1222,20 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     }
 
     // FIXME upstream: remove (the launch pipeline rebuilds these from the profile)
-    public List<string> GetClassPath()
+    public List<AbsolutePath> GetClassPath()
     {
-        var jars = new List<string>();
-        var nativeJars = new List<string>();
+        var jars = new List<AbsolutePath>();
+        var nativeJars = new List<AbsolutePath>();
         var profile = RequireProfile();
         profile.GetLibraryFiles(RuntimeContext, jars, nativeJars, GetLocalLibraryPath(), BinRoot(),
             storageBase: LibraryStorageBase());
         return jars;
     }
 
-    public List<string> GetNativeJars()
+    public List<AbsolutePath> GetNativeJars()
     {
-        var jars = new List<string>();
-        var nativeJars = new List<string>();
+        var jars = new List<AbsolutePath>();
+        var nativeJars = new List<AbsolutePath>();
         var profile = RequireProfile();
         profile.GetLibraryFiles(RuntimeContext, jars, nativeJars, GetLocalLibraryPath(), BinRoot(),
             storageBase: LibraryStorageBase());
@@ -1239,7 +1246,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// the C++ anchored the relative "libraries/" prefix on its chdir'd data dir; the port
     /// has no chdir (DI-B), so it anchors on the store root (E2). Bare fixtures without a
     /// stamped layout keep the historical CWD-relative behavior.</summary>
-    public string LibraryStorageBase() => Paths?.StoreRoot ?? "";
+    public AbsolutePath LibraryStorageBase() => Paths.StoreRoot;
 
     /// <summary>The applied profile's main class, or "" while the profile cannot be applied —
     /// VerboseDescription prints this line for broken instances, so it must not throw.</summary>
@@ -1294,7 +1301,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         if (_loaderModList is null)
         {
             var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
-            _loaderModList = new ModFolderModel(ModsRoot(), isIndexed, createDir: true);
+            _loaderModList = new ModFolderModel(ModsRoot, isIndexed, createDir: true);
         }
 
         return _loaderModList;
@@ -1305,7 +1312,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         if (_coreModList is null)
         {
             var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
-            _coreModList = new ModFolderModel(CoreModsDir(), isIndexed, createDir: true);
+            _coreModList = new ModFolderModel(CoreModsDir, isIndexed, createDir: true);
         }
 
         return _coreModList;
@@ -1317,7 +1324,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
             // NOTE: upstream does not create the folder for the nil mod list (4th arg false)
-            _nilModList = new ModFolderModel(NilModsDir(), isIndexed, createDir: false);
+            _nilModList = new ModFolderModel(NilModsDir, isIndexed, createDir: false);
         }
 
         return _nilModList;
@@ -1333,12 +1340,12 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         var mods = new List<Mod>();
         foreach (var jarmod in profile.GetJarMods())
         {
-            var jar = new List<string>();
-            var temp1 = new List<string>();
-            var temp2 = new List<string>();
-            var temp3 = new List<string>();
-            jarmod.GetApplicableFiles(RuntimeContext, jar, temp1, temp2, temp3, JarModsDir());
-            mods.Add(new Mod(new FileInfo(jar[0])));
+            var jar = new List<AbsolutePath>();
+            var temp1 = new List<AbsolutePath>();
+            var temp2 = new List<AbsolutePath>();
+            var temp3 = new List<AbsolutePath>();
+            jarmod.GetApplicableFiles(RuntimeContext, jar, temp1, temp2, temp3, JarModsDir);
+            mods.Add(new Mod(new FileInfo(jar[0].Value)));
         }
 
         return mods;
@@ -1346,7 +1353,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     // ------------------------------------------------------------------ IPackProfileEnv
 
-    string IPackProfileEnv.InstanceRoot => InstanceRoot();
+    AbsolutePath IPackProfileEnv.InstanceRoot => InstanceRoot;
 
     string IPackProfileEnv.InstanceName => Name();
 
@@ -1393,13 +1400,14 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// Port of AssetsUtils::getAssetsDir reduced to the branch the profile variable mapping
     /// needs (only the index's "virtual" and "mapToResources" booleans are consulted).
     /// </summary>
-    private string GetAssetsDir(string assetsId, string resourcesFolder)
+    private AbsolutePath GetAssetsDir(string assetsId, AbsolutePath resourcesFolder)
     {
-        var assetsDir = Paths?.AssetsRoot ?? QDirAbsolutePath("assets");
-        var indexPath = Path.Combine(assetsDir, "indexes", assetsId + ".json");
-        var virtualRoot = Path.Combine(assetsDir, "virtual", assetsId);
+        var assetsDir = Paths.AssetsRoot;
+        string a2 = assetsId + ".json";
+        var indexPath = assetsDir / "indexes" / a2;
+        var virtualRoot = assetsDir / "virtual" / assetsId;
 
-        if (!File.Exists(indexPath))
+        if (!indexPath.Exists())
         {
             // (upstream logs qCritical here)
             return virtualRoot;
@@ -1409,7 +1417,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         bool mapToResources;
         try
         {
-            using var doc = JsonDocument.Parse(File.ReadAllText(indexPath));
+            using var doc = JsonDocument.Parse(File.ReadAllText(indexPath.Value));
             isVirtual = doc.RootElement.ValueKind == JsonValueKind.Object &&
                         doc.RootElement.TryGetProperty("virtual", out var virtualProp) &&
                         virtualProp.ValueKind is JsonValueKind.True or JsonValueKind.False &&
@@ -1450,10 +1458,11 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         var suffix = OperatingSystem.IsWindows() ? ".exe" : "";
         foreach (var dir in pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
         {
-            var candidate = Path.Combine(dir, name + suffix);
-            if (File.Exists(candidate))
+            string a1 = name + suffix;
+            var candidate = new AbsolutePath(dir) / a1;
+            if (File.Exists(candidate.Value))
             {
-                return candidate;
+                return candidate.Value;
             }
         }
 
@@ -1465,26 +1474,6 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         var dot = fileName.LastIndexOf('.');
         return dot > 0 ? fileName[..dot] : fileName;
-    }
-
-    /// <summary>QDir::toNativeSeparators.</summary>
-    private static string ToNativeSeparators(string path) =>
-        Path.DirectorySeparatorChar != '/' ? path.Replace('/', Path.DirectorySeparatorChar) : path;
-
-    /// <summary>QDir(path).absolutePath(): relative paths anchor at the current directory.</summary>
-    private static string QDirAbsolutePath(string path)
-    {
-        if (path.Length == 0)
-        {
-            return Path.Combine(Directory.GetCurrentDirectory(), "");
-        }
-
-        if (path.StartsWith('/') || path is [_, ':', ..])
-        {
-            return Path.Combine(path, "");
-        }
-
-        return Path.Combine(Directory.GetCurrentDirectory(), path);
     }
 
     /// <summary>QFileInfo::exists(): file or directory.</summary>

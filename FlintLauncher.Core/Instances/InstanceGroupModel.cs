@@ -23,6 +23,7 @@ using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.State;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Instances;
 
@@ -74,8 +75,8 @@ internal sealed partial class GroupJsonContext : JsonSerializerContext;
 
 public sealed class InstanceGroupModel
 {
-    private readonly Func<string> _canonicalFile;
-    private readonly Func<IReadOnlyList<string>> _legacyFiles;
+    private readonly Func<AbsolutePath> _canonicalFile;
+    private readonly Func<IReadOnlyList<AbsolutePath>> _legacyFiles;
     private readonly Func<LauncherStateStore?> _stateProvider;
     private readonly Func<bool>? _canPersist;
 
@@ -101,7 +102,7 @@ public sealed class InstanceGroupModel
     /// <summary><paramref name="canPersist"/> is the upstream "group saving prevented
     /// because we don't know the full list of instances yet" gate (true = writes allowed);
     /// while it reports false, Save() is a legitimate no-op that leaves nothing stale.</summary>
-    public InstanceGroupModel(Func<string> canonicalFile, Func<IReadOnlyList<string>> legacyFiles,
+    public InstanceGroupModel(Func<AbsolutePath> canonicalFile, Func<IReadOnlyList<AbsolutePath>> legacyFiles,
         Func<LauncherStateStore?> stateProvider, Func<bool>? canPersist = null)
     {
         _canonicalFile = canonicalFile;
@@ -363,11 +364,11 @@ public sealed class InstanceGroupModel
         // instgroups.json — the Prism import target — then the primary-instance-dir copy
         // upstream used before there was a launcher data dir)
         var groupFileName = _canonicalFile();
-        if (!File.Exists(groupFileName))
+        if (!groupFileName.ExistsFile())
         {
             foreach (var legacy in _legacyFiles())
             {
-                if (File.Exists(legacy))
+                if (legacy.ExistsFile())
                 {
                     groupFileName = legacy;
                     migratingLegacyGroups = true;
@@ -384,7 +385,7 @@ public sealed class InstanceGroupModel
         byte[] jsonData;
         try
         {
-            jsonData = File.ReadAllBytes(groupFileName);
+            jsonData = groupFileName.ReadAllBytes();
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException)
         {
@@ -594,12 +595,12 @@ public sealed class InstanceGroupModel
     /// the group DEFINITIONS only once the state side owns the collapse state). Best-effort:
     /// a failed rewrite leaves the flags in place and the next load re-seeds them (the
     /// pre-fix behavior) — it must not fail the load.</summary>
-    private static void StripHiddenFromGroupFile(string groupFileName)
+    private static void StripHiddenFromGroupFile(AbsolutePath groupFileName)
     {
         try
         {
             var file = JsonSerializer.Deserialize(
-                File.ReadAllText(groupFileName), GroupJsonContext.Default.GroupFileJson);
+                groupFileName.ReadAllText(), GroupJsonContext.Default.GroupFileJson);
             if (file is null)
             {
                 return;

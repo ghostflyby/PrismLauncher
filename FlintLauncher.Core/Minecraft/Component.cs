@@ -203,7 +203,7 @@ public class Component : ProblemProvider
 
     public string GetVersion() => CachedVersion;
 
-    public string GetFilename() => Parent is not null ? Parent.PatchFilePathForUid(Uid) : "";
+    public AbsolutePath? GetFilename() => Parent?.PatchFilePathForUid(Uid);
 
     public DateTimeOffset GetReleaseDateTime()
     {
@@ -397,8 +397,7 @@ public class Component : ProblemProvider
             return false;
         }
 
-        var filename = GetFilename();
-        if (!FileOps.EnsureFilePathExists(new AbsolutePath(filename)))
+        if (GetFilename() is not { } filename || !FileOps.EnsureFilePathExists(filename))
         {
             return false;
         }
@@ -412,7 +411,7 @@ public class Component : ProblemProvider
                 return false;
             }
 
-            FileOps.Write(new AbsolutePath(filename), Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(vfile)));
+            FileOps.Write(filename, Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(vfile)));
             File = vfile;
             MetaVersion = null;
             EmitDataChanged();
@@ -434,12 +433,11 @@ public class Component : ProblemProvider
             return true;
         }
 
-        var filename = GetFilename();
         var result = true;
         // just kill the file and reload
-        if (System.IO.File.Exists(filename))
+        if (GetFilename() is { } filename && System.IO.File.Exists(filename.Value))
         {
-            result = FileOps.DeletePath(new AbsolutePath(filename));
+            result = FileOps.DeletePath(filename);
         }
 
         if (result)

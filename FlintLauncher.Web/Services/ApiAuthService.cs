@@ -11,6 +11,8 @@ using System.Security;
 using System.Security.Cryptography;
 using System.Text.Json;
 using FlintLauncher.Web.Models;
+using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Web.Services;
 
@@ -86,11 +88,11 @@ public sealed class ApiAuthService
     /// leftover is inert since nothing reads it anymore).</summary>
     public const string LegacyTokenFileName = "api-token";
 
-    public static void RemoveLegacyTokenFile(string dataDir)
+    public static void RemoveLegacyTokenFile(AbsolutePath dataDir)
     {
         try
         {
-            File.Delete(Path.Combine(dataDir, LegacyTokenFileName));
+            (dataDir / LegacyTokenFileName).Delete();
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                       or SecurityException)

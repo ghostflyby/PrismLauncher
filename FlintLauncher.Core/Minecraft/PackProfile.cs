@@ -43,7 +43,7 @@ namespace FlintLauncher.Core.Minecraft;
 public interface IPackProfileEnv
 {
     /// <summary>The instance folder holding mmc-pack.json, patches/, jarmods/ and libraries/.</summary>
-    string InstanceRoot { get; }
+    AbsolutePath InstanceRoot { get; }
 
     /// <summary>Instance display name (C++ name(); only used for log lines).</summary>
     string InstanceName { get; }
@@ -53,9 +53,9 @@ public interface IPackProfileEnv
 }
 
 /// <summary>Minimal IPackProfileEnv for standalone/test usage (name empty, default runtime context).</summary>
-public sealed class BasicPackProfileEnv(string instanceRoot, string instanceName = "", RuntimeContext runtimeContext = default) : IPackProfileEnv
+public sealed class BasicPackProfileEnv(AbsolutePath instanceRoot, string instanceName = "", RuntimeContext runtimeContext = default) : IPackProfileEnv
 {
-    public string InstanceRoot { get; } = instanceRoot;
+    public AbsolutePath InstanceRoot { get; } = instanceRoot;
 
     public string InstanceName { get; } = instanceName;
 
@@ -106,7 +106,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
     private bool _loaded;
 
-    public PackProfile(string instanceRoot, Index? metadataIndex = null)
+    public PackProfile(AbsolutePath instanceRoot, Index? metadataIndex = null)
         : this(new BasicPackProfileEnv(instanceRoot), metadataIndex)
     {
     }
@@ -149,15 +149,19 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
     // ---------------------------------------------------------------- paths
 
-    private string ComponentsFilePath() => Path.Combine(env.InstanceRoot, "mmc-pack.json");
+    private AbsolutePath ComponentsFilePath() => env.InstanceRoot / "mmc-pack.json";
 
-    public string PatchFilePathForUid(string uid) => Path.Combine(env.InstanceRoot, "patches", uid + ".json");
+    public AbsolutePath PatchFilePathForUid(string uid)
+    {
+        string a2 = uid + ".json";
+        return env.InstanceRoot / "patches" / a2;
+    }
 
     /// <summary>C++ MinecraftInstance::jarModsDir() (lives under the instance root, not the game root).</summary>
-    private string JarModsDir() => Path.Combine(env.InstanceRoot, "jarmods");
+    private AbsolutePath JarModsDir() => env.InstanceRoot / "jarmods";
 
     /// <summary>C++ MinecraftInstance::getLocalLibraryPath().</summary>
-    private string LocalLibraryPath() => Path.Combine(env.InstanceRoot, "libraries");
+    private AbsolutePath LocalLibraryPath() => env.InstanceRoot / "libraries";
 
     // ---------------------------------------------------------------- save/load logic
 
@@ -455,7 +459,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     }
 
     /// <summary>Save the given component container data to a file.</summary>
-    private static bool SavePackProfile(string filename, IReadOnlyList<Component> container)
+    private static bool SavePackProfile(AbsolutePath filename, IReadOnlyList<Component> container)
     {
         var doc = new PackConfigOutJson
         {
@@ -464,7 +468,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         };
         try
         {
-            FileOps.Write(new AbsolutePath(filename),
+            FileOps.Write(filename,
                 JsonSerializer.SerializeToUtf8Bytes(doc, PackConfigJsonContext.Default.PackConfigOutJson));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
@@ -477,10 +481,10 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     }
 
     /// <summary>Read the given file into the component container.</summary>
-    private static Result LoadPackProfile(PackProfile parent, string filename,
+    private static Result LoadPackProfile(PackProfile parent, AbsolutePath filename,
         List<Component> container)
     {
-        if (!File.Exists(filename))
+        if (!File.Exists(filename.Value))
         {
             return Result.Error($"Components file {filename} doesn't exist. This should never happen.");
         }
@@ -488,7 +492,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         string data;
         try
         {
-            data = File.ReadAllText(filename);
+            data = File.ReadAllText(filename.Value);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException)
         {
@@ -715,21 +719,21 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     // ---------------------------------------------------------------- installers
 
     /// <summary>install more jar mods</summary>
-    public bool InstallJarMods(IReadOnlyList<string> selectedFiles)
+    public bool InstallJarMods(List<AbsolutePath> selectedFiles)
     {
         return InstallJarModsInternal(selectedFiles);
     }
 
     /// <summary>install a jar/zip as a replacement for the main jar</summary>
-    public bool InstallCustomJar(string selectedFile)
+    public bool InstallCustomJar(AbsolutePath selectedFile)
     {
         return InstallCustomJarInternal(selectedFile);
     }
 
     /// <summary>install MMC/Prism component files</summary>
-    public bool InstallComponents(IReadOnlyList<string> selectedFiles)
+    public bool InstallComponents(IReadOnlyList<AbsolutePath> selectedFiles)
     {
-        var patchDir = new AbsolutePath(env.InstanceRoot) / "patches";
+        var patchDir = env.InstanceRoot / "patches";
         if (!FileOps.EnsureFolderPathExists(patchDir))
         {
             return false;
@@ -738,10 +742,10 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         var result = true;
         foreach (var source in selectedFiles)
         {
-            var versionFile = ProfileUtils.ParseJsonFile(source, requireOrder: false);
-            var target = (patchDir / (versionFile.Uid + ".json")).Value;
+            var versionFile = ProfileUtils.ParseJsonFile(source.Value, requireOrder: false);
+            var target = patchDir / (versionFile.Uid + ".json");
 
-            if (!FileOps.Copy(new AbsolutePath(source), new AbsolutePath(target)))
+            if (!FileOps.Copy(source, target))
             {
                 result = false;
                 continue;
@@ -757,14 +761,14 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     }
 
     /// <summary>install Java agent files</summary>
-    public bool InstallAgents(IReadOnlyList<string> selectedFiles)
+    public bool InstallAgents(IReadOnlyList<AbsolutePath> selectedFiles)
     {
         return InstallAgentsInternal(selectedFiles);
     }
 
     public bool InstallEmpty(string uid, string name)
     {
-        var patchDir = new AbsolutePath(env.InstanceRoot) / "patches";
+        var patchDir = env.InstanceRoot / "patches";
         if (!FileOps.EnsureFolderPathExists(patchDir))
         {
             return false;
@@ -776,10 +780,10 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
             Uid = uid,
             Version = "1"
         };
-        var patchFileName = (patchDir / (uid + ".json")).Value;
+        var patchFileName = patchDir / (uid + ".json");
         try
         {
-            FileOps.Write(new AbsolutePath(patchFileName), Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(f)));
+            FileOps.Write(patchFileName, Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(f)));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                       or NotSupportedException)
@@ -797,8 +801,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     {
         var ok = true;
         // first, remove the patch file. this ensures it's not used anymore
-        var fileName = patch.GetFilename();
-        if (fileName.Length != 0 && File.Exists(fileName) && !FileOps.DeletePath(new AbsolutePath(fileName)))
+        if (patch.GetFilename() is { } fileName && File.Exists(fileName.Value) && !FileOps.DeletePath(fileName))
         {
             return false;
         }
@@ -811,12 +814,12 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
                 return;
             }
 
-            var jar = new List<string>();
-            var temp1 = new List<string>();
-            var temp2 = new List<string>();
-            var temp3 = new List<string>();
+            var jar = new List<AbsolutePath>();
+            var temp1 = new List<AbsolutePath>();
+            var temp2 = new List<AbsolutePath>();
+            var temp3 = new List<AbsolutePath>();
             jarMod.GetApplicableFiles(RuntimeContext(), jar, temp1, temp2, temp3, JarModsDir());
-            if (jar.Count != 0 && File.Exists(jar[0]) && !FileOps.DeletePath(new AbsolutePath(jar[0])))
+            if (jar.Count != 0 && File.Exists(jar[0].Value) && !FileOps.DeletePath(jar[0]))
             {
                 ok = false;
             }
@@ -834,15 +837,15 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         return ok;
     }
 
-    private bool InstallJarModsInternal(IReadOnlyList<string> filepaths)
+    private bool InstallJarModsInternal(IReadOnlyList<AbsolutePath> filepaths)
     {
-        var patchDir = new AbsolutePath(env.InstanceRoot) / "patches";
+        var patchDir = env.InstanceRoot / "patches";
         if (!FileOps.EnsureFolderPathExists(patchDir))
         {
             return false;
         }
 
-        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(JarModsDir())))
+        if (!FileOps.EnsureFolderPathExists(JarModsDir()))
         {
             return false;
         }
@@ -852,11 +855,11 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
             var id = Guid.NewGuid().ToString(); // QUuid::createUuid().toString(QUuid::WithoutBraces)
             var targetFilename = id + ".jar";
             var targetId = "custom.jarmod." + id;
-            var targetName = CompleteBaseName(filepath) + " (jar mod)";
-            var finalPath = new AbsolutePath(JarModsDir()) / targetFilename;
+            var targetName = CompleteBaseName(filepath.Value) + " (jar mod)";
+            var finalPath = JarModsDir() / targetFilename;
             // (the C++ copies sourceInfo.absoluteFilePath(); FileOps.Copy copies a file
             // source onto the full dst path)
-            if (!FileOps.Copy(new AbsolutePath(filepath), finalPath))
+            if (!FileOps.Copy(filepath, finalPath))
             {
                 return false;
             }
@@ -866,17 +869,17 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
             {
                 Name = new GradleSpecifier("custom.jarmods:" + id + ":1"),
                 FilenameOverride = targetFilename,
-                DisplayNameValue = CompleteBaseName(filepath),
+                DisplayNameValue = CompleteBaseName(filepath.Value),
                 Hint = "local"
             };
             f.JarMods.Add(jarMod);
             f.Name = targetName;
             f.Uid = targetId;
-            var patchFileName = (patchDir / (targetId + ".json")).Value;
+            var patchFileName = patchDir / (targetId + ".json");
 
             try
             {
-                FileOps.Write(new AbsolutePath(patchFileName), Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(f)));
+                FileOps.Write(patchFileName, Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(f)));
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                           or NotSupportedException)
@@ -892,16 +895,16 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         return true;
     }
 
-    private bool InstallCustomJarInternal(string filepath)
+    private bool InstallCustomJarInternal(AbsolutePath filepath)
     {
-        var patchDir = new AbsolutePath(env.InstanceRoot) / "patches";
+        var patchDir = env.InstanceRoot / "patches";
         if (!FileOps.EnsureFolderPathExists(patchDir))
         {
             return false;
         }
 
         var libDir = LocalLibraryPath();
-        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(libDir)))
+        if (!FileOps.EnsureFolderPathExists(libDir))
         {
             return false;
         }
@@ -909,15 +912,15 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         var specifier = new GradleSpecifier("custom:customjar:1");
         var targetFilename = specifier.GetFileName() ?? "";
         var targetId = specifier.ArtifactId;
-        var targetName = CompleteBaseName(filepath) + " (custom jar)";
-        var finalPath = Path.Combine(libDir, targetFilename);
+        var targetName = CompleteBaseName(filepath.Value) + " (custom jar)";
+        var finalPath = libDir / targetFilename;
 
-        if (File.Exists(finalPath) && !FileOps.DeletePath(new AbsolutePath(finalPath)))
+        if (File.Exists(finalPath.Value) && !FileOps.DeletePath(finalPath))
         {
             return false;
         }
 
-        if (!FileOps.Copy(new AbsolutePath(filepath), new AbsolutePath(finalPath)))
+        if (!FileOps.Copy(filepath, finalPath))
         {
             return false;
         }
@@ -926,17 +929,17 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         var jarMod = new Library
         {
             Name = specifier,
-            DisplayNameValue = CompleteBaseName(filepath),
+            DisplayNameValue = CompleteBaseName(filepath.Value),
             Hint = "local"
         };
         f.MainJar = jarMod;
         f.Name = targetName;
         f.Uid = targetId;
-        var patchFileName = (patchDir / (targetId + ".json")).Value;
+        var patchFileName = patchDir / (targetId + ".json");
 
         try
         {
-            FileOps.Write(new AbsolutePath(patchFileName), Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(f)));
+            FileOps.Write(patchFileName, Encoding.UTF8.GetBytes(OneSixVersionFormat.SerializeVersionFile(f)));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                       or NotSupportedException)
@@ -951,17 +954,17 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         return true;
     }
 
-    private bool InstallAgentsInternal(IReadOnlyList<string> filepaths)
+    private bool InstallAgentsInternal(IReadOnlyList<AbsolutePath> filepaths)
     {
         // FIXME upstream: code duplication
-        var patchDir = new AbsolutePath(env.InstanceRoot) / "patches";
+        var patchDir = env.InstanceRoot / "patches";
         if (!FileOps.EnsureFolderPathExists(patchDir))
         {
             return false;
         }
 
         var libDir = LocalLibraryPath();
-        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(libDir)))
+        if (!FileOps.EnsureFolderPathExists(libDir))
         {
             return false;
         }
@@ -971,9 +974,9 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
             var id = Guid.NewGuid().ToString();
             var targetBaseName = id + ".jar";
             var targetId = "custom.agent." + id;
-            var targetName = CompleteBaseName(source) + " (agent)";
-            var target = new AbsolutePath(LocalLibraryPath()) / targetBaseName;
-            if (!FileOps.Copy(new AbsolutePath(source), target))
+            var targetName = CompleteBaseName(source.Value) + " (agent)";
+            var target = LocalLibraryPath() / targetBaseName;
+            if (!FileOps.Copy(source, target))
             {
                 return false;
             }
@@ -984,7 +987,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
             {
                 Name = new GradleSpecifier("custom.agents:" + id + ":1"),
                 FilenameOverride = targetBaseName,
-                DisplayNameValue = CompleteBaseName(source),
+                DisplayNameValue = CompleteBaseName(source.Value),
                 Hint = "local"
             };
 

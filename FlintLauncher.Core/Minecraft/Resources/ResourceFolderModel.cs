@@ -41,7 +41,6 @@ namespace FlintLauncher.Core.Minecraft.Resources;
 /// </summary>
 public class ResourceFolderModel
 {
-    private readonly string _dir;
     private readonly bool _isIndexed;
     private bool _firstFolderLoad = true;
 
@@ -50,9 +49,9 @@ public class ResourceFolderModel
     // Represents the relationship between a resource's internal ID and its row position on the model.
     private readonly Dictionary<string, int> _resourcesIndex = new();
 
-    public ResourceFolderModel(string dir, bool isIndexed, bool createDir)
+    public ResourceFolderModel(AbsolutePath dir, bool isIndexed, bool createDir)
     {
-        _dir = dir;
+        Dir = dir;
         _isIndexed = isIndexed;
         if (createDir)
         {
@@ -62,10 +61,10 @@ public class ResourceFolderModel
 
     public virtual string Id => "resource";
 
-    public string Dir => _dir;
+    public AbsolutePath Dir { get; }
 
     /// <summary>Port of ResourceFolderModel::indexDir.</summary>
-    public virtual string IndexDir => $"{_dir}/.index";
+    public virtual AbsolutePath IndexDir => Dir / ".index";
 
     public int Size => _resources.Count;
 
@@ -111,7 +110,7 @@ public class ResourceFolderModel
             return false; // not a valid resource. Ignoring it.
         }
 
-        var newPath = (new AbsolutePath(_dir) / fileInfo.Name).Value;
+        var newPath = (new AbsolutePath(Dir) / fileInfo.Name).Value;
         if (originalPath == newPath)
         {
             return false; // overwriting the resource with itself makes no sense
@@ -247,7 +246,7 @@ public class ResourceFolderModel
         IEnumerable<string> entries;
         try
         {
-            entries = Directory.EnumerateFileSystemEntries(_dir);
+            entries = Directory.EnumerateFileSystemEntries(Dir.Value);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
         {

@@ -21,11 +21,12 @@
 // details, like an upstream parse task that finishes with an empty result.
 
 using FlintLauncher.Core.ModPlatform;
+using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
 
 /// <summary>A legacy mod list, backed by a folder.</summary>
-public class ModFolderModel(string dir, bool isIndexed = false, bool createDir = false) : ResourceFolderModel(dir, isIndexed, createDir)
+public class ModFolderModel(AbsolutePath dir, bool isIndexed = false, bool createDir = false) : ResourceFolderModel(dir, isIndexed, createDir)
 {
     private readonly Dictionary<string, MetadataHandler.ModStruct> _metadata = new(StringComparer.Ordinal);
 
@@ -132,7 +133,7 @@ public class ModFolderModel(string dir, bool isIndexed = false, bool createDir =
         string[] files;
         try
         {
-            files = Directory.GetFiles(IndexDir);
+            files = Directory.GetFiles(IndexDir.Value);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
         {

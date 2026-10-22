@@ -4,6 +4,8 @@
 
 using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Nbt;
+using TruePath;
+using TruePath.SystemIo;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -149,9 +151,9 @@ public class ServersDatTests : IDisposable
     [Fact]
     public void Save_Load_RoundTrip_ThenEdit()
     {
-        var path = Path.Combine(_tempDir, "servers.dat");
+        var path = new AbsolutePath(Path.Combine(_tempDir, "servers.dat"));
         ServersDat.Save(path, SampleServers());
-        Assert.True(File.Exists(path));
+        Assert.True(path.ExistsFile());
 
         var loaded = ServersDat.Load(path);
         Assert.Equal(2, loaded.Count);
@@ -170,6 +172,6 @@ public class ServersDatTests : IDisposable
     [Fact]
     public void Load_MissingFile_ReturnsEmpty()
     {
-        Assert.Empty(ServersDat.Load(Path.Combine(_tempDir, "does-not-exist.dat")));
+        Assert.Empty(ServersDat.Load(new AbsolutePath(Path.Combine(_tempDir, "does-not-exist.dat"))));
     }
 }

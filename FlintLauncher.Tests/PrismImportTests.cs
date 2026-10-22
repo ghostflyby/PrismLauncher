@@ -6,6 +6,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web;
+using TruePath;
 using Xunit;
 using Xunit.Sdk;
 
@@ -246,7 +247,7 @@ public class FileTransferTests : IDisposable
         Directory.CreateSymbolicLink(SrcPath("real/loopA/intoB"), SrcPath("real/loopB"));
         Directory.CreateSymbolicLink(SrcPath("real/loopB/intoA"), SrcPath("real/loopA"));
 
-        var files = FileTransfer.EnumerateFilesDeep(SrcPath("real"))
+        var files = FileTransfer.EnumerateFilesDeep(new AbsolutePath(SrcPath("real")))
             .Select(f => Path.GetRelativePath(SrcPath("real"), f).Replace('\\', '/'))
             .OrderBy(f => f, StringComparer.Ordinal).ToList();
 
@@ -275,7 +276,7 @@ public class PrismImportPlannerTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "src", "instances", "myinst", "instance.cfg"), "x");
         File.WriteAllText(Path.Combine(_root, "src", "meta", "index.json"), "x");
 
-        var plan = PrismImportPlanner.Plan(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
+        var plan = PrismImportPlanner.Plan(new AbsolutePath(Path.Combine(_root, "src")), new AbsolutePath(Path.Combine(_root, "dst")),
             ImportMode.CopyOnWrite);
 
         var names = plan.Select(p => p.Name).ToList();
@@ -297,7 +298,7 @@ public class PrismImportPlannerTests : IDisposable
     {
         Directory.CreateDirectory(_root);
         Directory.CreateDirectory(Path.Combine(_root, "src", "meta"));
-        var plan = PrismImportPlanner.Plan(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
+        var plan = PrismImportPlanner.Plan(new AbsolutePath(Path.Combine(_root, "src")), new AbsolutePath(Path.Combine(_root, "dst")),
             ImportMode.Move);
         // src and dst are both under the same temp root → same volume → rename
         Assert.Equal(PlannedMethod.RenameDirectory, plan.Single(p => p.Name == "meta").Method);
@@ -308,7 +309,7 @@ public class PrismImportPlannerTests : IDisposable
     {
         Directory.CreateDirectory(_root);
         Directory.CreateDirectory(Path.Combine(_root, "src"));
-        Assert.Empty(PrismImportPlanner.Plan(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
+        Assert.Empty(PrismImportPlanner.Plan(new AbsolutePath(Path.Combine(_root, "src")), new AbsolutePath(Path.Combine(_root, "dst")),
             ImportMode.CopyOnWrite));
     }
 
@@ -331,7 +332,7 @@ public class PrismImportPlannerTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "src", "instances", "demo", "instance.cfg"), "x");
         Directory.CreateDirectory(Path.Combine(_root, "dst", "instances")); // what Flint startup creates
 
-        var plan = PrismImportPlanner.Plan(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
+        var plan = PrismImportPlanner.Plan(new AbsolutePath(Path.Combine(_root, "src")), new AbsolutePath(Path.Combine(_root, "dst")),
             ImportMode.CopyOnWrite);
 
         var instances = plan.Single(p => p.Name == "instances");
@@ -349,7 +350,7 @@ public class PrismImportPlannerTests : IDisposable
         Directory.CreateDirectory(Path.Combine(_root, "dst", "meta", "net.minecraft"));
         File.WriteAllText(Path.Combine(_root, "dst", "meta", "net.minecraft", "index.json"), "{}");
 
-        var plan = PrismImportPlanner.Plan(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
+        var plan = PrismImportPlanner.Plan(new AbsolutePath(Path.Combine(_root, "src")), new AbsolutePath(Path.Combine(_root, "dst")),
             ImportMode.CopyOnWrite);
 
         Assert.Equal(PlannedMethod.DestinationExists, plan.Single(p => p.Name == "meta").Method);
@@ -375,7 +376,7 @@ public class PrismImportPlannerTests : IDisposable
         Directory.CreateSymbolicLink(Path.Combine(_root, "src", "instances", "dirlink"),
             Path.Combine(_root, "src", "instances", "other"));
 
-        var plan = PrismImportPlanner.Plan(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
+        var plan = PrismImportPlanner.Plan(new AbsolutePath(Path.Combine(_root, "src")), new AbsolutePath(Path.Combine(_root, "dst")),
             ImportMode.CopyOnWrite);
 
         Assert.Equal(3, plan.Single(p => p.Name == "instances").Files); // marker + link + unrelated
@@ -389,8 +390,8 @@ public class PrismImportPlannerTests : IDisposable
         Directory.CreateDirectory(Path.Combine(_root, "src"));
         File.WriteAllText(Path.Combine(_root, "src", "multimc.cfg"), "x");
 
-        var item = Assert.Single(PrismImportPlanner.Plan(Path.Combine(_root, "src"),
-            Path.Combine(_root, "dst"), ImportMode.CopyOnWrite));
+        var item = Assert.Single(PrismImportPlanner.Plan(new AbsolutePath(Path.Combine(_root, "src")),
+            new AbsolutePath(Path.Combine(_root, "dst")), ImportMode.CopyOnWrite));
 
         Assert.Equal("multimc.cfg", item.Name);
         Assert.False(item.IsDirectory);
@@ -434,11 +435,12 @@ public class PrismImportTaskTests : IDisposable
         Directory.CreateDirectory(Path.Combine(_root, "dst", "meta"));
         await File.WriteAllTextAsync(Path.Combine(_root, "dst", "meta", "index.json"), "existing");
 
-        var decisions = new MigrationDecisionStore(Path.Combine(_root, "state", "migration"),
+        var decisions = new MigrationDecisionStore(new AbsolutePath(Path.Combine(_root, "state", "migration")),
             FlintJsonContext.Default.MigrationDecisionRecord);
         // S7: the task files under the ACTUAL source name — a polymc source must not be
         // recorded as "prism" (the old hardcode)
-        var task = new PrismImportTask(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
+        var task = new PrismImportTask(new AbsolutePath(Path.Combine(_root, "src")),
+            new AbsolutePath(Path.Combine(_root, "dst")),
             ImportMode.CopyOnWrite, "polymc", decisions);
         await task.StartAsync();
 
@@ -480,7 +482,8 @@ public class PrismImportTaskTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(_root, "src", "accounts.json"), "{}");
         FileTransfer.CloneAttemptHook = (_, _) => false; // simulate ext4/Windows/cross-volume
 
-        var task = new PrismImportTask(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
+        var task = new PrismImportTask(new AbsolutePath(Path.Combine(_root, "src")),
+            new AbsolutePath(Path.Combine(_root, "dst")),
             ImportMode.CopyOnWrite);
         await task.StartAsync();
 
@@ -495,7 +498,8 @@ public class PrismImportTaskTests : IDisposable
     {
         Directory.CreateDirectory(Path.Combine(_root, "src"));
 
-        var task = new PrismImportTask(Path.Combine(_root, "src"), Path.Combine(_root, "dst"), ImportMode.CopyOnWrite);
+        var task = new PrismImportTask(new AbsolutePath(Path.Combine(_root, "src")),
+            new AbsolutePath(Path.Combine(_root, "dst")), ImportMode.CopyOnWrite);
         await task.StartAsync();
 
         Assert.Equal(TaskState.Failed, task.State);
@@ -517,9 +521,10 @@ public class PrismImportTaskTests : IDisposable
         Directory.CreateDirectory(Path.Combine(_root, "dst", "instances", "native"));
         await File.WriteAllTextAsync(Path.Combine(_root, "dst", "instances", "native", "instance.cfg"), "native");
 
-        var decisions = new MigrationDecisionStore(Path.Combine(_root, "state", "migration"),
+        var decisions = new MigrationDecisionStore(new AbsolutePath(Path.Combine(_root, "state", "migration")),
             FlintJsonContext.Default.MigrationDecisionRecord);
-        var task = new PrismImportTask(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
+        var task = new PrismImportTask(new AbsolutePath(Path.Combine(_root, "src")),
+            new AbsolutePath(Path.Combine(_root, "dst")),
             ImportMode.CopyOnWrite, "prism", decisions);
         await task.StartAsync();
 
@@ -545,9 +550,10 @@ public class PrismImportTaskTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(_root, "src", "instances", "demo", "instance.cfg"), "x");
         await File.WriteAllTextAsync(Path.Combine(_root, "src", "prismlauncher.cfg"), "k=v");
 
-        var decisions = new MigrationDecisionStore(Path.Combine(_root, "state-move", "migration"),
+        var decisions = new MigrationDecisionStore(new AbsolutePath(Path.Combine(_root, "state-move", "migration")),
             FlintJsonContext.Default.MigrationDecisionRecord);
-        var task = new PrismImportTask(Path.Combine(_root, "src"), Path.Combine(_root, "dst"),
+        var task = new PrismImportTask(new AbsolutePath(Path.Combine(_root, "src")),
+            new AbsolutePath(Path.Combine(_root, "dst")),
             ImportMode.Move, "prism", decisions);
         await task.StartAsync();
 
@@ -586,9 +592,9 @@ public class PrismSourceDetectorTests : IDisposable
         Directory.CreateDirectory(Path.Combine(prism, "instances", "one"));
         File.WriteAllText(Path.Combine(prism, "prismlauncher.cfg"), "x");
 
-        var candidates = PrismSourceDetector.Detect(_root, [_root]);
+        var candidates = PrismSourceDetector.Detect(new AbsolutePath(_root), [new AbsolutePath(_root)]);
 
-        var hit = Assert.Single(candidates, c => c.Path.EndsWith("PrismLauncher"));
+        var hit = Assert.Single(candidates, c => c.Path.Value.EndsWith("PrismLauncher"));
         Assert.Equal("prism", hit.LegacyName);
         Assert.True(hit.ConfigFound);
         Assert.Equal(1, hit.InstancesFound);
@@ -603,9 +609,9 @@ public class PrismSourceDetectorTests : IDisposable
         File.WriteAllText(Path.Combine(prism, "prismlauncher.cfg"), "x");
         File.WriteAllText(Path.Combine(_root, "prism_nomigrate.txt"), "");
 
-        var candidates = PrismSourceDetector.Detect(_root, [_root]);
+        var candidates = PrismSourceDetector.Detect(new AbsolutePath(_root), [new AbsolutePath(_root)]);
 
-        var hit = Assert.Single(candidates, c => c.Path.EndsWith("PrismLauncher"));
+        var hit = Assert.Single(candidates, c => c.Path.Value.EndsWith("PrismLauncher"));
         Assert.True(hit.MarkerPresent);
         Assert.Equal(DataMigration.MigrationDecision.MarkerPresent, hit.Decision);
     }
@@ -620,7 +626,7 @@ public class PrismSourceDetectorTests : IDisposable
         Directory.CreateDirectory(multimc);
         File.WriteAllText(Path.Combine(multimc, "multimc.cfg"), "x");
 
-        var candidates = PrismSourceDetector.Detect(_root, [_root]);
+        var candidates = PrismSourceDetector.Detect(new AbsolutePath(_root), [new AbsolutePath(_root)]);
 
         var hit = Assert.Single(candidates);
         Assert.Equal("multimc", hit.LegacyName);
@@ -637,7 +643,7 @@ public class PrismSourceDetectorTests : IDisposable
         Directory.CreateDirectory(multimc);
         File.WriteAllText(Path.Combine(multimc, "mmc.cfg"), "x");
 
-        var candidates = PrismSourceDetector.Detect(_root, [_root]);
+        var candidates = PrismSourceDetector.Detect(new AbsolutePath(_root), [new AbsolutePath(_root)]);
 
         var hit = Assert.Single(candidates);
         Assert.Equal("multimc", hit.LegacyName);
@@ -653,7 +659,7 @@ public class PrismSourceDetectorTests : IDisposable
         File.WriteAllText(Path.Combine(multimc, "multimc.cfg"), "x");
         File.WriteAllText(Path.Combine(multimc, "mmc.cfg"), "x");
 
-        var hit = Assert.Single(PrismSourceDetector.Detect(_root, [_root]));
+        var hit = Assert.Single(PrismSourceDetector.Detect(new AbsolutePath(_root), [new AbsolutePath(_root)]));
 
         Assert.Equal("multimc", hit.LegacyName);
         Assert.Equal("multimc.cfg", hit.ConfigFile);
@@ -685,13 +691,13 @@ public class PrismSourceDetectorTests : IDisposable
         var flintJson = Path.Combine(configRoot, "flint.json");
 
         // no flint.json yet → ready to migrate
-        var before = Assert.Single(PrismSourceDetector.Detect(_root, [_root], null, flintJson));
+        var before = Assert.Single(PrismSourceDetector.Detect(new AbsolutePath(_root), [new AbsolutePath(_root)], null, new AbsolutePath(flintJson)));
         Assert.Equal(DataMigration.MigrationDecision.ReadyToMigrate, before.Decision);
         Assert.False(before.TargetHasOwnConfig);
 
         // Flint's own config appears → the C++ existing-data protection fires
         File.WriteAllText(flintJson, "{}");
-        var hit = Assert.Single(PrismSourceDetector.Detect(_root, [_root], null, flintJson));
+        var hit = Assert.Single(PrismSourceDetector.Detect(new AbsolutePath(_root), [new AbsolutePath(_root)], null, new AbsolutePath(flintJson)));
         Assert.Equal(DataMigration.MigrationDecision.CurrentDataExists, hit.Decision);
         Assert.True(hit.TargetHasOwnConfig);
     }

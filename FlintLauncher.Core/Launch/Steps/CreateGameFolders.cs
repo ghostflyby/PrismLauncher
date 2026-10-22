@@ -13,7 +13,7 @@ public sealed class CreateGameFolders(LaunchTask parent) : LaunchStep(parent)
     {
         var instance = Parent.Instance;
 
-        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(instance.GameRoot())))
+        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(instance.GameRoot)))
         {
             EmitLogLine("Couldn't create the main game folder", MessageLevel.Error);
             EmitFailed("Couldn't create the main game folder");
@@ -21,7 +21,7 @@ public sealed class CreateGameFolders(LaunchTask parent) : LaunchStep(parent)
         }
 
         // HACK: this is a workaround for MCL-3732 - 'server-resource-packs' folder is created.
-        if (!FileOps.EnsureFolderPathExists((new AbsolutePath(instance.GameRoot()) / "server-resource-packs")))
+        if (!FileOps.EnsureFolderPathExists((new AbsolutePath(instance.GameRoot) / "server-resource-packs")))
         {
             EmitLogLine("Couldn't create the 'server-resource-packs' folder", MessageLevel.Error);
         }

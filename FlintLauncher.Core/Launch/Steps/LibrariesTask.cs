@@ -48,14 +48,14 @@ public sealed class LibrariesTask(MinecraftInstance inst) : FlintTask
         libArtifactPool.Add(profile.GetMainJar());
         // (upstream ignores the processArtifactPool return value; the port stops before
         // starting a NetJob that would be useless after the task already failed)
-        if (!ProcessArtifactPool(libArtifactPool, failedLocalLibraries, inst1.GetLocalLibraryPath(), metacache, job))
+        if (!ProcessArtifactPool(libArtifactPool, failedLocalLibraries, inst1.GetLocalLibraryPath().Value, metacache, job))
         {
             _downloadJob = null;
             return;
         }
 
         var failedLocalJarMods = new List<string>();
-        if (!ProcessArtifactPool(profile.GetJarMods().Cast<Library?>(), failedLocalJarMods, inst1.JarModsDir(), metacache, job))
+        if (!ProcessArtifactPool(profile.GetJarMods().Cast<Library?>(), failedLocalJarMods, inst1.JarModsDir.Value, metacache, job))
         {
             _downloadJob = null;
             return;

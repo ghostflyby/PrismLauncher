@@ -19,6 +19,7 @@
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Net;
+using TruePath;
 
 namespace FlintLauncher.Core.Config;
 

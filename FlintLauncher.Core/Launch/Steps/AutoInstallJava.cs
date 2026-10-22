@@ -28,6 +28,7 @@ using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tasks;
 using TruePath;
+using TruePath.SystemIo;
 using Index = FlintLauncher.Core.Meta.Index;
 
 namespace FlintLauncher.Core.Launch.Steps;
@@ -84,7 +85,7 @@ public sealed class AutoInstallJava : LaunchStep
                             EmitLogLine("The automatic Java mechanism detected a 32-bit installation of Java.", MessageLevel.Launcher);
                         }
 
-                        SetJavaPath(java.Path);
+                        SetJavaPath(new AbsolutePath(java.Path));
                         return;
                     }
                 }
@@ -113,9 +114,9 @@ public sealed class AutoInstallJava : LaunchStep
         }
 
         var javaDir = Services.JavaRoot;
-        var relativeBinary = Path.Combine(wantedJavaName, "bin", JavaUtils.JavaExecutable);
-        var wantedJavaPath = Path.Combine(javaDir, relativeBinary);
-        if (File.Exists(wantedJavaPath) || Directory.Exists(wantedJavaPath))
+        var relativeBinary = new LocalPath(wantedJavaName) / "bin" / JavaUtils.JavaExecutable;
+        var wantedJavaPath = javaDir / relativeBinary;
+        if (wantedJavaPath.Exists())
         {
             SetJavaPathFromPartial();
             return;
@@ -139,7 +140,7 @@ public sealed class AutoInstallJava : LaunchStep
     private IReadOnlyList<int> MajorJavaVersions() =>
         _instance.GetPackProfile().GetProfile()?.GetCompatibleJavaMajors() ?? [];
 
-    private void SetJavaPath(string path)
+    private void SetJavaPath(AbsolutePath path)
     {
         var settings = _instance.Settings;
         // C7: there is no gate boolean anymore — writing JavaPath sets the instance-layer
@@ -158,9 +159,9 @@ public sealed class AutoInstallJava : LaunchStep
         // just checking if the executable is there should suffice
         // but if needed this can be achieved through refreshing the javalist
         // and retrieving the path that contains the java name
-        var relativeBinary = Path.Combine(javaName, "bin", JavaUtils.JavaExecutable);
-        var finalPath = Path.Combine(javaDir, relativeBinary);
-        if (File.Exists(finalPath))
+        var relativeBinary = new LocalPath(javaName) / "bin" / JavaUtils.JavaExecutable;
+        var finalPath = javaDir / relativeBinary;
+        if (finalPath.ExistsFile())
         {
             SetJavaPath(finalPath);
         }
@@ -180,7 +181,7 @@ public sealed class AutoInstallJava : LaunchStep
             if (java.RuntimeOs == _supportedArch && java.Name == javaName)
             {
                 var javaDir = Services.JavaRoot;
-                var finalPath = Path.Combine(javaDir, java.Name);
+                var finalPath = (AbsolutePath)javaDir / java.Name;
                 switch (java.DownloadType)
                 {
                     case JavaDownloadType.Manifest:
@@ -193,7 +194,7 @@ public sealed class AutoInstallJava : LaunchStep
                     default:
                         try
                         {
-                            if (Directory.Exists(finalPath) || File.Exists(finalPath))
+                            if (finalPath.Exists())
                             {
                                 FileOps.DeletePath(new AbsolutePath(finalPath));
                             }

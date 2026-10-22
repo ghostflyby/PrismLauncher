@@ -21,6 +21,7 @@ using System.Globalization;
 using System.Security;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 
 namespace FlintLauncher.Core.Migration;
 
@@ -67,19 +68,20 @@ public static class PrismImportPlanner
         "mmc.cfg",
     ];
 
-    public static IReadOnlyList<PrismImportPlanItem> Plan(string sourceDir, string targetDataDir, ImportMode mode)
+    public static IReadOnlyList<PrismImportPlanItem> Plan(AbsolutePath sourceDir, AbsolutePath targetDataDir,
+        ImportMode mode)
     {
         var items = new List<PrismImportPlanItem>();
         foreach (var dir in ImportDirectories)
         {
-            var src = Path.Combine(sourceDir, dir);
-            if (!Directory.Exists(src))
+            var src = sourceDir / dir;
+            if (!Directory.Exists(src.Value))
             {
                 continue;
             }
 
-            var dst = Path.Combine(targetDataDir, dir);
-            if (Directory.Exists(dst))
+            var dst = targetDataDir / dir;
+            if (Directory.Exists(dst.Value))
             {
                 // B2: Flint ALWAYS creates <data>/instances (InstanceList's constructor
                 // ensures the folder), so a flat "destination exists → skip" silently
@@ -97,7 +99,7 @@ public static class PrismImportPlanner
                 continue;
             }
 
-            var moveRename = mode == ImportMode.Move && FileTransfer.SameVolume(src, dst);
+            var moveRename = mode == ImportMode.Move && FileTransfer.SameVolume(src.Value, dst.Value);
             items.Add(new PrismImportPlanItem(dir, IsDirectory: true,
                 moveRename ? PlannedMethod.RenameDirectory : PlannedMethod.PerFile,
                 CountFiles(src), SizeOf(src)));
@@ -105,26 +107,26 @@ public static class PrismImportPlanner
 
         foreach (var file in ImportFiles)
         {
-            var src = Path.Combine(sourceDir, file);
-            if (!File.Exists(src))
+            var src = sourceDir / file;
+            if (!File.Exists(src.Value))
             {
                 continue;
             }
 
-            var dst = Path.Combine(targetDataDir, file);
-            var method = File.Exists(dst)
+            var dst = targetDataDir / file;
+            var method = File.Exists(dst.Value)
                 ? PlannedMethod.DestinationExists
-                : mode == ImportMode.Move && FileTransfer.SameVolume(src, dst)
+                : mode == ImportMode.Move && FileTransfer.SameVolume(src.Value, dst.Value)
                     ? PlannedMethod.RenameDirectory
                     : PlannedMethod.PerFile;
             items.Add(new PrismImportPlanItem(file, IsDirectory: false, method, Files: 1,
-                new FileInfo(src).Length));
+                new FileInfo(src.Value).Length));
         }
 
         return items;
     }
 
-    public static long CountFiles(string dir)
+    public static long CountFiles(AbsolutePath dir)
     {
         var count = 0L;
         foreach (var _ in FileTransfer.EnumerateFilesDeep(dir))
@@ -135,7 +137,7 @@ public static class PrismImportPlanner
         return count;
     }
 
-    public static long SizeOf(string dir)
+    public static long SizeOf(AbsolutePath dir)
     {
         var total = 0L;
         foreach (var file in FileTransfer.EnumerateFilesDeep(dir))
@@ -155,12 +157,12 @@ public static class PrismImportPlanner
     /// "destination exists" directory into a resumable per-file merge. The same
     /// enumeration and the same destination layout the import walk uses, so plan and
     /// transfer can never disagree.</summary>
-    private static bool HasFilesMissingAtDestination(string srcDir, string dstDir)
+    private static bool HasFilesMissingAtDestination(AbsolutePath srcDir, AbsolutePath dstDir)
     {
         foreach (var file in FileTransfer.EnumerateFilesDeep(srcDir))
         {
-            var relative = Path.GetRelativePath(srcDir, file);
-            if (!File.Exists(Path.Combine(dstDir, relative)))
+            var relative = Path.GetRelativePath(srcDir.Value, file);
+            if (!File.Exists((dstDir / relative).Value))
             {
                 return true;
             }
@@ -181,8 +183,8 @@ public static class PrismImportPlanner
 /// </summary>
 public sealed class PrismImportTask : FlintTask
 {
-    private readonly string _sourceDir;
-    private readonly string _targetDataDir;
+    private readonly AbsolutePath _sourceDir;
+    private readonly AbsolutePath _targetDataDir;
     private readonly ImportMode _mode;
     private readonly string _sourceName;
     private readonly MigrationDecisionStore? _decisions;
@@ -190,7 +192,7 @@ public sealed class PrismImportTask : FlintTask
     /// <summary><paramref name="sourceName"/> is the actual legacy-launcher id the record is
     /// filed under (S7: "prism" was hardcoded before; candidates carry polymc/multimc too).
     /// <paramref name="decisions"/> null (bare fixtures) skips the record write.</summary>
-    public PrismImportTask(string sourceDir, string targetDataDir, ImportMode mode,
+    public PrismImportTask(AbsolutePath sourceDir, AbsolutePath targetDataDir, ImportMode mode,
         string sourceName = "prism", MigrationDecisionStore? decisions = null)
     {
         _sourceDir = sourceDir;
@@ -235,13 +237,13 @@ public sealed class PrismImportTask : FlintTask
                 continue;
             }
 
-            var srcItem = Path.Combine(_sourceDir, item.Name);
-            var dstItem = Path.Combine(_targetDataDir, item.Name);
+            var srcItem = _sourceDir / item.Name;
+            var dstItem = _targetDataDir / item.Name;
 
             if (item is { IsDirectory: true, Method: PlannedMethod.RenameDirectory })
             {
                 EmitStatus($"Moving {item.Name}…");
-                if (FileTransfer.TryMoveDirectory(srcItem, dstItem))
+                if (FileTransfer.TryMoveDirectory(srcItem.Value, dstItem.Value))
                 {
                     done += item.Files;
                     continue;
@@ -254,10 +256,10 @@ public sealed class PrismImportTask : FlintTask
                 cancellationToken.ThrowIfCancellationRequested();
                 done++;
                 SetProgress(done, totalFiles);
-                var relative = Path.GetRelativePath(_sourceDir, file).Replace('\\', '/');
-                var dst = Path.Combine(_targetDataDir, relative);
+                var relative = Path.GetRelativePath(_sourceDir.Value, file).Replace('\\', '/');
+                var dst = _targetDataDir / relative;
                 EmitStatus($"Importing {Truncate(relative)}…");
-                if (!FileTransfer.TransferFile(file, dst, _mode, out _))
+                if (!FileTransfer.TransferFile(file, dst.Value, _mode, out _))
                 {
                     failed = true;
                 }
@@ -276,10 +278,10 @@ public sealed class PrismImportTask : FlintTask
         // stock, deleted once here. Best effort: the data has fully landed.
         try
         {
-            var legacyLedger = Path.Combine(_targetDataDir, "metacache");
-            if (File.Exists(legacyLedger))
+            var legacyLedger = _targetDataDir / "metacache";
+            if (File.Exists(legacyLedger.Value))
             {
-                File.Delete(legacyLedger);
+                File.Delete(legacyLedger.Value);
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
@@ -337,21 +339,21 @@ public sealed class PrismImportTask : FlintTask
     /// undercount).</summary>
     private long CountSourceInstances()
     {
-        var instancesDir = Path.Combine(_sourceDir, "instances");
-        return Directory.Exists(instancesDir)
-            ? Directory.EnumerateDirectories(instancesDir).Count()
+        var instancesDir = _sourceDir / "instances";
+        return Directory.Exists(instancesDir.Value)
+            ? Directory.EnumerateDirectories(instancesDir.Value).Count()
             : 0;
     }
 
-    private static IEnumerable<string> EnumerateFiles(string dir)
+    private static IEnumerable<string> EnumerateFiles(AbsolutePath dir)
     {
         // top-level whitelist FILES (accounts.json, instgroups.json) arrive here as file paths
-        if (File.Exists(dir))
+        if (File.Exists(dir.Value))
         {
-            return [dir];
+            return [dir.Value];
         }
 
-        if (!Directory.Exists(dir))
+        if (!Directory.Exists(dir.Value))
         {
             return [];
         }
@@ -384,29 +386,29 @@ public static class PrismSourceDetector
     ];
 
     /// <summary>Default parent directories that may contain launcher data, per platform.</summary>
-    public static IReadOnlyList<string> DefaultParents()
+    public static IReadOnlyList<AbsolutePath> DefaultParents()
     {
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         if (OperatingSystem.IsMacOS())
         {
-            return [Path.Combine(home, "Library", "Application Support")];
+            return [new AbsolutePath(home) / "Library" / "Application Support"];
         }
 
         if (OperatingSystem.IsWindows())
         {
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            return [appData];
+            return [new AbsolutePath(appData)];
         }
 
         var xdgDataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
         var baseDir = string.IsNullOrWhiteSpace(xdgDataHome)
-            ? Path.Combine(home, ".local", "share")
-            : xdgDataHome;
-        return [baseDir, Path.Combine(home, ".config")];
+            ? new AbsolutePath(home) / ".local" / "share"
+            : new AbsolutePath(xdgDataHome);
+        return [baseDir, new AbsolutePath(home) / ".config"];
     }
 
     public sealed record PrismSourceCandidate(
-        string Path,
+        AbsolutePath Path,
         string LegacyName,
         string ConfigFile,
         bool ConfigFound,
@@ -421,40 +423,43 @@ public static class PrismSourceDetector
     /// any legacy marker encountered). <paramref name="currentConfigFile"/> is Flint's own
     /// config at its authoritative position (post-reform <c>&lt;config-root&gt;/flint.json</c>)
     /// — the existing-data probe behind <see cref="PrismSourceCandidate.TargetHasOwnConfig"/>.</summary>
-    public static IReadOnlyList<PrismSourceCandidate> Detect(string targetDataDir,
-        MigrationDecisionStore? decisions = null, string? currentConfigFile = null) =>
+    public static IReadOnlyList<PrismSourceCandidate> Detect(AbsolutePath targetDataDir,
+        MigrationDecisionStore? decisions = null, AbsolutePath? currentConfigFile = null) =>
         Detect(targetDataDir, DefaultParents(), decisions, currentConfigFile);
 
     /// <summary>Detect over explicit parent directories (tests inject a sandbox root).</summary>
-    public static IReadOnlyList<PrismSourceCandidate> Detect(string targetDataDir, IEnumerable<string> parents,
-        MigrationDecisionStore? decisions = null, string? currentConfigFile = null)
+    public static IReadOnlyList<PrismSourceCandidate> Detect(AbsolutePath targetDataDir,
+        IEnumerable<AbsolutePath> parents,
+        MigrationDecisionStore? decisions = null, AbsolutePath? currentConfigFile = null)
     {
         var found = new List<PrismSourceCandidate>();
         foreach (var parent in parents)
         {
-            if (!Directory.Exists(parent))
+            if (!Directory.Exists(parent.Value))
             {
                 continue;
             }
 
             foreach (var (name, configFile) in KnownLaunchers)
             {
-                var dir = Path.Combine(parent, NameToDirectory(name));
-                if (!Directory.Exists(dir) || found.Any(c => string.Equals(c.Path, dir, StringComparison.OrdinalIgnoreCase)))
+                string a1 = NameToDirectory(name);
+                var dir = parent / a1;
+                if (!Directory.Exists(dir.Value) ||
+                    found.Any(c => string.Equals(c.Path.Value, dir.Value, StringComparison.OrdinalIgnoreCase)))
                 {
                     continue;
                 }
 
-                var hasConfig = File.Exists(Path.Combine(dir, configFile))
-                                || File.Exists(Path.Combine(dir, "prismlauncher.cfg"));
+                var hasConfig = File.Exists((dir / configFile).Value)
+                                || File.Exists((dir / "prismlauncher.cfg").Value);
                 if (!hasConfig)
                 {
                     continue;
                 }
 
-                var instances = Path.Combine(dir, "instances");
-                var instancesFound = Directory.Exists(instances)
-                    ? Directory.EnumerateDirectories(instances).Count()
+                var instances = dir / "instances";
+                var instancesFound = Directory.Exists(instances.Value)
+                    ? Directory.EnumerateDirectories(instances.Value).Count()
                     : 0;
                 var decision = DataMigration.Decide(targetDataDir, dir, name,
                     configFile, "flint.cfg", decisions, currentConfigFile);

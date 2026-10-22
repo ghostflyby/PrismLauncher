@@ -22,6 +22,7 @@ using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Settings;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.ModPlatform.Technic;
 
@@ -34,7 +35,7 @@ public static class TechnicPackProcessor
     public static async Task<string?> RunAsync(InstanceEnvironment environment,
         string instName,
         string instIcon,
-        string stagingPath,
+        AbsolutePath stagingPath,
         string minecraftVersion = "",
         bool isSolder = false,
         CancellationToken cancellationToken = default)
@@ -57,15 +58,15 @@ public static class TechnicPackProcessor
 
         string data;
 
-        var modpackJar = (minecraftPath / "bin" / "modpack.jar").Value;
+        AbsolutePath modpackJar = minecraftPath / "bin" / "modpack.jar";
         var versionJson = (minecraftPath / "bin" / "version.json").Value;
         var fmlMinecraftVersion = "";
-        if (File.Exists(modpackJar))
+        if (modpackJar.Exists())
         {
             ZipArchive zipFile;
             try
             {
-                zipFile = ZipFile.OpenRead(modpackJar);
+                zipFile = await ZipFile.OpenReadAsync(modpackJar.Value, cancellationToken);
             }
             catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
                                           or ArgumentException or NotSupportedException)
@@ -148,7 +149,7 @@ public static class TechnicPackProcessor
         {
             try
             {
-                data = Encoding.UTF8.GetString(File.ReadAllBytes(versionJson));
+                data = await File.ReadAllTextAsync(versionJson, cancellationToken);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {

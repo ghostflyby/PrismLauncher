@@ -11,6 +11,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -45,7 +46,7 @@ public class InstanceImportTaskTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList([instancesDir]) { Environment = _global };
+        return new InstanceList([new AbsolutePath(instancesDir)]) { Environment = _global };
     }
 
     private async Task<FlintTask> RunImport(Uri source, IReadOnlyDictionary<string, string>? extraInfo = null,
@@ -105,7 +106,7 @@ public class InstanceImportTaskTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(packDir, "instance.cfg"),
             "InstanceType=OneSix\nname=Original Name\niconKey=default\n");
         await File.WriteAllTextAsync(Path.Combine(packDir, ".minecraft", "options.txt"), "keepMe=1\n");
-        Assert.True(MmcZip.CompressDir(zipPath, packDir));
+        Assert.True(MmcZip.CompressDir(new AbsolutePath(zipPath), new AbsolutePath(packDir)));
 
         var task = await RunImport(new Uri(zipPath));
 
@@ -129,7 +130,7 @@ public class InstanceImportTaskTests : IDisposable
         Directory.CreateDirectory(dir);
         await File.WriteAllTextAsync(Path.Combine(dir, "manifest.json"),
             """{"manifestType":"minecraftModpack","manifestVersion":1,"minecraft":{"version":"1.20.1"},"files":[],"overrides":"overrides"}""");
-        Assert.True(MmcZip.CompressDir(zipPath, dir));
+        Assert.True(MmcZip.CompressDir(new AbsolutePath(zipPath), new AbsolutePath(dir)));
 
         var task = await RunImport(new Uri(zipPath));
 
@@ -156,7 +157,7 @@ public class InstanceImportTaskTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(dir, "bin", "version.json"),
             """{"inheritsFrom":"1.20.1","id":"technic-test","libraries":[]}""");
         await File.WriteAllTextAsync(Path.Combine(dir, "modpack", "options.txt"), "keepMe=1\n");
-        Assert.True(MmcZip.CompressDir(zipPath, dir));
+        Assert.True(MmcZip.CompressDir(new AbsolutePath(zipPath), new AbsolutePath(dir)));
 
         var task = await RunImport(new Uri(zipPath));
 
@@ -199,7 +200,7 @@ public class InstanceImportTaskTests : IDisposable
         var dir = Path.Combine(_root, "unknown-src");
         Directory.CreateDirectory(dir);
         await File.WriteAllTextAsync(Path.Combine(dir, "readme.txt"), "nothing in here");
-        Assert.True(MmcZip.CompressDir(zipPath, dir));
+        Assert.True(MmcZip.CompressDir(new AbsolutePath(zipPath), new AbsolutePath(dir)));
 
         var task = await RunImport(new Uri(zipPath));
 
@@ -213,8 +214,8 @@ public class InstanceImportTaskTests : IDisposable
         var mrpackPath = WriteMrpack();
 
         var cacheDir = Path.Combine(_root, "cache");
-        var cache = new HttpMetaCache(Path.Combine(_root, "metacache"));
-        cache.AddBase("general", cacheDir);
+        var cache = new HttpMetaCache(new AbsolutePath(Path.Combine(_root, "metacache")));
+        cache.AddBase("general", new AbsolutePath(cacheDir));
 
         // the C++ import URL shape (modrinth data/<id>/versions/<id>/...) — the pack id is
         // derived from it when no extra info is given

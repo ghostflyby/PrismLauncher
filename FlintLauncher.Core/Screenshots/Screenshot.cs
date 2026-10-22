@@ -5,12 +5,14 @@
 // Deviations: the C++ stores a QFileInfo; the port stores the path string (the helpers the
 // UI needs — fileName/baseName — are provided here, matching QFileInfo semantics).
 
+using TruePath;
+
 namespace FlintLauncher.Core.Screenshots;
 
-public sealed class ScreenShot(string filePath)
+public sealed class ScreenShot(AbsolutePath filePath)
 {
     /// <summary>Port of m_file (QFileInfo::absoluteFilePath).</summary>
-    public string FilePath { get; } = filePath;
+    public AbsolutePath FilePath { get; } = filePath;
 
     /// <summary>Link to the uploaded image (m_url); empty until the upload succeeded.</summary>
     public string Url { get; set; } = "";
@@ -22,7 +24,7 @@ public sealed class ScreenShot(string filePath)
     public string ImgurDeleteHash { get; set; } = "";
 
     /// <summary>Port of QFileInfo::fileName().</summary>
-    public string FileName() => Path.GetFileName(FilePath);
+    public string FileName() => FilePath.FileName;
 
     /// <summary>Port of QFileInfo::baseName(): everything up to (not including) the first '.'.</summary>
     public string BaseName()
