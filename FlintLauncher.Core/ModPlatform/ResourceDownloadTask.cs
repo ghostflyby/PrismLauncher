@@ -12,16 +12,15 @@
 //    meta, like the C++ null-profile branch).
 //  - The shader-config (.txt) rename of downloadSucceeded is dropped: ShaderPackFolderModel
 //    is not ported, and this task only ever runs against the mods folder for now.
-//  - The NetJob status line is raised on this task (the C# NetJob has no public status
-//    setter); progress propagates through the SequentialTask subtask plumbing.
+//  - The file download runs on the ModrinthClient's DownloadFileAsync (temp-file +
+//    checksum-gated move) instead of the NetRequest engine.
 
-using System.Security.Cryptography;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Dependencies;
 using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi;
 using FlintLauncher.Core.Tasks;
 using TruePath;
 
@@ -32,8 +31,11 @@ public class ResourceDownloadTask : SequentialTask
     private readonly IndexedPack _pack;
     private readonly IndexedVersion _packVersion;
     private readonly ResourceFolderModel _packModel;
+    private readonly ModrinthApi _modrinth;
+    private readonly string _downloadReason;
+    private readonly string _dependentOn;
+    private readonly MinecraftInstance? _instance;
 
-    private NetJob? _filesNetJob;
     private readonly LocalResourceUpdateTask? _updateTask;
 
     // Port of the to_delete tuple: (old metadata name, old file name)
@@ -51,7 +53,10 @@ public class ResourceDownloadTask : SequentialTask
         _pack = pack;
         _packVersion = version;
         _packModel = packs;
-        var modrinth1 = modrinth;
+        _modrinth = modrinth;
+        _downloadReason = downloadReason;
+        _dependentOn = dependentOn;
+        _instance = instance;
 
         if (isIndexed)
         {
@@ -61,28 +66,18 @@ public class ResourceDownloadTask : SequentialTask
             AddTask(_updateTask);
         }
 
-        _filesNetJob = new NetJob("Resource download");
-        EmitStatus($"Downloading resource:\n{_packVersion.DownloadUrl}");
-
-        string a1 = GetFilename();
-        var action = modrinth1.MakeFileRequest(_packVersion.DownloadUrl,
-            (AbsolutePath)_packModel.Dir / a1,
-            CreateModrinthMeta(instance, downloadReason, dependentOn));
-        if (_packVersion.HashType.Length != 0 && _packVersion.Hash.Length != 0)
+        var download = new CallbackTask(async cancellationToken =>
         {
-            var validator = MakeChecksumValidator(_packVersion.HashType, _packVersion.Hash);
-            if (validator is not null)
-            {
-                action.AddValidator(validator);
-            }
-        }
-
-        _filesNetJob.AddNetRequest(action);
-        _filesNetJob.Succeeded += DownloadSucceeded;
-        _filesNetJob.Failed += DownloadFailed;
-        _filesNetJob.Progress += DownloadProgressChanged;
-
-        AddTask(_filesNetJob);
+            EmitStatus($"Downloading resource:\n{_packVersion.DownloadUrl}");
+            await _modrinth.DownloadModFileAsync(_packVersion.DownloadUrl,
+                (AbsolutePath)_packModel.Dir / GetFilename(),
+                CreateModrinthMeta(_instance, _downloadReason, _dependentOn),
+                _packVersion.HashType.Length != 0 ? _packVersion.HashType : null,
+                _packVersion.Hash.Length != 0 ? _packVersion.Hash : null,
+                cancellationToken);
+        });
+        download.Succeeded += DownloadSucceeded;
+        AddTask(download);
     }
 
     public string GetFilename() => _packVersion.FileName;
@@ -100,7 +95,7 @@ public class ResourceDownloadTask : SequentialTask
     // ------------------------------------------------------------------ internals
 
     /// <summary>Port of the createModrinthMeta helper (net/ApiHeaderProxy metadata).</summary>
-    private static ModrinthApi.DownloadMeta CreateModrinthMeta(MinecraftInstance? instance, string reason, string dependentOn)
+    private static ModrinthDownloadMeta CreateModrinthMeta(MinecraftInstance? instance, string reason, string dependentOn)
     {
         if (instance is null)
         {
@@ -111,28 +106,10 @@ public class ResourceDownloadTask : SequentialTask
 
         var loaders = profile.GetModLoadersList();
 
-        return new ModrinthApi.DownloadMeta(reason,
+        return new ModrinthDownloadMeta(reason,
             profile.GetComponentVersion("net.minecraft"),
             loaders.Count != 0 ? ModIndex.GetModLoaderAsString(loaders[0]) : "",
             dependentOn);
-    }
-
-    /// <summary>
-    /// Port of the ChecksumValidator switch: md4/md5 -> MD5 (there is no managed MD4 in
-    /// .NET, see HashUtils), sha1/sha256/sha512 map directly; anything else (murmur2,
-    /// unknown) downloads without a checksum validator, like the C++ default branch.
-    /// </summary>
-    private static ChecksumValidator? MakeChecksumValidator(string hashType, string hash)
-    {
-        return HashUtils.AlgorithmFromString(hashType) switch
-        {
-            Algorithm.Md4 => ChecksumValidator.FromHex(HashAlgorithmName.MD5, hash),
-            Algorithm.Md5 => ChecksumValidator.FromHex(HashAlgorithmName.MD5, hash),
-            Algorithm.Sha1 => ChecksumValidator.FromHex(HashAlgorithmName.SHA1, hash),
-            Algorithm.Sha256 => ChecksumValidator.FromHex(HashAlgorithmName.SHA256, hash),
-            Algorithm.Sha512 => ChecksumValidator.FromHex(HashAlgorithmName.SHA512, hash),
-            _ => null,
-        };
     }
 
     // This indirection is done so that we don't delete a mod before being sure it was
@@ -144,7 +121,6 @@ public class ResourceDownloadTask : SequentialTask
 
     private void DownloadSucceeded(FlintTask task)
     {
-        _filesNetJob = null;
         var oldName = _toDelete.Name;
         var oldFilename = _toDelete.Filename;
 
@@ -157,16 +133,5 @@ public class ResourceDownloadTask : SequentialTask
 
         // (the C++ also renames the shader config .txt for ShaderPackFolderModel here; that
         //  model is not ported, see the header note)
-    }
-
-    private void DownloadFailed(FlintTask task, string reason)
-    {
-        _filesNetJob = null;
-        EmitFailed(reason);
-    }
-
-    private void DownloadProgressChanged(FlintTask task, TaskStepProgress progress)
-    {
-        SetProgress(progress.Current, progress.Total);
     }
 }

@@ -14,6 +14,7 @@
 using System.Text;
 using System.Text.Json;
 using FlintLauncher.Core.Minecraft;
+using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Versioning;
 using TruePath;
@@ -40,44 +41,9 @@ public sealed class ModrinthApi(ModrinthClient client, NetStack? net = null) : R
 
     public static IReadOnlyList<string> MrpackHosts { get; } = ["cdn.modrinth.com", "github.com", "raw.githubusercontent.com", "gitlab.com"];
 
-    /// <summary>The net stack behind the NetRequest-based download path (MakeFileRequest).</summary>
+    /// <summary>The net stack behind the raw NetRequest paths that have not moved onto the
+    /// client yet (the pinned-version and dependency-version fetches).</summary>
     public NetStack Net { get; } = net ?? NetStack.Default;
-
-    /// <summary>Port of ModrinthDownloadMeta (net/ApiHeaderProxy.h).</summary>
-    public readonly record struct DownloadMeta(string Reason, string GameVersion, string Loader, string DependentOn)
-    {
-        // default(DownloadMeta) produces null fields; treat them like the C++ empty strings
-        public bool IsEmpty => string.IsNullOrEmpty(Reason);
-
-        public string ToJson()
-        {
-            var dto = new ModrinthDownloadMeta(
-                Reason: string.IsNullOrEmpty(Reason) ? null : Reason,
-                GameVersion: string.IsNullOrEmpty(GameVersion) ? null : GameVersion,
-                Loader: string.IsNullOrEmpty(Loader) ? null : Loader,
-                DependentOn: string.IsNullOrEmpty(DependentOn) ? null : DependentOn);
-            return JsonSerializer.Serialize(dto, ModrinthJsonContext.Default.ModrinthDownloadMeta);
-        }
-    }
-
-    /// <summary>Port of the ApiHeaderProxy host checks (PAT + download-meta headers).</summary>
-    public void AddApiHeaders(NetRequest request, DownloadMeta meta = default)
-    {
-        var host = request.Url.Host;
-        if (host == new Uri(BaseUrl).Host || host == new Uri(StagingBaseUrl).Host)
-        {
-            if (ApiToken.Length != 0)
-            {
-                request.AddHeader("Authorization", ApiToken);
-            }
-        }
-
-        if (host == new Uri($"https://{DownloadHost}").Host
-            && !meta.IsEmpty)
-        {
-            request.AddHeader("modrinth-download-meta", meta.ToJson());
-        }
-    }
 
     // ------------------------------------------------------------------ domain queries
 
@@ -356,13 +322,28 @@ public sealed class ModrinthApi(ModrinthClient client, NetStack? net = null) : R
         ];
     }
 
-    // ------------------------------------------------------------------ plumbing
+    // ------------------------------------------------------------------ downloads
 
-    /// <summary>makeFile() with the Modrinth header proxy applied (downloads from the cdn).</summary>
-    public NetRequest MakeFileRequest(string url, AbsolutePath path, DownloadMeta meta = default)
-    {
-        var request = NetRequest.MakeFile(new Uri(url), path, stack: Net);
-        AddApiHeaders(request, meta);
-        return request;
-    }
+    /// <summary>The mod download path: stream the URL to disk through the client's
+    /// checksum-gated temp-file dance. Hash types are the launcher-domain spellings the
+    /// metadata files use (md4 degrades to md5 — no managed MD4 in .NET, see HashUtils);
+    /// unknown types download without a check, like the C++ default branch.</summary>
+    public Task DownloadModFileAsync(string url, AbsolutePath path, ModrinthDownloadMeta? meta = null,
+        string? hashType = null, string? hash = null, CancellationToken cancellationToken = default) =>
+        Client.DownloadFileAsync(url, path.Value, meta, MapChecksum(hashType, hash), cancellationToken);
+
+    /// <summary>Port of the ChecksumValidator switch: md4/md5 -> MD5, sha1/sha256/sha512 map
+    /// directly; anything else (murmur2, unknown) downloads unchecked.</summary>
+    private static (string Algorithm, string Hash)? MapChecksum(string? hashType, string? hash) =>
+        hash is { Length: > 0 }
+        ? HashUtils.AlgorithmFromString(hashType ?? "") switch
+        {
+            Algorithm.Md4 => ("md5", hash),
+            Algorithm.Md5 => ("md5", hash),
+            Algorithm.Sha1 => ("sha1", hash),
+            Algorithm.Sha256 => ("sha256", hash),
+            Algorithm.Sha512 => ("sha512", hash),
+            _ => null,
+        }
+        : null;
 }

@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // The Modrinth v2 client: queries return the wire models of ModrinthJson, decoded straight
-// from the response stream by the source-generated serializer. The client is a thin
-// forwarder — one send per call, a success-status gate (non-2xx surfaces as
-// HttpRequestException with the body excerpt in the message) and nothing else. Everything
-// transport-shaped — proxy, user agent, timeouts, retries, resilience — belongs to the
-// injected HttpClient and its handler pipeline, not here.
+// from the response stream by the source-generated serializer; file downloads land on disk
+// through a checksum-verified temp-file dance. The client is a thin forwarder — one send
+// per call, a success-status gate (non-2xx surfaces as HttpRequestException with the body
+// excerpt in the message) and nothing else. Everything transport-shaped — proxy, user
+// agent, timeouts, retries, resilience — belongs to the injected HttpClient and its handler
+// pipeline, not here.
 
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 
@@ -99,7 +101,93 @@ public sealed class ModrinthClient
         }
     }
 
+    /// <summary>Stream a download URL to disk: the body flows into a sibling temp file and
+    /// the file is moved into place only after the checksum matched ("" or null disables the
+    /// check), so a failed attempt never leaves a half-written artifact. Transport failures,
+    /// status failures and checksum mismatches all throw; a caller walking a fallback URL
+    /// list just catches and moves on. The download-meta header rides on the request when
+    /// the meta carries content.</summary>
+    public async Task DownloadFileAsync(string url, string destinationPath,
+        ModrinthDownloadMeta? meta = null, (string Algorithm, string Hash)? checksum = null,
+        CancellationToken cancellationToken = default)
+    {
+        var request = Get(url);
+        if (meta is { } downloadMeta && !downloadMeta.IsEmpty)
+        {
+            request.Headers.TryAddWithoutValidation("modrinth-download-meta",
+                JsonSerializer.Serialize(downloadMeta, ModrinthJsonContext.Default.ModrinthDownloadMeta));
+        }
+
+        using var response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            using var reader = new StreamReader(stream);
+            var buffer = new char[4097];
+            var read = await reader.ReadBlockAsync(buffer, cancellationToken).ConfigureAwait(false);
+            var excerpt = new string(buffer, 0, Math.Min(read, 4096));
+            throw new HttpRequestException(
+                $"HTTP status {(int)response.StatusCode} for {request.RequestUri}\n{excerpt}",
+                inner: null,
+                statusCode: response.StatusCode);
+        }
+
+        var tempPath = destinationPath + ".download";
+        try
+        {
+            await using (var output = File.Create(tempPath))
+            {
+                if (checksum is { } expected && AlgorithmName(expected.Algorithm) is { } algorithmName)
+                {
+                    using var hasher = IncrementalHash.CreateHash(algorithmName);
+                    var buffer = new byte[64 * 1024];
+                    int read;
+                    while ((read = await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+                    {
+                        hasher.AppendData(buffer, 0, read);
+                        await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                    }
+
+                    var actual = Convert.ToHexString(hasher.GetHashAndReset()).ToLowerInvariant();
+                    if (!string.Equals(actual, expected.Hash, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidDataException(
+                            $"checksum mismatch for {request.RequestUri}: expected {expected.Algorithm} {expected.Hash}, got {actual}");
+                    }
+                }
+                else
+                {
+                    await stream.CopyToAsync(output, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            File.Move(tempPath, destinationPath, overwrite: true);
+        }
+        catch
+        {
+            try
+            {
+                File.Delete(tempPath);
+            }
+            catch (IOException)
+            {
+                // the temp file best-effort cleanup must not mask the real failure
+            }
+
+            throw;
+        }
+    }
+
     // ------------------------------------------------------------------ plumbing
+
+    private static HashAlgorithmName? AlgorithmName(string modrinthAlgorithm) => modrinthAlgorithm switch
+    {
+        "sha1" => HashAlgorithmName.SHA1,
+        "sha256" => HashAlgorithmName.SHA256,
+        "sha512" => HashAlgorithmName.SHA512,
+        "md5" => HashAlgorithmName.MD5,
+        _ => null,
+    };
 
     private static HttpRequestMessage Get(string url) => new(HttpMethod.Get, url);
 

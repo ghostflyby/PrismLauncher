@@ -35,12 +35,17 @@ public sealed record ModrinthVersionUpdateRequest(
     List<string>? GameVersions,
     List<string>? VersionTypes);
 
-/// <summary>The modrinth-download-meta request header payload (net/ApiHeaderProxy).</summary>
+/// <summary>The modrinth-download-meta request header payload. The header is only sent
+/// when at least the reason carries content.</summary>
 public sealed record ModrinthDownloadMeta(
     string? Reason,
     string? GameVersion,
     string? Loader,
-    string? DependentOn);
+    string? DependentOn)
+{
+    // default(DownloadMeta) produces null fields; treat them like absent strings
+    public bool IsEmpty => string.IsNullOrEmpty(Reason);
+}
 
 // ------------------------------------------------------------------------ response models
 

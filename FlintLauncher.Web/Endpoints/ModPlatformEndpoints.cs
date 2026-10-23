@@ -243,15 +243,11 @@ public static class ModPlatformEndpoints
                 });
 
             var request = NetRequest.MakeByteArray(new Uri(url));
-            // the provider header hooks (Flame x-api-key / Modrinth PAT) mirror the request
-            // builders the core API methods use
+            // the provider header hook (the Flame x-api-key; the Modrinth path stays
+            // PAT-less until the raw request sites move onto the client)
             if (parsedProvider == ResourceProvider.Flame)
             {
                 runtime.Flame.AddApiKeyHeader(request);
-            }
-            else
-            {
-                runtime.Modrinth.AddApiHeaders(request);
             }
 
             await request.StartAsync();

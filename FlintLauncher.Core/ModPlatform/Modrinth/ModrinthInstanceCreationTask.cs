@@ -245,7 +245,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                 return;
             }
 
-            var meta = new ModrinthApi.DownloadMeta(Reason: "modpack", GameVersion: _minecraftVersion, Loader: loader,
+            var meta = new ModrinthDownloadMeta(Reason: "modpack", GameVersion: _minecraftVersion, Loader: loader,
                 DependentOn: _managedId.Length != 0 ? _managedVersionId : "");
 
             var downloadTask = new ModDownloadTask(file, filePath, meta, _modrinth);
@@ -581,32 +581,34 @@ public sealed class ModrinthCreationTask : InstanceTask
     /// One indexed file: try every download URL in order, checksum-verified (the per-file
     /// slice of the C++ download NetJob with its failed -> next-URL fallback chain).
     /// </summary>
-    private sealed class ModDownloadTask(File file, AbsolutePath filePath, ModrinthApi.DownloadMeta meta, ModrinthApi modrinth)
+    private sealed class ModDownloadTask(File file, AbsolutePath filePath, ModrinthDownloadMeta meta, ModrinthApi modrinth)
         : FlintTask
     {
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
             FileOps.EnsureFilePathExists(filePath);
-            var hashAlgorithm = file.HashAlgorithm;
+            // md4 degrades to md5 (no managed MD4 in .NET); the adapter maps it back
+            var hashAlgorithm = file.HashAlgorithm == HashAlgorithmName.MD5 ? "md4" : file.HashAlgorithm.Name.ToLowerInvariant();
 
             while (file.Downloads.Count > 0)
             {
                 var url = file.Downloads.Dequeue();
                 EmitStatus($"Downloading {file.Path}...");
-                var dl = modrinth.MakeFileRequest(url, filePath, meta);
-                dl.AddValidator(ChecksumValidator.FromHex(hashAlgorithm, file.Hash));
-                await dl.StartAsync(cancellationToken);
-                if (dl.WasSuccessful)
+                try
                 {
+                    await modrinth.DownloadModFileAsync(url, filePath, meta, hashAlgorithm, file.Hash,
+                        cancellationToken);
                     EmitSucceeded();
                     return;
                 }
-
-                if (!IsRunning)
+                catch (Exception e) when (e is HttpRequestException or InvalidDataException or IOException)
                 {
-                    return; // aborted
+                    if (!IsRunning)
+                    {
+                        return; // aborted
+                    }
+                    // else: try the next URL
                 }
-                // else: try the next URL
             }
 
             EmitFailed($"Failed to download {file.Path}: {file.Hash}");
