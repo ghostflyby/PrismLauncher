@@ -175,18 +175,17 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
                 return FlameMod.LoadIndexedPackVersion(data);
             }
 
-            var pinnedUrl = $"{_modrinth.BaseUrl}/version/{versionId}";
-            var pinnedRequest = NetRequest.MakeByteArray(new Uri(pinnedUrl), stack: _modrinth.Net);
-            await pinnedRequest.StartAsync(cancellationToken);
-            if (!pinnedRequest.WasSuccessful)
+            ModrinthVersion dto;
+            try
             {
-                throw new ModResolveException($"fetching the Modrinth version {versionId} failed: {pinnedRequest.FailReason}");
+                dto = await _modrinth.Client.GetVersionAsync(versionId, cancellationToken);
+            }
+            catch (Exception e) when (e is HttpRequestException or JsonException)
+            {
+                throw new ModResolveException($"fetching the Modrinth version {versionId} failed: {e.Message}");
             }
 
-            return ModrinthPackIndex.LoadIndexedPackVersion(
-                ParseModrinthBody<ModrinthVersion>(pinnedRequest.BodyAsString,
-                    $"the Modrinth version {versionId}", ModrinthJsonContext.Default.ModrinthVersion)
-                ?? throw new ModResolveException($"the Modrinth version {versionId} is not a JSON object"));
+            return ModrinthPackIndex.LoadIndexedPackVersion(dto);
         }
         catch (JsonException e)
         {
@@ -202,30 +201,16 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
     private async Task<IndexedVersion?> FetchLatestVersionAsync(ResourceProvider provider, IndexedPack pack,
         CancellationToken cancellationToken)
     {
-        var args = new VersionSearchArgs { Pack = pack, McVersions = [mcVersion] };
-        var url = provider == ResourceProvider.Flame
-            ? _flame.GetVersionsUrl(args)
-            : _modrinth.GetVersionsUrl(new VersionSearchArgs
-            {
-                Pack = pack,
-                McVersions = [mcVersion],
-                Loaders = loaders,
-            });
-        if (url is null)
-        {
-            throw new ModResolveException($"cannot build the version-list request for {pack.AddonId}");
-        }
-
-        var request = NetRequest.MakeByteArray(new Uri(url));
-        await request.StartAsync(cancellationToken);
-        if (!request.WasSuccessful)
-        {
-            throw new ModResolveException($"fetching the version list of {pack.AddonId} failed: {request.FailReason}");
-        }
-
-        var bodyRoot = ParseBodyNode(request.BodyAsString, $"the version list of {pack.AddonId}");
         if (provider == ResourceProvider.Flame)
         {
+            var request = NetRequest.MakeByteArray(new Uri(_flame.GetVersionsUrl(
+                new VersionSearchArgs { Pack = pack, McVersions = [mcVersion] })));
+            await request.StartAsync(cancellationToken);
+            if (!request.WasSuccessful)
+            {
+                throw new ModResolveException($"fetching the version list of {pack.AddonId} failed: {request.FailReason}");
+            }
+
             try
             {
                 if (!FlameMod.LoadIndexedPackVersionsFromResponse(pack, request.BodyAsString))
@@ -242,11 +227,26 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
                 checkLoaders: loaderList.Count != 0);
         }
 
-        // Modrinth: an array of versions; keep the valid ones for the instance's loader
-        // (the getDependencyVersion heuristic) and take the newest by published date.
-        // The `?? []` guards the JSON-null document edge, not the element shapes.
+        var versionsUrl = _modrinth.GetVersionsUrl(new VersionSearchArgs
+        {
+            Pack = pack,
+            McVersions = [mcVersion],
+            Loaders = loaders,
+        });
+        List<ModrinthVersion> dtos;
+        try
+        {
+            dtos = await _modrinth.Client.GetVersionListAsync(versionsUrl, cancellationToken);
+        }
+        catch (Exception e) when (e is HttpRequestException or JsonException)
+        {
+            throw new ModResolveException($"fetching the version list of {pack.AddonId} failed: {e.Message}");
+        }
+
+        // keep the valid ones for the instance's loader (the getDependencyVersion heuristic)
+        // and take the newest by published date
         var versions = new List<IndexedVersion>();
-        foreach (var dto in bodyRoot.Deserialize(ModrinthJsonContext.Default.ListModrinthVersion) ?? [])
+        foreach (var dto in dtos)
         {
             var file = ModrinthPackIndex.LoadIndexedPackVersion(dto);
 

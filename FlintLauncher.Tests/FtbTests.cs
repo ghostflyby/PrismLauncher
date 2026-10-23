@@ -15,7 +15,6 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.ExternalApi;
 using TruePath;
 using Xunit;
 

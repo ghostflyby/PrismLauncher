@@ -12,7 +12,6 @@
 
 using System.Globalization;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Flame;

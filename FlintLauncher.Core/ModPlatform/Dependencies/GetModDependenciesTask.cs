@@ -265,15 +265,12 @@ public class GetModDependenciesTask : SequentialTask
             IncludeChangelog = true,
         };
 
-        var job = new NetJob($"{dep.AddonId}::Dependency");
-        var request = NetRequest.MakeByteArray(new Uri(GetApi(provider).GetDependencyUrl(args)));
-        job.AddNetRequest(request);
-
-        job.Succeeded += _ =>
+        return new CallbackTask(async cancellationToken =>
         {
-            // the per-provider candidate lists: the Flame branch is the typed wire (the
-            // document IS the version when a file id is pinned, else the {"data": [...]}
-            // envelope); Modrinth answers a bare array of version documents
+            // the per-provider candidate lists: the Flame branch rides the raw request path
+            // (the document IS the version when a file id is pinned, else the {"data": [...]}
+            // envelope); the Modrinth branch runs on the client — pinned dependencies answer
+            // a single version document, the rest a bare array
             var versions = new List<IndexedVersion>();
 
             void Consider(IndexedVersion file)
@@ -284,7 +281,7 @@ public class GetModDependenciesTask : SequentialTask
                 }
 
                 // Heuristic to check if the returned value is valid
-                if (file.FileId.Length != 0 && (file.Loaders == ModLoaderType.None || (args.Loader & file.Loaders) != 0))
+                if (file.FileId.Length != 0 && (args.Loader == ModLoaderType.None || (args.Loader & file.Loaders) != 0))
                 {
                     versions.Add(file);
                 }
@@ -292,6 +289,16 @@ public class GetModDependenciesTask : SequentialTask
 
             if (provider == ResourceProvider.Flame)
             {
+                var job = new NetJob($"{dep.AddonId}::Dependency");
+                var request = NetRequest.MakeByteArray(new Uri(GetApi(provider).GetDependencyUrl(args)));
+                job.AddNetRequest(request);
+                await job.StartAsync(cancellationToken);
+                if (!job.WasSuccessful)
+                {
+                    RemovePack(pDep.Pack.AddonId);
+                    throw new HttpRequestException(job.FailReason);
+                }
+
                 try
                 {
                     var entries = dep.Version.Length != 0
@@ -323,52 +330,30 @@ public class GetModDependenciesTask : SequentialTask
             }
             else
             {
-                JsonNode root;
+                List<ModrinthVersion> dtos;
                 try
                 {
-                    root = JsonNode.Parse(request.BodyAsString) ?? throw new JsonException("empty response");
+                    dtos = dep.Version.Length != 0
+                        ? [await _modrinth.Client.GetVersionAsync(dep.Version, cancellationToken)]
+                        : await _modrinth.Client.GetVersionListAsync(_modrinth.GetDependencyUrl(args),
+                            cancellationToken);
                 }
-                catch (JsonException)
+                catch (Exception e) when (e is HttpRequestException or JsonException)
                 {
-                    // like the C++: warn (upstream logs) and leave the version unset (the
-                    // netJob still succeeds)
-                    return;
-                }
-
-                List<JsonNode?> arr;
-                if (dep.Version.Length != 0 && root is JsonObject pinned)
-                {
-                    // a version-pinned dependency answers the single version document
-                    arr = [pinned];
-                }
-                else if (root is JsonArray rootArray)
-                {
-                    arr = [.. rootArray];
-                }
-                else
-                {
-                    arr = [];
+                    RemovePack(pDep.Pack.AddonId);
+                    throw;
                 }
 
-                foreach (var entry in arr)
+                foreach (var dto in dtos)
                 {
-                    if (entry is not JsonObject)
-                    {
-                        continue;
-                    }
-
-                    IndexedVersion file;
                     try
                     {
-                        file = ModrinthPackIndex.LoadIndexedPackVersion(entry.Deserialize(ModrinthJsonContext.Default.ModrinthVersion)
-                                                                        ?? throw new JsonException("version is not a JSON object"));
+                        Consider(ModrinthPackIndex.LoadIndexedPackVersion(dto));
                     }
                     catch (JsonException)
                     {
                         continue;
                     }
-
-                    Consider(file);
                 }
             }
 
@@ -376,10 +361,7 @@ public class GetModDependenciesTask : SequentialTask
             versions.Sort((a, b) => string.CompareOrdinal(b.Date, a.Date));
             var bestMatch = versions.Count != 0 ? versions[0] : new IndexedVersion();
             OnDependencyVersionResolved(dep, provider, pDep, level, bestMatch);
-        };
-
-        job.Failed += (_, _) => RemovePack(pDep.Pack.AddonId);
-        return job;
+        });
     }
 
     /// <summary>The onSucceed continuation of the C++ prepareDependencyTask.</summary>

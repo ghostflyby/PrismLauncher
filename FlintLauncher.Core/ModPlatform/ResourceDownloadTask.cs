@@ -18,7 +18,6 @@
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Dependencies;
-using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.ExternalApi;
 using FlintLauncher.Core.Tasks;

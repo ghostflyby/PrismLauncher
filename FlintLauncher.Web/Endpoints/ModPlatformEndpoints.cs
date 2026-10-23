@@ -232,72 +232,70 @@ public static class ModPlatformEndpoints
                 return ApiJson.Error("unknown_provider", "provider must be 'modrinth' or 'flame'", 400);
             }
 
-            var url = parsedProvider == ResourceProvider.Flame
-                ? runtime.Flame.GetVersionsUrl(new VersionSearchArgs
-                {
-                    Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.Flame },
-                })
-                : runtime.Modrinth.GetVersionsUrl(new VersionSearchArgs
-                {
-                    Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.Modrinth },
-                });
-
-            var request = NetRequest.MakeByteArray(new Uri(url));
-            // the provider header hook (the Flame x-api-key; the Modrinth path stays
-            // PAT-less until the raw request sites move onto the client)
+            var pack = new IndexedPack { AddonId = projectId, Provider = parsedProvider };
             if (parsedProvider == ResourceProvider.Flame)
             {
+                var url = runtime.Flame.GetVersionsUrl(new VersionSearchArgs
+                {
+                    Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.Flame },
+                });
+                var request = NetRequest.MakeByteArray(new Uri(url));
                 runtime.Flame.AddApiKeyHeader(request);
-            }
 
-            await request.StartAsync();
-            if (request.State != TaskState.Succeeded)
-            {
-                return ApiJson.Error($"{parsedProvider.ToString().ToLowerInvariant()}_unavailable",
-                    $"{provider} version list failed: {request.FailReason}", 502);
-            }
+                await request.StartAsync();
+                if (request.State != TaskState.Succeeded)
+                {
+                    return ApiJson.Error("flame_unavailable",
+                        $"{provider} version list failed: {request.FailReason}", 502);
+                }
 
-            JsonNode? bodyRoot;
-            try
-            {
-                bodyRoot = JsonNode.Parse(request.BodyAsString);
-            }
-            catch (JsonException)
-            {
-                return ApiJson.Error($"{parsedProvider.ToString().ToLowerInvariant()}_invalid_response",
-                    $"{provider} returned invalid JSON", 502);
-            }
-
-            {
-                var pack = new IndexedPack { AddonId = projectId, Provider = parsedProvider };
                 try
                 {
-                    if (parsedProvider == ResourceProvider.Flame)
-                    {
-                        // loads + validates every file, sorted newest first (a broken body
-                        // surfaces as the invalid-response error below)
-                        FlameMod.LoadIndexedPackVersionsFromResponse(pack, request.BodyAsString);
-                    }
-                    else if (bodyRoot.Deserialize(ModrinthJsonContext.Default.ListModrinthVersion) is { } versionDtos)
-                    {
-                        foreach (var dto in versionDtos)
-                        {
-                            var version = ModrinthPackIndex.LoadIndexedPackVersion(dto);
-                            if (version.FileId.Length != 0)
-                            {
-                                pack.Versions.Add(version);
-                            }
-                        }
-                    }
+                    // loads + validates every file, sorted newest first (a broken body
+                    // surfaces as the invalid-response error below)
+                    FlameMod.LoadIndexedPackVersionsFromResponse(pack, request.BodyAsString);
                 }
                 catch (JsonException e)
                 {
-                    return ApiJson.Error($"{parsedProvider.ToString().ToLowerInvariant()}_invalid_response",
+                    return ApiJson.Error("flame_invalid_response",
                         $"{provider} version list is invalid: {e.Message}", 502);
                 }
-
-                return Results.Ok(pack.Versions.Select(VersionView).ToArray());
             }
+            else
+            {
+                var versionsUrl = runtime.Modrinth.GetVersionsUrl(new VersionSearchArgs
+                {
+                    Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.Modrinth },
+                });
+                List<ModrinthVersion> versionDtos;
+                try
+                {
+                    versionDtos = await runtime.Modrinth.Client.GetVersionListAsync(versionsUrl);
+                }
+                catch (Exception e) when (e is HttpRequestException or JsonException)
+                {
+                    return ApiJson.Error("modrinth_unavailable",
+                        $"{provider} version list failed: {e.Message}", 502);
+                }
+
+                foreach (var dto in versionDtos)
+                {
+                    try
+                    {
+                        var version = ModrinthPackIndex.LoadIndexedPackVersion(dto);
+                        if (version.FileId.Length != 0)
+                        {
+                            pack.Versions.Add(version);
+                        }
+                    }
+                    catch (JsonException)
+                    {
+                        // skip malformed entries, like the dependency resolver
+                    }
+                }
+            }
+
+            return Results.Ok(pack.Versions.Select(VersionView).ToArray());
         }).Produces<ProviderVersionView[]>();
 
         // ------------------------------------------------------ instances/{id}/mods

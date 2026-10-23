@@ -32,11 +32,7 @@ public sealed class ModrinthApi(ModrinthClient client, NetStack? net = null) : R
     public string BaseUrl { get => Client.Options.BaseUrl; set => Client.Options.BaseUrl = value; }
     public string ApiToken { get => Client.Options.ApiToken; set => Client.Options.ApiToken = value; }
 
-    /// <summary>The staging API base the PAT host gate also recognizes (BuildConfig's
-    /// _STAGING_URL; nothing else distinguishes it).</summary>
-    public string StagingBaseUrl { get; set; } = "https://staging-api.modrinth.com/v2";
-
-    /// <summary>The CDN host the modrinth-download-meta header gates on.</summary>
+    /// <summary>The CDN host the mrpack import validates download links against.</summary>
     public string DownloadHost { get; set; } = "cdn.modrinth.com";
 
     public static IReadOnlyList<string> MrpackHosts { get; } = ["cdn.modrinth.com", "github.com", "raw.githubusercontent.com", "gitlab.com"];

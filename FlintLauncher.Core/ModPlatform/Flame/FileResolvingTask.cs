@@ -15,7 +15,6 @@
 using System.Globalization;
 using System.Text.Json;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.ExternalApi;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;

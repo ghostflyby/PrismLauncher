@@ -12,6 +12,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Net.Http;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
@@ -74,6 +75,53 @@ public class ModrinthApiTests : IDisposable
     }
 
     // ---------------------------------------------------------------- API shapes
+
+    [Fact]
+    public async Task DownloadFileAsync_MismatchedChecksum_LeavesNoArtifact()
+    {
+        var destination = TempPath("checksum-miss.jar");
+        _server.Downloads["payload.bin"] = "actual payload"u8.ToArray();
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => _api.Client.DownloadFileAsync(
+            $"{_server.Url}/payload.bin", destination,
+            checksum: ("sha512", Convert.ToHexString(SHA512.HashData("different payload"u8.ToArray())).ToLowerInvariant())));
+
+        // neither the destination nor the temp file survives the failed attempt
+        Assert.False(File.Exists(destination));
+        Assert.False(File.Exists(destination + ".download"));
+    }
+
+    [Fact]
+    public async Task DownloadFileAsync_FailingUrl_ThrowsAndFallsBackByCaller()
+    {
+        var destination = TempPath("fallback.jar");
+        var payload = "fallback payload"u8.ToArray();
+        _server.Downloads["good.bin"] = payload;
+
+        // the first URL 404s (the real API's answer for an unknown path)...
+        await Assert.ThrowsAsync<HttpRequestException>(() =>
+            _api.Client.DownloadFileAsync($"{_server.Url}/missing.bin", destination));
+        Assert.False(File.Exists(destination));
+        Assert.False(File.Exists(destination + ".download"));
+
+        // ...and the caller's fallback walk retries with the next URL
+        await _api.Client.DownloadFileAsync($"{_server.Url}/good.bin", destination);
+        Assert.Equal(payload, await File.ReadAllBytesAsync(destination));
+    }
+
+    [Fact]
+    public async Task DownloadFileAsync_SendsDownloadMetaHeader()
+    {
+        var destination = TempPath("meta.jar");
+        var payload = "meta payload"u8.ToArray();
+        _server.Downloads["meta.bin"] = payload;
+
+        await _api.Client.DownloadFileAsync($"{_server.Url}/meta.bin", destination,
+            new ModrinthDownloadMeta("update", "1.20.1", "fabric", "pack-a"));
+
+        Assert.Contains("\"reason\":\"update\"", _server.LastDownloadHeaders["modrinth-download-meta"]);
+        Assert.Equal(payload, await File.ReadAllBytesAsync(destination));
+    }
 
     [Fact]
     public void SearchUrl_BuildsFacetsJson()

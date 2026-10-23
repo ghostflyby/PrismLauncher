@@ -12,7 +12,6 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
-using FlintLauncher.ExternalApi;
 using FlintLauncher.Core.Tasks;
 using TruePath;
 using Xunit;

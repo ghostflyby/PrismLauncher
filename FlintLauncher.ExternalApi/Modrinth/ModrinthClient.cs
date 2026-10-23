@@ -75,6 +75,18 @@ public sealed class ModrinthClient
         ReadJsonAsync(Get($"{Options.BaseUrl}/tag/category"),
             ModrinthJsonContext.Default.ListModrinthCategory, cancellationToken);
 
+    /// <summary>GET /version/{id} — one pinned version (the dependency lookup).</summary>
+    public Task<ModrinthVersion> GetVersionAsync(string versionId, CancellationToken cancellationToken = default) =>
+        ReadJsonAsync(Get($"{Options.BaseUrl}/version/{versionId}"),
+            ModrinthJsonContext.Default.ModrinthVersion, cancellationToken);
+
+    /// <summary>GET a version-list URL — the array of versions behind a project's
+    /// /version endpoint; the query string is built by the caller (the Core adapter owns
+    /// the game-version/loader filters).</summary>
+    public Task<List<ModrinthVersion>> GetVersionListAsync(string versionsUrl,
+        CancellationToken cancellationToken = default) =>
+        ReadJsonAsync(Get(versionsUrl), ModrinthJsonContext.Default.ListModrinthVersion, cancellationToken);
+
     /// <summary>GET /search — the search envelope; the query string is built by the caller
     /// (the Core adapter owns the facet building).</summary>
     public Task<ModrinthSearchResults> GetSearchResultsAsync(string searchUrl,
