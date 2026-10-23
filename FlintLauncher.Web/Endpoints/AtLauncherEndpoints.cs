@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// ATLauncher endpoints (fix-2 step 1): the packsnew.json pass-through (the pack list and the
+// ATLauncher endpoints: the packsnew.json pass-through (the pack list and the
 // per-pack version list, both mapped through AtLauncherPackIndex.LoadIndexedPack like the
 // C++ AtlListModel) and the pack install — AtLauncherPackInstallTask run through the same
 // staged-commit flow as POST /instances/vanilla (the ATL configs/mods downloads are small,
@@ -105,7 +105,7 @@ public static class AtLauncherEndpoints
                 }
 
                 runtime.Instances.LoadList();
-                // the staged commit's expected dirname, resolved through the D2 chain
+                // the staged commit's expected dirname, resolved through the chain
                 var inst = runtime.Instances.ResolveInstance(expectedId);
                 return inst is null
                     ? ApiJson.Error("creation_failed", "instance was committed but not discovered", 500)

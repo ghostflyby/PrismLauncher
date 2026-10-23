@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// API-level tests for the account skin endpoints (fix-2c): the profile skin read, the
+// API-level tests for the account skin endpoints: the profile skin read, the
 // SkinUpload multipart PUT (delegating to the same core SkinUpload the SkinApiTests assert
 // the byte shape of), the skin/cape removals and the CapeChange equip/remove semantics —
 // against the shared AuthStubServer, which records every request.
@@ -61,7 +61,7 @@ internal sealed class SkinApiHost : IAsyncDisposable
         }
 
         var previousCwd = Environment.CurrentDirectory;
-        // S2: the token is host-injected (--api-token) — no token file exists to read
+        // the token is host-injected (--api-token) — no token file exists to read
         var token = Guid.NewGuid().ToString("N");
         var app = WebHostBuilder.BuildWebApplication(
         [

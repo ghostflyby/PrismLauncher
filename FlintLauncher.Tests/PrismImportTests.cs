@@ -156,7 +156,7 @@ public class FileTransferTests : IDisposable
         Assert.True(FileTransfer.SameVolume(SrcPath("a"), DstPath("b")));
     }
 
-    // B1: on volumes without reflink support (ext4, Windows, cross-volume) TryClone fails
+    // on volumes without reflink support (ext4, Windows, cross-volume) TryClone fails
     // for every file — the CoW branch must degrade to a plain copy like the Move branch
     // does, or the whole import task EmitFailed's file by file
     [Fact]
@@ -174,7 +174,7 @@ public class FileTransferTests : IDisposable
         Assert.True(File.Exists(src));             // CoW keeps the source
     }
 
-    // B5: the transferred file must carry the source's permission bits — accounts.json is
+    // the transferred file must carry the source's permission bits — accounts.json is
     // 0600 in a Prism data directory and must not land world-readable
     [Fact]
     public void TransferFile_CarriesTheSourcePermissionBits()
@@ -201,7 +201,7 @@ public class FileTransferTests : IDisposable
         Assert.Equal(expected, File.GetUnixFileMode(DstPath("fallback.json")));
     }
 
-    // B5: the mode-carry helper itself — the exact call the Linux FICLONE branch makes
+    // the mode-carry helper itself — the exact call the Linux FICLONE branch makes
     // after a successful ioctl (not otherwise reachable on this OS)
     [Fact]
     public void CarryUnixFileMode_SetsTheDestinationModeFromTheSource()
@@ -225,7 +225,7 @@ public class FileTransferTests : IDisposable
         Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(dst));
     }
 
-    // B4: the migration enumeration — file symlinks are yielded (the C++ ResolveSymlinks
+    // the migration enumeration — file symlinks are yielded (the C++ ResolveSymlinks
     // walk copies them by content), directory links are never descended into, link cycles
     // cannot spin the walk
     [Fact]
@@ -313,7 +313,7 @@ public class PrismImportPlannerTests : IDisposable
             ImportMode.CopyOnWrite));
     }
 
-    // A1/A2 (CONFIG.md:23): the whitelist carries BOTH MultiMC config names — the upstream
+    // the whitelist carries BOTH MultiMC config names — the upstream
     // multimc.cfg (C++ Application.cpp:604) plus the historical mmc.cfg
     [Fact]
     public void ImportFiles_Carry_The_MultiMC_Dual_Name()
@@ -322,7 +322,7 @@ public class PrismImportPlannerTests : IDisposable
         Assert.Contains("mmc.cfg", PrismImportPlanner.ImportFiles);
     }
 
-    // B2: Flint startup ALWAYS creates <data>/instances — a destination directory must not
+    // Flint startup ALWAYS creates <data>/instances — a destination directory must not
     // swallow the whole item: the plan drills down into the per-file merge
     [Fact]
     public void Plan_DestinationDirectoryExists_PlansTheMergeWhenFilesAreMissing()
@@ -340,7 +340,7 @@ public class PrismImportPlannerTests : IDisposable
         Assert.Equal(1, instances.Files);                      // the source basis — the walk visits exactly these
     }
 
-    // B2: a destination that already holds every source file stays an honest skip
+    // a destination that already holds every source file stays an honest skip
     [Fact]
     public void Plan_DestinationDirectoryExists_StillReportsSkipWhenFullyMerged()
     {
@@ -356,7 +356,7 @@ public class PrismImportPlannerTests : IDisposable
         Assert.Equal(PlannedMethod.DestinationExists, plan.Single(p => p.Name == "meta").Method);
     }
 
-    // B4: the planned file count covers file symlinks (they transfer by content) while
+    // the planned file count covers file symlinks (they transfer by content) while
     // directory links add nothing — plan and walk can never disagree
     [Fact]
     public void Plan_CountsFileSymlinks_WhileNotDescendingDirectoryLinks()
@@ -382,7 +382,7 @@ public class PrismImportPlannerTests : IDisposable
         Assert.Equal(3, plan.Single(p => p.Name == "instances").Files); // marker + link + unrelated
     }
 
-    // A1: a source carrying only the upstream multimc.cfg plans its import
+    // a source carrying only the upstream multimc.cfg plans its import
     [Fact]
     public void Plan_Imports_The_Upstream_MultimcCfg()
     {
@@ -437,7 +437,7 @@ public class PrismImportTaskTests : IDisposable
 
         var decisions = new MigrationDecisionStore(new AbsolutePath(Path.Combine(_root, "state", "migration")),
             FlintJsonContext.Default.MigrationDecisionRecord);
-        // S7: the task files under the ACTUAL source name — a polymc source must not be
+        // the task files under the ACTUAL source name — a polymc source must not be
         // recorded as "prism" (the old hardcode)
         var task = new PrismImportTask(new AbsolutePath(Path.Combine(_root, "src")),
             new AbsolutePath(Path.Combine(_root, "dst")),
@@ -446,7 +446,7 @@ public class PrismImportTaskTests : IDisposable
 
         if (!task.WasSuccessful)
         {
-            // 探针：把失败细节落到文件（MTP 会截断断言消息）
+            // probe: write the failure details to a file (MTP truncates assertion messages)
             await File.WriteAllTextAsync(Path.Combine(Path.GetTempPath(), "flint-probe-dump.txt"),
                 "REASON=" + task.FailReason
                           + " | metaExists=" + File.Exists(Path.Combine(_root, "dst", "meta", "index.json"))
@@ -460,7 +460,7 @@ public class PrismImportTaskTests : IDisposable
         Assert.True(File.Exists(Path.Combine(_root, "dst", "instances", "demo", "instance.cfg")));
         Assert.True(File.Exists(Path.Combine(_root, "dst", "accounts.json")));
 
-        // S3: an `imported` decision record after full success — no marker file anywhere
+        // an `imported` decision record after full success — no marker file anywhere
         Assert.False(File.Exists(Path.Combine(_root, "dst", "prism_nomigrate.txt")));
         Assert.False(File.Exists(Path.Combine(_root, "dst", "polymc_nomigrate.txt")));
         var record = decisions.Read("polymc");
@@ -472,7 +472,7 @@ public class PrismImportTaskTests : IDisposable
         Assert.True(record.Bytes > 0);
     }
 
-    // B1 at the task level: on a volume without reflink support the CoW import used to
+    // at the task level: on a volume without reflink support the CoW import used to
     // fail EVERY file and EmitFailed the whole task — the copy fallback must carry it
     [Fact]
     public async Task ImportTask_OnReflinklessVolume_StillSucceedsThroughTheCopyFallback()
@@ -506,7 +506,7 @@ public class PrismImportTaskTests : IDisposable
         Assert.Contains("Nothing to import", task.FailReason);
     }
 
-    // B2 production scenario: Flint startup ALWAYS creates <data>/instances before any
+    // production scenario: Flint startup ALWAYS creates <data>/instances before any
     // import can run — the import must merge the instance tree into the existing
     // directory and succeed, not skip the whole item behind an imported record
     [Fact]
@@ -635,7 +635,7 @@ public class PrismSourceDetectorTests : IDisposable
         Assert.Equal(DataMigration.MigrationDecision.ReadyToMigrate, hit.Decision);
     }
 
-    // A1 (CONFIG.md:23 dual-name): the historical mmc.cfg stays probed as the fallback name
+    // dual-name: the historical mmc.cfg stays probed as the fallback name
     [Fact]
     public void Detect_MultiMC_Is_Still_Found_Via_The_Historical_MmcCfg()
     {
@@ -650,7 +650,7 @@ public class PrismSourceDetectorTests : IDisposable
         Assert.Equal("mmc.cfg", hit.ConfigFile);
     }
 
-    // A1: both names in one directory → ONE candidate, and the upstream multimc.cfg wins
+    // both names in one directory → ONE candidate, and the upstream multimc.cfg wins
     [Fact]
     public void Detect_MultiMC_With_Both_Config_Names_Is_One_Candidate_Preferring_Upstream()
     {
@@ -677,7 +677,7 @@ public class PrismSourceDetectorTests : IDisposable
         Assert.Equal("PrismLauncher", PrismSourceDetector.NameToDirectory("prism"));
     }
 
-    // A3: the existing-data decision runs against the CONFIG root's flint.json (CONFIG C5)
+    // the existing-data decision runs against the config root's flint.json
     // — the pre-reform <data>/flint.cfg position is dead, so the C++ protection
     // (Application.cpp:1994-1999) must fire on the authoritative position again
     [Fact]

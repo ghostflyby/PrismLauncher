@@ -8,8 +8,8 @@
 //    askIfShouldDeleteSaves) are message-box dialogs; only their enums
 //    (InstanceNameChange/ShouldUpdate/ShouldDeleteSaves) are ported. Callers run the
 //    dialog themselves and hand the outcome to <see cref="ShouldDeleteSaves"/>.
-//  - downloadFiles(): drives createUpdateTask() (the P5 launch pipeline) through a
-//    SequentialTask with a CustomMessageBox error dialog on failure — TODO(P5).
+//  - downloadFiles(): drives createUpdateTask() (the launch pipeline) through a
+//    SequentialTask with a CustomMessageBox error dialog on failure — TODO.
 //  - the m_gameFilesTask abort plumbing belongs to downloadFiles.
 //
 // Deviations:
@@ -59,7 +59,7 @@ public abstract class InstanceTask : FlintTask
     private bool _confirmUpdate = true;
     private string _originalInstanceId = "";
 
-    /// <summary>The typed instance-layer environment (D4): user flint.json store + the
+    /// <summary>The typed instance-layer environment: user flint.json store + the
     /// instance.json/instance-state.json type infos. Set through
     /// <see cref="SetParentEnvironment"/> (the InstanceStaging wrapper does it before the
     /// task runs); the creation tasks build their staged instances with it.</summary>

@@ -67,7 +67,7 @@ public static class LaunchEndpoints
             await runtime.InstanceLock.WaitAsync();
             try
             {
-                var inst = runtime.Instances.ResolveInstance(@ref); // D2 chain
+                var inst = runtime.Instances.ResolveInstance(@ref); // the addressing chain
                 if (inst is null)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");

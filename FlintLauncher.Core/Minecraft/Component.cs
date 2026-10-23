@@ -19,6 +19,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Net;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Minecraft;
 
@@ -435,7 +436,7 @@ public class Component : ProblemProvider
 
         var result = true;
         // just kill the file and reload
-        if (GetFilename() is { } filename && System.IO.File.Exists(filename.Value))
+        if (GetFilename() is { } filename && filename.ExistsFile())
         {
             result = FileOps.DeletePath(filename);
         }

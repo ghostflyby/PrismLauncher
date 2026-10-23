@@ -52,7 +52,7 @@ internal static class ApiOpenApi
             {
                 Title = "Flint API",
                 Version = "v1",
-                Description = "PrismLauncher's headless launcher core (G3: API v1, in-place).",
+                Description = "PrismLauncher's headless launcher core (API v1, in-place).",
             };
             document.Components ??= new OpenApiComponents();
             document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();

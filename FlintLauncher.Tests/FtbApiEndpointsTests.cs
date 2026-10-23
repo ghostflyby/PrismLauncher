@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// API-level tests for the FTB endpoints (fix-2 step 2): the /modpack/all index pass-through,
+// API-level tests for the FTB endpoints: the /modpack/all index pass-through,
 // the per-pack description/version list, the staged pack install against the stub FTB server
 // (reusing the FtbTestSupport fixture builders — the endpoint runs the same
 // FtbPackInstallTask the core tests drive directly, backed by the Flame stub for the
@@ -175,7 +175,7 @@ public class FtbApiEndpointsTests : IDisposable
             c => c.GetProperty("uid").GetString() == "net.minecraftforge"
                  && c.GetProperty("version").GetString() == "40.1.0");
 
-        // instance.json metadata (name + icon key + managed-pack bookkeeping, D4 camelCase)
+        // instance.json metadata (name + icon key + managed-pack bookkeeping, camelCase)
         // and the discovered instance surface
         var cfg = await File.ReadAllTextAsync(Path.Combine(staging, "instance.json"));
         Assert.Contains("FTB API Import", cfg);
@@ -208,7 +208,7 @@ public class FtbApiEndpointsTests : IDisposable
         Assert.NotNull(id);
 
         // the pack's first-listed version (the fixture's 1.0.0/4242) was installed and the
-        // instance name/icon fell back to the pack name / "default" (D4: instance.json)
+        // instance name/icon fell back to the pack name / "default" (instance.json)
         var cfg = await File.ReadAllTextAsync(
             Path.Combine(host.DataDir, "instances", id, "instance.json"));
         Assert.Contains($"{FtbPackFixture.VersionId}", cfg);

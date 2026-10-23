@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// P7-b API integration tests: host the real FlintLauncher.Web app in-process
+// API integration tests: host the real FlintLauncher.Web app in-process
 // (WebHostBuilder.BuildWebApplication with --data-dir <temp> + a random port) and drive the
 // whole HTTP surface with HttpClient.
 //
@@ -72,7 +72,7 @@ internal sealed class FlintApiHost : IAsyncDisposable
         var dataDir = Path.Combine(homeDir, "data");
         Directory.CreateDirectory(dataDir);
         var previousCwd = Environment.CurrentDirectory;
-        // S2: the token is host-injected (--api-token) — there is no token file to read
+        // the token is host-injected (--api-token) — there is no token file to read
         var token = Guid.NewGuid().ToString("N");
         var app = WebHostBuilder.BuildWebApplication(
         [
@@ -278,7 +278,7 @@ public class FlintApiIntegrationTests
         Assert.Equal("Packs", entry.GetProperty("group").GetString());
         Assert.Equal(0L, entry.GetProperty("lastLaunchTime").GetInt64());
         Assert.False(entry.GetProperty("running").GetBoolean());
-        // DATA D2 wire shape: every handle of the addressing chain is exposed
+        // the wire shape: every handle of the addressing chain is exposed
         Assert.Equal(id, entry.GetProperty("dirName").GetString());
         var uuid = entry.GetProperty("uuid").GetString();
         Assert.NotNull(uuid);
@@ -303,7 +303,7 @@ public class FlintApiIntegrationTests
         Assert.Equal("hello api", detail.GetProperty("notes").GetString());
         Assert.Equal("infinity", detail.GetProperty("iconKey").GetString());
 
-        // rename: a pure METADATA write since DATA D3 — the directory (and with it the id)
+        // rename: a pure METADATA write — the directory (and with it the id)
         // stays, the name changes, and the uuid holds as the stable reference -----------
         var rename = await host.PatchAsync($"/api/v1/instances/{Uri.EscapeDataString(id)}",
             new { name = "Renamed Trip" });
@@ -312,12 +312,12 @@ public class FlintApiIntegrationTests
             await (await host.GetAsync("/api/v1/instances")).Content.ReadAsStringAsync()).RootElement;
         entry = list.EnumerateArray().Single(e => e.GetProperty("name").GetString() == "Renamed Trip");
         Assert.Equal("Renamed Trip", entry.GetProperty("name").GetString());
-        // the dirname handle did not move (D3) and the uuid survived
+        // the dirname handle did not move and the uuid survived
         Assert.Equal(id, entry.GetProperty("id").GetString());
         Assert.Equal(uuid, entry.GetProperty("uuid").GetString());
         Assert.Equal(id, entry.GetProperty("dirName").GetString());
 
-        // the D2 chain resolves the same instance through uuid AND dirname --------------
+        // the same instance resolves through uuid AND dirname --------------
         var byUuid = JsonDocument.Parse(
             await (await host.GetAsync($"/api/v1/instances/{Uri.EscapeDataString(uuid)}")).Content
                 .ReadAsStringAsync()).RootElement;
@@ -364,7 +364,7 @@ public class FlintApiIntegrationTests
         Assert.NotNull(id);
 
         // PUT with kind-carrying values -------------------------------------------------
-        // C7: the gate has no boolean anymore — JavaPath at the instance layer IS the
+        // the gate has no boolean anymore — JavaPath at the instance layer IS the
         // override, and the derived OverrideJavaLocation gate reads true
         Assert.Equal(HttpStatusCode.NoContent, (
             await host.PutAsync(
@@ -384,7 +384,7 @@ public class FlintApiIntegrationTests
         var settings = JsonDocument.Parse(await (await host.GetAsync(
                 $"/api/v1/instances/{Uri.EscapeDataString(id)}/settings")).Content.ReadAsStringAsync())
             .RootElement;
-        // the settings map exposes the derived gates, the instance-layer members (D4) and
+        // the settings map exposes the derived gates, the instance-layer members and
         // the runtime time trio
         Assert.Equal(JsonValueKind.True, settings.GetProperty("OverrideJavaLocation").ValueKind);
         Assert.Equal("/tmp/flint-e2e-java", settings.GetProperty("JavaPath").GetString());
@@ -504,7 +504,7 @@ public class FlintApiIntegrationTests
     [Fact]
     public async Task News_Endpoint_Is_Retired()
     {
-        // CACHE E7: the news surface is deleted whole — checker, endpoint, feed base, env
+        // the news surface is deleted whole — checker, endpoint, feed base, env
         await using var host = await FlintApiHost.StartAsync();
         var response = await host.GetAsync("/api/v1/news");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -533,7 +533,7 @@ public class FlintApiIntegrationTests
 
         var dataDir = Path.Combine(Path.GetTempPath(), $"flint-api-e2e-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dataDir);
-        var dataRoot = Path.Combine(dataDir, "data"); // the G1 home layout's data root
+        var dataRoot = Path.Combine(dataDir, "data"); // the home layout's data root
         var previousCwd = Environment.CurrentDirectory;
 
         // seed an instance on disk the same way the LaunchFixture does (patched net.minecraft
@@ -554,7 +554,7 @@ public class FlintApiIntegrationTests
 
         try
         {
-            // S2: the token is host-injected (--api-token) — no token file exists to read
+            // the token is host-injected (--api-token) — no token file exists to read
             var apiToken = Guid.NewGuid().ToString("N");
             var app = WebHostBuilder.BuildWebApplication(
                 [
@@ -571,8 +571,8 @@ public class FlintApiIntegrationTests
             client.DefaultRequestHeaders.Add("X-Api-Token", apiToken);
             Environment.CurrentDirectory = dataDir;
 
-            // S5: seed the java probe cache in the launcher state (the former settings-key
-            // seeding — CONFIG C9 moved the probe quintet out of the settings world) so
+            // seed the java probe cache in the launcher state (the former settings-key
+            // seeding — the probe quintet moved out of the settings world) so
             // CheckJava trusts the fake java without running the checker
             app.Services.GetRequiredService<LauncherRuntime>().State.Update(state => state with
             {

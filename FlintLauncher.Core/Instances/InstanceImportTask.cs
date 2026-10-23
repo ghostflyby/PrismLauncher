@@ -2,7 +2,7 @@
 // Port of launcher/InstanceImportTask.{h,cpp}: import a modpack zip (local file or URL) by
 // detecting its type from marker files and dispatching to the matching creation task:
 //   modrinth.index.json      -> Modrinth (ModrinthCreationTask)
-//   bin/modpack.jar          -> Technic (deferred, P6-b)
+//   bin/modpack.jar          -> Technic (deferred)
 //   bin/version.json
 //   manifest.json            -> Flame (FlameCreationTask)
 //   */instance.cfg           -> plain MultiMC folder import (NullInstance + rename)
@@ -14,7 +14,7 @@
 //    detection is skipped and the icon key is passed through unchanged.
 //  - Remote downloads use MetaCache when set (APPLICATION->metacache()), otherwise a plain
 //    file download into the staging folder.
-//  - The Technic branch runs the TechnicPackProcessor (P6-b).
+//  - The Technic branch runs the TechnicPackProcessor.
 
 using System.IO.Compression;
 using System.Text.RegularExpressions;
@@ -56,7 +56,7 @@ public sealed partial class InstanceImportTask(
     public HttpMetaCache? MetaCache { get; set; }
 
     /// <summary>
-    /// The optional-mods selection (fix-2d) handed to the Modrinth/Flame creation tasks
+    /// The optional-mods selection handed to the Modrinth/Flame creation tasks
     /// (Modrinth: manifest paths, Flame: relative target paths; see the tasks' property
     /// notes). Unselected/unknown optional files keep the ".disabled" install behavior.
     /// </summary>
@@ -269,7 +269,7 @@ public sealed partial class InstanceImportTask(
 
     private void ProcessMultiMc()
     {
-        // D4: the staged MultiMC import writes its fixups (fresh uuid, name, playtime reset)
+        // the staged MultiMC import writes its fixups (fresh uuid, name, playtime reset)
         // through the typed adapter — the committed folder is Flint format (instance.json);
         // the cfg inside the zip, if any, stays untouched
         var instance = new NullInstance(

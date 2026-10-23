@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The instance.json store (DATA D4): one TypedJsonFile per instance directory holding the
+// The instance.json store: one TypedJsonFile per instance directory holding the
 // RAW instance layer — no fold at load time, because a member being null IS the layering
-// signal (C6/C7); the user layer joins at read time through InstanceConfigKeys.
+// signal; the user layer joins at read time through InstanceConfigKeys.
 //
-// The dual-track format determination (the CONFIG.md open point this batch closes, ask
-// item 3): an instance directory that carries instance.json IS Flint format. Otherwise the
+// The dual-track format determination: an instance directory that carries instance.json
+// IS Flint format. Otherwise the
 // instance.cfg is READ-ONLY compat — the importer produces the equivalent payload in memory
-// and the FIRST WRITE materializes it as instance.json ("写时转换"). The cfg file itself is
+// and the FIRST WRITE materializes it as instance.json. The cfg file itself is
 // never deleted or rewritten; after the conversion instance.json exists and wins every
 // subsequent read, so a stale cfg can never resurrect old values. The conversion carries the
-// cfg's uuid over verbatim (Identity.Uuid), keeping the D2 addressing chain stable.
+// cfg's uuid over verbatim (Identity.Uuid), keeping the addressing chain stable.
 //
 // Immediate atomic write on every mutation (the C++ INI settings object saved per Set; the
 // instance settings surface relies on that).
@@ -30,7 +30,7 @@ public sealed class InstanceConfigStore
         ConfigPath = instanceRoot / "instance.json";
         _file = new TypedJsonFile<InstanceConfigFile>(ConfigPath, typeInfo);
 
-        // the format marker is the FILE'S EXISTENCE (ask item 3): instance.json present ->
+        // the format marker is the FILE'S EXISTENCE: instance.json present ->
         // Flint format; else read-only instance.cfg (imported in memory, converted on write)
         IsFlintFormat = ConfigPath.ExistsFile();
         Current = IsFlintFormat

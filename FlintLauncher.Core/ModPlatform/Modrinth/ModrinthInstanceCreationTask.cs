@@ -13,7 +13,7 @@
 //
 // Deviations (headless port):
 //  - The update-existing-instance flow of executeTask() (APPLICATION->instances() lookups,
-//    the askIfShouldUpdate dialog and the old-mrpack diffing) is deferred to P6-c; the task
+//    the askIfShouldUpdate dialog and the old-mrpack diffing) is deferred; the task
 //    goes straight to createInstance().
 //  - The optional-mods dialog: optional files are installed disabled (".disabled" suffix),
 //    like the C++ non-dialog path.
@@ -90,7 +90,7 @@ public sealed class ModrinthCreationTask : InstanceTask
     public IReadOnlyList<string> UntrustedMods { get; private set; } = [];
 
     /// <summary>
-    /// Headless stand-in for the OptionalModDialog selection (fix-2d): keys are the manifest
+    /// Headless stand-in for the OptionalModDialog selection: keys are the manifest
     /// file paths ("mods/..."), values the selected flag. Selected optional files install
     /// enabled (like the C++ dialog's "required" upgrade), everything else keeps the
     /// non-dialog behavior (".disabled" suffix). Flagged Core addition: the C++ gets this
@@ -158,7 +158,7 @@ public sealed class ModrinthCreationTask : InstanceTask
             return;
         }
 
-        // D4: the staged instance is Flint format from birth (typed instance.json adapter)
+        // the staged instance is Flint format from birth (typed instance.json adapter)
         var newInstance = new MinecraftInstance(
             new InstanceJsonSettingsObject(StagingPath, Environment ??
                                                         throw new InvalidOperationException(
@@ -555,7 +555,7 @@ public sealed class ModrinthCreationTask : InstanceTask
         }
 
         _ = newInstance;
-        // (upstream calls downloadFiles(m_newInstance.get()) here — the P5 update pipeline;
+        // (upstream calls downloadFiles(m_newInstance.get()) here — the update pipeline;
         //  like VanillaCreationTask, creation succeeds without fetching game files)
         EmitSucceeded();
     }

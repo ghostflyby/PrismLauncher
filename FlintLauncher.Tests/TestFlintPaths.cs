@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The unified five-root test fixture (GLOBAL §1): stamps a fresh temp directory tree and
-// hands out the resulting FlintPaths, replacing the bare temp-dir fallbacks the E6 cleanup
-// removed the last production excuse for. Two shapes:
+// The unified five-root test fixture: stamps a fresh temp directory tree and
+// hands out the resulting FlintPaths, replacing the bare temp-dir fallbacks the
+// cleanup removed the last production excuse for. Two shapes:
 //  - UnderHome(): one temp home, five roots as its config/data/store/cache/state children
-//    (the G1 home layout — what a host started with --home-dir sees);
+//    (the home layout — what a host started with --home-dir sees);
 //  - IndependentRoots(): five separate temp roots (the precise-flag shape — catches any
 //    cross-root assumption the zero-implication discipline forbids).
 
@@ -50,7 +50,7 @@ public sealed class TestFlintPaths : IDisposable
         return new TestFlintPaths(paths, home) { _created = { home } };
     }
 
-    /// <summary>Five independent temp roots (the precise-flag shape, G1 zero-implication
+    /// <summary>Five independent temp roots (the precise-flag shape, zero-implication
     /// discipline).</summary>
     public static TestFlintPaths IndependentRoots([CallerMemberName] string stamp = "")
     {

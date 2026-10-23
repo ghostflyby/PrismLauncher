@@ -34,7 +34,7 @@ public class ComponentUpdateTaskTests : IDisposable
     {
         _root = Path.Combine(Path.GetTempPath(), "flint-resolve-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_root);
-        // the stamped fixture cache (E6 fixture injection): "meta" base inside the test root,
+        // the stamped fixture cache (fixture injection): "meta" base inside the test root,
         // replacing the former CWD-anchored static fallback; every profile gets it via
         // SetMetadataCache so metadata entities resolve files under <_root>/meta
         _metaCache = new HttpMetaCache(
@@ -146,7 +146,7 @@ public class ComponentUpdateTaskTests : IDisposable
         Assert.True(metaVersion.IsLoaded, "seeded meta version should be loaded");
     }
 
-    /// <summary>The fixture meta cache folder for one uid (the stamped "meta" base, E6).</summary>
+    /// <summary>The fixture meta cache folder for one uid (the stamped "meta" base).</summary>
     private string MetaDirFor(string uid) => Path.Combine(_root, "meta", uid);
 
     /// <summary>Meta-format version record (uid/version/releaseTime required by the meta parser).</summary>

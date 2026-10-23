@@ -2,9 +2,9 @@
 // Shared test double for the user layer (flint.json): a REAL FlintConfigStore over a
 // throwaway file, seeded with the same values the former in-memory SettingsObject stub
 // registered — so the tests' expectations keep holding. StubSet is a typed store Set (it
-// persists like production; the C5 importer's write path is the same).
+// persists like production; the importer's write path is the same).
 //
-// D4: the instance layer reads this store as the user layer of its instance.json stack, so
+// the instance layer reads this store as the user layer of its instance.json stack, so
 // the double converts implicitly to the InstanceEnvironment the instance ctors take (type
 // infos from the host's FlintJsonContext — tests reference Web for it).
 
@@ -40,7 +40,7 @@ internal sealed class TestGlobalSettings
         StubSet("JavaPath", "java");
         StubSet("JvmArgs", "");
         StubSet("IgnoreJavaCompatibility", false);
-        // NOTE: the java probe quintet is NOT seeded — launcher-state.json owns it (C9)
+        // NOTE: the java probe quintet is NOT seeded — launcher-state.json owns it
         StubSet("LaunchMaximized", false);
         StubSet("MinecraftWinWidth", 854);
         StubSet("MinecraftWinHeight", 480);
@@ -67,7 +67,7 @@ internal sealed class TestGlobalSettings
     /// <summary>A typed store.Set (persists to the throwaway flint.json, like production).</summary>
     public void StubSet(string key, object? value) => Store.Set(key, value);
 
-    /// <summary>The instance-layer environment over this store (the D4 typed stack).</summary>
+    /// <summary>The instance-layer environment over this store (the typed stack).</summary>
     public InstanceEnvironment Environment => new(Store,
         FlintJsonContext.Default.InstanceConfigFile, FlintJsonContext.Default.InstanceStateFile);
 
@@ -88,7 +88,7 @@ internal static class TestInstanceEnvironment
 }
 
 /// <summary>A throwaway launcher-state store (the real one over a temp file) for tests that
-/// wire <c>InstanceList.LauncherState</c> — the playtime hook since C9 retired the settings
+/// wire <c>InstanceList.LauncherState</c> — the playtime hook since the settings
 /// keys. Created dirs are swept at process exit (tests get no per-store Dispose hook — the
 /// store is handed straight to the instance list).</summary>
 internal static class TestLauncherState

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// CACHE E5 分层完备性派生视图 (the "dpkg --verify" model): the store roots are content
+// The layered completeness derivation view (the "dpkg --verify" model): the store roots are content
 // stores whose completeness is DERIVED from the manifests that installed them — the version
 // manifest's libraries[] for the libraries root, the asset index's objects map for the
 // assets root. Nothing is written: manifest-driven reads + file/ledger existence checks only
-// (the ledger does not record ownership, E5; the manifest is the sole "config → file" truth).
+// (the ledger does not record ownership; the manifest is the sole "config → file" truth).
 // The Web layer serves this as GET /store/status/libraries/{versionRef} and
 // GET /store/status/assets/{assetsId}.
 
@@ -19,10 +19,10 @@ using TruePath.SystemIo;
 namespace FlintLauncher.Core.Store;
 
 /// <summary>The completeness report of one store area ({complete, missing[], bytes}; the
-/// wire shape is fixed by CACHE E5 and shared by both routes).</summary>
+/// wire shape is fixed and shared by both routes).</summary>
 public sealed record StoreStatusReport(bool Complete, IReadOnlyList<string> Missing, long Bytes);
 
-/// <summary>The E5 derivation. Completeness semantics per area:
+/// <summary>The derivation. Completeness semantics per area:
 ///  - libraries: every manifest library must exist under the libraries root AND carry a
 ///    non-stale ledger entry (base "libraries") — a present file without a usable entry is
 ///    reported missing because the download path (Library.GetDownloads resolves the entry

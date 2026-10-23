@@ -3,7 +3,7 @@
 //
 // Deviations from the C++ original:
 //  - Application-singleton reach-ins become injectable hooks: playtimeSettings() ->
-//    <see cref="BaseInstance.LauncherState"/> (launcher-state.json since S5/C9);
+//    <see cref="BaseInstance.LauncherState"/> (launcher-state.json);
 //    m_detectedOpenALPath/m_detectedGLFWPath/
 //    m_detectedSDLPath -> the Detected*Path properties; APPLICATION->metacache() ->
 //    <see cref="MetaCache"/> (library_directory defaults to "" while unset); APPLICATION->
@@ -15,11 +15,11 @@
 //    (APPLICATION->settings()) is the injected BaseInstance global settings.
 //  - The Q_OS_* ifdef'ed bits port to OperatingSystem checks. switcherooSetupGPU() (DBus)
 //    and LibraryUtils::findMangoHud() are system-probing process-launch helpers and are
-//    TODO(P5-c): the discrete-GPU path always applies the open-driver env fallback.
-//  - createUpdateTask()/createLaunchTask()/createLaunchScript() are the P5-b launch pipeline
+//    TODO: the discrete-GPU path always applies the open-driver env fallback.
+//  - createUpdateTask()/createLaunchTask()/createLaunchScript() are the launch pipeline
 //    (Launch/LaunchTask + Launch/Steps/*). The switcheroo/MangoHud capability probing and
 //    the icon save remain hooks (see above).
-//  - The CleanEnviroment() base of createEnvironment() is the P5a JavaUtils.CleanEnvironment().
+//  - The CleanEnviroment() base of createEnvironment() is JavaUtils.CleanEnvironment().
 //  - The folder models for resource packs, texture packs, shader packs and data packs are
 //    not ported yet (only ModFolderModel/WorldList exist), so resourcePackList()/
 //    texturePackList()/shaderPackList()/dataPackList()/resourceLists() are omitted; the
@@ -41,11 +41,13 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
+using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.State;
@@ -78,7 +80,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     public string DetectedSdlPath { get; set; } = "";
 
     /// <summary>C++ APPLICATION->metacache(); used for the library_directory profile variable,
-    /// the library/asset-index download caches and the metadata entities. E6 wiring: setting
+    /// the library/asset-index download caches and the metadata entities. Wiring: setting
     /// it ALSO stamps the pack profile's metadata index (the "meta" base chain — the
     /// SetMetadataCache call the former static SharedCache default papered over).</summary>
     public HttpMetaCache? MetaCache
@@ -94,10 +96,20 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         }
     }
 
-    /// <summary>Injected data-directory layout (assets/libraries/java roots, instgroups.json).
-    /// Defaults to the legacy CWD-anchored layout for bare fixtures; hosts always stamp it
-    /// (InstanceList at discovery, tests directly).</summary>
-    public FlintPaths Paths { get; set; } = FlintPaths.FromHomeDir(AbsolutePath.CurrentWorkingDirectory);
+    /// <summary>The store anchors the instance's launch-time flows read (assets/libraries/
+    /// store): resolved through the injected LaunchServices. Bare fixtures without one
+    /// anchor on the process CWD (the legacy default layout's shape). The instance carries
+    /// no layout type — the composition root owns it.</summary>
+    public AbsolutePath AssetsRoot => LaunchServices?.AssetsRoot
+        ?? AbsolutePath.CurrentWorkingDirectory / "assets";
+
+    public AbsolutePath AssetIndexesDir => AssetsRoot / "indexes";
+
+    public AbsolutePath LibrariesRoot => LaunchServices?.LibrariesRoot
+        ?? AbsolutePath.CurrentWorkingDirectory / "libraries";
+
+    public AbsolutePath StoreRoot => LaunchServices?.StoreRoot
+        ?? AbsolutePath.CurrentWorkingDirectory / "store";
 
     /// <summary>Injected launch-pipeline dependencies (paths, logger factory, global settings,
     /// install root, UI hooks — the former static hooks). Stamped by the composition root
@@ -117,9 +129,9 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             return;
         }
 
-        // Java Settings (C7: the gate keys register as derived keys — inheritance is the
+        // Java Settings (the gate keys register as derived keys — inheritance is the
         // fold, the override chains are gone; the java probe quintet is NOT here, it lives
-        // in launcher-state.json's path-keyed map, S5/C9)
+        // in launcher-state.json's path-keyed map)
         InstanceSettings.RegisterSetting("OverrideJavaLocation", false);
         InstanceSettings.RegisterSetting("OverrideJavaArgs", false);
         InstanceSettings.RegisterSetting("AutomaticJava", false);
@@ -154,7 +166,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         InstanceSettings.RegisterSetting("OverrideEnv", false);
         InstanceSettings.RegisterSetting("Env", "{}");
         // the layered member keys resolve instance ?? user through the adapter — the
-        // registered values are type anchors only (C6 defaults live in the flint.json
+        // registered values are type anchors only (defaults live in the flint.json
         // record property initializers, the single source)
         InstanceSettings.RegisterSetting("JavaPath", "");
         InstanceSettings.RegisterSetting("JvmArgs", "");
@@ -163,7 +175,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // the C++ force-wrote InstanceType=OneSix here; with the typed layer the record
         // default IS OneSix (BaseInstance registration) and a non-OneSix type never
         // constructs a MinecraftInstance (InstanceList yields NullInstance instead), so
-        // a fresh load performs no write — the dual-track read-only guarantee (D4)
+        // a fresh load performs no write — the dual-track read-only guarantee
 
         // Join server on launch, this does not have a global override
         InstanceSettings.RegisterSetting("JoinServerOnLaunch", false);
@@ -186,7 +198,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // (upstream connects both settings to reset the data pack folder model; that model is
         //  not ported yet, so there is nothing to reset here)
 
-        // Mod download loaders (the C7 OverrideModDownloadLoaders family; instance-only)
+        // Mod download loaders (the OverrideModDownloadLoaders family; instance-only)
         InstanceSettings.RegisterSetting("OverrideModDownloadLoaders", false);
         InstanceSettings.RegisterSetting("ModDownloadLoaders", "[]");
 
@@ -199,8 +211,8 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         // RuntimeContext::updateFromInstanceSettings (the member itself lives on the C++
         // RuntimeContext struct; the C# struct has no SettingsObject dependency). The
-        // probed architectures come from the state-side probe cache (S5 path-keyed map;
-        // the former JavaArchitecture/JavaRealArchitecture settings keys are gone, C9).
+        // probed architectures come from the state-side probe cache (path-keyed map;
+        // the former JavaArchitecture/JavaRealArchitecture settings keys are gone).
         var detection = JavaDetection();
         // the struct property returns a copy — read-modify-write it back
         var context = RuntimeContext;
@@ -266,7 +278,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     public AbsolutePath ResourcesDir() => GameRoot / "resources";
 
     /// <summary>QDir::current().absoluteFilePath("libraries").</summary>
-    public AbsolutePath LibrariesPath() => Paths.LibrariesRoot;
+    public AbsolutePath LibrariesPath() => LibrariesRoot;
 
     public override AbsolutePath InstanceConfigFolder() => GameRoot / "config";
 
@@ -309,7 +321,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     //////  Launch stuff //////
 
-    // TODO(P5): the C++ assembles FoldersTask, LibrariesTask, LegacyFMLLibrariesTask and
+    // TODO: the C++ assembles FoldersTask, LibrariesTask, LegacyFMLLibrariesTask and
     // AssetUpdateTask here (the update pipeline). Ported in Launch/LaunchController and the
     // Launch/Steps/* tasks below.
     public override List<FlintTask> CreateUpdateTask() =>
@@ -474,12 +486,25 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// <summary>Headless LaunchServices for bare fixtures (no stamped services, no explicit
     /// per-launch override): CWD-anchored paths, a null logger and the injected instance
     /// settings — the same behavior the former unset static hooks produced.</summary>
-    private LaunchServices BuildLaunchServices() => new()
+    private LaunchServices BuildLaunchServices()
     {
-        Paths = Paths,
-        LoggerFactory = NullLoggerFactory.Instance,
-        Config = UserConfigStore,
-    };
+        // the headless fallback layout: the CWD shape the former default Paths carried
+        var cwd = AbsolutePath.CurrentWorkingDirectory;
+        return new()
+        {
+            Paths = new()
+            {
+                ConfigRoot = cwd / "config",
+                DataRoot = cwd,
+                StoreRoot = cwd / "store",
+                CacheRoot = cwd / "cache",
+                StateRoot = cwd / "state",
+                HomeRoot = cwd,
+            },
+            LoggerFactory = NullLoggerFactory.Instance,
+            Config = UserConfigStore,
+        };
+    }
 
     public string CreateLaunchScript(AuthSession? session, MinecraftTarget? targetToJoin) =>
         CreateLaunchScript(session, targetToJoin, services: null);
@@ -795,7 +820,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     public override ProcessEnvironment CreateEnvironment()
     {
         // prepare the process environment (C++ starts from CleanEnviroment(); the sanitized
-        // OS environment is the P5a JavaUtils.CleanEnvironment port)
+        // OS environment is the JavaUtils.CleanEnvironment port)
         var env = JavaUtils.CleanEnvironment();
 
         // export some infos
@@ -818,7 +843,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             if (Variant.AsBool(Settings.Get("EnableMangoHud")))
             {
-                // TODO(P5): the C++ also checks APPLICATION->capabilities() and probes the
+                // TODO: the C++ also checks APPLICATION->capabilities() and probes the
                 // MangoHud libraries with LibraryUtils::findMangoHud().
                 var preloadList = new List<string>();
                 var value = env.Value("LD_PRELOAD");
@@ -833,7 +858,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
             if (Variant.AsBool(Settings.Get("UseDiscreteGpu")))
             {
-                // TODO(P5): the C++ first tries switcheroo-control via DBus; without it the
+                // TODO: the C++ first tries switcheroo-control via DBus; without it the
                 // open/proprietary driver fallbacks below apply.
                 // Open Source Drivers
                 env.Insert("DRI_PRIME", "1");
@@ -1084,7 +1109,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         string windowParams;
         if (Variant.AsBool(settings.Get("LaunchMaximized")))
         {
-            // NOTE: the launch-script builder (P5) computes a screen-size form; the verbose
+            // NOTE: the launch-script builder computes a screen-size form; the verbose
             // description only ever prints the "max (if available)" placeholder upstream.
             windowParams = "max (if available)";
         }
@@ -1156,7 +1181,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
         var absRootDir = GameRoot;
         result["game_directory"] = absRootDir.Value;
-        var absAssetsDir = Paths.AssetsRoot;
+        var absAssetsDir = AssetsRoot;
         var assets = profile.GetMinecraftAssets();
         result["game_assets"] = GetAssetsDir(assets.Id, ResourcesDir()).Value;
 
@@ -1244,9 +1269,9 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     /// <summary>The storage base unstamped (meta-loaded) library paths resolve against —
     /// the C++ anchored the relative "libraries/" prefix on its chdir'd data dir; the port
-    /// has no chdir (DI-B), so it anchors on the store root (E2). Bare fixtures without a
+    /// has no chdir, so it anchors on the store root. Bare fixtures without a
     /// stamped layout keep the historical CWD-relative behavior.</summary>
-    public AbsolutePath LibraryStorageBase() => Paths.StoreRoot;
+    public AbsolutePath LibraryStorageBase() => StoreRoot;
 
     /// <summary>The applied profile's main class, or "" while the profile cannot be applied —
     /// VerboseDescription prints this line for broken instances, so it must not throw.</summary>
@@ -1263,12 +1288,12 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// installation JdkFind found no release file for.</summary>
     public int? GetJavaLanguageVersion()
     {
-        // the probe cache is launcher-state.json's path-keyed java map now (S5/C9) —
+        // the probe cache is launcher-state.json's path-keyed java map now —
         // settings never carried the probed version back
         return JavaDetection()?.LanguageVersion;
     }
 
-    /// <summary>The probe-cache key for a configured java path (S5): the resolved executable,
+    /// <summary>The probe-cache key for a configured java path: the resolved executable,
     /// or the configured string as-is when it cannot be resolved (deterministic — CheckJava
     /// stores and every reader resolves through this same function).</summary>
     public static string JavaDetectKey(string javaPathSetting)
@@ -1277,7 +1302,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         return resolved.Length != 0 ? resolved : javaPathSetting;
     }
 
-    /// <summary>The probe-cache entry for this instance's configured java (S5
+    /// <summary>The probe-cache entry for this instance's configured java (the
     /// JavaDetectState.Detections), or null when that binary has not been probed (or no state
     /// store is wired). Goes through Settings so the specific settings (and the JavaPath
     /// override) are loaded like every other reader, and reads the INSTANCE-stamped state
@@ -1296,12 +1321,54 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     //////  Mod Lists //////
 
+    /// <summary>The watched-directory tenancy stamped by the composition root chain
+    /// (InstanceList at discovery, LaunchFixture/tests directly): when set, the lazily
+    /// created mod folder models attach to it and reload on external changes (the C++
+    /// startWatching parity). Null keeps the demand-driven Update().</summary>
+    public DirectorySpace? WatchSpace { get; set; }
+
+    /// <summary>Unregisters the folder-model roots this instance registered on the shared
+    /// space (only models actually created so far hold a watch) and detaches the tenancy.</summary>
+    public override void ReleaseWatchTenancy()
+    {
+        if (WatchSpace is not { } space)
+        {
+            return;
+        }
+
+        if (_loaderModList is not null)
+        {
+            space.Unregister(_loaderModList.Dir);
+        }
+
+        if (_coreModList is not null)
+        {
+            space.Unregister(_coreModList.Dir);
+        }
+
+        if (_nilModList is not null)
+        {
+            space.Unregister(_nilModList.Dir);
+        }
+
+        if (_worldList is not null)
+        {
+            space.Unregister(_worldList.Dir);
+        }
+
+        WatchSpace = null;
+    }
+
     public ModFolderModel LoaderModList()
     {
         if (_loaderModList is null)
         {
             var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
-            _loaderModList = new ModFolderModel(ModsRoot, isIndexed, createDir: true);
+            _loaderModList = new ModFolderModel(MaterializedDirectory.Ensure(ModsRoot)!, isIndexed);
+            if (WatchSpace is { } space)
+            {
+                _loaderModList.AttachWatcher(space);
+            }
         }
 
         return _loaderModList;
@@ -1312,7 +1379,11 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         if (_coreModList is null)
         {
             var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
-            _coreModList = new ModFolderModel(CoreModsDir, isIndexed, createDir: true);
+            _coreModList = new ModFolderModel(MaterializedDirectory.Ensure(CoreModsDir)!, isIndexed);
+            if (WatchSpace is { } space)
+            {
+                _coreModList.AttachWatcher(space);
+            }
         }
 
         return _coreModList;
@@ -1323,16 +1394,42 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         if (_nilModList is null)
         {
             var isIndexed = !(UserLayer.ModDownload.ModMetadataDisabled ?? false);
-            // NOTE: upstream does not create the folder for the nil mod list (4th arg false)
-            _nilModList = new ModFolderModel(NilModsDir, isIndexed, createDir: false);
+            // DEVIATION: upstream does not create the folder for the nil mod list; the
+            // injected-handle contract cannot express an absent directory, so the first
+            // access materializes an empty nilmods/ (cosmetic — the list over it is empty)
+            _nilModList = new ModFolderModel(MaterializedDirectory.Ensure(NilModsDir)!, isIndexed);
+            if (WatchSpace is { } space)
+            {
+                _nilModList.AttachWatcher(space);
+            }
         }
 
         return _nilModList;
     }
 
-    // (resourcePackList()/texturePackList()/shaderPackList()/dataPackList()/resourceLists()/
-    //  worldList() arrive with the remaining P3b folder models; only ModFolderModel and
-    //  WorldList are ported so far. WorldList can be constructed from WorldDir() when needed.)
+    private WorldList? _worldList;
+
+    /// <summary>The resident world list (the C++ instance->worldList() member model):
+    /// lazily created over the instance's saves directory; when the WatchSpace tenancy is
+    /// stamped, the watcher keeps it fresh — otherwise WorldList.Update() is
+    /// demand-driven.</summary>
+    public WorldList WorldList()
+    {
+        if (_worldList is null)
+        {
+            _worldList = new WorldList(MaterializedDirectory.Ensure(WorldDir())!);
+            if (WatchSpace is { } space)
+            {
+                _worldList.AttachWatcher(space);
+            }
+        }
+
+        return _worldList;
+    }
+
+    // (resourcePackList()/texturePackList()/shaderPackList()/dataPackList()/resourceLists()
+    //  arrive with the remaining folder models; ModFolderModel, WorldList and the
+    //  world list are ported.)
 
     public List<Mod> GetJarMods()
     {
@@ -1402,7 +1499,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// </summary>
     private AbsolutePath GetAssetsDir(string assetsId, AbsolutePath resourcesFolder)
     {
-        var assetsDir = Paths.AssetsRoot;
+        var assetsDir = AssetsRoot;
         string a2 = assetsId + ".json";
         var indexPath = assetsDir / "indexes" / a2;
         var virtualRoot = assetsDir / "virtual" / assetsId;
@@ -1460,7 +1557,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             string a1 = name + suffix;
             var candidate = new AbsolutePath(dir) / a1;
-            if (File.Exists(candidate.Value))
+            if (candidate.ExistsFile())
             {
                 return candidate.Value;
             }
@@ -1509,5 +1606,5 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     private ModFolderModel? _nilModList;
     // (the resource pack / texture pack / shader pack / data pack models and the world list
-    //  arrive with the remaining P3b folder-model ports)
+    //  arrive with the remaining folder-model ports)
 }

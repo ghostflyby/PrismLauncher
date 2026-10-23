@@ -5,6 +5,7 @@
 // installed file is only removed after the new download succeeded.
 
 using System.Security.Cryptography;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform;
@@ -48,7 +49,7 @@ public class ResourceDownloadTaskTests : IDisposable
 
     private ModFolderModel CreateModel()
     {
-        var model = new ModFolderModel(new AbsolutePath(ModsDir), isIndexed: true, createDir: true);
+        var model = new ModFolderModel(MaterializedDirectory.Ensure(new AbsolutePath(ModsDir))!, isIndexed: true);
         return model;
     }
 

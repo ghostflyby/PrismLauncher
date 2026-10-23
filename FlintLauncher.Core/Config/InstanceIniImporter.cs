@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The instance-side INI import (CONFIG C5 read-compat + C7 gate folding, ask item 2): a
+// The instance-side INI import (read-compat + gate folding): a
 // Prism/PolyMC/MultiMC instance.cfg is parsed into the typed instance layer. Flint never
 // writes the INI back — the import is the READ half of the dual-track format determination:
 //
@@ -7,9 +7,9 @@
 //   otherwise                                 -> instance.cfg is READ-ONLY; the payload below
 //                                                is materialized in memory and only written
 //                                                to instance.json when the instance's first
-//                                                write happens ("写时转换").
+//                                                write happens.
 //
-// C7 gate folding: a layered value imports ONLY when its gate (OverrideMemory & co) is
+// gate folding: a layered value imports ONLY when its gate (OverrideMemory & co) is
 // present AND true — a gate set to false, or absent (the registered default is false), means
 // the C++ OverrideSetting resolved through to the global setting, so the value is treated as
 // unset and dropped into inheritance. Gate values are collected ONLY from the Override* keys
@@ -19,7 +19,7 @@
 // ("8192" → AsBool=false) must never BE the gate.
 //
 // The passthrough pair (ConsoleMaxLines/ConsoleOverflowStop) and the java probe quintet are
-// non-layered (C7/C9): instance values are dropped — the console pair stays global-only and
+// non-layered: instance values are dropped — the console pair stays global-only and
 // the probe cache is launcher-state.json's path-keyed map.
 
 using FlintLauncher.Core.Settings;
@@ -69,7 +69,7 @@ public static class InstanceIniImporter
         }
 
         // pass 2: fold the known keys; a layered value survives only behind an explicit
-        // gate=true (C7: gate=false AND gate-absent both mean "resolved through to global")
+        // gate=true (gate=false AND gate-absent both mean "resolved through to global")
         foreach (var key in ini.Keys)
         {
             if (key == QSettingsIniCodec.ConfigVersionKey)
@@ -85,7 +85,7 @@ public static class InstanceIniImporter
             if (entry.GateKey is { } family &&
                 (!gates.TryGetValue(family, out var enabled) || !enabled))
             {
-                continue; // C7: the instance value is treated as unset — inherit
+                continue; // the instance value is treated as unset — inherit
             }
 
             var value = ini.Get(key);

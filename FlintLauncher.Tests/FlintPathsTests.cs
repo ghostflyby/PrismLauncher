@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Five-root layout tests (G1/C1/E1/S1): the home-layout factory, the explicit named
+// Five-root layout tests: the home-layout factory, the explicit named
 // factory, the three-layer flag resolution (precise > home > platform default, each with
-// its env), the --data-dir semantics narrowing, the G1 fail-fast probe, and the S4 logs
+// its env), the --data-dir semantics narrowing, the fail-fast probe, and the logs
 // anchor with the macOS exception. Env-dependent cases snapshot and restore the process
 // environment (the suite runs with parallelMode none).
 
@@ -44,7 +44,7 @@ public class FlintPathsTests : IDisposable
         }
     }
 
-    // ------------------------------------------------------------------ home layout (G1)
+    // ------------------------------------------------------------------ home layout
 
     [Fact]
     public void FromHomeDir_Is_The_Home_Layout_Five_Roots_As_Children()
@@ -70,20 +70,20 @@ public class FlintPathsTests : IDisposable
         // data-root anchors (the user-owned half, DATA §2)
         Assert.Equal(paths.DataRoot / "instances", paths.InstancesDir);
         Assert.Equal(paths.DataRoot / "accounts.json", paths.AccountsFile);
-        // C8: the group definitions moved to the config side (members are uuid refs, D3);
+        // the group definitions moved to the config side (members are uuid refs);
         // the data-root instgroups.json anchor survives only as the legacy import fallback
         Assert.Equal(paths.ConfigRoot / "groups.json", paths.GroupsFile);
         Assert.Equal(paths.DataRoot / "instgroups.json", paths.InstgroupsFile);
-        // store anchors (CACHE E2: shared installed content)
+        // store anchors (shared installed content)
         Assert.Equal(paths.StoreRoot / "libraries", paths.LibrariesRoot);
         Assert.Equal(paths.StoreRoot / "assets", paths.AssetsRoot);
         Assert.Equal(paths.StoreRoot / "assets" / "indexes", paths.AssetIndexesDir);
         Assert.Equal(paths.StoreRoot / "java", paths.JavaRoot);
-        // cache anchors (CACHE E3: the ledger + the metadata content moved off the data root)
+        // cache anchors (the ledger + the metadata content moved off the data root)
         Assert.Equal(paths.CacheRoot / "metacache.json", paths.MetacacheFile);
         Assert.Equal(paths.CacheRoot / "meta", paths.MetaDir);
         Assert.Equal(paths.CacheRoot / "fmllibs", paths.FmllibsCacheDir);
-        // S4: the logger anchor moved to the state root
+        // the logger anchor moved to the state root
         Assert.Equal(paths.StateRoot / "logs", paths.LogsDir);
         Assert.Equal(paths.StateRoot / "migration", paths.MigrationDir);
         Assert.Equal(paths.StateRoot / "launcher-state.json", paths.LauncherStateFile);
@@ -108,7 +108,7 @@ public class FlintPathsTests : IDisposable
         Assert.Equal("/st", paths.StateRoot.Value);
     }
 
-    // ------------------------------------------------------------------- S4 logs anchor
+    // ------------------------------------------------------------------- logs anchor
 
     [Fact]
     public void LogsDir_Pins_To_The_Injected_State_Root_Even_On_MacOS()
@@ -147,7 +147,7 @@ public class FlintPathsTests : IDisposable
         Assert.Equal(home / "Library" / "Logs" / "Flint", paths.LogsDir);
     }
 
-    // --------------------------------------------------------------------- G1 fail-fast
+    // --------------------------------------------------------------------- fail-fast
 
     [Fact]
     public void EnsureUsable_Creates_All_Five_Roots()
@@ -217,7 +217,7 @@ public class FlintPathsTests : IDisposable
         }
     }
 
-    // ------------------------------------------------- G1 three-layer resolution (WebHost)
+    // ------------------------------------------------- three-layer resolution (WebHost)
 
     [Fact]
     public void Resolver_With_No_Flags_Yields_The_Platform_Defaults()
@@ -270,7 +270,7 @@ public class FlintPathsTests : IDisposable
         var paths = WebHostBuilder.ResolveFlintPaths(["--data-dir", data]);
 
         Assert.Equal(data, paths.DataRoot.Value);
-        // G1 破格: --data-dir no longer implies the other roots (the old total-directory
+        // deliberate exception: --data-dir no longer implies the other roots (the old total-directory
         // semantics); uncovered roots go to the platform defaults, NOT <data>/config etc.
         Assert.Equal(FlintPaths.PlatformDefaultConfigRoot(), paths.ConfigRoot);
         Assert.Equal(FlintPaths.PlatformDefaultStateRoot(), paths.StateRoot);
@@ -387,7 +387,7 @@ public class FlintPathsTests : IDisposable
         var homeRoot = fixture.HomeRoot?.Value;
         Assert.NotNull(homeRoot);
         using var app = WebHostBuilder.BuildWebApplication(["--home-dir", homeRoot]);
-        // the S4 anchor: the rolling provider opened its file under <state>/logs before any
+        // the anchor: the rolling provider opened its file under <state>/logs before any
         // service ran, and the old data-root anchor is gone
         Assert.True((fixture.Paths.StateRoot / "logs").ExistsDirectory());
         Assert.True((fixture.Paths.StateRoot / "logs" / "Flint-0.log").ExistsFile());

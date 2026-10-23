@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Account skin endpoints (fix-2c): the AccountPage/SkinManageDialog skin surface —
+// Account skin endpoints: the AccountPage/SkinManageDialog skin surface —
 //   GET    /accounts/{profileId}/skin   -> the profile's current skin {url, variant}
 //   PUT    /accounts/{profileId}/skin   -> SkinUpload (multipart {file, model}, sync)
 //   DELETE /accounts/{profileId}/skin   -> SkinDelete (DELETE skins/active)

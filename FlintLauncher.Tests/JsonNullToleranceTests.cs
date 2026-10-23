@@ -3,15 +3,15 @@
 // pins input compatibility that the first typed conversion had silently narrowed.
 //
 //  - ATL Configs.json required members (loader.type / configs.sha1 / decompFile) fail the
-//    manifest again instead of degrading (B1);
+//    manifest again instead of degrading;
 //  - QtCoercing* converters coerce JSON null members (HandleNull) — the FTB case lives in
 //    FtbTests, the metacache/ATL cases ride on the same converters;
 //  - collection/dictionary null elements and values surface as "Value is not an object"
-//    or fall back to the former defaults instead of NullReferenceException (S1);
-//  - Modrinth hash lookups and version lists keep the former per-entry tolerance (S3)
-//    and the sha512->sha1 fallback walks past a JSON null hash (S4, in ModrinthApiTests);
+//    or fall back to the former defaults instead of NullReferenceException;
+//  - Modrinth hash lookups and version lists keep the former per-entry tolerance
+//    and the sha512->sha1 fallback walks past a JSON null hash (in ModrinthApiTests);
 //  - the OneSix removed-feature problems probe QJsonObject::contains semantics, so a
-//    JSON null member still counts as present (S5).
+//    JSON null member still counts as present.
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -31,7 +31,7 @@ public class JsonNullToleranceTests
 {
     private static JsonObject Parse(string json) => (JsonObject)(JsonNode.Parse(json) ?? throw new InvalidOperationException());
 
-    // ------------------------------------------------------------------ ATL (B1)
+    // ------------------------------------------------------------------ ATL
 
     [Fact]
     public void Atl_Configs_MissingSha1_FailsTheManifest()
@@ -61,7 +61,7 @@ public class JsonNullToleranceTests
         Assert.Equal("'decompFile' is not a string", e.Message);
     }
 
-    // ------------------------------------------------------------------ Solder (S1)
+    // ------------------------------------------------------------------ Solder
 
     [Fact]
     public void Solder_Build_NullMinecraft_FailsWithTheRequireText()
@@ -79,7 +79,7 @@ public class JsonNullToleranceTests
         Assert.Equal("Value is not an object", e.Message);
     }
 
-    // ------------------------------------------------------------------ meta (S1)
+    // ------------------------------------------------------------------ meta
 
     [Fact]
     public void Meta_Index_NullPackageElement_FailsTheDocument()
@@ -97,7 +97,7 @@ public class JsonNullToleranceTests
         Assert.Equal("Document is not an object", e.Message);
     }
 
-    // ---------------------------------------------------------- OneSix (S1 + S5)
+    // ---------------------------------------------------------- OneSix
 
     [Fact]
     public void OneSix_Libraries_NullElement_FailsAsAnObjectCheck()
@@ -117,7 +117,7 @@ public class JsonNullToleranceTests
                                                   p.Description.Contains("'tweakers'"));
     }
 
-    // ------------------------------------------------- Mojang download map (S1)
+    // ------------------------------------------------- Mojang download map
 
     [Fact]
     public void Mojang_Downloads_NullEntry_FailsAsAnObjectCheck()
@@ -129,7 +129,7 @@ public class JsonNullToleranceTests
         Assert.Equal("Value is not an object", e.Message);
     }
 
-    // ------------------------------------------------------- assets index (S1)
+    // ------------------------------------------------------- assets index
 
     [Fact]
     public void AssetsIndex_NullObjectEntry_KeepsAnEmptyAssetObject()
@@ -149,7 +149,7 @@ public class JsonNullToleranceTests
         }
     }
 
-    // --------------------------------------------------- Modrinth (S3, per-entry)
+    // --------------------------------------------------- Modrinth (per-entry)
 
     [Fact]
     public void Modrinth_Lookup_MalformedEntry_SkipsOnlyThatEntry()

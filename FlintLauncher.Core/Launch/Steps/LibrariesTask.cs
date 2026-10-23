@@ -30,7 +30,7 @@ public sealed class LibrariesTask(MinecraftInstance inst) : FlintTask
         var job = new NetJob($"Libraries for instance {inst1.Name()}");
         _downloadJob = job;
 
-        // E6: the stamped runtime cache is the only source — the bare-fixture throwaway is
+        // the stamped runtime cache is the only source — the bare-fixture throwaway is
         // gone; an unstamped instance fails the step naming the missing wire
         var metacache = inst1.MetaCache ?? throw new InvalidOperationException(
             $"no meta cache stamped on instance '{inst1.Name()}' — the composition root must inject it");

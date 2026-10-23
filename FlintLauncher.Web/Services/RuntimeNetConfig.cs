@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// fix-3: the port of the C++ network-settings application paths — Application::updateProxySettings
+// The port of the C++ network-settings application paths — Application::updateProxySettings
 // (the Proxy* five), NumberOfManualRetries, RequestTimeout and the UserAgentOverride — applied
 // to the runtime's NetStack. Called by the host at startup and after every successful
 // PUT /settings write, so proxy changes take effect without a restart (the stack's HttpClient
 // is rebuilt only when the applied configuration actually changed).
 //
-// G4 secret rerouting: the config world carries no secret fields (C4), so the proxy password
+// Secret rerouting: the config world carries no secret fields, so the proxy password
 // reads from the ISecretStore by name (the write path was rerouted in PUT /settings), and the
 // secret-consuming API client options re-derive from the store here: the Modrinth PAT, the
-// Flame (CurseForge) key provider and — from the config side (C4 keeps it public) — the MSA
+// Flame (CurseForge) key provider and — from the config side (kept public) — the MSA
 // client-id override for the auth options.
 
 using FlintLauncher.Core;
@@ -24,7 +24,7 @@ public static class RuntimeNetConfig
 
     public static void Apply(LauncherRuntime runtime)
     {
-        // the typed user layer (C5/D4 — the SettingsObject adapter view retired)
+        // the typed user layer (the SettingsObject adapter view retired)
         var config = runtime.Config.Current;
         var stack = runtime.Net;
         var userAgent = config.Api.UserAgentOverride ?? "";
@@ -46,9 +46,9 @@ public static class RuntimeNetConfig
         ApplyApiCredentials(runtime);
     }
 
-    /// <summary>G4: the secret-consuming client options read the store. The Modrinth PAT and
-    /// the Flame key are C4 secrets (store); the MSA client id is a public override and reads
-    /// the typed config (Api domain — C4 explicitly keeps it out of the secret store).</summary>
+    /// <summary>The secret-consuming client options read the store. The Modrinth PAT and
+    /// the Flame key are secrets (store); the MSA client id is a public override and reads
+    /// the typed config (Api domain — explicitly kept out of the secret store).</summary>
     private static void ApplyApiCredentials(LauncherRuntime runtime)
     {
         var modrinthToken = runtime.Secrets.Get(ModrinthTokenSecret) ?? "";

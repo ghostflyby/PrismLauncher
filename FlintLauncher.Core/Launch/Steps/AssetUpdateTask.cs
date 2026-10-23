@@ -10,7 +10,6 @@ using System.Security.Cryptography;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
-using TruePath;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
@@ -33,7 +32,7 @@ public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
         var indexUrl = assets.Url;
         var localPath = assets.Id + ".json";
 
-        // E6: the stamped runtime cache is the only source — the bare-fixture throwaway is
+        // the stamped runtime cache is the only source — the bare-fixture throwaway is
         // gone; an unstamped instance fails the step naming the missing wire
         var metacache = inst.MetaCache ?? throw new InvalidOperationException(
             $"no meta cache stamped on instance '{inst.Name()}' — the composition root must inject it");
@@ -74,7 +73,7 @@ public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
         var assets = profile.GetMinecraftAssets();
 
         string a1 = assets.Id + ".json";
-        var assetFname = (inst.Paths?.AssetIndexesDir ?? AbsolutePath.CurrentWorkingDirectory / "assets" / "indexes") / a1;
+        var assetFname = inst.AssetIndexesDir / a1;
         var index = new AssetsIndex();
         // FIXME: this looks like a job for a generic validator based on json schema?
         if (!AssetsUtils.LoadAssetsIndexJson(assets.Id, assetFname, index))
@@ -87,8 +86,7 @@ public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
             return;
         }
 
-        var job = index.GetDownloadJob(ResourceUrl(), inst.Paths?.AssetsRoot
-                                                      ?? AbsolutePath.CurrentWorkingDirectory / "assets");
+        var job = index.GetDownloadJob(ResourceUrl(), inst.AssetsRoot);
         if (job is not null)
         {
             var resourceUrl = ResourceUrl();

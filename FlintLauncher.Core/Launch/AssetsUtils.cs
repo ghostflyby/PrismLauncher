@@ -12,6 +12,7 @@ using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Launch;
 
@@ -158,7 +159,7 @@ public static class AssetsUtils
         var indexPath = indexDir / (assetsId + ".json");
         var virtualRoot = (virtualDir / assetsId).Value;
 
-        if (!File.Exists(indexPath.Value))
+        if (!indexPath.ExistsFile())
         {
             return false;
         }
@@ -198,7 +199,7 @@ public static class AssetsUtils
             }
 
             presentFiles.Remove(targetPathForMap.Value);
-            if (File.Exists(targetPathForMap.Value))
+            if (targetPathForMap.ExistsFile())
             {
                 continue;
             }

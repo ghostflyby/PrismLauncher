@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The flint.json record domain full set (CONFIG C5/C6, §2.2 finalized): one record per
+// The flint.json record domain full set: one record per
 // domain, all of them registered into FlintJsonContext (AOT red line — a missing root
 // registration is a runtime failure, not a compile error).
 //
-// Layering shape (C6/C7): the DOMAIN members are non-null — the materializing constructor
+// Layering shape: the DOMAIN members are non-null — the materializing constructor
 // re-creates every domain the payload omitted (the .NET 10 source-generated deserializer
 // overwrites init-only initializers with null for absent members), and the domain records
 // are BLANK (no scalar initializers) so those re-created domains are inert: every scalar
@@ -12,19 +12,18 @@
 // <see cref="FlintConfigFold"/> folds each layer over it, so an all-null layer resolves to
 // exactly the defaults.
 //
-// Secret members are deliberately absent (C4): ProxyPass / ModrinthToken / FlameKeyOverride
+// Secret members are deliberately absent: ProxyPass / ModrinthToken / FlameKeyOverride
 // live in the secret store (FlintLauncher.Core.Secrets) and code reads them by name through
 // ISecretStore — the config format carries no secret fields.
 
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Net;
-using TruePath;
 
 namespace FlintLauncher.Core.Config;
 
-/// <summary>The flint.json user-layer root (C5). The JSON shape is one object with a
-/// camelCase member per domain; a future system layer (C2, format-reserved) is another
+/// <summary>The flint.json user-layer root. The JSON shape is one object with a
+/// camelCase member per domain; a future system layer is another
 /// payload of the same record at the head of the fold stack — the format does not change.</summary>
 public sealed record FlintConfigFile
 {
@@ -221,7 +220,7 @@ public sealed record FlintConfigFile
 public sealed record LauncherConfig
 {
     /// <summary>GUI-only today (no window chrome is ported); kept so the /settings wire
-    /// shape survives unchanged (C6: the group keys stay).</summary>
+    /// shape survives unchanged (the group keys stay).</summary>
     public bool? MenuBarInsteadOfToolBar { get; init; }
 
     public int? NumberOfConcurrentTasks { get; init; }
@@ -235,7 +234,7 @@ public sealed record LauncherConfig
 }
 
 /// <summary>Console visibility + the line buffer (ConsoleMaxLines/ConsoleOverflowStop are
-/// the C7 passthrough pair: never instance-layered, they stay global-only).</summary>
+/// the passthrough pair: never instance-layered, they stay global-only).</summary>
 public sealed record ConsoleConfig
 {
     public bool? ShowConsole { get; init; }
@@ -269,7 +268,7 @@ public sealed record MemoryConfig
     /// <summary>Port of SysInfo::defaultMaxJvmMem: below 6 GiB of total RAM the heap default
     /// is total/1.5, else 4 GiB. Deviation: unknown RAM (TotalRamMiB() == 0) keeps the usable
     /// 4 GiB default instead of the C++ 0. Lives here — the record property default IS the
-    /// single source (C6) since GlobalSettingsRegistration retired.</summary>
+    /// single source since GlobalSettingsRegistration retired.</summary>
     public static int DefaultMaxMemAlloc
     {
         get
@@ -344,9 +343,9 @@ public sealed record ModDownloadConfig
     public string? ModUpdateReleaseTypes { get; init; }
 }
 
-/// <summary>Java location/arguments plus the automatic-java machinery. The C9 probe quintet
+/// <summary>Java location/arguments plus the automatic-java machinery. The probe quintet
 /// (JavaSignature/Architecture/RealArchitecture/Version/Vendor) is deliberately absent —
-/// launcher-state.json owns the path-keyed probe cache (STATE S5).</summary>
+/// launcher-state.json owns the path-keyed probe cache.</summary>
 public sealed record JavaConfig
 {
     public string? JavaPath { get; init; }
@@ -358,14 +357,14 @@ public sealed record JavaConfig
 
     /// <summary>Legacy wire key only (never a C++ global): the java group exposes it and
     /// AutoInstallJava consults the instance-level flag; the C++ derive their defaults from
-    /// the empty JavaPath. Default true matches the wire table it replaces (C6).</summary>
+    /// the empty JavaPath. Default true matches the wire table it replaces.</summary>
     public bool? AutomaticJava { get; init; }
 }
 
-/// <summary>Directory layout plus the downloads-drop folder. CentralModsDir is GONE (DATA
-/// D8: a true dead setting — zero core consumers; it is no longer registered, so an
-/// imported INI's leftover key simply stays unread). JavaDir resolves under STORE root
-/// semantics since the E2 remount (GLOBAL §3).</summary>
+/// <summary>Directory layout plus the downloads-drop folder. CentralModsDir is GONE (a
+/// true dead setting — zero core consumers; it is no longer registered, so an
+/// imported INI's leftover key simply stays unread). JavaDir resolves under store root
+/// semantics since the store remount.</summary>
 public sealed record DirsConfig
 {
     /// <summary>QStandardPaths::writableLocation(DownloadLocation) approximation. The C++
@@ -402,7 +401,7 @@ public sealed record MirrorConfig
     public string? LegacyFmlLibsUrlOverride { get; init; }
 }
 
-/// <summary>Proxy coordinates. NO Pass member (C4): the proxy password is a secret, read by
+/// <summary>Proxy coordinates. NO Pass member: the proxy password is a secret, read by
 /// name from the secret store.</summary>
 public sealed record ProxyConfig
 {
@@ -412,7 +411,7 @@ public sealed record ProxyConfig
     public string? ProxyUser { get; init; }
 }
 
-/// <summary>API customization. NO credential members (C4): FlameKeyOverride/ModrinthToken
+/// <summary>API customization. NO credential members: FlameKeyOverride/ModrinthToken
 /// live in the secret store; MSAClientIDOverride is a public client id and stays here.</summary>
 public sealed record ApiConfig
 {

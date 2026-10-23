@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Tests for the BaseInstance/MinecraftInstance ports over the typed layer stack (D4):
+// Tests for the BaseInstance/MinecraftInstance ports over the typed layer stack:
 // instance.json (settings+identity) and instance-state.json (the runtime time trio) —
 // everything synthetic (temp dirs). The dual-track guarantee is exercised directly: a
 // Prism-format instance.cfg is READ-ONLY on load and only converts on the first write.
@@ -62,7 +62,7 @@ public class InstanceTests : IDisposable
         instance.SetIconKey("custom-icon");
         instance.SetNotes("some notes\nwith a newline");
 
-        // the write landed in instance.json (the INI write path is gone, C5/D4)
+        // the write landed in instance.json (the INI write path is gone)
         Assert.True(File.Exists(JsonPath));
         Assert.False(File.Exists(_cfgPath)); // nothing ever wrote an instance.cfg
         Assert.Contains("My Test", File.ReadAllText(JsonPath));
@@ -94,10 +94,10 @@ public class InstanceTests : IDisposable
         _global.StubSet("PreLaunchCommand", "echo global");
         var instance = CreateInstance();
 
-        // instance layer unset -> the user layer's value (the C7 fold)
+        // instance layer unset -> the user layer's value (the fold)
         Assert.Equal("echo global", instance.GetPreLaunchCommand());
 
-        // instance-layer write -> the override (the gate DEGENERATED to member-set, C7:
+        // instance-layer write -> the override (the gate DEGENERATED to member-set:
         // there is no separate OverrideCommands write; the derived gate reads true)
         instance.Settings.Set("PreLaunchCommand", "echo local");
         Assert.Equal("echo local", instance.GetPreLaunchCommand());
@@ -123,7 +123,7 @@ public class InstanceTests : IDisposable
 
         instance.Settings.Set("MaxMemAlloc", 8192);
         Assert.Equal(8192, Variant.AsInt(instance.Settings.Get("MaxMemAlloc")));
-        // the derived gate: a set family member IS the override (C7)
+        // the derived gate: a set family member IS the override
         Assert.True(Variant.AsBool(instance.Settings.Get("OverrideMemory")));
         Assert.Contains("8192", File.ReadAllText(JsonPath));
 
@@ -204,7 +204,7 @@ public class InstanceTests : IDisposable
         instance.SetMinecraftRunning(true);
         Assert.Equal(0, instance.TotalTimePlayed()); // reset base while running
         Assert.True(instance.LastLaunch() > 0);
-        Assert.True(File.Exists(StatePath)); // the launch stamped instance-state.json (D4)
+        Assert.True(File.Exists(StatePath)); // the launch stamped instance-state.json
 
         instance.SetMinecraftRunning(false);
         // ~0 seconds elapsed, but the state file must carry the bookkeeping
@@ -236,7 +236,7 @@ public class InstanceTests : IDisposable
     {
         var instance = CreateInstance();
         instance.Settings.Set("AutomaticJava", true);
-        // C7: the gate is the member — an explicit JavaPath at the instance layer
+        // the gate is the member — an explicit JavaPath at the instance layer
         instance.Settings.Set("JavaPath", "/opt/pinned-jdk");
         Assert.True(Variant.AsBool(instance.Settings.Get("OverrideJavaLocation")));
         _global.StubSet("AutomaticJavaSwitch", true);
@@ -272,7 +272,7 @@ public class InstanceTests : IDisposable
         ]);
 
         var instance = new MinecraftInstance(Settings(), new AbsolutePath(_root));
-        // reads come from the in-memory cfg import (C7 gate honored: gate=true keeps the value)
+        // reads come from the in-memory cfg import (gate honored: gate=true keeps the value)
         Assert.Equal("Prism Inst", instance.Name());
         Assert.Equal("grass", instance.IconKey());
         Assert.Equal("0123456789abcdef0123456789abcdef", instance.Uuid);
@@ -290,7 +290,7 @@ public class InstanceTests : IDisposable
         Assert.True(File.Exists(StatePath)); // the trio moved to the state file on first write
         var converted = File.ReadAllText(JsonPath);
         Assert.Contains("converted", converted);
-        Assert.Contains("0123456789abcdef0123456789abcdef", converted); // uuid survives (D2/D4)
+        Assert.Contains("0123456789abcdef0123456789abcdef", converted); // uuid survives
         // the cfg is never rewritten or deleted (read-compat), but instance.json now wins
         Assert.Contains("name=Prism Inst", File.ReadAllText(_cfgPath));
 
@@ -304,7 +304,7 @@ public class InstanceTests : IDisposable
     [Fact]
     public void PrismFormat_GateFalse_DropsIntoInheritance()
     {
-        // gate=false values are treated as unset on import (C7) — the user layer's value wins
+        // gate=false values are treated as unset on import — the user layer's value wins
         File.WriteAllLines(_cfgPath,
         [
             "[General]",
@@ -321,9 +321,9 @@ public class InstanceTests : IDisposable
     [Fact]
     public void PrismFormat_HandEditedGate_QtTruthyForms_KeepTheInstanceValue()
     {
-        // D1: QVariant(QString).toBool() reads every string but ""/"0"/"false" as true, so a
+        // QVariant(QString).toBool() reads every string but ""/"0"/"false" as true, so a
         // hand-edited "True" gate must import like Qt's own read did. Under the strict
-        // "true"/"1" match the gate read false and C7 folded the instance value away to the
+        // "true"/"1" match the gate read false and the instance value folded away to the
         // user layer (4096) — the override silently vanished on every load.
         File.WriteAllLines(_cfgPath,
         [

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/settings/SettingsObject.{h,cpp} (the registration/Get/Set surface).
 //
-// Since CONFIG C5/D4 the only production backing store is the typed layer stack
+// The only production backing store is the typed layer stack
 // (Core.Config.InstanceJsonSettingsObject: flint.json -> instance.json). The C++
-// RegisterOverride/RegisterPassthrough machinery (OverrideSetting/PassthroughSetting) is
-// retired with it — C7 degenerates the gates to "instance-layer member is non-null".
+// RegisterOverride/RegisterPassthrough machinery has no counterpart here — the gates
+// degenerate to "instance-layer member is non-null".
 
 namespace FlintLauncher.Core.Settings;
 

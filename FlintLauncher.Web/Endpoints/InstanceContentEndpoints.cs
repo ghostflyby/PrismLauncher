@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Instance-content endpoints (UI-API mapping Wave A): the per-instance functional clusters
+// Instance-content endpoints: the per-instance functional clusters
 // of the Qt pages — WorldListPage (worlds), ServersPage (servers.dat CRUD + status ping),
 // the external-resource pages (resources/{type}), ScreenshotsPage (listing + imgur upload)
 // and GameOptionsPage (options.txt). Long-running flows (imgur upload) run as registered
 // tasks (202) like import/mods-install; everything else is synchronous local file work.
 
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft.GameOptions;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Minecraft.Worlds;
@@ -47,7 +48,7 @@ public static class InstanceContentEndpoints
                 }
 
                 // a fresh WorldList per request (the C++ page model lives for the page)
-                var list = new WorldList(instance.WorldDir());
+                var list = instance.WorldList();
                 list.Update();
                 await list.LoadWorldsAsync();
                 return Results.Ok(list.Worlds.Select(ToWorldView).ToArray());
@@ -69,7 +70,7 @@ public static class InstanceContentEndpoints
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
 
-                var list = new WorldList(instance.WorldDir());
+                var list = instance.WorldList();
                 list.Update();
                 var index = IndexOfFolder(list, folderName);
                 if (index < 0)
@@ -102,7 +103,7 @@ public static class InstanceContentEndpoints
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
 
-                var list = new WorldList(instance.WorldDir());
+                var list = instance.WorldList();
                 list.Update();
                 var index = IndexOfFolder(list, folderName);
                 if (index < 0)
@@ -147,7 +148,7 @@ public static class InstanceContentEndpoints
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
 
-                var list = new WorldList(instance.WorldDir());
+                var list = instance.WorldList();
                 list.Update();
                 var index = IndexOfFolder(list, folderName);
                 if (index < 0)
@@ -193,7 +194,7 @@ public static class InstanceContentEndpoints
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
 
-                var list = new WorldList(instance.WorldDir());
+                var list = instance.WorldList();
                 list.Update();
                 var index = IndexOfFolder(list, folderName);
                 if (index < 0)
@@ -236,7 +237,7 @@ public static class InstanceContentEndpoints
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
 
-                var list = new WorldList(instance.WorldDir());
+                var list = instance.WorldList();
                 list.Update();
                 var before = list.Worlds.Select(w => w.FolderName).ToHashSet();
 
@@ -421,7 +422,7 @@ public static class InstanceContentEndpoints
 
     private static void MapResources(IEndpointRouteBuilder api)
     {
-        // NOTE (Wave B audit): the resources family EXCLUDES mods — the metadata-rich
+        // NOTE: the resources family EXCLUDES mods — the metadata-rich
         // /instances/{id}/mods surface below is the single mods source of truth.
         api.MapGet("/instances/{id}/resources/{type}", async (string id, string type,
             LauncherRuntime runtime) =>
@@ -548,7 +549,7 @@ public static class InstanceContentEndpoints
 
     // ------------------------------------------------------------------- mods (metadata-rich)
 
-    /// <summary>The /instances/{id}/mods mutations (Wave B audit: enable/disable/uninstall so
+    /// <summary>The /instances/{id}/mods mutations (enable/disable/uninstall so
     /// the mods surface is fully featured without going through the resources family). The
     /// folder is the instance's cached ModFolderModel — the metadata-aware one, so the
     /// uninstall also drops the packwiz index entry.</summary>
@@ -802,8 +803,8 @@ public static class InstanceContentEndpoints
     // ----------------------------------------------------------------------- helpers
 
     /// <summary>The MinecraftInstance for a {ref} (the content surfaces need the game
-    /// root). D2: every endpoint resolves through the addressing chain — direct
-    /// GetInstanceById is banned at the API boundary (GLOBAL §1).</summary>
+    /// root). Every endpoint resolves through the addressing chain — direct
+    /// GetInstanceById is banned at the API boundary.</summary>
     private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string reference) =>
         runtime.Instances.ResolveInstance(reference) as MinecraftInstance;
 
@@ -855,14 +856,14 @@ public static class InstanceContentEndpoints
         type switch
         {
             "mods" => instance.LoaderModList(),
-            "resourcepacks" => new ResourceFolderModel(instance.ResourcePacksDir, isIndexed: false,
-                createDir: true),
-            "texturepacks" => new ResourceFolderModel(instance.TexturePacksDir, isIndexed: false,
-                createDir: true),
-            "shaderpacks" => new ResourceFolderModel(instance.ShaderPacksDir, isIndexed: false,
-                createDir: true),
-            "datapacks" => new ResourceFolderModel((instance.GameRoot / "datapacks"),
-                isIndexed: false, createDir: true),
+            "resourcepacks" => new ResourceFolderModel(
+                MaterializedDirectory.Ensure(instance.ResourcePacksDir)!, isIndexed: false),
+            "texturepacks" => new ResourceFolderModel(
+                MaterializedDirectory.Ensure(instance.TexturePacksDir)!, isIndexed: false),
+            "shaderpacks" => new ResourceFolderModel(
+                MaterializedDirectory.Ensure(instance.ShaderPacksDir)!, isIndexed: false),
+            "datapacks" => new ResourceFolderModel(
+                MaterializedDirectory.Ensure(instance.GameRoot / "datapacks")!, isIndexed: false),
             _ => null,
         };
 

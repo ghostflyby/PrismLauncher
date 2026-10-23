@@ -82,8 +82,8 @@ public static class InstanceEndpoints
             }
         }).Produces<InstanceGroupView[]>();
 
-        // {ref} resolves through the D2 chain (inode → uuid → dirname); direct
-        // GetInstanceById is banned at the API boundary (GLOBAL §1 review rule)
+        // {ref} resolves through the addressing chain (inode → uuid → dirname); direct
+        // GetInstanceById is banned at the API boundary
         api.MapGet("/instances/{ref}", async (string @ref, LauncherRuntime runtime) =>
         {
             await runtime.InstanceLock.WaitAsync();
@@ -163,7 +163,7 @@ public static class InstanceEndpoints
                 var importTask = new InstanceImportTask(uri, trustedSource: true, modrinth: runtime.Modrinth, flame: runtime.Flame)
                 {
                     MetaCache = runtime.MetaCache,
-                    // the OptionalModDialog answers for mrpack/CurseForge packs (fix-2d):
+                    // the OptionalModDialog answers for mrpack/CurseForge packs:
                     // keys are the manifest file paths, unselected files install disabled
                     OptionalModsSelection = request.OptionalMods ?? new Dictionary<string, bool>(),
                 };
@@ -289,8 +289,8 @@ public static class InstanceEndpoints
             }
         }).Produces(204);
 
-        // D3: a rename is a pure METADATA write — the directory name stays (it is the
-        // display form, not the identity); references hold through the D2 chain (uuid),
+        // a rename is a pure METADATA write — the directory name stays (it is the
+        // display form, not the identity); references hold through the chain (uuid),
         // so there is no directory move, no LoadList reload and no group re-attachment
         // (the old syncInstanceDirName flow is gone).
         api.MapPatch("/instances/{ref}", async (string @ref, PatchInstanceRequest request,
@@ -350,8 +350,8 @@ public static class InstanceEndpoints
                 var node = new JsonObject();
                 if (settings is InstanceJsonSettingsObject typed)
                 {
-                    // the instance's own layer (D4): the derived gate states, every
-                    // instance-layer member that is set (with its EFFECTIVE value — the C7
+                    // the instance's own layer: the derived gate states, every
+                    // instance-layer member that is set (with its EFFECTIVE value — the
                     // fold over flint.json) and the runtime time trio (instance-state.json).
                     // Keys the instance layer never set are absent — they inherit.
                     foreach (var entry in InstanceConfigKeys.All
@@ -512,7 +512,7 @@ public static class InstanceEndpoints
             : long.TryParse(value.ToString(), out var l) ? l : 0L,
         double => value.ValueKind == JsonValueKind.Number ? value.GetDouble()
             : double.TryParse(value.ToString(), out var d) ? d : 0d,
-        // typed string lists (linkedInstances — D4): a JSON array of strings
+        // typed string lists (linkedInstances): a JSON array of strings
         IReadOnlyList<string> => value.ValueKind == JsonValueKind.Array
             ? value.EnumerateArray()
                 .Where(e => e.ValueKind == JsonValueKind.String)

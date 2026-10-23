@@ -70,7 +70,7 @@ internal static class MetaCacheJson
 
 public sealed class MetaEntry
 {
-    /// <summary>The cache whose mount table resolves <see cref="GetFullPath"/> (E4: the
+    /// <summary>The cache whose mount table resolves <see cref="GetFullPath"/> (the
     /// base path is NOT a field on the entry — the storage layer owns the baseId → root
     /// table and the key → path resolution; the disk format never carried it anyway).</summary>
     private HttpMetaCache? _owner;
@@ -97,9 +97,9 @@ public sealed class MetaEntry
     public bool IsStale { get; set; } = true;
 
     /// <summary>Full path of the cached file: resolved LIVE through the owning cache's
-    /// mount table (E4 — remounting a base re-points every entry with it). Fails fast when
+    /// mount table (remounting a base re-points every entry with it). Fails fast when
     /// the entry has no owning cache or its base is not registered — the silent fallback
-    /// to a process-CWD-relative path is exactly the E6 defect shape (② lazy bases → CWD
+    /// to a process-CWD-relative path is exactly the defect shape this design avoids (lazy bases → CWD
     /// landing) and must not come back through a side door.</summary>
     public AbsolutePath GetFullPath()
     {
@@ -249,7 +249,7 @@ public sealed class HttpMetaCache(AbsolutePath path) : IDisposable
         }
 
         // entry passed all the checks we cared about. (the base path is not cached on the
-        // entry — E4: GetFullPath resolves through the mount table, so a remount of the
+        // entry — GetFullPath resolves through the mount table, so a remount of the
         // base re-points the entry without a rewrite)
         return entry;
     }

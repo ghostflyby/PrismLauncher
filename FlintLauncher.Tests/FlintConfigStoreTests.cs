@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// CONFIG C2-C7 batch tests: the typed layer-stack fold (C6/C7 — upper non-null wins, null
+// Tests: the typed layer-stack fold (upper non-null wins, null
 // inherits, record property defaults single-source), the flint.json store (load-or-default,
 // atomic save, resolved-shape round-trip), the one-shot INI import pipeline (chain probing
-// with the MultiMC dual-name rider, the C4 secret trio → the store, the C9 state keys →
-// launcher-state.json, the rest → the record domains) and the G4 wire rerouting (PUT/GET of
+// with the MultiMC dual-name rider, the secret trio → the store, the state keys →
+// launcher-state.json, the rest → the record domains) and the wire rerouting (PUT/GET of
 // the secret trio through secrets.json, never flint.json).
 
 using System.Net;
@@ -41,7 +41,7 @@ public class FlintConfigStoreTests : IDisposable
     private FlintConfigStore NewStore() =>
         new(ConfigPath, FlintJsonContext.Default.FlintConfigFile);
 
-    // ------------------------------------------------------------------------ fold (C6/C7)
+    // ------------------------------------------------------------------------ fold
 
     [Fact]
     public void Fold_Defaults_Come_From_The_Default_Table()
@@ -73,7 +73,7 @@ public class FlintConfigStoreTests : IDisposable
         // are null and inherit; the materializing constructors re-create absent DOMAINS as
         // blank records, so a domain's presence never masks the layer below — only its set
         // scalars win):
-        // user layer sets memory + java, the instance layer (typed payloads arrive with D4)
+        // user layer sets memory + java, the instance layer (typed payloads arrive)
         // overrides only MinMemAlloc.
         var user = JsonSerializer.Deserialize(
             """{"memory":{"minMemAlloc":1024},"java":{"javaPath":"/opt/jdk-21"}}""",
@@ -91,7 +91,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Equal(FlintConfigFile.Default().Dirs.IconsDir, resolved.Dirs.IconsDir);
     }
 
-    // ------------------------------------------------------------------------ store (C5)
+    // ------------------------------------------------------------------------ store
 
     [Fact]
     public void Store_Missing_File_Yields_Defaults_And_First_Write_Seals_The_File()
@@ -105,7 +105,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.True(ConfigPath.ExistsFile());
         Assert.Equal(3072, store.Current.Memory.MinMemAlloc);
 
-        // reload from disk: the resolved shape round-trips (Flint-only write side, C5)
+        // reload from disk: the resolved shape round-trips (Flint-only write side)
         var reloaded = NewStore();
         Assert.Equal(3072, reloaded.Current.Memory.MinMemAlloc);
     }
@@ -144,7 +144,7 @@ public class FlintConfigStoreTests : IDisposable
         {
             if (entry.Secret)
             {
-                // C4: the secret trio is never a config member — the store serves an empty
+                // the secret trio is never a config member — the store serves an empty
                 // placeholder (the real values live in the ISecretStore)
                 Assert.Equal("", Variant.AsString(store.Get(entry.Key)));
             }
@@ -162,7 +162,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.True(ConfigPath.ExistsFile()); // every mutation persisted (flint.json, not INI)
     }
 
-    // ------------------------------------------------------------------------ importer (C5)
+    // ------------------------------------------------------------------------ importer
 
     /// <summary>Secrets + state over the fixture roots (the import's two side destinations).</summary>
     private (FileSecretStore Secrets, LauncherStateStore State) NewSideStores()
@@ -236,7 +236,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Equal(3128, store.Current.Proxy.ProxyPort);
         Assert.Equal("corpus", store.Current.Proxy.ProxyUser);
         Assert.Equal("zh_CN", store.Current.Language.Language);
-        // secrets must NOT be config members (C4: the format carries no secret fields)
+        // secrets must NOT be config members (the format carries no secret fields)
         Assert.DoesNotContain("hunter2", ConfigPath.ReadAllText());
         Assert.DoesNotContain("mr-token", ConfigPath.ReadAllText());
 
@@ -245,7 +245,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Equal("mr-token", secrets.Get("ModrinthToken"));
         Assert.Null(secrets.Get("FlameKeyOverride"));
 
-        // (2) the C9 keys → launcher-state.json
+        // (2) the state keys → launcher-state.json
         Assert.Equal(123456, state.Current.Playtime.Total);
         Assert.True(state.Current.Playtime.Migrated);
         Assert.Equal("OfflineOne", state.Current.LastOfflinePlayerName);
@@ -333,7 +333,7 @@ public class FlintConfigStoreTests : IDisposable
     [Fact]
     public void Import_C9_Bool_Keys_Read_Qt_Truthy_Strings()
     {
-        // D1: the C9 seals must judge the INI string the way QVariant(QString).toBool() did —
+        // the seals must judge the INI string the way QVariant(QString).toBool() did —
         // a hand-edited "True" reads true, so the playtime one-shot seal holds (no re-migration)
         // and the wizard question stays asked. The strict "true"/"1" match read these false.
         var paths = Paths;
@@ -353,7 +353,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.True(state.Current.UserAskedAboutAutomaticJavaDownload);
     }
 
-    // ------------------------------------------------- C++ setting synonyms (E1)
+    // ------------------------------------------------- C++ setting synonyms
 
     [Fact]
     public void Registry_Folds_The_Cpp_Synonyms_Onto_The_Primary_Keys()
@@ -386,10 +386,10 @@ public class FlintConfigStoreTests : IDisposable
             Assert.True(FlintConfigKeys.Resolve(alias) == FlintConfigKeys.Resolve(primary));
         }
 
-        // the secret aliases read as secrets (the import redirects them with the primary, C4)
+        // the secret aliases read as secrets (the import redirects them with the primary)
         Assert.True(FlintConfigKeys.IsSecret("ProxyPassword"));
         Assert.True(FlintConfigKeys.IsSecret("CFKeyOverride"));
-        // CentralModsDir|ModsDir stays dead (DATA D8): the alias of an unregistered key is
+        // CentralModsDir|ModsDir stays dead: the alias of an unregistered key is
         // unregistered — a leftover alias in an imported INI stays unread in the file
         Assert.Null(FlintConfigKeys.Resolve("CentralModsDir"));
         Assert.Null(FlintConfigKeys.Resolve("ModsDir"));
@@ -398,8 +398,8 @@ public class FlintConfigStoreTests : IDisposable
     [Fact]
     public void Import_Folds_The_Legacy_Synonym_Spellings_Onto_The_Primary_Keys()
     {
-        // E1: an old Prism cfg can carry the alias spellings — they must land under the
-        // primary (record domains; secret aliases redirect with the primary, C4), not drop
+        // an old Prism cfg can carry the alias spellings — they must land under the
+        // primary (record domains; secret aliases redirect with the primary), not drop
         // on the single pass's exact match
         var paths = Paths;
         paths.DataRoot.CreateDirectory();
@@ -437,7 +437,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Equal("echo postexit", store.Current.Commands.PostExitCommand);
         Assert.Equal("https://resources.example", store.Current.Mirror.ResourceUrlOverride);
 
-        // the secret aliases land under the PRIMARY names (C4) — nothing under the aliases
+        // the secret aliases land under the PRIMARY names — nothing under the aliases
         Assert.Equal("oldpass", secrets.Get("ProxyPass"));
         Assert.Equal("cf-old", secrets.Get("FlameKeyOverride"));
         Assert.Null(secrets.Get("ProxyPassword"));
@@ -471,12 +471,12 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Equal("primary-secret", secrets.Get("ProxyPass"));
     }
 
-    // ------------------------------------------------------------ playtime.cfg probe (E2)
+    // ------------------------------------------------------------ playtime.cfg probe
 
     [Fact]
     public void Import_Probes_The_DataRoot_PlaytimeCfg_For_The_TotalPlayTime_Pair()
     {
-        // E2: the C++ keeps the pair in <data-root>/playtime.cfg (Application.cpp:943-949 —
+        // the C++ keeps the pair in <data-root>/playtime.cfg (Application.cpp:943-949 —
         // the relative name resolves against the chdir'd data root), never in the cfg chain;
         // a real Prism import takes the pair from the separate file
         var paths = Paths;
@@ -520,12 +520,12 @@ public class FlintConfigStoreTests : IDisposable
         Assert.True(state.Current.Playtime.Migrated);    // the chain fills the absent member
     }
 
-    // ------------------------------------------- automatic-java default derivation (E3)
+    // ------------------------------------------- automatic-java default derivation
 
     [Fact]
     public void Import_Derives_The_Automatic_Java_Pair_From_The_Imported_JavaPath()
     {
-        // E3: Application.cpp:768-770 registers the pair with the default "JavaPath is
+        // Application.cpp:768-770 registers the pair with the default "JavaPath is
         // empty", evaluated AFTER the INI loads — a cfg that pins JavaPath while silent on
         // the pair must land false, or the auto-java machinery would override the pinned
         // JVM on the next launch (AutoInstallJava / BaseInstance consult this value)
@@ -597,7 +597,7 @@ public class FlintConfigStoreTests : IDisposable
     }
 }
 
-// ------------------------------------------------------------- G4 wire rerouting (API level)
+// ------------------------------------------------------------- wire rerouting (API level)
 
 [Collection("LauncherJars")]
 public class SettingsSecretReroutingApiTests
@@ -647,7 +647,7 @@ public class SettingsSecretReroutingApiTests
         Assert.Equal("mr-token", groups.GetProperty("api").GetProperty("ModrinthToken").GetString());
         Assert.Equal("flame-key", groups.GetProperty("api").GetProperty("FlameKeyOverride").GetString());
 
-        // the secrets live ONLY in secrets.json — flint.json carries no secret fields (C4)
+        // the secrets live ONLY in secrets.json — flint.json carries no secret fields
         var flintJson = File.Exists(configPath) ? await File.ReadAllTextAsync(configPath) : "";
         Assert.DoesNotContain("hunter2", flintJson);
         Assert.DoesNotContain("mr-token", flintJson);
@@ -678,7 +678,7 @@ public class SettingsSecretReroutingApiTests
         await using var host = await FlintApiHost.StartAsync();
         var groups = await GetGroups(host);
 
-        // the nine groups survive with the same membership (C6: the wire keys stay)
+        // the nine groups survive with the same membership (the wire keys stay)
         var expectedGroups = new[]
         {
             "launcher", "minecraft", "java", "dirs", "language", "meta", "proxy", "api", "tools",
@@ -695,7 +695,7 @@ public class SettingsSecretReroutingApiTests
         Assert.Equal(512, groups.GetProperty("minecraft").GetProperty("MinMemAlloc").GetInt32());
         Assert.Equal("", groups.GetProperty("java").GetProperty("JavaPath").GetString());
         Assert.True(groups.GetProperty("java").GetProperty("AutomaticJava").GetBoolean());
-        // DATA D8: CentralModsDir is unregistered and gone from the wire
+        // CentralModsDir is unregistered and gone from the wire
         Assert.False(groups.GetProperty("dirs").TryGetProperty("CentralModsDir", out _));
         Assert.Equal("", groups.GetProperty("proxy").GetProperty("ProxyPass").GetString());
         Assert.Equal(3, groups.GetProperty("api").GetProperty("PastebinType").GetInt32());

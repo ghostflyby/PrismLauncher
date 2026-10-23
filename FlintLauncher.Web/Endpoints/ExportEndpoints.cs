@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Export + log-file endpoints (UI-API mapping Wave B): POST /instances/{id}/export drives
+// Export + log-file endpoints: POST /instances/{id}/export drives
 // the ExportInstanceDialog/ExportPackDialog/ExportToModListDialog flows as registered tasks
 // (202 + taskId — mrpack via ModrinthPackExportTask, CurseForge via FlamePackExportTask, the
 // mod list via the local ModListExportTask), and GET /instances/{id}/logs[/{dir}/{name}]
@@ -188,7 +188,7 @@ public static class ExportEndpoints
     // ----------------------------------------------------------------------- helpers
 
     /// <summary>The MinecraftInstance for a {ref} (logs/exports need the game root).
-    /// D2: every endpoint resolves through the addressing chain (GLOBAL §1).</summary>
+    /// every endpoint resolves through the addressing chain.</summary>
     private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string reference) =>
         runtime.Instances.ResolveInstance(reference) as MinecraftInstance;
 

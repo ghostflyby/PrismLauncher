@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The secret store model (CONFIG C4 + GLOBAL G4): launcher secrets (accounts tokens, proxy
+// The secret store model: launcher secrets (accounts tokens, proxy
 // password, API keys) leave the config world entirely — code reads and writes them by NAME
 // through <see cref="ISecretStore"/>, the config format carries no secret fields. The
 // transitional backend is <see cref="FileSecretStore"/>: <data-root>/secrets.json, 0600 on
@@ -12,7 +12,7 @@ using TruePath;
 
 namespace FlintLauncher.Core.Secrets;
 
-/// <summary>Named secret read/write (C4: "ISecretStore（Get/Set/Delete by name）").</summary>
+/// <summary>Named secret read/write ("ISecretStore（Get/Set/Delete by name）").</summary>
 public interface ISecretStore
 {
     /// <summary>The stored secret, or null when the name is unknown.</summary>
@@ -47,7 +47,7 @@ public sealed record SecretsFile
     public Dictionary<string, string> Secrets { get; init; }
 }
 
-/// <summary>The transitional file backend (C4): &lt;data-root&gt;/secrets.json, 0600 on unix,
+/// <summary>The transitional file backend: &lt;data-root&gt;/secrets.json, 0600 on unix,
 /// atomic temp+rename writes. Not thread-safe across instances; the host keeps exactly one
 /// and serializes through it (a single file, a single writer).</summary>
 public sealed class FileSecretStore(AbsolutePath filePath, JsonTypeInfo<SecretsFile> typeInfo) : ISecretStore

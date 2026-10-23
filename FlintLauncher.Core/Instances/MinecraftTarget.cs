@@ -2,7 +2,7 @@
 // Port of launcher/minecraft/launch/MinecraftTarget.{h,cpp}: the "join server / world on
 // launch" target representation.
 //
-// P5 reconciliation: the C++ type is a mutable struct shared through MinecraftTarget::Ptr —
+// Launch reconciliation: the C++ type is a mutable struct shared through MinecraftTarget::Ptr —
 // the LookupServerAddress step writes the resolved address/port back through the pointer and
 // LauncherPartLaunch reads them afterwards. The draft `record` was immutable, so the port is
 // now a plain mutable class matching the C++ shape (the parse logic is unchanged).

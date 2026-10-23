@@ -5,7 +5,7 @@
 // Application-singleton reach-ins resolve through the instance (see Launch/LaunchController.cs
 // for the same pattern): the download base is the build default (the LegacyFMLLibsURLOverride
 // setting had no wired consumer and retired with the settings world) and the metacache comes
-// from the instance ("fmllibs" base — registered once at the composition root, E6; an
+// from the instance ("fmllibs" base — registered once at the composition root; an
 // unstamped instance fails the step instead of silently re-downloading).
 
 using FlintLauncher.Core.Instances;
@@ -14,6 +14,7 @@ using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
@@ -77,7 +78,7 @@ public sealed class LegacyFmlLibrariesTask(MinecraftInstance inst) : FlintTask
 
         // download missing libs to our place
         EmitStatus("Downloading FML libraries...");
-        // E6: the stamped runtime cache is the only source — the bare-fixture throwaway is
+        // the stamped runtime cache is the only source — the bare-fixture throwaway is
         // gone; an unstamped instance fails the step naming the missing wire
         var metacache = inst.MetaCache ?? throw new InvalidOperationException(
             $"no meta cache stamped on instance '{inst.Name()}' — the composition root must inject it");
@@ -130,7 +131,7 @@ public sealed class LegacyFmlLibrariesTask(MinecraftInstance inst) : FlintTask
 
                 try
                 {
-                    File.Copy(entry.GetFullPath().Value, (inst1.LibDir() / lib.Filename).Value, overwrite: true);
+                    entry.GetFullPath().Copy(inst1.LibDir() / lib.Filename, overwrite: true);
                 }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException)
                 {

@@ -35,7 +35,7 @@ public sealed class JavaInstallList
     private List<JavaInstall> _vlist = [];
 
     /// <summary><paramref name="javaRoot"/> is the launcher-managed java dir (the JavaDir
-    /// setting under E2 store semantics — the host passes the resolved root; the default
+    /// setting under store semantics — the host passes the resolved root; the default
     /// keeps the C++ cwd-relative behavior for bare fixtures).</summary>
     public JavaInstallList(bool onlyManagedVersions = false, AbsolutePath? javaRoot = null)
     {

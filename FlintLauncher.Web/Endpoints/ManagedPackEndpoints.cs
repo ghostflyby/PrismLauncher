@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Managed-pack endpoints (UI-API mapping Wave B, the ManagedPackPage): read the pack
+// Managed-pack endpoints (the ManagedPackPage): read the pack
 // metadata an import stamped onto the instance, and run the pack-level update check.
 //
 // The update check reuses the provider CheckUpdate semantics at the PACK level: for

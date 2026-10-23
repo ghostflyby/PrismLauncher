@@ -15,6 +15,7 @@
 
 using System.IO.Compression;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Minecraft.Worlds;
 
@@ -157,7 +158,7 @@ public static class WorldSaveIdentification
             }
 
             var levelDat = new AbsolutePath(entry) / "level.dat";
-            if (File.Exists(levelDat.Value))
+            if (levelDat.ExistsFile())
             {
                 return (true, fileName, saves);
             }

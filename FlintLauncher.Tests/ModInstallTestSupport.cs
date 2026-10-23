@@ -25,7 +25,7 @@ internal sealed class ModInstallTestEnv : IDisposable
 
     public MinecraftInstance CreateInstance(string mcVersion, ModLoaderType loader, string loaderVersion)
     {
-        // D4: the typed instance adapter over the env root (instance.json)
+        // the typed instance adapter over the env root (instance.json)
         var instance = new MinecraftInstance(
             new InstanceJsonSettingsObject(new AbsolutePath(_root), _global.Environment),
             new AbsolutePath(_root));

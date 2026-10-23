@@ -17,7 +17,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
-using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 

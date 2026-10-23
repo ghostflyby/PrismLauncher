@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The typed layer-stack fold (CONFIG C6/C7): a layer stack resolves by folding each layer
+// The typed layer-stack fold: a layer stack resolves by folding each layer
 // over the one below it — the UPPER layer wins wherever its member is non-null, null
 // inherits. The bottom of every fold is a fresh record, so the record property defaults
 // are the single default source: an all-null stack resolves to exactly them.
 //
-// Stack shape (C2/ask): system layer is NOT implemented — the format reserves the stack
-// head for it, so this phase folds user → instance (instance typed payloads arrive with
-// the D4 instance.json batch). Fold() takes the layers bottom-up and simply accepts more.
+// Stack shape: system layer is NOT implemented — the format reserves the stack
+// head for it, so this phase folds user → instance. Fold() takes the layers bottom-up
+// and simply accepts more.
 //
 // All merging is with-expressions over explicit members — no reflection (Native AOT).
 // NOTE: the source-generated deserializer does not honor property initializers for members
@@ -18,7 +18,7 @@ namespace FlintLauncher.Core.Config;
 public static class FlintConfigFold
 {
     /// <summary>Fold the layers bottom-up over the record defaults: layers[0] is the lowest
-    /// (user), later entries override it (instance, …; a future C2 system layer would be
+    /// (user), later entries override it (instance, …; a future system layer would be
     /// prepended). Null layers are skipped, so callers can pass optional stages as-is.</summary>
     public static FlintConfigFile Fold(params FlintConfigFile?[] layers)
     {
@@ -35,7 +35,7 @@ public static class FlintConfigFold
     }
 
     /// <summary>Fold <paramref name="upper"/> over <paramref name="lower"/>: non-null upper
-    /// members win, null inherits (C7). Domains are always materialized (the roots'
+    /// members win, null inherits. Domains are always materialized (the roots'
     /// materializing constructors); the layer semantics live at the scalar level — a scalar
     /// absent from either side is null and inherits, so the fold result is always fully
     /// resolved.

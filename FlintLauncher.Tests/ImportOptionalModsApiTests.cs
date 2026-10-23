@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// API-level tests for the import optional-mods input (fix-2d): POST /instances/import gains
+// API-level tests for the import optional-mods input: POST /instances/import gains
 // `optionalMods` ({manifest path: selected}) and the selection is honored by the Modrinth
 // creation task — an explicitly unselected optional file installs under its ".disabled"
 // name, a selected one under its real path (the OptionalModDialog answers, headless).

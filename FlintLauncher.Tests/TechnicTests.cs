@@ -11,6 +11,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
@@ -46,7 +47,11 @@ public class TechnicTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList([new AbsolutePath(instancesDir)]) { Environment = _global };
+        return new InstanceList(
+            [MaterializedDirectory.Ensure(new AbsolutePath(instancesDir))!],
+            _global,
+            new AbsolutePath(instancesDir) / ".test-groups.json",
+            []);
     }
 
     private async Task<SingleZipPackInstallTask> RunZipInstall(TechnicZipPackBuilder pack, string minecraftVersion = "",
@@ -225,7 +230,7 @@ public class TechnicTests : IDisposable
         // the extracted pack landed in minecraft/
         Assert.Equal("technic=1\n", await File.ReadAllTextAsync(Path.Combine(staging, "minecraft", "modpack", "options.txt")));
         Assert.True(File.Exists(Path.Combine(staging, "minecraft", "bin", "version.json")));
-        // instance.json identity (D4)
+        // instance.json identity
         var cfg = await File.ReadAllTextAsync(Path.Combine(staging, "instance.json"));
         Assert.Contains("Technic Imported", cfg);
         // the forge library name was translated into the component version

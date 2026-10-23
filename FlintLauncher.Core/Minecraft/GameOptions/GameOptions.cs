@@ -20,6 +20,7 @@ using System.Globalization;
 using System.Security;
 using System.Text;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Minecraft.GameOptions;
 
@@ -175,7 +176,7 @@ public sealed class GameOptions
                 }
             }
 
-            File.Move(tempPath.Value, path.Value, overwrite: true);
+            tempPath.Move(path, overwrite: true);
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
@@ -183,7 +184,7 @@ public sealed class GameOptions
         {
             try
             {
-                File.Delete(tempPath.Value);
+                tempPath.Delete();
             }
             catch (Exception)
             {

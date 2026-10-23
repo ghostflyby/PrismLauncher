@@ -16,6 +16,7 @@ using System.IO.Compression;
 using System.Text;
 using FlintLauncher.Core.IO;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Java;
 
@@ -276,7 +277,7 @@ public static class TarArchive
                 {
                     SkipData(stream, size);
                     var sourcePath = new AbsolutePath(Path.GetDirectoryName(targetFilePath) ?? "") / linkTarget;
-                    if (File.Exists(sourcePath.Value))
+                    if (sourcePath.ExistsFile())
                     {
                         FileOps.EnsureFilePathExists(new AbsolutePath(targetFilePath));
                         File.Copy(sourcePath.Value, targetFilePath, overwrite: true);

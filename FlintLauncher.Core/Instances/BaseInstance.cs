@@ -3,12 +3,14 @@
 // shouldStopOnConsoleOverflow free functions and the ShortcutData representation.
 //
 // Deviations from the C++ original:
-//  - QObject signals become C# events: propertiesChanged -> PropertiesChanged,
-//    runningStatusChanged -> RunningStatusChanged, statusChanged -> StatusChanged. The
-//    launchTaskChanged/profilerChanged signals belong to the launch pipeline (P5).
+//  - QObject signals become BCL notification contracts: propertiesChanged ->
+//    INotifyPropertyChanged (view-property names: Name/IconKey/Notes/IsRunning/…; an empty
+//    name is the whole-instance-view notification), runningStatusChanged ->
+//    RunningStatusChanged, statusChanged -> StatusChanged. The
+//    launchTaskChanged/profilerChanged signals belong to the launch pipeline.
 //  - setMinecraftRunning() adds the played seconds to the launcher runtime state's
-//    Playtime.Total (launcher-state.json, S5; the C++ used the "TotalPlayTime" settings
-//    key — moved out of the config world by CONFIG C9). The state store is injected
+//    Playtime.Total (launcher-state.json; the C++ used the "TotalPlayTime" settings
+//    key — moved out of the config world). The state store is injected
 //    through <see cref="LauncherState"/>; when it is null the global accumulation is
 //    skipped (all instance-local keys behave as upstream).
 //  - iconUpdated() received the icon list singleton's signal; it becomes a plain method
@@ -17,20 +19,21 @@
 //  - The qWarning for shortcuts with non-existent paths is dropped (no logging layer at
 //    this level); the shortcuts are skipped like upstream.
 //  - QUuid::Id128 form maps to Guid.ToString("N") (32 hex digits, no separators).
-//  - D4 (instance.json): the settings object IS the typed layer stack —
+//  - instance.json: the settings object IS the typed layer stack —
 //    flint.json (user) -> instance.json (instance) — see
 //    Core.Config.InstanceJsonSettingsObject. The C++ override-gate machinery
 //    (RegisterOverride/RegisterPassthrough, OverrideSetting/PassthroughSetting) is retired:
-//    C7 degenerates the gates to "instance-layer member is non-null", so inheritance comes
+//    the gates degenerate to "instance-layer member is non-null", so inheritance comes
 //    from the fold and the per-domain gate keys are derived (reading) / family clears
 //    (writing false). The RegisterSetting calls STAY — they are where the instance-only
-//    keys' defaults live (C6) and the key existence contract for the settings surfaces.
+//    keys' defaults live and the key existence contract for the settings surfaces.
 //    The runtime time trio (lastLaunchTime/lastTimePlayed/totalTimePlayed) is routed to
-//    instance-state.json by the adapter (D4) — the reads/writes below are unchanged.
+//    instance-state.json by the adapter — the reads/writes below are unchanged.
 //  - The C++ registerPassthrough(setting, nullptr) calls (ConsoleMaxLines/
 //    ConsoleOverflowStop) become plain registrations whose values the adapter resolves from
-//    the user layer — the C7 passthrough pair is global-only, instance writes are dropped.
+//    the user layer — the passthrough pair is global-only, instance writes are dropped.
 
+using System.ComponentModel;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -60,7 +63,7 @@ public readonly record struct ShortcutData(string Name, string FilePath, Shortcu
 /// Base class for instances. Implements many functions that are common between instances and
 /// provides a standard interface for all instances.
 /// </summary>
-public abstract class BaseInstance
+public abstract class BaseInstance : INotifyPropertyChanged
 {
     /// <summary>Port of the BaseInstance::Status enum.</summary>
     public enum Status : byte
@@ -78,7 +81,7 @@ public abstract class BaseInstance
         InstanceSettings.RegisterSetting("iconKey", "default");
         InstanceSettings.RegisterSetting("notes", "");
 
-        // the runtime time trio lives in instance-state.json since D4 — the adapter routes
+        // the runtime time trio lives in instance-state.json — the adapter routes
         // these keys there; the registrations carry their zero defaults
         InstanceSettings.RegisterSetting("lastLaunchTime", 0L);
         InstanceSettings.RegisterSetting("totalTimePlayed", 0L);
@@ -89,7 +92,7 @@ public abstract class BaseInstance
 
         InstanceSettings.RegisterSetting("lastTimePlayed", 0L);
 
-        // D4: a real string list (the old JSON text form parses through GetLinkedInstances)
+        // a real string list (the old JSON text form parses through GetLinkedInstances)
         InstanceSettings.RegisterSetting("linkedInstances", Array.Empty<string>());
         InstanceSettings.RegisterSetting("shortcuts", "");
         InstanceSettings.RegisterSetting("uuid", "");
@@ -104,7 +107,7 @@ public abstract class BaseInstance
             Uuid = savedUuid;
         }
 
-        // Game time override family (C7: the gate key stays readable; its value is derived
+        // Game time override family (the gate key stays readable; its value is derived
         // from Misc.GameTime's members by the adapter — no OverrideSetting chain anymore).
         // The member keys register plain: the adapter resolves them instance ?? user layer.
         InstanceSettings.RegisterSetting("OverrideGameTime", false);
@@ -134,7 +137,7 @@ public abstract class BaseInstance
         InstanceSettings.RegisterSetting("AutoCloseConsole", false);
         InstanceSettings.RegisterSetting("ShowConsoleOnError", true);
         InstanceSettings.RegisterSetting("LogPrePostOutput", true);
-        // C7 passthrough pair: global-only values (the adapter resolves them from the user
+        // passthrough pair: global-only values (the adapter resolves them from the user
         // layer); registered so the GetConsoleMaxLines/ShouldStopOnConsoleOverflow readers
         // keep finding the keys
         InstanceSettings.RegisterSetting("ConsoleMaxLines", 100000);
@@ -154,14 +157,27 @@ public abstract class BaseInstance
 
     // ---------------------------------------------------------------- events (Qt signals)
 
-    /// <summary>Port of the launchTaskChanged() signal (added with the P5 launch pipeline).</summary>
+    /// <summary>Port of the launchTaskChanged() signal (added with the launch pipeline).</summary>
     public event Action<BaseInstance>? LaunchTaskChanged;
 
     /// <summary>Raise LaunchTaskChanged (C# events can only be raised by the declaring type).</summary>
     protected void RaiseLaunchTaskChanged() => LaunchTaskChanged?.Invoke(this);
 
-    /// <summary>Signal emitted when properties relevant to the instance view change.</summary>
-    public event Action? PropertiesChanged;
+    /// <summary>INPC for the instance-view properties (name/icon/notes/running state/…):
+    /// the standard clothing of the C++ propertiesChanged() signal. Property names are the
+    /// setter-semantic names below ("Name", "IconKey", "IsRunning", …); an empty name means
+    /// "the whole instance view changed" (group membership and similar external facts).</summary>
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>Raise PropertyChanged for one view property (the declaring type raises).</summary>
+    private void RaisePropertyChanged(string propertyName) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+    /// <summary>The whole-instance-view notification (empty property name = all properties
+    /// changed): the group-membership half of the C++ dataChanged() glue — group state lives
+    /// on InstanceList, not here, so there is no property name to point at.</summary>
+    public void NotifyChanged() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
 
     /// <summary>Port of runningStatusChanged().</summary>
     public event Action<bool>? RunningStatusChanged;
@@ -218,6 +234,15 @@ public abstract class BaseInstance
         ChangeStatus(Status.Gone);
     }
 
+    /// <summary>The instance is leaving the live list (deleted on request, dropped as
+    /// vanished, or the configured roots changed): release its watcher tenancy — lazily
+    /// created folder models registered their directories on the shared space, and after
+    /// this point those directories are gone or no longer belong to this instance.
+    /// No-op without tenancy; the instance itself stays usable read-only.</summary>
+    public virtual void ReleaseWatchTenancy()
+    {
+    }
+
     /// <summary>
     /// The instance's ID. The ID SHALL be determined by LAUNCHER internally. The ID IS
     /// guaranteed to be unique.
@@ -265,7 +290,7 @@ public abstract class BaseInstance
                 });
             }
 
-            PropertiesChanged?.Invoke();
+            RaisePropertyChanged("TotalTimePlayed");
         }
     }
 
@@ -332,11 +357,11 @@ public abstract class BaseInstance
     {
         // FIXME upstream: if no change, do not set. setting involves saving a file.
         InstanceSettings.Set("name", val);
-        PropertiesChanged?.Invoke();
+        RaisePropertyChanged("Name");
     }
 
-    // NOTE (DATA D3): the C++ setInstanceSyncLine moved the instance directory on rename
-    // (syncInstanceDirName) so the dirname stayed a stable handle. The D2 addressing chain
+    // NOTE: the C++ setInstanceSyncLine moved the instance directory on rename
+    // (syncInstanceDirName) so the dirname stayed a stable handle. The addressing chain
     // (inode → uuid → dirname) makes that move unnecessary — directory names stay
     // human-readable, a rename is a pure metadata write, and references hold via uuid.
 
@@ -442,7 +467,7 @@ public abstract class BaseInstance
     {
         // FIXME upstream: if no change, do not set. setting involves saving a file.
         InstanceSettings.Set("iconKey", val);
-        PropertiesChanged?.Invoke();
+        RaisePropertyChanged("IconKey");
     }
 
     /// <summary>Port of the iconUpdated() slot: reacts to the icon list changing a key.</summary>
@@ -450,7 +475,7 @@ public abstract class BaseInstance
     {
         if (IconKey() == key)
         {
-            PropertiesChanged?.Invoke();
+            RaisePropertyChanged("IconKey");
         }
     }
 
@@ -460,6 +485,7 @@ public abstract class BaseInstance
     {
         // FIXME upstream: if no change, do not set. setting involves saving a file.
         InstanceSettings.Set("notes", val);
+        RaisePropertyChanged("Notes");
     }
 
     public string GetPreLoadCommand() => Variant.AsString(Settings.Get("PreLoadCommand"));
@@ -495,7 +521,7 @@ public abstract class BaseInstance
             Variant.AsBool(InstanceSettings.Get("AutomaticJava")) &&
             Variant.AsBool(InstanceSettings.Get("OverrideJavaLocation")))
         {
-            // C7 translation of the C++ pair (gate=false + JavaPath=""): clear the instance
+            // translation of the C++ pair (gate=false + JavaPath=""): clear the instance
             // java-location family — every member falls back to the user layer. There is no
             // separate JavaPath="" write anymore: with the gate gone, an explicit empty
             // string would be a real (empty) override, the opposite of the intent.
@@ -521,7 +547,7 @@ public abstract class BaseInstance
     {
         // FIXME upstream: if no change, do not set. setting involves saving a file.
         InstanceSettings.Set("lastLaunchTime", val);
-        PropertiesChanged?.Invoke();
+        RaisePropertyChanged("LastLaunch");
     }
 
     public void SetLastLaunch() => SetLastLaunch(DateTimeOffset.Now.ToUnixTimeMilliseconds());
@@ -547,7 +573,7 @@ public abstract class BaseInstance
     public abstract List<FlintTask> CreateUpdateTask();
 
     /// <summary>
-    /// returns a valid launcher (task container). P5: returns the LaunchTask (LaunchTask
+    /// returns a valid launcher (task container). Returns the LaunchTask (LaunchTask
     /// derives from FlintTask, like the C++ LaunchTask derives from Task).
     /// </summary>
     public abstract LaunchTask? CreateLaunchTask(AuthSession? account, MinecraftTarget? targetToJoin);
@@ -586,7 +612,7 @@ public abstract class BaseInstance
         if (_hasBrokenVersion != value)
         {
             _hasBrokenVersion = value;
-            PropertiesChanged?.Invoke();
+            RaisePropertyChanged("HasBrokenVersion");
         }
     }
 
@@ -597,7 +623,7 @@ public abstract class BaseInstance
         if (_hasUpdate != value)
         {
             _hasUpdate = value;
-            PropertiesChanged?.Invoke();
+            RaisePropertyChanged("HasUpdateAvailable");
         }
     }
 
@@ -608,7 +634,7 @@ public abstract class BaseInstance
         if (_crashed != value)
         {
             _crashed = value;
-            PropertiesChanged?.Invoke();
+            RaisePropertyChanged("HasCrashed");
         }
     }
 
@@ -630,7 +656,7 @@ public abstract class BaseInstance
 
     public List<string> GetLinkedInstances()
     {
-        // D4: the typed layer carries a real string array; a legacy JSON text (old cfg value
+        // the typed layer carries a real string array; a legacy JSON text (old cfg value
         // round-tripping through a plain SettingsObject double) still parses
         return InstanceSettings.Get("linkedInstances") is IReadOnlyList<string> list
             ? list.ToList()
@@ -644,12 +670,12 @@ public abstract class BaseInstance
 
     public void AddLinkedInstanceId(string id)
     {
-        // D3: the persisted reference form is the uuid — a dirname input resolves at WRITE
+        // the persisted reference form is the uuid — a dirname input resolves at WRITE
         // time when <see cref="UuidResolver"/> is wired (InstanceList stamps it during
         // discovery). Without a resolver (bare fixtures, not-yet-discovered targets) the raw
         // value appends verbatim and converts at the next LoadList round, exactly like the
         // group-file members. The C++ lineage passed id() — the dirname; that form is NOT
-        // carried over (the D2 persistent handle is the uuid).
+        // carried over (the persistent handle is the uuid).
         var links = GetLinkedInstances();
         links.Add(UuidResolver?.Invoke(id) is { Length: > 0 } resolvedUuid ? resolvedUuid : id);
         SetLinkedInstances(links);
@@ -707,13 +733,13 @@ public abstract class BaseInstance
 
     protected DateTimeOffset? TimeStarted;
 
-    /// <summary>The launcher runtime state (launcher-state.json, S5) — the playtime
-    /// accumulation lands in <c>Playtime.Total</c> (the former TotalPlayTime settings key,
-    /// CONFIG C9). Null skips the global accumulation; the instance list stamps it at
+    /// <summary>The launcher runtime state (launcher-state.json) — the playtime
+    /// accumulation lands in <c>Playtime.Total</c> (the former TotalPlayTime settings key).
+    /// Null skips the global accumulation; the instance list stamps it at
     /// discovery.</summary>
     public LauncherStateStore? LauncherState { get; set; }
 
-    /// <summary>D3: resolves an instance reference (dirname or uuid) to the referenced
+    /// <summary>Resolves an instance reference (dirname or uuid) to the referenced
     /// instance's uuid — the persisted linkedInstances form. Port-internal wiring (no C++
     /// counterpart): the instance list stamps it at discovery so the write path below
     /// converts dirname inputs instead of persisting them. Null (bare fixtures) means

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Port of launcher/java/JavaMetadata.{h,cpp}. The P2a parse-half (parseJavaMeta, DownloadType
+// Port of launcher/java/JavaMetadata.{h,cpp}. The parse-half (parseJavaMeta, DownloadType
 // and the Metadata record) lived in Minecraft/JavaMetadata.cs and has been MOVED here so the
 // whole java/ subsystem sits in the Java/ folder + FlintLauncher.Core.Java namespace; the
 // comparison operators (<, >, <=, >= over CompareTo; == is the record's Equals) are added on top.
@@ -7,7 +7,7 @@
 // (descriptor/name/typeString) are inlined here.
 //
 // NOTE: the file holds two namespaces. JsonObjectExtensions (the Qt QJsonObject/QJsonValue
-// shim used across the Minecraft format layer since P2a) keeps its original
+// shim used across the Minecraft format layer) keeps its original
 // FlintLauncher.Core.Minecraft namespace so its many consumers keep compiling; that is also
 // why this file uses classic block-scoped namespaces instead of the file-scoped form.
 

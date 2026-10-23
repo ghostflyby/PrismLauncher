@@ -42,7 +42,7 @@ public static class TechnicPackProcessor
     {
         _ = isSolder; // (unused upstream too)
         var minecraftPath = new AbsolutePath(stagingPath) / "minecraft";
-        // D4: the staged instance is Flint format from birth (typed instance.json adapter)
+        // the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
             new InstanceJsonSettingsObject(stagingPath, environment), stagingPath);
 

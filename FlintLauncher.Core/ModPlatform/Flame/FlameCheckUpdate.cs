@@ -6,10 +6,10 @@
 // the checkFailed(recoverUrl) path after the project info was fetched (collectBlockedMods).
 //
 // Deviations (headless port):
-//  - Resource::metadata() becomes the injectable metadataLookup delegate (the P3b Mod has
+//  - Resource::metadata() becomes the injectable metadataLookup delegate (the ported Mod has
 //    no metadata field; ModFolderModel.GetMetadata is the intended provider).
 //  - The ResourceDownloadTask / GetModDependenciesTask wiring of the C++ Update struct is
-//    not ported yet (P6-c); the update record carries the resolved IndexedVersion instead.
+//    not ported yet; the update record carries the resolved IndexedVersion instead.
 //  - checkFailed carries the recoverUrl as a third event argument ("" when none).
 
 using System.Globalization;

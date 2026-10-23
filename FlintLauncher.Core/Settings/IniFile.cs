@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Port of launcher/settings/INIFile.{h,cpp}: sectionless INI storage. Since CONFIG C5/D4
-// this is the READ side only — the one-shot INI imports (FlintConfigImporter for the global
+// Port of launcher/settings/INIFile.{h,cpp}: sectionless INI storage. This is the READ
+// side only — the one-shot INI imports (FlintConfigImporter for the global
 // chain, InstanceIniImporter for instance.cfg). Flint never writes an INI; the write sides
 // are flint.json and instance.json (TypedJsonFile). Reads legacy formats (no ConfigVersion,
 // 1.1, 1.2), staying byte-compatible with PrismLauncher.

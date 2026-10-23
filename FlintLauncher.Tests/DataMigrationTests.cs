@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Tests for the data-migration port (launcher/DataMigrationTask.{h,cpp} plus the data-level
 // half of Application::handleDataMigration): the whitelist inventory, the dry-run/copy task
-// flow, the S3 migration decision records (with the legacy "_nomigrate.txt" marker upgrade)
+// flow, the migration decision records (with the legacy "_nomigrate.txt" marker upgrade)
 // and the idempotency decision tree.
 
 using FlintLauncher.Core.Migration;
@@ -16,7 +16,7 @@ public class DataMigrationTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), $"flint-migrate-{Guid.NewGuid():N}");
 
-    /// <summary>The S3 decision store over a throwaway migration directory.</summary>
+    /// <summary>The decision store over a throwaway migration directory.</summary>
     private MigrationDecisionStore Decisions() =>
         new(new AbsolutePath(Path.Combine(_dir, Guid.NewGuid().ToString("N"), "migration")),
             FlintJsonContext.Default.MigrationDecisionRecord);
@@ -174,7 +174,7 @@ public class DataMigrationTests : IDisposable
         Assert.True(File.Exists(DataMigration.NoMigrateMarkerPath(new AbsolutePath(current), "PolyMC").Value));
     }
 
-    // S3: a legacy empty marker upgrades in place on first sight — declined@unknown record,
+    // a legacy empty marker upgrades in place on first sight — declined@unknown record,
     // marker file deleted
     [Fact]
     public void Decide_Upgrades_The_Legacy_Marker_Into_A_Decision_Record()
@@ -270,7 +270,7 @@ public class DataMigrationTests : IDisposable
         Assert.True(File.Exists(Path.Combine(current, "polymc.cfg")));
         Assert.True(File.Exists(Path.Combine(current, "instances", "1.21", "world", "level.dat")));
 
-        // the host records the completed migration (the S3 record replaces setDoNotMigrate)
+        // the host records the completed migration (the decision record replaces setDoNotMigrate)
         decisions.Write(new MigrationDecisionRecord
         {
             Source = "PolyMC",
@@ -294,8 +294,8 @@ public class DataMigrationTests : IDisposable
             DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(old), "PolyMC", PolyMcConfigFile, LauncherConfigFile));
     }
 
-    // A3: post-reform the authoritative own-config position is the CONFIG root's flint.json
-    // (CONFIG C5) — the flat <data>/flint.cfg probe is dead there, so the C++ existing-data
+    // post-reform the authoritative own-config position is the CONFIG root's flint.json
+    // — the flat <data>/flint.cfg probe is dead there, so the C++ existing-data
     // protection (Application.cpp:1994-1999, 2029, 2055-2057) keys off the config-root path
     // the caller passes
     [Fact]
@@ -412,7 +412,7 @@ public class DataMigrationTests : IDisposable
         Assert.Equal("Failed to scan source path.", task.FailReason);
     }
 
-    // B4: a file symlink inside the migrated tree is copied by its TARGET'S CONTENT (the
+    // a file symlink inside the migrated tree is copied by its TARGET'S CONTENT (the
     // C++ FS::copy default follows file symlinks — m_followSymlinks=true, FileSystem.h:159,
     // ResolveSymlinks enumeration, FileSystem.cpp:461) — the old ReparsePoint skip silently
     // pruned it from both the dry-run count and the copy

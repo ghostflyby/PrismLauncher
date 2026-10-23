@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// C# reimplementation of Qt's INI format codec (QSettings::IniFormat) — READ side only since
-// CONFIG C5. Verified against golden files produced by real QSettings 6.11 (see
+// C# reimplementation of Qt's INI format codec (QSettings::IniFormat) — READ side only.
+// Verified against golden files produced by real QSettings 6.11 (see
 // tools/qt-ini-golden and tests/FlintLauncher.Tests/TestData/IniFile) plus the per-file dump
 // fixtures recording what QSettings itself reads back. Covers the value shapes PrismLauncher
 // stores; the QDataStream-backed @-types are preserved verbatim instead of being decoded.
@@ -8,7 +8,7 @@
 // Consumers are the import-only INI readers (FlintConfigImporter for the global chain,
 // InstanceIniImporter for instance.cfg) — INI files are never deleted, never rewritten by
 // Flint (flint.json / instance.json are the only config write targets, TypedJsonFile).
-// The former Encode/SaveFile writer half retired with the instance.cfg write path (D4).
+// There is no Encode/SaveFile writer half — Flint never writes an INI.
 
 using System.Text;
 

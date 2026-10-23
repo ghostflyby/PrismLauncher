@@ -2,8 +2,8 @@
 // Port of launcher/launch/steps/CheckJava.{h,cpp}: verify the configured java binary and,
 // when its signature changed, probe it through JdkFind.FromExecutable (the JavaCheck.jar
 // checker died in the migration) and store the probed properties in the launcher runtime
-// state's path-keyed probe cache (launcher-state.json, S5 — the C++ stored them as settings
-// keys, moved out of the config world by CONFIG C9).
+// state's path-keyed probe cache (launcher-state.json — the C++ stored them as settings
+// keys, moved out of the config world).
 
 using System.Globalization;
 using System.Security.Cryptography;
@@ -30,7 +30,7 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
         var javaPathSetting = Variant.AsString(settings.Get("JavaPath"));
         _javaPath = LauncherJars.ResolveExecutable(javaPathSetting);
 
-        // C7: the override gate is derived — "a java location member is set at the instance
+        // the override gate is derived — "a java location member is set at the instance
         // layer" (the legacy "OverrideJava" spelling was never a registered key and stays a
         // harmless unknown read, like upstream's leftover)
         var perInstance = Variant.AsBool(settings.Get("OverrideJava")) || Variant.AsBool(settings.Get("OverrideJavaLocation"));
@@ -60,10 +60,9 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
 
         _javaSignature = ComputeJavaSignature(javaUnixTime, _javaPath);
 
-        // S5: the probe cache is launcher-state.json's path-keyed map (keyed through
+        // the probe cache is launcher-state.json's path-keyed map (keyed through
         // MinecraftInstance.JavaDetectKey — the same resolution the signature covers),
         // replacing the five global settings keys that overwrote each other across JVMs
-        // (CONFIG C9)
         _detectKey = MinecraftInstance.JavaDetectKey(javaPathSetting);
         var stored = Services.LauncherState?.Current.Java.Detections.GetValueOrDefault(_detectKey);
 
@@ -125,8 +124,8 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
         PrintJavaInfo(version, mojangPlatform, osArch, vendor);
         // Installation re-reads the release file on every access — resolve it once here
         var languageVersion = executable.Installation?.LanguageVersion;
-        // write the probe result into the path-keyed state cache (S5), then
-        // refresh the runtime context from it — settings are out of the loop (C9)
+        // write the probe result into the path-keyed state cache, then
+        // refresh the runtime context from it — settings are out of the loop
         Services.LauncherState?.Update(state =>
         {
             var detections = new Dictionary<string, JavaDetectEntry>(

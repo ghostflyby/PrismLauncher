@@ -7,6 +7,7 @@
 
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform;
@@ -65,7 +66,7 @@ public class GetModDependenciesTaskTests : IDisposable
             });
         }
 
-        var model = new ModFolderModel(new AbsolutePath(ModsDir), isIndexed: true, createDir: true);
+        var model = new ModFolderModel(MaterializedDirectory.Ensure(new AbsolutePath(ModsDir))!, isIndexed: true);
         model.Update();
 
         var instance = _env.CreateInstance("1.20.1", ModLoaderType.Fabric, "0.14.21");
@@ -282,7 +283,7 @@ public class GetModDependenciesFlameTests : IDisposable
     public async Task FlameDependency_ResolvedThroughFileIds()
     {
         var modsDir = Path.Combine(_root, "mods");
-        var model = new ModFolderModel(new AbsolutePath(modsDir), isIndexed: true, createDir: true);
+        var model = new ModFolderModel(MaterializedDirectory.Ensure(new AbsolutePath(modsDir))!, isIndexed: true);
         model.Update();
         var instance = _env.CreateInstance("1.18.2", ModLoaderType.Forge, "40.1.0");
 

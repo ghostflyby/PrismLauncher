@@ -3,7 +3,7 @@
 //
 // Deviations:
 //  - Usable (increment/decrementUses in-use tracking) and the getFace() QPixmap skin cropping
-//    are not ported (Qt UI / launch-time reference counting, the latter P5); shouldRefresh()
+//    are not ported (Qt UI / launch-time reference counting); shouldRefresh()
 //    therefore never sees isInUse() == true.
 //  - The signal/slot pair changed()/activityChanged(bool) becomes the Changed/ActivityChanged
 //    events; connect() bookkeeping inside AccountList is dropped accordingly.

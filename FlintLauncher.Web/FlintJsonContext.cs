@@ -55,11 +55,11 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(TaskResultView))]
 [JsonSerializable(typeof(ProviderCategoryView))]
 [JsonSerializable(typeof(ProviderBodyView))]
-// ATLauncher (fix-2 step 1): packsnew.json surface + install request
+// ATLauncher: packsnew.json surface + install request
 [JsonSerializable(typeof(AtLauncherPackView))]
 [JsonSerializable(typeof(AtLauncherPackVersionView))]
 [JsonSerializable(typeof(AtLauncherInstallRequest))]
-// FTB (fix-2 step 2): modpacks.ch surface + install request
+// FTB: modpacks.ch surface + install request
 [JsonSerializable(typeof(FtbPackIndexResponse))]
 [JsonSerializable(typeof(FtbPackIndexEntry))]
 [JsonSerializable(typeof(FtbPackView))]
@@ -67,18 +67,18 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(FtbPackArtView))]
 [JsonSerializable(typeof(FtbPackAuthorView))]
 [JsonSerializable(typeof(FtbInstallRequest))]
-// Technic (fix-2c): platform search/trending/metadata surface + install request
+// Technic: platform search/trending/metadata surface + install request
 [JsonSerializable(typeof(TechnicSearchResultView))]
 [JsonSerializable(typeof(TechnicPackView))]
 [JsonSerializable(typeof(TechnicInstallRequest))]
-// skins (fix-2c): the account skin surface
+// skins: the account skin surface
 [JsonSerializable(typeof(AccountSkinView))]
-// skins (DATA D6): the local skin library surface
+// skins: the local skin library surface
 [JsonSerializable(typeof(SkinView))]
 [JsonSerializable(typeof(SkinApplyRequest))]
 [JsonSerializable(typeof(SkinStoredResponse))]
 [JsonSerializable(typeof(SkinView[]))]
-// Wave A (UI-API mapping): instance content surface
+// instance content surface
 [JsonSerializable(typeof(InstanceGroupView))]
 [JsonSerializable(typeof(CopyInstanceRequest))]
 [JsonSerializable(typeof(WorldView))]
@@ -93,7 +93,7 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(ScreenshotUploadRequest))]
 [JsonSerializable(typeof(GameOptionView))]
 [JsonSerializable(typeof(GameOptionsPutRequest))]
-// Wave B (UI-API mapping): components / export / logs / managed pack / icons / settings
+// components / export / logs / managed pack / icons / settings
 [JsonSerializable(typeof(ComponentProblemView))]
 [JsonSerializable(typeof(ComponentView))]
 [JsonSerializable(typeof(ComponentPatchRequest))]
@@ -107,7 +107,7 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(IconInstalledResponse))]
 [JsonSerializable(typeof(InstanceIconPutRequest))]
 [JsonSerializable(typeof(GlobalSettingsPutRequest))]
-// fix-3/fix-4: launch join targets, paste, about
+// launch join targets, paste, about
 [JsonSerializable(typeof(LaunchJoinServer))]
 [JsonSerializable(typeof(PasteRequest))]
 [JsonSerializable(typeof(PasteCreatedResponse))]
@@ -147,19 +147,19 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(PrismImportPlanResponse))]
 [JsonSerializable(typeof(PrismImportDryRunResponse))]
 [JsonSerializable(typeof(PrismImportPlanItem))]
-// migration decision records (STATE S3) — TypedJsonFile root
+// migration decision records — TypedJsonFile root
 [JsonSerializable(typeof(MigrationDecisionRecord))]
-// store completeness (CACHE E5): the derived {complete, missing[], bytes} report
+// store completeness: the derived {complete, missing[], bytes} report
 [JsonSerializable(typeof(StoreStatusReport))]
-// launcher-state.json (STATE S5) — TypedJsonFile roots
+// launcher-state.json — TypedJsonFile roots
 [JsonSerializable(typeof(LauncherState))]
 [JsonSerializable(typeof(PlaytimeState))]
 [JsonSerializable(typeof(JavaDetectState))]
 [JsonSerializable(typeof(JavaDetectEntry))]
 [JsonSerializable(typeof(UiState))]
-// secrets.json (CONFIG C4) — TypedJsonFile root
+// secrets.json — TypedJsonFile root
 [JsonSerializable(typeof(SecretsFile))]
-// flint.json (CONFIG C5) — TypedJsonFile root: the record domain full set (§2.2 finalized).
+// flint.json — TypedJsonFile root: the record domain full set.
 // A missing root here is a RUNTIME 500, not a compile error (AOT red line)
 [JsonSerializable(typeof(FlintConfigFile))]
 [JsonSerializable(typeof(LauncherConfig))]
@@ -179,7 +179,7 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(ProxyConfig))]
 [JsonSerializable(typeof(ApiConfig))]
 [JsonSerializable(typeof(ToolsConfig))]
-// instance.json (DATA D4) — TypedJsonFile root: the record domain full set. A missing root
+// instance.json — TypedJsonFile root: the record domain full set. A missing root
 // here is a RUNTIME 500, not a compile error (AOT red line)
 [JsonSerializable(typeof(InstanceConfigFile))]
 [JsonSerializable(typeof(InstanceIdentityConfig))]
@@ -195,6 +195,6 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(InstanceMiscConfig))]
 [JsonSerializable(typeof(InstanceConsoleConfig))]
 [JsonSerializable(typeof(InstanceGameTimeConfig))]
-// instance-state.json (DATA D4) — TypedJsonFile root (the per-instance runtime time trio)
+// instance-state.json — TypedJsonFile root (the per-instance runtime time trio)
 [JsonSerializable(typeof(InstanceStateFile))]
 internal sealed partial class FlintJsonContext : JsonSerializerContext;

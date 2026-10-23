@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// API-level tests for the Technic endpoints (fix-2c): the search/trending pass-through
+// API-level tests for the Technic endpoints: the search/trending pass-through
 // (the ?build= request param, the "vanilla" slug exclusion, the icon mapping), the pack
 // metadata with the url-vs-solder detection (zip vs solder flavor) and both install shapes
 // (zip download / Solder instance) against the stub Technic Platform+Solder server —

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// fix-3 core-level tests: the C++-aligned config defaults (CONFIG C5/C6 — the record
-// property defaults are the single source, read through the typed flint.json store; the D4
+// Core-level coverage tests: the C++-aligned config defaults (the record
+// property defaults are the single source, read through the typed flint.json store; the
 // batch retired the SettingsObject adapter view), the
 // LaunchTask.parseXmlLogs wiring (LogParser behind the LaunchServices.XmlLogParsing gate),
 // the Http proxy/timeout hook application (RuntimeNetConfig) and the meta-cache eviction the
@@ -37,7 +37,7 @@ public class CoverageFixCoreTests
             FlintJsonContext.Default.FlintConfigFile);
     }
 
-    // ---------------------------------------------------------------- defaults (fix-3)
+    // ---------------------------------------------------------------- defaults
 
     [Fact]
     public void Global_Defaults_Match_Cpp_RegisterSettings()
@@ -53,7 +53,7 @@ public class CoverageFixCoreTests
         Assert.True(Variant.AsBool(store.Get("AutomaticJavaSwitch")));
         Assert.True(Variant.AsBool(store.Get("AutomaticJavaDownload")));
         Assert.False(Variant.AsBool(store.Get("IgnoreJavaWizard")));
-        // CONFIG C9: the runtime-state keys (UserAskedAboutAutomaticJavaDownload,
+        // the runtime-state keys (UserAskedAboutAutomaticJavaDownload,
         // LastHostname, the java probe quintet, LastOfflinePlayerName, TotalPlayTime*) are
         // NOT settings anymore — launcher-state.json owns them (see LauncherStateStoreTests)
         Assert.Null(FlintConfigKeys.Resolve("UserAskedAboutAutomaticJavaDownload"));
@@ -61,7 +61,7 @@ public class CoverageFixCoreTests
         Assert.Null(FlintConfigKeys.Resolve("JavaSignature"));
         Assert.Null(FlintConfigKeys.Resolve("TotalPlayTime"));
         Assert.Null(FlintConfigKeys.Resolve("LastOfflinePlayerName"));
-        // C4: the secret trio is not a config member — the wire serves it from the store
+        // the secret trio is not a config member — the wire serves it from the store
         Assert.True(FlintConfigKeys.IsSecret("ProxyPass"));
         Assert.True(FlintConfigKeys.IsSecret("ModrinthToken"));
         Assert.True(FlintConfigKeys.IsSecret("FlameKeyOverride"));
@@ -86,7 +86,7 @@ public class CoverageFixCoreTests
         Assert.Equal("", Variant.AsString(store.Get("LegacyFMLLibsURLOverride")));
         Assert.Equal("", Variant.AsString(store.Get("MSAClientIDOverride")));
         Assert.Equal("", Variant.AsString(store.Get("UserAgentOverride")));
-        // folders (DATA D8: CentralModsDir is unregistered — the lookup resolves to null)
+        // folders (CentralModsDir is unregistered — the lookup resolves to null)
         Assert.Null(FlintConfigKeys.Resolve("CentralModsDir"));
         Assert.Equal("icons", Variant.AsString(store.Get("IconsDir")));
         Assert.Equal("skins", Variant.AsString(store.Get("SkinsDir")));
@@ -105,7 +105,7 @@ public class CoverageFixCoreTests
         Assert.Equal("", Variant.AsString(store.Get("PastebinCustomAPIBase")));
 
         // every registry key resolves (FlintConfigKeys) and the store round-trips a write
-        // into flint.json (the authoritative global source, C5)
+        // into flint.json (the authoritative global source)
         store.Set("LowMemWarning", false);
         Assert.False(Variant.AsBool(store.Get("LowMemWarning")));
         Assert.True(store.FilePath.ExistsFile());
@@ -125,7 +125,7 @@ public class CoverageFixCoreTests
         Assert.InRange(MemoryConfig.DefaultMaxMemAlloc, 1, 4096);
     }
 
-    // ------------------------------------------------------------ parseXmlLogs (fix-3)
+    // ------------------------------------------------------------ parseXmlLogs
 
     [Fact]
     public async Task XmlParsing_Disabled_Appends_Game_Lines_Raw()
@@ -185,7 +185,7 @@ public class CoverageFixCoreTests
                                       e.Line.StartsWith("[Log4j Parse Error]"));
     }
 
-    // --------------------------------------------------- net config application (fix-3)
+    // --------------------------------------------------- net config application
 
     [Fact]
     public void RuntimeNetConfig_Applies_Proxy_Retries_Timeout_And_Ua()
@@ -248,7 +248,7 @@ public class CoverageFixCoreTests
         }
     }
 
-    // ------------------------------------------------------- meta cache eviction (fix-4)
+    // ------------------------------------------------------- meta cache eviction
 
     [Fact]
     public void MetaCache_EvictAll_Drops_Entries_And_Cached_Files()

@@ -3,9 +3,9 @@
 // Only the data members and helpers the instance/launch layer consumes are ported; the
 // MinecraftAccount machinery that fills the session in is the auth layer's business.
 //
-// P4 reconciliation: upstream has no status enum on AuthSession (the launch pipeline tracks
+// launch reconciliation: upstream has no status enum on AuthSession (the launch pipeline tracks
 // state itself), so the draft's data surface was already complete; MinecraftAccount::fillSession
-// lives on FlintLauncher.Core.Auth.MinecraftAccount.FillSession (P4).
+// lives on FlintLauncher.Core.Auth.MinecraftAccount.FillSession.
 
 using System.Text.Json.Nodes;
 

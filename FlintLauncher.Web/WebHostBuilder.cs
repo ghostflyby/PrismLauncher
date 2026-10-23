@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // The ASP.NET Core Minimal API host factory: BuildWebApplication(args) resolves the five
-// roots (G1 three-layer flags: precise > home > platform default), fail-fast-probes them
+// roots (three-layer flags: precise > home > platform default), fail-fast-probes them
 // BEFORE any core service is built, wires the core singletons and maps the /api/v1
 // endpoints. Program.cs is a one-line wrapper around this factory so integration tests can
 // host the exact same app in-process.
@@ -10,6 +10,7 @@ using System.Text.Json;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Diagnostics;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
@@ -39,7 +40,7 @@ public static class WebHostBuilder
         AuthEndpointsOptions? auth = null,
         FlintPaths? paths = null)
     {
-        // the five-root layout (G1); tests override to point InstallRoot (the jars/ lookup)
+        // the five-root layout; tests override to point InstallRoot (the jars/ lookup)
         // at a fixture root — the former JavaUtils.LauncherRootPath static test hook
         paths ??= ResolveFlintPaths(args);
         // fail-fast: five roots EnsureDir + writable probe; any unusable root refuses
@@ -48,7 +49,7 @@ public static class WebHostBuilder
         // NOTE: the process working directory is NOT touched — every core path is explicit
         // (FlintPaths), so multiple hosts can coexist in one process (integration tests).
 
-        // S2: the API token never touches the disk — host injection (--api-token /
+        // the API token never touches the disk — host injection (--api-token /
         // FLINT_API_TOKEN) wins, else a process-lifetime token is generated and logged at
         // startup; a pre-reform <dataRoot>/api-token leftover is dead weight and is removed
         ApiAuthService.RemoveLegacyTokenFile(paths.DataRoot);
@@ -58,20 +59,33 @@ public static class WebHostBuilder
 
         // diagnostics channel (Application.cpp:513-528 parity): level from --log-level /
         // FLINT_LOG_LEVEL (default Information), default console provider plus the rolling
-        // state-root file (S4); the core services log through this factory by injection
+        // state-root file; the core services log through this factory by injection
         // (LaunchServices.LoggerFactory / DI)
         builder.Logging.SetMinimumLevel(ResolveLogLevel(args));
-        // S4 + assembly step 2 ("logger early, every later step diagnosable"): the rolling
-        // file sink opens its writer IN ITS CONSTRUCTOR, so the provider instance exists
-        // before the runtime assembly below (steps 3-9) — a mid-assembly crash gets its
+        // the rolling file sink opens its writer IN ITS CONSTRUCTOR, so the provider instance
+        // exists before the runtime assembly below — a mid-assembly crash gets its
         // last words into Flint-0.log through the catch around the ctor, instead of dying
         // before any log file write
-        var fileLogger = new RollingFileLoggerProvider(paths.LogsDir);
-        builder.Logging.AddProvider(fileLogger);
+        // the logs directory is materialized here: when it is unusable (a file occupying
+        // the path, unwritable) the host degrades to console-only logging and says so on
+        // stderr — the C++ fatal dialog became a diagnosable, non-fatal startup line. The
+        // runtime-assembly crash handler below degrades with it (stderr instead of the
+        // file sink), so a broken logs path can never hide a startup failure.
+        RollingFileLoggerProvider? fileLogger = null;
+        if (MaterializedDirectory.Ensure(paths.LogsDir) is { } logsDir)
+        {
+            fileLogger = new RollingFileLoggerProvider(logsDir);
+            builder.Logging.AddProvider(fileLogger);
+        }
+        else
+        {
+            Console.Error.WriteLine(
+                $"Flint: the logs directory '{paths.LogsDir.Value}' is unusable — console-only logging");
+        }
 
         builder.Services.ConfigureHttpJsonOptions(options => { options.SerializerOptions.TypeInfoResolverChain.Insert(0, FlintJsonContext.Default); });
 
-        // machine-readable API surface (G3): source-generated under Native AOT, served
+        // machine-readable API surface: source-generated under Native AOT, served
         // unauthenticated next to /healthz as a discovery-plane artifact
         builder.Services.AddOpenApi("v1", ApiOpenApi.Configure);
 
@@ -84,16 +98,26 @@ public static class WebHostBuilder
         catch (Exception e)
         {
             // the file sink exists since before the ctor — the failure is diagnosable, not
-            // unwritten; then fail-fast as before (no silent degradation, no half runtime)
-            fileLogger.CreateLogger(LogCategories.Startup).LogError(e,
-                "runtime assembly failed — the process cannot start");
-            fileLogger.Dispose();
+            // unwritten; in the degraded (console-only) mode the same line goes to stderr.
+            // Either way: fail-fast as before (no silent degradation, no half runtime)
+            if (fileLogger is { } sink)
+            {
+                sink.CreateLogger(LogCategories.Startup).LogError(e,
+                    "runtime assembly failed — the process cannot start");
+                sink.Dispose();
+            }
+            else
+            {
+                Console.Error.WriteLine(
+                    "Flint: runtime assembly failed — the process cannot start: " + e.Message);
+            }
+
             throw;
         }
 
         builder.Services.AddSingleton(FlintConfig.Default);
         builder.Services.AddSingleton(runtime);
-        // the D5/D6 data models are injectable like the rest of the runtime's singletons
+        // the icon/skin data models are injectable like the rest of the runtime's singletons
         builder.Services.AddSingleton(runtime.Icons);
         builder.Services.AddSingleton(runtime.Skins);
         builder.Services.AddSingleton<FlintTaskRegistry>();
@@ -105,7 +129,7 @@ public static class WebHostBuilder
         var app = builder.Build();
         var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
 
-        // S2: a generated token exists only in this process — announce it once at startup
+        // a generated token exists only in this process — announce it once at startup
         // (Information, single line) so the host's client can pick it up; nothing is written
         if (apiAuth is { Enabled: true, TokenGenerated: true })
         {
@@ -123,19 +147,19 @@ public static class WebHostBuilder
             LoggerFactory = loggerFactory,
             Config = runtime.Config,
             LauncherState = runtime.State,
-            // CACHE E2 via GLOBAL §3: the java root follows the JavaDir setting under store
+            // the java root follows the JavaDir setting under store
             // semantics, and the managed-versions javalist scans it (the C++
             // APPLICATION->javalist() the AutoInstallJava "no download" branch reads)
             JavaRootProvider = () => runtime.JavaRoot,
             JavaInstallListProvider = () => new JavaInstallList(javaRoot: runtime.JavaRoot),
             // the C++ LaunchTask always parses log4j XML events out of the game output
             // (LaunchTask::parseXmlLogs); the port keeps it behind an opt-in gate for
-            // pure-core consumers and this host turns it on (fix-3)
+            // pure-core consumers and this host turns it on
             XmlLogParsing = true,
         };
         runtime.Instances.LaunchServices = runtime.LaunchServices;
 
-        // the flint-legacy startup remount (assembly step 5) already ran inside the runtime
+        // the flint-legacy startup remount already ran inside the runtime
         // constructor — surface what it did (informational; a failed pass retries next start)
         if (runtime.LegacyMigration is { Ran: true } legacy)
         {
@@ -152,7 +176,7 @@ public static class WebHostBuilder
                 "flint-legacy remount: skipped (no undecided legacy layout at the data or home root)");
         }
 
-        // the C5 INI import (assembly step 6) ran in the constructor too — surface its
+        // the INI import ran in the constructor too — surface its
         // outcome, in particular the previously SILENT failure: a chain INI that exists but
         // cannot be parsed (the launcher starts on a default flint.json behind it)
         if (runtime.ConfigImport.ImportedIni is { } importedIni)
@@ -187,7 +211,7 @@ public static class WebHostBuilder
             }
         });
 
-        // fix-3: proxy / NumberOfManualRetries / RequestTimeout / UserAgentOverride reach the
+        // proxy / NumberOfManualRetries / RequestTimeout / UserAgentOverride reach the
         // shared Http stack (also re-applied after every settings write)
         RuntimeNetConfig.Apply(runtime);
 
@@ -232,7 +256,7 @@ public static class WebHostBuilder
         api.MapLaunch();
         api.MapTasks();
         api.MapAccounts();
-        api.MapSkinLibrary(); // DATA D6: the local skin library (apply composes SkinUpload)
+        api.MapSkinLibrary(); // the local skin library (apply composes SkinUpload)
         api.MapMisc();
         api.MapModPlatform();
         api.MapInstanceContent();
@@ -241,19 +265,19 @@ public static class WebHostBuilder
         api.MapManagedPack();
         api.MapSettingsAndIcons();
         api.MapMigration();
-        api.MapStore(); // CACHE E5: the /store completeness derivation surface (G3 /store 新面)
+        api.MapStore(); // the /store completeness derivation surface
 
         return app;
     }
 
-    /// <summary>G1 three-layer root resolution. The platform defaults come from FlintPaths
+    /// <summary>Three-layer root resolution. The platform defaults come from FlintPaths
     /// (the single absorption point); a home flag (--home-dir=X / FLINT_HOME) re-anchors all
     /// five roots at X/{config,data,store,cache,state} — the only implicit-derivation site;
     /// a precise flag (--config-dir/--data-dir/--store-dir/--cache-dir/--state-dir, each
     /// with its FLINT_*_DIR env) overrides exactly its own root, zero sibling implication.
     /// Precedence: precise > home > platform default; within a layer CLI beats env, and the
-    /// last occurrence of a flag wins. NOTE: --data-dir names the precise data root since
-    /// G1/G3 — the old "total directory" usage is --home-dir.</summary>
+    /// last occurrence of a flag wins. NOTE: --data-dir names the precise data root —
+    /// the old "total directory" usage is --home-dir.</summary>
     public static FlintPaths ResolveFlintPaths(string[] args)
     {
         var config = FlintPaths.PlatformDefaultConfigRoot();
@@ -286,7 +310,7 @@ public static class WebHostBuilder
             StateRoot = stateRoot,
         };
 
-        // G1: home mode records its origin so the flint-legacy probe can find the
+        // home mode records its origin so the flint-legacy probe can find the
         // pre-reform flat files at the home root (the fresh X/data child cannot)
         return roots with
         {

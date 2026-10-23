@@ -10,6 +10,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
@@ -65,7 +66,11 @@ public class AtLauncherTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList([new AbsolutePath(instancesDir)]) { Environment = _global };
+        return new InstanceList(
+            [MaterializedDirectory.Ensure(new AbsolutePath(instancesDir))!],
+            _global,
+            new AbsolutePath(instancesDir) / ".test-groups.json",
+            []);
     }
 
     /// <summary>The (uid, version) component list of the created instance's mmc-pack.json;
@@ -239,7 +244,7 @@ public class AtLauncherTests : IDisposable
         Assert.True(Directory.Exists(patches));
         Assert.Contains(Directory.GetFiles(patches), f => Path.GetFileName(f).StartsWith("custom.jarmod."));
 
-        // instance.json identity + the net.minecraft component from the pack (D4)
+        // instance.json identity + the net.minecraft component from the pack
         var cfg = await File.ReadAllTextAsync(Path.Combine(staging, "instance.json"));
         Assert.Contains("ATL Imported", cfg);
         var components = Components(staging);
@@ -253,7 +258,7 @@ public class AtLauncherTests : IDisposable
 
     private static string? GetManagedType(string staging)
     {
-        // D4: managed-pack registration lives in instance.json ("managedPackType")
+        // managed-pack registration lives in instance.json ("managedPackType")
         var json = JsonDocument.Parse(File.ReadAllText(Path.Combine(staging, "instance.json")));
         return json.RootElement.TryGetProperty("managed", out var managed) &&
                managed.TryGetProperty("type", out var type)

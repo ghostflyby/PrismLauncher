@@ -26,6 +26,7 @@
 
 using FlintLauncher.Core.Instances;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Java;
 
@@ -412,7 +413,7 @@ public static class JavaUtils
 
         void ScanJavaDir(AbsolutePath dirPath)
         {
-            if (!Directory.Exists(dirPath.Value))
+            if (!dirPath.ExistsDirectory())
             {
                 return;
             }

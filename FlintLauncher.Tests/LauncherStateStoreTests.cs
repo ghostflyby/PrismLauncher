@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// launcher-state.json store tests (STATE S5): load-or-default over the five-record schema,
+// launcher-state.json store tests: load-or-default over the five-record schema,
 // atomic writes, corrupt-payload fallback, the path-keyed java probe map (the multi-JVM fix)
 // and the round-trip through the real FlintJsonContext registration (the AOT smoke: a root
 // type missing from the context is a RUNTIME failure, not a compile error).
@@ -85,7 +85,7 @@ public class LauncherStateStoreTests : IDisposable
     [Fact]
     public void Java_Probe_Map_Keeps_Multiple_JVMs_Apart()
     {
-        // the C9/S5 fix: the five settings keys overwrote each other — the path-keyed map
+        // the fix: the five settings keys overwrote each other — the path-keyed map
         // remembers one entry per binary
         var store = Store();
         store.Update(state => PutDetection(state, "/jvm/17/bin/java", "sig-17", "17.0.2", 17));
@@ -168,7 +168,7 @@ public class LauncherStateStoreTests : IDisposable
     }
 }
 
-/// <summary>LaunchController's offline-name write-back (S5/C9): the used name lands in
+/// <summary>LaunchController's offline-name write-back: the used name lands in
 /// launcher-state.json — not in settings — and the next headless offline launch suggests it.
 /// The controller is driven through the real Login flow; the launch itself fails fast
 /// (no JavaCheck.jar in the fixture install root), which is fine — the name decision

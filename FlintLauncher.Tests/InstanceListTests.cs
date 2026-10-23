@@ -6,6 +6,7 @@
 using System.Globalization;
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.State;
 using FlintLauncher.Core.Tasks;
 using TruePath;
@@ -37,12 +38,14 @@ public class InstanceListTests : IDisposable
         catch (DirectoryNotFoundException) { }
     }
 
-    private InstanceList CreateList() =>
-        new([new AbsolutePath(_instancesDir)])
-        {
-            Environment = _global,
-            GroupFilePath = new AbsolutePath(_groupFile),
-        };
+    private InstanceList CreateList(LauncherStateStore? state = null) =>
+        new([MaterializedDirectory.Ensure(new AbsolutePath(_instancesDir))!],
+            _global,
+            new AbsolutePath(_groupFile),
+            // the legacy read-compat probes: the primary-instance-dir copy
+            // upstream used before there was a launcher data dir
+            [new AbsolutePath(_instancesDir) / "instgroups.json"],
+            launcherState: state);
 
     private void MakeInstanceDir(string id, string instanceType = "OneSix", string? name = null)
     {
@@ -123,7 +126,7 @@ public class InstanceListTests : IDisposable
         Assert.Same(inst, list.GetInstanceById(inst.Uuid));
     }
 
-    // DATA D2: the addressing chain (inode → uuid → dirname) is the endpoint entry point
+    // the addressing chain (inode → uuid → dirname) is the endpoint entry point
     [Fact]
     public void ResolveInstance_FollowsUuidThenDirname()
     {
@@ -149,7 +152,7 @@ public class InstanceListTests : IDisposable
         Assert.NotNull(inst);
         if (OperatingSystem.IsWindows())
         {
-            // D2: no inode support on Windows — the chain skips the link (InodeOf = 0)
+            // no inode support on Windows — the chain skips the link (InodeOf = 0)
             Assert.Equal(0, list.InodeOf(inst));
             return;
         }
@@ -162,7 +165,7 @@ public class InstanceListTests : IDisposable
         Assert.Null(list.ResolveInstance(long.MaxValue.ToString(CultureInfo.InvariantCulture)));
     }
 
-    // DOCUMENTED BOUNDARY (D2): a pure-numeric dirname still resolves (as itself) when no
+    // a pure-numeric dirname still resolves (as itself) when no
     // live inode carries that number — the inode link only wins on a real index hit
     [Fact]
     public void ResolveInstance_PureNumericDirname_ResolvesViaDirnameWithoutInodeHit()
@@ -176,7 +179,7 @@ public class InstanceListTests : IDisposable
         Assert.Equal("Numeric", inst.Name());
     }
 
-    // DATA D3: a committed folder whose metadata carries a uuid lands in the group file
+    // a committed folder whose metadata carries a uuid lands in the group file
     // under that uuid (the persistent reference form)
     [Fact]
     public void StagedInstance_GroupMemberIsTheCommittedUuid()
@@ -218,7 +221,7 @@ public class InstanceListTests : IDisposable
         MakeInstanceDir("b", name: "B");
         MakeInstanceDir("c", name: "C");
         // upstream format: formatVersion is the STRING "1", groups are name -> {hidden, instances}
-        // (the hidden flag is legacy/Prism payload — read-compat seed, C8/S5)
+        // (the hidden flag is legacy/Prism payload — read-compat seed)
         File.WriteAllText(_groupFile,
             """
             {
@@ -233,12 +236,11 @@ public class InstanceListTests : IDisposable
             """);
 
         var state = TestLauncherState.Create();
-        var list = CreateList();
-        list.LauncherState = state;
+        var list = CreateList(state);
         Assert.Equal(InstListError.NoError, list.LoadList()); // group load happens lazily at first group access
 
         // instance group queries right — the loaded dirname members were converted to the
-        // instances' uuids (D3 import conversion)
+        // instances' uuids (import conversion)
         Assert.Equal("Group", list.GetInstanceGroup("a"));
         Assert.Equal("Group", list.GetInstanceGroup("b"));
         Assert.Equal("", list.GetInstanceGroup("c"));
@@ -246,7 +248,7 @@ public class InstanceListTests : IDisposable
         // the legacy "hidden" key became the collapsed state
         Assert.True(list.IsGroupCollapsed("Group"));
         Assert.False(list.IsGroupCollapsed("Other"));
-        // ...and was promoted into launcher-state.json (the S5 owner of the hidden half)
+        // ...and was promoted into launcher-state.json (the owner of the hidden half)
         Assert.Equal(["Group"], state.Current.Ui.HiddenGroups);
 
         // setInstanceGroup persists compatible JSON
@@ -269,14 +271,14 @@ public class InstanceListTests : IDisposable
             Assert.Equal(2, groups.EnumerateObject().Count());
 
             var group = groups.GetProperty("Group");
-            // DATA D3: members are uuid references now (the legacy dirnames converted at
+            // members are uuid references now (the legacy dirnames converted at
             // load); "id" on the wire keeps serving the dirname
             Assert.Equal(
                 new[] { a.Uuid, b.Uuid }.Order(),
                 group.GetProperty("instances").EnumerateArray()
                     .Select(v => v.GetString()).ToList().Order());
             // the collapse state is NOT written into the group file anymore — launcher-state
-            // owns it (C8 split); the Flint-side file only carries group definitions
+            // owns it); the Flint-side file only carries group definitions
             Assert.False(group.TryGetProperty("hidden", out _));
 
             Assert.Equal([c.Uuid], groups.GetProperty("Other")
@@ -303,8 +305,7 @@ public class InstanceListTests : IDisposable
             """);
 
         var state = TestLauncherState.Create();
-        var list = CreateList();
-        list.LauncherState = state;
+        var list = CreateList(state);
         list.LoadList();
 
         // empty string represents ungrouped "group"
@@ -313,7 +314,7 @@ public class InstanceListTests : IDisposable
         // the legacy seed promoted into the state
         Assert.True(state.Current.Ui.UngroupedHidden);
 
-        // a later collapse writes the state only — the group file is untouched (the C8/S5
+        // a later collapse writes the state only — the group file is untouched (collapse
         // split made collapse purely machine-local state; the file carries definitions)
         var before = File.ReadAllText(_groupFile);
         list.SetGroupCollapsed("", false);
@@ -322,7 +323,7 @@ public class InstanceListTests : IDisposable
         Assert.Equal(before, File.ReadAllText(_groupFile));
     }
 
-    // L18: toVariant().toInt() never throws upstream — a non-int32-representable number
+    // toVariant().toInt() never throws upstream — a non-int32-representable number
     // (a decimal, an overflow) must be a silent version-match reject, not a FormatException
     // unwinding through Load into a group-endpoint 500
     [Fact]
@@ -365,7 +366,7 @@ public class InstanceListTests : IDisposable
         Assert.Empty(list.GetGroups());
     }
 
-    // L19: the load-time promise ("unknown members convert on the next load") is honored
+    // the load-time promise ("unknown members convert on the next load") is honored
     // in-session now — the discovery round re-resolves dirname members even when the group
     // model was loaded earlier with the instance still undiscovered
     [Fact]
@@ -405,8 +406,7 @@ public class InstanceListTests : IDisposable
     {
         MakeInstanceDir("one", name: "One");
         var state = TestLauncherState.Create();
-        var list = CreateList();
-        list.LauncherState = state;
+        var list = CreateList(state);
         list.LoadList();
 
         list.SetGroupCollapsed("G", true);
@@ -415,13 +415,12 @@ public class InstanceListTests : IDisposable
         Assert.True(state.Current.Ui.UngroupedHidden);
 
         // a fresh list over the same state restores the collapse state with no group file at all
-        var reloaded = CreateList();
-        reloaded.LauncherState = state;
+        var reloaded = CreateList(state);
         reloaded.LoadList();
         Assert.True(reloaded.IsGroupCollapsed("G"));
         Assert.True(reloaded.IsGroupCollapsed(""));
 
-        // rename and delete follow the state (hidden keys on the group NAME, G4)
+        // rename and delete follow the state (hidden keys on the group NAME)
         reloaded.RenameGroup("G", "H");
         Assert.Equal(["H"], state.Current.Ui.HiddenGroups);
         reloaded.DeleteGroup("H");
@@ -431,7 +430,7 @@ public class InstanceListTests : IDisposable
 
     // the BLOCKING review repro: a legacy/Prism file flag must not resurrect a collapsed
     // state the user has since cleared — the seed promotes into launcher-state.json AND
-    // strips the file, making it truly one-shot (C8/S5)
+    // strips the file, making it truly one-shot
     [Fact]
     public void LegacyHiddenFlag_SeedsOnce_ThenNeverResurrects()
     {
@@ -454,8 +453,7 @@ public class InstanceListTests : IDisposable
             """);
 
         var state = TestLauncherState.Create();
-        var list = CreateList();
-        list.LauncherState = state;
+        var list = CreateList(state);
         list.LoadList();
         Assert.True(list.IsGroupCollapsed("B"));
         Assert.True(list.IsGroupCollapsed(""));
@@ -478,8 +476,7 @@ public class InstanceListTests : IDisposable
 
         // restart: a fresh list over the same state — the stale file flag is gone, so the
         // collapsed state stays cleared
-        var reloaded = CreateList();
-        reloaded.LauncherState = state;
+        var reloaded = CreateList(state);
         reloaded.LoadList();
         Assert.False(reloaded.IsGroupCollapsed("B"));
         Assert.False(reloaded.IsGroupCollapsed(""));
@@ -513,8 +510,7 @@ public class InstanceListTests : IDisposable
             }
             """);
 
-        var list = CreateList();
-        list.LauncherState = state;
+        var list = CreateList(state);
         list.LoadList();
         Assert.True(list.IsGroupCollapsed("B")); // state still says collapsed
 
@@ -526,8 +522,7 @@ public class InstanceListTests : IDisposable
 
         // and now un-collapse sticks across a restart
         list.SetGroupCollapsed("B", false);
-        var reloaded = CreateList();
-        reloaded.LauncherState = state;
+        var reloaded = CreateList(state);
         reloaded.LoadList();
         Assert.False(reloaded.IsGroupCollapsed("B"));
         Assert.Equal([], state.Current.Ui.HiddenGroups);
@@ -558,7 +553,7 @@ public class InstanceListTests : IDisposable
         Assert.Empty(doc.RootElement.GetProperty("groups").EnumerateObject());
     }
 
-    // G4 pre-wiring: config side first, state side after — a failed group-file write rolls
+    // pre-wiring: config side first, state side after — a failed group-file write rolls
     // the in-memory rename back and leaves the hidden state under the old name
     [Fact]
     public void RenameGroup_ConfigWriteFailure_RollsBack_AndKeepsStateSide()
@@ -568,12 +563,12 @@ public class InstanceListTests : IDisposable
         // a group-file path whose parent is a FILE: every group-file write fails
         var blocker = Path.Combine(_root, "blocker");
         File.WriteAllText(blocker, "x");
-        var list = new InstanceList([new AbsolutePath(_instancesDir)])
-        {
-            Environment = _global,
-            GroupFilePath = new AbsolutePath(Path.Combine(blocker, "instgroups.json")),
-            LauncherState = state,
-        };
+        var list = new InstanceList(
+            [MaterializedDirectory.Ensure(new AbsolutePath(_instancesDir))!],
+            _global,
+            new AbsolutePath(Path.Combine(blocker, "instgroups.json")),
+            [],
+            launcherState: state);
         list.LoadList();
 
         list.SetInstanceGroup("one", "G");
@@ -594,7 +589,7 @@ public class InstanceListTests : IDisposable
         // the success path still follows the name (covered by CollapseState_…_AndSurvivesAReload)
     }
 
-    // G4 pre-wiring, delete half: the same failure rolls the in-memory deletion back too
+    // pre-wiring, delete half: the same failure rolls the in-memory deletion back too
     [Fact]
     public void DeleteGroup_ConfigWriteFailure_RollsBack_AndKeepsStateSide()
     {
@@ -603,12 +598,12 @@ public class InstanceListTests : IDisposable
         // a group-file path whose parent is a FILE: every group-file write fails
         var blocker = Path.Combine(_root, "blocker");
         File.WriteAllText(blocker, "x");
-        var list = new InstanceList([new AbsolutePath(_instancesDir)])
-        {
-            Environment = _global,
-            GroupFilePath = new AbsolutePath(Path.Combine(blocker, "instgroups.json")),
-            LauncherState = state,
-        };
+        var list = new InstanceList(
+            [MaterializedDirectory.Ensure(new AbsolutePath(_instancesDir))!],
+            _global,
+            new AbsolutePath(Path.Combine(blocker, "instgroups.json")),
+            [],
+            launcherState: state);
         list.LoadList();
 
         list.SetInstanceGroup("one", "G");
@@ -649,7 +644,7 @@ public class InstanceListTests : IDisposable
 
         Assert.Equal("Old", list.GetInstanceGroup("m"));
         // migrated to the primary group file location, with the dirname member converted
-        // to the instance's uuid (DATA D3)
+        // to the instance's uuid
         Assert.True(File.Exists(_groupFile));
         var m = list.GetInstanceById("m");
         Assert.NotNull(m);
@@ -704,11 +699,10 @@ public class InstanceListTests : IDisposable
         MakeInstanceDir("played", name: "P");
         File.AppendAllText(Path.Combine(_instancesDir, "played", "instance.cfg"), "totalTimePlayed=3600\n");
 
-        // the migration hook is launcher-state.json's Playtime state (S5; the former
-        // TotalPlayTime/TotalPlayTimeMigrated settings keys retired by CONFIG C9)
+        // the migration hook is launcher-state.json's Playtime state (the former
+        // TotalPlayTime/TotalPlayTimeMigrated settings keys retired)
         var state = TestLauncherState.Create();
-        var list = CreateList();
-        list.LauncherState = state;
+        var list = CreateList(state);
 
         list.LoadList();
         Assert.Equal(3600, state.Current.Playtime.Total);
@@ -887,7 +881,7 @@ public class InstanceListTests : IDisposable
         Assert.Equal([], list.GetLinkedInstancesById("link"));
     }
 
-    // DATA D3: linkedInstances carry uuid references — the Prism/legacy dirname form
+    // linkedInstances carry uuid references — the Prism/legacy dirname form
     // converts at the discovery round (the group-member import conversion, applied to the
     // per-instance list)
 
@@ -907,7 +901,7 @@ public class InstanceListTests : IDisposable
         var link = list.GetInstanceById("link");
         Assert.NotNull(baseInst);
         Assert.NotNull(link);
-        // the imported dirname became the target's uuid (D3 import conversion)
+        // the imported dirname became the target's uuid (import conversion)
         Assert.Equal([baseInst.Uuid], link.GetLinkedInstances());
         // ...and the conversion persisted (the dual-track write landed the uuid form)
         using (var doc = JsonDocument.Parse(

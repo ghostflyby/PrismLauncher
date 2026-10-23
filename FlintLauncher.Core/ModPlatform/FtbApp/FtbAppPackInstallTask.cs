@@ -4,7 +4,7 @@
 // InstanceType=OneSix, totalTimePlayed (from the ms totalPlayTime), the jvmArgs override,
 // the net.minecraft component and the modloader component derived from the parsed loader.
 //
-// Deviation: downloadFiles() (the P5 update pipeline) is not ported; creation succeeds
+// Deviation: downloadFiles() (the update pipeline) is not ported; creation succeeds
 // without fetching game files, like the other creation tasks.
 
 using FlintLauncher.Core.Config;
@@ -37,7 +37,7 @@ public sealed class FtbAppPackInstallTask(FtbAppModpack pack) : InstanceTask
         EmitStatus("Copying settings...");
         SetProgress(2, 2);
 
-        // D4: the staged instance is Flint format from birth (typed instance.json adapter)
+        // the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
             new InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution.")),
@@ -47,7 +47,7 @@ public sealed class FtbAppPackInstallTask(FtbAppModpack pack) : InstanceTask
 
         if (pack.JvmArgs.Length != 0)
         {
-            // C7: writing JvmArgs sets the instance-layer member, which IS the override (the
+            // writing JvmArgs sets the instance-layer member, which IS the override (the
             // derived OverrideJavaArgs gate reads true; no separate gate write exists)
             instance.Settings.Set("JvmArgs", pack.JvmArgs);
         }
@@ -81,7 +81,7 @@ public sealed class FtbAppPackInstallTask(FtbAppModpack pack) : InstanceTask
         instance.SetName(Name());
         instance.SetIconKey(Icon == "default" ? "ftb_logo" : Icon);
 
-        // (upstream calls downloadFiles(m_instance.get()) here — the P5 update pipeline;
+        // (upstream calls downloadFiles(m_instance.get()) here — the update pipeline;
         //  like the other creation tasks, creation succeeds without fetching game files)
         await Task.CompletedTask;
         EmitSucceeded();

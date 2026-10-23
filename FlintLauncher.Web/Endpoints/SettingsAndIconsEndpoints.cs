@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Settings groups (the global settings pages of the C++ UI collapse into named key groups
-// over the typed flint.json stack — CONFIG C5/C6; the group KEYS are the wire contract and
+// over the typed flint.json stack; the group KEYS are the wire contract and
 // stay, while the values come from the single key registry FlintConfigKeys — the old
 // Groups value-table + GlobalSettingsRegistration double bookkeeping retired) and the
-// global icon library endpoints (IconPickerDialog). UI-API mapping Wave B; the icon half
-// runs on the injected IconPool model since DATA D5 (IconsDir setting honored).
+// global icon library endpoints (IconPickerDialog). The icon half
+// runs on the injected IconPool model (IconsDir setting honored).
 //
-// G4 secret rerouting: PUT of ProxyPass/ModrinthToken/FlameKeyOverride writes the
-// ISecretStore (C4 — flint.json carries no secret fields); GET serves the stored values so
+// Secret rerouting: PUT of ProxyPass/ModrinthToken/FlameKeyOverride writes the
+// ISecretStore (flint.json carries no secret fields); GET serves the stored values so
 // the wire contract is unchanged for the host.
 
 using System.Text.Json;
@@ -96,7 +96,7 @@ public static class SettingsAndIconsEndpoints
                 // it instance-side; AutoInstallJava writes it, BaseInstance.cpp:201 consults
                 // it); AutomaticJavaSwitch/Download are the GLOBAL switches whose C++ defaults
                 // derive from JavaPath being empty (Application.cpp:768-770 — the one-shot
-                // import materializes the derived pair into flint.json, E3)
+                // import materializes the derived pair into flint.json)
                 "AutomaticJava",
                 "AutomaticJavaDownload",
                 "AutomaticJavaSwitch",
@@ -104,9 +104,9 @@ public static class SettingsAndIconsEndpoints
             ["dirs"] =
             [
                 // LauncherPage folders (IconsDir/SkinsDir relative to the data dir, JavaDir
-                // under STORE root semantics since the E2 remount; InstanceDir itself is
+                // under store root semantics since the store remount; InstanceDir itself is
                 // structural in the host and stays unwritable). CentralModsDir left with
-                // DATA D8 (true dead setting, unregistered).
+                // (true dead setting, unregistered).
                 "IconsDir",
                 "DownloadsDir",
                 "DownloadsDirWatchRecursive",
@@ -132,7 +132,7 @@ public static class SettingsAndIconsEndpoints
             ["proxy"] =
             [
                 // ProxyPage: written values reach the NetStack through RuntimeNetConfig;
-                // ProxyPass is a C4 secret — same wire key, ISecretStore storage
+                // ProxyPass is a secret — same wire key, ISecretStore storage
                 "ProxyType",
                 "ProxyAddr",
                 "ProxyPort",
@@ -170,7 +170,7 @@ public static class SettingsAndIconsEndpoints
                 var values = new Dictionary<string, object?>(StringComparer.Ordinal);
                 foreach (var key in keys)
                 {
-                    // G4: the secret trio serves from the store; everything else from the
+                    // the secret trio serves from the store; everything else from the
                     // typed stack's resolved fold (defaults = the record property defaults)
                     values[key] = FlintConfigKeys.IsSecret(key)
                         ? runtime.Secrets.Get(key) ?? ""
@@ -204,7 +204,7 @@ public static class SettingsAndIconsEndpoints
                     FlintConfigKeys.Default(prop.Name));
                 if (FlintConfigKeys.IsSecret(prop.Name))
                 {
-                    // G4: the secret trio never touches flint.json — the write goes to the
+                    // the secret trio never touches flint.json — the write goes to the
                     // ISecretStore (empty clears the stored secret)
                     if (Variant.AsString(value) is { Length: > 0 } secret)
                     {
@@ -225,11 +225,18 @@ public static class SettingsAndIconsEndpoints
             // re-runs updateProxySettings from the ProxyPage the same way); the apply also
             // re-reads the store-backed secrets and the mod-platform API credentials
             RuntimeNetConfig.Apply(runtime);
+
+            // the dir-kind models re-point to their (created-on-demand) new roots
+            if (body.Group == "dirs")
+            {
+                runtime.ApplyDirsSettings();
+            }
+
             return Results.NoContent();
         }).Produces(204);
 
         // ---- global icon library (IconPickerDialog) ------------------------------------
-        // D5: the surface talks to the injected IconPool model (key→path index, scan,
+        // the surface talks to the injected IconPool model (key→path index, scan,
         // install/delete) and the IconsDir SETTING decides where the library lives — the
         // three former hardcoded Path.Combine(DataDir, "icons") sites ignored the setting.
 

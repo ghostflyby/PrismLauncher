@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/launch/VerifyJavaInstall.{h,cpp}: verify that the selected Java
 // feature version is compatible with the instance profile. The probed version/architecture
-// come from the state-side probe cache (S5) via the instance, not from settings (C9).
+// come from the state-side probe cache via the instance, not from settings.
 
 using System.Globalization;
 using FlintLauncher.Core.Settings;

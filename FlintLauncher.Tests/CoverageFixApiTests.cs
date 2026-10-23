@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// fix-3/fix-4 API-surface tests: the completed settings whitelist (new groups + aligned
+// API-surface coverage tests: the completed settings whitelist (new groups + aligned
 // defaults), the proxy/retry/timeout wiring reaching the shared Http stack, the world
 // copy/detail endpoints, the paste/about/meta-cache endpoints and the launch join-target
 // parameters (e2e with the fake java).
@@ -25,7 +25,7 @@ using Xunit;
 
 namespace FlintLauncher.Tests;
 
-// --------------------------------------------------------------------- settings + misc (fix-3/4)
+// --------------------------------------------------------------------- settings + misc
 
 [Collection("LauncherJars")]
 public class CoverageFixSettingsApiTests
@@ -49,7 +49,7 @@ public class CoverageFixSettingsApiTests
 
         var minecraft = groups.GetProperty("minecraft");
         // RAM-derived (SysInfo::defaultMaxJvmMem port); the record property default is the
-        // single source (CONFIG C6 — GlobalSettingsRegistration retired)
+        // single source (GlobalSettingsRegistration retired)
         Assert.Equal(MemoryConfig.DefaultMaxMemAlloc,
             minecraft.GetProperty("MaxMemAlloc").GetInt32());
         Assert.True(minecraft.GetProperty("LowMemWarning").GetBoolean());
@@ -61,7 +61,7 @@ public class CoverageFixSettingsApiTests
         Assert.Equal("127.0.0.1", groups.GetProperty("proxy").GetProperty("ProxyAddr").GetString());
 
         var dirs = groups.GetProperty("dirs");
-        // CentralModsDir left with DATA D8 (true dead setting — not served, not writable)
+        // CentralModsDir left (true dead setting — not served, not writable)
         Assert.False(dirs.TryGetProperty("CentralModsDir", out _));
         Assert.Equal("icons", dirs.GetProperty("IconsDir").GetString());
         Assert.Equal("skins", dirs.GetProperty("SkinsDir").GetString());
@@ -87,7 +87,7 @@ public class CoverageFixSettingsApiTests
                 ["DownloadsDirWatchRecursive"] = true,
             },
         })).StatusCode);
-        // DATA D8: the dead CentralModsDir key is not part of the dirs group — rejected
+        // the dead CentralModsDir key is not part of the dirs group — rejected
         var deadKey = await host.PutAsync("/api/v1/settings", new
         {
             group = "dirs",
@@ -258,7 +258,7 @@ public class CoverageFixSettingsApiTests
     }
 }
 
-// ------------------------------------------------------------------------------ worlds (fix-4)
+// ------------------------------------------------------------------------------ worlds
 
 [Collection("LauncherJars")]
 public class CoverageFixWorldsApiTests : IAsyncDisposable
@@ -361,7 +361,7 @@ public class CoverageFixWorldsApiTests : IAsyncDisposable
     }
 }
 
-// ------------------------------------------------------- launch join targets + paste (fix-4)
+// ------------------------------------------------------- launch join targets + paste
 
 [Collection("LauncherJars")]
 public class CoverageFixLaunchJoinApiTests
@@ -499,7 +499,7 @@ public class CoverageFixLaunchJoinApiTests
 
         var dataDir = Path.Combine(Path.GetTempPath(), $"flint-api-join-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dataDir);
-        var dataRoot = Path.Combine(dataDir, "data"); // the G1 home layout's data root
+        var dataRoot = Path.Combine(dataDir, "data"); // the home layout's data root
         var previousCwd = Environment.CurrentDirectory;
 
         var instanceRoot = Path.Combine(dataRoot, "instances", "join-inst");
@@ -518,7 +518,7 @@ public class CoverageFixLaunchJoinApiTests
 
         try
         {
-            // S2: the token is host-injected (--api-token) — no token file exists to read
+            // the token is host-injected (--api-token) — no token file exists to read
             var apiToken = Guid.NewGuid().ToString("N");
             var app = WebHostBuilder.BuildWebApplication(
                 [
@@ -535,8 +535,8 @@ public class CoverageFixLaunchJoinApiTests
             client.DefaultRequestHeaders.Add("X-Api-Token", apiToken);
             Environment.CurrentDirectory = dataDir;
 
-            // S5: seed the java probe cache in the launcher state (the former settings-key
-            // seeding — CONFIG C9 moved the probe quintet out of the settings world)
+            // seed the java probe cache in the launcher state (the former settings-key
+            // seeding — the probe quintet moved out of the settings world)
             app.Services.GetRequiredService<LauncherRuntime>().State.Update(state => state with
             {
                 Java = state.Java with

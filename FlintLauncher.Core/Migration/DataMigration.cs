@@ -171,7 +171,7 @@ public sealed class DataMigrationTask(AbsolutePath sourcePath, AbsolutePath targ
 /// <summary>
 /// Data-level port of Application::handleDataMigration: which legacy launcher directories can
 /// be migrated, the exact inventory copied, and the one-shot per-source decision that keeps
-/// the migration from proposing twice — since STATE S3 that decision lives in the
+/// the migration from proposing twice — that decision lives in the
 /// <see cref="MigrationDecisionRecord"/> files (the C++/pre-reform "_nomigrate.txt" empty
 /// markers are read only as a legacy input and upgraded away).
 /// </summary>
@@ -238,14 +238,14 @@ public static class DataMigration
 
     /// <summary>Port of the handleDataMigration decision tree (without the dialog): a migration
     /// runs only when an old config exists, the decision was not made yet, and the current
-    /// directory has no launcher config yet. The "decision made" check is the S3 record
+    /// directory has no launcher config yet. The "decision made" check is the record
     /// (<see cref="MigrationDecisionStore"/>/<paramref name="decisions"/>) when one is
     /// available, falling back to the legacy empty marker — which the record store upgrades
     /// on sight (declined@unknown record + marker deleted, see
     /// <see cref="DecisionAlreadyMade"/>).
     /// <paramref name="currentConfigFile"/> is the launcher's own config at its CURRENT
     /// authoritative position — post-reform <c>&lt;config-root&gt;/flint.json</c> (CONFIG
-    /// C5); when omitted the pre-reform flat position
+    /// the config); when omitted the pre-reform flat position
     /// <c>&lt;currentData&gt;/&lt;launcherConfigFile&gt;</c> is probed (bare fixtures). The
     /// C++ existing-data protection (Application.cpp:1994-1999, 2029, 2055-2057: "Migration
     /// was skipped, due to existing data") keys off exactly this probe.</summary>
@@ -255,7 +255,7 @@ public static class DataMigration
         var configExists = false;
         foreach (var configPath in OldConfigCandidates(oldData, configFile, launcherConfigFile))
         {
-            configExists |= File.Exists(configPath.Value);
+            configExists |= configPath.ExistsFile();
         }
 
         if (!configExists || DecisionAlreadyMade(currentData, name, decisions))
@@ -263,11 +263,11 @@ public static class DataMigration
             return configExists ? MigrationDecision.MarkerPresent : MigrationDecision.NoOldConfig;
         }
 
-        var currentExists = File.Exists((currentConfigFile ?? currentData / launcherConfigFile).Value);
+        var currentExists = (currentConfigFile ?? currentData / launcherConfigFile).ExistsFile();
         return currentExists ? MigrationDecision.CurrentDataExists : MigrationDecision.ReadyToMigrate;
     }
 
-    /// <summary>S3: has the one-shot decision for this source been made? A decision record
+    /// <summary>Has the one-shot decision for this source been made? A decision record
     /// counts; a legacy <c>&lt;source&gt;_nomigrate.txt</c> empty marker counts too and is
     /// upgraded on sight — it becomes a declined@unknown record and the marker file is
     /// deleted (the markers stop existing; the record carries the decision). Without a
@@ -324,12 +324,12 @@ public static class DataMigration
     private static AbsolutePath? FindLegacyMarker(AbsolutePath currentData, string name)
     {
         var exact = NoMigrateMarkerPath(currentData, name);
-        if (File.Exists(exact.Value))
+        if (exact.ExistsFile())
         {
             return exact;
         }
 
-        if (Directory.Exists(currentData.Value))
+        if (currentData.ExistsDirectory())
         {
             foreach (var file in Directory.EnumerateFiles(currentData.Value, "*_nomigrate.txt"))
             {

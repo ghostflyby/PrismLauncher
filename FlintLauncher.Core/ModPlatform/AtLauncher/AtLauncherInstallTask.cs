@@ -25,7 +25,7 @@
 //    be loaded.
 //  - Downloads use the meta cache when MetaCache is set ("ATLauncherPacks" base), otherwise
 //    a plain download into a temporary folder (the C++ always goes through the cache).
-//  - downloadFiles() (the P5 update pipeline) is not ported; creation succeeds without
+//  - downloadFiles() (the update pipeline) is not ported; creation succeeds without
 //    fetching game files, like the other creation tasks.
 
 using System.Security.Cryptography;
@@ -41,6 +41,7 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.ModPlatform.AtLauncher;
 
@@ -292,7 +293,7 @@ public sealed partial class AtLauncherPackInstallTask(
         {
             string a1 = ConvertToSystemPath(item.Target);
             var fullPath = GetPathForBase(item.Base) / a1;
-            if (!Directory.Exists(fullPath.Value))
+            if (!fullPath.ExistsDirectory())
             {
                 continue;
             }
@@ -1051,13 +1052,13 @@ public sealed partial class AtLauncherPackInstallTask(
         {
             // If the file already exists, assume the mod is the correct copy - and remove
             // the copy from the Configs.zip
-            if (File.Exists(to.Value) && !FileOps.DeletePath(to))
+            if (to.ExistsFile() && !FileOps.DeletePath(to))
             {
                 EmitStatus("Failed to delete " + to);
                 return false;
             }
 
-            if (!File.Exists(from.Value) || !FileOps.Copy(from, to))
+            if (!from.ExistsFile() || !FileOps.Copy(from, to))
             {
                 EmitStatus($"Failed to copy {from} to {to}");
                 return false;
@@ -1071,7 +1072,7 @@ public sealed partial class AtLauncherPackInstallTask(
     {
         EmitStatus("Installing modpack");
 
-        // D4: the staged instance is Flint format from birth (typed instance.json adapter)
+        // the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
             new InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution.")),
@@ -1151,7 +1152,7 @@ public sealed partial class AtLauncherPackInstallTask(
             _jarMods.Clear();
         }
 
-        // (upstream calls downloadFiles(m_instance.get()) here — the P5 update pipeline;
+        // (upstream calls downloadFiles(m_instance.get()) here — the update pipeline;
         //  like the other creation tasks, creation succeeds without fetching game files)
         await Task.CompletedTask;
         EmitSucceeded();

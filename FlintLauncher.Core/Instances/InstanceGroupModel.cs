@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The instance group model (GLOBAL G4): the SOLE OWNER of both halves the C++ kept together
+// The instance group model: the SOLE OWNER of both halves the C++ kept together
 // in instgroups.json —
-//   config side (syncable): the group definitions, group name → member set, in the C8
-//     groups file (<config-root>/groups.json — see FlintPaths.GroupsFile); members are
-//     instance UUID references (DATA D3), with unresolvable legacy members (dirnames of
+//   config side (syncable): the group definitions, group name → member set, in the
+//     canonical groups file (<config-root>/groups.json); members are
+//     instance UUID references, with unresolvable legacy members (dirnames of
 //     instances that are gone or not yet discovered) kept verbatim and converted whenever
 //     a discovery resolves them;
 //   state side (machine-local): the collapsed/"hidden" flags, keyed by group NAME (no group
-//     IDs — G4: the name is the explicit user identifier and follows a rename), persisted
-//     into launcher-state.json's ui section (STATE S5).
+//     IDs — the name is the explicit user identifier and follows a rename), persisted
+//     into launcher-state.json's ui section.
 //
-// Atomicity contract (G4): RenameGroup/DeleteGroup write the CONFIG side first and only
+// Atomicity contract: RenameGroup/DeleteGroup write the CONFIG side first and only
 // then re-point the state side; a failed config write rolls the in-memory change back so
 // memory and disk never split. (Both files are small — rollback costs nothing.)
 //
 // Port lineage: this is the group half of InstanceList (C++ InstanceList::groupByGroup /
-// m_instanceGroupIndex / on_GroupStateChanged), extracted once the C8/S5 split made the two
+// m_instanceGroupIndex / on_GroupStateChanged), extracted once the launcher-state.json split made the two
 // halves heterogeneous (config syncs, state does not).
 
 using System.Text.Json;
@@ -31,21 +31,21 @@ namespace FlintLauncher.Core.Instances;
 /// of the opaque dynamic-key region; formatVersion keeps its dual-shape input compat
 /// (number or numeric string — the file literally writes the string "1") through
 /// GroupFormatVersionConverter.</summary>
-internal sealed record GroupFileJson(
+public sealed record GroupFileJson(
     [property: JsonPropertyName("formatVersion"), JsonConverter(typeof(GroupFormatVersionConverter))]
     int Version,
     [property: JsonPropertyName("groups")] Dictionary<string, GroupBodyJson>? Groups,
     [property: JsonPropertyName("ungrouped")]
     GroupBodyJson? Ungrouped);
 
-internal sealed record GroupBodyJson(
+public sealed record GroupBodyJson(
     [property: JsonPropertyName("instances")]
     List<string?>? Instances,
     [property: JsonPropertyName("hidden")] bool? Hidden);
 
 /// <summary>Input compat for the dual-shape formatVersion: a JSON number uses TryGetInt32
 /// (silent reject on overflow), a numeric string parses, everything else fails.</summary>
-internal sealed class GroupFormatVersionConverter : JsonConverter<int>
+public sealed class GroupFormatVersionConverter : JsonConverter<int>
 {
     public override int Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
@@ -71,12 +71,12 @@ internal sealed class GroupFormatVersionConverter : JsonConverter<int>
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(GroupFileJson))]
-internal sealed partial class GroupJsonContext : JsonSerializerContext;
+public sealed partial class GroupJsonContext : JsonSerializerContext;
 
 public sealed class InstanceGroupModel
 {
-    private readonly Func<AbsolutePath> _canonicalFile;
-    private readonly Func<IReadOnlyList<AbsolutePath>> _legacyFiles;
+    private readonly AbsolutePath _canonicalFile;
+    private readonly IReadOnlyList<AbsolutePath> _legacyFiles;
     private readonly Func<LauncherStateStore?> _stateProvider;
     private readonly Func<bool>? _canPersist;
 
@@ -85,7 +85,7 @@ public sealed class InstanceGroupModel
     private LauncherStateStore? State => _stateProvider();
 
     /// <summary>member reference → group (C++ m_instanceGroupIndex). The key is the
-    /// instance UUID (D3: the only persistent reference form); a member that could not be
+    /// instance UUID (the only persistent reference form); a member that could not be
     /// resolved at load/commit time keeps its raw string (a legacy dirname) until a
     /// discovery resolves it.</summary>
     private readonly Dictionary<string, string> _memberGroups = new(StringComparer.Ordinal);
@@ -94,7 +94,7 @@ public sealed class InstanceGroupModel
     private readonly Dictionary<string, int> _groupCounts = new(StringComparer.Ordinal);
 
     /// <summary>The collapsed group names ("" = the ungrouped pseudo-group) — the state
-    /// side; owned by launcher-state.json since C8/S5.</summary>
+    /// side; owned by launcher-state.json.</summary>
     private readonly HashSet<string> _collapsed = new(StringComparer.Ordinal);
 
     private bool _loaded;
@@ -102,7 +102,7 @@ public sealed class InstanceGroupModel
     /// <summary><paramref name="canPersist"/> is the upstream "group saving prevented
     /// because we don't know the full list of instances yet" gate (true = writes allowed);
     /// while it reports false, Save() is a legitimate no-op that leaves nothing stale.</summary>
-    public InstanceGroupModel(Func<AbsolutePath> canonicalFile, Func<IReadOnlyList<AbsolutePath>> legacyFiles,
+    public InstanceGroupModel(AbsolutePath canonicalFile, IReadOnlyList<AbsolutePath> legacyFiles,
         Func<LauncherStateStore?> stateProvider, Func<bool>? canPersist = null)
     {
         _canonicalFile = canonicalFile;
@@ -182,10 +182,10 @@ public sealed class InstanceGroupModel
         return true;
     }
 
-    // ------------------------------------------------------- atomic group ops (G4 owner)
+    // ------------------------------------------------------- atomic group ops
 
     /// <summary>Rename a group: members (config side) move, and the collapse state follows
-    /// the NAME (G4 — no group IDs). Config side is written FIRST; a failed write rolls the
+    /// the NAME (no group IDs). Config side is written FIRST; a failed write rolls the
     /// in-memory rename back and leaves the state side untouched. Returns the members that
     /// moved (for the caller's change notifications), in no particular order.</summary>
     public IReadOnlyList<string> RenameGroup(string src, string dst)
@@ -208,7 +208,7 @@ public sealed class InstanceGroupModel
     }
 
     /// <summary>Delete a group: its members become ungrouped and its collapse flag goes.
-    /// Same G4 ordering/rollback as <see cref="RenameGroup"/>. Returns the members that
+    /// Same ordering/rollback as <see cref="RenameGroup"/>. Returns the members that
     /// were ungrouped.</summary>
     public IReadOnlyList<string> DeleteGroup(string name)
     {
@@ -285,7 +285,7 @@ public sealed class InstanceGroupModel
     // -------------------------------------------------------------- collapse (state side)
 
     /// <summary>Port of the on_GroupStateChanged slot. Only the state side changes (the
-    /// group file carries definitions only since C8/S5), so there is no config write to
+    /// group file carries definitions only), so there is no config write to
     /// order against.</summary>
     public void SetCollapsed(string group, bool collapsed)
     {
@@ -325,8 +325,8 @@ public sealed class InstanceGroupModel
     /// instgroups.json mid-session). Returns true when a group file was read and parsed.
     /// The collapse state comes from launcher-state.json first (the owner); a legacy/Prism
     /// group file may still carry "hidden" keys — those seed in as a one-shot read-compat
-    /// promote-and-strip (C8/S5). Member references are converted to UUIDs through
-    /// <paramref name="uuidResolver"/> (D3 import conversion: legacy files and Prism
+    /// promote-and-strip. Member references are converted to UUIDs through
+    /// <paramref name="uuidResolver"/> (import conversion: legacy files and Prism
     /// imports carry dirnames); a reference that resolves to nothing is kept verbatim.</summary>
     public bool Load(Func<string, string?> uuidResolver)
     {
@@ -335,7 +335,7 @@ public sealed class InstanceGroupModel
             return true;
         }
 
-        // the collapse state seeds from launcher-state.json on EVERY attempt (C8/S5: it is
+        // the collapse state seeds from launcher-state.json on EVERY attempt (it is
         // the owner; idempotent). The member maps are only reset when a file actually
         // parses — a retry (file not there yet / not parseable) must not wipe member
         // assignments made between attempts.
@@ -360,13 +360,13 @@ public sealed class InstanceGroupModel
         var stateSeededHidden = false;
         var fileCarriedHidden = false;
 
-        // canonical file first; when absent, the legacy anchors (the pre-C8 data-root
+        // canonical file first; when absent, the legacy anchors (the data-root
         // instgroups.json — the Prism import target — then the primary-instance-dir copy
         // upstream used before there was a launcher data dir)
-        var groupFileName = _canonicalFile();
+        var groupFileName = _canonicalFile;
         if (!groupFileName.ExistsFile())
         {
-            foreach (var legacy in _legacyFiles())
+            foreach (var legacy in _legacyFiles)
             {
                 if (legacy.ExistsFile())
                 {
@@ -451,7 +451,7 @@ public sealed class InstanceGroupModel
             {
                 // QJsonValue::toString() yields "" for non-strings
                 var member = value ?? "";
-                // D3 import conversion: a dirname member becomes the instance's uuid
+                // import conversion: a dirname member becomes the instance's uuid
                 // when the current discovery can resolve it; unknown members persist
                 // verbatim (the conversion retries on the next load)
                 member = uuidResolver(member) is { Length: > 0 } uuid ? uuid : member;
@@ -482,7 +482,7 @@ public sealed class InstanceGroupModel
 
         if (fileCarriedHidden && State is not null && !migratingLegacyGroups)
         {
-            // C8/S5 one-shot completion: the state side owns the collapse flags now, so the
+            // one-shot completion: the state side owns the collapse flags now, so the
             // file must stop carrying them. Runs even when the flag only DUPLICATED the
             // state (Add returned false) — that is exactly the leftover of a pre-fix
             // resurrect cycle and would keep re-seeding otherwise. The legacy-group
@@ -499,7 +499,7 @@ public sealed class InstanceGroupModel
         return true;
     }
 
-    /// <summary>D3: re-resolve members kept verbatim at load (dirnames of instances not yet
+    /// <summary>Re-resolve members kept verbatim at load (dirnames of instances not yet
     /// discovered — the promise the load-time comment makes). Called after every discovery
     /// round; a conversion keeps the member's group so counts are untouched, and the file is
     /// rewritten once when something actually resolved.</summary>
@@ -531,7 +531,7 @@ public sealed class InstanceGroupModel
     public const int GroupFormatVersion = 1;
 
     /// <summary>Write the group-definition file (config side). Returns false when a write
-    /// was attempted and failed — the G4 ordering (config side first, state side after)
+    /// was attempted and failed — the ordering (config side first, state side after)
     /// gates on it; the C++ swallowed this failure (qCritical) and had no second side to
     /// protect.</summary>
     public bool Save()
@@ -543,12 +543,12 @@ public sealed class InstanceGroupModel
             return true;
         }
 
-        var groupFileName = _canonicalFile();
+        var groupFileName = _canonicalFile;
 
         // C++ QMap<QString, QSet<QString>> reverseGroupMap; sorted containers for
         // deterministic QMap-ordered output. The write side maps onto the same GroupFileJson
         // wire the read side probes (the formatVersion writes as a number now — the read
-        // converter accepts both shapes). Members are uuid references (D3) — unresolvable
+        // converter accepts both shapes). Members are uuid references — unresolvable
         // legacy members (dirnames kept verbatim at load) round-trip as they are.
         var reverseGroupMap = new SortedDictionary<string, SortedSet<string>>(StringComparer.Ordinal);
         foreach (var (member, group) in _memberGroups)
@@ -571,7 +571,7 @@ public sealed class InstanceGroupModel
         foreach (var (name, list) in reverseGroupMap)
         {
             // NOTE: the collapse state ("hidden") is NOT written here — it lives in
-            // launcher-state.json (CONFIG C8 split / STATE S5); the group file carries the
+            // launcher-state.json; the group file carries the
             // group definitions only
             groups[name] = new GroupBodyJson([.. list], null);
         }
@@ -586,12 +586,12 @@ public sealed class InstanceGroupModel
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                       or NotSupportedException)
         {
-            // qCritical: failed to write instance group file — reported to the G4 ordering
+            // qCritical: failed to write instance group file — reported to the ordering
             return false;
         }
     }
 
-    /// <summary>Rewrite the group file without its "hidden" flags (C8/S5: the file carries
+    /// <summary>Rewrite the group file without its "hidden" flags (the file carries
     /// the group DEFINITIONS only once the state side owns the collapse state). Best-effort:
     /// a failed rewrite leaves the flags in place and the next load re-seeds them (the
     /// pre-fix behavior) — it must not fail the load.</summary>

@@ -16,6 +16,7 @@
 
 using FlintLauncher.Core.IO;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Minecraft.Worlds;
 
@@ -24,14 +25,14 @@ public sealed class WorldList
 {
     private readonly List<World> _worlds = [];
 
-    public WorldList(AbsolutePath dir)
+    public WorldList(MaterializedDirectory dir)
     {
-        Dir = dir;
-        FileOps.EnsureFolderPathExists(Dir);
+        Dir = dir.Path;
     }
 
-    /// <summary>The saves directory this list is rooted at (QDir m_dir).</summary>
-    public AbsolutePath Dir { get; }
+    /// <summary>The saves directory this list is rooted at (QDir m_dir). Re-pointed when
+    /// the tenancy reports the root moved.</summary>
+    public AbsolutePath Dir { get; private set; }
 
     /// <summary>The worlds of the last Update(), in directory order (m_worlds).</summary>
     public IReadOnlyList<World> Worlds => _worlds;
@@ -41,6 +42,50 @@ public sealed class WorldList
     public bool IsEmpty => _worlds.Count == 0;
 
     public World this[int index] => _worlds[index];
+
+    private DirectorySpace? _watchSpace;
+    private int _reconcileRunning;
+
+    /// <summary>Opts the list into watcher-driven refresh (the C++ WorldList watched its
+    /// folder): external changes coalesce into Update() re-runs, and a rename/move of the
+    /// root re-points <see cref="Dir"/> before the next reconcile. Default keeps the
+    /// demand-driven Update().</summary>
+    public void AttachWatcher(DirectorySpace space)
+    {
+        _watchSpace = space;
+        Update();
+        if (MaterializedDirectory.Wrap(Dir) is { } materialized)
+        {
+            space.Register(materialized, Reconcile,
+                moved: (oldRoot, newRoot) =>
+                {
+                    if (Dir == oldRoot)
+                    {
+                        Dir = newRoot;
+                        Update();
+                    }
+                });
+        }
+    }
+
+    /// <summary>The watcher-side reconcile: Update() is idempotent, so overlapping fires
+    /// collapse into the running one instead of re-entering it.</summary>
+    private void Reconcile()
+    {
+        if (Interlocked.Exchange(ref _reconcileRunning, 1) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            Update();
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _reconcileRunning, 0);
+        }
+    }
 
     /// <summary>Port of WorldList::update: rescan the directory and rebuild the world list.</summary>
     /// <returns>False when the directory does not exist or is unreadable.</returns>
@@ -80,7 +125,7 @@ public sealed class WorldList
     /// <summary>Port of WorldList::isValid.</summary>
     public bool IsValid()
     {
-        return Directory.Exists(Dir.Value);
+        return Dir.ExistsDirectory();
     }
 
     /// <summary>

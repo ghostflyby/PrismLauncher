@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The modlist leg of POST /instances/{id}/export (UI-API mapping Wave B): render the
+// The modlist leg of POST /instances/{id}/export: render the
 // instance's mods through the ported ExportToModList helpers and write the result file into
 // the instance directory. Runs as a registered task (202 + taskId) like the mrpack/Flame
 // export legs so the endpoint shape stays uniform; the work is local and quick.

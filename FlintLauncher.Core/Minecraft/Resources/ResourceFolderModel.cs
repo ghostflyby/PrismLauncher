@@ -29,6 +29,8 @@
 //    (getFromMetadata), the orphan-metadata cleanup and the NotInstalled status never
 //    trigger; m_isIndexed/firstFolderLoad are kept for structure.
 
+using System.Collections.Specialized;
+using System.ComponentModel;
 using FlintLauncher.Core.IO;
 using TruePath;
 
@@ -39,7 +41,7 @@ namespace FlintLauncher.Core.Minecraft.Resources;
 /// users of such resources do not own them, and the resource's lifetime is contingent on
 /// the model's lifetime.
 /// </summary>
-public class ResourceFolderModel
+public class ResourceFolderModel : INotifyCollectionChanged, INotifyPropertyChanged
 {
     private readonly bool _isIndexed;
     private bool _firstFolderLoad = true;
@@ -49,37 +51,93 @@ public class ResourceFolderModel
     // Represents the relationship between a resource's internal ID and its row position on the model.
     private readonly Dictionary<string, int> _resourcesIndex = new();
 
-    public ResourceFolderModel(AbsolutePath dir, bool isIndexed, bool createDir)
+    // C++ m_lock parity: the model is mutated by Update()/install/uninstall AND, once the
+    // watcher tenancy is attached, from watcher timer threads — every list touch goes
+    // through this lock (Monitor is reentrant, so lock-nested calls are fine).
+    private readonly Lock _lock = new();
+
+    private DirectorySpace? _watchSpace;
+    private int _reconcileRunning;
+
+    /// <summary>INCC with Reset-only semantics: the update model is reconcile-and-swap.
+    /// Raised when a scan actually changed the resource set, while the model lock may still
+    /// be held (C++ parity — Qt emitted dataChanged under m_lock too); handlers must not
+    /// re-enter the model synchronously, and consumers marshal threads.</summary>
+    public event NotifyCollectionChangedEventHandler? CollectionChanged;
+
+    /// <summary>INPC for <see cref="Size"/> (raised together with Reset, only on real
+    /// changes).</summary>
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private void RaiseResetAndSize()
     {
-        Dir = dir;
+        CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Size)));
+    }
+
+    public ResourceFolderModel(MaterializedDirectory dir, bool isIndexed)
+    {
+        Dir = dir.Path;
         _isIndexed = isIndexed;
-        if (createDir)
-        {
-            FileOps.EnsureFolderPathExists(new AbsolutePath(dir));
-        }
     }
 
     public virtual string Id => "resource";
 
-    public AbsolutePath Dir { get; }
+    /// <summary>The model's directory (the injected handle's path — the creation/
+    /// verification happened at the injection site, which is why the old createDir
+    /// constructor flag retired). Re-pointed when the tenancy reports the root moved.</summary>
+    public AbsolutePath Dir { get; private set; }
 
     /// <summary>Port of ResourceFolderModel::indexDir.</summary>
     public virtual AbsolutePath IndexDir => Dir / ".index";
 
-    public int Size => _resources.Count;
+    public int Size
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _resources.Count;
+            }
+        }
+    }
 
     public bool Empty => Size == 0;
 
-    public Resource At(int index) => _resources[index];
+    public Resource At(int index)
+    {
+        lock (_lock)
+        {
+            return _resources[index];
+        }
+    }
 
-    public IReadOnlyList<Resource> Resources => _resources;
+    public IReadOnlyList<Resource> Resources
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return [.. _resources];
+            }
+        }
+    }
 
-    public List<Resource> AllResources() => [.. _resources];
+    public List<Resource> AllResources()
+    {
+        lock (_lock)
+        {
+            return [.. _resources];
+        }
+    }
 
     /// <summary>Port of ResourceFolderModel::find.</summary>
     public Resource? Find(string id)
     {
-        return _resources.Find(r => r.InternalId == id);
+        lock (_lock)
+        {
+            return _resources.Find(r => r.InternalId == id);
+        }
     }
 
     /// <summary>
@@ -116,61 +174,64 @@ public class ResourceFolderModel
             return false; // overwriting the resource with itself makes no sense
         }
 
-        switch (resource.Type)
+        lock (_lock)
         {
-            case ResourceType.SingleFile:
-            case ResourceType.ZipFile:
-            case ResourceType.LiteMod:
+            switch (resource.Type)
             {
-                if (File.Exists(newPath) || File.Exists(newPath + ".disabled"))
+                case ResourceType.SingleFile:
+                case ResourceType.ZipFile:
+                case ResourceType.LiteMod:
                 {
-                    if (!FileOps.DeletePath(new AbsolutePath(newPath)))
+                    if (File.Exists(newPath) || File.Exists(newPath + ".disabled"))
                     {
-                        return false; // cleaning up new location was unsuccessful
+                        if (!FileOps.DeletePath(new AbsolutePath(newPath)))
+                        {
+                            return false; // cleaning up new location was unsuccessful
+                        }
                     }
-                }
 
-                try
+                    try
+                    {
+                        File.Copy(originalPath, newPath, overwrite: false);
+                    }
+                    catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
+                                                  or NotSupportedException)
+                    {
+                        return false; // copy failed
+                    }
+
+                    FileOps.UpdateTimestamp(new AbsolutePath(newPath));
+
+                    resource.Fileinfo = new FileInfo(newPath);
+
+                    if (!IsWatching)
+                    {
+                        return Update();
+                    }
+
+                    return true;
+                }
+                case ResourceType.Folder:
                 {
-                    File.Copy(originalPath, newPath, overwrite: false);
+                    if (File.Exists(newPath) || Directory.Exists(newPath))
+                    {
+                        return false; // it would merge with the existing folder
+                    }
+
+                    if (!FileOps.Copy(new AbsolutePath(originalPath), new AbsolutePath(newPath)))
+                    {
+                        return false; // copy of folder (potentially partially) failed
+                    }
+
+                    resource.Fileinfo = new FileInfo(newPath);
+
+                    if (!IsWatching)
+                    {
+                        return Update();
+                    }
+
+                    return true;
                 }
-                catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                              or NotSupportedException)
-                {
-                    return false; // copy failed
-                }
-
-                FileOps.UpdateTimestamp(new AbsolutePath(newPath));
-
-                resource.Fileinfo = new FileInfo(newPath);
-
-                if (!IsWatching)
-                {
-                    return Update();
-                }
-
-                return true;
-            }
-            case ResourceType.Folder:
-            {
-                if (File.Exists(newPath) || Directory.Exists(newPath))
-                {
-                    return false; // it would merge with the existing folder
-                }
-
-                if (!FileOps.Copy(new AbsolutePath(originalPath), new AbsolutePath(newPath)))
-                {
-                    return false; // copy of folder (potentially partially) failed
-                }
-
-                resource.Fileinfo = new FileInfo(newPath);
-
-                if (!IsWatching)
-                {
-                    return Update();
-                }
-
-                return true;
             }
         }
 
@@ -183,25 +244,28 @@ public class ResourceFolderModel
     /// </summary>
     public virtual bool UninstallResource(string fileName, bool preserveMetadata = false)
     {
-        foreach (var resource in _resources)
+        lock (_lock)
         {
-            var resourceFileName = resource.Fileinfo.Name;
-            if (!resource.Enabled && resourceFileName.EndsWith(".disabled", StringComparison.Ordinal))
+            foreach (var resource in _resources)
             {
-                resourceFileName = resourceFileName[..^9];
+                var resourceFileName = resource.Fileinfo.Name;
+                if (!resource.Enabled && resourceFileName.EndsWith(".disabled", StringComparison.Ordinal))
+                {
+                    resourceFileName = resourceFileName[..^9];
+                }
+
+                if (resourceFileName == fileName)
+                {
+                    var res = resource.Destroy(attemptTrash: false);
+
+                    Update();
+
+                    return res;
+                }
             }
 
-            if (resourceFileName == fileName)
-            {
-                var res = resource.Destroy(attemptTrash: false);
-
-                Update();
-
-                return res;
-            }
+            return false;
         }
-
-        return false;
     }
 
     /// <summary>
@@ -211,20 +275,70 @@ public class ResourceFolderModel
     /// </summary>
     public virtual bool Update()
     {
-        var newResources = RunLoadTask();
-        _firstFolderLoad = false;
+        lock (_lock)
+        {
+            var newResources = RunLoadTask();
+            _firstFolderLoad = false;
 
-        var currentSet = new HashSet<string>(_resourcesIndex.Keys);
-        var newSet = new HashSet<string>(newResources.Keys);
+            var currentSet = new HashSet<string>(_resourcesIndex.Keys);
+            var newSet = new HashSet<string>(newResources.Keys);
 
-        ApplyUpdates(currentSet, newSet, newResources);
-        return true;
+            if (ApplyUpdates(currentSet, newSet, newResources))
+            {
+                RaiseResetAndSize();
+            }
+
+            return true;
+        }
     }
 
     // ------------------------------------------------------------------ internals
 
-    /// <summary>Whether the (unported) watcher would be running; always false here.</summary>
-    protected bool IsWatching => false;
+    /// <summary>Whether the watcher tenancy is attached (the C++ startWatching state): when
+    /// set, install/uninstall leave the list refresh to the coalesced watcher reconcile
+    /// instead of running a synchronous Update().</summary>
+    protected bool IsWatching => _watchSpace is not null;
+
+    /// <summary>Opts the model into watcher-driven reloads (the C++ startWatching/
+    /// stopWatching pair): external changes to <see cref="Dir"/> coalesce into a debounced
+    /// Update() re-run, and a rename/move of the root re-points <see cref="Dir"/> before
+    /// the next reconcile. Default (no attachment) keeps the demand-driven update.</summary>
+    public void AttachWatcher(DirectorySpace space)
+    {
+        _watchSpace = space;
+        if (MaterializedDirectory.Wrap(Dir) is { } materialized)
+        {
+            space.Register(materialized, ReconcileFromWatcher,
+                moved: (oldRoot, newRoot) =>
+                {
+                    if (Dir == oldRoot)
+                    {
+                        Dir = newRoot;
+                        Update();
+                    }
+                });
+        }
+    }
+
+    /// <summary>The watcher-side reconcile: Update() is idempotent, so the coalesced
+    /// trailing re-run after the model's own mutations (install/uninstall) is harmless;
+    /// skip-if-busy collapses overlapping fires instead of re-entering a running pass.</summary>
+    private void ReconcileFromWatcher()
+    {
+        if (Interlocked.Exchange(ref _reconcileRunning, 1) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            Update();
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _reconcileRunning, 0);
+        }
+    }
 
     /// <summary>Port of ResourceFolderModel::createResource.</summary>
     protected virtual Resource CreateResource(FileInfo info) => new(info);
@@ -310,10 +424,13 @@ public class ResourceFolderModel
     /// <summary>
     /// Port of ResourceFolderModel::applyUpdates: use set operations to find differences
     /// between the current state and the updated state, acting only on those disparities.
+    /// Returns whether anything actually changed (drives the change notifications).
     /// </summary>
-    private void ApplyUpdates(HashSet<string> currentSet, HashSet<string> newSet,
+    private bool ApplyUpdates(HashSet<string> currentSet, HashSet<string> newSet,
         SortedDictionary<string, Resource> newResources)
     {
+        var changed = false;
+
         // see if the kept resources changed in some way
         {
             var keptSet = currentSet.Intersect(newSet).ToHashSet();
@@ -335,6 +452,7 @@ public class ResourceFolderModel
                 // want to continue the resolving (parse tasks are not ported).
 
                 _resources[row] = newResource;
+                changed = true;
             }
         }
 
@@ -349,6 +467,7 @@ public class ResourceFolderModel
             foreach (var removedIndex in removedRows)
             {
                 _resources.RemoveAt(removedIndex);
+                changed = true;
             }
         }
 
@@ -359,6 +478,7 @@ public class ResourceFolderModel
             foreach (var added in addedSet.OrderBy(id => id, StringComparer.Ordinal))
             {
                 _resources.Add(newResources[added]);
+                changed = true;
             }
         }
 
@@ -372,5 +492,7 @@ public class ResourceFolderModel
                 idx++;
             }
         }
+
+        return changed;
     }
 }

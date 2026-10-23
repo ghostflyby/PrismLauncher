@@ -8,8 +8,8 @@
 //    the resolve, so GetCurrentTask() is null again by the time executeTask would check it —
 //    the wrapped subtask propagation collapses into the awaited reload (the terminal states
 //    map 1:1).
-//  - updateLatestMinecraft() (the "UseLatestMinecraftVersion" branch) was deferred in P3 and
-//    is not ported, so the whole branch is skipped (documented P5-c follow-up).
+//  - updateLatestMinecraft() (the "UseLatestMinecraftVersion" branch) was deferred and
+//    is not ported, so the whole branch is skipped (documented follow-up).
 
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Net;

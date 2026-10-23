@@ -5,7 +5,7 @@
 // excluded from the overrides; everything else is packed.
 //
 // Deviations (headless port):
-//  - loaderModList() is not part of the P3b MinecraftInstance port; the task builds its own
+//  - loaderModList() is not part of the ported MinecraftInstance; the task builds its own
 //    ModFolderModel over instance.ModsRoot() (which is what the C++ list reads) and uses
 //    ModFolderModel.GetMetadata for the local-metadata resolution.
 //  - The ExportToZipTask becomes direct ZipArchive writing with the same layout
@@ -82,7 +82,7 @@ public sealed class ModrinthPackExportTask(
         EmitStatus("Finding file hashes...");
 
         // instance->loaderModList()->update()
-        var modList = new ModFolderModel(instance.ModsRoot);
+        var modList = new ModFolderModel(MaterializedDirectory.Wrap(instance.ModsRoot)!);
         modList.Update();
 
         foreach (var file in _files)

@@ -1,28 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The global-side INI import pipeline (CONFIG C5 §2.4 + the MultiMC dual-name rider):
+// The global-side INI import pipeline (plus the MultiMC dual-name rider):
 // when flint.json is missing, the first file of the INI chain
 //     flint.cfg ← prismlauncher.cfg / polymc.cfg / multimc.cfg | mmc.cfg
 // (probed under the config root, then the pre-reform flat data root) is imported ONCE.
 // "Once" = the import writes flint.json, which is the guard — the INI stays on disk
-// untouched (C5: the write side is JSON-only now; read-compat only).
+// untouched (the write side is JSON-only now; read-compat only).
 //
-// The single pass sorts every INI key (CONFIG C4 + C9 + the key registry):
-//   0. the C++ Setting synonyms fold onto the primary key first (E1: ProxyPassword→ProxyPass,
+// The single pass sorts every INI key (the secrets, the state keys, and the key registry):
+//   0. the C++ Setting synonyms fold onto the primary key first (ProxyPassword→ProxyPass,
 //      CFKeyOverride→FlameKeyOverride, MCWindowWidth→MinecraftWinWidth, … — the old INI
 //      spellings must land, not drop); when both spellings are present the primary wins,
 //      like INISettingsObject::retrieveValue walking configKeys() primary-first
 //   1. secret trio (ProxyPass/ModrinthToken/FlameKeyOverride — aliases included) → ISecretStore
-//      under the PRIMARY name (C4)
-//   2. C9 pseudo-config keys (java probe, offline name, the wizard ask) → launcher-state.json
-//      (the java probe QUINTET is dropped: S5's cache is keyed by the probed binary path,
+//      under the PRIMARY name
+//   2. pseudo-config keys (java probe, offline name, the wizard ask) → launcher-state.json
+//      (the java probe QUINTET is dropped: the state cache is keyed by the probed binary path,
 //      which the INI never recorded — it is a pure optimization that re-probes on the next
 //      launch). TotalPlayTime/TotalPlayTimeMigrated keep an in-chain branch only as a
 //      compatibility fallback: their C++ home is <data-root>/playtime.cfg, probed separately
-//      beside the chain (E2 — the chain never carried them in a real Prism install)
+//      beside the chain (the chain never carried them in a real Prism install)
 //   3. everything else → the record domains through the shared key registry (unknown keys
 //      — GUI geometry blobs, themes, ConfigVersion — stay in the INI, unread)
 //
-// After the pass, the automatic-java pair is re-derived the way the C++ did (E3): with a
+// After the pass, the automatic-java pair is re-derived the way the C++ did: with a
 // non-empty imported JavaPath and no explicit AutomaticJavaSwitch/Download key, the pair
 // lands false in flint.json (Application.cpp computes the default from the INI-loaded
 // JavaPath before registering the keys; the typed records default them true unconditionally).
@@ -61,7 +61,7 @@ public static class FlintConfigImporter
         "mmc.cfg",
     ];
 
-    /// <summary>C9 runtime-state keys: their INI names and the state fields they land in.</summary>
+    /// <summary>Runtime-state keys: their INI names and the state fields they land in.</summary>
     private const string KeyTotalPlayTime = "TotalPlayTime";
 
     private const string KeyTotalPlayTimeMigrated = "TotalPlayTimeMigrated";
@@ -69,7 +69,7 @@ public static class FlintConfigImporter
     private const string KeyLastOfflinePlayerName = "LastOfflinePlayerName";
     private const string KeyLastHostname = "LastHostname";
 
-    /// <summary>The java probe quintet: recognized as state, but NOT importable (S5 keys the
+    /// <summary>The java probe quintet: recognized as state, but NOT importable (the cache keys the
     /// cache by the probed binary path, which the INI never carried).</summary>
     public static readonly IReadOnlyList<string> JavaProbeKeys =
     [
@@ -101,7 +101,7 @@ public static class FlintConfigImporter
         if (!ini.LoadFile(iniPath))
         {
             // the INI exists but cannot be parsed: flint.json stays default — report it
-            // instead of dying silently (the INI is kept on disk; C5 reads JSON only)
+            // instead of dying silently (the INI is kept on disk; reads are JSON only)
             return new ImportResult(null, iniPath.Value);
         }
 
@@ -116,7 +116,7 @@ public static class FlintConfigImporter
         var sawExplicitAutomaticJavaSwitch = false;
         var sawExplicitAutomaticJavaDownload = false;
 
-        // E2: the playtime pair's real home — TotalPlayTime/TotalPlayTimeMigrated never lived
+        // the playtime pair's real home — TotalPlayTime/TotalPlayTimeMigrated never lived
         // in the flint.cfg chain: the C++ registers them on a separate INISettingsObject opened
         // on the RELATIVE name "playtime.cfg" after chdir-ing to the data root
         // (Application.cpp:445 + :943-949; BaseInstance.cpp:312-315 accumulates there), so a
@@ -139,7 +139,7 @@ public static class FlintConfigImporter
                 continue;
             }
 
-            // (0) E1: fold the C++ synonym spellings onto the primary key. When the file
+            // (0) fold the C++ synonym spellings onto the primary key. When the file
             // carries BOTH spellings the primary wins regardless of file order — the C++
             // retrieveValue walks configKeys() primary-first.
             var key = FlintConfigKeys.Canonical(iniKey);
@@ -148,7 +148,7 @@ public static class FlintConfigImporter
                 continue;
             }
 
-            // (1) the secret trio → the store, verbatim strings, under the PRIMARY name (C4)
+            // (1) the secret trio → the store, verbatim strings, under the PRIMARY name
             if (FlintConfigKeys.IsSecret(key))
             {
                 var secret = Variant.AsString(Variant.FromIniValue(value));
@@ -160,8 +160,8 @@ public static class FlintConfigImporter
                 continue;
             }
 
-            // (2) the C9 pseudo-config keys → launcher-state.json (the playtime pair is the
-            // in-chain compatibility fallback — see the E2 probe above)
+            // (2) the pseudo-config keys → launcher-state.json (the playtime pair is the
+            // in-chain compatibility fallback — see the playtime probe above)
             if (key == KeyTotalPlayTime)
             {
                 chainTotalPlayTime = Variant.AsLong(Variant.FromIniValue(value));
@@ -193,7 +193,7 @@ public static class FlintConfigImporter
             if (key == KeyLastHostname || JavaProbeKeys.Contains(key))
             {
                 // LastHostname seeds the state's rescan anchor; the probe quintet is dropped
-                // (S5's map needs the probed path — the INI never recorded it)
+                // (the state map needs the probed path — the INI never recorded it)
                 if (key == KeyLastHostname)
                 {
                     lastHostname = Variant.AsString(Variant.FromIniValue(value));
@@ -203,7 +203,7 @@ public static class FlintConfigImporter
                 continue;
             }
 
-            // (2b) E3 bookkeeping: which half of the automatic-java pair the INI states
+            // (2b) bookkeeping: which half of the automatic-java pair the INI states
             // explicitly (each key's derived default only applies to the other half)
             if (key == "AutomaticJavaSwitch")
             {
@@ -222,7 +222,7 @@ public static class FlintConfigImporter
             }
         }
 
-        // ---- E3: re-derive the automatic-java defaults the way the C++ did ------------------
+        // ---- re-derive the automatic-java defaults the way the C++ did ----------------------
         // Application.cpp:768-770 evaluates `JavaPath is empty` AFTER the INI loads and
         // registers the pair with that per-key default — a cfg that pinned JavaPath while
         // staying silent on the pair must NOT leave the typed records' unconditional true
@@ -242,7 +242,7 @@ public static class FlintConfigImporter
         }
 
         // ---- land the results: one state write, one config write (the one-shot seal) -------
-        // E2 merge: per member, the playtime.cfg probe outranks the in-chain fallback
+        // merge: per member, the playtime probe outranks the in-chain fallback
         var playtimeTotal = playtime?.Total ?? chainTotalPlayTime ?? 0;
         var playtimeMigrated = playtime?.Migrated ?? chainPlaytimeMigrated ?? false;
         if (sawStateKeys || playtime is not null)
@@ -290,7 +290,7 @@ public static class FlintConfigImporter
         return null;
     }
 
-    /// <summary>The E2 playtime pair: which of TotalPlayTime/TotalPlayTimeMigrated carried a
+    /// <summary>The playtime pair: which of TotalPlayTime/TotalPlayTimeMigrated carried a
     /// usable value (either member may be absent — a half-populated playtime.cfg merges
     /// member-by-member with the in-chain fallback).</summary>
     private sealed record PlaytimePair(long? Total, bool? Migrated);

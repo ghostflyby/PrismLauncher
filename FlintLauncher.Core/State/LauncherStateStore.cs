@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The launcher-state.json store (STATE S5, assembly step 4): one TypedJsonFile per state
+// The launcher-state.json store: one TypedJsonFile per state
 // root, load-or-default with the stateVersion evolution gate, and immediate atomic writes on
-// every mutation ("变更即时原子写"). The loaded record lives in <see cref="Current"/> so the
+// every mutation. The loaded record lives in <see cref="Current"/> so the
 // hot paths (java probe cache lookups, playtime accumulation) never touch the disk; writers
 // go through <see cref="Update"/> which replaces the immutable snapshot and persists it.
 //
 // The JsonTypeInfo comes from the host's source-generated context (FlintJsonContext —
-// GLOBAL §1 keeps the registration list in one place); Core only ever sees the opaque
+// the registration list stays in one place); Core only ever sees the opaque
 // type-info handle, so no reflection ever enters the picture (AOT red line).
 
 using System.Text.Json.Serialization.Metadata;
@@ -35,12 +35,12 @@ public sealed class LauncherStateStore
 
     public AbsolutePath FilePath => _file.FilePath;
 
-    /// <summary>The fresh-install default (S5 schema version 1).</summary>
+    /// <summary>The fresh-install default (schema version 1).</summary>
     public static LauncherState CurrentDefault() => new() { StateVersion = LauncherState.CurrentVersion };
 
     /// <summary>Reload from disk (the record-merge + version-gate path; also what the
     /// constructor runs). Goes through the shared <see cref="TypedJsonFileVersioning.LoadEvolved"/>
-    /// gate — the single stateVersion implementation (S5/D4 alignment): the merge folds the
+    /// gate — the single stateVersion implementation: the merge folds the
     /// payload over the current defaults first (the source-generated deserializer does NOT
     /// honor property initializers for members absent from the payload — an older or partial
     /// file would otherwise surface null halves), then the gate hands differing versions to

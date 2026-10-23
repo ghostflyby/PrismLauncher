@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// instance-state.json (DATA D4): the per-instance runtime time trio — lastLaunchTime /
-// lastTimePlayed / totalTimePlayed — machine-local ("本机"), aligned with the S5
+// instance-state.json: the per-instance runtime time trio — lastLaunchTime /
+// lastTimePlayed / totalTimePlayed — machine-local, aligned with the
 // launcher-state.json shape (one TypedJsonFile, stateVersion evolution, atomic writes).
-// The C++ kept these inside instance.cfg (mixed into the settings plane); D4 splits them
+// The C++ kept these inside instance.cfg (mixed into the settings plane); the split moves them
 // out: they are runtime data, not configuration, and never participate in the layer stack.
 
 using System.Text.Json.Serialization.Metadata;
@@ -12,7 +12,7 @@ using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Config;
 
-/// <summary>The instance-state.json record (D4). Milliseconds/seconds semantics match the
+/// <summary>The instance-state.json record. Milliseconds/seconds semantics match the
 /// C++ exactly: LastLaunchTime is ms-since-epoch, the played durations are seconds.</summary>
 public sealed record InstanceStateFile : IStateVersioned
 {
@@ -25,11 +25,11 @@ public sealed record InstanceStateFile : IStateVersioned
 }
 
 /// <summary>The instance-state.json store: one TypedJsonFile per instance directory, loaded
-/// through the shared stateVersion gate (S5/D4 alignment), immediate atomic write on every
+/// through the shared stateVersion gate, immediate atomic write on every
 /// mutation (SetMinecraftRunning writes on every launch/stop). Not thread-safe across
 /// instances; the adapter serializes per store like FlintConfigStore does.
 ///
-/// Dual-track (D4): a Prism-format instance keeps the trio inside instance.cfg — while
+/// Dual-track: a Prism-format instance keeps the trio inside instance.cfg — while
 /// instance-state.json does not exist, the cfg's values seed the in-memory snapshot
 /// READ-ONLY (the C++ kept lastLaunchTime/totalTimePlayed in the cfg); the first mutation
 /// materializes instance-state.json and the cfg's copies are ignored from then on.</summary>
@@ -49,7 +49,7 @@ public sealed class InstanceStateStore
         }
 
         // the read-only seed from the legacy cfg (zeros when there is none): the C++ kept
-        // the trio inside instance.cfg, and the D4 split must not lose it on a load that
+        // the trio inside instance.cfg, and the split must not lose it on a load that
         // performs no write — the first mutation materializes instance-state.json
         var legacyCfg = instanceRoot / InstanceIniImporter.LegacyFileName;
         var ini = new IniFile();
@@ -89,7 +89,7 @@ public sealed class InstanceStateStore
         }
     }
 
-    /// <summary>The dual-track conversion half (D4): persist the current snapshot so the
+    /// <summary>The dual-track conversion half: persist the current snapshot so the
     /// trio's home is instance-state.json. Called by the settings adapter on the first write
     /// of ANY kind — after the format switch the legacy cfg must feed nothing anymore.</summary>
     public void EnsureMaterialized()

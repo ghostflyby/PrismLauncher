@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The /store surface (CACHE E5, G3 "/store 新面"): the layered completeness API. The outer
+// The /store surface: the layered completeness API. The outer
 // layer is the manifest-driven derived view (the dpkg --verify model) served here:
 //   GET /store/status/libraries/{versionRef} — the meta version manifest's libraries[]
 //     checked against the libraries root + the ledger;
 //   GET /store/status/assets/{assetsId}     — the asset index objects map checked against
 //     the assets root.
 // Both are PURE derivations (StoreCompleteness): no downloads, no ledger writes. The inner
-// E5 layer (per-file ledger entry queries) is the metacache eviction surface that exists.
+// layer (per-file ledger entry queries) is the metacache eviction surface that exists.
 
 using System.Text.Json;
 using FlintLauncher.Core.Meta;

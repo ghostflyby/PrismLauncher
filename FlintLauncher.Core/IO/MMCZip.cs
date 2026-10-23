@@ -297,7 +297,7 @@ public static class MmcZip
     public static bool CollectFileListRecursively(AbsolutePath rootDir, string? subDir, List<string> files,
         Func<FileSystemInfo, bool>? excludeFilter = null)
     {
-        if (!Directory.Exists(rootDir.Value))
+        if (!rootDir.ExistsDirectory())
         {
             return false;
         }

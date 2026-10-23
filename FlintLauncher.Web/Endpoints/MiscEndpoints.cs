@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Java discovery, the static /about identity (fix-4), the paste upload (fix-4: GuiUtil's
+// Java discovery, the static /about identity, the paste upload (GuiUtil's
 // "upload log" flow over the core PasteUpload) and the metadata-cache eviction endpoint.
-// (the launcher news half left with CACHE E7 — GUI-bound, not ported material)
+// (the launcher news half left — GUI-bound, not ported material)
 
 using FlintLauncher.Core;
 using FlintLauncher.Core.Java;
@@ -25,7 +25,7 @@ public static class MiscEndpoints
         api.MapPost("/java/scan", async (JavaScanService scan) =>
             Results.Ok((await scan.ScanAsync()).ToArray())).Produces<JavaView[]>();
 
-        // (CACHE E7: the /news endpoint is gone — the news checker was GUI-bound and the
+        // (the /news endpoint is gone — the news checker was GUI-bound and the
         // user decision retired it whole: checker, feed base, FLINT_NEWS_RSS_URL)
 
         // --------------------------------------------------------------- about
@@ -88,7 +88,7 @@ public static class MiscEndpoints
                     "body must be {\"content\": ...} or {\"taskId\": ...} (exactly one)", 400);
             }
 
-            // the typed user layer (C5/D4 — the SettingsObject view retired)
+            // the typed user layer (the SettingsObject view retired)
             var typeIndex = runtime.Config.Current.Api.PastebinType ?? (int)PasteUpload.PasteType.Mclogs;
             var pasteType = typeIndex >= 0 && typeIndex < PasteUpload.PasteTypes.Length
                 ? (PasteUpload.PasteType)typeIndex
@@ -118,7 +118,7 @@ public static class MiscEndpoints
 /// <summary>Cached java discovery (GET serves the cache, POST re-scans). The scan is the
 /// shared detection pipeline (JavaDetection): JdkFind primary + the checker-validated
 /// legacy/launcher fallback, so the launcher-managed java root — the JavaDir setting under
-/// E2 store semantics — is covered like the system-wide sources. Wire shape unchanged:
+/// store semantics — is covered like the system-wide sources. Wire shape unchanged:
 /// invalid fallback candidates list as ("unknown", "unknown").</summary>
 public sealed class JavaScanService(LauncherRuntime runtime)
 {

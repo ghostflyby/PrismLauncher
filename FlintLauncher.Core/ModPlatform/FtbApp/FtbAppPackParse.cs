@@ -15,6 +15,7 @@ using System.Text.Json.Serialization;
 using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Minecraft;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.ModPlatform.FtbApp;
 
@@ -131,7 +132,7 @@ public static class FtbAppPackParse
     {
         var modpack = new FtbAppModpack { Path = path };
         var instanceFile = new AbsolutePath(path) / "instance.json";
-        if (!File.Exists(instanceFile.Value))
+        if (!instanceFile.ExistsFile())
         {
             return new FtbAppModpack();
         }
@@ -198,12 +199,12 @@ public static class FtbAppPackParse
     {
         loaderVersion = "";
         var versionsFile = new AbsolutePath(path) / ".ftbapp" / "version.json";
-        if (!File.Exists(versionsFile.Value))
+        if (!versionsFile.ExistsFile())
         {
             versionsFile = new AbsolutePath(path) / "version.json";
         }
 
-        if (!File.Exists(versionsFile.Value))
+        if (!versionsFile.ExistsFile())
         {
             return null;
         }
@@ -243,7 +244,7 @@ public static class FtbAppPackParse
     public static FtbAppIcon LoadFtbIcon(string path)
     {
         var iconFile = new AbsolutePath(path) / "folder.jpg";
-        if (File.Exists(iconFile.Value))
+        if (iconFile.ExistsFile())
         {
             return new FtbAppIcon { IconKind = FtbAppIcon.Kind.FolderJpg, FilePath = iconFile.Value };
         }
@@ -252,7 +253,7 @@ public static class FtbAppPackParse
         // actual image data
         var logoPath = new AbsolutePath(path) / ".ftbapp" / "logo";
         var icon = new FtbAppIcon { IconKind = FtbAppIcon.Kind.Logo, FilePath = logoPath.Value };
-        if (!File.Exists(logoPath.Value))
+        if (!logoPath.ExistsFile())
         {
             return icon;
         }

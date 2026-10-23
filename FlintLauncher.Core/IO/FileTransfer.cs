@@ -241,13 +241,13 @@ public static partial class FileTransfer
         return false;
     }
 
-    // ------------------------------------------------------------------ unix stat (D2)
+    // ------------------------------------------------------------------------ unix stat
     //
-    // The instance addressing chain (DATA D2) needs the instance directory's inode: stable
+    // The instance addressing chain needs the instance directory's inode: stable
     // across renames, zero-write, resolvable even when the instance cfg is broken. Same
     // LibraryImport convention as clonefile below (UTF-8 string marshalling, the stat
     // buffer pinned in place). Windows has no libc binding and returns 0 — the
-    // addressing chain skips the inode link there (NTFS FileId can come later, D2).
+    // addressing chain skips the inode link there (NTFS FileId can come later).
     //
     // The native side writes the WHOLE struct stat, so the managed buffer must be at least
     // as large as the largest ABI in play (144 bytes on x86-64 Linux, 136 on macOS, 128 on
@@ -259,7 +259,7 @@ public static partial class FileTransfer
 
     /// <summary>The unix inode of <paramref name="path"/>; 0 when unavailable (Windows, a
     /// missing path, or a libc without a plain "stat" export — older glibc routed stat(2)
-    /// through __xstat). A 0 result simply skips the inode link of the D2 chain.</summary>
+    /// through __xstat). A 0 result simply skips the inode link of the chain.</summary>
     public static long StatInode(AbsolutePath path)
     {
         if (OperatingSystem.IsWindows() || (!OperatingSystem.IsMacOS() && !OperatingSystem.IsLinux()))
@@ -315,7 +315,7 @@ public static partial class FileTransfer
         if (cloned)
         {
             // FICLONE clones extents only — the CreateNew destination keeps its
-            // 0666&~umask mode, so a 0600 accounts.json would land world-readable (B5)
+            // 0666&~umask mode, so a 0600 accounts.json would land world-readable
             CarryUnixFileMode(src, dst);
             return true;
         }

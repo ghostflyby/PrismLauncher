@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Modplatform endpoints (phase P6-fix-b + UI-API mapping Wave B): the merged per-provider
+// Modplatform endpoints: the merged per-provider
 // search pass-through (provider = modrinth|flame), the per-provider indexed version lists,
 // and the per-instance mods surface (list / tracked install / tracked update plus the
 // enable/disable/uninstall renames). The install/update flows run as registered tasks
@@ -414,7 +414,7 @@ public static class ModPlatformEndpoints
 
                 // release channels (#3404): the request's explicit list wins; otherwise the
                 // global ModUpdateReleaseTypes setting (the ResourceUpdateDialog fallback) —
-                // read from the typed user layer (C5/D4)
+                // read from the typed user layer
                 IReadOnlyList<IndexedVersionType> releaseTypes =
                     filter?.ReleaseTypes is { Count: > 0 } requested
                         ? IndexedVersionType.FromStringList(requested)
@@ -740,7 +740,7 @@ public static class ModPlatformEndpoints
 
     /// <summary>The MinecraftInstance for a {ref} (null when missing or not a Minecraft
     /// instance — the mods surface only exists for real instances, like launch).
-    /// D2: every endpoint resolves through the addressing chain (GLOBAL §1).</summary>
+    /// every endpoint resolves through the addressing chain.</summary>
     private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string reference) =>
         runtime.Instances.ResolveInstance(reference) as MinecraftInstance;
 

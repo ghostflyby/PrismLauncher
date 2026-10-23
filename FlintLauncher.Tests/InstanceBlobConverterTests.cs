@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // The three former "opaque JSON-text blob" config members (InstanceBlobConverters): the
 // dual-form READ compatibility (the legacy wire form was a string holding the embedded
-// JSON, the modern form is the native collection) and the free native WRITE shape, per
-// docs/JSON-MIGRATION.md §1 (读兼容，不保证写兼容). The FromObject entry points cover the
+// JSON, the modern form is the native collection) and the free native WRITE shape —
+// read compatibility only, no write-compat guarantee. The FromObject entry points cover the
 // three runtime value shapes the settings registry feeds them (runtime Set / settings PUT
 // JsonElement / legacy imported string).
 //

@@ -5,9 +5,9 @@
 // (m_requiredBy/m_requires, onParseSucceeded) are not ported — the latter is driven by
 // the background parse tasks that were dropped with the resolver.
 //
-// P6-a metadata hook: upstream runs the indexed getFromMetadata() pass inside the folder
+// metadata hook: upstream runs the indexed getFromMetadata() pass inside the folder
 // load task (ResourceFolderLoadTask) and attaches a MetadataHandler::ModStruct to each Mod.
-// The P3b port dropped both; this port wires the minimal get/set path instead: Update()
+// The port dropped both; this port wires the minimal get/set path instead: Update()
 // loads the .pw.toml index after the folder scan, marks mods that have metadata as
 // Installed and exposes the metadata through GetMetadata (the Mod object itself has no
 // metadata field in this port). UninstallResource removes the index entry like the C++
@@ -20,13 +20,13 @@
 // resolve pass targets). The parse is best-effort: a failing jar keeps filename-only
 // details, like an upstream parse task that finishes with an empty result.
 
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform;
-using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
 
 /// <summary>A legacy mod list, backed by a folder.</summary>
-public class ModFolderModel(AbsolutePath dir, bool isIndexed = false, bool createDir = false) : ResourceFolderModel(dir, isIndexed, createDir)
+public class ModFolderModel(MaterializedDirectory dir, bool isIndexed = false) : ResourceFolderModel(dir, isIndexed)
 {
     private readonly Dictionary<string, MetadataHandler.ModStruct> _metadata = new(StringComparer.Ordinal);
 

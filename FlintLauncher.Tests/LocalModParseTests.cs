@@ -8,6 +8,7 @@
 
 using System.IO.Compression;
 using System.Text;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft.Resources;
 using TruePath;
 using Xunit;
@@ -532,7 +533,7 @@ public class LocalModParseTests : IDisposable
         File.WriteAllText(Path.Combine(folderMod, "mcmod.info"),
             """[ { "modid": "foldermod", "name": "Folder Mod", "version": "0.5" } ]""");
 
-        var model = new ModFolderModel(new AbsolutePath(modsDir), isIndexed: false, createDir: true);
+        var model = new ModFolderModel(MaterializedDirectory.Ensure(new AbsolutePath(modsDir))!, isIndexed: false);
         Assert.True(model.Update());
 
         Assert.Equal(2, model.Size);

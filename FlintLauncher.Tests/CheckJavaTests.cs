@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// CheckJava's probe-cache gate (S5): a cached entry whose signature matches and whose members
+// CheckJava's probe-cache gate: a cached entry whose signature matches and whose members
 // are complete skips the JdkFind probe; an entry without a language version — written before
 // the member existed, or by a probe that found no readable release file — is stale and gets
 // probed again. This is what migrates launcher-state.json written by older builds.

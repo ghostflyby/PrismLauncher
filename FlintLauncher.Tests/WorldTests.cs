@@ -4,6 +4,7 @@
 // the world_gen_settings seed fallback, icon handling and the WorldList directory ops.
 
 using System.IO.Compression;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Nbt;
 using TruePath;
@@ -144,6 +145,34 @@ public class WorldTests : IDisposable
         Assert.NotNull(root);
         var data = Assert.IsType<NbtCompound>(root["Data"]);
         Assert.Equal(2, Assert.IsType<NbtInt>(data["Difficulty"]).Value);
+    }
+
+    // the folder rename derives a NON-clashing name (FS::DirNameFromString): against a
+    // taken folder name it lands on "name(N)" — it never merges into or duplicates the
+    // existing world
+    [Fact]
+    public void Rename_OntoATakenFolderName_LandsOnTheNextFreeName()
+    {
+        var dir = MakeFolderWorld("Alpha");
+        var world = new World(dir);
+        world.LoadMetadata();
+
+        var otherDir = MakeFolderWorld("Beta");
+        var otherEntries = Directory.GetFileSystemEntries(otherDir, "*", SearchOption.AllDirectories).Length;
+
+        Assert.True(world.Rename("Beta"));
+
+        var movedDir = Path.Combine(_tempDir, "Beta(1)");
+        Assert.True(Directory.Exists(movedDir)); // landed on the next free name
+        Assert.False(Directory.Exists(dir));
+        Assert.True(Directory.Exists(otherDir)); // the existing world is untouched
+        Assert.Equal(otherEntries,
+            Directory.GetFileSystemEntries(otherDir, "*", SearchOption.AllDirectories).Length);
+
+        var reloaded = new World(movedDir);
+        reloaded.LoadMetadata();
+        Assert.True(reloaded.IsValid);
+        Assert.Equal("Beta", reloaded.Name);
     }
 
     [Fact]
@@ -288,7 +317,7 @@ public class WorldTests : IDisposable
         Directory.CreateDirectory(Path.Combine(saves, "not_a_world")); // no level.dat
         File.WriteAllBytes(Path.Combine(saves, "stray.zip"), []);      // files are skipped
 
-        var list = new WorldList(new AbsolutePath(saves));
+        var list = new WorldList(MaterializedDirectory.Ensure(new AbsolutePath(saves))!);
         Assert.True(list.Update());
         Assert.Equal(2, list.Count);
         Assert.Equal("alpha", list[0].FolderName); // name sorted
@@ -303,7 +332,7 @@ public class WorldTests : IDisposable
         WriteWorldInto(saves, "alpha", "Alpha");
         WriteWorldInto(saves, "beta", "Beta");
 
-        var list = new WorldList(new AbsolutePath(saves));
+        var list = new WorldList(MaterializedDirectory.Ensure(new AbsolutePath(saves))!);
         Assert.True(list.Update());
         await list.LoadWorldsAsync();
 
@@ -319,7 +348,7 @@ public class WorldTests : IDisposable
         var saves = MakeSavesDir();
         WriteWorldInto(saves, "alpha", "Alpha");
 
-        var list = new WorldList(new AbsolutePath(saves));
+        var list = new WorldList(MaterializedDirectory.Ensure(new AbsolutePath(saves))!);
         list.Update();
 
         // copy with a new display name (CopyWorldTask)
@@ -348,7 +377,7 @@ public class WorldTests : IDisposable
         WriteWorldInto(saves, "two", "Two");
         WriteWorldInto(saves, "three", "Three");
 
-        var list = new WorldList(new AbsolutePath(saves));
+        var list = new WorldList(MaterializedDirectory.Ensure(new AbsolutePath(saves))!);
         list.Update();
         Assert.True(list.DeleteWorlds(0, 1));
         Assert.Equal(1, list.Count);
@@ -376,7 +405,7 @@ public class WorldTests : IDisposable
     [Fact]
     public void WorldList_InvalidDir_UpdateFails()
     {
-        var list = new WorldList(new AbsolutePath(Path.Combine(_tempDir, "never-created")));
+        var list = new WorldList(MaterializedDirectory.Ensure(new AbsolutePath(Path.Combine(_tempDir, "never-created")))!);
         Directory.Delete(Path.Combine(_tempDir, "never-created")); // ctor created it; remove again
         Assert.False(list.IsValid());
         Assert.False(list.Update());

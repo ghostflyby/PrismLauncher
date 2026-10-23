@@ -4,8 +4,8 @@
 // the Qt models/signals of the original are not ported.
 //
 // Deviations:
-//  - ModPlatform::ModLoaderType is the one already ported in FlintLauncher.Core.Minecraft
-//    (P2b); QFlags<ModLoaderType> maps to the [Flags] enum itself.
+//  - ModPlatform::ModLoaderType is the one already ported in FlintLauncher.Core.Minecraft;
+//    QFlags<ModLoaderType> maps to the [Flags] enum itself.
 //  - The EnumWrapper<T> types (SideType/IndexedVersionType/DependencyType) become readonly
 //    record structs over the raw enum + mapping functions. fromString stays case-sensitive
 //    like the C++ (DependencyType upper-cases its input first, exactly like upstream).

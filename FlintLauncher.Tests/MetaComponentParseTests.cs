@@ -2,11 +2,10 @@
 // Port of tests/MetaComponentParse_test.cpp. Upstream this exercises
 // DataPackUtils::processComponent (the JSON chat component renderer) on fixtures under
 // tests/testdata/MetaComponentParse — the ported renderer lives in
-// FlintLauncher.Core/Minecraft/Resources (moved there from Minecraft/ in P3-b).
+// FlintLauncher.Core/Minecraft/Resources (moved there from Minecraft/).
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Minecraft.Resources;
 using Xunit;
 

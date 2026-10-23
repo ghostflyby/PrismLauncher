@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// TypedJsonFile<T> infrastructure tests (GLOBAL §1): load-or-default, the record-merge
+// TypedJsonFile<T> infrastructure tests: load-or-default, the record-merge
 // hook, atomic writes, and the stateVersion evolution gate. The sample record uses a
 // test-local source-generated context — production consumers pass FlintJsonContext's
 // JsonTypeInfo the same way.
@@ -206,7 +206,7 @@ public class TypedJsonFileTests : IDisposable
     }
 }
 
-/// <summary>Test state record: the S5 launcher-state.json shape in miniature.</summary>
+/// <summary>Test state record: the launcher-state.json shape in miniature.</summary>
 internal sealed record SampleState : IStateVersioned
 {
     public required int StateVersion { get; init; }

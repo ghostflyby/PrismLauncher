@@ -204,14 +204,14 @@ public class Library
             var outPath = new LocalPath(StoragePrefix()) / relPath;
             if (local && overridePath.Value is { Length: > 0 })
             {
-                var fileName = Path.GetFileName(outPath.Value);
+                var fileName = outPath.FileName;
                 return new AbsolutePath(Path.GetFullPath((overridePath / fileName).Value));
             }
 
             // the default prefix is the C++-era relative "libraries/", which anchored on
             // the C++ process CWD (the application chdir'd into its data dir at startup);
             // the port has no chdir (DI-B), so an unstamped prefix must anchor on the
-            // storage base (the store root, E2) — never on the process CWD
+            // storage base (the store root) — never on the process CWD
             if (!Path.IsPathRooted(outPath.Value) && storageBase.Value is { Length: > 0 })
             {
                 outPath = storageBase / outPath;
@@ -420,7 +420,7 @@ public class Library
 
     /// <summary>The Maven-relative storage path under the libraries root — the same string
     /// the download path keys the ledger entry with (base "libraries"; see GetDownloads) and
-    /// the store-completeness derivation checks (CACHE E5). Native ${arch} placeholders are
+    /// the store-completeness derivation checks. Native ${arch} placeholders are
     /// NOT expanded here (GetApplicableFiles expands them into the 32/64 pair).</summary>
     public string StorageRelativePath(RuntimeContext runtimeContext) => StorageSuffix(runtimeContext);
 

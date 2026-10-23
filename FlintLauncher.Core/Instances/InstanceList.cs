@@ -4,15 +4,22 @@
 // Dropped (Qt UI/infrastructure plumbing):
 //  - the QAbstractListModel surface (index/rowCount/data/setData/flags, the drag&drop
 //    mime handling and the AdditionalRoles): the instancesChanged() model-reset signal
-//    becomes the plain <see cref="InstanceListChanged"/> event and the per-instance
-//    propertiesChanged()->dataChanged() glue becomes <see cref="InstanceDataChanged"/>;
+//    becomes INotifyCollectionChanged (Reset-only — the update model is reconcile-and-
+//    swap, never positional deltas) on the list itself, and the per-instance
+//    propertiesChanged()->dataChanged() glue becomes INotifyPropertyChanged on
+//    BaseInstance;
 //  - the QFileSystemWatcher glue (suspendWatch/resumeWatch/instanceDirContentsChanged and
-//    the m_watchLevel/m_dirty bookkeeping) — callers re-run LoadList() themselves;
+//    the m_watchLevel/m_dirty bookkeeping) is RESTORED as an opt-in tenancy of
+//    <see cref="FlintLauncher.Core.IO.DirectorySpace"/> (<see cref="AttachWatcher"/>):
+//    external changes coalesce into a debounced LoadList() re-run. Where the C++ watcher
+//    died silently when a watched root was renamed away, the port reports the loss to the
+//    tenants and re-binds with bounded backoff when the root returns. Default off —
+//    demand-driven LoadList() (callers re-run it themselves) stays the fallback.
 //  - the trash flow (trashInstance/trashedSomething/undoTrashInstance and the
 //    TrashHistoryItem stack): FS::trash needs desktop-shell integration and is not ported.
 //    DeleteInstance (hard delete) is ported;
 //  - on_GroupStateChanged stays as <see cref="SetGroupCollapsed"/> because it persists the
-//    group view state — since the C8/S5 split into launcher-state.json ("hidden" is machine-
+//    group view state — since the launcher-state.json split ("hidden" is machine-
 //    local state now; the group file carries the group definitions only).
 //
 // Deviations from the C++ original:
@@ -26,10 +33,10 @@
 //    broken instance.
 //  - the group file location: upstream hard-codes QDir::current().filePath("instgroups.json")
 //    (the launcher data dir, where the application chdir'd at startup) with a legacy
-//    fallback inside the primary instance dir. Since CONFIG C8 the canonical file is the
-//    config-side groups.json (FlintPaths.GroupsFile) with both legacy instgroups.json
+//    fallback inside the primary instance dir. The canonical file is the
+//    config-side groups.json with both legacy instgroups.json
 //    anchors as read-compat fallbacks, and the whole group half lives in the
-//    InstanceGroupModel (GLOBAL G4) — the location can still be pinned through
+//    InstanceGroupModel — the location can still be pinned through
 //    <see cref="GroupFilePath"/> (tests/embedding).
 //  - instance-dir canonicalization uses Path.GetFullPath (QDir::canonicalPath resolves
 //    symlinks; there is no cheap portable equivalent and the watcher dedup use is dropped).
@@ -37,14 +44,15 @@
 //    triggered (instancesChanged -> providerUpdated -> loadList) is collapsed into a direct
 //    LoadList() call.
 //  - migrateTotalPlayTime()'s APPLICATION->playtimeSettings() becomes the injectable
-//    <see cref="LauncherState"/> (launcher-state.json since S5 — CONFIG C9 retired the
-//    settings keys); when it is null the migration is skipped.
+//    <see cref="LauncherState"/> (the former settings keys moved to
+//    launcher-state.json); when it is null the migration is skipped.
 //  - instance order inside a group of instgroups.json: QSet iteration is unordered upstream,
 //    the port writes ids sorted (ordinal) for deterministic output.
 //  - CommitStagedInstance's override path re-implements FS::overrideFolder as an
 //    overwrite-copy of the staging folder over the destination.
 
-using System.Diagnostics;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Globalization;
 using System.Text.Json;
 using FlintLauncher.Core.Config;
@@ -66,7 +74,7 @@ public enum InstListError : byte
     UnknownError,
 }
 
-public class InstanceList
+public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged
 {
     private const int MinBackoff = 1;
     private const int MaxBackoff = 16;
@@ -78,85 +86,124 @@ public class InstanceList
     // C++ m_instanceRootDirMap: id -> instance dir that provided it
     private readonly Dictionary<string, AbsolutePath> _instanceRootDirMap = new(StringComparer.Ordinal);
 
-    // D2 inode index: instance uuid <-> the stat(2) inode of its instance dir. Rebuilt on
-    // every LoadList ("索引随 LoadList 重建"); empty on platforms without inode support
-    // (Windows StatInode = 0 — the addressing chain skips the inode link).
-    private readonly Dictionary<string, long> _inodeByUuid = new(StringComparer.Ordinal);
-    private readonly Dictionary<long, string> _uuidByInode = new();
+    // inode index: instance uuid <-> the identity of its instance dir. Rebuilt on
+    // every LoadList; empty on platforms without identity
+    // support (Windows StatInode = 0 — the addressing chain skips the identity link).
+    private readonly Dictionary<string, DirectoryIdentity> _inodeByUuid = new(StringComparer.Ordinal);
+    private readonly Dictionary<DirectoryIdentity, string> _uuidByInode = new();
 
-    // G4: the group model is the sole owner of the config-side group file (uuid members)
+    // the group model is the sole owner of the config-side group file (uuid members)
     // and the state-side collapse flags; the list only translates instance handles.
     private readonly InstanceGroupModel _groups;
 
     private bool _groupsLoaded;
     private bool _instancesProbed;
 
-    public InstanceList(IEnumerable<AbsolutePath> instDirs)
+    // the restored watcher tenancy (see the header note): null = demand-driven LoadList
+    private DirectorySpace? _watchSpace;
+    private int _reconcileRunning;
+
+    private LaunchServices? _launchServices;
+
+    /// <summary>Constructs the list over its materialized instance roots. The list owns
+    /// discovery, lifecycle and watching — it deliberately knows nothing about the wider
+    /// data layout (it stays with the composition root and the instances):
+    /// the group persistence arrives as its two config objects, and the launch-pipeline
+    /// half reaches the instances through <paramref name="launchServices"/>.</summary>
+    /// <param name="instanceDirs">The materialized instance roots (Ensure semantics —
+    /// missing roots are created; the first one is the primary dir).</param>
+    /// <param name="environment">The typed instance-layer environment. Required:
+    /// discovery cannot build instances without it.</param>
+    /// <param name="groupsFile">The canonical groups file (the write target).</param>
+    /// <param name="legacyGroupsFiles">The read-compat instgroups probes, in order (the
+    /// data-root copy, then the primary-dir copy upstream used).</param>
+    /// <param name="launchServices">Optional at construction (the host logger factory
+    /// lives in DI); the composition root completes it through the
+    /// <see cref="LaunchServices"/> property, which re-stamps discovered instances.</param>
+    /// <param name="metaCache">Optional: stamped onto discovered instances (library and
+    /// asset-index download caches, metadata entities).</param>
+    /// <param name="launcherState">Optional: launcher-state.json — the TotalPlayTime
+    /// migration and the group collapse persistence; null skips both.</param>
+    public InstanceList(IEnumerable<MaterializedDirectory> instanceDirs,
+        InstanceEnvironment environment, AbsolutePath groupsFile,
+        IReadOnlyList<AbsolutePath> legacyGroupsFiles,
+        LaunchServices? launchServices = null, HttpMetaCache? metaCache = null,
+        LauncherStateStore? launcherState = null)
     {
-        foreach (var dir in instDirs)
+        Environment = environment;
+        _launchServices = launchServices;
+        MetaCache = metaCache;
+        LauncherState = launcherState;
+
+        foreach (var dir in instanceDirs)
         {
-            FileOps.EnsureFolderPathExists(dir);
-            // NOTE: canonicalPath requires the path to exist. Do not move this above the creation block!
-            if (!_instDirs.Contains(dir))
+            if (!_instDirs.Contains(dir.Path))
             {
-                _instDirs.Add(dir);
+                _instDirs.Add(dir.Path);
             }
         }
 
-        _groups = new InstanceGroupModel(
-            CanonicalGroupFile,
-            LegacyGroupFiles,
+        _groups = new InstanceGroupModel(groupsFile, legacyGroupsFiles,
             () => LauncherState,
             canPersist: () => _instancesProbed);
     }
 
-    /// <summary>The typed instance-layer environment (D4): the user-layer flint.json store
+    /// <summary>The typed instance-layer environment: the user-layer flint.json store
     /// plus the instance.json / instance-state.json type infos. The C++ passed the global
-    /// SettingsObject here; the typed stack replaced it (CONFIG C6/C7). Must be stamped
-    /// before LoadList — discovery cannot build instances without it.</summary>
-    public InstanceEnvironment? Environment { get; init; }
-
-    /// <summary>Injected data-directory layout — stamped onto discovered instances (their
-    /// asset/library/java anchors) and used for instgroups.json. Set by the composition root.</summary>
-    public FlintPaths? Paths { get; init; }
+    /// SettingsObject here; the typed stack replaced it.</summary>
+    public InstanceEnvironment Environment { get; }
 
     /// <summary>Injected metadata cache — stamped onto discovered instances (library and
     /// asset-index download caches, metadata entities).</summary>
-    public HttpMetaCache? MetaCache { get; init; }
+    public HttpMetaCache? MetaCache { get; }
 
     /// <summary>Injected launch-pipeline dependencies — stamped onto discovered instances
-    /// (the base LaunchServices their CreateLaunchTask builds from). Set by the composition
-    /// root next to Paths/MetaCache.</summary>
-    public LaunchServices? LaunchServices { get; set; }
+    /// (the base LaunchServices their CreateLaunchTask builds from). The composition root
+    /// completes it after the host build (its logger factory lives in DI); setting it
+    /// re-stamps the already-discovered residents.</summary>
+    public LaunchServices? LaunchServices
+    {
+        get => _launchServices;
+        set
+        {
+            _launchServices = value;
+            foreach (var resident in _instances.OfType<MinecraftInstance>())
+            {
+                resident.LaunchServices = value;
+            }
+        }
+    }
 
-    // ---------------------------------------------------------------- events (Qt signals)
+    /// <summary>The launcher runtime state (launcher-state.json) — the one-shot
+    /// TotalPlayTime migration and the group collapse ("hidden") persistence land here;
+    /// null skips both (no state root in a bare fixture).</summary>
+    public LauncherStateStore? LauncherState { get; }
 
-    /// <summary>Port of the instancesChanged() signal (the model reset replacement).</summary>
-    public event Action? InstanceListChanged;
+    // ------------------------------------------------------------- events (BCL notifications)
 
-    /// <summary>Merged port of the propertiesChanged()->dataChanged() per-instance glue.</summary>
-    public event Action<BaseInstance>? InstanceDataChanged;
+    /// <summary>INCC with Reset-only semantics: the update model is reconcile-and-swap (the
+    /// watcher coalesces external changes into a full reload), never positional deltas —
+    /// Reset carries that contract to every standard .NET consumer. Raised at most once per
+    /// mutating pass, on the reconcile thread; consumers marshal.</summary>
+    public event NotifyCollectionChangedEventHandler? CollectionChanged;
 
-    /// <summary>Port of the instanceSelectRequest() signal.</summary>
+    /// <summary>INPC for the aggregate view ("Count"/"Instances"); per-instance data
+    /// changes surface through the instance's own INotifyPropertyChanged.</summary>
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>Port of the instanceSelectRequest() signal (a UI command, not a change
+    /// notification — outside the INCC/INPC scope).</summary>
     public event Action<string>? InstanceSelectRequest;
 
-    // --------------------------------------------------------------------- configuration
-
-    /// <summary>
-    /// The launcher runtime state (launcher-state.json, S5) — the one-shot TotalPlayTime
-    /// migration and the group collapse ("hidden") persistence land here; null skips both
-    /// (no state root in a bare fixture).
-    /// </summary>
-    public LauncherStateStore? LauncherState { get; set; }
-
-    /// <summary>
-    /// Overrides the C8 groups-file location (tests/embedding). When set, it IS the
-    /// canonical file (only the primary-instance-dir legacy copy still falls back).
-    /// Empty (default) uses the config-side anchors: &lt;config-root&gt;/groups.json
-    /// (FlintPaths.GroupsFile, C8) with the legacy data-root instgroups.json and the
-    /// primary-instance-dir instgroups.json as read-compat fallbacks.
-    /// </summary>
-    public AbsolutePath? GroupFilePath { get; init; }
+    /// <summary>Raises Reset plus the aggregate INPC pair. Called at most once per mutating
+    /// pass (the C++ instancesChanged() signal, in standard clothing), outside the model's
+    /// internal state transitions.</summary>
+    private void RaiseReset()
+    {
+        CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Count)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Instances)));
+    }
 
     // ------------------------------------------------------------------- list accessors
 
@@ -204,15 +251,13 @@ public class InstanceList
             // needs to drop the instances that disappeared, invalidated like upstream)
             foreach (var index in existingIds.Values.OrderByDescending(i => i))
             {
+                // the directory is gone — the instance's folder-model watches would
+                // otherwise retry against it forever
+                _instances[index].ReleaseWatchTenancy();
                 _instances[index].Invalidate();
                 _instances.RemoveAt(index);
                 removedAny = true;
             }
-        }
-
-        if (removedAny)
-        {
-            InstanceListChanged?.Invoke();
         }
 
         if (newList.Count != 0)
@@ -220,11 +265,18 @@ public class InstanceList
             Add(newList);
         }
 
-        RebuildInodeIndex();               // D2: the inode index follows every (re)discovery
-        ConvertLinkedInstanceReferences(); // D3: persisted link references are uuids
+        // at most ONE reset per reconcile pass (the pre-interface version raised twice when
+        // a pass both removed and added); a pass with no membership change is silent
+        if (removedAny || newList.Count != 0)
+        {
+            RaiseReset();
+        }
+
+        RebuildInodeIndex();               // the inode index follows every (re)discovery
+        ConvertLinkedInstanceReferences(); // persisted link references are uuids
         if (_groupsLoaded)
         {
-            // D3: discovery is complete — dirname members resolve now (the model was loaded
+            // discovery is complete — dirname members resolve now (the model was loaded
             // earlier in this session with some references unresolvable; without this the
             // conversion waits for the next process). Never forces the lazy group load.
             _groups.ConvertUnresolvedMembers(ResolveMemberUuid);
@@ -243,17 +295,18 @@ public class InstanceList
     }
 
     /// <summary>
-    /// The D2 instance addressing chain (inode → uuid → dirname) — the SINGLE entry point
-    /// through which every endpoint resolves an <c>{ref}</c> parameter (GLOBAL §1 bans the
-    /// direct GetInstanceById use at the API boundary; this is its only caller shape there).
+    /// The instance addressing chain (inode → uuid → dirname) — the SINGLE entry point
+    /// through which every endpoint resolves an <c>{ref}</c> parameter (the direct
+    /// GetInstanceById use is banned at the API boundary; this is its only caller shape
+    /// there).
     /// Unresolved references yield null (the endpoint answers 404).
     /// </summary>
     /// <remarks>
-    /// Layer semantics (DATA D2):
+    /// Layer semantics:
     ///  - <b>inode</b>: first link. Only a pure-numeric reference can name an inode; the
     ///    index is rebuilt with every LoadList and is empty on platforms without inode
     ///    support (Windows StatInode returns 0), so the chain transparently skips the link.
-    ///    DOCUMENTED BOUNDARY (D2): a pure-numeric DIRECTORY name that collides with a live
+    ///    Documented boundary: a pure-numeric DIRECTORY name that collides with a live
     ///    inode resolves to the INODE — the directory loses. Probability tends to zero and
     ///    the collision is resolved deterministically (inode wins) rather than left ambiguous.
     ///    The index is local-only, never persisted: a rename does not change the inode, so
@@ -275,7 +328,7 @@ public class InstanceList
         // inode link: a numeric miss falls through (the reference may be a numeric dirname
         // whose inode is not tracked, or the platform may not track inodes at all)
         if (long.TryParse(reference, NumberStyles.Integer, CultureInfo.InvariantCulture, out var inode) &&
-            _uuidByInode.TryGetValue(inode, out var inodeUuid) &&
+            _uuidByInode.TryGetValue(new DirectoryIdentity(inode), out var inodeUuid) &&
             FindByUuidOrDirname(inodeUuid) is { } byInode)
         {
             return byInode;
@@ -284,12 +337,12 @@ public class InstanceList
         return FindByUuidOrDirname(reference);
     }
 
-    /// <summary>The instance directory's stat inode (D2), 0 when unavailable (Windows, or
+    /// <summary>The instance directory's stat inode, 0 when unavailable (Windows, or
     /// the directory vanished since LoadList).</summary>
     public long InodeOf(BaseInstance inst) =>
-        _inodeByUuid.GetValueOrDefault(inst.Uuid, 0);
+        _inodeByUuid.GetValueOrDefault(inst.Uuid, DirectoryIdentity.Unavailable).Inode;
 
-    /// <summary>D2: re-stat every instance dir; the index is local-only and never
+    /// <summary>Re-stats every instance dir; the index is local-only and never
     /// persisted, so a rebuild is always authoritative.</summary>
     private void RebuildInodeIndex()
     {
@@ -297,14 +350,14 @@ public class InstanceList
         _uuidByInode.Clear();
         foreach (var inst in _instances)
         {
-            var inode = FileTransfer.StatInode(inst.InstanceRoot);
-            if (inode == 0)
+            var identity = DirectoryIdentity.Of(inst.InstanceRoot);
+            if (!identity.IsAvailable)
             {
-                continue; // platform without inode support (Windows) or a vanished dir
+                continue; // platform without identity support (Windows) or a vanished dir
             }
 
-            _inodeByUuid[inst.Uuid] = inode;
-            _uuidByInode[inode] = inst.Uuid;
+            _inodeByUuid[inst.Uuid] = identity;
+            _uuidByInode[identity] = inst.Uuid;
         }
     }
 
@@ -327,7 +380,7 @@ public class InstanceList
         return null;
     }
 
-    /// <summary>The uuid/directname half of the D2 chain: uuid first (the persistent
+    /// <summary>The uuid/directname half of the chain: uuid first (the persistent
     /// handle), dirname second (compat).</summary>
     private BaseInstance? FindByUuidOrDirname(string reference)
     {
@@ -363,7 +416,7 @@ public class InstanceList
 
     public List<string> GetLinkedInstancesById(string id)
     {
-        // D3: the persisted reference form is the uuid; an entry written before its target
+        // the persisted reference form is the uuid; an entry written before its target
         // was discovered (or between LoadList rounds) may still carry the dirname until the
         // next conversion pass — match both forms, the same tolerance GroupOfInstance gives
         // the group members.
@@ -381,8 +434,8 @@ public class InstanceList
         return linkedInstances;
     }
 
-    /// <summary>D3 import conversion for linkedInstances (the group-member precedent, D3:
-    /// "导入时转换" — the import lands dirnames, the discovery round converts them): a
+    /// <summary>Import conversion for linkedInstances (the group-member precedent —
+    /// the import lands dirnames, the discovery round converts them): a
     /// dirname entry becomes the referenced instance's uuid when the now-complete discovery
     /// can resolve it; unknown entries are kept verbatim and retried on the next LoadList.
     /// A changed list persists through SetLinkedInstances — on a Prism-format instance that
@@ -427,7 +480,7 @@ public class InstanceList
     }
 
     // ---------------------------------------------------------------------- group logic
-    // G4: InstanceGroupModel is the SOLE owner of both halves (config groups file + state
+    // InstanceGroupModel is the SOLE owner of both halves (config groups file + state
     // hidden); the list only translates instance handles (dirname/uuid) and raises the
     // per-instance change notifications around the model's answers.
 
@@ -441,7 +494,7 @@ public class InstanceList
         }
 
         EnsureGroupsLoaded();
-        // the member key is the uuid (D3); the dirname fallback covers a staged commit's
+        // the member key is the uuid; the dirname fallback covers a staged commit's
         // transient not-yet-converted member
         return _groups.GroupOfInstance(inst.Uuid, inst.Id());
     }
@@ -458,7 +511,7 @@ public class InstanceList
         EnsureGroupsLoaded();
         if (_groups.SetMemberGroup(inst.Uuid, name))
         {
-            InstanceDataChanged?.Invoke(inst);
+            inst.NotifyChanged();
         }
 
         // dedupe: a staged commit whose uuid was unprovable left a dirname-keyed member —
@@ -482,7 +535,7 @@ public class InstanceList
         {
             if (FindByUuidOrDirname(member) is { } inst)
             {
-                InstanceDataChanged?.Invoke(inst);
+                inst.NotifyChanged();
             }
         }
     }
@@ -495,7 +548,7 @@ public class InstanceList
         {
             if (FindByUuidOrDirname(member) is { } inst)
             {
-                InstanceDataChanged?.Invoke(inst);
+                inst.NotifyChanged();
             }
         }
     }
@@ -507,7 +560,7 @@ public class InstanceList
     }
 
     /// <summary>Port of the on_GroupStateChanged slot. Only the state side changes (the
-    /// collapse state is launcher-state.json's since C8/S5 — the group file no longer
+    /// collapse state is launcher-state.json's — the group file no longer
     /// carries "hidden"), so there is no config write to order against.</summary>
     public void SetGroupCollapsed(string group, bool collapsed)
     {
@@ -516,7 +569,7 @@ public class InstanceList
     }
 
     /// <summary>The group definitions load lazily on first group access (it used to hang
-    /// off the first instance load, but the D3 uuid conversion needs the COMPLETE
+    /// off the first instance load, but the uuid conversion needs the COMPLETE
     /// discovery). Retries until a file was parsed — a missing file may still appear
     /// (e.g. a Prism import landing instgroups.json mid-session).</summary>
     private void EnsureGroupsLoaded()
@@ -527,7 +580,7 @@ public class InstanceList
         }
     }
 
-    /// <summary>D3 reference conversion, shared by both persisted-reference forms: a dirname
+    /// <summary>Reference conversion, shared by both persisted-reference forms: a dirname
     /// (the legacy and Prism-import form — group-file members and linkedInstances entries)
     /// becomes the instance's uuid; unknown references return null and are kept verbatim
     /// (the group load retries; the linkedInstances pass retries at the next LoadList).
@@ -536,39 +589,6 @@ public class InstanceList
     /// uuid/dirname only — a numeric member must not resolve through the inode link.</summary>
     private string? ResolveMemberUuid(string member) =>
         member.Length == 0 ? null : GetInstanceById(member)?.Uuid;
-
-    /// <summary>The canonical C8 groups file (the model's write target): the GroupFilePath
-    /// override when pinned, else the config-side groups.json, else the legacy CWD anchor
-    /// of bare fixtures.</summary>
-    private AbsolutePath CanonicalGroupFile()
-    {
-        if (GroupFilePath is { } group)
-        {
-            return group;
-        }
-
-        if (Paths is { } paths)
-        {
-            return paths.GroupsFile;
-        }
-
-        throw new UnreachableException("must have a group file");
-    }
-
-    /// <summary>The read-compat instgroups.json anchors, probed in order when the canonical
-    /// file is missing: the pre-C8 data-root copy (the Prism import target) and the
-    /// primary-instance-dir copy upstream used before there was a launcher data dir.</summary>
-    private List<AbsolutePath> LegacyGroupFiles()
-    {
-        var legacy = new List<AbsolutePath>();
-        if (Paths is { } paths)
-        {
-            legacy.Add(paths.InstgroupsFile);
-        }
-
-        legacy.Add(PrimaryDir() / "instgroups.json");
-        return legacy;
-    }
 
     // ---------------------------------------------------------------- instance deletion
 
@@ -587,6 +607,10 @@ public class InstanceList
         _groups.RemoveMember(inst.Uuid);
         _groups.RemoveMember(inst.Id());
 
+        // release the watcher tenancy BEFORE the delete: the folder models' watches
+        // dispose now instead of retrying against a directory that stops existing
+        inst.ReleaseWatchTenancy();
+
         if (!FileOps.DeletePath(new AbsolutePath(inst.InstanceRoot)))
         {
             // qWarning: deletion not completely successful
@@ -596,7 +620,7 @@ public class InstanceList
         // (the C++ leaves the list update to the directory watcher; without one the port
         //  drops the instance from the list directly)
         _instances.Remove(inst);
-        InstanceListChanged?.Invoke();
+        RaiseReset();
     }
 
     // ---------------------------------------------------------- staging / instance tasks
@@ -721,7 +745,7 @@ public class InstanceList
 
         if (groupName.Length != 0)
         {
-            // D3: the group file stores UUID references, but the committed folder is not
+            // the group file stores UUID references, but the committed folder is not
             // discovered yet — probe its metadata for the uuid; when unreadable the member
             // goes in under the raw dirname and the next group load converts it.
             EnsureGroupsLoaded();
@@ -734,13 +758,76 @@ public class InstanceList
             _groups.SetMemberGroup(member, groupName);
         }
 
-        InstanceListChanged?.Invoke();
+        RaiseReset();
         InstanceSelectRequest?.Invoke(instId);
 
         return true;
     }
 
     // -------------------------------------------------------------- instance dirs change
+
+    /// <summary>Opts the list into watcher-driven reloads (the restored C++ watcher glue,
+    /// see the header note): <paramref name="space"/> watches every instance root and
+    /// external changes coalesce into a debounced LoadList() re-run. A renamed/moved root
+    /// re-points the configured root set in place (the discovery reads
+    /// <see cref="InstanceDirs"/>, so a stale path would empty the list on the next
+    /// reconcile). The space's dispatcher owns serialization with the host's instance
+    /// lock. Default (no attachment) keeps the demand-driven reload.</summary>
+    public void AttachWatcher(DirectorySpace space)
+    {
+        _watchSpace = space;
+        foreach (var dir in _instDirs)
+        {
+            if (MaterializedDirectory.Wrap(dir) is { } materialized)
+            {
+                space.Register(materialized, ReconcileFromWatcher, moved: OnInstanceRootMoved);
+            }
+        }
+    }
+
+    /// <summary>The configured root set follows the watched root's rename — and the
+    /// instances reload from scratch: the kept objects hold path-derived state
+    /// (InstanceRoot and the settings stack's own root) that cannot be re-pointed in
+    /// place, so a stale keep would keep reading the dead location. The reload is
+    /// identity-stable: references hold via uuid, and the directory identities (and the
+    /// inode index over them) survive the move untouched.</summary>
+    private void OnInstanceRootMoved(AbsolutePath oldRoot, AbsolutePath newRoot)
+    {
+        var index = _instDirs.IndexOf(oldRoot);
+        if (index < 0)
+        {
+            return;
+        }
+
+        _instDirs[index] = newRoot;
+        foreach (var inst in _instances)
+        {
+            inst.ReleaseWatchTenancy();
+        }
+
+        _instances.Clear();
+        LoadList();
+    }
+
+    /// <summary>The watcher-side reconcile: LoadList is idempotent, so the coalesced
+    /// trailing re-run after the list's own mutations (staging commit, delete) is harmless;
+    /// skip-if-busy collapses overlapping fires instead of re-entering a running pass.</summary>
+    private void ReconcileFromWatcher()
+    {
+        if (Interlocked.Exchange(ref _reconcileRunning, 1) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            LoadList();
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _reconcileRunning, 0);
+        }
+    }
 
     /// <summary>Port of the on_InstFolderChanged slot as an explicit method.</summary>
     public void SetInstanceDirs(IEnumerable<AbsolutePath> dirs)
@@ -774,12 +861,21 @@ public class InstanceList
             _groups.Save();
         }
 
+        var oldDirs = _instDirs.ToArray();
         _instDirs.Clear();
         _instDirs.AddRange(newDirs);
+        _watchSpace?.SyncTenantRoots(oldDirs, newDirs, ReconcileFromWatcher);
         _groupsLoaded = false;
+        // the old roots' instances leave the live list — their folder-model watches must
+        // not outlive the directories they were registered on
+        foreach (var inst in _instances)
+        {
+            inst.ReleaseWatchTenancy();
+        }
+
         _instances.Clear();
         // (upstream emits instancesChanged; the connected providerUpdated reloads right away)
-        InstanceListChanged?.Invoke();
+        // — the trailing LoadList owns the Reset now
         LoadList();
     }
 
@@ -806,12 +902,12 @@ public class InstanceList
             };
             foreach (var entry in rootInfo.EnumerateDirectories("*", options))
             {
-                var subDir = entry.FullName;
-                // D4 dual-track discovery: a Flint-format directory carries instance.json,
+                var instDir = new AbsolutePath(entry.FullName);
+                // dual-track discovery: a Flint-format directory carries instance.json,
                 // a Prism-format one instance.cfg — both are instances (the cfg stays
                 // read-only until the instance's first write converts it)
-                if (!File.Exists((new AbsolutePath(subDir) / "instance.json").Value) &&
-                    !File.Exists((new AbsolutePath(subDir) / "instance.cfg").Value))
+                if (!(instDir / "instance.json").ExistsFile() &&
+                    !(instDir / "instance.cfg").ExistsFile())
                 {
                     continue;
                 }
@@ -857,12 +953,10 @@ public class InstanceList
 
     private BaseInstance LoadInstance(string id)
     {
-        var environment = Environment ??
-                          throw new InvalidOperationException(
-                              "InstanceList.Environment (the typed instance.json stack) must be stamped before LoadList.");
+        var environment = Environment;
 
         var instanceRoot = RootDirOf(id) / id;
-        // the typed layer stack (D4): instance.json when present (Flint format), otherwise
+        // the typed layer stack: instance.json when present (Flint format), otherwise
         // the read-only instance.cfg import in memory — no write happens on discovery
         var instanceSettings = new InstanceJsonSettingsObject(instanceRoot, environment);
         // register the discriminator before dispatch (BaseInstance would only register it
@@ -884,14 +978,14 @@ public class InstanceList
         {
             inst = new MinecraftInstance(instanceSettings, instanceRoot)
             {
-                Paths = Paths ?? FlintPaths.FromHomeDir(AbsolutePath.CurrentWorkingDirectory),
                 MetaCache = MetaCache,
                 LaunchServices = LaunchServices,
                 LauncherState = LauncherState,
+                WatchSpace = _watchSpace,
             };
         }
 
-        // D3: the write-side uuid convention — a dirname handed to AddLinkedInstanceId
+        // the write-side uuid convention — a dirname handed to AddLinkedInstanceId
         // resolves to the uuid at write time; an unresolvable input appends verbatim and
         // converts at the next LoadList round (same deferral as the group members).
         inst.UuidResolver = ResolveMemberUuid;
@@ -900,17 +994,16 @@ public class InstanceList
 
     private void Add(IEnumerable<BaseInstance> list)
     {
+        // per-instance data changes surface through the instance's own INotifyPropertyChanged
+        // (BaseInstance.PropertyChanged) — the list only notifies about membership (Reset)
         foreach (var inst in list)
         {
-            inst.PropertiesChanged += () => InstanceDataChanged?.Invoke(inst);
             _instances.Add(inst);
         }
-
-        InstanceListChanged?.Invoke();
     }
 
     // -------------------------------------------------------------------- groups file
-    // (G4: the file mechanics — load/save/strip/counts — live in InstanceGroupModel now;
+    // (the file mechanics — load/save/strip/counts — live in InstanceGroupModel now;
     // this type keeps only the location anchors above and the uuid conversion delegate.)
 
     /// <summary>The uuid of a just-committed instance folder, read straight from its
@@ -922,7 +1015,7 @@ public class InstanceList
         try
         {
             var jsonPath = instanceRoot / "instance.json";
-            if (File.Exists(jsonPath.Value))
+            if (jsonPath.ExistsFile())
             {
                 using var doc = JsonDocument.Parse(File.ReadAllBytes(jsonPath.Value));
                 if (doc.RootElement.ValueKind == JsonValueKind.Object &&
@@ -938,7 +1031,7 @@ public class InstanceList
             }
 
             var cfgPath = instanceRoot / InstanceIniImporter.LegacyFileName;
-            if (File.Exists(cfgPath.Value))
+            if (cfgPath.ExistsFile())
             {
                 var ini = new IniFile();
                 return ini.LoadFile(cfgPath) ? ini.GetString("uuid", "") : "";
@@ -976,7 +1069,7 @@ public class InstanceList
         }
 
         // the add happens inside the update so a concurrent writer cannot lose the totals
-        // (S5: the former TotalPlayTime/TotalPlayTimeMigrated settings keys, CONFIG C9)
+        // (the former TotalPlayTime/TotalPlayTimeMigrated settings keys)
         LauncherState.Update(state => state with
         {
             Playtime = new PlaytimeState
@@ -1029,11 +1122,9 @@ public class InstanceList
             }
 
             child.StagingPath = stagingPath;
-            // D4: the typed instance environment (user flint.json store + instance.json
+            // the typed instance environment (user flint.json store + instance.json
             // type infos) replaces the former parent SettingsObject handle
-            child.SetParentEnvironment(parent.Environment ??
-                                       throw new InvalidOperationException(
-                                           "InstanceList.Environment (the typed instance.json stack) must be stamped before staging instances."));
+            child.SetParentEnvironment(parent.Environment);
 
             await child.StartAsync(cancellationToken);
 

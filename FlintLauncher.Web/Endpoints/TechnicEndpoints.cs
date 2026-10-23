@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Technic endpoints (fix-2c), mirroring the ATLauncher/FTB surface: the search/trending
+// Technic endpoints, mirroring the ATLauncher/FTB surface: the search/trending
 // pass-through (TechnicModel::performQuery's URL selection + ListModel::searchRequestFinished
 // mapping), the per-slug pack metadata with the url-vs-solder detection
 // (TechnicPage::suggestCurrent + metadataLoaded, including the Solder build listing) and the
@@ -230,7 +230,7 @@ public static class TechnicEndpoints
                 }
 
                 runtime.Instances.LoadList();
-                // the staged commit's expected dirname, resolved through the D2 chain
+                // the staged commit's expected dirname, resolved through the chain
                 var inst = runtime.Instances.ResolveInstance(expectedId);
                 return inst is null
                     ? ApiJson.Error("creation_failed", "instance was committed but not discovered", 500)

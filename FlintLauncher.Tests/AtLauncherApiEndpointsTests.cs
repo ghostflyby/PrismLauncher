@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// API-level tests for the ATLauncher endpoints (fix-2 step 1): the packsnew.json
+// API-level tests for the ATLauncher endpoints: the packsnew.json
 // pass-through (list + per-pack versions), the staged pack install against the stub ATL CDN
 // (reusing the AtlTestSupport fixture builders — the endpoint runs the same
 // AtLauncherPackInstallTask the core tests drive directly) and the failure surface
@@ -149,7 +149,7 @@ public class AtLauncherApiEndpointsTests : IDisposable
             await File.ReadAllBytesAsync(Path.Combine(staging, "minecraft", "mods", "optsel.jar")));
         Assert.False(File.Exists(Path.Combine(staging, "minecraft", "mods", "optunsel.jar")));
 
-        // instance.json metadata (name + icon key, D4) and the discovered instance surface
+        // instance.json metadata (name + icon key) and the discovered instance surface
         var cfg = await File.ReadAllTextAsync(Path.Combine(staging, "instance.json"));
         Assert.Contains("Test Pack", cfg);
         Assert.Contains("flint", cfg);

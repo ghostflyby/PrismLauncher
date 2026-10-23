@@ -22,7 +22,7 @@ public class LaunchScriptTests
         var lines = script.Split('\n');
 
         var gameDir = instance.GameRoot;
-        var assetsRoot = instance.Paths.AssetsRoot; // the five-root reform: <store>/assets (E2)
+        var assetsRoot = instance.AssetsRoot; // the five-root reform: <store>/assets
         var expected = new[]
         {
             "mainClass net.minecraft.client.main.Main",
@@ -142,7 +142,7 @@ public class LaunchScriptTests
             "--username", "Steve",
             "--version", "1.20.1",
             "--gameDir", instance.GameRoot.Value,
-            "--assetsDir", instance.Paths.AssetsRoot.Value,
+            "--assetsDir", instance.AssetsRoot.Value,
             "--assetIndex", "5",
             "--uuid", session.Uuid,
             "--accessToken", "0",

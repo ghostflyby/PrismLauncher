@@ -27,7 +27,7 @@ public sealed class FlintConfig
 
     /// <summary>
     /// Global config file name. Prism uses "prismlauncher.cfg"; Flint's own historical name
-    /// was "flint.cfg" — since CONFIG C5 the global config is flint.json and this name is
+    /// was "flint.cfg" — the global config is now flint.json and this name is
     /// the IMPORT-ONLY chain anchor (FlintConfigImporter probe order) plus the legacy
     /// migration filter term; Flint never writes it.
     /// </summary>
@@ -46,7 +46,7 @@ public sealed class FlintConfig
     public int VersionMinor { get; init; } = 1;
     public int VersionPatch { get; init; } = 0;
 
-    /// <summary>Update channel; TODO(P0+): derive from git branch / SourceRevisionId at build time.</summary>
+    /// <summary>Update channel; TODO: derive from git branch / SourceRevisionId at build time.</summary>
     public string VersionChannel { get; init; } = "develop";
 
     public string GitCommit { get; init; } = "";
@@ -64,7 +64,7 @@ public sealed class FlintConfig
 
     public string UpdaterGithubRepo { get; init; } = "https://github.com/PrismLauncher/PrismLauncher";
 
-    // (the news feed URLs left with CACHE E7 — the checker they fed is deleted)
+    // (the news feed URLs left with the checker they fed — it is deleted)
     public string WikiUrl { get; init; } = "https://prismlauncher.org/wiki/";
     public string HelpUrl { get; init; } = "https://prismlauncher.org/wiki/help-pages/%1";
     public string LoginCallbackUrl { get; init; } = "https://prismlauncher.org/successful-login";

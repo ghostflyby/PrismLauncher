@@ -7,9 +7,9 @@
 //  - the C++ task receives BaseVersion::Ptr objects and forwards descriptor() strings; the
 //    version-list layer is not ported, so the constructor takes the descriptors directly
 //    ("1.20.1", the loader uid, the loader version).
-//  - downloadFiles() is not ported: it drives createUpdateTask() (the P5 update pipeline)
+//  - downloadFiles() is not ported: it drives createUpdateTask() (the update pipeline)
 //    and a GUI error dialog; creation succeeds without fetching game files.
-//  - D4: the staged instance is created through the typed instance.json adapter — new
+//  - the staged instance is created through the typed instance.json adapter — new
 //    instances are Flint format from birth (no instance.cfg is written).
 
 using FlintLauncher.Core.Config;
@@ -40,7 +40,7 @@ public sealed class VanillaCreationTask : InstanceTask
     {
         EmitStatus("Creating instance from version " + _version);
 
-        // D4: a fresh Flint instance writes instance.json (the typed adapter) — the staged
+        // a fresh Flint instance writes instance.json (the typed adapter) — the staged
         // folder commits as Flint format
         var instance = new MinecraftInstance(
             new InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(

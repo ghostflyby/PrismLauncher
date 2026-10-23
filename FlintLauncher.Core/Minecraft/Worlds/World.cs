@@ -26,6 +26,7 @@ using System.IO.Compression;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Nbt;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Minecraft.Worlds;
 
@@ -141,12 +142,12 @@ public sealed class World
         else if (Directory.Exists(full))
         {
             var assumedIconPath = new AbsolutePath(full) / "icon.png";
-            if (File.Exists(assumedIconPath.Value))
+            if (assumedIconPath.ExistsFile())
             {
                 IconFile = Path.GetFullPath(assumedIconPath.Value);
             }
 
-            IsValid = File.Exists((new AbsolutePath(full) / "level.dat").Value);
+            IsValid = (new AbsolutePath(full) / "level.dat").ExistsFile();
         }
         else
         {
@@ -207,7 +208,7 @@ public sealed class World
         }
 
         var levelDatPath = new AbsolutePath(ContainerPath) / "level.dat";
-        if (!File.Exists(levelDatPath.Value))
+        if (!levelDatPath.ExistsFile())
         {
             return false;
         }
@@ -255,9 +256,14 @@ public sealed class World
         {
             try
             {
+                // a plain same-folder directory rename. FileOps.Move is deliberately NOT
+                // used: its copy+delete fallback is the import pipeline's merge semantics
+                // and must not run for a rename — against an existing target it would
+                // MERGE into that world, and over locked files it would duplicate this
+                // one (PathIo has no directory move, hence the raw call)
                 Directory.Move(ContainerPath, targetPath.Value);
                 ContainerPath = Path.GetFullPath(targetPath.Value);
-                FolderName = Path.GetFileName(ContainerPath);
+                FolderName = targetPath.FileName;
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
@@ -512,7 +518,7 @@ public sealed class World
     private static byte[]? GetDatDataFromFs(string root, string file)
     {
         var fullFilePath = new AbsolutePath(root) / file;
-        if (!File.Exists(fullFilePath.Value))
+        if (!fullFilePath.ExistsFile())
         {
             return null;
         }

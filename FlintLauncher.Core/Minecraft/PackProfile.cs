@@ -10,17 +10,17 @@
 //    <see cref="MinecraftChanged"/> and <see cref="DataChanged"/>.
 //  - The MinecraftInstance dependency is reduced to the <see cref="IPackProfileEnv"/> surface
 //    (instance root, instance name, runtime context); MinecraftInstance will implement it in
-//    P3. A plain constructor taking the instance root is available for tests/standalone use.
+//    later. A plain constructor taking the instance root is available for tests/standalone use.
 //  - APPLICATION->metadataIndex() becomes the per-profile <see cref="MetadataIndex"/> (in C++
 //    all profiles share the application-wide index; pass the same instance around to share).
 //  - scheduleSave()'s 5-second QTimer becomes a dirty flag only: saving happens through
-//    <see cref="SaveNow"/> (and on <see cref="Dispose"/>); the instance layer (P3) can wire a
+//    <see cref="SaveNow"/> (and on <see cref="Dispose"/>); the instance layer can wire a
 //    timer on top.
 //  - reload()/resolve() await the ComponentUpdateTask (C++ start()s it and returns, results
 //    arriving via signals); the returned Task makes the completion awaitable.
 //  - setComponentVersion() is async for the same reason (important changes trigger a resolve).
 //  - Not ported: setOldConfigVersion() and writeOverrideOrders() (declared-but-undefined
-//    upstream), updateLatestMinecraft() (instance update flow, P3) and the model roles.
+//    upstream), updateLatestMinecraft() (instance update flow) and the model roles.
 
 using System.Text;
 using System.Text.Json;
@@ -31,6 +31,7 @@ using FlintLauncher.Core.Json;
 using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Net;
 using TruePath;
+using TruePath.SystemIo;
 using Index = FlintLauncher.Core.Meta.Index;
 
 namespace FlintLauncher.Core.Minecraft;
@@ -38,7 +39,7 @@ namespace FlintLauncher.Core.Minecraft;
 /// <summary>
 /// Port of the MinecraftInstance surface PackProfile/Component actually use (instanceRoot(),
 /// name(), runtimeContext(), jarModsDir()/getLocalLibraryPath() are all derived from the
-/// instance root). Implemented by MinecraftInstance in P3.
+/// instance root). Implemented by MinecraftInstance.
 /// </summary>
 public interface IPackProfileEnv
 {
@@ -484,7 +485,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     private static Result LoadPackProfile(PackProfile parent, AbsolutePath filename,
         List<Component> container)
     {
-        if (!File.Exists(filename.Value))
+        if (!filename.ExistsFile())
         {
             return Result.Error($"Components file {filename} doesn't exist. This should never happen.");
         }
@@ -801,7 +802,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     {
         var ok = true;
         // first, remove the patch file. this ensures it's not used anymore
-        if (patch.GetFilename() is { } fileName && File.Exists(fileName.Value) && !FileOps.DeletePath(fileName))
+        if (patch.GetFilename() is { } fileName && fileName.ExistsFile() && !FileOps.DeletePath(fileName))
         {
             return false;
         }
@@ -819,7 +820,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
             var temp2 = new List<AbsolutePath>();
             var temp3 = new List<AbsolutePath>();
             jarMod.GetApplicableFiles(RuntimeContext(), jar, temp1, temp2, temp3, JarModsDir());
-            if (jar.Count != 0 && File.Exists(jar[0].Value) && !FileOps.DeletePath(jar[0]))
+            if (jar.Count != 0 && jar[0].ExistsFile() && !FileOps.DeletePath(jar[0]))
             {
                 ok = false;
             }
@@ -915,7 +916,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         var targetName = CompleteBaseName(filepath.Value) + " (custom jar)";
         var finalPath = libDir / targetFilename;
 
-        if (File.Exists(finalPath.Value) && !FileOps.DeletePath(finalPath))
+        if (finalPath.ExistsFile() && !FileOps.DeletePath(finalPath))
         {
             return false;
         }

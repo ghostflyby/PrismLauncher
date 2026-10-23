@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Assembly-sequence diagnostics (GLOBAL §2 step 2, "logger early, every later step
+// Assembly-sequence diagnostics ("logger early, every later step
 // diagnosable"): a runtime-constructor crash must reach the state-root file sink — the
 // rolling file provider opens its writer in its own constructor, BEFORE the runtime
 // assembly, so the WebHostBuilder catch can write the failure into Flint-0.log before
@@ -29,7 +29,7 @@ public class WebHostAssemblyTests
 
             File.SetUnixFileMode(ini, UnixFileMode.None);
 
-            // the unreadable chain INI makes the C5 import throw inside the runtime
+            // the unreadable chain INI makes the import throw inside the runtime
             // constructor (IniFile.LoadFile catches IOException only) — the crash must be
             // written to the file sink before the exception re-emerges
             var crash = Record.Exception(() =>

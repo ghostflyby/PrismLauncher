@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/launch/AutoInstallJava.{h,cpp}: pick a runtime from the java
 // metadata list matching the profile's compatible java majors (and the OS/arch) and install it
-// through the P5a Java::Manifest/ArchiveDownloadTask machinery.
+// through the Java::Manifest/ArchiveDownloadTask machinery.
 //
 // Application-singleton reach-ins resolve through the parent LaunchTask's LaunchServices
 // (see the other Launch steps):
 //  - APPLICATION->settings() (global, the java/download switches) -> Services.Config
-//    (the typed flint.json store, D4)
+//    (the typed flint.json store)
 //  - APPLICATION->javalist() (the "no download" branch) -> Services.JavaInstallListProvider
 //    (null degrades to the upstream "no compatible Java version was found" warning)
 //  - APPLICATION->javaPath() (settings "JavaDir")   -> Services.JavaRoot (the JavaDir
-//    setting under E2 store semantics; falls back to the store/java anchor)
+//    setting under store semantics; falls back to the store/java anchor)
 //  - APPLICATION->metadataIndex()                   -> the instance PackProfile's index
 //
 // Flow deviations from the C++ (documented):
@@ -49,9 +49,9 @@ public sealed class AutoInstallJava : LaunchStep
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         var settings = _instance.Settings;
-        // the typed user layer (D4): the C++ default of this switch derives from the
+        // the typed user layer: the C++ default of this switch derives from the
         // INI-loaded JavaPath being empty (Application.cpp:768-770) and the one-shot import
-        // materializes exactly that into flint.json (E3) — so a present store carries the
+        // materializes exactly that into flint.json — so a present store carries the
         // effective switch (true only for an empty/pinned-absent JavaPath), while a null
         // store keeps the bare-fixture "feature off" behavior the former unset global double
         // produced
@@ -143,7 +143,7 @@ public sealed class AutoInstallJava : LaunchStep
     private void SetJavaPath(AbsolutePath path)
     {
         var settings = _instance.Settings;
-        // C7: there is no gate boolean anymore — writing JavaPath sets the instance-layer
+        // there is no gate boolean anymore — writing JavaPath sets the instance-layer
         // member, which IS the override (the derived OverrideJavaLocation reads true)
         settings.Set("JavaPath", path);
         settings.Set("AutomaticJava", true);

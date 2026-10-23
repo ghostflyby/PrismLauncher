@@ -8,7 +8,7 @@
 //
 // Deviations (headless port):
 //  - the download goes straight into a temporary folder (the port has no meta cache)
-//  - downloadFiles() (the P5 update pipeline) is not ported; creation succeeds without
+//  - downloadFiles() (the update pipeline) is not ported; creation succeeds without
 //    fetching game files, like the other creation tasks.
 
 using System.Text.Json;
@@ -111,7 +111,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
             }
         }
 
-        // D4: the staged instance is Flint format from birth (typed instance.json adapter)
+        // the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
             new InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution.")),
@@ -186,7 +186,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
             instance.SetIconKey(Icon == "default" ? "ftb_logo" : Icon);
         }
 
-        // (upstream calls downloadFiles(m_instance.get()) here — the P5 update pipeline;
+        // (upstream calls downloadFiles(m_instance.get()) here — the update pipeline;
         //  like the other creation tasks, creation succeeds without fetching game files)
         await Task.CompletedTask;
         EmitSucceeded();

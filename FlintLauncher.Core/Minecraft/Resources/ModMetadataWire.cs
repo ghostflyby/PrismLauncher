@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The mod-metadata wire (docs/JSON-MIGRATION.md batch "mod 信息读取类型化"): typed probes
+// The mod-metadata wire: typed probes
 // over the four JSON schemas LocalModParse consumes — mcmod.info, fabric.mod.json,
 // quilt.mod.json and litemod.json. These are fixed structured formats of files WE consume,
 // so the former "heuristic" node probing becomes records + the Qt coercion converters

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// P6-fix-b API integration tests: the modplatform endpoints (CurseForge search pass-through,
+// API integration tests: the modplatform endpoints (CurseForge search pass-through,
 // per-provider indexed version lists) and the per-instance mods surface (list / tracked
 // install with the dependency chain / tracked update) against the real in-process web host
 // (FlintApiHost) and the provider stub servers from ModrinthTestSupport/FlameTestSupport.
@@ -60,7 +60,7 @@ public class FlintApiFlameSearchTests : IDisposable
     [Fact]
     public async Task Flame_Search_MapsHits_And_SendsApiKey()
     {
-        // G4: the Flame key is a store secret — the host startup apply derives the provider
+        // the Flame key is a store secret — the host startup apply derives the provider
         // from the ISecretStore, so the key goes in through PUT /settings (the former direct
         // ApiKeyProvider override no longer survives host startup)
         _server.SearchJson = new JsonObject { ["data"] = new JsonArray(JsonNode.Parse(SearchHitJson)) }.ToJsonString();

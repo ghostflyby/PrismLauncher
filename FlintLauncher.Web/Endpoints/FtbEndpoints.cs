@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// FTB endpoints (fix-2 step 2), mirroring the ATLauncher surface: the /modpack/all index
+// FTB endpoints, mirroring the ATLauncher surface: the /modpack/all index
 // pass-through, the per-pack description + version list (mapped through FtbPackManifest's
 // loaders like the C++ FtbListModel) and the pack install — FtbPackInstallTask run through
 // the same staged-commit flow as POST /modplatform/atlauncher/install (the modpacks.ch
@@ -155,7 +155,7 @@ public static class FtbEndpoints
                 }
 
                 runtime.Instances.LoadList();
-                // the staged commit's expected dirname, resolved through the D2 chain
+                // the staged commit's expected dirname, resolved through the chain
                 var inst = runtime.Instances.ResolveInstance(expectedId);
                 return inst is null
                     ? ApiJson.Error("creation_failed", "instance was committed but not discovered", 500)

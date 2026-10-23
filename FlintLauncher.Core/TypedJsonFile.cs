@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Strongly-typed JSON file infrastructure (GLOBAL §1): one instance per file, load-or-
+// Strongly-typed JSON file infrastructure: one instance per file, load-or-
 // default, atomic write, and a stateVersion evolution hook. Consumers (launcher-state.json,
 // migration/*.json, instance-state.json, later flint.json) pass the source-generated
 // JsonTypeInfo<T> from FlintJsonContext — reflection-based serialization never enters the
@@ -15,8 +15,8 @@ using TruePath.SystemIo;
 
 namespace FlintLauncher.Core;
 
-/// <summary>Marker for state records persisted with a <c>stateVersion</c> discriminator (S5
-/// launcher-state.json, D4 instance-state.json). The property must be serialized so the
+/// <summary>Marker for state records persisted with a <c>stateVersion</c> discriminator (
+/// launcher-state.json, instance-state.json). The property must be serialized so the
 /// evolution gate can read the on-disk version.</summary>
 public interface IStateVersioned
 {
@@ -34,7 +34,7 @@ public sealed class TypedJsonFile<T>(AbsolutePath filePath, JsonTypeInfo<T> type
     /// default. A corrupt payload is preserved next to the file as <c>&lt;name&gt;.corrupt</c>
     /// (previous backup replaced) — defaulting must not silently destroy the evidence.
     ///
-    /// <paramref name="mergeWithDefault"/> is the record-merge helper (C6/C7 fold shape):
+    /// <paramref name="mergeWithDefault"/> is the record-merge helper (fold shape):
     /// it receives the loaded record and folds it over a fresh default so members added
     /// since the file was written take their current default — with-expressions only, no
     /// reflection, e.g. <c>loaded => loaded with { NewField = loaded.NewField }</c> when the
@@ -139,7 +139,7 @@ public sealed class TypedJsonFile<T>(AbsolutePath filePath, JsonTypeInfo<T> type
     }
 }
 
-/// <summary>The stateVersion evolution half of the infrastructure (GLOBAL §1; S5/D4 share
+/// <summary>The stateVersion evolution half of the infrastructure (shared
 /// it). <see cref="TypedJsonFileVersioning.LoadEvolved{U}"/> gates the caller's migration function
 /// on the on-disk version vs the current default's version — the current default record IS
 /// the schema version, so the caller never states the number twice.</summary>
@@ -151,7 +151,7 @@ public static class TypedJsonFileVersioning
     /// downgrade) is handed to <paramref name="evolve"/>(onDiskVersion, payload) which owns
     /// both the upgrade and the downgrade policy. <paramref name="mergeWithDefault"/>, when
     /// given, folds EVERY loaded payload over the current defaults BEFORE the gate (the
-    /// C6/C7 fold shape: members absent from an older/partial payload take their property
+    /// fold shape: members absent from an older/partial payload take their property
     /// defaults) — this is the single stateVersion gate; do not fork a second one.</summary>
     public static TU LoadEvolved<TU>(this TypedJsonFile<TU> file, Func<TU> currentDefault,
         Func<int, TU, TU> evolve, Func<TU, TU>? mergeWithDefault = null)

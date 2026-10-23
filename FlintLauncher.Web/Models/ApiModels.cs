@@ -26,7 +26,7 @@ public sealed record ApiErrorEnvelope(ErrorResponse Error);
 
 // ------------------------------------------------------------------ instances
 
-/// <summary>One entry of GET /instances (DATA D2 wire shape): every handle of the
+/// <summary>One entry of GET /instances (the wire shape): every handle of the
 /// addressing chain is exposed — uuid (the only persistent reference form), inode (0 on
 /// platforms without stat inode support, e.g. Windows) and dirName (compat/display; the
 /// "id" field keeps serving the same dirname so existing clients do not break the
@@ -114,7 +114,7 @@ public sealed record ModInstallEntryView(
     string? RequiredBy);
 
 /// <summary>Optional terminal payload of a task (mods-update sets Updates, mods-install sets
-/// Installed, the Wave B export tasks set OutputPath).</summary>
+/// Installed, the export tasks set OutputPath).</summary>
 public sealed record TaskResultView(
     IReadOnlyList<ModUpdateEntryView>? Updates,
     IReadOnlyList<ModInstallEntryView>? Installed,
@@ -162,7 +162,7 @@ public sealed record ModrinthSearchResult(
     string Author,
     long Downloads);
 
-// ------------------------------------------------------------------ modplatform (P6-fix-b)
+// ------------------------------------------------------------------ modplatform
 
 /// <summary>A CurseForge search hit mapped through FlameMod.LoadIndexedPack.</summary>
 public sealed record FlameSearchResult(
@@ -209,7 +209,7 @@ public sealed record ProviderCategoryView(string Id, string Name, string Icon);
 /// <summary>The plain-text body of a project description / file changelog.</summary>
 public sealed record ProviderBodyView(string Body);
 
-// ------------------------------------------------------------------ UI-API Wave A
+// ------------------------------------------------------------------ instance content
 
 /// <summary>One named group of the instance list (GET /instances/groups).</summary>
 public sealed record InstanceGroupView(string Name, IReadOnlyList<string> InstanceIds);
@@ -308,7 +308,7 @@ public sealed record GameOptionView(string Key, string Value);
 /// <summary>PUT /instances/{id}/gameoptions body: key/values to set (add-or-replace).</summary>
 public sealed record GameOptionsPutRequest(IReadOnlyList<GameOptionView> Options);
 
-// ------------------------------------------------------------------ UI-API Wave B
+// ------------------------------------------------------------------ components / export / settings
 
 /// <summary>One problem of a component (GET /instances/{id}/components, the VersionPage
 /// problem column).</summary>
@@ -397,7 +397,7 @@ public sealed record AboutResponse(
     string SubredditUrl,
     string BugTrackerUrl);
 
-// ----------------------------------------------------------------- ATLauncher (fix-2)
+// ----------------------------------------------------------------- ATLauncher
 
 /// <summary>One packsnew.json index version (GET /modplatform/atlauncher/packs[/versions]).</summary>
 public sealed record AtLauncherPackVersionView(string Version, string Minecraft);
@@ -424,7 +424,7 @@ public sealed record AtLauncherInstallRequest(
     string? ChooseLoaderVersion = null,
     string? ServerUrl = null);
 
-// ----------------------------------------------------------------- FTB (fix-2b)
+// ----------------------------------------------------------------- FTB
 
 /// <summary>One /modpack/all index entry — the index payload only carries pack ids.</summary>
 public sealed record FtbPackIndexEntry(int Id);
@@ -472,7 +472,7 @@ public sealed record FtbInstallRequest(
     string? Group = null,
     string? ServerUrl = null);
 
-// ----------------------------------------------------------------- Technic (fix-2c)
+// ----------------------------------------------------------------- Technic
 
 /// <summary>One search/trending hit mapped through TechnicApi.LoadSearchResults (id is the
 /// slug; displayName is only set by the single-pack mode, where the API distinguishes the
@@ -522,13 +522,13 @@ public sealed record TechnicInstallRequest(
     string? Group = null,
     string? ServerUrl = null);
 
-// ----------------------------------------------------------------- skins (fix-2c)
+// ----------------------------------------------------------------- skins
 
 /// <summary>GET /accounts/{profileId}/skin: the profile skin data the login flow stored on
 /// the account (variant is the API's CLASSIC/SLIM spelling; empty when unknown).</summary>
 public sealed record AccountSkinView(string Url, string Variant);
 
-// ------------------------------------------------- skins (DATA D6: local skin library)
+// ------------------------------------------------- skins (local skin library)
 
 /// <summary>One entry of the local skin library (GET /skins). model is CLASSIC/SLIM;
 /// capeId/url are the stored metadata (empty when unknown); fileExists reports whether the

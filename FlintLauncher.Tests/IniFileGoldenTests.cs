@@ -2,7 +2,7 @@
 // Byte-level compatibility tests for the INI layer against golden files produced by real
 // QSettings (Qt 6.11) — see FlintLauncher/tools/qt-ini-golden. The *_dump.tsv fixtures record
 // what QSettings itself reads back from the same files, so the parser is compared against Qt's
-// own interpretation. READ side only (CONFIG C5/D4: Flint never writes an INI — the writer
+// own interpretation. READ side only (Flint never writes an INI — the writer
 // half and its byte-level round-trip tests retired with the instance.cfg write path).
 
 using FlintLauncher.Core.Settings;
@@ -73,7 +73,7 @@ public class IniFileGoldenTests
     }
 
     /// <summary>Port of IniFileTest::test_SaveAlreadyExistingFile (pre-1.1 legacy format) —
-    /// the parse/migrate half only (Flint never re-saves an INI, C5/D4).</summary>
+    /// the parse/migrate half only (Flint never re-saves an INI).</summary>
     [Fact]
     public void Legacy_NoConfigVersion_File_Parses()
     {

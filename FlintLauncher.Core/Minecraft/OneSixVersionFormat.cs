@@ -9,7 +9,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
 using System.Text.RegularExpressions;
-using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Meta;
 
 namespace FlintLauncher.Core.Minecraft;

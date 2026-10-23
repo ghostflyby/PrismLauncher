@@ -4,6 +4,7 @@
 
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Tasks;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
@@ -13,7 +14,7 @@ public sealed class FoldersTask(MinecraftInstance inst) : FlintTask
     {
         // Make directories
         var mcDir = inst.GameRoot;
-        if (!Directory.Exists(mcDir.Value))
+        if (!mcDir.ExistsDirectory())
         {
             try
             {

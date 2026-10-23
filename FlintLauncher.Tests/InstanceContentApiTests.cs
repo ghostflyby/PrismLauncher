@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// UI-API mapping Wave A tests: host the real web app in-process (same pattern as
+// Instance-content API tests: host the real web app in-process (same pattern as
 // ApiIntegrationTests) and drive the new instance-content surface — instances search/group
 // filters + /instances/groups, the copy flow (202 task), worlds CRUD/rename/install,
 // servers.dat CRUD + the status ping against a local TCP stub, resources/{type}
@@ -30,7 +30,7 @@ namespace FlintLauncher.Tests;
 /// <summary>Like FlintApiHost, but the temp home's data root is created (and seeded) by the
 /// caller BEFORE the host starts — the instance list loads once in the runtime constructor.
 /// The caller passes the home root; instances live under &lt;home&gt;/data/instances (the
-/// G1 home layout).</summary>
+/// home layout).</summary>
 internal sealed class WaveApiHost : IAsyncDisposable
 {
     private readonly WebApplication _app;
@@ -63,7 +63,7 @@ internal sealed class WaveApiHost : IAsyncDisposable
         var dataDir = Path.Combine(homeDir, "data");
         Directory.CreateDirectory(dataDir);
         var previousCwd = Environment.CurrentDirectory;
-        // S2: the token is host-injected (--api-token) — no token file exists to read
+        // the token is host-injected (--api-token) — no token file exists to read
         var token = Guid.NewGuid().ToString("N");
         var app = WebHostBuilder.BuildWebApplication(
         [
@@ -131,7 +131,7 @@ internal sealed class WaveApiHost : IAsyncDisposable
 
 internal static class WaveSeed
 {
-    /// <summary>The data root's instances dir for a home root (the G1 home layout).</summary>
+    /// <summary>The data root's instances dir for a home root (the home layout).</summary>
     public static string InstancesDir(string homeDir) =>
         Path.Combine(homeDir, "data", "instances");
 
@@ -260,7 +260,7 @@ public class InstanceQueryApiTests : IAsyncDisposable
         WaveSeed.Instance(_dataDir, "loose", "Loose");
         _host = await WaveApiHost.StartAsync(_dataDir);
 
-        // assign groups through the PATCH endpoint (the group definitions live in the C8
+        // assign groups through the PATCH endpoint (the group definitions live in the
         // groups file, members as uuid references)
         await PatchGroup("one", "Packs");
         await PatchGroup("two", "Packs");
@@ -269,7 +269,7 @@ public class InstanceQueryApiTests : IAsyncDisposable
             "/api/v1/instances/groups")).RootElement;
         Assert.Equal(1, groups.GetArrayLength());
         Assert.Equal("Packs", groups[0].GetProperty("name").GetString());
-        // DATA D3: the members are uuid references (the persistent form)
+        // the members are uuid references (the persistent form)
         var uuidOf = await _host.Client.GetStringAsync("/api/v1/instances");
         var uuids = JsonDocument.Parse(uuidOf).RootElement.EnumerateArray()
             .Where(e => new[] { "one", "two" }.Contains(e.GetProperty("id").GetString()))

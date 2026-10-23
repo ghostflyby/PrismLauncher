@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The instance settings object over the typed layer stack (DATA D4 + CONFIG C6/C7 — the
+// The instance settings object over the typed layer stack (the
 // SettingsObject shape the instance/launch layer reads through, backed by
 // flint.json -> instance.json instead of instance.cfg):
 //
-//  - READS resolve through the C7 fold per key (InstanceConfigKeys): instance-layer member
+//  - READS resolve through the fold per key (InstanceConfigKeys): instance-layer member
 //    when set, else the user layer (the live flint.json snapshot), else the registered
 //    Setting default (the instance-only keys' defaults).
 //  - WRITES land in the instance layer only and persist instance.json atomically; on a
 //    Prism-format instance the first write performs the dual-track conversion (the in-memory
 //    instance.cfg import materializes as instance.json — see InstanceConfigStore).
 //  - The runtime time trio (lastLaunchTime/lastTimePlayed/totalTimePlayed) routes to
-//    instance-state.json (D4), never to the config.
-//  - The Override* gates are DERIVED (C7): reading computes "any family member set"; writing
-//    false clears the family. The C7 passthrough pair reads the user layer and drops
+//    instance-state.json, never to the config.
+//  - The Override* gates are DERIVED: reading computes "any family member set"; writing
+//    false clears the family. The passthrough pair reads the user layer and drops
 //    instance-side writes.
 //
-// This replaces the IniSettingsObject instance.cfg store (the INI write path is gone — C5)
-// and, together with the typed user stack, retires the S2 FlintConfigSettings adapter.
+// This replaces the IniSettingsObject instance.cfg store (the INI write path is gone)
+// and, together with the typed user stack, retires the FlintConfigSettings adapter.
 
 using FlintLauncher.Core.Settings;
 using TruePath;

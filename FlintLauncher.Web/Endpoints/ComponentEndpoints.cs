@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Component-stack endpoints (UI-API mapping Wave B, the VersionPage): list the instance's
+// Component-stack endpoints (the VersionPage): list the instance's
 // component list (PackProfile), change a component's pinned version / important flag,
 // install a loader component, customize (materialize the metadata patch as a local file),
 // revert (delete the local patch and fall back to metadata), remove and reorder.
@@ -14,7 +14,7 @@
 //   remove                → DELETE /instances/{id}/components/{uid}
 //   move up/down          → POST /instances/{id}/components/{uid}/move {delta}
 //  (the C++ "add empty patch" and the jarmod/agent/custom-jar imports of PackProfile are
-//   not exposed here — deferred; see the Wave B delivery notes)
+//   not exposed here — deferred)
 //
 // Every mutation runs through PackProfile (the same code paths the C++ page drives) and
 // SaveNow()s the profile afterwards (the C++ schedules a 5s deferred save; the port saves
@@ -308,7 +308,7 @@ public static class ComponentEndpoints
     // ----------------------------------------------------------------------- helpers
 
     /// <summary>The MinecraftInstance for a {ref} (the component stack needs the PackProfile).
-    /// D2: every endpoint resolves through the addressing chain (GLOBAL §1).</summary>
+    /// every endpoint resolves through the addressing chain.</summary>
     private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string reference) =>
         runtime.Instances.ResolveInstance(reference) as MinecraftInstance;
 

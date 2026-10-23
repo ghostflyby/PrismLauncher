@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Tests for the VanillaCreationTask port: folder layout, the instance.json identity keys and
-// the initial mmc-pack.json, verified through the real PackProfile loader. D4: a fresh
+// the initial mmc-pack.json, verified through the real PackProfile loader. A fresh
 // instance is Flint format from birth — no instance.cfg is written.
 
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Instances.Creation;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Tasks;
 using TruePath;
 using Xunit;
@@ -37,11 +38,10 @@ public class VanillaCreationTests : IDisposable
     }
 
     private InstanceList CreateList() =>
-        new([new AbsolutePath(_instancesDir)])
-        {
-            Environment = _global,
-            GroupFilePath = new AbsolutePath(_groupFile),
-        };
+        new([MaterializedDirectory.Ensure(new AbsolutePath(_instancesDir))!],
+            _global,
+            new AbsolutePath(_groupFile),
+            []);
 
     private VanillaCreationTask CreateTask(string version, string name)
     {

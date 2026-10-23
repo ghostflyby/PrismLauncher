@@ -97,7 +97,7 @@ public class FlameExportTests : IDisposable
                 websiteUrl: "https://www.curseforge.com/projects/unmeta-mod")),
         }.ToJsonString();
 
-        // the export reads the instance through the typed settings stack (D4) — the staged
+        // the export reads the instance through the typed settings stack — the staged
         // instance is Flint format (instance.json), written by the import task itself
         var instance = new MinecraftInstance(
             new InstanceJsonSettingsObject(new AbsolutePath(staging), _global.Environment), new AbsolutePath(staging));

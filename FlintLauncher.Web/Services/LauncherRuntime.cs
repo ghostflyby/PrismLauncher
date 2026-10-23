@@ -8,6 +8,7 @@ using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Icons;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
@@ -25,7 +26,7 @@ using TruePath;
 
 namespace FlintLauncher.Web.Services;
 
-public sealed class LauncherRuntime
+public sealed class LauncherRuntime : IDisposable
 {
     public FlintPaths Paths { get; }
     public AbsolutePath DataDir => Paths.DataDir;
@@ -57,42 +58,40 @@ public sealed class LauncherRuntime
     /// auth flow and the skin/cape calls; tests construct a runtime pointed at their stub).</summary>
     public AuthEndpointsOptions Auth { get; }
 
-    /// <summary>The C++ APPLICATION->settings(): the typed flint.json store (CONFIG C5/C6 —
+    /// <summary>The C++ APPLICATION->settings(): the typed flint.json store —
     /// load-or-default, atomic writes; the /settings surface and RuntimeNetConfig read the
     /// resolved fold through it). The instance layer folds it as the user layer of its own
-    /// instance.json stack (D4) — the former SettingsObject adapter view retired with the D4
-    /// batch.</summary>
+    /// instance.json stack.</summary>
     public FlintConfigStore Config { get; }
 
-    /// <summary>The launcher runtime state (launcher-state.json, S5 — assembly step 4:
-    /// loaded BEFORE the config so the C5 importer can strip state keys into it later).</summary>
+    /// <summary>The launcher runtime state (launcher-state.json):
+    /// loaded BEFORE the config so the importer can strip state keys into it later).</summary>
     public LauncherStateStore State { get; }
 
-    /// <summary>The transitional secret store (CONFIG C4, assembly step 3:
-    /// &lt;data-root&gt;/secrets.json, 0600).</summary>
+    /// <summary>The transitional secret store (&lt;data-root&gt;/secrets.json, 0600).</summary>
     public ISecretStore Secrets { get; }
 
-    /// <summary>The per-source migration decision records (STATE S3:
-    /// &lt;state-root&gt;/migration/&lt;source&gt;.json).</summary>
+    /// <summary>The per-source migration decision records
+    /// (&lt;state-root&gt;/migration/&lt;source&gt;.json).</summary>
     public MigrationDecisionStore MigrationDecisions { get; }
 
     public InstanceList Instances { get; }
 
-    /// <summary>The global icon library (DATA D5: the IconList port — key→path index,
+    /// <summary>The global icon library (the IconList port — key→path index,
     /// scan, install/delete — over the IconsDir setting).</summary>
     public IconPool Icons { get; }
 
-    /// <summary>The local skin library (DATA D6 plan B) over the SkinsDir setting.</summary>
+    /// <summary>The local skin library over the SkinsDir setting.</summary>
     public SkinsLibrary Skins { get; }
 
     public AccountList Accounts { get; }
     public HttpMetaCache MetaCache { get; }
 
-    /// <summary>The flint-legacy eager pass outcome (assembly step 5, GLOBAL G2): what the
+    /// <summary>The flint-legacy eager pass outcome: what the
     /// startup remount did, so the host can log it and tests can assert it.</summary>
     public FlintLegacyMigration.Result LegacyMigration { get; }
 
-    /// <summary>The C5 INI import outcome (assembly step 6): what the one-shot importer did,
+    /// <summary>The INI import outcome: what the one-shot importer did,
     /// including an unreadable chain INI — the ctor runs before any logger exists, so the
     /// host surfaces this after Build (the flint-legacy result pattern).</summary>
     public FlintConfigImporter.ImportResult ConfigImport { get; }
@@ -118,93 +117,150 @@ public sealed class LauncherRuntime
         Ftb = ftb ?? new FtbApi(Net);
         Imgur = imgur ?? new ImgurApi(Net);
 
-        // secrets init (assembly step 3): <dataDir>/secrets.json (0600) — the C4 transitional
-        // backend; the secret trio (ProxyPass/ModrinthToken/FlameKeyOverride) reads and
-        // writes here (G4: PUT /settings reroutes, RuntimeNetConfig/API clients read the store)
+        // the watched-directory tenancy (the restored C++ watcher glue): reconciles are
+        // serialized through the instance lock — watch events arrive on threadpool threads
+        // and must not race endpoint mutations of the instance list
+        InstanceWatchSpace = new DirectorySpace(action =>
+        {
+            InstanceLock.Wait();
+            try
+            {
+                action();
+            }
+            finally
+            {
+                InstanceLock.Release();
+            }
+        });
+
+        // secrets init: <dataDir>/secrets.json (0600) — the transitional
+        // store; the secret trio (ProxyPass/ModrinthToken/FlameKeyOverride) reads and
+        // writes here (PUT /settings reroutes, RuntimeNetConfig/API clients read the store)
         Secrets = new FileSecretStore(paths.SecretsFile, FlintJsonContext.Default.SecretsFile);
 
-        // state load (assembly step 4): launcher-state.json BEFORE the config import — the
-        // importer will strip the C9 state keys into it (GLOBAL §2 ordering)
+        // state load: launcher-state.json BEFORE the config import — the
+        // importer will strip the state keys into it
         State = new LauncherStateStore(paths.LauncherStateFile, FlintJsonContext.Default.LauncherState);
 
-        // per-source migration decision records (S3): <stateDir>/migration/<source>.json
+        // per-source migration decision records: <stateDir>/migration/<source>.json
         MigrationDecisions = new MigrationDecisionStore(
             paths.MigrationDir, FlintJsonContext.Default.MigrationDecisionRecord);
 
-        // flint-legacy migration probe/execute (assembly step 5, GLOBAL G2): the pre-reform
+        // flint-legacy migration probe/execute: the pre-reform
         // flat layout remounts onto the five roots ONCE (eager, no lazy dual-read) — before
         // the config import so the moved flint.cfg is found on the config side, and before
         // the cache ledger is built so its Load() reads the remounted metacache.json
         LegacyMigration = FlintLegacyMigration.ExecuteIfNeeded(paths, MigrationDecisions);
 
-        // global config (assembly step 6): flint.json is the authoritative user layer (C5);
+        // global config: flint.json is the authoritative user layer;
         // when it is missing, the one-shot importer reads the INI chain
         // (flint.cfg ← prismlauncher.cfg/polymc.cfg/multimc.cfg|mmc.cfg) and sorts it in a
-        // single pass — secret trio → the store (C4, loaded above), C9 state keys → the
+        // single pass — secret trio → the store (loaded above), state keys → the
         // state store (loaded above), the rest → the record domains. Flint never writes INI.
         Config = new FlintConfigStore(paths.ConfigFile, FlintJsonContext.Default.FlintConfigFile);
         ConfigImport = FlintConfigImporter.ImportIfNeeded(paths, Config, Secrets, State);
 
-        // meta cache (assembly step 8, CACHE E6 — the C++ Application.cpp:1036-1051 startup
-        // shape: ONE registration of every base, then the ledger Load()). The mounts follow
-        // E2/E3: the store bases (libraries/assets/asset_indexes/java) hang off the store
+        // meta cache (the C++ Application.cpp:1036-1051 startup
+        // shape: ONE registration of every base, then the ledger Load()). The store bases
+        // (libraries/assets/asset_indexes/java) hang off the store
         // root, the true-cache bases (meta/ledger/general/icons/fmllibs/pack downloads) off
-        // the cache root. The former lazy in-task registrations (asset_indexes/fmllibs/java)
-        // resolved against the process CWD when they fired before any stamp — the defect E6
-        // retires. The dead "screenshots" base is gone with it (DATA D8).
+        // the cache root. Bases are registered exactly once, here, before any use — a
+        // registration is never lazy enough to resolve against the process CWD. There is
+        // no "screenshots" base (nothing consumes it).
         MetaCache = new HttpMetaCache(paths.MetacacheFile);
-        MetaCache.AddBase("meta", paths.MetaDir);                  // cache/meta (E3)
-        MetaCache.AddBase("libraries", paths.LibrariesRoot);       // store/libraries (E2)
-        MetaCache.AddBase("assets", paths.AssetsRoot);             // store/assets (E2)
-        MetaCache.AddBase("asset_indexes", paths.AssetIndexesDir); // store/assets/indexes (E2)
-        MetaCache.AddBase("java", paths.JavaRoot);                 // store/java (E2)
+        MetaCache.AddBase("meta", paths.MetaDir);
+        MetaCache.AddBase("libraries", paths.LibrariesRoot);
+        MetaCache.AddBase("assets", paths.AssetsRoot);
+        MetaCache.AddBase("asset_indexes", paths.AssetIndexesDir);
+        MetaCache.AddBase("java", paths.JavaRoot);
         MetaCache.AddBase("general", paths.CacheRoot);             // import staging etc.
         MetaCache.AddBase("icons", paths.CacheRoot / "icons");
-        MetaCache.AddBase("fmllibs", paths.FmllibsCacheDir); // cache/fmllibs (E3)
+        MetaCache.AddBase("fmllibs", paths.FmllibsCacheDir);
         MetaCache.AddBase("ATLauncherPacks", paths.CacheRoot / "ATLauncherPacks");
         MetaCache.AddBase("FTBPacks", paths.CacheRoot / "FTBPacks");
-        // E6: the ledger is READ at startup again (the "write-only ledger" defect — entries
-        // re-downloaded on every run because nothing ever loaded the persisted index)
+        // the ledger is read at startup: the persisted index restores, so existing
+        // entries do not re-download on every run
         MetaCache.Load();
 
-        // instance list (assembly step 9): <dataDir>/instances; the typed instance
-        // environment (user flint.json store + the D4 instance.json/instance-state.json type
-        // infos) is stamped so discovery builds the typed settings stack per instance;
-        // discovered instances also carry the layout, cache and state store
-        Instances = new InstanceList([paths.InstancesDir])
-        {
-            Environment = new InstanceEnvironment(
+        // instance list: <dataDir>/instances; the typed instance
+        // environment (user flint.json store + the instance.json/instance-state.json type
+        // infos) and the group-file config objects are constructor-injected; discovered
+        // instances also carry the cache, state store and the launch pipeline stamp.
+        // The legacy read-compat probes: the data-root
+        // instgroups.json (the Prism import target), then the primary-instance-dir copy
+        // upstream used before there was a launcher data dir
+        var instanceDirs = MaterializedDirectory.Ensure(paths.InstancesDir)!;
+        Instances = new InstanceList(
+            [instanceDirs],
+            new InstanceEnvironment(
                 Config, FlintJsonContext.Default.InstanceConfigFile, FlintJsonContext.Default.InstanceStateFile),
-            LauncherState = State,
-            Paths = paths,
-            MetaCache = MetaCache,
-        };
+            paths.GroupsFile,
+            [paths.InstgroupsFile, instanceDirs.Path / "instgroups.json"],
+            metaCache: MetaCache,
+            launcherState: State);
         Instances.LoadList();
+        // the restored watcher glue: external changes to the instance roots now reload the
+        // list (coalesced, serialized through InstanceLock) instead of waiting for a caller
+        Instances.AttachWatcher(InstanceWatchSpace);
 
-        // icon pool (assembly step 9, DATA D5): the IconList successor over the IconsDir
+        // icon pool: the IconList successor over the IconsDir
         // SETTING (default "icons", data-root-relative — previously three hardcoded
         // Path.Combine(DataDir, "icons") sites ignored the setting)
-        Icons = new IconPool(() => ResolveDataRelativeDir(Config.Current.Dirs.IconsDir, "icons"));
+        Icons = new IconPool(MaterializedDirectory.Ensure(
+            ResolveDataRelativeDir(Config.Current.Dirs.IconsDir, "icons"))!);
 
-        // local skin library (assembly step 9, DATA D6 plan B): the SkinsDir SETTING
+        // local skin library: the SkinsDir SETTING
         // (default "skins", data-root-relative) finally has a resident model
-        Skins = new SkinsLibrary(() => ResolveDataRelativeDir(Config.Current.Dirs.SkinsDir, "skins"));
+        Skins = new SkinsLibrary(MaterializedDirectory.Ensure(
+            ResolveDataRelativeDir(Config.Current.Dirs.SkinsDir, "skins"))!);
+        // the restored watcher glue now covers the dir-kind models too; a rename/move of
+        // a watched root re-points them (the index/list rebuilds over the new location)
+        Icons.AttachWatcher(InstanceWatchSpace);
+        Skins.AttachWatcher(InstanceWatchSpace);
+        InstanceWatchSpace.TenantMoved += (oldDir, newDir) =>
+        {
+            if (oldDir == Icons.IconsDir)
+            {
+                Icons.SetIconsDir(newDir);
+            }
+
+            if (oldDir == Skins.SkinsDir)
+            {
+                Skins.SetSkinsDir(newDir);
+            }
+        };
 
         // accounts: <dataDir>/accounts.json (autosaved on every change)
         Accounts = new AccountList();
         Accounts.SetListFilePath(paths.AccountsFile, enableAutosave: true);
         Accounts.LoadList();
 
-        // (CACHE E7: the news checker is gone entirely — the /news endpoint, the feed base
-        // and FLINT_NEWS_RSS_URL went with it; the C++ GUI was its only consumer)
+        // (there is no news checker — no /news endpoint, no feed base, no
+        // FLINT_NEWS_RSS_URL; the C++ GUI was its only consumer)
     }
 
     /// <summary>Serialize the instance-list mutations (create/delete/rename + LoadList):
     /// InstanceList is not thread-safe and the API handlers can interleave.</summary>
     public SemaphoreSlim InstanceLock { get; } = new(1, 1);
 
-    /// <summary>The launcher-managed java root (CACHE E2 via GLOBAL §3): the JavaDir
-    /// setting under STORE semantics — absolute wins as-is, relative joins the STORE root
+    /// <summary>Re-points the dir-kind models (icons/skins) after a Dirs settings write:
+    /// the new roots are created on demand and the models rebuild their indexes and
+    /// re-point their watches.</summary>
+    public void ApplyDirsSettings()
+    {
+        Icons.SetIconsDir(ResolveDataRelativeDir(Config.Current.Dirs.IconsDir, "icons"));
+        Skins.SetSkinsDir(ResolveDataRelativeDir(Config.Current.Dirs.SkinsDir, "skins"));
+    }
+
+    /// <summary>The watched-directory tenancy: instance-root watchers live here so external
+    /// changes reload the instance list (the restored C++ watcher glue). Owned by the
+    /// runtime; disposed with it.</summary>
+    public DirectorySpace InstanceWatchSpace { get; }
+
+    public void Dispose() => InstanceWatchSpace.Dispose();
+
+    /// <summary>The launcher-managed java root: the JavaDir
+    /// setting under store semantics — absolute wins as-is, relative joins the store root
     /// (the C++ "relative to the data dir" convention re-anchored by the store remount),
     /// empty/null falls back to the store/java anchor. Consumed by the java scan
     /// (JavaUtils.FindJavaPaths), the JavaInstallList managed-versions probe and the
@@ -217,7 +273,7 @@ public sealed class LauncherRuntime
                 : Paths.StoreRoot / Config.Current.Dirs.JavaDir;
 
     /// <summary>A dir-kind setting (IconsDir/SkinsDir — the C++ "relative to the data dir"
-    /// convention, CONFIG matrix A): absolute wins as-is, relative joins the data root,
+    /// convention): absolute wins as-is, relative joins the data root,
     /// empty/null falls back to the C++ default name.</summary>
     private AbsolutePath ResolveDataRelativeDir(string? configured, string fallbackName) =>
         string.IsNullOrWhiteSpace(configured)

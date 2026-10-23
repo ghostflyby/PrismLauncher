@@ -9,7 +9,7 @@
 // overrides/ and simply don't appear in the manifest's files list.
 //
 // Deviations (headless port):
-//  - loaderModList() is not part of the P3b MinecraftInstance port; the task builds its own
+//  - loaderModList() is not part of the ported MinecraftInstance; the task builds its own
 //    ModFolderModel over instance.ModsRoot() and uses ModFolderModel.GetMetadata for the
 //    local-metadata resolution.
 //  - The ExportToZipTask becomes direct ZipArchive writing with the same layout
@@ -115,7 +115,7 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
         SetProgress(1, 5);
 
         // instance->loaderModList()->update()
-        var modList = new ModFolderModel(options.Instance.ModsRoot);
+        var modList = new ModFolderModel(MaterializedDirectory.Ensure(options.Instance.ModsRoot)!);
         modList.Update();
         var allMods = modList.AllMods();
 

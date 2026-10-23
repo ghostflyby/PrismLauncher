@@ -6,7 +6,7 @@
 //    ported — FlintLauncher's account UI is not a Qt item model. The list semantics (add/replace
 //    by profile id, remove, move, default-account activation) are kept.
 //  - The background refresh schedule (m_refreshQueue/m_explicitRefreshes + the QTimer-driven
-//    fillQueue/tryNext loop and the activity counter) is deferred to P5; requestRefresh() /
+//    fillQueue/tryNext loop and the activity counter) is deferred; requestRefresh() /
 //    queueRefresh() / isActive() therefore have no port here.
 //  - QSaveFile + QFile::setPermissions(ReadOwner|WriteOwner|ReadUser|WriteUser) maps to an
 //    atomic temp-file write with unix mode 0600 (where the OS supports it).
@@ -227,7 +227,10 @@ public sealed class AccountList
         // Attempt to rename the old version.
         try
         {
-            File.Move(_listFilePath.Value, Path.Combine(Path.GetDirectoryName(_listFilePath.Value) ?? "", newName));
+            if (_listFilePath.Parent is { } parent)
+            {
+                _listFilePath.Move(parent / newName);
+            }
         }
         catch (Exception)
         {

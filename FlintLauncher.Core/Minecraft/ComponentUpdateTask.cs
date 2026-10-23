@@ -23,6 +23,7 @@
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Minecraft;
 
@@ -108,7 +109,7 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
 
         LoadResult result;
         var customPatchFilename = component.GetFilename();
-        if (customPatchFilename is { } patchFile && File.Exists(patchFile.Value))
+        if (customPatchFilename is { } patchFile && patchFile.ExistsFile())
         {
             // if local file exists...
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Tests for the InstanceImportTask dispatch: modpack type detection by marker file
-// (modrinth.index.json -> Modrinth, manifest.json -> Flame (FlameCreationTask, P6-b),
-// bin/modpack.jar -> Technic (TechnicPackProcessor, P6-b), instance.cfg -> plain folder
+// (modrinth.index.json -> Modrinth, manifest.json -> Flame (FlameCreationTask),
+// bin/modpack.jar -> Technic (TechnicPackProcessor), instance.cfg -> plain folder
 // import, unknown -> error), plus the download-from-URL path through the meta cache.
 
 using System.IO.Compression;
@@ -46,7 +46,11 @@ public class InstanceImportTaskTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList([new AbsolutePath(instancesDir)]) { Environment = _global };
+        return new InstanceList(
+            [MaterializedDirectory.Ensure(new AbsolutePath(instancesDir))!],
+            _global,
+            new AbsolutePath(instancesDir) / ".test-groups.json",
+            []);
     }
 
     private async Task<FlintTask> RunImport(Uri source, IReadOnlyDictionary<string, string>? extraInfo = null,
@@ -112,7 +116,7 @@ public class InstanceImportTaskTests : IDisposable
 
         Assert.True(task.WasSuccessful, task.FailReason);
         // the extracted pack folder landed in the staging instance dir and was renamed; the
-        // import fixups run through the typed adapter — instance.json (D4)
+        // import fixups run through the typed adapter — instance.json
         var instanceDir = Path.Combine(_root, "instances", "Imported");
         Assert.True(Directory.Exists(instanceDir));
         var cfg = await File.ReadAllTextAsync(Path.Combine(instanceDir, "instance.json"));
@@ -165,7 +169,7 @@ public class InstanceImportTaskTests : IDisposable
         var instanceDir = Path.Combine(_root, "instances", "Imported");
         Assert.True(Directory.Exists(instanceDir));
         // the pack contents landed in minecraft/, the version.json flavor set the component,
-        // and the identity landed in instance.json (D4)
+        // and the identity landed in instance.json
         Assert.True(File.Exists(Path.Combine(instanceDir, "minecraft", "modpack", "options.txt")));
         Assert.Contains("Imported", await File.ReadAllTextAsync(Path.Combine(instanceDir, "instance.json")));
         using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(instanceDir, "mmc-pack.json")));

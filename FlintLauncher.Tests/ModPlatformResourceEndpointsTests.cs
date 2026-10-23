@@ -161,7 +161,7 @@ public class FlintApiFlameResourceTests : IDisposable
 // ------------------------------------------------------------------- modrinth provider surface
 
 /// <summary>
-/// A minimal free-port Modrinth stub for the fix-1 routes the shared StubModrinthServer does
+/// A minimal free-port Modrinth stub for the routes the shared StubModrinthServer does
 /// not model: GET /tag/category (categories) and GET /project/{id}/description (the plain
 /// text body endpoint; the shared stub's /project route only handles bare project ids).
 /// </summary>

@@ -2,20 +2,23 @@
 // Port of launcher/icons/IconList.{h,cpp} — the stateful half the port was missing (the
 // stateless IconUtils/file-operations half already lives in <see cref="IconFiles"/>):
 // a key→path index over the icon library directory, the directory scan that builds it,
-// and install/delete. DATA D5 turns this into an injectable model (the C++ singleton
+// and install/delete. This is an injectable model (the C++ singleton
 // ICONS := new IconList) that the icon endpoints consume instead of the static helpers;
 // the IconsDir SETTING finally decides where the library lives (it resolves relative to
 // the data root, like the C++ default "icons").
 //
 // Deviations from the C++ original:
 //  - IconList is a live QAbstractListModel kept fresh by a QFileSystemWatcher; the port
-//    rebuilds the index per read — icon trees are tens of files, and the watchers' one
-//    consumer (iconUpdated → PropertiesChanged) is carried by BaseInstance.IconUpdated
+//    keeps the live model through the DirectorySpace tenancy (AttachWatcher): the index
+//    is resident and coalesced watcher events rebuild it. Without the tenancy the pool
+//    stays demand-driven (every accessor rescans). The C++ watchers' one consumer
+//    (iconUpdated → the instance view change) is carried by BaseInstance.IconUpdated
 //    instead. MMCIcon's theme/mask bookkeeping is display-side and not ported (the
 //    getIconFileSizeLimit/m reapIcon edge is display-only).
 //  - installIcon() returned void upstream (failures silently ignored); the port returns
 //    bool, like <see cref="IconFiles.InstallIcon"/> (QFile::copy semantics — no overwrite).
 
+using FlintLauncher.Core.IO;
 using TruePath;
 
 namespace FlintLauncher.Core.Icons;
@@ -26,28 +29,56 @@ public sealed record IconEntry(string Key, AbsolutePath Path, string DisplayName
 
 public sealed class IconPool
 {
-    private readonly Func<AbsolutePath> _iconsDir;
+    // injected, re-pointable: the IconsDir setting change arrives as SetIconsDir from the
+    // composition root, not as per-access re-resolution
+    private MaterializedDirectory _iconsDir;
     private readonly Dictionary<string, AbsolutePath> _byKey = new(StringComparer.Ordinal);
 
-    /// <summary><paramref name="iconsDir"/> is a provider, not a value: the IconsDir
-    /// setting can change at runtime (PUT /settings) and the pool follows it.</summary>
-    public IconPool(Func<AbsolutePath> iconsDir)
+    private DirectorySpace? _watchSpace;
+    private AbsolutePath _watchedRoot;
+
+    /// <summary>The injected library directory (created-and-verified at the composition
+    /// root; the IconsDir setting change arrives through <see cref="SetIconsDir"/>).</summary>
+    public IconPool(MaterializedDirectory iconsDir)
     {
         _iconsDir = iconsDir;
+        _watchedRoot = iconsDir.Path;
     }
 
-    /// <summary>The library root the provider currently resolves to.</summary>
-    public AbsolutePath IconsDir => _iconsDir();
+    /// <summary>The library root (the injected directory's path).</summary>
+    public AbsolutePath IconsDir => _iconsDir.Path;
+
+    /// <summary>Re-points the library (the IconsDir setting changed at runtime): swaps the
+    /// directory, rebuilds the index and re-points the watch. The new directory is created
+    /// on demand.</summary>
+    public void SetIconsDir(AbsolutePath dir)
+    {
+        if (dir == _iconsDir.Path)
+        {
+            return;
+        }
+
+        _iconsDir = MaterializedDirectory.Ensure(dir)
+                    ?? throw new InvalidOperationException(
+                        $"cannot create the icons directory '{dir.Value}'");
+        if (_watchSpace is { } space && _watchedRoot is { } watched)
+        {
+            space.SyncTenantRoots([watched], [_iconsDir.Path], Rescan);
+            _watchedRoot = _iconsDir.Path;
+        }
+
+        Rescan();
+    }
 
     // ------------------------------------------------------------------ lookups (index)
 
     /// <summary>The icon FILE for a key ("" when there is none). Like the upstream
     /// getIcon/getIconIndex the scan covers the whole tree (subdirectory icons carry their
     /// base-name key, a later duplicate replaces an earlier one) and "default" aliases to
-    /// "grass". Rescans first — the C++ refreshed its model through the file watcher.</summary>
+    /// "grass". Watched: serves the resident index; unwatched: rescans first.</summary>
     public AbsolutePath? GetIconFile(string key)
     {
-        Rescan();
+        EnsureFresh();
         var resolvedKey = key == "default" ? "grass" : key;
         return _byKey.TryGetValue(resolvedKey, out var file) ? file : null;
     }
@@ -55,11 +86,11 @@ public sealed class IconPool
     /// <summary>Port of IconList::iconFileExists.</summary>
     public bool IconFileExists(string key) => GetIconFile(key) is not null;
 
-    /// <summary>The index, freshly scanned (the listing source for GET /icons).</summary>
+    /// <summary>The index (the listing source for GET /icons).</summary>
     public List<IconEntry> Entries()
     {
-        Rescan();
-        var dir = _iconsDir();
+        EnsureFresh();
+        var dir = _iconsDir.Path;
         return _byKey
             .Select(pair => new IconEntry(pair.Key, pair.Value, IconFiles.IconDisplayName(dir, pair.Value)))
             .OrderBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase)
@@ -72,7 +103,7 @@ public sealed class IconPool
     public void Rescan()
     {
         _byKey.Clear();
-        var dir = _iconsDir();
+        var dir = _iconsDir.Path;
         foreach (var file in IconFiles.GetIconFilePaths(dir))
         {
             if (!IconFiles.IsIconSuffix(file.GetExtensionWithoutDot()))
@@ -84,6 +115,34 @@ public sealed class IconPool
         }
     }
 
+    // ------------------------------------------------------------------- watcher tenancy
+
+    /// <summary>Opts the pool into the watcher-driven live model (the C++ IconList was a
+    /// QAbstractListModel kept fresh by a QFileSystemWatcher): the index becomes resident,
+    /// accessors serve it without rescanning, and coalesced watcher events rebuild it. A
+    /// changed IconsDir resolution re-points the watch. Default (no attachment) keeps the
+    /// demand-driven rescan-per-access.</summary>
+    public void AttachWatcher(DirectorySpace space, Action<AbsolutePath, AbsolutePath>? moved = null)
+    {
+        _watchSpace = space;
+        _watchedRoot = _iconsDir.Path;
+        Rescan();
+        space.Register(_iconsDir, Rescan, moved);
+    }
+
+    /// <summary>Refresh path for both modes: unwatched pools rescan per access; watched
+    /// pools follow the IconsDir setting across provider changes (re-pointing the watch)
+    /// and otherwise serve the resident index.</summary>
+    private void EnsureFresh()
+    {
+        // watched: the index is resident and the watch keeps it current; unwatched
+        // (bare fixtures): the demand-driven rescan-per-access fallback
+        if (_watchSpace is null)
+        {
+            Rescan();
+        }
+    }
+
     // ----------------------------------------------------------------------- mutations
 
     /// <summary>Install one icon file (multipart upload target): copies it into the library
@@ -92,7 +151,7 @@ public sealed class IconPool
     /// unsupported, or the target exists (QFile::copy semantics).</summary>
     public bool Install(AbsolutePath file, string name = "")
     {
-        if (!IconFiles.InstallIcon(_iconsDir(), file, name))
+        if (!IconFiles.InstallIcon(_iconsDir.Path, file, name))
         {
             return false;
         }
@@ -105,7 +164,7 @@ public sealed class IconPool
     /// index. Returns false when the key has no file or the delete failed.</summary>
     public bool Delete(string key)
     {
-        if (!IconFiles.DeleteIcon(_iconsDir(), key))
+        if (!IconFiles.DeleteIcon(_iconsDir.Path, key))
         {
             return false;
         }

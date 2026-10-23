@@ -9,6 +9,7 @@
 using System.Text.Json;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform.FtbApp;
 using FlintLauncher.Core.Settings;
@@ -41,7 +42,11 @@ public class FtbAppTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList([new AbsolutePath(instancesDir)]) { Environment = _global };
+        return new InstanceList(
+            [MaterializedDirectory.Ensure(new AbsolutePath(instancesDir))!],
+            _global,
+            new AbsolutePath(instancesDir) / ".test-groups.json",
+            []);
     }
 
     private static List<(string? Uid, string? Version)> Components(string staging)
@@ -258,7 +263,7 @@ public class FtbAppTests : IDisposable
         Assert.Equal("extra=1\n",
             await File.ReadAllTextAsync(Path.Combine(staging, "minecraft", "config", "extra.cfg")));
 
-        // the settings of the C++ copySettings, through the typed layer (D4): the time trio
+        // the settings of the C++ copySettings, through the typed layer: the time trio
         // lands in instance-state.json and the jvm args in instance.json (the derived
         // OverrideJavaArgs gate reads true because JvmArgs is set)
         Assert.Equal(95514, // ms -> s

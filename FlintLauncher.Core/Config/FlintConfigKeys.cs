@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The single settings-key registry (C6: "分组→域映射一份"): every global settings key maps
+// The single settings-key registry: every global settings key maps
 // to its record domain member exactly once — GET/PUT /settings (the wire groups reference
 // this table, the old Web Groups value-table retired), the instance-side adapter view
-// (FlintConfigSettings — the C7 override/passthrough pairs pull Setting objects from it),
+// (FlintConfigSettings — the override/passthrough pairs pull Setting objects from it),
 // and the INI importer (one pass sorts keys through the same Apply functions).
 //
 // Defaults come from the record property initializers via the resolved fold — this table
-// never states a value twice. The three C4 secret keys are listed with Secret=true so the
+// never states a value twice. The three secret keys are listed with Secret=true so the
 // wire groups keep accepting them; their storage is the ISecretStore, never the config.
 
 using FlintLauncher.Core.Settings;
@@ -26,7 +26,7 @@ public sealed record ConfigKeyEntry(
 
 public static class FlintConfigKeys
 {
-    /// <summary>The C4 secret keys: same names as the old settings keys (the wire is
+    /// <summary>The secret keys: same names as the old settings keys (the wire is
     /// unchanged) but stored in the ISecretStore, never in flint.json.</summary>
     public static readonly IReadOnlyList<string> SecretKeys =
     [
@@ -42,7 +42,7 @@ public static class FlintConfigKeys
     /// ProxyPassword/CFKeyOverride must land under the primary — not be silently dropped.
     /// flint.json itself stays primary-name-only (the aliases are an INI-read compat layer);
     /// the CentralModsDir|ModsDir pair is deliberately absent — the primary itself is
-    /// unregistered per DATA D8, and an alias of a dead key stays dead.</summary>
+    /// unregistered (a true dead setting), and an alias of a dead key stays dead.</summary>
     private static readonly Dictionary<string, string> AliasToPrimary = new(StringComparer.Ordinal)
     {
         // Application.cpp:740-742 (window size)
@@ -52,7 +52,7 @@ public static class FlintConfigKeys
         // Application.cpp:746-749 (proxy)
         ["ProxyHostName"] = "ProxyAddr",
         ["ProxyUsername"] = "ProxyUser",
-        ["ProxyPassword"] = "ProxyPass", // the C4 secret alias — redirects with the primary
+        ["ProxyPassword"] = "ProxyPass", // the secret alias — redirects with the primary
         // Application.cpp:752-753 (memory)
         ["MinMemoryAlloc"] = "MinMemAlloc",
         ["MaxMemoryAlloc"] = "MaxMemAlloc",
@@ -62,7 +62,7 @@ public static class FlintConfigKeys
         ["PostExitCmd"] = "PostExitCommand",
         // Application.cpp:894 (resource mirror)
         ["ResourceURL"] = "ResourceURLOverride",
-        // Application.cpp:912 (flame api key — the C4 secret alias)
+        // Application.cpp:912 (flame api key — the secret alias)
         ["CFKeyOverride"] = "FlameKeyOverride",
     };
 
@@ -285,7 +285,7 @@ public static class FlintConfigKeys
                 f => f.Java.AutomaticJava,
                 (f, v) => f with { Java = f.Java with { AutomaticJava = Variant.AsBool(v) } }),
 
-            // ---- dirs (DATA D8: CentralModsDir is dead — zero core consumers, no longer
+            // ---- dirs (CentralModsDir is dead — zero core consumers, no longer
             // registered; a leftover key in an imported INI stays unread in the file)
             Entry("IconsDir",
                 f => f.Dirs.IconsDir,

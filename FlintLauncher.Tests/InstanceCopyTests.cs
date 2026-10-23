@@ -2,12 +2,13 @@
 // Tests for the InstanceCopyPrefs/InstanceCopyTask port. Everything synthetic (temp dirs);
 // the copy flows go through the real staging machinery of the InstanceList port, like the
 // upstream MainWindow::on_actionCopyInstance_triggered flow (dialog -> task -> staging).
-// D4: the source here is Prism format (instance.cfg, read-only); the copy's metadata fixups
+// the source here is Prism format (instance.cfg, read-only); the copy's metadata fixups
 // run through the typed adapter, so the staged folder commits as Flint format (instance.json
 // + instance-state.json) while the copied cfg stays untouched on disk.
 
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Tasks;
 using TruePath;
 using Xunit;
@@ -60,11 +61,10 @@ public class InstanceCopyTests : IDisposable
             new AbsolutePath(_sourceDir));
 
     private InstanceList CreateList() =>
-        new([new AbsolutePath(_instancesDir)])
-        {
-            Environment = _global,
-            GroupFilePath = new AbsolutePath(_groupFile),
-        };
+        new([MaterializedDirectory.Ensure(new AbsolutePath(_instancesDir))!],
+            _global,
+            new AbsolutePath(_groupFile),
+            []);
 
     // ------------------------------------------------------------------ prefs/filters
 

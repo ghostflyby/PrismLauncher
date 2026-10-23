@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of launcher/minecraft/mod/tasks/LocalDataPackParseTask.{h,cpp} (the DataPackUtils
 // namespace) together with the LocalDataPackParseTask-adjacent parsing used by resource
-// packs. This file absorbs the P2a partial port that lived in
+// packs. This file absorbs the partial port that lived in
 // FlintLauncher.Core/Minecraft/DataPackUtils.cs (the processComponent JSON chat component
 // renderer); it has been moved here to complete the resource parsing layer.
 //

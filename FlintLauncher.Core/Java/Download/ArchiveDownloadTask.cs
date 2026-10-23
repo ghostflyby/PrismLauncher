@@ -20,6 +20,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Java.Download;
 
@@ -71,11 +72,11 @@ public sealed class ArchiveDownloadTask(
         }
         finally
         {
-            if (tempDownload && File.Exists(fullPath.Value))
+            if (tempDownload && fullPath.ExistsFile())
             {
                 try
                 {
-                    File.Delete(fullPath.Value);
+                    fullPath.Delete();
                 }
                 catch (IOException)
                 {

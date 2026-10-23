@@ -2,7 +2,7 @@
 // Qt-read-compat pins for the Variant coercions and the ini codec's @-types:
 //  - Variant.AsBool's string branch must judge strings the way QVariant(QString).toBool()
 //    does (toLower(), then ONLY empty/"0"/"false" are false — everything else reads true,
-//    Qt6 qmetatype.cpp convertToBool). The Override* import gates (C7) and the C9 keys read
+//    Qt6 qmetatype.cpp convertToBool). The Override* import gates and the state keys read
 //    hand-edited Prism cfg strings through it; a strict "true"/"1" match folded away values
 //    Qt's own reads kept.
 //  - @String(...) wrappers decode to their content the way Qt's read side unwraps them
@@ -70,7 +70,7 @@ public class QSettingsIniAtTypeTests
         return map["k"];
     }
 
-    // ------------------------------------------------------------------- @String (D2)
+    // ------------------------------------------------------------------- @String
 
     [Fact]
     public void AtString_With_Embedded_Nul_Decodes_To_Its_Content()
@@ -113,7 +113,7 @@ public class QSettingsIniAtTypeTests
         Assert.Equal("nul\0less", file.GetString("k", "DEF"));
     }
 
-    // ----------------------------------------------- @ByteArray stringification (D2)
+    // ----------------------------------------------- @ByteArray stringification
 
     [Fact]
     public void ByteArray_AsString_Is_Text_Not_The_Type_Name()

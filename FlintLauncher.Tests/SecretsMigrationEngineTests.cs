@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Tests for the new state-cluster infrastructure: the FileSecretStore (CONFIG C4:
-// data/secrets.json, 0600, named get/set/delete) and the G2 migration engine (profiles +
-// auto-run candidates + the flint-legacy eager remount pass with its E8 bare-ledger cleanup).
+// Tests for the new state-cluster infrastructure: the FileSecretStore (
+// data/secrets.json, 0600, named get/set/delete) and the migration engine (profiles +
+// auto-run candidates + the flint-legacy eager remount pass with its bare-ledger cleanup).
 
 using System.Security.Cryptography;
 using FlintLauncher.Core;
@@ -112,7 +112,7 @@ public class MigrationEngineTests : IDisposable
         var legacy = engine.Find("flint-legacy");
         Assert.NotNull(prism);
         Assert.NotNull(legacy);
-        Assert.False(prism.AutoRunAtStartup);        // API-driven (G2)
+        Assert.False(prism.AutoRunAtStartup);        // API-driven
         Assert.True(legacy.AutoRunAtStartup);        // startup probe runs once
         Assert.NotNull(engine.Find("FLINT-LEGACY")); // lookup is case-insensitive
         Assert.Null(engine.Find("unknown"));
@@ -152,8 +152,8 @@ public class MigrationEngineTests : IDisposable
         Assert.Contains(plan, item => item.Name == "instances");
     }
 
-    // A2: the prism-family profile surfaces a MultiMC source under BOTH config names —
-    // detection delegates to the dual-name probe (upstream multimc.cfg, CONFIG.md:23, plus
+    // the prism-family profile surfaces a MultiMC source under BOTH config names —
+    // detection delegates to the dual-name probe (upstream multimc.cfg plus
     // the historical mmc.cfg) under the same launcher id
     [Fact]
     public void PrismFamily_Detects_MultiMC_Under_Both_Config_Names()
@@ -225,10 +225,10 @@ public class MigrationEngineTests : IDisposable
         var candidates = legacy.Detect(paths, decisions);
         var hit = Assert.Single(candidates);
         Assert.False(hit.DecisionRecorded);
-        // the auto-run predicate lights up for the undecided detection (assembly step 5 hook)
+        // the auto-run predicate lights up for the undecided detection
         Assert.Equal([legacy], engine.AutoRunCandidates(paths, decisions));
 
-        // the S3 record settles it — the engine never proposes twice
+        // the decision record settles it — the engine never proposes twice
         decisions.Write(new MigrationDecisionRecord
         {
             Source = FlintLegacyMigrationProfile.ProfileName,
@@ -238,7 +238,7 @@ public class MigrationEngineTests : IDisposable
         Assert.True(legacy.Detect(paths, decisions).Single().DecisionRecorded);
         Assert.Empty(engine.AutoRunCandidates(paths, decisions));
 
-        // the flat→five-root whitelist mapping (G2): flint.cfg plans onto the config root
+        // the flat→five-root whitelist mapping: flint.cfg plans onto the config root
         var plan = legacy.Plan(data, paths, ImportMode.Move);
         Assert.NotNull(plan);
         var cfgItem = Assert.Single(plan, item => item.Name == "flint.cfg");
@@ -279,7 +279,7 @@ public class MigrationEngineTests : IDisposable
             FlintJsonContext.Default.MigrationDecisionRecord);
 
         // the old flat layout: config file, a ledger WITH a real entry, meta content, store
-        // content, the old in-data cache area, and the Prism bare ledger (E8 dead stock)
+        // content, the old in-data cache area, and the Prism bare ledger (dead stock)
         await (data / "flint.cfg").WriteAllTextAsync("JavaPath=old");
         var metaFile = data / "meta" / "net.minecraft" / "index.json";
         var metaDir = Assert.NotNull(metaFile.Parent);
@@ -304,14 +304,14 @@ public class MigrationEngineTests : IDisposable
         Assert.True(result.Ran);
         Assert.Null(result.Error);
         Assert.True(result.LegacyLedgerCleaned);
-        Assert.False((data / "metacache").ExistsFile());      // E8
+        Assert.False((data / "metacache").ExistsFile());      // bare ledger deleted
         Assert.True((config / "flint.cfg").ExistsFile());     // config root
-        Assert.True((cache / "metacache.json").ExistsFile()); // cache root (E3)
+        Assert.True((cache / "metacache.json").ExistsFile()); // cache root
         Assert.True((cache / "meta" / "net.minecraft" / "index.json").ExistsFile());
-        Assert.True((store / "assets" / "indexes" / "5.json").ExistsFile()); // store (E2)
-        Assert.True((cache / "fmllibs" / "lib.jar").ExistsFile());           // cache (E3)
+        Assert.True((store / "assets" / "indexes" / "5.json").ExistsFile()); // store
+        Assert.True((cache / "fmllibs" / "lib.jar").ExistsFile());           // cache
 
-        // the pass sealed itself with the S3 record — a second run is a no-op
+        // the pass sealed itself with the decision record — a second run is a no-op
         var record = decisions.Read(FlintLegacyMigrationProfile.ProfileName);
         Assert.NotNull(record);
         Assert.Equal(MigrationDecisionRecord.Imported, record.Decision);
@@ -339,12 +339,12 @@ public class MigrationEngineTests : IDisposable
     [Fact]
     public void FlintLegacy_HomeDir_Source_Migrates_The_Total_Directory()
     {
-        // G1 --home-dir laid on a pre-reform total directory: the flat files sit at the
+        // --home-dir laid on a pre-reform total directory: the flat files sit at the
         // HOME root — X/data is a fresh child that sees none of them. This pins the
         // home-root probe plus the home-only mounts: the data-root anchors
         // (instances/accounts/instgroups/icons/skins) move per child into X/data, the INI
-        // chain fallbacks land on the config side, the S2 token file is deleted, and the
-        // S3 markers move to the data root where DataMigration.Decide upgrades them.
+        // chain fallbacks land on the config side, the token file is deleted, and the
+        // nomigrate markers move to the data root where DataMigration.Decide upgrades them.
         var home = _dir / "homedir";
         (home / "instances" / "GTN").CreateDirectory();
         (home / "cache" / "icons").CreateDirectory();
@@ -388,15 +388,15 @@ public class MigrationEngineTests : IDisposable
         Assert.True((paths.DataRoot / "skins" / "steve.png").ExistsFile());
         Assert.True((paths.ConfigRoot / "prismlauncher.cfg").ExistsFile());
         Assert.True((paths.DataRoot / "prism_nomigrate.txt").ExistsFile());
-        Assert.False((home / "api-token").ExistsFile()); // S2: dead stock, deleted
-        Assert.False((home / "metacache").ExistsFile()); // E8: bare ledger, deleted
+        Assert.False((home / "api-token").ExistsFile()); // dead stock, deleted
+        Assert.False((home / "metacache").ExistsFile()); // bare ledger, deleted
         // under a home source the old cache root IS the new cache root — children stay
         Assert.True((paths.CacheRoot / "icons" / "i.png").ExistsFile());
         Assert.True((paths.CacheRoot / "meta" / "index.json").ExistsFile());
         Assert.True((paths.StoreRoot / "assets" / "indexes" / "5.json").ExistsFile());
         Assert.True((paths.StoreRoot / "libraries" / "x.jar").ExistsFile());
 
-        // the pass sealed itself with the S3 record — a second run is a no-op
+        // the pass sealed itself with the decision record — a second run is a no-op
         var record = decisions.Read(FlintLegacyMigrationProfile.ProfileName);
         Assert.NotNull(record);
         Assert.Equal(MigrationDecisionRecord.Imported, record.Decision);
@@ -407,7 +407,7 @@ public class MigrationEngineTests : IDisposable
     [Fact]
     public async Task FlintLegacy_Execute_Remounts_Imported_Content_Even_When_The_Startup_Record_Is_Sealed()
     {
-        // the upgraded-user steady state: the startup pass already ran and sealed the S3
+        // the upgraded-user steady state: the startup pass already ran and sealed the
         // record — the record gates the STARTUP auto-run only, never the remount itself
         var home = _dir / "sealed";
         var data = home / "data";
@@ -542,7 +542,7 @@ public class MigrationEngineTests : IDisposable
         Assert.Null(decisions.Read(FlintLegacyMigrationProfile.ProfileName));
     }
 
-    // B3: an existing destination DIRECTORY must resume the merge file by file — the old
+    // an existing destination DIRECTORY must resume the merge file by file — the old
     // whole-item skip stranded every not-yet-transferred source file forever, so a pass
     // that failed halfway could never complete on a rerun
     [Fact]

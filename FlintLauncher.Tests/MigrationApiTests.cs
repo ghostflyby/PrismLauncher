@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// A3 regression at the API surface: the migration endpoints refuse an UNKNOWN source
+// Regression at the API surface: the migration endpoints refuse an UNKNOWN source
 // directory (400 invalid_source, NO decision record — the old "prism" fallback key let a
 // ~/prism-backup style import/decline seal the canonical PrismLauncher source's key away),
 // and refuse to import into a target that already carries its own launcher config (the C++
@@ -35,7 +35,7 @@ public class MigrationApiTests
         return source;
     }
 
-    /// <summary>The S3 decision record for the CANONICAL Prism source key (the one the
+    /// <summary>The decision record for the CANONICAL Prism source key (the one the
     /// detector files the PrismLauncher directory under) — the record an unrelated
     /// directory's import/decline must never create.</summary>
     private static string PrismRecordPath(FlintApiHost host) =>
@@ -166,7 +166,7 @@ public class MigrationApiTests
     }
 
     // the guard must not over-reject: a FRESH target still imports to completion, and the
-    // decision record lands under the actual source name (S7)
+    // decision record lands under the actual source name
     [Fact]
     public async Task Import_Into_Fresh_Target_Still_Runs()
     {
@@ -182,7 +182,7 @@ public class MigrationApiTests
         Assert.NotNull(taskId);
         await host.WaitForTaskStateAsync(taskId, "succeeded", TimeSpan.FromSeconds(30));
         // the import ran to completion: whitelisted files and un-shadowed directories landed
-        // at the data root, and the decision record sealed under the ACTUAL source name (S7)
+        // at the data root, and the decision record sealed under the ACTUAL source name
         Assert.True(File.Exists(Path.Combine(host.DataDir, "prismlauncher.cfg")));
         Assert.True(File.Exists(Path.Combine(host.DataDir, "mods", "a", "mod.jar")));
         Assert.True(File.Exists(PrismRecordPath(host)));
@@ -198,7 +198,7 @@ public class MigrationApiTests
         }, TimeSpan.FromSeconds(15), "the fresh-target import's instance reload");
     }
 
-    // ------------------------------------------------ G2 single-pass completion (sort+reload)
+    // ------------------------------------------------ single-pass completion (sort+reload)
 
     // Synthetic accounts.json in the upstream v3 layout (AccountListTests carries the full
     // one; this is the minimal offline shape the loader accepts).
@@ -263,8 +263,8 @@ public class MigrationApiTests
         Assert.True(await probe(), $"timed out waiting for {what}");
     }
 
-    // C1: the import-finished hook must complete the G2 single pass — the import lands
-    // prismlauncher.cfg + accounts.json at the data root, but the consumers (C5 INI
+    // the import-finished hook must complete the single pass — the import lands
+    // prismlauncher.cfg + accounts.json at the data root, but the consumers (the INI
     // importer, AccountList.LoadList) ran at STARTUP, before any import existed. Without
     // the in-hook re-sort the imported settings/secrets/state keys/accounts stay invisible
     // until a restart — and a user writing any setting first would create flint.json and
@@ -280,7 +280,7 @@ public class MigrationApiTests
         Directory.CreateDirectory(Path.Combine(source, "assets", "objects", "aa"));
         await File.WriteAllTextAsync(Path.Combine(source, "assets", "objects", "aa", "blob"), "asset");
         await File.WriteAllTextAsync(Path.Combine(source, "accounts.json"), OfflineAccountsJson("ImportedOne"));
-        // the recognized INI key set: record domain + secret trio + C9 state keys
+        // the recognized INI key set: record domain + secret trio + state keys
         await File.WriteAllTextAsync(Path.Combine(source, "prismlauncher.cfg"), """
                                                                                 [General]
                                                                                 ConfigVersion=1.3
@@ -312,7 +312,7 @@ public class MigrationApiTests
             TimeSpan.FromSeconds(15), "the import's remount");
         Assert.False(Directory.Exists(Path.Combine(host.DataDir, "assets")));
 
-        // the C5 sort half, SAME SESSION: /settings serves the imported values from the
+        // the sort half, SAME SESSION: /settings serves the imported values from the
         // live stores — the record domain through Config.Current, the secret through the
         // ISecretStore (no restart in between). The task state flips BEFORE the synchronous
         // hook subscribers complete (see WaitUntilAsync), so poll for the first imported
@@ -336,13 +336,13 @@ public class MigrationApiTests
         Assert.DoesNotContain("hunter2", configText);
         Assert.DoesNotContain("mr-token", configText);
 
-        // the C9 state keys landed in launcher-state.json
+        // the state keys landed in launcher-state.json
         var stateText = await File.ReadAllTextAsync(Path.Combine(host.HomeDir, "state", "launcher-state.json"));
         Assert.Contains("OfflineOne", stateText);
         Assert.Contains("123456", stateText);
 
         // the imported accounts are live in the same session — Accounts.LoadList runs AFTER
-        // the C5 sort inside the same hook, so it needs its own poll (same flip-before-hook
+        // the sort inside the same hook, so it needs its own poll (same flip-before-hook
         // reason as above)
         await WaitUntilAsync(async () =>
         {
@@ -359,7 +359,7 @@ public class MigrationApiTests
         }, TimeSpan.FromSeconds(15), "the imported instance in the same session");
     }
 
-    // C2: abort is a terminal state like any other — the C++ task emitted finished() after
+    // abort is a terminal state like any other — the C++ task emitted finished() after
     // emitAborted() (Task.cpp:133-146), so a cancelled import ran the same completion. The
     // port dropped finished(); before the Aborted subscription an aborted import left the
     // already-transferred assets stranded at the data root (remount never ran) and never

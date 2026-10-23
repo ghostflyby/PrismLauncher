@@ -3,7 +3,7 @@
 // BaseEntityLoadTask). Deviations from the C++ original:
 //  - The C++ code reaches the shared cache through APPLICATION->metacache() (base "meta");
 //    the port stamps that cache onto the entity chain at adoption (SetMetaCache — the
-//    composition root's HttpMetaCache, base "meta" under the cache root, E3/E6). There is
+//    composition root's HttpMetaCache, base "meta" under the cache root). There is
 //    NO static fallback: a load without a stamp fails fast. The "MetaURLOverride" setting
 //    is not part of the settings layer yet, so Url() always resolves against
 //    BuildConfig.META_URL (FlintConfig.MetaUrl).
@@ -62,13 +62,13 @@ public abstract class MetaEntity
     private FlintTask? _task;
 
     /// <summary>The cache this entity downloads through and resolves its local file under
-    /// (base "meta"; C++: APPLICATION->metacache()). E6: the static CWD-anchored fallback is
+    /// (base "meta"; C++: APPLICATION->metacache()). The static CWD-anchored fallback is
     /// GONE — the composition root's cache is stamped down the Index/VersionList/entity
     /// chain at adoption (SetMetaCache), so a load without a stamp fails fast naming the
     /// missing wire instead of silently re-downloading into the process working directory.</summary>
     public HttpMetaCache? Cache { get; set; }
 
-    /// <summary>The stamped runtime cache (naming the missing wire when unset — the E6
+    /// <summary>The stamped runtime cache (naming the missing wire when unset — the
     /// bare-fixture fallback must not come back).</summary>
     protected HttpMetaCache RequireCache() => Cache ?? throw new InvalidOperationException(
         "no meta cache stamped on this entity — wire the runtime cache (SetMetaCache)");

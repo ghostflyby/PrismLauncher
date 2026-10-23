@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Local-token authentication for the /api/v1 surface: the token lives for the PROCESS
-// lifetime and never touches the disk (STATE S2 — the pre-reform <dataDir>/api-token file is
+// lifetime and never touches the disk (the pre-reform <dataDir>/api-token file is
 // dead; the host owns credential provisioning). Resolution order: an explicit token from
 // --api-token <t> / FLINT_API_TOKEN (host injection — the host is responsible for getting
 // the token to its clients) → a freshly generated temporary token held in-process (the
@@ -21,7 +21,7 @@ public sealed class ApiAuthService
     public bool Enabled { get; }
     public string Token { get; }
 
-    /// <summary>True when the effective token was generated for this process (S2's default):
+    /// <summary>True when the effective token was generated for this process (the default):
     /// the host must surface it from the startup log line — it exists nowhere else.</summary>
     public bool TokenGenerated { get; }
 
@@ -72,7 +72,7 @@ public sealed class ApiAuthService
             return new ApiAuthService(true, explicitToken, tokenGenerated: false);
         }
 
-        // S2: no file fallback, no write-back — a process-lifetime token, logged once at
+        // no file fallback, no write-back — a process-lifetime token, logged once at
         // startup (the host prints it; see WebHostBuilder), never persisted anywhere
         var generated = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
         return new ApiAuthService(true, generated, tokenGenerated: true);
@@ -83,7 +83,7 @@ public sealed class ApiAuthService
         (candidate is not null &&
          string.Equals(candidate, Token, StringComparison.Ordinal));
 
-    /// <summary>S2 cleanup: the pre-reform token file (&lt;dataDir&gt;/api-token) is dead —
+    /// <summary>Cleanup: the pre-reform token file (&lt;dataDir&gt;/api-token) is dead —
     /// no compatibility read, and a leftover is deleted on startup (best effort; an unreadable
     /// leftover is inert since nothing reads it anymore).</summary>
     public const string LegacyTokenFileName = "api-token";

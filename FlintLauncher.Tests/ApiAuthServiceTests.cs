@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Pins for the STATE S2 red lines: the default resolution path writes NOTHING to disk (the
+// Pins for the auth red lines: the default resolution path writes NOTHING to disk (the
 // token is process-lifetime, generated in-process), a leftover pre-reform
 // <dataRoot>/api-token file is deleted on startup and NEVER read, and the host-injection /
 // disable switches behave as decided. The injection path itself is exercised end-to-end by
@@ -19,7 +19,7 @@ public class ApiAuthServiceTests : IDisposable
 
     public ApiAuthServiceTests()
     {
-        // the resolver reads process env; pin the two S2 variables for the duration
+        // the resolver reads process env; pin the two variables for the duration
         // (restored in Dispose) so an ambient environment cannot flip the default path
         _savedEnv = [PinEnv("FLINT_API_TOKEN"), PinEnv("FLINT_NO_AUTH")];
         Environment.SetEnvironmentVariable("FLINT_API_TOKEN", null);
@@ -55,7 +55,7 @@ public class ApiAuthServiceTests : IDisposable
         Assert.True(auth.Enabled);
         Assert.True(auth.TokenGenerated);
         Assert.NotEmpty(auth.Token);
-        // the S2 red line: not one file appears under the data root — the pre-reform
+        // the red line: not one file appears under the data root — the pre-reform
         // api-token file has no successor (TokenGenerated=true is the only carrier)
         Assert.Empty(Directory.EnumerateFiles(DataRoot, "*", SearchOption.AllDirectories));
     }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// CACHE E5 store-completeness tests: the derivation semantics (manifest-driven, ledger +
+// store-completeness tests: the derivation semantics (manifest-driven, ledger +
 // file existence, local/inactive exclusion, ${arch} expansion, unsafe-ref refusal) at the
 // Core level, and the two routes (GET /store/status/libraries/{versionRef},
 // GET /store/status/assets/{assetsId}) end-to-end through the real host.
@@ -182,7 +182,7 @@ public class StoreCompletenessTests : IDisposable
 
 public class StoreStatusApiTests
 {
-    /// <summary>The two E5 routes end-to-end: the manifest/ledger/store fixture is planted
+    /// <summary>The two routes end-to-end: the manifest/ledger/store fixture is planted
     /// BEFORE the host starts (the runtime ledger loads in the constructor), then both
     /// routes derive their reports over HTTP, and unknown refs 404.</summary>
     [Fact]

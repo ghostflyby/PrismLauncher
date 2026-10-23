@@ -10,6 +10,7 @@
 
 using System.IO.Compression;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
 
@@ -42,7 +43,7 @@ public static class ShaderPackUtils
     public static bool ProcessFolder(ShaderPack pack, ShaderPackProcessingLevel level = ShaderPackProcessingLevel.Full)
     {
         var shadersDirInfo = new AbsolutePath(pack.Fileinfo.FullName) / "shaders";
-        if (!Directory.Exists(shadersDirInfo.Value))
+        if (!shadersDirInfo.ExistsDirectory())
         {
             return false; // assets dir does not exists or isn't valid
         }

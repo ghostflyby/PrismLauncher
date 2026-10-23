@@ -8,7 +8,7 @@
 // is no longer load-bearing and multiple runtimes can coexist in one process (integration
 // tests).
 //
-// Five independent roots (G1 / C1 / E1 / S1): config/data/store/cache/state, each injectable
+// Five independent roots: config/data/store/cache/state, each injectable
 // on its own (precise flags/env), or all at once via a home layout (--home-dir=X ⇒
 // X/{config,data,store,cache,state} — the only implicit-derivation site). Platform defaults
 // are absorbed HERE and nowhere else.
@@ -29,7 +29,7 @@ public sealed record FlintPaths
     public required AbsolutePath CacheRoot { get; init; }
     public required AbsolutePath StateRoot { get; init; }
 
-    /// <summary>The home directory a home-layout resolution started from (G1: --home-dir=X ⇒
+    /// <summary>The home directory a home-layout resolution started from (--home-dir=X ⇒
     /// X/{config,data,store,cache,state}), or null for precise/platform resolutions. The
     /// flint-legacy startup probe checks it as a legacy source: pre-reform flat layouts sit
     /// at the home root (the old "total directory"), which the fresh X/data child cannot
@@ -37,11 +37,11 @@ public sealed record FlintPaths
     public AbsolutePath? HomeRoot { get; init; }
 
     /// <summary>Compat alias for <see cref="DataRoot"/> (the pre-five-root single-root name;
-    /// the single-root-derives-everything form it anchored is retired, CONFIG C1 §2.5).</summary>
+    /// the single-root-derives-everything form it anchored is retired).</summary>
     public AbsolutePath DataDir => DataRoot;
 
 
-    /// <summary>Home-layout factory (G1's only implicit-derivation site, and the embedded
+    /// <summary>Home-layout factory (the only implicit-derivation site, and the embedded
     /// "one directory for everything" shape): the five roots are
     /// <paramref name="homeDir"/>'s config/data/store/cache/state children. Named for what
     /// the argument IS — a home, not a data dir: handing a bare data root here would bury
@@ -61,9 +61,9 @@ public sealed record FlintPaths
     }
 
     // ---------------------------------------------------------------- platform defaults
-    // G1/C1: the default derivation lives here and nowhere else. The data root keeps the
-    // historical app-directory anchor (D1: existing installs stay where they are); the other
-    // roots follow the platform convention (S1/E1), including macOS' logs exception (S4).
+    // The default derivation lives here and nowhere else. The data root keeps the
+    // historical app-directory anchor (existing installs stay where they are); the other
+    // roots follow the platform convention, including macOS' logs exception.
 
     /// <summary>User overrides (INI/JSON) and the groups file. Linux: $XDG_CONFIG_HOME/Flint
     /// (else ~/.config/Flint); macOS: ~/Library/Application Support/Flint/config; Windows:
@@ -84,7 +84,7 @@ public sealed record FlintPaths
         return XdgBase("XDG_CONFIG_HOME") / ".config" / "Flint";
     }
 
-    /// <summary>User data (accounts, instances). D1 keeps the historical anchors: macOS
+    /// <summary>User data (accounts, instances). The historical anchors are kept: macOS
     /// ~/Library/Application Support/Flint; Windows %APPDATA%/Flint; Linux
     /// $XDG_DATA_HOME/Flint (else ~/.local/share/Flint).</summary>
     public static AbsolutePath PlatformDefaultDataRoot()
@@ -102,7 +102,7 @@ public sealed record FlintPaths
         return XdgBase("XDG_DATA_HOME") / ".local" / "share" / "Flint";
     }
 
-    /// <summary>Shared installed content (assets/libraries/java, E1/E2). Linux:
+    /// <summary>Shared installed content (assets/libraries/java). Linux:
     /// $XDG_DATA_HOME/Flint/store; macOS: ~/Library/Application Support/Flint/store; Windows:
     /// %LOCALAPPDATA%/Flint/store (machine-local, not roaming).</summary>
     public static AbsolutePath PlatformDefaultStoreRoot()
@@ -121,7 +121,7 @@ public sealed record FlintPaths
         return XdgBase("XDG_DATA_HOME") / ".local" / "share" / "Flint" / "store";
     }
 
-    /// <summary>True cache (rebuildable in seconds, E3). Linux: $XDG_CACHE_HOME/Flint (else
+    /// <summary>True cache (rebuildable in seconds). Linux: $XDG_CACHE_HOME/Flint (else
     /// ~/.cache/Flint); macOS: ~/Library/Caches/Flint; Windows: %LOCALAPPDATA%/Flint/cache.</summary>
     public static AbsolutePath PlatformDefaultCacheRoot()
     {
@@ -140,7 +140,7 @@ public sealed record FlintPaths
         return XdgBase("XDG_CACHE_HOME") / ".cache" / "Flint";
     }
 
-    /// <summary>Machine-local runtime state (S1). Linux: $XDG_STATE_HOME/Flint (else
+    /// <summary>Machine-local runtime state. Linux: $XDG_STATE_HOME/Flint (else
     /// ~/.local/state/Flint); macOS: ~/Library/Application Support/Flint/state; Windows:
     /// %LOCALAPPDATA%/Flint/state (not roaming).</summary>
     public static AbsolutePath PlatformDefaultStateRoot()
@@ -175,26 +175,26 @@ public sealed record FlintPaths
 
     // ------------------------------------------------------- config-root children (anchors)
 
-    /// <summary>The user-layer config file (CONFIG C5: flint.json, the authoritative global
+    /// <summary>The user-layer config file (flint.json, the authoritative global
     /// settings source; the INI chain below is import-only read side).</summary>
     public AbsolutePath ConfigFile => ConfigRoot / "flint.json";
 
-    /// <summary>The instance group definitions file (CONFIG C8: the group-name → member
+    /// <summary>The instance group definitions file (the group-name → member
     /// set half of the old instgroups.json is USER CONFIG — syncable, so it lives on the
     /// config side next to flint.json as its own file; the machine-local "hidden"/collapse
-    /// half went to launcher-state.json's ui section, STATE S5). The "groups.json" name is
-    /// the C8 leftover resolved: a plain, self-describing sibling of flint.json. Members
-    /// are instance UUID references (DATA D3); a legacy data-root instgroups.json (see
+    /// half went to launcher-state.json's ui section). The "groups.json" name is
+    /// settled: a plain, self-describing sibling of flint.json. Members
+    /// are instance UUID references; a legacy data-root instgroups.json (see
     /// <see cref="InstgroupsFile"/>) is read as the import fallback and promoted into this
     /// file on first load.</summary>
     public AbsolutePath GroupsFile => ConfigRoot / "groups.json";
 
     // ------------------------------------------------------- data-root children (anchors)
-    // The user-owned half of the layout (DATA §2): accounts/secrets/instances live under the
+    // The user-owned half of the layout: accounts/secrets/instances live under the
     // data root. The shared installed content and the true cache are remounted onto the
-    // store/cache roots (CACHE E2/E3 — see the store/cache children below).
+    // store/cache roots (see the store/cache children below).
 
-    /// <summary>The LEGACY instgroups.json anchor (data root). Since CONFIG C8 the group
+    /// <summary>The LEGACY instgroups.json anchor (data root). The group
     /// definitions live at <see cref="GroupsFile"/> (config side); this path survives only
     /// as the read-compat import fallback — Prism-imported installs carry instgroups.json
     /// here, and the group model promotes it into the canonical file on first load.</summary>
@@ -203,14 +203,14 @@ public sealed record FlintPaths
     /// <summary>Stored Mojang/MSA accounts.</summary>
     public AbsolutePath AccountsFile => DataRoot / "accounts.json";
 
-    /// <summary>The transitional secret store file (CONFIG C4: data/secrets.json, 0600;
+    /// <summary>The transitional secret store file (data/secrets.json, 0600;
     /// the <see cref="Core.Secrets.FileSecretStore"/> anchor).</summary>
     public AbsolutePath SecretsFile => DataRoot / "secrets.json";
 
     /// <summary>Discovered/created instances.</summary>
     public AbsolutePath InstancesDir => DataRoot / "instances";
 
-    // ------------------------------------------------------- store-root children (E2)
+    // ------------------------------------------------------- store-root children
     // Shared installed content ("download and install in one tree" — deleting it means the
     // feature is unusable and GBs re-download, unlike a cache which only gets slow). The
     // internal shapes stay contract-owned (Mojang objects / Maven layout); only the mount
@@ -226,19 +226,19 @@ public sealed record FlintPaths
     public AbsolutePath AssetIndexesDir => AssetsRoot / "indexes";
 
     /// <summary>Auto-installed Java runtimes (the "java" store base; the JavaDir setting
-    /// resolves relative to the STORE root since E2 — GLOBAL §3).</summary>
+    /// resolves relative to the store root).</summary>
     public AbsolutePath JavaRoot => StoreRoot / "java";
 
-    // ------------------------------------------------------- cache-root children (E3)
+    // ------------------------------------------------------- cache-root children
     // True cache: seconds to rebuild, safe to auto-clean. The ledger and the metadata
     // content moved here from the data root; the ledger describes downloads across BOTH
-    // store and cache (it stays a single file at the cache root, CACHE E3).
+    // store and cache (it stays a single file at the cache root).
 
     /// <summary>Local metadata cache root (MetaEntity "meta" base).</summary>
     public AbsolutePath MetaDir => CacheRoot / "meta";
 
     /// <summary>HttpMetaCache ledger (downloaded metadata/asset/library download state).
-    /// The name is kept per CACHE E3 (用户决议 2); it describes both store and cache bases.</summary>
+    /// The name is kept as-is; it describes both store and cache bases.</summary>
     public AbsolutePath MetacacheFile => CacheRoot / "metacache.json";
 
     /// <summary>Legacy FML libraries download cache ("fmllibs" base).</summary>
@@ -246,7 +246,7 @@ public sealed record FlintPaths
 
     // ------------------------------------------------------- state-root children (anchors)
 
-    /// <summary>Rolling diagnostics logs (S4): the logger anchor is StateRoot/logs — except
+    /// <summary>Rolling diagnostics logs: the logger anchor is StateRoot/logs — except
     /// on macOS, where the platform-default state root keeps them at ~/Library/Logs/Flint
     /// (platform convention wins; an explicitly injected state root pins logs under itself).
     /// Rolling 5 generations, per-line flush — only the anchor moved.</summary>
@@ -263,11 +263,11 @@ public sealed record FlintPaths
         }
     }
 
-    /// <summary>Per-source migration decision records (S3: migration/&lt;source&gt;.json;
-    /// consumed by the migration wiring, assembly step 5).</summary>
+    /// <summary>Per-source migration decision records (migration/&lt;source&gt;.json;
+    /// consumed by the migration wiring at startup).</summary>
     public AbsolutePath MigrationDir => StateRoot / "migration";
 
-    /// <summary>The runtime-state single file (S5; consumed by the state assembly step).</summary>
+    /// <summary>The runtime-state single file (launcher-state.json).</summary>
     public AbsolutePath LauncherStateFile => StateRoot / "launcher-state.json";
 
     // ------------------------------------------------------------------ install root
@@ -277,9 +277,9 @@ public sealed record FlintPaths
     /// root. Defaults to the process base — an install-root concept, not a root-layout one.</summary>
     public string InstallRoot { get; init; } = AppContext.BaseDirectory;
 
-    // ------------------------------------------------------------------- G1 fail-fast
+    // ------------------------------------------------------------------- fail-fast
 
-    /// <summary>Startup discipline (G1): create each of the five roots in turn and verify it
+    /// <summary>Startup discipline: create each of the five roots in turn and verify it
     /// accepts a write. Any unusable root refuses startup with its name in the exception —
     /// no silent degradation, no half-assembled runtime. Explicit roots get no cross-root
     /// assumptions; implicit creation happens under a home because providing the home IS the

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Manual verification against a real PrismLauncher data directory (P3 exit criterion).
+// Manual verification against a real PrismLauncher data directory.
 // Read-only: skips silently when the directory is absent, never writes to the data dir.
-// D4: instances load through the typed layer stack — a Prism-format instance.cfg imports in
+// Instances load through the typed layer stack — a Prism-format instance.cfg imports in
 // memory (read-only, nothing materializes) and InstanceType/uuid still resolve.
 
 using FlintLauncher.Core.Config;

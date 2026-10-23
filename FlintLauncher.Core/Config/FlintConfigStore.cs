@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The flint.json store (CONFIG C5): one TypedJsonFile per config root, load-or-default with
+// The flint.json store: one TypedJsonFile per config root, load-or-default with
 // the record-merge fold (absent members take the record property defaults), atomic writes,
 // and an immediate save on every mutation (the C++ INI settings object saved per Set; the
 // /settings PUT path relies on that).
 //
 // <see cref="Current"/> is the RESOLVED fold (defaults ← user layer; the typed instance
-// layer joins the stack with D4 next phase). Storing the resolved shape keeps flint.json
+// layer joins the stack as the instance layer). Storing the resolved shape keeps flint.json
 // materialized and round-trip stable — with-expressions only, no reflection (AOT).
 //
 // Not thread-safe across instances: the host keeps exactly one; the /settings handlers

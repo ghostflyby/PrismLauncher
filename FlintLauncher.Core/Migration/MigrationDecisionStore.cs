@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The per-source migration decision records (STATE S3): the old "<source>_nomigrate.txt"
+// The per-source migration decision records: the old "<source>_nomigrate.txt"
 // empty marker becomes one auditable JSON file per source,
 // <state-root>/migration/<source>.json = { source, decision: imported|declined, at, mode,
-// instances, bytes } — the one-shot decision per legacy source survives as a record the API
-// can show ("可审计、API 可展示上次迁移结果"). Legacy markers found on disk are upgraded in
+// instances, bytes } — the one-shot decision per legacy source survives as an auditable
+// record the API can show. Legacy markers found on disk are upgraded in
 // place on first sight (read → declined@unknown record → marker deleted), see
 // <see cref="DataMigration.Decide"/>.
 
 using System.Text.Json.Serialization.Metadata;
 using TruePath;
+using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Migration;
 
-/// <summary>One migration decision for one source (S3 schema; the record IS the file).</summary>
+/// <summary>One migration decision for one source (the record IS the file).</summary>
 public sealed record MigrationDecisionRecord
 {
     /// <summary>decision value: the import ran to completion.</summary>
@@ -40,8 +41,8 @@ public sealed record MigrationDecisionRecord
     /// for `declined` (nothing was imported).</summary>
     public string Mode { get; init; } = "";
 
-    /// <summary>Instance count observed for the import (planned basis — the exact `bytes`
-    /// 口径 stays open per STATE §4).</summary>
+    /// <summary>Instance count observed for the import (planned basis — the planned figure
+    /// is the reproducible one).</summary>
     public long Instances { get; init; }
 
     /// <summary>Byte total observed for the import (planned basis).</summary>
@@ -49,7 +50,7 @@ public sealed record MigrationDecisionRecord
 }
 
 /// <summary>Reads and writes the per-source decision records under the state root's
-/// migration/ directory (S3). One TypedJsonFile per record file; writes are atomic.</summary>
+/// migration/ directory. One TypedJsonFile per record file; writes are atomic.</summary>
 public sealed class MigrationDecisionStore(AbsolutePath migrationDir, JsonTypeInfo<MigrationDecisionRecord> typeInfo)
 {
     /// <summary>The directory the per-source record files live in
@@ -66,7 +67,7 @@ public sealed class MigrationDecisionStore(AbsolutePath migrationDir, JsonTypeIn
     public MigrationDecisionRecord? Read(string source)
     {
         var path = RecordPath(source);
-        if (!File.Exists(path.Value))
+        if (!path.ExistsFile())
         {
             return null;
         }

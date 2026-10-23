@@ -10,6 +10,7 @@
 //  - test_addFromWatch's QFileSystemWatcher behavior (startWatching/stopWatching); the
 //    port exercises the same update() folder scan directly.
 
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft.Resources;
 using TruePath;
 using Xunit;
@@ -61,7 +62,7 @@ public class ResourceFolderModelTests : IDisposable
             var folder = source;
             var tempDir = NewTempDir("gh1178_a");
 
-            var m = new ModFolderModel(new AbsolutePath(tempDir), isIndexed: false, createDir: true);
+            var m = new ModFolderModel(MaterializedDirectory.Ensure(new AbsolutePath(tempDir))!, isIndexed: false);
 
             Assert.True(m.InstallResource(folder));
 
@@ -73,7 +74,7 @@ public class ResourceFolderModelTests : IDisposable
             var folder = source + '/';
             var tempDir = NewTempDir("gh1178_b");
 
-            var m = new ModFolderModel(new AbsolutePath(tempDir), isIndexed: false, createDir: true);
+            var m = new ModFolderModel(MaterializedDirectory.Ensure(new AbsolutePath(tempDir))!, isIndexed: false);
 
             Assert.True(m.InstallResource(folder));
 
@@ -85,7 +86,7 @@ public class ResourceFolderModelTests : IDisposable
     public void Test_addFromWatch()
     {
         var source = TestDataDir();
-        var model = new ModFolderModel(new AbsolutePath(source), isIndexed: false, createDir: true);
+        var model = new ModFolderModel(MaterializedDirectory.Ensure(new AbsolutePath(source))!, isIndexed: false);
 
         Assert.Equal(0, model.Size);
 
@@ -102,7 +103,7 @@ public class ResourceFolderModelTests : IDisposable
         var fileMod = Path.Combine(TestDataDir(), "supercoolmod.jar");
 
         var tmp = NewTempDir("remove_resource");
-        var model = new ResourceFolderModel(new AbsolutePath(tmp), isIndexed: false, createDir: false);
+        var model = new ResourceFolderModel(MaterializedDirectory.Ensure(new AbsolutePath(tmp))!, isIndexed: false);
 
         Assert.Equal(0, model.Size);
 
@@ -138,7 +139,7 @@ public class ResourceFolderModelTests : IDisposable
         var fileMod = Path.Combine(TestDataDir(), "supercoolmod.jar");
 
         var tmp = NewTempDir("enable_disable");
-        var model = new ResourceFolderModel(new AbsolutePath(tmp), isIndexed: false, createDir: false);
+        var model = new ResourceFolderModel(MaterializedDirectory.Ensure(new AbsolutePath(tmp))!, isIndexed: false);
 
         Assert.Equal(0, model.Size);
 

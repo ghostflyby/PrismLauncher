@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The local skin library endpoints (DATA D6, user-picked plan B) — the SkinManageDialog's
+// The local skin library endpoints — the SkinManageDialog's
 // LOCAL half, which the port never had:
 //   GET    /skins                -> the stored skins (index.json via SkinListStore)
 //   GET    /skins/{name}         -> one stored skin
@@ -7,10 +7,10 @@
 //   DELETE /skins/{name}         -> drop the entry + texture
 //   POST   /skins/{name}/apply   -> make an account wear the stored skin
 //
-// Apply is a COMPOSITION of the existing account upload path (D6): the stored texture is
+// Apply is a COMPOSITION of the existing account upload path: the stored texture is
 // uploaded through the same SkinUpload core the PUT /accounts/{profileId}/skin endpoint
 // uses (Mojang minecraftservices "minecraft/profile/skins") — no second upload mechanism,
-// no new account surface. The account skin/cape endpoints themselves are untouched (D6).
+// no new account surface. The account skin/cape endpoints themselves are untouched.
 // The SkinsDir SETTING decides where the library lives (LauncherRuntime resolves it
 // data-root-relative, the C++ convention).
 
@@ -104,7 +104,7 @@ public static class SkinLibraryEndpoints
                 ? Results.NoContent()
                 : ApiJson.NotFound("skin_not_found", $"no stored skin '{name}'")).Produces(204);
 
-        // apply = the D6 composition: SkinUpload (the account upload core) over the stored
+        // apply = the composition: SkinUpload (the account upload core) over the stored
         // texture; the model override picks classic/slim, defaulting to the stored variant
         api.MapPost("/skins/{name}/apply", async Task<IResult> (string name,
             SkinApplyRequest? request, LauncherRuntime runtime) =>

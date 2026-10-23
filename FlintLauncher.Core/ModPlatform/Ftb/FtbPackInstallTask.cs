@@ -10,7 +10,7 @@
 //    through the BlockedMods property; the optional BlockedModLocalFileResolver hook stands
 //    in for the dialog's match-a-local-file step. Files that stay unmatched after it fail
 //    the install listing them (the C++ dialog defaults to rejecting -> abort).
-//  - downloadFiles() (the P5 update pipeline) is not ported; creation succeeds without
+//  - downloadFiles() (the update pipeline) is not ported; creation succeeds without
 //    fetching game files, like the other creation tasks.
 
 using System.Security.Cryptography;
@@ -212,7 +212,7 @@ public sealed class FtbPackInstallTask(
     private async Task CreateInstance(CancellationToken cancellationToken)
     {
         EmitStatus("Creating the instance...");
-        // D4: the staged instance is Flint format from birth (typed instance.json adapter)
+        // the staged instance is Flint format from birth (typed instance.json adapter)
         var instance = new MinecraftInstance(
             new InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution.")),
@@ -317,7 +317,7 @@ public sealed class FtbPackInstallTask(
             CopyBlockedMods();
         }
 
-        // (upstream calls downloadFiles(m_instance.get()) here — the P5 update pipeline;
+        // (upstream calls downloadFiles(m_instance.get()) here — the update pipeline;
         //  like the other creation tasks, creation succeeds without fetching game files)
         EmitSucceeded();
     }

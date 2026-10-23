@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// API tests for the local skin library (DATA D6 plan B): the GET/POST/DELETE /skins
+// API tests for the local skin library: the GET/POST/DELETE /skins
 // surface over the SkinsDir setting (default "skins" under the home layout's data root)
 // and the apply endpoint's guard rails (unknown account / missing skin / missing texture).
 // The happy-path apply is covered by the SkinApiEndpointsTests stub machinery shape — here

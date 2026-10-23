@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Tests for the typed instance settings stack (D4 — the SettingsObject shape over
-// flint.json -> instance.json): C7 fold resolution, the derived gates, the C7 passthrough
+// Tests for the typed instance settings stack (the SettingsObject shape over
+// flint.json -> instance.json): fold resolution, the derived gates, the passthrough
 // pair, persistence through instance.json and the state-trio routing. The former
-// INISettingsObject tests retired with the INI write path (CONFIG C5).
+// The C++ INISettingsObject surface is not ported (Flint never writes an INI).
 
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Settings;
@@ -115,7 +115,7 @@ public class SettingsObjectTests : IDisposable
         settings.RegisterSetting("ConsoleMaxLines", 100000);
         settings.RegisterSetting("ConsoleOverflowStop", true);
 
-        // C7: the pair is non-layered — the instance layer cannot carry it
+        // the pair is non-layered — the instance layer cannot carry it
         Assert.Equal(5000, Variant.AsInt(settings.Get("ConsoleMaxLines")));
         settings.Set("ConsoleMaxLines", 77);
         Assert.Equal(5000, Variant.AsInt(settings.Get("ConsoleMaxLines")));
@@ -158,7 +158,7 @@ public class SettingsObjectTests : IDisposable
         settings.Set("totalTimePlayed", 3600L);
         settings.Set("lastTimePlayed", 120L);
 
-        // the trio NEVER lands in instance.json — it is instance-state.json (D4)
+        // the trio NEVER lands in instance.json — it is instance-state.json
         Assert.False(JsonPath.ExistsFile());
         Assert.True((_root / "instance-state.json").ExistsFile());
 
@@ -191,7 +191,7 @@ public class SettingsObjectTests : IDisposable
         Assert.Equal("Legacy", Variant.AsString(settings.Get("name")));
         Assert.False(JsonPath.ExistsFile());
 
-        // the first write converts (uuid carried over verbatim — the D2 addressing chain)
+        // the first write converts (uuid carried over verbatim — the addressing chain)
         settings.Set("notes", "now flint");
         Assert.True(JsonPath.ExistsFile());
         Assert.Contains("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", JsonPath.ReadAllText());

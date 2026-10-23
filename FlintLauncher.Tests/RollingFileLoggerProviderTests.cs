@@ -3,9 +3,11 @@
 // at startup, a fresh Flint-0.log receives the lines, and an unwritable location degrades to
 // a no-op instead of taking the launcher down.
 
+using FlintLauncher.Core.IO;
 using FlintLauncher.Web.Logging;
 using Microsoft.Extensions.Logging;
 using TruePath;
+using TruePath.SystemIo;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -42,7 +44,7 @@ public class RollingFileLoggerProviderTests : IDisposable
         File.WriteAllText(PathOf(3), "gen3\n");
         File.WriteAllText(PathOf(4), "gen4-oldest\n");
 
-        using var provider = new RollingFileLoggerProvider(new AbsolutePath(_dir));
+        using var provider = new RollingFileLoggerProvider(MaterializedDirectory.Ensure(new AbsolutePath(_dir))!);
         using (var factory = LoggerFactory.Create(builder =>
                {
                    builder.SetMinimumLevel(LogLevel.Information);
@@ -65,15 +67,15 @@ public class RollingFileLoggerProviderTests : IDisposable
     }
 
     [Fact]
-    public void UnwritableDirectoryDegradesToNoop()
+    public void OccupiedLogsPath_YieldsNoHandle_TheHostSkipsTheSink()
     {
-        // a FILE where the directory should be — the provider must not throw and the
-        // loggers must swallow writes instead of faulting the app
-        var filePath = Path.Combine(_dir, "not-a-directory");
-        File.WriteAllText(filePath, "occupied");
+        // a FILE where the directory should be — Ensure refuses to materialize (null) and
+        // the composition root skips the file sink: the degrade-to-console decision moved
+        // from the provider interior to the injection site with the handle type
+        var occupied = new AbsolutePath(Path.Combine(_dir, "not-a-directory"));
+        occupied.WriteAllText("occupied");
 
-        using var provider = new RollingFileLoggerProvider(new AbsolutePath(filePath));
-        var logger = provider.CreateLogger("any");
-        logger.LogInformation("dropped");
+        Assert.Null(MaterializedDirectory.Ensure(occupied));
+        Assert.False(occupied.ExistsDirectory());
     }
 }

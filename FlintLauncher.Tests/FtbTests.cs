@@ -11,6 +11,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using TruePath;
@@ -51,7 +52,11 @@ public class FtbTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList([new AbsolutePath(instancesDir)]) { Environment = _global };
+        return new InstanceList(
+            [MaterializedDirectory.Ensure(new AbsolutePath(instancesDir))!],
+            _global,
+            new AbsolutePath(instancesDir) / ".test-groups.json",
+            []);
     }
 
     private static List<(string? Uid, string? Version)> Components(string staging)
@@ -295,7 +300,7 @@ public class FtbTests : IDisposable
         Assert.Contains(components, c => c is { Uid: "net.minecraftforge", Version: "40.1.0" });
         Assert.DoesNotContain(components, c => c.Uid == "net.fabricmc.fabric-loader");
 
-        // managed-pack bookkeeping (D4: instance.json, the "managed" domain)
+        // managed-pack bookkeeping (instance.json, the "managed" domain)
         var instJson = await File.ReadAllTextAsync(Path.Combine(staging, "instance.json"));
         Assert.Contains("managed", instJson);
         Assert.Contains("\"ftb\"", instJson);

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// P5-c smoke: launch a real assembled step chain through the LaunchController (the headless
+// smoke: launch a real assembled step chain through the LaunchController (the headless
 // entry point) with a fake java that speaks the EntryPoint stdin protocol — no network, no
 // real Minecraft. Also assembles the launch task of a real Prism instance (read-only).
 
@@ -33,12 +33,12 @@ public class RealLaunchSmokeTests
 
         // Pre-seed the java probe results so CheckJava skips the JavaCheck.jar run (exactly the
         // state of an instance whose java was already checked by a previous launch): the stored
-        // signature must equal ComputeJavaSignature(mtime, path). Since CONFIG C9/S5 the probe
+        // signature must equal ComputeJavaSignature(mtime, path). The probe
         // cache lives in launcher-state.json, seeded through the fixture's state store.
         var javaPath = WriteFakeJava(root);
         var javaUnixTime = new DateTimeOffset(File.GetLastWriteTimeUtc(javaPath)).ToUnixTimeMilliseconds();
         // JavaPath is the instance-layer override: writing the member IS the override (the
-        // derived OverrideJavaLocation gate reads true — C7; real Prism instance.cfg files
+        // derived OverrideJavaLocation gate reads true; real Prism instance.cfg files
         // carry the same override as a gated value).
         instance.Settings.Set("JavaPath", javaPath);
         fixture.SeedJavaDetection(javaPath, javaUnixTime, languageVersion: 17, vendor: "smoke");
@@ -133,7 +133,7 @@ public class RealLaunchSmokeTests
         // assembly needs a resolved component profile, which offline needs the meta cache
         // (in the deployed host the CWD is the data dir, so CWD/meta IS the Prism cache).
         var global = new GlobalLaunchSettingsStub();
-        // D4: the real Prism instance loads read-only through the typed layer stack (the
+        // the real Prism instance loads read-only through the typed layer stack (the
         // instance.cfg imports in memory; nothing materializes)
         var instanceRootPath = new AbsolutePath(instanceDir);
         var instance = new MinecraftInstance(

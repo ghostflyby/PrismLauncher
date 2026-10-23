@@ -9,6 +9,7 @@
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform;
@@ -67,7 +68,7 @@ public class ModUpdateTaskTests : IDisposable
             Loaders = ModLoaderType.Forge,
         });
 
-        var model = new ModFolderModel(new AbsolutePath(ModsDir), isIndexed: true, createDir: true);
+        var model = new ModFolderModel(MaterializedDirectory.Ensure(new AbsolutePath(ModsDir))!, isIndexed: true);
         model.Update();
         var mod = model.AllMods().First(m => m.Fileinfo.Name == "test.jar");
         var instance = _env.CreateInstance("1.18.2", ModLoaderType.Forge, "40.1.0");

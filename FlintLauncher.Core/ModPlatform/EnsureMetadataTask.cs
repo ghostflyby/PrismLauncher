@@ -6,7 +6,7 @@
 // Deviations:
 //  - The ConcurrentTask hash-priming pass lives in the callers (HashUtils.HashFile is
 //    synchronous here), so the task takes the hash → resource map directly.
-//  - Resource::setMetadata does not exist yet (the P3b Mod port has no metadata field),
+//  - Resource::setMetadata does not exist yet (the ported Mod has no metadata field),
 //    so the freshly created ModStruct is handed to callers through the MetadataReady
 //    event (ModFolderModel re-reads it from disk through its hook).
 

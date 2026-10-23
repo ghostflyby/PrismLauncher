@@ -10,7 +10,7 @@
 //
 // Deviations (headless port):
 //  - The update-existing-instance flow of executeTask() (APPLICATION->instances() lookups,
-//    the askIfShouldUpdate/warn dialogs and the old-manifest diffing) is deferred to P6-c;
+//    the askIfShouldUpdate/warn dialogs and the old-manifest diffing) is deferred;
 //    the task goes straight to createInstance().
 //  - The optional-mods dialog: optional files are installed disabled (".disabled" suffix),
 //    like the C++ non-dialog path.
@@ -94,7 +94,7 @@ public sealed partial class FlameCreationTask : InstanceTask
     public Func<BlockedMod, string?>? BlockedModLocalFileResolver { get; init; }
 
     /// <summary>
-    /// Headless stand-in for the optional-mods dialog selection (fix-2d): keys are the
+    /// Headless stand-in for the optional-mods dialog selection: keys are the
     /// resolved file's relative path ("&lt;targetFolder&gt;/&lt;fileName&gt;", separators
     /// normalized), values the selected flag. Selected optional files install enabled,
     /// everything else keeps the non-dialog behavior (".disabled" suffix). Flagged Core
@@ -234,7 +234,7 @@ public sealed partial class FlameCreationTask : InstanceTask
             loaderVersion = id;
         }
 
-        // D4: the staged instance is Flint format from birth (typed instance.json adapter)
+        // the staged instance is Flint format from birth (typed instance.json adapter)
         _newInstance = new MinecraftInstance(
             new InstanceJsonSettingsObject(StagingPath, Environment ??
                                                         throw new InvalidOperationException(
@@ -300,7 +300,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                 recommendedRam = (int)max;
             }
 
-            // C7: writing MaxMemAlloc sets the instance-layer member, which IS the override
+            // writing MaxMemAlloc sets the instance-layer member, which IS the override
             // (the derived OverrideMemory gate reads true; no separate gate write exists)
             _newInstance.Settings.Set("MaxMemAlloc", recommendedRam);
         }
@@ -719,7 +719,7 @@ public sealed partial class FlameCreationTask : InstanceTask
             }
         }
 
-        // (upstream calls downloadFiles(m_newInstance.get()) here — the P5 update pipeline;
+        // (upstream calls downloadFiles(m_newInstance.get()) here — the update pipeline;
         //  like the other creation tasks, creation succeeds without fetching game files)
         EmitSucceeded();
     }

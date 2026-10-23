@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The instance-layer environment (D4): everything an instance's typed settings stack needs —
+// The instance-layer environment: everything an instance's typed settings stack needs —
 // the user layer's live store (flint.json) plus the source-generated type infos for
-// instance.json / instance-state.json (GLOBAL §1: Core only sees the opaque JsonTypeInfo
+// instance.json / instance-state.json (Core only sees the opaque JsonTypeInfo
 // handles; the registration list stays in the host's FlintJsonContext — AOT red line).
 //
 // Threaded from the composition root through InstanceList to every discovered instance, and

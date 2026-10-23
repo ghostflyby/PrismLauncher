@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Shared fixtures for the P5-b launch pipeline tests: a settings stub with every key the
+// Shared fixtures for the launch pipeline tests: a settings stub with every key the
 // launch layer reads (mirroring InstanceTests' GlobalSettingsStub) and a MinecraftInstance
 // factory that seeds a complete net.minecraft patch so PackProfile::getProfile() builds a
 // LaunchProfile offline (no network, no real Mojang metadata).
@@ -22,7 +22,7 @@ namespace FlintLauncher.Tests;
 /// <summary>The user layer for the launch tests: a REAL FlintConfigStore over the fixture's
 /// config root, seeded with the same values the former in-memory stub registered (the tests'
 /// expectations were written against these — deliberately NOT the production defaults).
-/// StubSet is a typed store Set; the D4 instance stack reads this store as its user layer.</summary>
+/// StubSet is a typed store Set; the instance stack reads this store as its user layer.</summary>
 public class GlobalLaunchSettingsStub
 {
     /// <summary>The fixture's typed user-layer store (flint.json under the fixture config root).</summary>
@@ -53,7 +53,7 @@ public class GlobalLaunchSettingsStub
         StubSet("JvmArgs", "");
         StubSet("IgnoreJavaCompatibility", false);
         // NOTE: the java probe quintet / LastOfflinePlayerName are NOT here — they live in
-        // launcher-state.json since CONFIG C9 (seed through LaunchFixture.SeedJavaDetection)
+        // launcher-state.json (seed through LaunchFixture.SeedJavaDetection)
 
         StubSet("LaunchMaximized", false);
         StubSet("MinecraftWinWidth", 854);
@@ -82,7 +82,7 @@ public class GlobalLaunchSettingsStub
 
     public void StubSet(string id, object? value) => Store.Set(id, value);
 
-    /// <summary>The typed instance environment over this store (the D4 instance.json stack).</summary>
+    /// <summary>The typed instance environment over this store (the instance.json stack).</summary>
     public InstanceEnvironment Environment =>
         new(Store, FlintJsonContext.Default.InstanceConfigFile, FlintJsonContext.Default.InstanceStateFile);
 
@@ -92,7 +92,7 @@ public class GlobalLaunchSettingsStub
 
 /// <summary>
 /// A temp-dir instance with a seeded, offline-loadable net.minecraft patch (the "seeded
-/// profile fixture" of the P5-b test plan).
+/// profile fixture" of the test plan).
 /// </summary>
 public sealed class LaunchFixture : IDisposable
 {
@@ -100,16 +100,16 @@ public sealed class LaunchFixture : IDisposable
 
     public GlobalLaunchSettingsStub Global { get; } = new();
 
-    /// <summary>The fixture's five-root stamp (G1 home layout); disposed with the fixture.</summary>
+    /// <summary>The fixture's five-root stamp (home layout); disposed with the fixture.</summary>
     private readonly TestFlintPaths _paths = TestFlintPaths.UnderHome();
 
-    /// <summary>The fixture's stamped meta cache (E6 fixture injection: the runtime cache the
+    /// <summary>The fixture's stamped meta cache (fixture injection: the runtime cache the
     /// composition root owns, "meta" base under the fixture's cache root — the CWD-anchored
     /// static fallback is gone). Instances created here carry it, which also stamps their
     /// pack profiles' metadata index.</summary>
     public HttpMetaCache MetaCache { get; }
 
-    /// <summary>The launcher runtime state store (S5) over the fixture's state root — launch
+    /// <summary>The launcher runtime state store over the fixture's state root — launch
     /// fixtures seed the java probe cache / offline name through <see cref="SeedJavaDetection"/>
     /// or <see cref="State"/> directly.</summary>
     public LauncherStateStore State { get; }
@@ -127,8 +127,8 @@ public sealed class LaunchFixture : IDisposable
         MetaCache.AddBase("asset_indexes", _paths.Paths.AssetIndexesDir);
     }
 
-    /// <summary>Seed the S5 java probe cache for a configured java path so CheckJava trusts
-    /// the binary without running the checker (the former settings-key seeding, C9): the
+    /// <summary>Seed the java probe cache for a configured java path so CheckJava trusts
+    /// the binary without running the checker (the former settings-key seeding): the
     /// stored signature matches ComputeJavaSignature(mtime, resolved-path). The caller names
     /// the language version explicitly — it is what the launch rules (--add-opens, JNI
     /// rename, compatibility) read, and it must agree with the version string it seeds.</summary>
@@ -203,7 +203,7 @@ public sealed class LaunchFixture : IDisposable
                 """);
         }
 
-        // the typed instance layer (D4): the adapter over the fixture root folds the
+        // the typed instance layer: the adapter over the fixture root folds the
         // fixture's user-layer store (Global) with the instance's own instance.json
         var services = CreateServices();
         var instance = new MinecraftInstance(
@@ -215,10 +215,10 @@ public sealed class LaunchFixture : IDisposable
         {
             // the composition-root stamp (InstanceList does the same in the host): the
             // CreateLaunchTask path builds its per-launch services from these, the launcher
-            // runtime state carries the java probe cache (S5), and the fixture meta cache
-            // (E6 fixture injection) feeds the metadata/library/asset-index downloads
+            // runtime state carries the java probe cache, and the fixture meta cache
+            // (fixture injection) feeds the metadata/library/asset-index downloads.
+            // Paths rides LaunchServices (the instance derives its layout from it).
             LaunchServices = services,
-            Paths = services.Paths,
             LauncherState = State,
             MetaCache = MetaCache,
         };

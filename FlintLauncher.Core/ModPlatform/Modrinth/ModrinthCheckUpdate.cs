@@ -5,10 +5,10 @@
 // update when the latest preferred file's hash differs from the installed one.
 //
 // Deviations (headless port):
-//  - Resource::metadata() becomes the injectable metadataLookup delegate (the P3b Mod has
+//  - Resource::metadata() becomes the injectable metadataLookup delegate (the ported Mod has
 //    no metadata field; ModFolderModel.GetMetadata is the intended provider).
 //  - The ResourceDownloadTask / GetModDependenciesTask wiring of the C++ Update struct is
-//    not ported yet (P6-c); the update record carries the resolved IndexedVersion instead.
+//    not ported yet; the update record carries the resolved IndexedVersion instead.
 //  - The dependency list (m_deps) is not ported.
 
 using FlintLauncher.Core.Minecraft;

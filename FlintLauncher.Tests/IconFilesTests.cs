@@ -2,6 +2,7 @@
 // Tests for the IconFiles port (IconUtils + the file-level IconList operations).
 
 using FlintLauncher.Core.Icons;
+using FlintLauncher.Core.IO;
 using TruePath;
 using TruePath.SystemIo;
 using Xunit;
@@ -155,7 +156,7 @@ public class IconFilesTests : IDisposable
         Assert.False(IconFiles.DeleteIcon(_iconsDir, "deleteme"));
     }
 
-    // DATA D5: the IconPool model over the static helpers (key→path index, scan,
+    // the IconPool model over the static helpers (key→path index, scan,
     // install/delete — the IconList half; the endpoints consume this, not the statics)
     [Fact]
     public void IconPool_IndexesScansInstallsAndDeletes()
@@ -163,7 +164,7 @@ public class IconFilesTests : IDisposable
         WriteFile((_iconsDir / "grass.png"));
         WriteFile((_iconsDir / "sub" / "inner.svg"));
 
-        var pool = new IconPool(() => _iconsDir);
+        var pool = new IconPool(MaterializedDirectory.Ensure(_iconsDir)!);
         Assert.Equal(_iconsDir, pool.IconsDir);
 
         // the scan indexes subdirectory icons by their base-name key; entries carry the

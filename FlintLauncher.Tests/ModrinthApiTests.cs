@@ -313,7 +313,7 @@ public class ModrinthApiTests : IDisposable
             Assert.Equal(["net.minecraft", "net.fabricmc.fabric-loader"], uids);
         }
 
-        // D4: the staged instance's identity lives in instance.json (Flint format)
+        // the staged instance's identity lives in instance.json (Flint format)
         Assert.Contains("Imported Pack", await File.ReadAllTextAsync(Path.Combine(staging, "instance.json")));
 
         // packwiz-style metadata written per mod
@@ -327,7 +327,8 @@ public class ModrinthApiTests : IDisposable
         Assert.Contains("url = \"" + _server.Url + "/mod.bin\"", metadataToml);
 
         // the metadata layer attaches through ModFolderModel (status Installed)
-        var modList = new ModFolderModel(new AbsolutePath(Path.Combine(staging, "minecraft", "mods")));
+        var modList = new ModFolderModel(MaterializedDirectory.Ensure(
+        new AbsolutePath(Path.Combine(staging, "minecraft", "mods")))!);
         modList.Update();
         var mod = Assert.Single(modList.AllMods(),
             m => m.Type == FlintLauncher.Core.Minecraft.Resources.ResourceType.ZipFile);
@@ -478,7 +479,7 @@ public class ModrinthApiTests : IDisposable
         await import.StartAsync();
         Assert.True(import.WasSuccessful, import.FailReason);
 
-        // ... then export the instance again (the staged instance is Flint format, D4)
+        // ... then export the instance again (the staged instance is Flint format)
         var instance = new MinecraftInstance(
             new InstanceJsonSettingsObject(new AbsolutePath(staging), _global.Environment), new AbsolutePath(staging));
         var output = TempPath("exported.mrpack");

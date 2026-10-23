@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The accounts.json wire domain (docs/JSON-MIGRATION.md batch "accounts.json 读写类型化"):
+// The accounts.json wire domain:
 // the typed probe records over the format AccountData::saveState/resumeStateFromV3 speak.
 //
 // Read compatibility (files written by upstream Prism land here verbatim through the

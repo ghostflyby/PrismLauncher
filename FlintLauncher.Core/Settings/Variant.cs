@@ -29,8 +29,8 @@ public static class Variant
         bool b => b,
         // QVariant(QString).toBool(): toLower() then ONLY empty/"0"/"false" are false —
         // everything else ("True"/"2"/"yes") reads true (Qt6 qmetatype.cpp convertToBool).
-        // The import gates (Override* keys, C9 keys) must judge hand-edited cfg strings the
-        // way Qt's own reads did, or C7 folding drops instance values Qt kept.
+        // The import gates (Override* keys, state keys) must judge hand-edited cfg strings the
+        // way Qt's own reads did, or the gate folding drops instance values Qt kept.
         string s => !(s.Length == 0 || s == "0" || s.Equals("false", StringComparison.OrdinalIgnoreCase)),
         int i => i != 0,
         long l => l != 0,

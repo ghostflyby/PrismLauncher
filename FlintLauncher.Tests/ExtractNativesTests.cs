@@ -14,7 +14,6 @@ using System.IO.Compression;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
-using FlintLauncher.Core;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Launch.Steps;
@@ -90,7 +89,7 @@ public class ExtractNativesTests
     public async Task ExtractsNativeJars_WithJniLibRename()
     {
         using var fixture = new LaunchFixture();
-        fixture.SeedJavaDetection("java", 0, languageVersion: 17, version: "17.0.2"); // >= 8: the .jnilib hack applies (C9: state cache)
+        fixture.SeedJavaDetection("java", 0, languageVersion: 17, version: "17.0.2"); // >= 8: the .jnilib hack applies (state cache)
         var instance = await fixture.CreateInstance(NativeLibrariesPatch);
         WriteNativeJars(instance.GetLocalLibraryPath(), "dylib-bytes", "jnilib-bytes");
 
@@ -327,23 +326,27 @@ public class ExtractNativesTests
         // instance cache ("asset_indexes" base) instead of the former static hook; the
         // instance stamp reads its assets anchors through the <BaseDirectory>/assets symlink
         // (the CWD-lexical fallback of FILE-LAYOUT §1.5), so the STORE root is BaseDirectory
-        // (E2: assets hang off the store root)
+        // (assets hang off the store root)
         var instanceCache = new HttpMetaCache(Temporary.SystemTempDirectory() / $"flint-asset-indexes-{Guid.NewGuid():N}" / "metacache.json");
         instanceCache.AddBase("asset_indexes", new AbsolutePath(Path.Combine(assetsRoot.Root, "indexes")));
         instance.MetaCache = instanceCache;
-        instance.Paths = new()
-        {
-            ConfigRoot = new AbsolutePath(AppContext.BaseDirectory),
-            DataRoot = new AbsolutePath(AppContext.BaseDirectory),
-            StoreRoot = new AbsolutePath(AppContext.BaseDirectory),
-            CacheRoot = new AbsolutePath(AppContext.BaseDirectory),
-            StateRoot = new AbsolutePath(AppContext.BaseDirectory),
-        };
+        // the layout arrives through the injected LaunchServices (the instance derives its
+        // Paths from it): the instance stamp reads its assets anchors through the
+        // <BaseDirectory>/assets symlink (the CWD-lexical fallback of FILE-LAYOUT §1.5), so
+        // the store root is BaseDirectory (assets hang off the store root)
+        var baseDir = new AbsolutePath(AppContext.BaseDirectory);
         // the resource URL override rides the instance-stamped LaunchServices (the former
         // AssetUpdateTask.ResourceUrlOverride static hook)
         instance.LaunchServices = new LaunchServices
         {
-            Paths = instance.Paths,
+            Paths = new()
+            {
+                ConfigRoot = baseDir,
+                DataRoot = baseDir,
+                StoreRoot = baseDir,
+                CacheRoot = baseDir,
+                StateRoot = baseDir,
+            },
             LoggerFactory = NullLoggerFactory.Instance,
             ResourceUrlOverride = server.Url + "/objects/",
         };

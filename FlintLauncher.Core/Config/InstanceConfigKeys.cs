@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The instance-side key registry (D4/C6/C7 — the instance.json counterpart of
+// The instance-side key registry (the instance.json counterpart of
 // FlintConfigKeys): every instance settings key maps to its record member exactly once.
 //
 // Resolution shape: Get(user, instance) resolves a key as instance-layer member ?? user-layer
-// (flint.json) member — the C7 fold — for the layered keys, or reads the instance layer alone
+// (flint.json) member — the fold — for the layered keys, or reads the instance layer alone
 // for the instance-only keys (their defaults stay in the BaseInstance/MinecraftInstance
 // Setting registrations, which Setting.Get falls back to when this getter yields null).
 //
-// The Override* gate booleans DEGENERATE (C7): reading one yields "any member of its family
+// The Override* gate booleans DEGENERATE: reading one yields "any member of its family
 // is non-null at the instance layer"; writing false CLEARS the family (reset to inherit) and
 // writing true is a no-op (the member write is what makes the override real — exactly how the
 // old GUI/tasks used the gate+value pair). The INI importer consults the same gate keys to
 // drop gate=false values into inheritance.
 //
 // The runtime time trio (lastLaunchTime/lastTimePlayed/totalTimePlayed) is NOT here — it
-// lives in instance-state.json (D4) and is routed by the settings adapter directly.
+// lives in instance-state.json and is routed by the settings adapter directly.
 //
-// The C7 passthrough pair (ConsoleMaxLines/ConsoleOverflowStop) is deliberately global-only:
-// reads come from the user layer, instance-side writes are dropped (non-layered per C7).
+// The passthrough pair (ConsoleMaxLines/ConsoleOverflowStop) is deliberately global-only:
+// reads come from the user layer, instance-side writes are dropped (non-layered).
 
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Settings;
@@ -163,7 +163,7 @@ public static class InstanceConfigKeys
     private static bool GateModDownloadLoaders(InstanceConfigFile i) => i.Misc.ModDownloadLoaders is not null;
 
     /// <summary>
-    ///     The gate write: false/null clears the family (C7 — the members fall back to
+    ///     The gate write: false/null clears the family (the members fall back to
     ///     inheritance); true is a no-op (the family is derived from its members).
     /// </summary>
     private static InstanceConfigFile GateWrite(InstanceConfigFile i, object? value,
@@ -565,7 +565,7 @@ public static class InstanceConfigKeys
                     }
                 }),
 
-            // ---- console (OverrideConsole) — the C7 passthrough pair is NOT here
+            // ---- console (OverrideConsole) — the passthrough pair is NOT here
             E("ShowConsole", "OverrideConsole",
                 (u, i) => i.Misc.Console.ShowConsole ?? u.Console.ShowConsole,
                 i => i.Misc.Console.ShowConsole is not null,
@@ -822,7 +822,7 @@ public static class InstanceConfigKeys
                 i => i.Export.Profiler is not null,
                 (i, v) => i with { Export = i.Export with { Profiler = StringOf(v) } }),
 
-            // ---- the C7 passthrough pair: global-only reads, instance writes dropped
+            // ---- the passthrough pair: global-only reads, instance writes dropped
             E("ConsoleMaxLines", null,
                 (u, _) => u.Console.ConsoleMaxLines,
                 _ => false,
@@ -832,7 +832,7 @@ public static class InstanceConfigKeys
                 _ => false,
                 (i, _) => i),
 
-            // ---- the derived gates (C7: read = any family member non-null; write false = clear)
+            // ---- the derived gates (read = any family member non-null; write false = clear)
             E("OverrideJavaLocation", "OverrideJavaLocation", // the family this derived gate belongs to (its INI spelling lives in GateIniSpellings)
                 (_, i) => GateJavaLocation(i),
                 _ => false,
@@ -899,7 +899,7 @@ public static class InstanceConfigKeys
     /// <summary>
     ///     linkedInstances accepts a real string list (typed writes) or the legacy JSON
     ///     array text (INI import). Null passes through (reset to inherit). Entries are stored
-    ///     verbatim — the dirname→uuid conversion (D3) is the discovery-side pass in
+    ///     verbatim — the dirname→uuid conversion is the discovery-side pass in
     ///     InstanceList, not a transform of this layer.
     /// </summary>
     private static IReadOnlyList<string>? ToStringList(object? value) => value switch

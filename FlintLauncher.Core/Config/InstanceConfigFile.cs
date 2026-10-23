@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The instance.json record domain (DATA D4 + CONFIG C5/C7, ask shape: Identity / Launch /
-// Managed / Export / Misc — "拆分形状和核心配置一样"). One file per instance directory next
-// to the untouched mmc-pack.json + patches/ (read-compat, C5) and the machine-local
+// The instance.json record domain — Identity / Launch / Managed / Export / Misc — the
+// same domain split as the core config. One file per instance directory next
+// to the untouched mmc-pack.json + patches/ (read-compat) and the machine-local
 // instance-state.json (the runtime time trio lives there, not here).
 //
-// Layering shape (C6/C7): every MEMBER is NULLABLE — null means "not set at this layer,
+// Layering shape: every MEMBER is NULLABLE — null means "not set at this layer,
 // inherit from the user layer (flint.json) below". The gate booleans of the old instance.cfg
-// (OverrideMemory & co) DEGENERATE to "is any member of the domain non-null" (CONFIG C7 §D);
+// (OverrideMemory & co) DEGENERATE to "is any member of the domain non-null";
 // the reader is <see cref="InstanceConfigKeys"/>, which resolves each key as
 // instance-layer ?? user-layer and derives the gates. There are no property defaults on
 // layered members on purpose: the user layer (flint.json's record defaults) is the single
@@ -14,7 +14,7 @@
 // their defaults stay where the C++ RegisterSetting calls had them — the Setting
 // registrations in BaseInstance/MinecraftInstance (Setting.Get falls back to them).
 //
-// uuid belongs to Identity (D4: "身份不是状态") and is the D2 addressing chain's persistent
+// uuid belongs to Identity (identity is not state) and is the addressing chain's persistent
 // handle; the INI import carries a Prism instance.cfg's uuid over VERBATIM so references
 // survive the format switch.
 //
@@ -26,7 +26,7 @@ using FlintLauncher.Core.Instances;
 
 namespace FlintLauncher.Core.Config;
 
-/// <summary>The instance.json root (D4). One object with a camelCase member per domain;
+/// <summary>The instance.json root. One object with a camelCase member per domain;
 /// absent scalar members inherit from the user layer or the registered defaults.</summary>
 public sealed record InstanceConfigFile
 {
@@ -58,7 +58,7 @@ public sealed record InstanceConfigFile
     public InstanceMiscConfig Misc { get; init; }
 }
 
-/// <summary>Who this instance is (D4: uuid is identity, not state). Name/iconKey/notes
+/// <summary>Who this instance is (uuid is identity, not state). Name/iconKey/notes
 /// defaults live in the BaseInstance Setting registrations ("Unnamed Instance"/"default"/"").</summary>
 public sealed record InstanceIdentityConfig
 {
@@ -74,7 +74,7 @@ public sealed record InstanceIdentityConfig
     public List<ShortcutData>? Shortcuts { get; init; }
 }
 
-/// <summary>The layered launch settings (the C7 override families): java / memory / window /
+/// <summary>The layered launch settings (the override families): java / memory / window /
 /// commands / env / performance / nativeLib.</summary>
 public sealed record InstanceLaunchConfig
 {
@@ -269,7 +269,7 @@ public sealed record InstanceMiscConfig
     /// <summary>Count this instance's playtime into the launcher-state global total.</summary>
     public bool? CountGameTime { get; init; }
 
-    /// <summary>D3: the persisted reference form is the instance uuid. This layer stores the
+    /// <summary>The persisted reference form is the instance uuid. This layer stores the
     /// list VERBATIM — the INI import lands whatever the Prism cfg carried (dirnames), and
     /// the conversion to uuids is the discovery-side pass (InstanceList
     /// ConvertLinkedInstanceReferences after each LoadList; unresolvable entries are retried
@@ -279,7 +279,7 @@ public sealed record InstanceMiscConfig
 
     public bool? GlobalDataPacksEnabled { get; init; }
 
-    /// <summary>CONFIG matrix C: machine-local path (not synced), like the C++.</summary>
+    /// <summary>Machine-local path (not synced), like the C++.</summary>
     public string? GlobalDataPacksPath { get; init; }
 
     public bool? UseLatestMinecraftVersion { get; init; }
@@ -291,7 +291,7 @@ public sealed record InstanceMiscConfig
 }
 
 /// <summary>Console visibility family (OverrideConsole). ConsoleMaxLines/ConsoleOverflowStop
-/// are NOT here — C7 passthrough keys stay global-only.</summary>
+/// are NOT here — the passthrough keys stay global-only.</summary>
 public sealed record InstanceConsoleConfig
 {
     public bool? ShowConsole { get; init; }

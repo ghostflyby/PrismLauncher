@@ -6,7 +6,7 @@
 //  - LocalResourceUpdateTask::executeTask (metadata write after download/parse)
 //  - ResourceFolderLoadTask::getFromMetadata (the indexed folder scan)
 //  - Resource/Mod metadata accessors; in this port the Mod object keeps no metadata field
-//    (P3b dropped it), so ModFolderModel carries a lookup hook instead (see
+//    (the port dropped it), so ModFolderModel carries a lookup hook instead (see
 //    ModFolderModel.GetMetadata).
 
 namespace FlintLauncher.Core.ModPlatform;
