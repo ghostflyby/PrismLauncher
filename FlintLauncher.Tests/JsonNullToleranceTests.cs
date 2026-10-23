@@ -181,4 +181,28 @@ public class JsonNullToleranceTests
                                                                       ]
                                                                       """, ModrinthJsonContext.Default.ListModrinthVersion));
     }
+
+    [Fact]
+    public void Modrinth_NullValueForRequiredMember_FailsTheDocument()
+    {
+        // the spec types these members as non-nullable strings: an explicit null fails the
+        // decode (RespectNullableAnnotations) instead of landing as a null reference
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize("""
+            {
+                "project_id": "p", "id": "v1", "date_published": "2024-01-01T00:00:00Z",
+                "game_versions": ["1.20.1"], "loaders": ["fabric"],
+                "name": "V", "version_number": null, "version_type": "release", "files": []
+            }
+            """, ModrinthJsonContext.Default.ModrinthVersion));
+    }
+
+    [Fact]
+    public void Modrinth_NullMemberInsideListElement_FailsTheDocument()
+    {
+        // element-level nullability is not emitted by the source generator, but the
+        // element's own required members still are
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize("""
+            {"hits": [{"project_id": "p", "slug": null, "title": "T", "author": "a", "downloads": 1}]}
+            """, ModrinthJsonContext.Default.ModrinthSearchResults));
+    }
 }

@@ -56,6 +56,7 @@ public static class ModPlatformEndpoints
             string? index,
             string? type,
             LauncherRuntime runtime,
+            CancellationToken cancellationToken,
             int offset = 0) =>
         {
             if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
@@ -76,7 +77,8 @@ public static class ModPlatformEndpoints
 
             return parsedProvider == ResourceProvider.Flame
                 ? await FlameSearchAsync(resourceType, query, version, loader, index, offset, runtime)
-                : await ModrinthSearchAsync(resourceType, query, version, loader, index, offset, runtime);
+                : await ModrinthSearchAsync(resourceType, query, version, loader, index, offset, runtime,
+                    cancellationToken);
         }).Produces<FlameSearchResult[]>().Produces<ModrinthSearchResultView[]>();
 
         // ----------------------------------------------------- modplatform/{provider}/categories
@@ -84,7 +86,8 @@ public static class ModPlatformEndpoints
         // project_type (Modrinth), mapped to [{id, name, icon}]. An explicit numeric classId
         // wins over `type` on Flame (search hits carry the raw CurseForge class id).
         api.MapGet("/modplatform/{provider}/categories", async Task<IResult> (
-            string provider, string? type, string? classId, LauncherRuntime runtime) =>
+            string provider, string? type, string? classId, LauncherRuntime runtime,
+            CancellationToken cancellationToken) =>
         {
             if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
             {
@@ -143,7 +146,7 @@ public static class ModPlatformEndpoints
             List<ModrinthCategory>? modrinthCategories;
             try
             {
-                modrinthCategories = await runtime.Modrinth.Client.GetCategoriesAsync();
+                modrinthCategories = await runtime.Modrinth.Client.GetCategoriesAsync(cancellationToken);
             }
             catch (Exception e) when (e is HttpRequestException or JsonException)
             {
@@ -156,7 +159,8 @@ public static class ModPlatformEndpoints
 
         // --------------------------------------------------- modplatform/{provider}/mods/{projectId}/description
         api.MapGet("/modplatform/{provider}/mods/{projectId}/description",
-            async Task<IResult> (string provider, string projectId, LauncherRuntime runtime) =>
+            async Task<IResult> (string provider, string projectId, LauncherRuntime runtime,
+                CancellationToken cancellationToken) =>
             {
                 if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
                 {
@@ -176,7 +180,7 @@ public static class ModPlatformEndpoints
                 else
                 {
                     // the Modrinth body endpoint answers with plain text
-                    body = await runtime.Modrinth.Client.GetProjectDescriptionAsync(projectId);
+                    body = await runtime.Modrinth.Client.GetProjectDescriptionAsync(projectId, cancellationToken);
                 }
 
                 return Results.Ok(new ProviderBodyView(body));
@@ -282,17 +286,10 @@ public static class ModPlatformEndpoints
                     {
                         foreach (var dto in versionDtos)
                         {
-                            try
+                            var version = ModrinthPackIndex.LoadIndexedPackVersion(dto);
+                            if (version.FileId.Length != 0)
                             {
-                                var version = ModrinthPackIndex.LoadIndexedPackVersion(dto);
-                                if (version.FileId.Length != 0)
-                                {
-                                    pack.Versions.Add(version);
-                                }
-                            }
-                            catch (JsonException)
-                            {
-                                // skip malformed entries, like the dependency resolver
+                                pack.Versions.Add(version);
                             }
                         }
                     }
@@ -673,7 +670,7 @@ public static class ModPlatformEndpoints
     /// <summary>The Modrinth search pass-through (PAT header through ModrinthApi.AddApiHeaders
     /// inside the core request builder; facets like the C++ search model builds them).</summary>
     private static async Task<IResult> ModrinthSearchAsync(ResourceType resourceType, string? query, string? version,
-        string? loader, string? index, int offset, LauncherRuntime runtime)
+        string? loader, string? index, int offset, LauncherRuntime runtime, CancellationToken cancellationToken)
     {
         var args = new SearchArgs
         {
@@ -700,29 +697,26 @@ public static class ModPlatformEndpoints
         ModrinthSearchResults search;
         try
         {
-            search = await runtime.Modrinth.Client.GetSearchResultsAsync(url);
+            search = await runtime.Modrinth.Client.GetSearchResultsAsync(url, cancellationToken);
         }
         catch (Exception e) when (e is HttpRequestException or JsonException)
         {
             return ApiJson.Error("modrinth_unavailable", $"modrinth search failed: {e.Message}", 502);
         }
 
+        var results = new List<ModrinthSearchResultView>();
+        foreach (var hit in search.Hits)
         {
-            var results = new List<ModrinthSearchResultView>();
-            if (search.Hits is not { } hits) return Results.Ok(results.ToArray());
-            foreach (var hit in hits)
-            {
-                results.Add(new ModrinthSearchResultView(
-                    hit.ProjectId,
-                    hit.Slug,
-                    hit.Title,
-                    hit.IconUrl ?? "",
-                    hit.Author,
-                    hit.Downloads));
-            }
-
-            return Results.Ok(results.ToArray());
+            results.Add(new ModrinthSearchResultView(
+                hit.ProjectId,
+                hit.Slug,
+                hit.Title,
+                hit.IconUrl ?? "",
+                hit.Author,
+                hit.Downloads));
         }
+
+        return Results.Ok(results.ToArray());
     }
 
     /// <summary>A string property of a JSON hit object ("" when absent or of another kind).</summary>

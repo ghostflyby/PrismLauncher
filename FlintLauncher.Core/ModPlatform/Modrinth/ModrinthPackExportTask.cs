@@ -163,12 +163,12 @@ public sealed class ModrinthPackExportTask(
     {
         foreach (var (relative, sha512) in _pendingHashes)
         {
-            if (!entries.TryGetValue(sha512, out var v) || v.Files is not { } filesArray)
+            if (!entries.TryGetValue(sha512, out var v))
             {
                 continue;
             }
 
-            foreach (var file in filesArray)
+            foreach (var file in v.Files)
             {
                 if (file.Hashes?.TryGetValue("sha512", out var hash) != true || hash != sha512)
                 {

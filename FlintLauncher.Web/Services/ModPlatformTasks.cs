@@ -134,14 +134,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
                 throw new ModResolveException($"fetching the Modrinth project {projectId} failed: {e.Message}");
             }
 
-            try
-            {
-                ModrinthPackIndex.LoadIndexedPack(pack, dto);
-            }
-            catch (JsonException e)
-            {
-                throw new ModResolveException($"the Modrinth project response for {projectId} is invalid: {e.Message}");
-            }
+            ModrinthPackIndex.LoadIndexedPack(pack, dto);
         }
 
         var version = versionId.Length != 0
@@ -250,19 +243,12 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         }
 
         // Modrinth: an array of versions; keep the valid ones for the instance's loader
-        // (the getDependencyVersion heuristic) and take the newest by published date
+        // (the getDependencyVersion heuristic) and take the newest by published date.
+        // The `?? []` guards the JSON-null document edge, not the element shapes.
         var versions = new List<IndexedVersion>();
         foreach (var dto in bodyRoot.Deserialize(ModrinthJsonContext.Default.ListModrinthVersion) ?? [])
         {
-            IndexedVersion file;
-            try
-            {
-                file = ModrinthPackIndex.LoadIndexedPackVersion(dto);
-            }
-            catch (JsonException)
-            {
-                continue;
-            }
+            var file = ModrinthPackIndex.LoadIndexedPackVersion(dto);
 
             if (file.FileId.Length != 0 &&
                 (file.Loaders == ModLoaderType.None || (loaders & file.Loaders) != 0))

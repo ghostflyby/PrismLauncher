@@ -146,10 +146,9 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi modri
         {
             // a non-object (or invalid) body fails the decode: every lookup just misses,
             // treated the same as the C++ parse-error path
-            if (FallbackMrBlockedMods
-                && await _modrinth.Client.GetCurrentVersionsAsync(hashes, "sha1", cancellationToken) is
-                    { } entries)
+            if (FallbackMrBlockedMods)
             {
+                var entries = await _modrinth.Client.GetCurrentVersionsAsync(hashes, "sha1", cancellationToken);
                 foreach (var outFile in toProcess.Files.Values)
                 {
                     var urlValid = Uri.TryCreate(outFile.Version.DownloadUrl, UriKind.Absolute, out _);

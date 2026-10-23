@@ -72,7 +72,7 @@ public sealed class ModrinthApi(ModrinthClient client, NetStack? net = null) : R
             }
         }
 
-        if (host == new Uri(DownloadHost.StartsWith("http", StringComparison.Ordinal) ? DownloadHost : "https://" + DownloadHost).Host
+        if (host == new Uri($"https://{DownloadHost}").Host
             && !meta.IsEmpty)
         {
             request.AddHeader("modrinth-download-meta", meta.ToJson());

@@ -176,8 +176,13 @@ public sealed record MrPackEnv(
 // The Modrinth v2 API is snake_case end to end (project_id, date_published, game_versions,
 // ...) — the context-wide SnakeCaseLower policy carries the naming; the .mrpack index is
 // camelCase (formatVersion / versionId / fileSize) and gets its own camel context.
+// RespectNullableAnnotations closes the presence-only gap of `required`: a present-but-null
+// value for a non-nullable member fails the decode with a named JsonException instead of
+// landing as a NullReferenceException downstream. (Property-level only — the source
+// generator does not emit element-level checks for collection members.)
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
+    PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower,
+    RespectNullableAnnotations = true)]
 [JsonSerializable(typeof(ModrinthHashLookupRequest))]
 [JsonSerializable(typeof(ModrinthVersionUpdateRequest))]
 [JsonSerializable(typeof(ModrinthDownloadMeta))]
@@ -272,6 +277,7 @@ public sealed class ModrinthHashMapConverter : JsonConverter<Dictionary<string, 
 }
 
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    RespectNullableAnnotations = true)]
 [JsonSerializable(typeof(MrPackIndex))]
 public sealed partial class MrPackJsonContext : JsonSerializerContext;

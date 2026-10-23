@@ -79,20 +79,14 @@ public sealed class EnsureMetadataTask(
             foreach (var hash in resources.Keys)
             {
                 var resource = resources[hash];
-                try
+                if (!versionEntries.TryGetValue(hash, out var entry))
                 {
-                    if (!versionEntries.TryGetValue(hash, out var entry))
-                    {
-                        throw new JsonException(hash + " is not an object");
-                    }
+                    EmitMetadataFailed(resource, hash + " is not an object");
+                    continue;
+                }
 
-                    EmitStatus($"Parsing API response from Modrinth for '{resource.Name}'...");
-                    _tempVersions[hash] = ModrinthPackIndex.LoadIndexedPackVersion(entry);
-                }
-                catch (JsonException e)
-                {
-                    EmitMetadataFailed(resource, e.Message);
-                }
+                EmitStatus($"Parsing API response from Modrinth for '{resource.Name}'...");
+                _tempVersions[hash] = ModrinthPackIndex.LoadIndexedPackVersion(entry);
             }
         }
 

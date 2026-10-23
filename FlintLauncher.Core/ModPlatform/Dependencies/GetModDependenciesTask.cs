@@ -216,8 +216,7 @@ public class GetModDependenciesTask : SequentialTask
                 }
                 else
                 {
-                    var dto = await _modrinth.Client.GetProjectAsync(pDep.Pack.AddonId, cancellationToken)
-                              ?? throw new JsonException("project is not a JSON object");
+                    var dto = await _modrinth.Client.GetProjectAsync(pDep.Pack.AddonId, cancellationToken);
                     ModrinthPackIndex.LoadIndexedPack(pDep.Pack, dto);
                 }
             }

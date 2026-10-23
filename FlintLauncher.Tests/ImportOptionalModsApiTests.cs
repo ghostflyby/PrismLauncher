@@ -4,8 +4,8 @@
 // creation task — an explicitly unselected optional file installs under its ".disabled"
 // name, a selected one under its real path (the OptionalModDialog answers, headless).
 //
-// [Collection("ModrinthApi")] matches InstanceImportTaskTests: ModrinthApi.BaseUrl /
-// DownloadHost are process-global statics and the API host runs the very same
+// [Collection("ModrinthApi")] matches InstanceImportTaskTests: each suite injects its own
+// ModrinthApi pointed at its own stub server, and the API host runs the very same
 // InstanceImportTask the core tests drive directly.
 
 using System.Net;

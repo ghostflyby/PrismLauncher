@@ -161,9 +161,16 @@ internal sealed class StubModrinthServer : IDisposable
         }
         else if (path.Contains("/version/", StringComparison.Ordinal))
         {
-            // GET /version/{id} (a dependency pinned to a specific version)
+            // GET /version/{id} (a dependency pinned to a specific version); the real API
+            // answers 404 for an unknown id
             var id = path[(path.IndexOf("/version/", StringComparison.Ordinal) + "/version/".Length)..].Split('?')[0];
-            body = Encoding.UTF8.GetBytes(_versionsById.GetValueOrDefault(id, "{}"));
+            if (!_versionsById.TryGetValue(id, out var pinned))
+            {
+                ctx.Response.StatusCode = 404;
+                return;
+            }
+
+            body = Encoding.UTF8.GetBytes(pinned);
         }
         else if (path.Contains("/project/", StringComparison.Ordinal) && path.Contains("/version", StringComparison.Ordinal))
         {
@@ -176,7 +183,14 @@ internal sealed class StubModrinthServer : IDisposable
         else if (path.Contains("/project/", StringComparison.Ordinal))
         {
             var id = path[(path.IndexOf("/project/", StringComparison.Ordinal) + "/project/".Length)..].Split('?')[0];
-            body = Encoding.UTF8.GetBytes(_projects.GetValueOrDefault(id, "{}"));
+            if (!_projects.TryGetValue(id, out var project))
+            {
+                // the real API answers 404 for an unknown project
+                ctx.Response.StatusCode = 404;
+                return;
+            }
+
+            body = Encoding.UTF8.GetBytes(project);
         }
         else if (path.Contains("/search", StringComparison.Ordinal))
         {
