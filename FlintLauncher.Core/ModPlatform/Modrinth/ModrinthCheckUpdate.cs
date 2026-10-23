@@ -17,6 +17,8 @@ using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 
+using FlintLauncher.ExternalApi;
+
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
 public sealed class ModrinthCheckUpdate : FlintTask

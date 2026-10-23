@@ -21,6 +21,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FlintLauncher.Core\FlintLauncher.Core.csproj"/>
+    <!-- Modrinth wire-model tests target the leaf assembly directly, not through Core. -->
+    <ProjectReference Include="..\FlintLauncher.ExternalApi\FlintLauncher.ExternalApi.csproj"/>
     <ProjectReference Include="..\FlintLauncher.Nbt\FlintLauncher.Nbt.csproj"/>
     <!-- API integration tests host FlintLauncher.Web in-process (BuildWebApplication). -->
     <ProjectReference Include="..\FlintLauncher.Web\FlintLauncher.Web.csproj"/>

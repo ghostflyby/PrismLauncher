@@ -35,6 +35,8 @@ using FlintLauncher.Core.Tasks;
 using TruePath;
 using TruePath.SystemIo;
 
+using FlintLauncher.ExternalApi;
+
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
 public sealed class ModrinthCreationTask : InstanceTask

@@ -17,6 +17,8 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Versioning;
 using TruePath;
 
+using FlintLauncher.ExternalApi;
+
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
 public sealed class ModrinthApi(NetStack? net = null) : ResourceApi

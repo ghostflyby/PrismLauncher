@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="FlintLauncher.Nbt/FlintLauncher.Nbt.csproj" />
+  <Project Path="FlintLauncher.ExternalApi/FlintLauncher.ExternalApi.csproj" />
   <Project Path="FlintLauncher.Core/FlintLauncher.Core.csproj" />
   <Project Path="FlintLauncher.Web/FlintLauncher.Web.csproj" />
   <Project Path="FlintLauncher.Tests/FlintLauncher.Tests.csproj" />

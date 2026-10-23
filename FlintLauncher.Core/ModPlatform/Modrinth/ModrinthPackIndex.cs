@@ -9,6 +9,8 @@
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 
+using FlintLauncher.ExternalApi;
+
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
 // https://docs.modrinth.com/api/operations/getproject/

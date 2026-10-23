@@ -17,6 +17,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
+using FlintLauncher.ExternalApi;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using TruePath;

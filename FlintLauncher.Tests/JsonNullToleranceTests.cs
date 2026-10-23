@@ -20,6 +20,7 @@ using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.ModPlatform.Modrinth;
+using FlintLauncher.ExternalApi;
 using FlintLauncher.Core.ModPlatform.Technic;
 using TruePath;
 using Xunit;
