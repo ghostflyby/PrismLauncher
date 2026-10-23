@@ -154,7 +154,7 @@ public sealed record DeviceCodePollResponse(string State, AccountView? Account);
 
 public sealed record JavaView(string Path, string Version, string Architecture);
 
-public sealed record ModrinthSearchResult(
+public sealed record ModrinthSearchResultView(
     string Id,
     string Slug,
     string Title,

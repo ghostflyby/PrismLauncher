@@ -150,41 +150,35 @@ public class JsonNullToleranceTests
         }
     }
 
-    // --------------------------------------------------- Modrinth (per-entry)
+    // --------------------------------------------------- Modrinth (direct decode)
 
     [Fact]
-    public void Modrinth_Lookup_MalformedEntry_SkipsOnlyThatEntry()
+    public void Modrinth_Lookup_MalformedEntry_FailsTheDocument()
     {
-        var lookup = ModrinthJson.ParseVersionLookup("""
-                                                     {
-                                                         "good": {"project_id": "p", "id": "v", "date_published": "2024-01-01",
-                                                                  "game_versions": ["1.20.1"], "loaders": ["fabric"], "name": "V",
-                                                                  "version_number": "1", "version_type": "release",
-                                                                  "files": [{"filename": "a.jar", "primary": true, "hashes": {"sha1": "h"},
-                                                                             "url": "https://x/a.jar"}]},
-                                                         "bad": 3
-                                                     }
-                                                     """);
-
-        Assert.NotNull(lookup);
-        Assert.Equal(["good"], lookup.Keys.ToArray());
-        Assert.Equal("v", lookup["good"].Id);
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize("""
+                                                                     {
+                                                                         "good": {"project_id": "p", "id": "v", "date_published": "2024-01-01",
+                                                                                  "game_versions": ["1.20.1"], "loaders": ["fabric"], "name": "V",
+                                                                                  "version_number": "1", "version_type": "release",
+                                                                                  "files": [{"filename": "a.jar", "primary": true, "hashes": {"sha1": "h"},
+                                                                                             "url": "https://x/a.jar", "size": 1}]},
+                                                                         "bad": 3
+                                                                     }
+                                                                     """, ModrinthJsonContext.Default.DictionaryStringModrinthVersion));
     }
 
     [Fact]
-    public void Modrinth_VersionList_MalformedEntry_SkipsOnlyThatEntry()
+    public void Modrinth_VersionList_MalformedEntry_FailsTheDocument()
     {
-        var versions = ModrinthJson.ParseVersionListOrEmpty("""
-                                                            [
-                                                                {"project_id": "p", "id": "v", "date_published": "2024-01-01",
-                                                                 "game_versions": ["1.20.1"], "loaders": ["fabric"], "name": "V",
-                                                                 "version_number": "1", "version_type": "release",
-                                                                 "files": [{"filename": "a.jar", "primary": true, "hashes": {"sha1": "h"},
-                                                                            "url": "https://x/a.jar"}]},
-                                                                5
-                                                            ]
-                                                            """);
-
-        Assert.Single(versions);
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize("""
+                                                                      [
+                                                                          {"project_id": "p", "id": "v", "date_published": "2024-01-01",
+                                                                           "game_versions": ["1.20.1"], "loaders": ["fabric"], "name": "V",
+                                                                           "version_number": "1", "version_type": "release",
+                                                                           "files": [{"filename": "a.jar", "primary": true, "hashes": {"sha1": "h"},
+                                                                                      "url": "https://x/a.jar", "size": 1}]},
+                                                                          5
+                                                                      ]
+                                                                      """, ModrinthJsonContext.Default.ListModrinthVersion));
     }
 }

@@ -21,12 +21,12 @@ public class ImportOptionalModsApiTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-import-api-{Guid.NewGuid():N}");
     private readonly StubModrinthServer _server = new();
 
-    private readonly ModrinthApi _modrinth = new();
+    private readonly ModrinthApi _modrinth;
 
     public ImportOptionalModsApiTests()
     {
         Directory.CreateDirectory(_root);
-        _modrinth.BaseUrl = _server.Url;
+        _modrinth = TestModrinthApi.At(_server.Url);
         _modrinth.DownloadHost = "127.0.0.1";
     }
 

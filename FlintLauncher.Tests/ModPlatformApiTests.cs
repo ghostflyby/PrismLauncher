@@ -130,11 +130,11 @@ public class FlintApiVersionsTests : IDisposable
     private readonly StubModrinthServer _modrinth = new();
     private readonly StubFlameServer _flame = new();
 
-    private readonly ModrinthApi _modrinthApi = new();
+    private readonly ModrinthApi _modrinthApi;
 
     public FlintApiVersionsTests()
     {
-        _modrinthApi.BaseUrl = _modrinth.Url;
+        _modrinthApi = TestModrinthApi.At(_modrinth.Url);
         _flameApi.BaseUrl = _flame.Url;
     }
 
@@ -162,6 +162,7 @@ public class FlintApiVersionsTests : IDisposable
                 ["url"] = $"{_modrinth.Url}/mod.bin",
                 ["filename"] = "test.jar",
                 ["primary"] = true,
+                ["size"] = 4096,
                 ["hashes"] = new JsonObject { ["sha512"] = "abc" },
             }),
         }).ToJsonString();
@@ -231,11 +232,11 @@ public class FlintApiModsTests : IDisposable
 {
     private readonly StubModrinthServer _modrinth = new();
 
-    private readonly ModrinthApi _modrinthApi = new();
+    private readonly ModrinthApi _modrinthApi;
 
     public FlintApiModsTests()
     {
-        _modrinthApi.BaseUrl = _modrinth.Url;
+        _modrinthApi = TestModrinthApi.At(_modrinth.Url);
     }
 
     public void Dispose()
@@ -283,6 +284,8 @@ public class FlintApiModsTests : IDisposable
             ["slug"] = slug,
             ["title"] = title,
             ["description"] = "A synthetic mod",
+            ["body"] = "A synthetic mod body",
+            ["status"] = "approved",
             ["project_type"] = "mod",
             ["client_side"] = "required",
             ["server_side"] = "required",

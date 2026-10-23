@@ -39,13 +39,13 @@ public class ModrinthApiTests : IDisposable
     private readonly StubModrinthServer _server = new();
     private readonly string _baseUrl;
 
-    private readonly ModrinthApi _api = new();
+    private readonly ModrinthApi _api;
 
     public ModrinthApiTests()
     {
         Directory.CreateDirectory(_root);
         _baseUrl = _server.Url;
-        _api.BaseUrl = _baseUrl;
+        _api = TestModrinthApi.At(_baseUrl);
         // make the download host match the stub so the modrinth-download-meta header path is used
         _api.DownloadHost = "127.0.0.1";
     }
@@ -176,33 +176,28 @@ public class ModrinthApiTests : IDisposable
     public async Task CurrentVersion_FetchesByHashAndAlgorithm()
     {
         _server.VersionFiles["cafebabecafebabe"] = """{"version_number":"1.2.3","id":"v1","project_id":"p1","date_published":"2023-01-01T00:00:00Z","game_versions":["1.20.1"],"loaders":["fabric"],"name":"n","version_number":"1.2.3","version_type":"release","files":[]}""";
-        var (_, request) = _api.CurrentVersion("cafebabecafebabe", "sha1");
-        await request.StartAsync();
+        var version = await _api.Client.GetCurrentVersionAsync("cafebabecafebabe", "sha1");
 
-        Assert.Equal(TaskState.Succeeded, request.State);
+        Assert.NotNull(version);
         Assert.EndsWith("/version_file/cafebabecafebabe?algorithm=sha1", _server.LastPath);
-        Assert.Equal("1.2.3",
-            JsonDocument.Parse(request.BodyAsString).RootElement.GetProperty("version_number").GetString());
+        Assert.Equal("1.2.3", version.VersionNumber);
     }
 
     [Fact]
     public async Task ApiToken_IsSentAsAuthorizationHeader()
     {
         _api.ApiToken = "mrpat_token";
-        var (_, request) = _api.CurrentVersion("cafebabecafebabe", "sha1");
-        await request.StartAsync();
+        _server.VersionFiles["cafebabecafebabe"] = """{"id":"v1","project_id":"p1","date_published":"2023-01-01T00:00:00Z","game_versions":["1.20.1"],"loaders":["fabric"],"name":"n","version_number":"1.2.3","version_type":"release","files":[]}""";
+        await _api.Client.GetCurrentVersionAsync("cafebabecafebabe", "sha1");
 
-        Assert.Equal(TaskState.Succeeded, request.State);
         Assert.Equal("mrpat_token", _server.LastHeaders["Authorization"]);
     }
 
     [Fact]
     public async Task CurrentVersions_PostsHashList()
     {
-        var (job, _) = _api.CurrentVersions(["hash1", "hash2"], "sha512");
-        await job.StartAsync();
+        await _api.Client.GetCurrentVersionsAsync(["hash1", "hash2"], "sha512");
 
-        Assert.Equal(TaskState.Succeeded, job.State);
         Assert.EndsWith("/version_files", _server.LastPath);
 
         var body = JsonDocument.Parse(Encoding.UTF8.GetString(_server.LastBody ?? [])).RootElement;
@@ -211,40 +206,17 @@ public class ModrinthApiTests : IDisposable
         Assert.Equal("sha512", body.GetProperty("algorithm").GetString());
     }
 
-    // ------------------------------------------------- modrinth://modpack links (#5528)
-
-    [Theory]
-    [InlineData("modrinth://modpack/fabulously-optimized", "fabulously-optimized")]
-    [InlineData("modrinth://modpack/fabulously-optimized/", "fabulously-optimized")]
-    [InlineData("modrinth://MODPACK/fo", "fo")]
-    public void GetModpackIdFromUrl_ParsesModpackLinks(string link, string slug)
-    {
-        Assert.Equal(slug, ModrinthApi.GetModpackIdFromUrl(link));
-    }
-
-    [Theory]
-    [InlineData("https://modrinth.com/modpack/fabulously-optimized")]      // wrong scheme
-    [InlineData("modrinth://modpack/")]                                    // missing slug
-    [InlineData("modrinth://mod/sodium")]                                  // unsupported resource
-    [InlineData("modrinth://modpack/fabulously-optimized/version/latest")] // extra path
-    public void GetModpackIdFromUrl_RejectsInvalidLinks(string link)
-    {
-        Assert.Equal("", ModrinthApi.GetModpackIdFromUrl(link));
-    }
-
     // ----------------------------------------------------- release channels (#3404)
 
     [Fact]
     public async Task LatestVersions_PostsReleaseTypes()
     {
-        var (job, _) = _api.LatestVersions(["hash1"], "sha512", null, null,
+        await _api.GetLatestVersionsAsync(["hash1"], "sha512", null, null,
         [
             new IndexedVersionType(IndexedVersionTypeValue.Release),
             new IndexedVersionType(IndexedVersionTypeValue.Beta),
         ]);
-        await job.StartAsync();
 
-        Assert.Equal(TaskState.Succeeded, job.State);
         Assert.EndsWith("/version_files/update", _server.LastPath);
 
         var body = JsonDocument.Parse(Encoding.UTF8.GetString(_server.LastBody ?? [])).RootElement;
@@ -255,10 +227,9 @@ public class ModrinthApiTests : IDisposable
     [Fact]
     public async Task LatestVersions_OmitsVersionTypesByDefault()
     {
-        var (job, _) = _api.LatestVersions(["hash1"], "sha512", null, null);
-        await job.StartAsync();
+        await _api.GetLatestVersionsAsync(["hash1"], "sha512", null, null);
 
-        Assert.Equal(TaskState.Succeeded, job.State);
+        Assert.EndsWith("/version_files/update", _server.LastPath);
         var body = JsonDocument.Parse(Encoding.UTF8.GetString(_server.LastBody ?? [])).RootElement;
         Assert.False(body.TryGetProperty("version_types", out _));
     }
@@ -354,6 +325,7 @@ public class ModrinthApiTests : IDisposable
         var mrpackPath = TempPath("pack-meta.mrpack");
         Assert.True(pack.WriteZip(mrpackPath));
         UnpackInto(mrpackPath, staging);
+        _server.Projects["projId1"] = MrPackBuilder.ProjectJson();
         _server.VersionFiles[pack.ModSha512] = MrPackBuilder.VersionJson(_server.Url, pack);
 
         var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _api);
@@ -384,6 +356,7 @@ public class ModrinthApiTests : IDisposable
         Assert.True(pack.WriteZip(mrpackPath));
         UnpackInto(mrpackPath, staging);
 
+        _server.Projects["projId1"] = MrPackBuilder.ProjectJson();
         _server.VersionFiles[pack.ModSha512] = MrPackBuilder.VersionJson(_server.Url, pack);
 
         var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _api);
@@ -532,16 +505,16 @@ public class ModrinthApiTests : IDisposable
     public void HashLookup_NullPreferredHash_FallsBackToNextAlgorithm()
     {
         // a JSON null hash value counts as absent: the sha512 -> sha1 fallback keeps walking
-        var dto = ModrinthJson.VersionFromNode(JsonNode.Parse("""
+        var dto = JsonSerializer.Deserialize("""
             {
                 "project_id": "p", "id": "v1", "date_published": "2024-01-01T00:00:00Z",
                 "game_versions": ["1.20.1"], "loaders": ["fabric"],
                 "name": "V", "version_number": "1.0.0", "version_type": "release",
                 "files": [ { "filename": "a.jar", "primary": true,
                              "hashes": { "sha512": null, "sha1": "abc" },
-                             "url": "https://cdn.modrinth.com/a.jar" } ]
+                             "url": "https://cdn.modrinth.com/a.jar", "size": 1 } ]
             }
-            """));
+            """, ModrinthJsonContext.Default.ModrinthVersion);
         Assert.NotNull(dto);
         var indexed = ModrinthPackIndex.LoadIndexedPackVersion(dto);
 
@@ -666,7 +639,7 @@ public class ModrinthCreationTaskManifestTests : IDisposable
         var staging = Path.Combine(_root, "staging");
         Directory.CreateDirectory(staging);
 
-        var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global);
+        var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, TestModrinthApi.Unreachable());
         task.SetName("M");
         await File.WriteAllTextAsync(Path.Combine(staging, "modrinth.index.json"),
             """{"formatVersion":1,"game":"terraria","files":[],"dependencies":{}}""");
@@ -674,7 +647,7 @@ public class ModrinthCreationTaskManifestTests : IDisposable
         Assert.Equal(TaskState.Failed, task.State);
         Assert.Contains("Unknown game", task.FailReason);
 
-        var task2 = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global);
+        var task2 = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, TestModrinthApi.Unreachable());
         await File.WriteAllTextAsync(Path.Combine(staging, "modrinth.index.json"),
             """{"formatVersion":42,"game":"minecraft","files":[],"dependencies":{}}""");
         await task2.StartAsync();

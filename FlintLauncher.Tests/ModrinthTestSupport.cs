@@ -150,9 +150,14 @@ internal sealed class StubModrinthServer : IDisposable
         {
             var hash = path[(path.IndexOf("/version_file/", StringComparison.Ordinal) + "/version_file/".Length)..]
                 .Split('?')[0];
-            body = Encoding.UTF8.GetBytes(_versionFiles.TryGetValue(hash, out var version)
-                ? version
-                : _versionFiles.Values.FirstOrDefault() ?? "{}");
+            if (!_versionFiles.TryGetValue(hash, out var version))
+            {
+                // the real API answers 404 for an unknown hash
+                ctx.Response.StatusCode = 404;
+                return;
+            }
+
+            body = Encoding.UTF8.GetBytes(version);
         }
         else if (path.Contains("/version/", StringComparison.Ordinal))
         {
@@ -333,6 +338,8 @@ internal sealed class MrPackBuilder
             ["slug"] = "test-mod",
             ["title"] = "Test Mod",
             ["description"] = "A synthetic mod",
+            ["body"] = "A synthetic mod body",
+            ["status"] = "approved",
             ["project_type"] = "mod",
             ["client_side"] = "required",
             ["server_side"] = "required",

@@ -124,7 +124,7 @@ public static class FtbEndpoints
                         ? pack.Versions[0].Name
                         : "";
 
-                var task = new FtbPackInstallTask(pack, versionName, runtime.Flame, ftb)
+                var task = new FtbPackInstallTask(pack, versionName, runtime.Modrinth, runtime.Flame, ftb)
                 {
                     Group = request.Group ?? "",
                 };

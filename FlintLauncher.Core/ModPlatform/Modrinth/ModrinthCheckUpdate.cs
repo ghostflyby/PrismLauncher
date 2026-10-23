@@ -17,6 +17,7 @@ using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 
+using System.Text.Json;
 using FlintLauncher.ExternalApi;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
@@ -55,10 +56,10 @@ public sealed class ModrinthCheckUpdate : FlintTask
         IReadOnlyList<McVersion> mcVersions,
         IReadOnlyList<ModLoaderType> loadersList,
         Func<Resource, MetadataHandler.ModStruct?> metadataLookup,
-        IReadOnlyList<IndexedVersionType>? releaseTypes = null,
-        ModrinthApi? modrinth = null)
+        ModrinthApi modrinth,
+        IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     {
-        _modrinth = modrinth ?? new ModrinthApi();
+        _modrinth = modrinth;
         _resources = resources;
         _gameVersions = mcVersions;
         _loadersList = [.. loadersList];
@@ -146,29 +147,25 @@ public sealed class ModrinthCheckUpdate : FlintTask
             return;
         }
 
-        var (job, request) = _modrinth.LatestVersions(hashes, _hashType, _gameVersions, loader,
-            _releaseTypes);
-        await job.StartAsync(cancellationToken);
-        if (!job.WasSuccessful)
+        Dictionary<string, ModrinthVersion> entries;
+        try
+        {
+            entries = await _modrinth.GetLatestVersionsAsync(hashes, _hashType, _gameVersions, loader,
+                _releaseTypes, cancellationToken);
+        }
+        catch (Exception e) when (e is HttpRequestException or JsonException)
         {
             await CheckNextLoader(cancellationToken);
             return;
         }
 
-        await CheckVersionsResponse(request.BodyAsString, loader, cancellationToken);
+        await CheckVersionsResponse(entries, loader, cancellationToken);
     }
 
-    private async Task CheckVersionsResponse(string response, ModLoaderType? loader,
+    private async Task CheckVersionsResponse(Dictionary<string, ModrinthVersion> entries, ModLoaderType? loader,
         CancellationToken cancellationToken)
     {
         EmitStatus("Parsing the API response from Modrinth...");
-
-        var entries = ModrinthJson.ParseVersionLookup(response);
-        if (entries is null)
-        {
-            EmitFailed("empty response");
-            return;
-        }
 
         {
             var processed = new List<string>();

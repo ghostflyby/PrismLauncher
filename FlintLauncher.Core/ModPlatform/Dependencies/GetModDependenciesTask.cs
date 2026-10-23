@@ -54,13 +54,13 @@ public class GetModDependenciesTask : SequentialTask
     public sealed record PackDependencyExtraInfo(List<string> RequiredByIds);
 
     public GetModDependenciesTask(MinecraftInstance instance, ModFolderModel folder, List<PackDependency> selected,
-        ModrinthApi? modrinth = null, FlameApi? flame = null)
+        ModrinthApi modrinth, FlameApi? flame = null)
     {
         _selected = selected;
         _flame = flame ?? new FlameApi();
         _version = new McVersion(instance.GetPackProfile().GetComponentVersion("net.minecraft"));
         _loaderType = instance.GetPackProfile().GetSupportedModLoaders() ?? ModLoaderType.None;
-        _modrinth = modrinth ?? new ModrinthApi();
+        _modrinth = modrinth;
 
         foreach (var mod in folder.AllMods())
         {
@@ -183,36 +183,24 @@ public class GetModDependenciesTask : SequentialTask
             isOnlyVersion ? i.Version == verDep.Version : i.AddonId == verDep.AddonId;
     }
 
-    /// <summary>Port of ResourceAPI::getProject for both providers.</summary>
-    private (NetJob? Job, NetRequest? Request) GetProject(ResourceProvider provider, string addonId)
-    {
-        if (provider == ResourceProvider.Flame)
-        {
-            var (job, request) = _flame.GetProject(addonId);
-            return (job, request);
-        }
-
-        return _modrinth.GetProject(addonId);
-    }
-
+    /// <summary>The project-info step for one dependency pack: fetch, parse into the pack,
+    /// and drop the pack (failing the step) when the fetch or the shape fails.</summary>
     private FlintTask GetProjectInfoTask(PackDependency pDep)
     {
         var provider = pDep.Pack.Provider;
-        var (job, request) = GetProject(provider, pDep.Pack.AddonId);
-        if (job is null || request is null)
-        {
-            // the C++ cannot build the request either (getProject returned {nullptr, nullptr})
-            RemovePack(pDep.Pack.AddonId);
-            var failed = new SequentialTask("DependencyInfo");
-            return failed;
-        }
-
-        job.Succeeded += _ =>
+        return new CallbackTask(async cancellationToken =>
         {
             try
             {
                 if (provider == ResourceProvider.Flame)
                 {
+                    var (job, request) = _flame.GetProject(pDep.Pack.AddonId);
+                    await job.StartAsync(cancellationToken);
+                    if (!job.WasSuccessful)
+                    {
+                        throw new HttpRequestException(job.FailReason);
+                    }
+
                     // Flame nests the project under "data" (the C++
                     // Json::requireObject(Json::requireObject(doc), "data") form)
                     var envelope = FlameMod.ParseResponse(request.BodyAsString,
@@ -228,21 +216,18 @@ public class GetModDependenciesTask : SequentialTask
                 }
                 else
                 {
-                    var root = JsonNode.Parse(request.BodyAsString)
-                               ?? throw new JsonException("empty response");
-                    var dto = ModrinthJson.ProjectFromNode(root)
+                    var dto = await _modrinth.Client.GetProjectAsync(pDep.Pack.AddonId, cancellationToken)
                               ?? throw new JsonException("project is not a JSON object");
                     ModrinthPackIndex.LoadIndexedPack(pDep.Pack, dto);
                 }
             }
-            catch (Exception e) when (e is JsonException)
+            catch (Exception e) when (e is HttpRequestException or JsonException)
             {
                 // (upstream logs the parse error / the error cause)
                 RemovePack(pDep.Pack.AddonId);
+                throw;
             }
-        };
-        job.Failed += (_, _) => RemovePack(pDep.Pack.AddonId);
-        return job;
+        });
     }
 
     private FlintTask PrepareDependencyTask(Dependency dep, ResourceProvider providerName, int level)
@@ -376,7 +361,7 @@ public class GetModDependenciesTask : SequentialTask
                     IndexedVersion file;
                     try
                     {
-                        file = ModrinthPackIndex.LoadIndexedPackVersion(ModrinthJson.VersionFromNode(entry)
+                        file = ModrinthPackIndex.LoadIndexedPackVersion(entry.Deserialize(ModrinthJsonContext.Default.ModrinthVersion)
                                                                         ?? throw new JsonException("version is not a JSON object"));
                     }
                     catch (JsonException)

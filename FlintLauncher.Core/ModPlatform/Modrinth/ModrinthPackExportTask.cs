@@ -35,8 +35,8 @@ public sealed class ModrinthPackExportTask(
     bool optionalFiles,
     MinecraftInstance instance,
     AbsolutePath output,
-    MmcZip.FilterFunction? filter = null,
-    ModrinthApi? modrinth = null)
+    ModrinthApi modrinth,
+    MmcZip.FilterFunction? filter = null)
     : FlintTask
 {
     private static readonly string[] Prefixes = ["mods/", "coremods/", "resourcepacks/", "texturepacks/", "shaderpacks/"];
@@ -47,7 +47,7 @@ public sealed class ModrinthPackExportTask(
     private readonly List<string> _files = [];
     private readonly Dictionary<string, string> _pendingHashes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ResolvedFile> _resolvedFiles = new(StringComparer.Ordinal);
-    private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
+    private readonly ModrinthApi _modrinth = modrinth;
 
     private sealed record ResolvedFile(string Sha1, string Sha512, string Url, long Size, SideType Side);
 
@@ -152,27 +152,15 @@ public sealed class ModrinthPackExportTask(
         }
 
         EmitStatus("Finding versions for hashes...");
-        var (_, request) = _modrinth.CurrentVersions(_pendingHashes.Values.ToList(), "sha512");
-        await request.StartAsync(cancellationToken);
-        if (!request.WasSuccessful)
-        {
-            EmitFailed(request.FailReason);
-            return;
-        }
+        var entries = await _modrinth.Client.GetCurrentVersionsAsync(_pendingHashes.Values.ToList(), "sha512",
+            cancellationToken);
 
-        ParseApiResponse(request.BodyAsString);
+        ParseApiResponse(entries);
         BuildZip();
     }
 
-    private void ParseApiResponse(string response)
+    private void ParseApiResponse(Dictionary<string, ModrinthVersion> entries)
     {
-        var entries = ModrinthJson.ParseVersionLookup(response);
-        if (entries is null)
-        {
-            EmitFailed("Failed to parse versions response: empty response");
-            return;
-        }
-
         foreach (var (relative, sha512) in _pendingHashes)
         {
             if (!entries.TryGetValue(sha512, out var v) || v.Files is not { } filesArray)
@@ -191,8 +179,8 @@ public sealed class ModrinthPackExportTask(
                 _resolvedFiles[relative] = new ResolvedFile(
                     Sha1: file.Hashes.GetValueOrDefault("sha1", ""),
                     Sha512: sha512,
-                    Url: file.Url ?? "",
-                    Size: file.Size ?? 0,
+                    Url: file.Url,
+                    Size: file.Size,
                     Side: SideType.Invalid);
                 break;
             }
@@ -279,7 +267,7 @@ public sealed class ModrinthPackExportTask(
             dependencies["neoforge"] = neoForge.Version;
         }
 
-        var filesOut = new List<MrPackFileJson>();
+        var filesOut = new List<MrPackFile>();
         foreach (var (pathIn, value) in _resolvedFiles)
         {
             var path = pathIn;
@@ -304,8 +292,8 @@ public sealed class ModrinthPackExportTask(
                 server = "unsupported";
             }
 
-            filesOut.Add(new MrPackFileJson(
-                Env: new MrPackEnvJson(Client: client, Server: server),
+            filesOut.Add(new MrPackFile(
+                Env: new MrPackEnv(Client: client, Server: server),
                 Path: path,
                 Downloads: [value.Url],
                 Hashes: new Dictionary<string, string>(StringComparer.Ordinal)
@@ -316,7 +304,7 @@ public sealed class ModrinthPackExportTask(
                 FileSize: value.Size));
         }
 
-        var index = new MrPackIndexJson
+        var index = new MrPackIndex
         {
             FormatVersion = 1,
             Game = "minecraft",
@@ -327,7 +315,7 @@ public sealed class ModrinthPackExportTask(
             Files = filesOut,
         };
 
-        return JsonSerializer.Serialize(index, MrPackJsonContext.Default.MrPackIndexJson);
+        return JsonSerializer.Serialize(index, MrPackJsonContext.Default.MrPackIndex);
     }
 
     private string GetRelativePath(string file)

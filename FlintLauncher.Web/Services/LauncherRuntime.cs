@@ -15,6 +15,7 @@ using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Core.ModPlatform.Modrinth;
+using FlintLauncher.ExternalApi;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Screenshots;
@@ -109,7 +110,7 @@ public sealed class LauncherRuntime : IDisposable
     {
         Paths = paths;
         Net = net ?? NetStack.Default;
-        Modrinth = modrinth ?? new ModrinthApi(Net);
+        Modrinth = modrinth ?? new ModrinthApi(new ModrinthClient(Net.Client), Net);
         Auth = auth ?? new AuthEndpointsOptions();
         Flame = flame ?? new FlameApi(Net);
         Technic = technic ?? new TechnicApi(Net);

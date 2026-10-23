@@ -1,20 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Strongly-typed wire models for the Modrinth v2 API and the .mrpack index format, with the
-// source-generated serializer context that owns them (reflection-based
-// serialization never enters the picture). The wire layer is its own leaf assembly so the
-// provider boundary stays free of transport and launcher-domain concerns: consumers get the
-// models and nothing else.
+// source-generated serializer context that owns them (reflection-based serialization never
+// enters the picture). Shapes and nullability follow the labrinth OpenAPI document: the
+// spec's required members are non-nullable C# `required` properties (a missing key fails
+// the document), genuinely optional members stay nullable, and search hits are their own
+// type (ProjectResult) separate from the full Project — the spec has no author on Project
+// and no all_project_types anywhere. Only the members this codebase consumes are modeled;
+// the serializer ignores the rest.
 //
 // Serialization notes:
-//  - request bodies serialize with WhenWritingNull: a null member means "omit the key",
-//    matching the Json::writeString/writeStringList semantics it replaces;
-//  - `hashes` maps of versions/projects are keyed by arbitrary algorithm names and stay
-//    Dictionary<string, string>;
-//  - the POST /version_files (update) responses are hash-keyed maps of versions, so their
-//    root type is Dictionary<string, ModrinthVersionJson>.
+//  - request bodies serialize with WhenWritingNull: a null member means "omit the key";
+//  - `hashes` maps are keyed by arbitrary algorithm names and stay Dictionary<string, string>;
+//  - the POST /version_files (update) responses are hash-keyed maps of versions.
 
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 
@@ -37,7 +36,7 @@ public sealed record ModrinthVersionUpdateRequest(
     List<string>? VersionTypes);
 
 /// <summary>The modrinth-download-meta request header payload (net/ApiHeaderProxy).</summary>
-public sealed record ModrinthDownloadMetaJson(
+public sealed record ModrinthDownloadMeta(
     string? Reason,
     string? GameVersion,
     string? Loader,
@@ -45,93 +44,113 @@ public sealed record ModrinthDownloadMetaJson(
 
 // ------------------------------------------------------------------------ response models
 
-/// <summary>Modrinth project/search-hit shape (https://docs.modrinth.com GET /project).</summary>
-public sealed record ModrinthProjectJson
+/// <summary>The full project shape (GET /project/{id}, POST /projects?ids=[]) — the spec's
+/// Project, minus the members nothing here consumes. `icon_url` is explicitly nullable;
+/// the URLs below are optional links.</summary>
+public sealed record ModrinthProject
 {
-    public string? ProjectId { get; init; }
-    public string? Id { get; init; }
-    public string? Title { get; init; }
-    public string? ProjectType { get; init; }
-    public List<string>? Loaders { get; init; }
-    public List<string>? AllProjectTypes { get; init; }
-    public string? Slug { get; init; }
-    public string? Description { get; init; }
-    public string? IconUrl { get; init; }
-    public string? Author { get; init; }
-    public string? ClientSide { get; init; }
-    public string? ServerSide { get; init; }
+    public required string Id { get; init; }
+    public required string Slug { get; init; }
+    public required string Title { get; init; }
+    public required string Description { get; init; }
+    public required string Body { get; init; }
+    public required string Status { get; init; }
+    public required string ProjectType { get; init; }
+    public required string ClientSide { get; init; }
+    public required string ServerSide { get; init; }
 
-    /// <summary>Search hits only: the raw download count member. Left as JsonElement so the
-    /// "only real JSON number tokens count" sniff survives (a quoted "123" stays 0).</summary>
-    public JsonElement? Downloads { get; init; }
+    public string? IconUrl { get; init; }
+
+    /// <summary>Not in the Project schema's required list.</summary>
+    public List<string>? Loaders { get; init; }
 
     public string? IssuesUrl { get; init; }
     public string? SourceUrl { get; init; }
     public string? WikiUrl { get; init; }
-    public string? DiscordUrl { get; init; }
-    public List<ModrinthDonationJson>? DonationUrls { get; init; }
-    public string? Status { get; init; }
-    public string? Body { get; init; }
 }
 
-public sealed record ModrinthDonationJson(
-    string? Id,
-    string? Platform,
-    string? Url);
-
-/// <summary>GET /search body ({hits: [...]}).</summary>
-public sealed record ModrinthSearchResponseJson(
-    List<ModrinthProjectJson>? Hits);
-
-/// <summary>GET /tag/category entries (the category id is its name).</summary>
-public sealed record ModrinthCategoryJson(
-    string? Name,
-    string? ProjectType,
-    string? Icon);
-
-/// <summary>Modrinth version shape (project version lists, hash lookups, update responses).
-/// The changelog and dependencies ride on the version object.</summary>
-public sealed record ModrinthVersionJson
+/// <summary>One search hit (the spec's ProjectResult) — a distinct type from the full
+/// project: `author` exists on search results only. Only the consumed members are modeled;
+/// the spec types `downloads` as a plain integer.</summary>
+public sealed record ModrinthSearchResult
 {
-    public string? ProjectId { get; init; }
-    public string? Id { get; init; }
-    public string? DatePublished { get; init; }
-    public List<string>? GameVersions { get; init; }
-    public List<string>? Loaders { get; init; }
-    public string? Name { get; init; }
-    public string? VersionNumber { get; init; }
-    public string? VersionType { get; init; }
+    public required string ProjectId { get; init; }
+    public required string Slug { get; init; }
+    public required string Title { get; init; }
+    public required string Author { get; init; }
+    public required long Downloads { get; init; }
+
+    public string? IconUrl { get; init; }
+}
+
+/// <summary>GET /search envelope (the spec's SearchResults); the pagination members are not
+/// modeled.</summary>
+public sealed record ModrinthSearchResults
+{
+    public required List<ModrinthSearchResult> Hits { get; init; }
+}
+
+/// <summary>GET /tag/category entries (the spec's CategoryTag; `header` is required).</summary>
+public sealed record ModrinthCategory
+{
+    public required string Name { get; init; }
+    public required string ProjectType { get; init; }
+    public required string Icon { get; init; }
+    public required string Header { get; init; }
+}
+
+/// <summary>The version shape (project version lists, hash lookups, update responses).
+/// Required members follow the spec's Version required list; `changelog` and
+/// `dependencies` stay optional.</summary>
+public sealed record ModrinthVersion
+{
+    public required string ProjectId { get; init; }
+    public required string Id { get; init; }
+    public required string DatePublished { get; init; }
+    public required List<string> GameVersions { get; init; }
+    public required List<string> Loaders { get; init; }
+    public required string Name { get; init; }
+    public required string VersionNumber { get; init; }
+    public required string VersionType { get; init; }
+
     public string? Changelog { get; init; }
-    public List<ModrinthDependencyJson>? Dependencies { get; init; }
+    public List<ModrinthDependency>? Dependencies { get; init; }
 
     /// <summary>JSON null elements drop at binding (ModrinthVersionFileListConverter), so
-    /// the non-nullable element label holds — docs/JSON-MIGRATION.md §2.4.</summary>
+    /// the non-nullable element label holds.</summary>
     [property: JsonConverter(typeof(ModrinthVersionFileListConverter))]
-    public List<ModrinthVersionFileJson>? Files { get; init; }
+    public required List<ModrinthVersionFile> Files { get; init; }
 }
 
-public sealed record ModrinthDependencyJson(
-    string? ProjectId,
-    string? VersionId,
-    string? DependencyType);
+/// <summary>The spec's VersionDependency: at most one of version_id/project_id is set;
+/// `dependency_type` is the only required member.</summary>
+public sealed record ModrinthDependency
+{
+    public string? ProjectId { get; init; }
+    public string? VersionId { get; init; }
+    public required string DependencyType { get; init; }
+}
 
-/// <summary>One downloadable file of a version; hashes is keyed by algorithm name. A JSON
-/// null hash VALUE counts as absent (ModrinthHashMapConverter drops the entry, so the
-/// fallback chain keeps walking) — docs/JSON-MIGRATION.md §2.4.</summary>
-public sealed record ModrinthVersionFileJson(
-    string? Filename,
-    bool? Primary,
-    string? Url,
-    long? Size,
+/// <summary>One downloadable file of a version (the spec's VersionFile: hashes, url,
+/// filename, primary and size are all required). A JSON null hash VALUE counts as absent
+/// (ModrinthHashMapConverter drops the entry, so the fallback chain keeps walking).</summary>
+public sealed record ModrinthVersionFile
+{
+    public required string Filename { get; init; }
+    public required bool Primary { get; init; }
+    public required string Url { get; init; }
+    public required long Size { get; init; }
+
     [property: JsonConverter(typeof(ModrinthHashMapConverter))]
-    Dictionary<string, string>? Hashes);
+    public required Dictionary<string, string> Hashes { get; init; }
+}
 
 // ------------------------------------------------------------------------- .mrpack format
 
 /// <summary>modrinth.index.json (https://docs.modrinth.com/docs/modpacks/format_definition).
 /// Shared by the import (parse) and export (write) paths; `dependencies` is a free string map
 /// validated against the known-loader whitelist by the import mapping.</summary>
-public sealed record MrPackIndexJson
+public sealed record MrPackIndex
 {
     public int? FormatVersion { get; init; }
     public string? Game { get; init; }
@@ -139,17 +158,17 @@ public sealed record MrPackIndexJson
     public string? VersionId { get; init; }
     public string? Summary { get; init; }
     public Dictionary<string, string?>? Dependencies { get; init; }
-    public List<MrPackFileJson>? Files { get; init; }
+    public List<MrPackFile>? Files { get; init; }
 }
 
-public sealed record MrPackFileJson(
-    MrPackEnvJson? Env,
+public sealed record MrPackFile(
+    MrPackEnv? Env,
     string? Path,
     List<string>? Downloads,
     Dictionary<string, string>? Hashes,
     long? FileSize);
 
-public sealed record MrPackEnvJson(
+public sealed record MrPackEnv(
     string? Client,
     string? Server);
 // ------------------------------------------------------------------------------- context
@@ -161,33 +180,32 @@ public sealed record MrPackEnvJson(
     PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
 [JsonSerializable(typeof(ModrinthHashLookupRequest))]
 [JsonSerializable(typeof(ModrinthVersionUpdateRequest))]
-[JsonSerializable(typeof(ModrinthDownloadMetaJson))]
-[JsonSerializable(typeof(ModrinthProjectJson))]
-[JsonSerializable(typeof(List<ModrinthProjectJson>))]
-[JsonSerializable(typeof(ModrinthSearchResponseJson))]
-[JsonSerializable(typeof(ModrinthCategoryJson))]
-[JsonSerializable(typeof(List<ModrinthCategoryJson>))]
-[JsonSerializable(typeof(ModrinthVersionJson))]
-[JsonSerializable(typeof(List<ModrinthVersionJson>))]
-[JsonSerializable(typeof(Dictionary<string, ModrinthVersionJson>))]
+[JsonSerializable(typeof(ModrinthDownloadMeta))]
+[JsonSerializable(typeof(ModrinthProject))]
+[JsonSerializable(typeof(List<ModrinthProject>))]
+[JsonSerializable(typeof(ModrinthSearchResults))]
+[JsonSerializable(typeof(ModrinthCategory))]
+[JsonSerializable(typeof(List<ModrinthCategory>))]
+[JsonSerializable(typeof(ModrinthVersion))]
+[JsonSerializable(typeof(List<ModrinthVersion>))]
+[JsonSerializable(typeof(Dictionary<string, ModrinthVersion>))]
 public sealed partial class ModrinthJsonContext : JsonSerializerContext;
 
 /// <summary>The version files array: JSON null elements are dropped at binding (the
 /// non-nullable element label is enforced HERE, in the wire layer — between "non-null +
-/// ignore" and "nullable + keep" there is no third option). A wrong-kind member reads
-/// null so ModrinthRequire.Array surfaces "'files' is not an array"; junk element kinds
-/// still fail the document like a binding error.</summary>
-public sealed class ModrinthVersionFileListConverter : JsonConverter<List<ModrinthVersionFileJson>?>
+/// ignore" and "nullable + keep" there is no third option). A non-array or null token fails
+/// the document like a binding error.</summary>
+public sealed class ModrinthVersionFileListConverter : JsonConverter<List<ModrinthVersionFile>>
 {
-    public override List<ModrinthVersionFileJson>? Read(ref Utf8JsonReader reader, Type typeToConvert,
+    public override List<ModrinthVersionFile> Read(ref Utf8JsonReader reader, Type typeToConvert,
         JsonSerializerOptions options)
     {
         if (reader.TokenType is not JsonTokenType.StartArray)
         {
-            return null;
+            throw new JsonException("'files' is not an array");
         }
 
-        var files = new List<ModrinthVersionFileJson>();
+        var files = new List<ModrinthVersionFile>();
         while (reader.Read())
         {
             if (reader.TokenType == JsonTokenType.EndArray)
@@ -200,29 +218,29 @@ public sealed class ModrinthVersionFileListConverter : JsonConverter<List<Modrin
                 continue;
             }
 
-            files.Add(JsonSerializer.Deserialize(ref reader, ModrinthJsonContext.Default.ModrinthVersionFileJson)
+            files.Add(JsonSerializer.Deserialize(ref reader, ModrinthJsonContext.Default.ModrinthVersionFile)
                       ?? throw new JsonException("'files' entry is null"));
         }
 
         throw new JsonException("unterminated array");
     }
 
-    public override void Write(Utf8JsonWriter writer, List<ModrinthVersionFileJson>? value,
+    public override void Write(Utf8JsonWriter writer, List<ModrinthVersionFile> value,
         JsonSerializerOptions options) =>
-        throw new NotSupportedException("the Modrinth wire records are read-only");
+        throw new NotSupportedException("the Modrinth wire models are read-only");
 }
 
 /// <summary>The hash map: entries whose JSON value is null drop at binding (treated as
-/// absent, so the hash-fallback chain keeps walking — docs/JSON-MIGRATION.md §2.4). A
-/// non-string value still fails the document like a binding error.</summary>
-public sealed class ModrinthHashMapConverter : JsonConverter<Dictionary<string, string>?>
+/// absent, so the hash-fallback chain keeps walking). A non-object token or a non-string
+/// value fails the document.</summary>
+public sealed class ModrinthHashMapConverter : JsonConverter<Dictionary<string, string>>
 {
-    public override Dictionary<string, string>? Read(ref Utf8JsonReader reader, Type typeToConvert,
+    public override Dictionary<string, string> Read(ref Utf8JsonReader reader, Type typeToConvert,
         JsonSerializerOptions options)
     {
         if (reader.TokenType is not JsonTokenType.StartObject)
         {
-            return null;
+            throw new JsonException("'hashes' is not an object");
         }
 
         var map = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -248,151 +266,12 @@ public sealed class ModrinthHashMapConverter : JsonConverter<Dictionary<string, 
         throw new JsonException("unterminated object");
     }
 
-    public override void Write(Utf8JsonWriter writer, Dictionary<string, string>? value,
+    public override void Write(Utf8JsonWriter writer, Dictionary<string, string> value,
         JsonSerializerOptions options) =>
-        throw new NotSupportedException("the Modrinth wire records are read-only");
+        throw new NotSupportedException("the Modrinth wire models are read-only");
 }
 
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
-[JsonSerializable(typeof(MrPackIndexJson))]
+[JsonSerializable(typeof(MrPackIndex))]
 public sealed partial class MrPackJsonContext : JsonSerializerContext;
-
-/// <summary>Parse helpers over the raw response bodies (the seam where JsonException becomes
-/// a null/empty result, preserving the tolerant node-parse outcomes of the former readers).</summary>
-public static class ModrinthJson
-{
-    /// <summary>The {hash: version} lookup responses of POST /version_files(/update). Null
-    /// when the body is not a JSON object — every lookup then just misses, like indexing a
-    /// non-object node did.</summary>
-    public static Dictionary<string, ModrinthVersionJson>? ParseVersionLookup(string json)
-    {
-        // per-entry tolerance like the former node readers: one malformed version entry
-        // costs that entry, not the whole lookup
-        JsonNode? root;
-        try
-        {
-            root = JsonNode.Parse(json);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-
-        if (root is not JsonObject obj)
-        {
-            return null;
-        }
-
-        var result = new Dictionary<string, ModrinthVersionJson>(StringComparer.Ordinal);
-        foreach (var (hash, node) in obj)
-        {
-            var version = VersionFromNode(node);
-            if (version is not null)
-            {
-                result[hash] = version;
-            }
-        }
-
-        return result;
-    }
-
-    /// <summary>A JSON array of versions (project version lists), with the former per-entry
-    /// tolerance: a non-array body or a malformed entry parses to an empty list / is skipped.
-    /// </summary>
-    public static List<ModrinthVersionJson> ParseVersionListOrEmpty(string json)
-    {
-        JsonNode? root;
-        try
-        {
-            root = JsonNode.Parse(json);
-        }
-        catch (JsonException)
-        {
-            return [];
-        }
-
-        if (root is not JsonArray array)
-        {
-            return [];
-        }
-
-        var result = new List<ModrinthVersionJson>();
-        foreach (var entry in array)
-        {
-            var version = VersionFromNode(entry);
-            if (version is not null)
-            {
-                result.Add(version);
-            }
-        }
-
-        return result;
-    }
-
-    public static ModrinthProjectJson? ParseProject(string json) =>
-        Parse(json, ModrinthJsonContext.Default.ModrinthProjectJson);
-
-    /// <summary>A JSON array of projects (GET /projects?ids=...). Non-array bodies parse to an
-    /// empty list.</summary>
-    public static List<ModrinthProjectJson> ParseProjectListOrEmpty(string json) =>
-        Parse(json, ModrinthJsonContext.Default.ListModrinthProjectJson) ?? [];
-
-    public static ModrinthSearchResponseJson? ParseSearchResponse(string json) =>
-        Parse(json, ModrinthJsonContext.Default.ModrinthSearchResponseJson);
-
-    public static List<ModrinthCategoryJson>? ParseCategories(string json) =>
-        Parse(json, ModrinthJsonContext.Default.ListModrinthCategoryJson);
-
-    public static MrPackIndexJson? ParseMrPackIndex(string json) =>
-        Parse(json, MrPackJsonContext.Default.MrPackIndexJson);
-
-    /// <summary>Deserialize a version DTO from an already-parsed node (the provider-dispatch
-    /// seams that sniff the response shape before knowing the provider). Null when the node
-    /// is not a version object.</summary>
-    public static ModrinthVersionJson? VersionFromNode(JsonNode? node) =>
-        FromNode(node, ModrinthJsonContext.Default.ModrinthVersionJson);
-
-    /// <summary>Deserialize a project DTO from an already-parsed node (same dispatch seams).</summary>
-    public static ModrinthProjectJson? ProjectFromNode(JsonNode? node) =>
-        FromNode(node, ModrinthJsonContext.Default.ModrinthProjectJson);
-
-    /// <summary>Deserialize a version array from an already-parsed node; null when the node
-    /// is not an array (the array sniff of the former readers).</summary>
-    public static List<ModrinthVersionJson>? VersionListFromNode(JsonNode? node) =>
-        FromNode(node, ModrinthJsonContext.Default.ListModrinthVersionJson);
-
-    /// <summary>Deserialize a project array from an already-parsed node; null when the node
-    /// is not an array.</summary>
-    public static List<ModrinthProjectJson>? ProjectListFromNode(JsonNode? node) =>
-        FromNode(node, ModrinthJsonContext.Default.ListModrinthProjectJson);
-
-    private static T? FromNode<T>(JsonNode? node, JsonTypeInfo<T> typeInfo) where T : class
-    {
-        if (node is null)
-        {
-            return null;
-        }
-
-        try
-        {
-            return node.Deserialize(typeInfo);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    private static T? Parse<T>(string json, JsonTypeInfo<T> typeInfo) where T : class
-    {
-        try
-        {
-            return JsonSerializer.Deserialize(json, typeInfo);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-}

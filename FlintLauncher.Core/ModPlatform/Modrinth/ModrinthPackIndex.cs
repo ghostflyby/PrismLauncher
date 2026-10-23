@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Port of modplatform/modrinth/ModrinthPackIndex.{h,cpp}: load Modrinth project/version
 // payloads into the provider-neutral ModIndex models. The wire shapes arrive as the
-// source-generated DTOs in ModrinthJson (ModrinthProjectJson / ModrinthVersionJson); these
+// source-generated DTOs in ModrinthJson (ModrinthProject / ModrinthVersion); these
 // loaders are the DTO -> model mapping, keeping the require/fallback semantics of the
 // former node readers. The .mrpack (modrinth.index.json) parsing lives in
 // ModrinthInstanceCreationTask.ParseManifest, like upstream.
@@ -18,43 +18,30 @@ public static class ModrinthPackIndex
 {
     private static bool ShouldDownloadOnSide(string side) => side is "required" or "optional";
 
-    /// <summary>Port of Modrinth::loadIndexedPack.</summary>
-    public static void LoadIndexedPack(IndexedPack pack, ModrinthProjectJson dto)
+    /// <summary>Port of Modrinth::loadIndexedPack. The search-only members (author,
+    /// all_project_types) are not on the full Project shape and no longer read; the datapack
+    /// detection rides on the project's loader list alone.</summary>
+    public static void LoadIndexedPack(IndexedPack pack, ModrinthProject dto)
     {
-        pack.AddonId = dto.ProjectId ?? "";
-        if (pack.AddonId.Length == 0)
-        {
-            pack.AddonId = ModrinthRequire.String(dto.Id, "id");
-        }
-
+        pack.AddonId = dto.Id;
         pack.Provider = ResourceProvider.Modrinth;
-        pack.Name = ModrinthRequire.String(dto.Title, "title");
-        pack.ResourceType = ModrinthApi.GetResourceType(dto.ProjectType ?? "");
-        if ((dto.Loaders?.Contains("datapack") ?? false) ||
-            (dto.AllProjectTypes?.Contains("datapack") ?? false))
+        pack.Name = dto.Title;
+        pack.ResourceType = ModrinthApi.GetResourceType(dto.ProjectType);
+        if (dto.Loaders?.Contains("datapack") == true)
         {
             pack.ResourceType = ResourceType.DataPack;
         }
 
-        pack.Slug = dto.Slug ?? "";
+        pack.Slug = dto.Slug;
         pack.WebsiteUrl = pack.Slug.Length != 0 ? "https://modrinth.com/mod/" + pack.Slug : "";
 
-        pack.Description = dto.Description ?? "";
+        pack.Description = dto.Description;
 
         pack.LogoUrl = dto.IconUrl ?? "";
-        pack.LogoName = $"{dto.Slug ?? ""}.{UrlPathSuffix(pack.LogoUrl)}";
+        pack.LogoName = $"{dto.Slug}.{UrlPathSuffix(pack.LogoUrl)}";
 
-        if (dto.Author is { } author)
-        {
-            var modAuthor = new ModpackAuthor
-            {
-                Name = author,
-            };
-            pack.Authors = [modAuthor];
-        }
-
-        var client = ShouldDownloadOnSide(dto.ClientSide ?? "");
-        var server = ShouldDownloadOnSide(dto.ServerSide ?? "");
+        var client = ShouldDownloadOnSide(dto.ClientSide);
+        var server = ShouldDownloadOnSide(dto.ServerSide);
 
         if (server && client)
         {
@@ -75,41 +62,43 @@ public static class ModrinthPackIndex
 
     /// <summary>Port of Modrinth::loadExtraPackData (the donation list, discord url and
     /// status members have no reader and are not ported).</summary>
-    public static void LoadExtraPackData(IndexedPack pack, ModrinthProjectJson dto)
+    public static void LoadExtraPackData(IndexedPack pack, ModrinthProject dto)
     {
         pack.ExtraData.IssuesUrl = ChopTrailingSlash(dto.IssuesUrl ?? "");
         pack.ExtraData.SourceUrl = ChopTrailingSlash(dto.SourceUrl ?? "");
         pack.ExtraData.WikiUrl = ChopTrailingSlash(dto.WikiUrl ?? "");
 
-        pack.ExtraData.Body = (dto.Body ?? "").Replace("<br>", "");
+        pack.ExtraData.Body = dto.Body.Replace("<br>", "");
 
         pack.ExtraDataLoaded = true;
     }
 
-    /// <summary>Port of Modrinth::loadIndexedPackVersion.</summary>
-    public static IndexedVersion LoadIndexedPackVersion(ModrinthVersionJson dto, string preferredHashType = "sha512",
+    /// <summary>Port of Modrinth::loadIndexedPackVersion. The wire's required members are
+    /// enforced by the model itself (missing keys fail the decode), so the former
+    /// require-is-type checks are gone; a JSON null hash value still counts as absent and
+    /// the sha512 -> sha1 fallback keeps walking.</summary>
+    public static IndexedVersion LoadIndexedPackVersion(ModrinthVersion dto, string preferredHashType = "sha512",
         string preferredFileName = "")
     {
         var file = new IndexedVersion
         {
-            AddonId = ModrinthRequire.String(dto.ProjectId, "project_id"),
-            FileId = ModrinthRequire.String(dto.Id, "id"),
-            Date = ModrinthRequire.String(dto.DatePublished, "date_published"),
+            AddonId = dto.ProjectId,
+            FileId = dto.Id,
+            Date = dto.DatePublished,
         };
-        var versionArray = ModrinthRequire.Array(dto.GameVersions, "game_versions");
-        if (versionArray.Count == 0)
+        if (dto.GameVersions.Count == 0)
         {
             return new IndexedVersion();
         }
 
-        foreach (var raw in versionArray)
+        foreach (var raw in dto.GameVersions)
         {
             // double this so we can check both strings when filtering
             file.McVersion.Add(ModrinthApi.MapMcVersionFromModrinth(raw));
             file.McVersion.Add(raw);
         }
 
-        foreach (var loader in ModrinthRequire.Array(dto.Loaders, "loaders"))
+        foreach (var loader in dto.Loaders)
         {
             switch (loader)
             {
@@ -122,41 +111,31 @@ public static class ModrinthPackIndex
             }
         }
 
-        file.Version = ModrinthRequire.String(dto.Name, "name");
-        file.VersionNumber = ModrinthRequire.String(dto.VersionNumber, "version_number");
-        file.VersionType = IndexedVersionType.FromString(ModrinthRequire.String(dto.VersionType, "version_type"));
+        file.Version = dto.Name;
+        file.VersionNumber = dto.VersionNumber;
+        file.VersionType = IndexedVersionType.FromString(dto.VersionType);
 
-        // the wire's `changelog` member has no ported reader (UI-only display field), but a
-        // present non-string value still fails the read like it did upstream
-        if (dto.Changelog is { } changelog)
+        foreach (var d in dto.Dependencies ?? [])
         {
-            _ = ModrinthRequire.String(changelog, "changelog");
-        }
-
-        if (dto.Dependencies is { } dependencies)
-        {
-            foreach (var d in dependencies)
+            var dependency = new Dependency
             {
-                var dependency = new Dependency
-                {
-                    AddonId = d.ProjectId ?? "",
-                    Version = d.VersionId ?? "",
-                };
+                AddonId = d.ProjectId ?? "",
+                Version = d.VersionId ?? "",
+            };
 
-                dependency.Type = ModrinthRequire.String(d.DependencyType, "dependency_type") switch
-                {
-                    "required" => new DependencyType(DependencyTypeValue.Required),
-                    "optional" => new DependencyType(DependencyTypeValue.Optional),
-                    "incompatible" => new DependencyType(DependencyTypeValue.Incompatible),
-                    "embedded" => new DependencyType(DependencyTypeValue.Embedded),
-                    _ => new DependencyType(DependencyTypeValue.Unknown),
-                };
+            dependency.Type = d.DependencyType switch
+            {
+                "required" => new DependencyType(DependencyTypeValue.Required),
+                "optional" => new DependencyType(DependencyTypeValue.Optional),
+                "incompatible" => new DependencyType(DependencyTypeValue.Incompatible),
+                "embedded" => new DependencyType(DependencyTypeValue.Embedded),
+                _ => new DependencyType(DependencyTypeValue.Unknown),
+            };
 
-                file.Dependencies.Add(dependency);
-            }
+            file.Dependencies.Add(dependency);
         }
 
-        var files = ModrinthRequire.Array(dto.Files, "files");
+        var files = dto.Files;
         var fileCount = files.Count;
 
         if (fileCount == 0)
@@ -172,9 +151,9 @@ public static class ModrinthPackIndex
         for (var i = 0; i < fileCount - 1; i++)
         {
             var candidate = files[i];
-            var fileName = ModrinthRequire.String(candidate.Filename, "filename");
 
-            if (preferredFileName.Length != 0 && fileName.Contains(preferredFileName, StringComparison.Ordinal))
+            if (preferredFileName.Length != 0 &&
+                candidate.Filename.Contains(preferredFileName, StringComparison.Ordinal))
             {
                 file.IsPreferred = true;
                 parent = candidate;
@@ -182,44 +161,38 @@ public static class ModrinthPackIndex
             }
 
             // Grab the primary file, if available
-            if (ModrinthRequire.Boolean(candidate.Primary, "primary"))
+            if (candidate.Primary)
             {
                 parent = candidate;
                 break;
             }
         }
 
-        if (parent.Url is not null)
+        file.DownloadUrl = parent.Url;
+        file.FileName = FileNaming.RemoveInvalidPathChars(parent.Filename);
+        file.IsPreferred = parent.Primary || fileCount == 1;
+        var hashList = parent.Hashes;
+
+        // a JSON null hash value counts as absent (the former node model: null is not
+        // { }), so the fallback chain keeps walking
+        if (hashList.TryGetValue(preferredHashType, out var preferredHash))
         {
-            file.DownloadUrl = ModrinthRequire.String(parent.Url, "url");
-            var fileName = ModrinthRequire.String(parent.Filename, "filename");
-            file.FileName = FileNaming.RemoveInvalidPathChars(fileName);
-            file.IsPreferred = ModrinthRequire.Boolean(parent.Primary, "primary") || fileCount == 1;
-            var hashList = ModrinthRequire.Object(parent.Hashes, "hashes");
-
-            // a JSON null hash value counts as absent (the former node model: null is not
-            // { }), so the fallback chain keeps walking
-            if (hashList.TryGetValue(preferredHashType, out var preferredHash))
+            file.Hash = preferredHash;
+            file.HashType = preferredHashType;
+        }
+        else
+        {
+            var hashTypes = ProviderCapabilities.HashType(ResourceProvider.Modrinth);
+            foreach (var hashType in hashTypes)
             {
-                file.Hash = ModrinthRequire.String(preferredHash, preferredHashType);
-                file.HashType = preferredHashType;
+                if (!hashList.TryGetValue(hashType, out var hash)) continue;
+                file.Hash = hash;
+                file.HashType = hashType;
+                break;
             }
-            else
-            {
-                var hashTypes = ProviderCapabilities.HashType(ResourceProvider.Modrinth);
-                foreach (var hashType in hashTypes)
-                {
-                    if (!hashList.TryGetValue(hashType, out var hash)) continue;
-                    file.Hash = ModrinthRequire.String(hash, hashType);
-                    file.HashType = hashType;
-                    break;
-                }
-            }
-
-            return file;
         }
 
-        return new IndexedVersion();
+        return file;
     }
 
     // ------------------------------------------------------------------ helpers

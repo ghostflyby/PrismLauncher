@@ -32,8 +32,8 @@ namespace FlintLauncher.Core.Instances;
 public sealed partial class InstanceImportTask(
     Uri sourceUrl,
     bool trustedSource,
+    ModrinthApi modrinth,
     IReadOnlyDictionary<string, string>? extraInfo = null,
-    ModrinthApi? modrinth = null,
     FlameApi? flame = null)
     : InstanceTask
 {
@@ -46,7 +46,7 @@ public sealed partial class InstanceImportTask(
         Modrinth,
     }
 
-    private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
+    private readonly ModrinthApi _modrinth = modrinth;
     private readonly FlameApi _flame = flame ?? new FlameApi();
     private readonly IReadOnlyDictionary<string, string> _extraInfo = extraInfo ?? new Dictionary<string, string>();
     private AbsolutePath _archivePath;
@@ -223,7 +223,7 @@ public sealed partial class InstanceImportTask(
         var instCreationTask = new FlameCreationTask(StagingPath, trustedSource,
             Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution."),
-            packId, packVersionId, _modrinth, flame: _flame)
+            _modrinth, packId, packVersionId, flame: _flame)
         {
             OptionalModsSelection = OptionalModsSelection,
         };
@@ -318,7 +318,7 @@ public sealed partial class InstanceImportTask(
         var instCreationTask = new ModrinthCreationTask(StagingPath, trustedSource,
             Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution."),
-            packId, packVersionId, modrinth: _modrinth)
+            _modrinth, packId, packVersionId)
         {
             OptionalModsSelection = OptionalModsSelection,
         };

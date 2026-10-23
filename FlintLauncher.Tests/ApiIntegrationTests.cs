@@ -844,11 +844,11 @@ public class FlintApiModrinthSearchTests : IDisposable
         ctx.Response.Close();
     }
 
-    private readonly ModrinthApi _modrinth = new();
+    private readonly ModrinthApi _modrinth;
 
     public FlintApiModrinthSearchTests()
     {
-        _modrinth.BaseUrl = _server.Url;
+        _modrinth = TestModrinthApi.At(_server.Url);
     }
 
     public void Dispose()

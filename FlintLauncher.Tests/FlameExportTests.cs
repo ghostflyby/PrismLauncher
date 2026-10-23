@@ -12,6 +12,7 @@ using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
+using FlintLauncher.ExternalApi;
 using TruePath;
 using Xunit;
 
@@ -65,7 +66,7 @@ public class FlameExportTests : IDisposable
         Directory.CreateDirectory(staging);
         Assert.NotNull(MmcZip.ExtractDir(new AbsolutePath(zipPath), "", new AbsolutePath(staging)));
 
-        var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, flame: _flameApi);
+        var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, TestModrinthApi.Unreachable(), flame: _flameApi);
         task.SetName(name);
         await task.StartAsync();
         Assert.True(task.WasSuccessful, task.FailReason);

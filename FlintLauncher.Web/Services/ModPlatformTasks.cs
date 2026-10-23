@@ -87,9 +87,9 @@ public static class ModPlatformTasks
 /// (IndexedPack, IndexedVersion) pairs: project info through the provider getProject, the
 /// version either pinned by id or the latest one matching the instance's mc version/loader.
 /// </summary>
-public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType loaders, IReadOnlyList<ModLoaderType> loaderList, ModrinthApi? modrinth = null, FlameApi? flame = null)
+public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType loaders, IReadOnlyList<ModLoaderType> loaderList, ModrinthApi modrinth, FlameApi? flame = null)
 {
-    private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
+    private readonly ModrinthApi _modrinth = modrinth;
     private readonly FlameApi _flame = flame ?? new FlameApi();
 
     public async Task<(IndexedPack Pack, IndexedVersion Version)> ResolveAsync(
@@ -124,24 +124,18 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         }
         else
         {
-            var (job, request) = _modrinth.GetProject(projectId);
-            if (job is null || request is null)
+            ModrinthProject dto;
+            try
             {
-                throw new ModResolveException($"cannot build the Modrinth project request for {projectId}");
+                dto = await _modrinth.Client.GetProjectAsync(projectId, cancellationToken);
             }
-
-            await job.StartAsync(cancellationToken);
-            if (!job.WasSuccessful)
+            catch (Exception e) when (e is HttpRequestException or JsonException)
             {
-                throw new ModResolveException($"fetching the Modrinth project {projectId} failed: {job.FailReason}");
+                throw new ModResolveException($"fetching the Modrinth project {projectId} failed: {e.Message}");
             }
 
             try
             {
-                var dto = ParseModrinthBody<ModrinthProjectJson>(request.BodyAsString,
-                              $"the Modrinth project {projectId}",
-                              ModrinthJsonContext.Default.ModrinthProjectJson)
-                          ?? throw new ModResolveException($"the Modrinth project {projectId} is not a JSON object");
                 ModrinthPackIndex.LoadIndexedPack(pack, dto);
             }
             catch (JsonException e)
@@ -197,8 +191,8 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             }
 
             return ModrinthPackIndex.LoadIndexedPackVersion(
-                ParseModrinthBody<ModrinthVersionJson>(pinnedRequest.BodyAsString,
-                    $"the Modrinth version {versionId}", ModrinthJsonContext.Default.ModrinthVersionJson)
+                ParseModrinthBody<ModrinthVersion>(pinnedRequest.BodyAsString,
+                    $"the Modrinth version {versionId}", ModrinthJsonContext.Default.ModrinthVersion)
                 ?? throw new ModResolveException($"the Modrinth version {versionId} is not a JSON object"));
         }
         catch (JsonException e)
@@ -258,7 +252,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         // Modrinth: an array of versions; keep the valid ones for the instance's loader
         // (the getDependencyVersion heuristic) and take the newest by published date
         var versions = new List<IndexedVersion>();
-        foreach (var dto in ModrinthJson.VersionListFromNode(bodyRoot) ?? [])
+        foreach (var dto in bodyRoot.Deserialize(ModrinthJsonContext.Default.ListModrinthVersion) ?? [])
         {
             IndexedVersion file;
             try
@@ -322,14 +316,14 @@ public sealed class ModInstallTask(
     IReadOnlyList<ModInstallRequest> selections,
     string mcVersion,
     ModLoaderType loaders,
-    ModrinthApi? modrinth = null,
+    ModrinthApi modrinth,
     FlameApi? flame = null)
     : FlintTask
 {
     private readonly McVersion _mcVersion = new(mcVersion);
     private readonly List<ModLoaderType> _loaderList = ModIndex.ModLoaderTypesToList(loaders);
     private readonly List<ModInstallEntryView> _installed = [];
-    private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
+    private readonly ModrinthApi _modrinth = modrinth;
     private readonly FlameApi _flame = flame ?? new FlameApi();
 
     /// <summary>The entries for the task view's optional result payload.</summary>
@@ -410,11 +404,15 @@ public sealed class ModInstallTask(
                 entry.Pack,
                 entry.Version,
                 folder,
+                _modrinth,
+
                 isIndexed: true,
+
                 downloadReason: isDependency ? "dependency" : "standalone",
+
                 dependentOn: requiredBy ?? "",
-                instance,
-                _modrinth));
+
+                instance));
         }
 
         await downloads.StartAsync(cancellationToken);
@@ -444,14 +442,14 @@ public sealed class ModsUpdateTask(
     MinecraftInstance instance,
     ModFolderModel folder,
     IReadOnlyList<string>? filter,
-    IReadOnlyList<IndexedVersionType>? releaseTypes = null,
-    ModrinthApi? modrinth = null)
+    ModrinthApi modrinth,
+    IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     : FlintTask
 {
     private sealed record PendingUpdate(ModUpdateEntryView View, IndexedVersion Version, string ProjectId, string Slug, string Name);
 
     private readonly List<PendingUpdate> _updates = [];
-    private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
+    private readonly ModrinthApi _modrinth = modrinth;
 
     /// <summary>The update entries for the task view's optional result payload.</summary>
     public TaskResultView BuildResult() => new(_updates.Select(u => u.View).ToArray(), null);
@@ -499,7 +497,7 @@ public sealed class ModsUpdateTask(
         {
             EmitStatus("Checking Modrinth updates...");
             var check = new ModrinthCheckUpdate(modrinth, gameVersions, loadersList,
-                resource => folder.GetMetadata(resource), releaseTypes, _modrinth);
+                resource => folder.GetMetadata(resource), _modrinth, releaseTypes);
             await check.StartAsync(cancellationToken);
             if (!check.WasSuccessful)
             {

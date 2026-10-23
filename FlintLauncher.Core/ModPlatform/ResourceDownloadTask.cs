@@ -42,16 +42,16 @@ public class ResourceDownloadTask : SequentialTask
     public ResourceDownloadTask(IndexedPack pack,
         IndexedVersion version,
         ResourceFolderModel packs,
+        ModrinthApi modrinth,
         bool isIndexed = true,
         string downloadReason = "standalone",
         string dependentOn = "",
-        MinecraftInstance? instance = null,
-        ModrinthApi? modrinth = null)
+        MinecraftInstance? instance = null)
     {
         _pack = pack;
         _packVersion = version;
         _packModel = packs;
-        var modrinth1 = modrinth ?? new ModrinthApi();
+        var modrinth1 = modrinth;
 
         if (isIndexed)
         {

@@ -109,7 +109,7 @@ public class ModUpdateTaskTests : IDisposable
             Name = update.Name,
             Provider = ResourceProvider.Flame,
         };
-        var download = new ResourceDownloadTask(pack, update.Version, model,
+        var download = new ResourceDownloadTask(pack, update.Version, model, TestModrinthApi.Unreachable(),
             isIndexed: true, downloadReason: "update", instance: instance);
 
         var updateTask = new ModUpdateTask(model, [download]);
@@ -151,7 +151,7 @@ public class ModUpdateTaskTests : IDisposable
             HashType = "sha1",
             Hash = Sha1(goodBytes),
         };
-        var goodDownload = new ResourceDownloadTask(goodPack, goodVersion, model,
+        var goodDownload = new ResourceDownloadTask(goodPack, goodVersion, model, TestModrinthApi.Unreachable(),
             instance: instance);
 
         // ...and one whose checksum cannot match
@@ -166,7 +166,7 @@ public class ModUpdateTaskTests : IDisposable
             HashType = "sha1",
             Hash = Sha1("totally different content"u8.ToArray()),
         };
-        var badDownload = new ResourceDownloadTask(badPack, badVersion, model,
+        var badDownload = new ResourceDownloadTask(badPack, badVersion, model, TestModrinthApi.Unreachable(),
             instance: instance);
 
         var updateTask = new ModUpdateTask(model, [badDownload, goodDownload]);

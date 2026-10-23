@@ -14,6 +14,7 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
+using FlintLauncher.ExternalApi;
 using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
@@ -454,7 +455,7 @@ public class FlameApiTests : IDisposable
 
         var manifest = new FlameManifest { Files = { [456] = new FlameFile { ProjectId = 123, FileId = 456 } } };
 
-        var task = new FileResolvingTask(manifest, flame: _flameApi);
+        var task = new FileResolvingTask(manifest, TestModrinthApi.Unreachable(), flame: _flameApi);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -481,7 +482,7 @@ public class FlameApiTests : IDisposable
 
         var manifest = new FlameManifest { Files = { [456] = new FlameFile { ProjectId = 123, FileId = 456 } } };
 
-        var task = new FileResolvingTask(manifest, flame: _flameApi) { FallbackMrBlockedMods = false };
+        var task = new FileResolvingTask(manifest, TestModrinthApi.Unreachable(), flame: _flameApi) { FallbackMrBlockedMods = false };
         await task.StartAsync();
 
         // the resolve succeeds; the blocked state is the *missing download URL*
@@ -503,7 +504,7 @@ public class FlameApiTests : IDisposable
 
         var manifest = new FlameManifest { Files = { [456] = new FlameFile { ProjectId = 123, FileId = 456 } } };
 
-        var task = new FileResolvingTask(manifest, flame: _flameApi);
+        var task = new FileResolvingTask(manifest, TestModrinthApi.Unreachable(), flame: _flameApi);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);

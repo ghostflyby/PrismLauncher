@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+using FlintLauncher.Core.ModPlatform.Modrinth;
+using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi;
+
+namespace FlintLauncher.Tests;
+
+/// <summary>Test factory for hermetic ModrinthApi instances: every client gets a throwaway
+/// HttpClient and its own NetStack (nothing process-global to leak in or out) pointed at the
+/// suite's stub — or at a discard address when the suite never exercises the Modrinth
+/// paths.</summary>
+internal static class TestModrinthApi
+{
+    public static ModrinthApi At(string baseUrl)
+    {
+        // UseProxy=false keeps the throwaway client hermetic: a system proxy would otherwise
+        // intercept the loopback stub traffic (and answer 502)
+        var http = new HttpClient(new SocketsHttpHandler { UseProxy = false });
+        var options = new ModrinthClientOptions { BaseUrl = baseUrl };
+        return new ModrinthApi(new ModrinthClient(http, options), new NetStack());
+    }
+
+    /// <summary>An API wired to a closed port: any surprise request fails fast and locally
+    /// instead of reaching the real service.</summary>
+    public static ModrinthApi Unreachable() => At("http://127.0.0.1:9/");
+}

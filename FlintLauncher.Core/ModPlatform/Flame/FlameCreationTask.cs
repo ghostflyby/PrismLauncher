@@ -51,13 +51,13 @@ public sealed partial class FlameCreationTask : InstanceTask
     public FlameCreationTask(AbsolutePath stagingPath,
         bool trustedSource,
         InstanceEnvironment environment,
+        ModrinthApi modrinth,
         string id = "",
         string versionId = "",
-        ModrinthApi? modrinth = null,
         string originalInstanceId = "",
         FlameApi? flame = null)
     {
-        _modrinth = modrinth ?? new ModrinthApi();
+        _modrinth = modrinth;
         _flame = flame ?? new FlameApi();
         StagingPath = stagingPath;
         TrustedSource = trustedSource;

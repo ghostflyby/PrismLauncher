@@ -14,6 +14,8 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
+using FlintLauncher.Core.ModPlatform.Modrinth;
+using FlintLauncher.ExternalApi;
 using TruePath;
 using Xunit;
 
@@ -21,6 +23,7 @@ namespace FlintLauncher.Tests;
 
 public class FtbTests : IDisposable
 {
+    private readonly ModrinthApi _modrinthApi = TestModrinthApi.Unreachable();
     private readonly FlameApi _flameApi = new();
     private readonly FtbApi _ftbApi;
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-ftb-{Guid.NewGuid():N}");
@@ -274,7 +277,7 @@ public class FtbTests : IDisposable
         SetupFlameResolution();
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _flameApi, _ftbApi);
+        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _flameApi, _ftbApi);
         task.SetName("FTB Imported");
         task.Icon = "ftb_logo";
         var wrapped = list.WrapInstanceTask(task);
@@ -316,7 +319,7 @@ public class FtbTests : IDisposable
         _server.Downloads["testmod.jar"] = "corrupted payload!!"u8.ToArray();
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _flameApi, _ftbApi);
+        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _flameApi, _ftbApi);
         task.SetName("FTB Sha1");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
@@ -335,7 +338,7 @@ public class FtbTests : IDisposable
         SetupFlameResolution(downloadUrlPath: null);
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _flameApi, _ftbApi);
+        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _flameApi, _ftbApi);
         task.SetName("FTB Blocked");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
@@ -359,7 +362,7 @@ public class FtbTests : IDisposable
         await File.WriteAllBytesAsync(localPath, _cfBytes);
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _flameApi, _ftbApi)
+        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _flameApi, _ftbApi)
         {
             BlockedModLocalFileResolver = _ => localPath,
         };
@@ -382,7 +385,7 @@ public class FtbTests : IDisposable
         fixture.Register(_server);
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "no-such-version", ftb: _ftbApi);
+        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "no-such-version", modrinth: _modrinthApi, ftb: _ftbApi);
         task.SetName("FTB UnknownVersion");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();

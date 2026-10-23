@@ -25,12 +25,12 @@ public class ResourceDownloadTaskTests : IDisposable
 
     private readonly byte[] _jarBytes = "test mod jar content 0123456789"u8.ToArray();
 
-    private readonly ModrinthApi _modrinth = new();
+    private readonly ModrinthApi _modrinth;
 
     public ResourceDownloadTaskTests()
     {
         Directory.CreateDirectory(_root);
-        _modrinth.BaseUrl = _server.Url;
+        _modrinth = TestModrinthApi.At(_server.Url);
     }
 
     public void Dispose()

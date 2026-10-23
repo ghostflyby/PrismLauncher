@@ -19,6 +19,7 @@ using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
+using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using TruePath;
 using TruePath.SystemIo;
@@ -28,12 +29,14 @@ namespace FlintLauncher.Core.ModPlatform.Ftb;
 public sealed class FtbPackInstallTask(
     FtbModpack pack,
     string versionName,
+    ModrinthApi modrinth,
     FlameApi? flame = null,
     FtbApi? ftb = null)
     : InstanceTask
 {
     private readonly FlameApi _flame = flame ?? new FlameApi();
     private readonly FtbApi _ftb = ftb ?? new FtbApi();
+    private readonly ModrinthApi _modrinth = modrinth;
 
     // assigned by OnManifestDownloadSucceeded before any read
     private FtbVersion? _manifest;
@@ -135,7 +138,7 @@ public sealed class FtbPackInstallTask(
             }
         }
 
-        var modIdResolverTask = new FileResolvingTask(flameManifest, flame: _flame);
+        var modIdResolverTask = new FileResolvingTask(flameManifest, _modrinth, flame: _flame);
 
         EmitStatus("Resolving mods...");
         await modIdResolverTask.StartAsync(cancellationToken);

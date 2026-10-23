@@ -28,12 +28,12 @@ public sealed class EnsureMetadataTask(
     Dictionary<string, Resource> resources,
     AbsolutePath indexDir,
     ResourceProvider provider,
-    ModrinthApi? modrinth = null,
+    ModrinthApi modrinth,
     FlameApi? flame = null)
     : FlintTask
 {
     // hash -> resource
-    private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
+    private readonly ModrinthApi _modrinth = modrinth;
     private readonly FlameApi _flame = flame ?? new FlameApi();
     private readonly Dictionary<string, IndexedVersion> _tempVersions = new(StringComparer.Ordinal);
     public bool LockUpdate { get; init; }
@@ -71,21 +71,9 @@ public sealed class EnsureMetadataTask(
     {
         var hashType = ProviderCapabilities.HashType(ResourceProvider.Modrinth)[0];
 
-        // ---------------------------------------------------------- versions task
-        var (versionJob, versionRequest) = _modrinth.CurrentVersions(resources.Keys.ToList(), hashType);
-        await versionJob.StartAsync(cancellationToken);
-        if (!versionJob.WasSuccessful)
-        {
-            EmitFailed(versionJob.FailReason);
-            return;
-        }
-
-        var versionEntries = ModrinthJson.ParseVersionLookup(versionRequest.BodyAsString);
-        if (versionEntries is null)
-        {
-            EmitFailed("Version response is not a JSON object");
-            return;
-        }
+        // ---------------------------------------------------------- versions lookup
+        var versionEntries = await _modrinth.Client.GetCurrentVersionsAsync(resources.Keys.ToList(), hashType,
+            cancellationToken);
 
         {
             foreach (var hash in resources.Keys)
@@ -108,7 +96,7 @@ public sealed class EnsureMetadataTask(
             }
         }
 
-        // ---------------------------------------------------------- projects task
+        // ---------------------------------------------------------- projects lookup
         var addonIds = new Dictionary<string, string>(StringComparer.Ordinal); // addonId -> hash
         foreach (var (hash, data) in _tempVersions)
         {
@@ -121,85 +109,46 @@ public sealed class EnsureMetadataTask(
             return;
         }
 
-        NetJob projectJob;
-        NetRequest projectRequest;
-        bool multiple;
+        List<ModrinthProject> projectEntries;
         if (addonIds.Count == 1)
         {
-            var (job, request) = _modrinth.GetProject(addonIds.Keys.First());
-            if (job is null || request is null)
-            {
-                EmitFailed("Could not build the project request");
-                return;
-            }
-
-            projectJob = job;
-            projectRequest = request;
-            multiple = false;
+            projectEntries = [await _modrinth.Client.GetProjectAsync(addonIds.Keys.First(), cancellationToken)];
         }
         else
         {
-            (projectJob, projectRequest) = _modrinth.GetProjects(addonIds.Keys.ToList());
-            multiple = true;
+            projectEntries = await _modrinth.Client.GetProjectsAsync(addonIds.Keys.ToList(), cancellationToken);
         }
 
-        await projectJob.StartAsync(cancellationToken);
-        if (!projectJob.WasSuccessful)
+        foreach (var dto in projectEntries)
         {
-            EmitFailed(projectJob.FailReason);
-            return;
-        }
-
-        JsonNode projectDoc;
-        try
-        {
-            projectDoc = JsonNode.Parse(projectRequest.BodyAsString)
-                         ?? throw new JsonException("empty response");
-        }
-        catch (JsonException e)
-        {
-            EmitFailed(e.Message);
-            return;
-        }
-
-        {
-            List<ModrinthProjectJson> projectEntries = multiple
-                ? ModrinthJson.ProjectListFromNode(projectDoc) ?? []
-                : ModrinthJson.ProjectFromNode(projectDoc) is { } single
-                    ? [single]
-                    : [];
-
-            foreach (var dto in projectEntries)
+            IndexedPack pack;
+            try
             {
-                IndexedPack pack;
-                try
-                {
-                    pack = new IndexedPack();
-                    ModrinthPackIndex.LoadIndexedPack(pack, dto);
-                }
-                catch (JsonException)
-                {
-                    // Skip this entry, since it has problems
-                    continue;
-                }
+                pack = new IndexedPack();
+                ModrinthPackIndex.LoadIndexedPack(pack, dto);
+            }
+            catch (JsonException)
+            {
+                // Skip this entry, since it has problems
+                continue;
+            }
 
-                if (!addonIds.TryGetValue(pack.AddonId, out var hash))
-                {
-                    // "Invalid project id from the API response."
-                    continue;
-                }
+            if (!addonIds.TryGetValue(pack.AddonId, out var hash))
+            {
+                // "Invalid project id from the API response."
+                continue;
+            }
 
-                if (!resources.TryGetValue(hash, out var resource))
-                {
-                    continue;
-                }
+            if (!resources.TryGetValue(hash, out var resource))
+            {
+                continue;
+            }
 
-                EmitStatus($"Parsing API response from Modrinth for '{resource.Name}'...");
+            EmitStatus($"Parsing API response from Modrinth for '{resource.Name}'...");
 
-                if (_tempVersions.TryGetValue(hash, out var version))
-                {
-                    await UpdateMetadata(pack, version, resource);
-                }
+            if (_tempVersions.TryGetValue(hash, out var version))
+            {
+                await UpdateMetadata(pack, version, resource);
             }
         }
     }

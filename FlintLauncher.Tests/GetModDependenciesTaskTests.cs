@@ -27,12 +27,12 @@ public class GetModDependenciesTaskTests : IDisposable
     private readonly StubModrinthServer _server = new();
     private readonly ModInstallTestEnv _env;
 
-    private readonly ModrinthApi _modrinth = new();
+    private readonly ModrinthApi _modrinth;
 
     public GetModDependenciesTaskTests()
     {
         Directory.CreateDirectory(_root);
-        _modrinth.BaseUrl = _server.Url;
+        _modrinth = TestModrinthApi.At(_server.Url);
         _env = new ModInstallTestEnv(_root);
     }
 
@@ -122,6 +122,8 @@ public class GetModDependenciesTaskTests : IDisposable
             ["slug"] = slug,
             ["title"] = title,
             ["description"] = "A synthetic mod",
+            ["body"] = "A synthetic mod body",
+            ["status"] = "approved",
             ["project_type"] = "mod",
             ["client_side"] = "required",
             ["server_side"] = "required",
@@ -312,7 +314,7 @@ public class GetModDependenciesFlameTests : IDisposable
         };
 
         var task = new GetModDependenciesTask(instance, model,
-            [new GetModDependenciesTask.PackDependency(packA, verA)], flame: _flameApi);
+            [new GetModDependenciesTask.PackDependency(packA, verA)], modrinth: TestModrinthApi.Unreachable(), flame: _flameApi);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);

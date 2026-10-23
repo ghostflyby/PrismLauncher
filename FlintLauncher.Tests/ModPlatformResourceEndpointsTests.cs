@@ -252,11 +252,11 @@ public class FlintApiModrinthResourceTests : IDisposable
     private readonly StubModrinthServer _server = new();
     private readonly StubModrinthResourceServer _resourceServer = new();
 
-    private ModrinthApi _modrinthApi = new();
+    private ModrinthApi _modrinthApi;
 
     public FlintApiModrinthResourceTests()
     {
-        _modrinthApi.BaseUrl = _server.Url;
+        _modrinthApi = TestModrinthApi.At(_server.Url);
     }
 
     public void Dispose()
@@ -306,20 +306,24 @@ public class FlintApiModrinthResourceTests : IDisposable
                 ["name"] = "adventure",
                 ["project_type"] = "mod",
                 ["icon"] = "https://cdn.modrinth.test/adventure.png",
+                ["header"] = "Mod Categories",
             },
             new JsonObject
             {
                 ["name"] = "8x-",
                 ["project_type"] = "resourcepack",
                 ["icon"] = "https://cdn.modrinth.test/8x-.png",
+                ["header"] = "Resolution Categories",
             },
             new JsonObject
             {
                 ["name"] = "16x",
                 ["project_type"] = "resourcepack",
+                ["icon"] = "",
+                ["header"] = "Resolution Categories",
             }).ToJsonString();
 
-        _modrinthApi = new ModrinthApi { BaseUrl = _resourceServer.Url };
+        _modrinthApi = TestModrinthApi.At(_resourceServer.Url);
         await using var host = await FlintApiHost.StartAsync(_modrinthApi);
         var response = await host.GetAsync("/api/v1/modplatform/modrinth/categories?type=resourcepacks");
         response.EnsureSuccessStatusCode();
@@ -341,7 +345,7 @@ public class FlintApiModrinthResourceTests : IDisposable
     {
         _resourceServer.DescriptionText = "This is a plain-text project body.";
 
-        _modrinthApi = new ModrinthApi { BaseUrl = _resourceServer.Url };
+        _modrinthApi = TestModrinthApi.At(_resourceServer.Url);
         await using var host = await FlintApiHost.StartAsync(_modrinthApi);
         var response = await host.GetAsync("/api/v1/modplatform/modrinth/mods/projId1/description");
         response.EnsureSuccessStatusCode();

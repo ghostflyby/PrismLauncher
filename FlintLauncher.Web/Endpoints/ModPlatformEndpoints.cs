@@ -77,7 +77,7 @@ public static class ModPlatformEndpoints
             return parsedProvider == ResourceProvider.Flame
                 ? await FlameSearchAsync(resourceType, query, version, loader, index, offset, runtime)
                 : await ModrinthSearchAsync(resourceType, query, version, loader, index, offset, runtime);
-        }).Produces<FlameSearchResult[]>().Produces<ModrinthSearchResult[]>();
+        }).Produces<FlameSearchResult[]>().Produces<ModrinthSearchResultView[]>();
 
         // ----------------------------------------------------- modplatform/{provider}/categories
         // GET /categories?gameId=432&classId=... (Flame) or GET /tag/category filtered by
@@ -140,15 +140,18 @@ public static class ModPlatformEndpoints
                 return ApiJson.Error("invalid_type", unsupportedType, 400);
             }
 
-            var (_, modrinthRequest) = runtime.Modrinth.GetModCategories();
-            await modrinthRequest.StartAsync();
-            if (modrinthRequest.State != TaskState.Succeeded)
+            List<ModrinthCategory>? modrinthCategories;
+            try
+            {
+                modrinthCategories = await runtime.Modrinth.Client.GetCategoriesAsync();
+            }
+            catch (Exception e) when (e is HttpRequestException or JsonException)
             {
                 return ApiJson.Error("modrinth_unavailable",
-                    $"modrinth categories failed: {modrinthRequest.FailReason}", 502);
+                    $"modrinth categories failed: {e.Message}", 502);
             }
 
-            return Results.Ok(ParseModrinthCategories(modrinthRequest.BodyAsString, projectType).ToArray());
+            return Results.Ok(ParseModrinthCategories(modrinthCategories, projectType).ToArray());
         }).Produces<ProviderCategoryView[]>();
 
         // --------------------------------------------------- modplatform/{provider}/mods/{projectId}/description
@@ -173,7 +176,7 @@ public static class ModPlatformEndpoints
                 else
                 {
                     // the Modrinth body endpoint answers with plain text
-                    body = await runtime.Modrinth.GetProjectDescription(projectId);
+                    body = await runtime.Modrinth.Client.GetProjectDescriptionAsync(projectId);
                 }
 
                 return Results.Ok(new ProviderBodyView(body));
@@ -275,7 +278,7 @@ public static class ModPlatformEndpoints
                         // surfaces as the invalid-response error below)
                         FlameMod.LoadIndexedPackVersionsFromResponse(pack, request.BodyAsString);
                     }
-                    else if (ModrinthJson.VersionListFromNode(bodyRoot) is { } versionDtos)
+                    else if (bodyRoot.Deserialize(ModrinthJsonContext.Default.ListModrinthVersion) is { } versionDtos)
                     {
                         foreach (var dto in versionDtos)
                         {
@@ -422,7 +425,7 @@ public static class ModPlatformEndpoints
                         : IndexedVersionType.FromStringList(SettingsJson.ToStringList(
                             runtime.Config.Current.ModDownload.ModUpdateReleaseTypes ?? "[]"));
 
-                var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, releaseTypes, runtime.Modrinth);
+                var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, runtime.Modrinth, releaseTypes);
                 var entry = registry.Register("mods-update", task, instanceId: instance.Id());
                 // the result payload carries the found/applied updates; it is published once
                 // the task reaches a terminal state (the check pass fills it before applying)
@@ -562,10 +565,10 @@ public static class ModPlatformEndpoints
 
     /// <summary>The Modrinth /tag/category response filtered by project_type and mapped to
     /// [{id, name, icon}] (the Modrinth category id is its name, like LoadCategories).</summary>
-    private static List<ProviderCategoryView> ParseModrinthCategories(string response, string projectType)
+    private static List<ProviderCategoryView> ParseModrinthCategories(List<ModrinthCategory>? entries,
+        string projectType)
     {
         var result = new List<ProviderCategoryView>();
-        var entries = ModrinthJson.ParseCategories(response);
         if (entries is null)
         {
             return result;
@@ -578,8 +581,8 @@ public static class ModPlatformEndpoints
                 continue;
             }
 
-            var name = entry.Name ?? "";
-            result.Add(new ProviderCategoryView(name, name, entry.Icon ?? ""));
+            var name = entry.Name;
+            result.Add(new ProviderCategoryView(name, name, entry.Icon));
         }
 
         return result;
@@ -694,41 +697,28 @@ public static class ModPlatformEndpoints
             return ApiJson.Error("invalid_loader", $"loader '{loader}' is not supported by Modrinth", 400);
         }
 
-        var request = NetRequest.MakeByteArray(new Uri(url));
-        await request.StartAsync();
-        if (request.State != TaskState.Succeeded)
-        {
-            return ApiJson.Error("modrinth_unavailable",
-                $"modrinth search failed: {request.FailReason}", 502);
-        }
-
-        ModrinthSearchResponseJson? search;
+        ModrinthSearchResults search;
         try
         {
-            search = JsonSerializer.Deserialize(request.BodyAsString,
-                ModrinthJsonContext.Default.ModrinthSearchResponseJson);
+            search = await runtime.Modrinth.Client.GetSearchResultsAsync(url);
         }
-        catch (JsonException)
+        catch (Exception e) when (e is HttpRequestException or JsonException)
         {
-            return ApiJson.Error("modrinth_invalid_response", "modrinth returned invalid JSON", 502);
+            return ApiJson.Error("modrinth_unavailable", $"modrinth search failed: {e.Message}", 502);
         }
 
         {
-            var results = new List<ModrinthSearchResult>();
-            if (search?.Hits is not { } hits) return Results.Ok(results.ToArray());
+            var results = new List<ModrinthSearchResultView>();
+            if (search.Hits is not { } hits) return Results.Ok(results.ToArray());
             foreach (var hit in hits)
             {
-                results.Add(new ModrinthSearchResult(
-                    hit.ProjectId ?? "",
-                    hit.Slug ?? "",
-                    hit.Title ?? "",
+                results.Add(new ModrinthSearchResultView(
+                    hit.ProjectId,
+                    hit.Slug,
+                    hit.Title,
                     hit.IconUrl ?? "",
-                    hit.Author ?? "",
-                    hit.Downloads is { } downloads &&
-                    downloads.ValueKind == JsonValueKind.Number &&
-                    downloads.TryGetInt64(out var downloadCount)
-                        ? downloadCount
-                        : 0));
+                    hit.Author,
+                    hit.Downloads));
             }
 
             return Results.Ok(results.ToArray());

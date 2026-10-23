@@ -57,12 +57,12 @@ public sealed class ModrinthCreationTask : InstanceTask
     public ModrinthCreationTask(AbsolutePath stagingPath,
         bool trustedSource,
         InstanceEnvironment environment,
+        ModrinthApi modrinth,
         string id = "",
         string versionId = "",
-        string originalInstanceId = "",
-        ModrinthApi? modrinth = null)
+        string originalInstanceId = "")
     {
-        _modrinth = modrinth ?? new ModrinthApi();
+        _modrinth = modrinth;
         StagingPath = stagingPath;
         TrustedSource = trustedSource;
         SetParentEnvironment(environment);
@@ -278,11 +278,11 @@ public sealed class ModrinthCreationTask : InstanceTask
     {
         try
         {
-            MrPackIndexJson? parsed;
+            MrPackIndex? parsed;
             try
             {
                 parsed = JsonSerializer.Deserialize(indexPath.ReadAllText(),
-                    MrPackJsonContext.Default.MrPackIndexJson);
+                    MrPackJsonContext.Default.MrPackIndex);
             }
             catch (JsonException e)
             {

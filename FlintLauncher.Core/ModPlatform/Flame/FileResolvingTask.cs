@@ -33,9 +33,9 @@ public sealed class BlockedMod
     public bool Disabled { get; set; }
 }
 
-public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi? modrinth = null, FlameApi? flame = null) : FlintTask
+public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi modrinth, FlameApi? flame = null) : FlintTask
 {
-    private readonly ModrinthApi _modrinth = modrinth ?? new ModrinthApi();
+    private readonly ModrinthApi _modrinth = modrinth;
     private readonly FlameApi _flame = flame ?? new FlameApi();
 
     public FlameManifest GetResults() => toProcess;
@@ -142,14 +142,13 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi? modr
     /// <summary>The Modrinth fallback for blocked files (currentVersions by sha1).</summary>
     private async Task ModrinthFallback(List<string> hashes, CancellationToken cancellationToken)
     {
-        var (modrinthJob, modrinthResponse) = _modrinth.CurrentVersions(hashes, "sha1");
-        await modrinthJob.StartAsync(cancellationToken);
-        if (modrinthJob.WasSuccessful && FallbackMrBlockedMods)
+        try
         {
-            // a non-object (or invalid) body parses to no entries: every lookup just misses,
-            // like the C++ parse-error path
-            var entries = ModrinthJson.ParseVersionLookup(modrinthResponse.BodyAsString);
-            if (entries is not null)
+            // a non-object (or invalid) body fails the decode: every lookup just misses,
+            // treated the same as the C++ parse-error path
+            if (FallbackMrBlockedMods
+                && await _modrinth.Client.GetCurrentVersionsAsync(hashes, "sha1", cancellationToken) is
+                    { } entries)
             {
                 foreach (var outFile in toProcess.Files.Values)
                 {
@@ -167,6 +166,10 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi? modr
                     }
                 }
             }
+        }
+        catch (Exception e) when (e is HttpRequestException or JsonException)
+        {
+            // the fallback is best-effort: the sha1-lookup failing must not fail the resolution
         }
 
         // the C++ moves on to the projects step even when the Modrinth task failed
