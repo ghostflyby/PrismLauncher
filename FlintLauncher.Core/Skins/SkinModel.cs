@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2023 Trial97 <alexandru.tripon97@gmail.com>
+// SPDX-FileCopyrightText: 2023-2025 Trial97 <alexandru.tripon97@gmail.com>
+// SPDX-FileCopyrightText: 2025 Rinth, Inc.
+//
 // Port of the persistence half of launcher/minecraft/skins/SkinModel.{h,cpp} and
 // SkinList.{h,cpp}: the index.json layout of the skins folder.
 //

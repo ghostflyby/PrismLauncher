@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Assembly-sequence diagnostics ("logger early, every later step
 // diagnosable"): a runtime-constructor crash must reach the state-root file sink — the
 // rolling file provider opens its writer in its own constructor, BEFORE the runtime

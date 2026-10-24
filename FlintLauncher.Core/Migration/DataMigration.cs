@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of launcher/DataMigrationTask.{h,cpp} plus the data-level half of
 // Application::handleDataMigration (the file/dir inventory, the "_nomigrate.txt" marker and the
 // idempotency rules): migrate existing data from other MMC-like launchers into the Flint data

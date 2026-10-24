@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Typed wire probes + mappers for the Mojang/OneSix version format, both directions. The
 // format classes keep their public node-based READ entry points (the tests and callers pin
 // them); each entry deserializes the probe for the whole document once and maps it onto the

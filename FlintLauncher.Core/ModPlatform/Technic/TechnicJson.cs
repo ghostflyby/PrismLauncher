@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Shared node-model accessors for the Technic parsers. Reads go through the JsonNode model
 // (single-DOM, the JsonUtils node-side family); the former element→node bridges are gone.
 // What remains is the response-body entry point: JsonNode.Parse throws the raw JsonException,

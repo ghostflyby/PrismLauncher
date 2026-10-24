@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Java discovery, the static /about identity, the paste upload (GuiUtil's
 // "upload log" flow over the core PasteUpload) and the metadata-cache eviction endpoint.
 // (the launcher news half left — GUI-bound, not ported material)

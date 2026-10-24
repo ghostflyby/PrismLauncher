@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Converters for the three former "opaque JSON-text blob" members of the instance/global
 // configs. Read compatibility: the legacy wire form was a STRING holding the embedded
 // JSON (the C++ QJsonDocument payload verbatim), so every converter accepts the String

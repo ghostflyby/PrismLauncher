@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // launcher-state.json store tests: load-or-default over the five-record schema,
 // atomic writes, corrupt-payload fallback, the path-keyed java probe map (the multi-JVM fix)
 // and the round-trip through the real FlintJsonContext registration (the AOT smoke: a root

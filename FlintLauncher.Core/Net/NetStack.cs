@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Instance-owned shared HttpClient for Flint network activity (the DI successor of the
 // former `Http` static class, which replaced QNetworkAccessManager). A NetStack belongs to a
 // runtime/composition root: its configuration (user agent, manual retries, transfer timeout,

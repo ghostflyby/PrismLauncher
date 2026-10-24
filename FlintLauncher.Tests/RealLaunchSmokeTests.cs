@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // smoke: launch a real assembled step chain through the LaunchController (the headless
 // entry point) with a fake java that speaks the EntryPoint stdin protocol — no network, no
 // real Minecraft. Also assembles the launch task of a real Prism instance (read-only).

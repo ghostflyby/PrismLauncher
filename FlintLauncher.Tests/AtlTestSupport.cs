@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Test doubles for the ATLauncher layer tests: a stub ATL CDN/API server (free-port
 // HttpListener pattern, see ModrinthTestSupport) serving packsnew.json, share-codes,
 // per-version Configs.json/Configs.zip and mod downloads, plus a synthetic pack fixture

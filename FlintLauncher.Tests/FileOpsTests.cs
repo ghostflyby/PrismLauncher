@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The FileOps cases of the port of tests/FileSystem_test.cpp (QTemporaryDir is replaced by
 // a per-test temp directory). The Qt path-math cases (PathCombine/PathDepth/PathTruncate)
 // went with the helpers they tested: path arithmetic is TruePath's now, tested upstream.

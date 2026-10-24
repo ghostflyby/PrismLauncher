@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The flint.json record domain full set: one record per
 // domain, all of them registered into FlintJsonContext (AOT red line — a missing root
 // registration is a runtime failure, not a compile error).

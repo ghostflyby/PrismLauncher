@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Regression at the API surface: the migration endpoints refuse an UNKNOWN source
 // directory (400 invalid_source, NO decision record — the old "prism" fallback key let a
 // ~/prism-backup style import/decline seal the canonical PrismLauncher source's key away),

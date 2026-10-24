@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Account endpoints: list, offline add, remove, default-selection and the MSA device-code
 // login (start + poll; see DeviceCodeSessionStore for the flow wiring).
 

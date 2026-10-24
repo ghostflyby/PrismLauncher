@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Export + log-file endpoints: POST /instances/{id}/export drives
 // the ExportInstanceDialog/ExportPackDialog/ExportToModListDialog flows as registered tasks
 // (202 + taskId — mrpack via ModrinthPackExportTask, CurseForge via FlamePackExportTask, the

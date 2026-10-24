@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // A minimal, AOT-safe TOML subset parser (hand-rolled replacement for toml++) used by the
 // packwiz metadata layer. It covers exactly the constructs packwiz .pw.toml files (and the
 // writer in Packwiz.cs) use:

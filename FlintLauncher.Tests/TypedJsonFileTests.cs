@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // TypedJsonFile<T> infrastructure tests: load-or-default, the record-merge
 // hook, atomic writes, and the stateVersion evolution gate. The sample record uses a
 // test-local source-generated context — production consumers pass FlintJsonContext's

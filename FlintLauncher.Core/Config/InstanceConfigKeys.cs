@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The instance-side key registry (the instance.json counterpart of
 // FlintConfigKeys): every instance settings key maps to its record member exactly once.
 //

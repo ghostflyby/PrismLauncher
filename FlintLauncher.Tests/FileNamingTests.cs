@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The FileNaming cases of the port of tests/FileSystem_test.cpp: sanitization and
 // on-disk name dedup. RemoveInvalidFilenameChars is FileNaming-internal now (only
 // DirNameFromString sanitizes names), and CheckProblematicPathJava had no production

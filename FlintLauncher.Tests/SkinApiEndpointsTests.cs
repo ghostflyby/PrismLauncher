@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // API-level tests for the account skin endpoints: the profile skin read, the
 // SkinUpload multipart PUT (delegating to the same core SkinUpload the SkinApiTests assert
 // the byte shape of), the skin/cape removals and the CapeChange equip/remove semantics —

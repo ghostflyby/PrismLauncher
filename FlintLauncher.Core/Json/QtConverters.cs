@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // QJsonValue coercion as JSON converters — the typed-serialization counterparts of the
 // JsonUtils Ensure*/Require* families, for third-party formats whose semantics the port
 // must reproduce (the FTB App API pins them in tests). Apply per member with

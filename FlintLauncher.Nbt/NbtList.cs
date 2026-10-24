@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2013, 2015 ljfa-ag
+//
 // Port of libraries/libnbtplusplus/include/tag_list.h and src/tag_list.cpp.
+// libnbt++ is LGPL-3.0-or-later (see COPYING.md); this port is conveyed under GPL-3.0-only per LGPL-3.0 section 2.
 // An ordered list of tags that must all share one element type. An empty list has the
 // undetermined element type NbtTagType.Null; it is serialized with element type End
 // (and its length, which libnbt++ also ignores when reading End, is written as 0).

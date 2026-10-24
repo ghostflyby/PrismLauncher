@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the legacy FTB platform: the modpacks.xml/thirdparty.xml parsing (attributes,
 // oldVersions repair, bugged/broken flags), private pack fetching, the private pack code
 // file round-trip and the end-to-end install of a CDN archive (unzip -> minecraft folder,

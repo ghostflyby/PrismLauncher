@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The secret store model: launcher secrets (accounts tokens, proxy
 // password, API keys) leave the config world entirely — code reads and writes them by NAME
 // through <see cref="ISecretStore"/>, the config format carries no secret fields. The

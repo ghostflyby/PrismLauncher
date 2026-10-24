@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2026 Octol1ttle <l1ttleofficial@outlook.com>
+//
 // Port of launcher/minecraft/launch/EnsureOfflineLibraries.{h,cpp}: fail the launch with a
 // clear message when the instance's libraries are missing (offline mode has no downloads).
 

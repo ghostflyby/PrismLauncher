@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the jar/asset artifact steps: ExtractNatives (synthetic native jar -> natives
 // folder, with the .jnilib -> .dylib Java 8+ rename), ModMinecraftJar::createModdedJar
 // (jar mod merging), ReconstructAssets (virtual assets folder rebuild) and AssetUpdateTask

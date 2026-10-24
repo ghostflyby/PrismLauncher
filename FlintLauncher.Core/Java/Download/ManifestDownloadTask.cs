@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2023-2024 Trial97 <alexandru.tripon97@gmail.com>
+//
 // Port of launcher/java/download/ManifestDownloadTask.{h,cpp}: install a JDK from a Mojang
 // runtime manifest (a "files" object of directory/link/file entries; file entries carry a
 // downloads.raw url + sha1 and an executable flag).

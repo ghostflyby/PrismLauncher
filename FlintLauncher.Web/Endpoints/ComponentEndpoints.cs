@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Component-stack endpoints (the VersionPage): list the instance's
 // component list (PackProfile), change a component's pinned version / important flag,
 // install a loader component, customize (materialize the metadata patch as a local file),

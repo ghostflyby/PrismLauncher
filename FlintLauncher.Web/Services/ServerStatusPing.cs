@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Minimal Minecraft server status ping for the servers-page surface: SRV resolution
 // (launcher/ui/pages/instance/McResolver.cpp semantics over the core SrvResolver) followed by
 // the tiny status handshake of launcher/ui/pages/instance/McClient.cpp (handshake packet +

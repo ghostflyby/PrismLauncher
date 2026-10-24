@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the Log4j XML event parser port (launcher/logs/LogParser.{h,cpp}; guessLevel lives
 // in MessageLevel.cs and is covered by the launch tests): complete/partial/mixed event streams,
 // the required-attribute errors and the buffer bookkeeping across parseNext/parseAvailable.

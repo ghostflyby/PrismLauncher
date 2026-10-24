@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Task endpoints: list/get/abort/proceed/log/SSE-stream over the in-memory FlintTaskRegistry.
 
 using System.Text.Json;

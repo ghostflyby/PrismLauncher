@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Auth flow tests against a local stub server: full device-code MSA run (all 7 steps), the XSTS
 // XErr child-account path, profile 404/500 handling, the device-code expired_token path, the
 // offline no-op flow, the interactive loopback listener exchange and the silent refresh flow.

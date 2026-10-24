@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of modplatform/flame/FlameModIndex.{h,cpp}: load CurseForge project/version JSON
 // documents into the provider-neutral ModIndex models.
 //

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // store-completeness tests: the derivation semantics (manifest-driven, ledger +
 // file existence, local/inactive exclusion, ${arch} expansion, unsafe-ref refusal) at the
 // Core level, and the two routes (GET /store/status/libraries/{versionRef},

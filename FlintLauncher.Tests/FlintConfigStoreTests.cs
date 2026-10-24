@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests: the typed layer-stack fold (upper non-null wins, null
 // inherits, record property defaults single-source), the flint.json store (load-or-default,
 // atomic save, resolved-shape round-trip), the one-shot INI import pipeline (chain probing

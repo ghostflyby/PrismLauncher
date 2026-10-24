@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2026 Octol1ttle <l1ttleofficial@outlook.com>
+//
 // Port of launcher/minecraft/launch/EnsureAvailableMemory.{h,cpp}: warn (or, when the
 // LowMemWarning setting asks for it, abort) when the system is low on RAM. The macOS path
 // checks the kernel memory-pressure level; the other platforms compare the maximum allocation

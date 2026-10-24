@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // API-level tests for the import optional-mods input: POST /instances/import gains
 // `optionalMods` ({manifest path: selected}) and the selection is honored by the Modrinth
 // creation task — an explicitly unselected optional file installs under its ".disabled"

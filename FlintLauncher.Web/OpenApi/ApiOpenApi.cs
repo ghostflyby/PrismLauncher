@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // OpenAPI document shaping for the /api/v1 surface: security schemes, the blanket error
 // responses every endpoint can produce through ApiJson, and small endpoint markers for the
 // handful of shapes Minimal API cannot infer (SSE streams, plain-text bodies, multipart

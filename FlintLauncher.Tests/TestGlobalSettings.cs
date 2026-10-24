@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Shared test double for the user layer (flint.json): a REAL FlintConfigStore over a
 // throwaway file, seeded with the same values the former in-memory SettingsObject stub
 // registered — so the tests' expectations keep holding. StubSet is a typed store Set (it

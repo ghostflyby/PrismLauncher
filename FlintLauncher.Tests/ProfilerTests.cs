@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the profiler tools port (launcher/tools/{JProfiler,JVisualVM,GenericProfiler}): the
 // registry keys from Application.cpp, the registered settings (JProfilerPath/JProfilerPort/
 // JVisualVMPath with the PATH-search default), the factories' check() messages and the argv the

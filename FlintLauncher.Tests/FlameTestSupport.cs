@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Test doubles for the Flame layer tests: a stub CurseForge API/download server (free-port
 // HttpListener pattern, see StubModrinthServer) plus synthetic CurseForge manifest.zip
 // payload builders (manifest.json + overrides) and the file/project/fingerprint JSON

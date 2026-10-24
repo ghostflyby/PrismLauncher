@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2025 Rachel Powers <508861+Ryex@users.noreply.github.com>
+//
 // Port of launcher/logs/LogParser.{h,cpp}: a streaming parser for log4j XML event logs (the
 // XMLLayout appender output Minecraft can produce) mixed with plain text lines. guessLevel()
 // already lives in Launch/MessageLevel.cs; this file adds the event parser itself.

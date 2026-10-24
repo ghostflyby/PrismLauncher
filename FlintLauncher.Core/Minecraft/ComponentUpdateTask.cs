@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of launcher/minecraft/ComponentUpdateTask.{h,cpp} (ComponentUpdateTask_p.h inlined):
 // loads the components of a component list AND resolves dependency issues between them.
 //

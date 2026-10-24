@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // API-level tests for the FTB endpoints: the /modpack/all index pass-through,
 // the per-pack description/version list, the staged pack install against the stub FTB server
 // (reusing the FtbTestSupport fixture builders — the endpoint runs the same

@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of launcher/minecraft/mod/ResourcePack.{h,cpp}: a DataPack whose pack_format maps
 // through the resource pack format table.
 

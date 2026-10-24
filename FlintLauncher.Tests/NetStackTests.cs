@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the Net stack: sinks/validators offline, HttpMetaCache persistence (Prism-compatible
 // JSON index), and live requests against a local HTTP server (304 revalidation, checksums, retry).
 

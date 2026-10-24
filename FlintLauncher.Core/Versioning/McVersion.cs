@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2023 flowln <flowlnlnln@gmail.com>
+// SPDX-FileCopyrightText: 2022 Sefa Eyeoglu <contact@scrumplex.net>
+// SPDX-FileCopyrightText: 2026 Trial97 <alexandru.tripon97@gmail.com>
+//
 // Port of launcher/Version.{h,cpp} — FlexVer ordering (https://git.sleeping.town/exa/FlexVer)
 // with Prism's custom handling of spaces ("1.20 Pre-Release 1").
 // Renamed from `Version` to `McVersion` to avoid ambiguity with System.Version.

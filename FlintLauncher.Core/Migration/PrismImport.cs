@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The Prism→Flint import layer on top of the DataMigration port: a FlintTask that moves or
 // reflink/CoW-copies a typical Prism data directory into the Flint data directory (one
 // whitelist per top-level item, idempotent "destination exists → skip"), a dry-run planner

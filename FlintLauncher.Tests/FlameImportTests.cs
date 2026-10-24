@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // End-to-end tests for the CurseForge import: a synthetic manifest.zip (manifest.json with a
 // forge-40.1.0 loader + overrides/) run through the InstanceImportTask dispatch and the
 // FlameCreationTask, against the stub CurseForge API. Asserts the instance layout, the forge

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // In-process HttpListener stub for the peripheral-feature tests (Imgur upload/album, news feed,
 // paste uploads) — the same free-port pattern as AuthStubServer/NetStackTests' TestHttpServer.
 // Every request is recorded with its raw body bytes (multipart bodies are binary) and the

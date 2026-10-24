@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for MinecraftAccount offline creation: the deterministic offline UUID
 // (Java UUID#nameUUIDFromBytes over "OfflinePlayer:<name>", ported via MD5 + QUuid byte order),
 // the format of the random pieces and the saved JSON.

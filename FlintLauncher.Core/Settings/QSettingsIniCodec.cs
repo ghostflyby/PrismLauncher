@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // C# reimplementation of Qt's INI format codec (QSettings::IniFormat) — READ side only.
 // Verified against golden files produced by real QSettings 6.11 (see
 // tools/qt-ini-golden and tests/FlintLauncher.Tests/TestData/IniFile) plus the per-file dump

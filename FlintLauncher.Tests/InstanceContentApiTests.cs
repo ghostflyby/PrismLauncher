@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Instance-content API tests: host the real web app in-process (same pattern as
 // ApiIntegrationTests) and drive the new instance-content surface — instances search/group
 // filters + /instances/groups, the copy flow (202 task), worlds CRUD/rename/install,

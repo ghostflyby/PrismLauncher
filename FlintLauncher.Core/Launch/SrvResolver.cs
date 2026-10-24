@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Minimal DNS SRV resolver used by the LookupServerAddress launch step. The C++ uses
 // QDnsLookup (and the server browser page uses ui/pages/instance/McResolver.cpp on top of
 // it); .NET has no public SRV API and no DnsClient package is available, so this implements

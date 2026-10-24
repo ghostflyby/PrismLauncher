@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // In-memory correlation store for the MSA device-code endpoints.
 //
 // Each POST /api/v1/accounts/msa/devicecode creates a real MinecraftAccount MSA login flow

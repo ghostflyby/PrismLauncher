@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2023 TheKodeToad <TheKodeToad@proton.me>
+//
 // Port of modplatform/modrinth/ModrinthPackExportTask.{h,cpp}: export an instance to a
 // .mrpack (modrinth.index.json + an overrides/ zip). Mods resolved from local packwiz
 // metadata (or from the Modrinth API by sha512) are referenced by URL in the index and

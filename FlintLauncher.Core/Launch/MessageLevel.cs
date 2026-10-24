@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+// SPDX-FileCopyrightText: 2025 Rachel Powers <508861+Ryex@users.noreply.github.com>
+//
 // Port of launcher/MessageLevel.{h,cpp} plus the LogParser::guessLevel level-detection
 // heuristics (launcher/logs/LogParser.cpp) the launch pipeline uses to tag game output.
 //

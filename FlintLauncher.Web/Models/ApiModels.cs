@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // API DTOs. Explicit records (no dictionaries of object) so the whole surface stays
 // source-generation/AOT clean; every type here is registered in FlintJsonContext.
 

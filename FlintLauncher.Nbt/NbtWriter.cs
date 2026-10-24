@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2013, 2015 ljfa-ag
+//
 // Port of libraries/libnbtplusplus/include/io/stream_writer.h and src/io/stream_writer.cpp
 // (big-endian). Corresponds to nbt::io::stream_writer + nbt::io::write_tag.
+// libnbt++ is LGPL-3.0-or-later (see COPYING.md); this port is conveyed under GPL-3.0-only per LGPL-3.0 section 2.
 //
 // Exception mapping: libnbt++ write-side std::length_error (string/list/array too large)
 // maps to ArgumentOutOfRangeException; std::logic_error (list element type mismatch) maps

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // A directory that the application has materialized: the factories are the single place
 // that creates/verifies existence (the imperative FileOps.EnsureFolderPathExists dance,
 // previously scattered across every consumer), and the handle certifies that this step

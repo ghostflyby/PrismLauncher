@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Modplatform endpoints: the merged per-provider
 // search pass-through (provider = modrinth|flame), the per-provider indexed version lists,
 // and the per-instance mods surface (list / tracked install / tracked update plus the

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Fix-1 tests for the LocalModParseTask port (Minecraft/Resources/LocalModParse.cs): the
 // jar/folder metadata readers (fabric.mod.json, quilt.mod.json, META-INF/mods.toml +
 // neoforge.mods.toml, mcmod.info, forgeversion.properties, litemod.json, nilmod.css) and

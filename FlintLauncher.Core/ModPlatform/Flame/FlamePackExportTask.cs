@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2023 TheKodeToad <TheKodeToad@proton.me>
+// SPDX-FileCopyrightText: 2023 Trial97 <alexandru.tripon97@gmail.com>
+//
 // Port of modplatform/flame/FlamePackExportTask.{h,cpp}: export an instance to a CurseForge
 // zip (manifest.json + modlist.html + an overrides/ zip). Mods resolved from local Flame
 // packwiz metadata (project-id/file-id) or from the API by murmur2 fingerprint are listed

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The modplatform install/update orchestration behind POST /instances/{id}/mods/install and
 // POST /instances/{id}/mods/update — the headless port of the C++ ModrinthPage/FlamePage
 // download-dialog flow (resolve selections -> GetModDependenciesTask -> a ResourceDownloadTask

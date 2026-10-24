@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Java "Modified UTF-8" codec for TAG_String / tag names.
 //
 // This is a deliberate deviation from libnbt++: tag_string.h stores the raw payload

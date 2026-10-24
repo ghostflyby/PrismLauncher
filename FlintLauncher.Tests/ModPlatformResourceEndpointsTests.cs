@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Fix-1 endpoint tests for the resource-type search pass, the categories surface and the
 // description/changelog routes (ModPlatformEndpoints), against the real in-process web host
 // (FlintApiHost) and the provider stub servers from ModrinthTestSupport/FlameTestSupport.

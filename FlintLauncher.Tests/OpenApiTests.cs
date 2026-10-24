@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The OpenAPI document surface: unauthenticated availability (a discovery-plane artifact
 // like /api/v1/info), coverage of the /api/v1 route table (every operation carries a 2xx
 // response and, except the discovery endpoint, the 401 the auth filter produces), and the

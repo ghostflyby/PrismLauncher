@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the LoggedProcess port: line-based stdout/stderr capture (including interleaved
 // output), state transitions, exit codes, kill/abort, stdin writes and working directory
 // handling. Unix-only fixtures (/bin/sh + coreutils); skipped trivially on other hosts.

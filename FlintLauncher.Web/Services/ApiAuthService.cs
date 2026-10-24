@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Local-token authentication for the /api/v1 surface: the token lives for the PROCESS
 // lifetime and never touches the disk (the pre-reform <dataDir>/api-token file is
 // dead; the host owns credential provisioning). Resolution order: an explicit token from

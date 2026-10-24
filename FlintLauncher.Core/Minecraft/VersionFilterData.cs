@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of launcher/minecraft/VersionFilterData.{h,cpp}: the static version tables, copied
 // value-for-value from the C++ constructor. Members the port never reads (the forge
 // installer blacklist, the legacy/java cutoff dates, the fml-lib checksum column) are not

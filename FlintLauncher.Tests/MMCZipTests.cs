@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Focused round-trip tests for the port of launcher/MMCZip.{h,cpp}.
 
 using System.IO.Compression;

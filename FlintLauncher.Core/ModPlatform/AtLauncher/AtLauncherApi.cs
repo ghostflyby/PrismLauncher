@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The ATLauncher API surface used by the platform layer: the packsnew.json index URL
 // (AtlListModel), the per-pack/version Configs.json + Configs.zip and mod/library download
 // URLs (ATLPackInstallTask), the pack image URL (AtlListModel/AtlPage) and the share-code

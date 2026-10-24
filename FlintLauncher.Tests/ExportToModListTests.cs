@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the mod-list export: the exact templates of the C++ ExportToModList for the
 // HTML/Markdown/plain-text/JSON/CSV formats (with every OptionalData flag) and the custom
 // line-template format, including the metadata-version fallback and the escaping rules.

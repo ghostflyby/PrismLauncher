@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of launcher/minecraft/auth/steps/GetSkinStep.{h,cpp}.
 //
 // NOTE: upstream always reports success ("Got skin"), even when the download failed.

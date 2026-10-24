@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Identity and move-stable path re-derivation for watched roots. Platforms without
 // anchor support defer to the path-based backoff, so every anchor test gates on the
 // platform.

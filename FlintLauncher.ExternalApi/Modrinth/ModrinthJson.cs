@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Strongly-typed wire models for the Modrinth v2 API and the .mrpack index format, with the
 // source-generated serializer context that owns them (reflection-based serialization never
 // enters the picture). Shapes and nullability follow the labrinth OpenAPI document: the

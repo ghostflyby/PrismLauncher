@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Shared fixtures for the launch pipeline tests: a settings stub with every key the
 // launch layer reads (mirroring InstanceTests' GlobalSettingsStub) and a MinecraftInstance
 // factory that seeds a complete net.minecraft patch so PackProfile::getProfile() builds a

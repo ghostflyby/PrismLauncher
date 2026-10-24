@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The unified migration engine: the Prism→Flint import pipeline
 // (FileTransfer merge semantics + whitelists) is promoted to a general engine whose SOURCES
 // are profiled. Two profiles:

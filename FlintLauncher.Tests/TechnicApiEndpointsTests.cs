@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // API-level tests for the Technic endpoints: the search/trending pass-through
 // (the ?build= request param, the "vanilla" slug exclusion, the icon mapping), the pack
 // metadata with the url-vs-solder detection (zip vs solder flavor) and both install shapes

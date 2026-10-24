@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Opt-in background account refresh: on startup (after a small delay) and on a fixed interval,
 // re-run the auth flow for every account whose token is stale (MinecraftAccount.ShouldRefresh).
 // Disabled by default for C++ parity — enable with FLINT_ACCOUNT_REFRESH_MINUTES=<n>.

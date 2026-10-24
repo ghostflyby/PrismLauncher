@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The injectable filesystem model. The C++ application chdir'd into its data directory at
 // startup and several subsystems addressed files with data-dir-relative literals ("meta",
 // "assets/indexes", "instgroups.json", ...); the port inherited that via the process working

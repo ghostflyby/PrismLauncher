@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The name-derivation helpers of launcher/FileSystem.{h,cpp}: sanitizing user strings into
 // file names (FS::RemoveInvalidPathChars) and picking a free name on disk
 // (FS::DirNameFromString, FS::getUniqueResourceName). Names travel as strings; the folders

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The launcher-state.json store: one TypedJsonFile per state
 // root, load-or-default with the stateVersion evolution gate, and immediate atomic writes on
 // every mutation. The loaded record lives in <see cref="Current"/> so the

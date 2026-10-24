@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The settings-layer dynamic-JSON text helpers (the tail of the former JsonUtils, relocated
 // next to their only consumers): the INI-era settings values that carry arbitrary JSON
 // strings — the custom environment QVariantMap (MinecraftInstance's "Env") and the

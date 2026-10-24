@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Test doubles for the FTB App API layer tests: a stub modpacks.ch server (free-port
 // HttpListener pattern, see AtlTestSupport) serving /modpack/all, /modpack/{id} and
 // /modpack/{id}/{version} plus file downloads, and a synthetic pack/version fixture with

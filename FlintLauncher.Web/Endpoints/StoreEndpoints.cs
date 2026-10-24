@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The /store surface: the layered completeness API. The outer
 // layer is the manifest-driven derived view (the dpkg --verify model) served here:
 //   GET /store/status/libraries/{versionRef} — the meta version manifest's libraries[]

@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022 Jamie Mansfield <jmansfield@cadixdev.org>
+//
 // Port of modplatform/atlauncher/ATLShareCode.{h,cpp}: the {AtlApiBaseUrl}share-codes/{code}
 // response model (the optional-mod selection encoded by the ATLauncher website). The wire
 // shape arrives as the AtlShareCodeResponseJson probe records (source-generated context in

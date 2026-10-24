@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Source-generated log events for the diagnostics channel ([LoggerMessage] emits plain
 // formatting code — no reflection-based template parsing, AOT-safe and allocation-light).
 // Grouped by component; event ids are unique within each class. The points trace exactly

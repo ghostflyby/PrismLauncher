@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2026 Octol1ttle <l1ttleofficial@outlook.com>
+//
 // Port of launcher/HardwareInfo.{h,cpp} (the parts the launch pipeline consumes) and the
 // MacOSHardwareInfo memory-pressure surface.
 //

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The launch pipeline's injected dependencies. The C++ steps reached their environment
 // through the APPLICATION singleton (icons, settings, meta cache, jar paths, dialogs); the
 // port first approximated that with static hooks (settable static Action?/Func?/flags).

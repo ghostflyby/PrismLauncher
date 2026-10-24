@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the BaseInstance/MinecraftInstance ports over the typed layer stack:
 // instance.json (settings+identity) and instance-state.json (the runtime time trio) —
 // everything synthetic (temp dirs). The dual-track guarantee is exercised directly: a

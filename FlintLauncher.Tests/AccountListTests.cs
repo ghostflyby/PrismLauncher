@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the AccountList port: accounts.json round-trip in the exact upstream layout
 // ({"accounts": [...], "formatVersion": 3} with per-account "active" flags), default-account
 // activation and add/remove/replace semantics.

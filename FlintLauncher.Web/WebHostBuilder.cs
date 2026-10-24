@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The ASP.NET Core Minimal API host factory: BuildWebApplication(args) resolves the five
 // roots (three-layer flags: precise > home > platform default), fail-fast-probes them
 // BEFORE any core service is built, wires the core singletons and maps the /api/v1

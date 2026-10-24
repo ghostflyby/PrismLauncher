@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The JVM detection pipeline, fully on JdkFind facilities: LocateAsync is the primary
 // source (validated installations whose release file is enriched by the runtime probe),
 // and the C++-parity legacy/launcher scan survives only as a candidate producer for what

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The moved-root recovery of the watch layer, driven through the synchronous
 // anchor/Rearm path — no test waits on real watcher timing.
 

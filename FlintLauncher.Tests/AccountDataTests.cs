@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the AccountData port: v3 wire resume/save round-trips on the exact upstream key
 // layout, the legacy "offline" ygg token migration, the entitlement fallback from profile
 // validity, the http->https textures rewrite and unknown-type rejection. The wire is the

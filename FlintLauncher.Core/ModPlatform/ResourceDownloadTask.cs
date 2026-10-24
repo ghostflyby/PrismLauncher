@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2023 flowln <flowlnlnln@gmail.com>
+// SPDX-FileCopyrightText: 2022 Sefa Eyeoglu <contact@scrumplex.net>
+//
 // Port of launcher/ResourceDownloadTask.{h,cpp}: download an IndexedVersion's primary file
 // into the target folder model's directory and keep the per-mod metadata (.pw.toml) in
 // sync. A SequentialTask with (optionally, when isIndexed) the LocalResourceUpdateTask

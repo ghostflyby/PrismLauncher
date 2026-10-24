@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // In-process HttpListener stub for the auth/skin endpoints (same pattern as NetStackTests'
 // TestHttpServer). Every request is recorded (method, path, query, headers, body) and the
 // endpoint behaviour is driven by the knobs, so the whole MSA flow can be exercised without

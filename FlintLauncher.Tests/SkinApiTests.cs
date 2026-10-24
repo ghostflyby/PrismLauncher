@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Skin API tests: the multipart PUT shape of SkinUpload (boundary, parts, ordering), the
 // DELETE of the active skin and the cape equip/remove endpoints against the local stub server.
 

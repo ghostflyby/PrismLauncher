@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for MinecraftInstance::javaArguments(): Xms/Xmx orderings, FirstThreadOnMacOS on
 // macOS, the PermGen hack for old Java and the --add-opens online-fixes rule.
 

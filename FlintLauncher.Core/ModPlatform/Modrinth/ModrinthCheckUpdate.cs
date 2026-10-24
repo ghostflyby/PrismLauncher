@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of modplatform/modrinth/ModrinthCheckUpdate.{h,cpp}: hash-based update detection.
 // For every mod (its installed hash taken from the packwiz metadata), ask Modrinth for the
 // latest version matching the game versions (+ loader, in loader passes); a mod has an

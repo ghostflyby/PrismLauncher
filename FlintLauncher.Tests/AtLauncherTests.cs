@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the ATLauncher platform: packsnew.json index parsing, share-code responses,
 // and the end-to-end pack install (Configs.json fetch -> Configs.zip download+extraction
 // with sha1 verification -> md5-verified mod downloads -> instance creation with the

@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2023-2024 Trial97 <alexandru.tripon97@gmail.com>
+//
 // Port of launcher/java/download/SymlinkTask.{h,cpp}: on macOS an extracted JDK layout is
 // <target>/Contents/Home/bin/java, but the launcher expects <target>/bin/java. The task finds
 // the Contents/Home folder and symlinks everything inside it into the target folder.

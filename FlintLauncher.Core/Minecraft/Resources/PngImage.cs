@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Stand-in for the QImage::fromData validation the C++ parse tasks perform on pack.png.
 // Qt decodes the bytes with an image codec; this port reads the PNG structure directly
 // (signature + IHDR chunk) to validate the data and extract the dimensions, with no

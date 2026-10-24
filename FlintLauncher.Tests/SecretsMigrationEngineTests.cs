@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the new state-cluster infrastructure: the FileSecretStore (
 // data/secrets.json, 0600, named get/set/delete) and the migration engine (profiles +
 // auto-run candidates + the flint-legacy eager remount pass with its bare-ledger cleanup).

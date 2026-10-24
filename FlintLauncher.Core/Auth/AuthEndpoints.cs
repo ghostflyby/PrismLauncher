@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Endpoint-injection options (Flint deviation, no upstream counterpart): the C++ auth steps
 // hardcode the Microsoft/Xbox/Minecraft service URLs (login.microsoftonline.com,
 // user.auth.xboxlive.com, xsts.auth.xboxlive.com, api.minecraftservices.com). The defaults

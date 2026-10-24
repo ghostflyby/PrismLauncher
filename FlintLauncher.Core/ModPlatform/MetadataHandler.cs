@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022 flowln <flowlnlnln@gmail.com>
+// SPDX-FileCopyrightText: 2023 Trial97 <alexandru.tripon97@gmail.com>
+//
 // Port of minecraft/mod/MetadataHandler.h: the per-mod metadata layer facade. The storage
 // backend is the packwiz index (Metadata::ModStruct == Packwiz::V1::Mod), like upstream.
 //

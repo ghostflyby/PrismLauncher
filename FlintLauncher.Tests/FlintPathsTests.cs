@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Five-root layout tests: the home-layout factory, the explicit named
 // factory, the three-layer flag resolution (precise > home > platform default, each with
 // its env), the --data-dir semantics narrowing, the fail-fast probe, and the logs

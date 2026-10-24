@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The per-source migration decision records: the old "<source>_nomigrate.txt"
 // empty marker becomes one auditable JSON file per source,
 // <state-root>/migration/<source>.json = { source, decision: imported|declined, at, mode,

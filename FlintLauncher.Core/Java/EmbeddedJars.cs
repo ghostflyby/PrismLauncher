@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // On-demand extraction of the embedded launcher jars (NewLaunch/NewLaunchLegacy, built by
 // the BuildJavaJars MSBuild target (javac/jar via Exec) and embedded into this assembly).
 // Extracted to the per-user temp cache so LauncherJars finds them without any external

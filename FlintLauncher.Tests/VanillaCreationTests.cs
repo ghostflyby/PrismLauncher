@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the VanillaCreationTask port: folder layout, the instance.json identity keys and
 // the initial mmc-pack.json, verified through the real PackProfile loader. A fresh
 // instance is Flint format from birth — no instance.cfg is written.

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the Modrinth layer: API request shapes (facets JSON, version-file-by-hash,
 // multiple-hash POST), the .mrpack import end-to-end on a synthetic pack built with
 // MMCZip (index + overrides + mods with correct hashes) -> instance created, files placed,

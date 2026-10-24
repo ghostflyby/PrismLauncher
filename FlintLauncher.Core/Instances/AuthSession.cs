@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+// SPDX-FileCopyrightText: 2026 Octol1ttle <l1ttleofficial@outlook.com>
+//
 // Port of launcher/minecraft/auth/AuthSession.{h,cpp} (data subset) and launcher/LaunchMode.h.
 // Only the data members and helpers the instance/launch layer consumes are ported; the
 // MinecraftAccount machinery that fills the session in is the auth layer's business.

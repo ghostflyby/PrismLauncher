@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The single settings-key registry: every global settings key maps
 // to its record domain member exactly once — GET/PUT /settings (the wire groups reference
 // this table, the old Web Groups value-table retired), the instance-side adapter view
