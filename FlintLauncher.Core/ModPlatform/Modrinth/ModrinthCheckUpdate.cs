@@ -11,13 +11,12 @@
 //    not ported yet; the update record carries the resolved IndexedVersion instead.
 //  - The dependency list (m_deps) is not ported.
 
+using System.Text.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
-
-using System.Text.Json;
 using FlintLauncher.ExternalApi;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;

@@ -17,9 +17,8 @@ using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Versioning;
-using TruePath;
-
 using FlintLauncher.ExternalApi;
+using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 

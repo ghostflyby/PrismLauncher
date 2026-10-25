@@ -31,10 +31,9 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Tasks;
+using FlintLauncher.ExternalApi;
 using TruePath;
 using TruePath.SystemIo;
-
-using FlintLauncher.ExternalApi;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 

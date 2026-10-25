@@ -329,6 +329,9 @@ public static partial class HardwareInfo
     [SupportedOSPlatform("macos")]
     private static partial int SysctlByName(string name, Span<byte> oldValue, ref nuint oldSize, nint newValue, nuint newValueSize);
 
+    // Field names mirror MEMORYSTATUSEX so the layout can be checked against the Windows
+    // SDK header; renaming them to the project convention would break that correspondence.
+#pragma warning disable IDE1006
     [StructLayout(LayoutKind.Sequential)]
     [SupportedOSPlatform("windows")]
     private struct MemoryStatusEx
@@ -343,6 +346,7 @@ public static partial class HardwareInfo
         public ulong ullAvailVirtual;
         public ulong ullAvailExtendedVirtual;
     }
+#pragma warning restore IDE1006
 
     // ref, not out: the LibraryImport stub zeroes an out parameter before the call, which
     // would wipe the caller-set dwLength GlobalMemoryStatusEx requires on entry

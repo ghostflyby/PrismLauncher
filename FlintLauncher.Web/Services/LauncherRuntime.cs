@@ -15,13 +15,13 @@ using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.ExternalApi;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Screenshots;
 using FlintLauncher.Core.Secrets;
 using FlintLauncher.Core.Skins;
 using FlintLauncher.Core.State;
+using FlintLauncher.ExternalApi;
 using FlintLauncher.Web.Models;
 using TruePath;
 
