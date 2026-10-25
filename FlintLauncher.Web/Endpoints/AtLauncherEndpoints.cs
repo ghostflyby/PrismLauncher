@@ -146,7 +146,7 @@ public static class AtLauncherEndpoints
         }
 
         // the URL builders concatenate directly onto the base, so keep the slash
-        return new AtLauncherApi(atlauncher.Net)
+        return new AtLauncherApi(atlauncher.Http, atlauncher.Settings)
         {
             DownloadServerUrl = trimmed.EndsWith('/') ? trimmed : trimmed + "/",
             // (ApiBaseUrl is only read by the share-code flow, never by the install)

@@ -54,24 +54,24 @@ public class PasteUploadTests : IDisposable
     {
         // empty url -> provider default base + endpoint path
         Assert.Equal("https://hst.sh/documents",
-            new PasteUpload(LogLine, "", PasteUpload.PasteType.Hastebin, TestNet.Stack).EndpointUrl);
+            new PasteUpload(LogLine, "", PasteUpload.PasteType.Hastebin, TestNet.Http, TestNet.Settings).EndpointUrl);
         Assert.Equal("https://0x0.st",
-            new PasteUpload(LogLine, "", PasteUpload.PasteType.NullPointer, TestNet.Stack).EndpointUrl);
+            new PasteUpload(LogLine, "", PasteUpload.PasteType.NullPointer, TestNet.Http, TestNet.Settings).EndpointUrl);
         Assert.Equal("https://api.mclo.gs/1/log",
-            new PasteUpload(LogLine, "", PasteUpload.PasteType.Mclogs, TestNet.Stack).EndpointUrl);
+            new PasteUpload(LogLine, "", PasteUpload.PasteType.Mclogs, TestNet.Http, TestNet.Settings).EndpointUrl);
 
         // custom url -> base + endpoint path
         Assert.Equal(_server.BaseUrl + "/documents",
-            new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.Hastebin, TestNet.Stack).EndpointUrl);
+            new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.Hastebin, TestNet.Http, TestNet.Settings).EndpointUrl);
         Assert.Equal(_server.BaseUrl,
-            new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.NullPointer, TestNet.Stack).EndpointUrl);
+            new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.NullPointer, TestNet.Http, TestNet.Settings).EndpointUrl);
 
         // HACK: the official paste.gg instance does not follow its own documented api path
         Assert.Equal("https://api.paste.gg/v1/pastes",
-            new PasteUpload(LogLine, "", PasteUpload.PasteType.PasteGg, TestNet.Stack).EndpointUrl);
+            new PasteUpload(LogLine, "", PasteUpload.PasteType.PasteGg, TestNet.Http, TestNet.Settings).EndpointUrl);
         // ... but a custom paste.gg base keeps the endpoint path suffix
         Assert.Equal(_server.BaseUrl + "/api/v1/pastes",
-            new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.PasteGg, TestNet.Stack).EndpointUrl);
+            new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.PasteGg, TestNet.Http, TestNet.Settings).EndpointUrl);
     }
 
     // ---------------------------------------------------------------- AnonymizeLog.cpp
@@ -125,7 +125,7 @@ public class PasteUploadTests : IDisposable
     [Fact]
     public void Constructor_Anonymizes_The_Log()
     {
-        var upload = new PasteUpload("welcome /home/alice/minecraft", "", PasteUpload.PasteType.Hastebin, TestNet.Stack);
+        var upload = new PasteUpload("welcome /home/alice/minecraft", "", PasteUpload.PasteType.Hastebin, TestNet.Http, TestNet.Settings);
         Assert.Equal("welcome /home/********/minecraft", upload.Log);
     }
 
@@ -136,7 +136,7 @@ public class PasteUploadTests : IDisposable
     {
         _server.Responder = _ => (200, "http://127.0.0.1:1/abcde\n", "OK");
 
-        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.NullPointer, TestNet.Stack);
+        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.NullPointer, TestNet.Http, TestNet.Settings);
         await upload.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, upload.State);
@@ -162,7 +162,7 @@ public class PasteUploadTests : IDisposable
     {
         _server.Responder = _ => (200, """{"key":"61c6c1ad"}""", "OK");
 
-        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.Hastebin, TestNet.Stack);
+        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.Hastebin, TestNet.Http, TestNet.Settings);
         await upload.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, upload.State);
@@ -178,7 +178,7 @@ public class PasteUploadTests : IDisposable
     {
         _server.Responder = _ => (200, """{"success":true,"url":"https://mclo.gs/XYZ"}""", "OK");
 
-        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.Mclogs, TestNet.Stack);
+        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.Mclogs, TestNet.Http, TestNet.Settings);
         await upload.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, upload.State);
@@ -196,7 +196,7 @@ public class PasteUploadTests : IDisposable
     {
         _server.Responder = _ => (200, """{"status":"success","result":{"id":"abcdef"}}""", "OK");
 
-        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.PasteGg, TestNet.Stack);
+        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.PasteGg, TestNet.Http, TestNet.Settings);
         await upload.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, upload.State);
@@ -227,7 +227,7 @@ public class PasteUploadTests : IDisposable
     public async Task Hastebin_Malformed_Response_Fails()
     {
         _server.Responder = _ => (200, """{"no_key":1}""", "OK");
-        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.Hastebin, TestNet.Stack);
+        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.Hastebin, TestNet.Http, TestNet.Settings);
         await upload.StartAsync();
         Assert.Equal(TaskState.Failed, upload.State);
         Assert.Equal($"Error: {_server.BaseUrl}/documents returned a malformed response body", upload.FailReason);
@@ -237,7 +237,7 @@ public class PasteUploadTests : IDisposable
     public async Task Mclogs_Provider_Error_Fails()
     {
         _server.Responder = _ => (200, """{"success":false,"error":"logs do not exist"}""", "OK");
-        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.Mclogs, TestNet.Stack);
+        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.Mclogs, TestNet.Http, TestNet.Settings);
         await upload.StartAsync();
         Assert.Equal(TaskState.Failed, upload.State);
         Assert.Equal($"Error: {_server.BaseUrl}/1/log returned an error: logs do not exist", upload.FailReason);
@@ -247,7 +247,7 @@ public class PasteUploadTests : IDisposable
     public async Task Mclogs_Malformed_Response_Fails()
     {
         _server.Responder = _ => (200, """{"unexpected":true}""", "OK");
-        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.Mclogs, TestNet.Stack);
+        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.Mclogs, TestNet.Http, TestNet.Settings);
         await upload.StartAsync();
         Assert.Equal(TaskState.Failed, upload.State);
         Assert.Equal($"Error: {_server.BaseUrl}/1/log returned a malformed response body", upload.FailReason);
@@ -257,7 +257,7 @@ public class PasteUploadTests : IDisposable
     public async Task PasteGG_Error_Code_Includes_Error_And_Message()
     {
         _server.Responder = _ => (200, """{"status":"error","error":"expired","message":"too old"}""", "OK");
-        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.PasteGg, TestNet.Stack);
+        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.PasteGg, TestNet.Http, TestNet.Settings);
         await upload.StartAsync();
         Assert.Equal(TaskState.Failed, upload.State);
         Assert.Equal($"Error: {_server.BaseUrl}/api/v1/pastes returned an error code: expired\nError message: too old",
@@ -268,7 +268,7 @@ public class PasteUploadTests : IDisposable
     public async Task PasteGG_Error_Code_Defaults_Message_To_None()
     {
         _server.Responder = _ => (200, """{"status":"error","error":"nope"}""", "OK");
-        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.PasteGg, TestNet.Stack);
+        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.PasteGg, TestNet.Http, TestNet.Settings);
         await upload.StartAsync();
         Assert.Equal(TaskState.Failed, upload.State);
         Assert.Contains("Error message: none", upload.FailReason);
@@ -286,7 +286,7 @@ public class PasteUploadTests : IDisposable
                      (PasteUpload.PasteType.PasteGg, "pasteGG"),
                  })
         {
-            var upload = new PasteUpload(LogLine, _server.BaseUrl, type, TestNet.Stack);
+            var upload = new PasteUpload(LogLine, _server.BaseUrl, type, TestNet.Http, TestNet.Settings);
             await upload.StartAsync();
             Assert.Equal(TaskState.Failed, upload.State);
             Assert.Contains($"Failed to parse response from {provider} server: expected JSON but got an invalid response.",
@@ -298,7 +298,7 @@ public class PasteUploadTests : IDisposable
     public async Task Non_2xx_Status_Fails_With_The_Cpp_Message()
     {
         _server.Responder = _ => (502, "", "Bad Gateway");
-        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.Hastebin, TestNet.Stack);
+        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.Hastebin, TestNet.Http, TestNet.Settings);
         await upload.StartAsync();
         Assert.Equal(TaskState.Failed, upload.State);
         Assert.Equal($"Error: {_server.BaseUrl}/documents returned unexpected status code 502 Bad Gateway",
@@ -310,7 +310,7 @@ public class PasteUploadTests : IDisposable
     public async Task Status_201_Passes_The_Gate()
     {
         _server.Responder = _ => (201, "https://0x0.st/ok\n", "Created");
-        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.NullPointer, TestNet.Stack);
+        var upload = new PasteUpload(LogLine, _server.BaseUrl, PasteUpload.PasteType.NullPointer, TestNet.Http, TestNet.Settings);
         await upload.StartAsync();
         Assert.Equal(TaskState.Succeeded, upload.State);
         Assert.Equal("https://0x0.st/ok", upload.PasteLink);

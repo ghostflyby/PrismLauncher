@@ -57,7 +57,8 @@ public enum HttpMethodValue
 
 public sealed class NetRequest(
     Uri url,
-    NetStack stack,
+    HttpClient http,
+    NetSettings settings,
     RequestOptions options = RequestOptions.NoOptions,
     HttpMethodValue method = HttpMethodValue.Get,
     byte[]? postData = null,
@@ -66,7 +67,8 @@ public sealed class NetRequest(
 {
     public const int MaxAutoRetries = 3;
 
-    private readonly NetStack _stack = stack;
+    private readonly HttpClient _http = http;
+    private readonly NetSettings _settings = settings;
 
     private readonly List<(string name, string value)> _headers = [];
     private Sink? _sink;
@@ -93,17 +95,17 @@ public sealed class NetRequest(
 
     // ---------------------------------------------------------------- factories
 
-    /// <summary>Port of Net::Request::makeCached. The download rides <paramref name="stack"/>
-    /// when one is named, else the cache's own <see cref="HttpMetaCache.Net"/> — the cache is
-    /// the download plane.</summary>
-    public static NetRequest MakeCached(HttpMetaCache cache, Uri url, MetaEntry entry, RequestOptions options = RequestOptions.NoOptions, NetStack? stack = null)
+    /// <summary>Port of Net::Request::makeCached. The download rides the named client pair
+    /// when one is given, else the cache's own client pair — the cache is the download
+    /// plane.</summary>
+    public static NetRequest MakeCached(HttpMetaCache cache, Uri url, MetaEntry entry, RequestOptions options = RequestOptions.NoOptions, HttpClient? http = null, NetSettings? settings = null)
     {
         var checksum = new ChecksumValidator(HashAlgorithmName.MD5, entry.Md5Sum.Length == 0 ? null : Convert.FromHexString(entry.Md5Sum));
         var sink = new MetaCacheSink(entry, checksum, isEternal: options.HasFlag(RequestOptions.MakeEternal))
         {
             MetaCache = cache,
         };
-        var request = new NetRequest(url, stack ?? cache.Net, options | RequestOptions.AcceptLocalFiles)
+        var request = new NetRequest(url, http ?? cache.Http, settings ?? cache.Settings, options | RequestOptions.AcceptLocalFiles)
         {
             RequestSink = sink,
             MetaCache = cache,
@@ -114,26 +116,26 @@ public sealed class NetRequest(
     }
 
     /// <summary>Port of Net::Request::makeByteArray; the response lands in <see cref="Body"/>.</summary>
-    public static NetRequest MakeByteArray(Uri url, NetStack stack, RequestOptions options = RequestOptions.NoOptions)
+    public static NetRequest MakeByteArray(Uri url, HttpClient http, NetSettings settings, RequestOptions options = RequestOptions.NoOptions)
     {
         var sink = new ByteArraySink();
-        return new NetRequest(url, stack, options)
+        return new NetRequest(url, http, settings, options)
         {
             RequestSink = sink,
         };
     }
 
-    public static NetRequest MakeByteArray(Uri url, byte[] postData, NetStack stack, RequestOptions options = RequestOptions.NoOptions)
+    public static NetRequest MakeByteArray(Uri url, byte[] postData, HttpClient http, NetSettings settings, RequestOptions options = RequestOptions.NoOptions)
     {
-        return new NetRequest(url, stack, options, HttpMethodValue.Post, postData)
+        return new NetRequest(url, http, settings, options, HttpMethodValue.Post, postData)
         {
             RequestSink = new ByteArraySink(),
         };
     }
 
-    public static NetRequest MakeFile(Uri url, AbsolutePath path, NetStack stack, RequestOptions options = RequestOptions.NoOptions)
+    public static NetRequest MakeFile(Uri url, AbsolutePath path, HttpClient http, NetSettings settings, RequestOptions options = RequestOptions.NoOptions)
     {
-        return new NetRequest(url, stack, options)
+        return new NetRequest(url, http, settings, options)
         {
             RequestSink = new FileSink(path),
         };
@@ -150,9 +152,11 @@ public sealed class NetRequest(
     {
         // Port of the NetJob manual-retry gate (NumberOfManualRetries): a request that failed
         // on the network level (connection refused/reset, DNS, the RequestTimeout idle timeout)
-        // is retried up to the stack's ManualRetries times before it finally fails. HTTP error
-        // statuses are not retried here (the AutoRetry option covers 429/503 like the C++).
+        // is retried up to the settings' ManualRetries times before it finally fails. HTTP
+        // error statuses are not retried here (the AutoRetry option covers 429/503 like the
+        // C++).
         var attempt = 0;
+        var retries = _settings.Current.ManualRetries;
         while (true)
         {
             try
@@ -160,10 +164,10 @@ public sealed class NetRequest(
                 await ExecuteOnceAsync(cancellationToken).ConfigureAwait(false);
                 return;
             }
-            catch (HttpRequestException e) when (attempt < _stack.ManualRetries &&
+            catch (HttpRequestException e) when (attempt < retries &&
                                                  !cancellationToken.IsCancellationRequested)
             {
-                EmitStatus($"Network error ({e.Message}); retrying ({_stack.ManualRetries - attempt} tries left)");
+                EmitStatus($"Network error ({e.Message}); retrying ({retries - attempt} tries left)");
             }
 
             attempt++;
@@ -172,6 +176,7 @@ public sealed class NetRequest(
 
     private async Task ExecuteOnceAsync(CancellationToken cancellationToken)
     {
+        var requestTimeout = _settings.Current.RequestTimeout;
         var spec = new NetRequestSpec();
         foreach (var (name, value) in _headers)
         {
@@ -186,7 +191,7 @@ public sealed class NetRequest(
 
         void ArmIdleTimer(CancellationTokenSource source)
         {
-            source.CancelAfter(_stack.RequestTimeout);
+            source.CancelAfter(requestTimeout);
         }
 
         try
@@ -213,7 +218,7 @@ public sealed class NetRequest(
                 }
 
                 ArmIdleTimer(timeoutSource);
-                response = await _stack.Client.SendAsync(
+                response = await _http.SendAsync(
                     message,
                     HttpCompletionOption.ResponseHeadersRead,
                     timeoutSource.Token).ConfigureAwait(false);
@@ -355,7 +360,7 @@ public sealed class NetRequest(
             // our inactivity timer fired: surface as a network error so the manual-retry gate
             // sees it (the C++ setTransferTimeout surfaces as OperationCanceledError too)
             throw new HttpRequestException(
-                $"transfer timed out: no data for {_stack.RequestTimeout.TotalSeconds:F0} seconds (RequestTimeout)");
+                $"transfer timed out: no data for {requestTimeout.TotalSeconds:F0} seconds (RequestTimeout)");
         }
     }
 

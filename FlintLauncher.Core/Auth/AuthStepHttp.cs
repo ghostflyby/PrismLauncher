@@ -97,12 +97,19 @@ public static class AuthStepHttp
 {
     public const int MaxAutoRetries = 3;
 
-    public static async Task<AuthStepResponse> SendAsync(AuthStepRequest request, NetStack net,
-        CancellationToken cancellationToken)
+    public static async Task<AuthStepResponse> SendAsync(AuthStepRequest request, HttpClient http,
+        NetSettings settings, CancellationToken cancellationToken)
     {
+        var requestTimeout = settings.Current.RequestTimeout;
         var retries = 0;
         while (true)
         {
+            // RequestTimeout port (QNetworkReply::setTransferTimeout): the persistent client
+            // carries no total-duration timeout, so each phase (headers, body) gets an
+            // inactivity window instead
+            using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutSource.CancelAfter(requestTimeout);
+
             using var message = new HttpRequestMessage(
                 request.Body is null ? HttpMethod.Get : HttpMethod.Post, request.Url);
             if (request.Body is not null)
@@ -126,16 +133,16 @@ public static class AuthStepHttp
             HttpResponseMessage response;
             try
             {
-                response = await net.Client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
-                    cancellationToken).ConfigureAwait(false);
+                response = await http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
+                    timeoutSource.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw; // user abort: let the task machinery route this to the aborted state
             }
-            catch (TaskCanceledException)
+            catch (OperationCanceledException)
             {
-                // HttpClient timeout
+                // the RequestTimeout window elapsed before the headers arrived
                 return new AuthStepResponse
                 {
                     Error = (int)QtNetworkError.TimeoutError,
@@ -176,11 +183,20 @@ public static class AuthStepHttp
                 byte[] body;
                 try
                 {
-                    body = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+                    timeoutSource.CancelAfter(requestTimeout);
+                    body = await response.Content.ReadAsByteArrayAsync(timeoutSource.Token).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
                     throw;
+                }
+                catch (OperationCanceledException)
+                {
+                    return new AuthStepResponse
+                    {
+                        Error = (int)QtNetworkError.TimeoutError,
+                        ErrorString = "Operation timed out",
+                    };
                 }
                 catch (Exception)
                 {

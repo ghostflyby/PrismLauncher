@@ -7,7 +7,7 @@
 //
 // BuildConfig.FTB_API_BASE_URL became injected instance state: BaseUrl is per-instance
 // (tests construct their own client pointed at a stub; the install endpoint derives one
-// for its serverUrl override — see FtbEndpoints); the client rides the injected NetStack
+// for its serverUrl override — see FtbEndpoints); the client rides the injected persistent client pair
 // (LauncherRuntime.Ftb — see the Modrinth/Flame de-singletoning for the same story). The
 // parsers are pure helpers and stay static; the wire shapes deserialize through the
 // source-generated FtbJsonContext (the FTB models carry their annotations themselves).
@@ -36,14 +36,16 @@ public sealed class FtbPackIndexFile
 [JsonSerializable(typeof(FtbVersion))]
 internal sealed partial class FtbJsonContext : JsonSerializerContext;
 
-public sealed class FtbApi(NetStack net)
+public sealed class FtbApi(HttpClient http, NetSettings settings)
 {
     /// <summary>BuildConfig.FTB_API_BASE_URL (per-instance; tests construct a client
     /// pointed at their stub).</summary>
     public string BaseUrl { get; init; } = FlintConfig.Default.FtbApiBaseUrl;
 
     /// <summary>The network stack this client's requests go through.</summary>
-    public NetStack Net { get; } = net;
+    public HttpClient Http { get; } = http;
+
+    public NetSettings Settings { get; } = settings;
 
     // ------------------------------------------------------------------ URL builders
 
@@ -62,7 +64,7 @@ public sealed class FtbApi(NetStack net)
     public (NetJob Job, NetRequest Request) FetchModpacks()
     {
         var netJob = new NetJob("Ftb::Request");
-        var request = NetRequest.MakeByteArray(new Uri(ModpacksUrl()), stack: Net);
+        var request = NetRequest.MakeByteArray(new Uri(ModpacksUrl()), http: Http, settings: Settings);
         netJob.AddNetRequest(request);
         return (netJob, request);
     }
@@ -71,7 +73,7 @@ public sealed class FtbApi(NetStack net)
     public (NetJob Job, NetRequest Request) FetchModpack(int packId)
     {
         var netJob = new NetJob("Ftb::Search");
-        var request = NetRequest.MakeByteArray(new Uri(ModpackUrl(packId)), stack: Net);
+        var request = NetRequest.MakeByteArray(new Uri(ModpackUrl(packId)), http: Http, settings: Settings);
         netJob.AddNetRequest(request);
         return (netJob, request);
     }
@@ -80,7 +82,7 @@ public sealed class FtbApi(NetStack net)
     public (NetJob Job, NetRequest Request) FetchVersion(int packId, int versionId)
     {
         var netJob = new NetJob("FTB::VersionFetch");
-        var request = NetRequest.MakeByteArray(new Uri(VersionUrl(packId, versionId)), stack: Net);
+        var request = NetRequest.MakeByteArray(new Uri(VersionUrl(packId, versionId)), http: Http, settings: Settings);
         netJob.AddNetRequest(request);
         return (netJob, request);
     }

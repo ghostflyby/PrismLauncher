@@ -49,7 +49,7 @@ public static class SkinEndpoints
 
         // ------------------------------------------------- accounts/{id}/skin (upload)
         api.MapPut("/accounts/{profileId}/skin", async Task<IResult> (string profileId,
-            HttpRequest request, AccountList accounts, AuthEndpointsOptions auth, NetStack net) =>
+            HttpRequest request, AccountList accounts, AuthEndpointsOptions auth, HttpClient http, NetSettings settings) =>
         {
             if (!TryLookupAccount(accounts, profileId, out var account, out var notFound))
             {
@@ -77,7 +77,7 @@ public static class SkinEndpoints
 
             using var body = new MemoryStream();
             await file.CopyToAsync(body);
-            var upload = SkinUpload.Make(account.AccessToken(), body.ToArray(), model, auth, net);
+            var upload = SkinUpload.Make(account.AccessToken(), body.ToArray(), model, auth, http, settings);
             await upload.StartAsync();
             return upload.WasSuccessful
                 ? Results.NoContent()

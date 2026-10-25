@@ -45,15 +45,24 @@ public sealed class AuthEndpointsOptions
     /// <summary>Base of launcher/login, entitlements, minecraft/profile, skins and capes endpoints.</summary>
     public string MinecraftServices { get; set; } = DefaultMinecraftServices;
 
-    /// <summary>The network stack the auth steps send through — the host wires its shared,
-    /// settings-configured stack (proxy, user agent, timeout) so the auth traffic follows the
-    /// same configuration as every other request. Unset falls back to a private default
-    /// stack, which keeps a bare fixture working without process-global state.</summary>
-    public NetStack Net
+    /// <summary>The persistent client the auth steps send through — the host wires its
+    /// shared client (proxy, user agent, timeout) so the auth traffic follows the same
+    /// configuration as every other request. Unset falls back to a private default client,
+    /// which keeps a bare fixture working without process-global state.</summary>
+    public HttpClient Http
     {
-        get => _net ??= new NetStack();
-        init => _net = value;
+        get => _http ??= NetPrimaryHandler.CreateClient(Settings);
+        init => _http = value;
     }
 
-    private NetStack? _net;
+    /// <summary>The settings the auth client and the step timeouts read; same lazy-default
+    /// story as <see cref="Http"/>.</summary>
+    public NetSettings Settings
+    {
+        get => _settings ??= NetSettings.CreateDefault();
+        init => _settings = value;
+    }
+
+    private HttpClient? _http;
+    private NetSettings? _settings;
 }

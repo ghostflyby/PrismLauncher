@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
 // Test doubles for the Modrinth layer tests: a stub Modrinth API/download server (free-port
-// HttpListener pattern, see NetStackTests) and a synthetic .mrpack builder (index +
+// HttpListener pattern, see NetRequestTests) and a synthetic .mrpack builder (index +
 // overrides + mods with real hashes) written through MMCZip.
 
 using System.Net;

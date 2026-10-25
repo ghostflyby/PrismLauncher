@@ -86,7 +86,7 @@ public sealed class FlameCheckUpdate(
             };
             var versionsUrl = GetVersionsUrl(project);
 
-            var request = NetRequest.MakeByteArray(new Uri(versionsUrl), _flame.Net);
+            var request = NetRequest.MakeByteArray(new Uri(versionsUrl), _flame.Http, _flame.Settings);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
             {

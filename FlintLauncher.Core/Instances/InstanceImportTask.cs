@@ -68,7 +68,7 @@ public sealed partial class InstanceImportTask(
     }
 
     private readonly ModrinthApi _modrinth = modrinth;
-    private readonly FlameApi _flame = flame ?? new FlameApi(modrinth.Net);
+    private readonly FlameApi _flame = flame ?? new FlameApi(modrinth.Http, modrinth.Settings);
     private readonly IReadOnlyDictionary<string, string> _extraInfo = extraInfo ?? new Dictionary<string, string>();
     private AbsolutePath _archivePath;
     private ModpackType _modpackType = ModpackType.Unknown;
@@ -123,7 +123,7 @@ public sealed partial class InstanceImportTask(
             string a1 = Path.GetFileName(sourceUrl.AbsolutePath);
             _archivePath = StagingPath / a1;
             FileOps.EnsureFilePathExists(_archivePath);
-            var request = NetRequest.MakeFile(sourceUrl, _archivePath, _modrinth.Net);
+            var request = NetRequest.MakeFile(sourceUrl, _archivePath, _modrinth.Http, _modrinth.Settings);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
             {

@@ -5,10 +5,12 @@ using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Tests;
 
-/// <summary>The one network stack the fixtures share where a test only needs an HttpClient
-/// to reach its local stub (no proxy or user-agent assertions). A test that asserts on a
-/// stack's configuration constructs its own stack instead.</summary>
+/// <summary>The one client pair the fixtures share where a test only needs an HttpClient to
+/// reach its local stub (no proxy or user-agent assertions). A test that asserts on settings
+/// or transport behavior constructs its own pair instead.</summary>
 internal static class TestNet
 {
-    public static NetStack Stack { get; } = new();
+    public static readonly NetSettings Settings = NetSettings.CreateDefault();
+
+    public static readonly HttpClient Http = NetPrimaryHandler.CreateClient(Settings);
 }

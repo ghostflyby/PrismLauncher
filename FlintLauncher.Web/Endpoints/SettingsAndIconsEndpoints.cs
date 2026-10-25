@@ -134,7 +134,7 @@ public static class SettingsAndIconsEndpoints
             ],
             ["proxy"] =
             [
-                // ProxyPage: written values reach the NetStack through NetSettingsApplier;
+                // ProxyPage: written values reach the shared settings through NetSettingsApplier;
                 // ProxyPass is a secret — same wire key, ISecretStore storage
                 "ProxyType",
                 "ProxyAddr",

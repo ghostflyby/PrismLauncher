@@ -24,15 +24,16 @@ public class AuthFlowTests : IDisposable
 
     public AuthFlowTests()
     {
-        _auth = StubOptions(new NetStack());
+        _auth = StubOptions(TestNet.Http, TestNet.Settings);
     }
 
-    /// <summary>The stub-pointed options over one network stack: every endpoint URL
+    /// <summary>The stub-pointed options over one client pair: every endpoint URL
     /// redirected to the local stub. The single wiring site, so a new endpoint property
     /// cannot silently fall back to the production URL in a test.</summary>
-    private AuthEndpointsOptions StubOptions(NetStack net) => new()
+    private AuthEndpointsOptions StubOptions(HttpClient http, NetSettings settings) => new()
     {
-        Net = net,
+        Http = http,
+        Settings = settings,
         MsaDeviceCode = _server.BaseUrl + "/devicecode",
         MsaToken = _server.BaseUrl + "/token",
         MsaAuthorize = _server.BaseUrl + "/authorize",
@@ -316,7 +317,7 @@ public class AuthFlowTests : IDisposable
         var redirectUri = Uri.UnescapeDataString(
             url.Split("redirect_uri=")[1].Split('&')[0]);
         var port = new Uri(redirectUri).Port;
-        using var callback = await TestNet.Stack.Client
+        using var callback = await TestNet.Http
             .GetAsync($"http://127.0.0.1:{port}/?code=INTERACTIVE_CODE")
             .WaitAsync(TimeSpan.FromSeconds(10));
         Assert.True(callback.IsSuccessStatusCode);
@@ -352,7 +353,7 @@ public class AuthFlowTests : IDisposable
 
         var redirectUri = Uri.UnescapeDataString(url.Split("redirect_uri=")[1].Split('&')[0]);
         var port = new Uri(redirectUri).Port;
-        using var _ = await TestNet.Stack.Client
+        using var _ = await TestNet.Http
             .GetAsync($"http://127.0.0.1:{port}/?error=access_denied&error_description=User+cancelled")
             .WaitAsync(TimeSpan.FromSeconds(10));
 
@@ -464,13 +465,15 @@ public class AuthFlowTests : IDisposable
     }
 
     [Fact]
-    public async Task Auth_Steps_Send_Through_The_Injected_NetStack()
+    public async Task Auth_Steps_Send_Through_The_Injected_Client_Pair()
     {
-        // the stack carries the proxy/user-agent configuration, so every auth request —
-        // including the skin download — must leave through the injected one; the user agent
-        // is the observable stamp
-        var auth = StubOptions(new NetStack("Flint-AuthStackProbe/1.0",
-            manualRetries: 1, TimeSpan.FromSeconds(30)));
+        // the settings carry the user-agent configuration, so every auth request —
+        // including the skin download — must leave stamped with it; the user agent is the
+        // observable stamp
+        var settings = NetSettings.CreateDefault();
+        settings.Update("Flint-AuthStackProbe/1.0", "None", "", 0, "", "",
+            manualRetries: 1, TimeSpan.FromSeconds(30));
+        var auth = StubOptions(NetPrimaryHandler.CreateClient(settings), settings);
         var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, auth);
 

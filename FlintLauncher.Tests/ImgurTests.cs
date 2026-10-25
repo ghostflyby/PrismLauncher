@@ -4,7 +4,7 @@
 // Tests for the imgur screenshot layer (launcher/screenshots/ImgurAPI.{h,cpp}, the unified
 // shape that replaced ImgurUpload/ImgurAlbumCreation): the exact multipart/form shape and
 // headers, the JSON response parsing into the ScreenShot metadata, and every failure path.
-// The factories are instance methods (the client rides an injected NetStack); each suite
+// The factories are instance methods (the client rides an injected client pair); each suite
 // builds its own ImgurApi.
 
 using System.Text;
@@ -19,7 +19,7 @@ namespace FlintLauncher.Tests;
 
 public class ImgurTests : IDisposable
 {
-    private readonly ImgurApi _imgur = new(TestNet.Stack);
+    private readonly ImgurApi _imgur = new(TestNet.Http, TestNet.Settings);
     private readonly PeripheralStubServer _server = new();
     private readonly string _dir = Path.Combine(Path.GetTempPath(), $"flint-imgur-{Guid.NewGuid():N}");
 

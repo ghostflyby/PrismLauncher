@@ -201,13 +201,13 @@ public class CoverageFixCoreTests
             runtime.Config.Set("RequestTimeout", 120);
             runtime.Config.Set("UserAgentOverride", "Flint-NetCfg-Agent/9.9");
 
-            new NetSettingsApplier(runtime.Config, runtime.Secrets, runtime.Net,
+            new NetSettingsApplier(runtime.Config, runtime.Secrets, runtime.Settings,
                 runtime.Modrinth, runtime.Flame, runtime.Auth).Apply();
 
-            Assert.Equal(("HTTP", "10.1.2.3", 8118, "", ""), runtime.Net.ProxyConfig);
-            Assert.Equal(4, runtime.Net.ManualRetries);
-            Assert.Equal(TimeSpan.FromSeconds(120), runtime.Net.RequestTimeout);
-            Assert.Equal("Flint-NetCfg-Agent/9.9", runtime.Net.UserAgent);
+            Assert.Equal(("HTTP", "10.1.2.3", 8118, "", ""), runtime.Settings.Current.Proxy);
+            Assert.Equal(4, runtime.Settings.Current.ManualRetries);
+            Assert.Equal(TimeSpan.FromSeconds(120), runtime.Settings.Current.RequestTimeout);
+            Assert.Equal("Flint-NetCfg-Agent/9.9", runtime.Settings.Current.UserAgent);
         }
         finally
         {
@@ -220,18 +220,22 @@ public class CoverageFixCoreTests
     }
 
     [Fact]
-    public void Http_Configure_Is_Idempotent_For_An_Unchanged_Config()
+    public void NetSettings_Update_Bumps_The_Proxy_Version_Only_On_A_Proxy_Change()
     {
-        var stack = new NetStack();
-        stack.Configure("Flint-Idempotent/1.0", "None", "", 0, "", "");
-        var client = stack.Client;
-        // same configuration -> no client rebuild (connection pool survives)
-        stack.Configure("Flint-Idempotent/1.0", "None", "", 0, "", "");
-        Assert.Same(client, stack.Client);
-        // a UA change rebuilds the client so the new header lands
-        stack.Configure("Flint-Idempotent/2.0", "None", "", 0, "", "");
-        Assert.NotSame(client, stack.Client);
-        Assert.Equal("Flint-Idempotent/2.0", stack.UserAgent);
+        var settings = NetSettings.CreateDefault();
+        settings.Update("Flint-Idempotent/1.0", "None", "", 0, "", "",
+            manualRetries: 1, TimeSpan.FromSeconds(60));
+        var version = settings.Current.ProxyVersion;
+        // an identical proxy tuple -> no version bump (the transport keeps its handler, so
+        // the connection pool survives a settings re-apply)
+        settings.Update("Flint-Idempotent/2.0", "None", "", 0, "", "",
+            manualRetries: 1, TimeSpan.FromSeconds(60));
+        Assert.Equal(version, settings.Current.ProxyVersion);
+        Assert.Equal("Flint-Idempotent/2.0", settings.Current.UserAgent);
+        // a proxy change advances the version the transport swaps on
+        settings.Update("Flint-Idempotent/2.0", "HTTP", "10.0.0.1", 8080, "", "",
+            manualRetries: 1, TimeSpan.FromSeconds(60));
+        Assert.Equal(version + 1, settings.Current.ProxyVersion);
     }
 
     // ------------------------------------------------------- meta cache eviction

@@ -146,17 +146,24 @@ public sealed class HttpMetaCache(AbsolutePath path) : IDisposable
 
     private readonly Dictionary<string, AbsolutePath> _basePaths = new(StringComparer.Ordinal);
     private Timer? _saveTimer;
-    private NetStack? _net;
+    private HttpClient? _http;
+    private NetSettings? _settings;
 
-    /// <summary>The network stack the cached downloads (<see cref="NetRequest.MakeCached"/>)
+    /// <summary>The client and settings the cached downloads (<see cref="NetRequest.MakeCached"/>)
     /// ride when the caller names none: the cache is the download plane — where a fetch lands
-    /// and through which stack it travels. The composition root wires its shared,
-    /// settings-configured stack; unset falls back to a private default stack, which keeps a
-    /// bare fixture working without process-global state.</summary>
-    public NetStack Net
+    /// and through which client it travels. The composition root wires its shared, persistent
+    /// client; unset falls back to a private default client, which keeps a bare fixture
+    /// working without process-global state.</summary>
+    public HttpClient Http
     {
-        get => _net ??= new NetStack();
-        init => _net = value;
+        get => _http ??= NetPrimaryHandler.CreateClient(Settings);
+        init => _http = value;
+    }
+
+    public NetSettings Settings
+    {
+        get => _settings ??= NetSettings.CreateDefault();
+        init => _settings = value;
     }
 
     public void Dispose()
@@ -172,11 +179,11 @@ public sealed class HttpMetaCache(AbsolutePath path) : IDisposable
     /// (meta/general/icons/fmllibs/pack downloads) off the cache root; there is no
     /// "screenshots" base (nothing consumes it). Not loaded — the caller runs
     /// <see cref="Load"/> once the roots are final (after the legacy remount). The one base
-    /// table the host and the fixtures share; <paramref name="net"/> is the stack its cached
-    /// downloads ride.</summary>
-    public static HttpMetaCache ForRoots(FlintPaths paths, NetStack net)
+    /// table the host and the fixtures share; the cached downloads ride the named client
+    /// pair.</summary>
+    public static HttpMetaCache ForRoots(FlintPaths paths, HttpClient http, NetSettings settings)
     {
-        var cache = new HttpMetaCache(paths.MetacacheFile) { Net = net };
+        var cache = new HttpMetaCache(paths.MetacacheFile) { Http = http, Settings = settings };
         cache.AddBase("meta", paths.MetaDir);
         cache.AddBase("libraries", paths.LibrariesRoot);
         cache.AddBase("assets", paths.AssetsRoot);

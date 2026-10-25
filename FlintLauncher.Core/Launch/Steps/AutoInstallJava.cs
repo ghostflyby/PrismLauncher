@@ -205,11 +205,13 @@ public sealed class AutoInstallJava : LaunchStep
                 switch (java.DownloadType)
                 {
                     case JavaDownloadType.Manifest:
-                        _currentTask = new ManifestDownloadTask(new Uri(java.Url), finalPath, Services.Net,
+                        _currentTask = new ManifestDownloadTask(new Uri(java.Url), finalPath, Services.Http,
+                            Services.Settings,
                             java.ChecksumType, java.ChecksumHash);
                         break;
                     case JavaDownloadType.Archive:
-                        _currentTask = new ArchiveDownloadTask(new Uri(java.Url), finalPath, Services.Net,
+                        _currentTask = new ArchiveDownloadTask(new Uri(java.Url), finalPath, Services.Http,
+                            Services.Settings,
                             java.ChecksumType, java.ChecksumHash);
                         break;
                     case JavaDownloadType.Unknown:

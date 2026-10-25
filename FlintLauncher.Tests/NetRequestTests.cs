@@ -15,7 +15,7 @@ using Xunit;
 
 namespace FlintLauncher.Tests;
 
-public class NetStackTests : IDisposable
+public class NetRequestTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), $"flint-net-{Guid.NewGuid():N}");
 
@@ -299,7 +299,7 @@ public class NetStackTests : IDisposable
         });
 
         var target = TempPath("download.bin");
-        var request = NetRequest.MakeFile(new Uri(server.Url + "/file"), new AbsolutePath(target), TestNet.Stack);
+        var request = NetRequest.MakeFile(new Uri(server.Url + "/file"), new AbsolutePath(target), TestNet.Http, TestNet.Settings);
         request.AddValidator(ChecksumValidator.FromHex(
             HashAlgorithmName.SHA1,
             Convert.ToHexString(SHA1.HashData("file-content-0123456789"u8.ToArray())).ToLowerInvariant()));
@@ -376,7 +376,7 @@ public class NetStackTests : IDisposable
             ctx.Response.OutputStream.Write(body);
         });
 
-        var request = NetRequest.MakeByteArray(new Uri(server.Url + "/x"), TestNet.Stack, RequestOptions.AutoRetry);
+        var request = NetRequest.MakeByteArray(new Uri(server.Url + "/x"), TestNet.Http, TestNet.Settings, RequestOptions.AutoRetry);
         await request.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, request.State);
@@ -389,7 +389,7 @@ public class NetStackTests : IDisposable
     {
         using var server = new TestHttpServer(ctx => { ctx.Response.StatusCode = 404; });
 
-        var request = NetRequest.MakeByteArray(new Uri(server.Url + "/missing"), TestNet.Stack);
+        var request = NetRequest.MakeByteArray(new Uri(server.Url + "/missing"), TestNet.Http, TestNet.Settings);
         await request.StartAsync();
 
         Assert.Equal(TaskState.Failed, request.State);
@@ -412,7 +412,7 @@ public class NetStackTests : IDisposable
         var requests = new List<NetRequest>();
         for (var i = 0; i < 5; i++)
         {
-            var request = NetRequest.MakeByteArray(new Uri($"{server.Url}/item{i}"), TestNet.Stack);
+            var request = NetRequest.MakeByteArray(new Uri($"{server.Url}/item{i}"), TestNet.Http, TestNet.Settings);
             requests.Add(request);
             job.AddNetRequest(request);
         }

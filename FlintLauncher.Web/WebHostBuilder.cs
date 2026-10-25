@@ -121,7 +121,8 @@ public static class WebHostBuilder
         // the assembled runtime is not registered itself — a handler depends on the members
         // it uses, each injectable on its own
         builder.Services.AddSingleton(paths);
-        builder.Services.AddSingleton(runtime.Net);
+        builder.Services.AddSingleton(runtime.Settings);
+        builder.Services.AddSingleton(runtime.Http);
         builder.Services.AddSingleton(runtime.Config);
         builder.Services.AddSingleton(runtime.Dirs);
         builder.Services.AddSingleton(runtime.State);
@@ -157,7 +158,8 @@ public static class WebHostBuilder
         {
             Paths = paths,
             LoggerFactory = sp.GetRequiredService<ILoggerFactory>(),
-            Net = runtime.Net,
+            Http = runtime.Http,
+            Settings = runtime.Settings,
             Config = runtime.Config,
             LauncherState = runtime.State,
             Auth = runtime.Auth,

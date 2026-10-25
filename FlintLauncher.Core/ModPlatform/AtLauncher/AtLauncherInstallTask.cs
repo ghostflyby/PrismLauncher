@@ -149,7 +149,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
         var netJob = new NetJob("ATLauncher::VersionFetch");
         var request = NetRequest.MakeByteArray(new Uri(_api.PackConfigsUrl(PackSafeName, VersionName)),
-            stack: _api.Net);
+            http: _api.Http, settings: _api.Settings);
         netJob.AddNetRequest(request);
         await netJob.StartAsync(cancellationToken);
         if (!netJob.WasSuccessful)
@@ -699,13 +699,13 @@ public sealed partial class AtLauncherPackInstallTask(
         {
             var entry = MetaCache.ResolveEntry("ATLauncherPacks", path);
             entry.IsStale = true;
-            dl = NetRequest.MakeCached(MetaCache, new Uri(url), entry, stack: _api.Net);
+            dl = NetRequest.MakeCached(MetaCache, new Uri(url), entry, http: _api.Http, settings: _api.Settings);
             _archivePath = entry.GetFullPath();
         }
         else
         {
             _archivePath = TempCachePath(path);
-            dl = NetRequest.MakeFile(new Uri(url), _archivePath, stack: _api.Net);
+            dl = NetRequest.MakeFile(new Uri(url), _archivePath, http: _api.Http, settings: _api.Settings);
         }
 
         if (Configs.Configs.Sha1.Length != 0)
@@ -971,12 +971,12 @@ public sealed partial class AtLauncherPackInstallTask(
             var entry = MetaCache.ResolveEntry("ATLauncherPacks", cacheName);
             entry.IsStale = true;
             cachePath = entry.GetFullPath();
-            dl = NetRequest.MakeCached(MetaCache, new Uri(url), entry, stack: _api.Net);
+            dl = NetRequest.MakeCached(MetaCache, new Uri(url), entry, http: _api.Http, settings: _api.Settings);
         }
         else
         {
             cachePath = TempCachePath(cacheName);
-            dl = NetRequest.MakeFile(new Uri(url), cachePath, stack: _api.Net);
+            dl = NetRequest.MakeFile(new Uri(url), cachePath, http: _api.Http, settings: _api.Settings);
         }
 
         if (mod.Md5.Length != 0)

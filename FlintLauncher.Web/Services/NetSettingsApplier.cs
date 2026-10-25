@@ -3,9 +3,10 @@
 //
 // The port of the C++ network-settings application paths — Application::updateProxySettings
 // (the Proxy* five), NumberOfManualRetries, RequestTimeout and the UserAgentOverride — applied
-// to the runtime's NetStack. Called by the host at startup and after every successful
-// PUT /settings write, so proxy changes take effect without a restart (the stack's HttpClient
-// is rebuilt only when the applied configuration actually changed).
+// to the shared NetSettings snapshot. Called by the host at startup and after every successful
+// PUT /settings write; the persistent client picks a proxy change up without a restart (the
+// transport swaps its inner handler on the snapshot's proxy version, in-flight transfers
+// included — nothing is rebuilt or aborted).
 //
 // Secret rerouting: the config world carries no secret fields, so the proxy password
 // reads from the ISecretStore by name (the write path was rerouted in PUT /settings), and the
@@ -26,7 +27,7 @@ namespace FlintLauncher.Web.Services;
 public sealed class NetSettingsApplier(
     FlintConfigStore configStore,
     ISecretStore secrets,
-    NetStack net,
+    NetSettings settings,
     ModrinthApi modrinth,
     FlameApi flame,
     AuthEndpointsOptions auth)
@@ -37,23 +38,21 @@ public sealed class NetSettingsApplier(
 
     public void Apply()
     {
-        // the typed user layer (the SettingsObject adapter view retired)
+        // the typed user layer (the SettingsObject adapter view retired); the clamping of the
+        // proxy fallback, retries and timeout lives in NetSettings.Update itself
         var config = configStore.Current;
         var userAgent = config.Api.UserAgentOverride ?? "";
-        net.Configure(
+        var retries = config.Launcher.NumberOfManualRetries ?? 1;
+        var timeoutSeconds = config.Launcher.RequestTimeout ?? 60;
+        settings.Update(
             userAgent.Length > 0 ? userAgent : FlintConfig.Default.UserAgent,
             config.Proxy.ProxyType ?? "None",
             config.Proxy.ProxyAddr ?? "127.0.0.1",
             config.Proxy.ProxyPort ?? 8080,
             config.Proxy.ProxyUser ?? "",
-            secrets.Get(ProxyPassSecret) ?? "");
-
-        var retries = config.Launcher.NumberOfManualRetries ?? 1;
-        net.ManualRetries = retries < 0 ? 0 : retries;
-
-        // C++ RequestTimeout is in seconds; 0/negative would cancel instantly, so clamp to the default
-        var timeoutSeconds = config.Launcher.RequestTimeout ?? 60;
-        net.RequestTimeout = TimeSpan.FromSeconds(timeoutSeconds < 1 ? 60 : timeoutSeconds);
+            secrets.Get(ProxyPassSecret) ?? "",
+            retries,
+            TimeSpan.FromSeconds(timeoutSeconds));
 
         ApplyApiCredentials();
     }

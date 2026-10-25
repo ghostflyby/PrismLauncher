@@ -25,7 +25,7 @@ using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
-public sealed class ModrinthApi(ModrinthClient client, NetStack net) : ResourceApi
+public sealed class ModrinthApi(ModrinthClient client, HttpClient http, NetSettings settings) : ResourceApi
 {
     /// <summary>The executed client behind every query; its Options carry the hosts and PAT
     /// this adapter forwards.</summary>
@@ -39,9 +39,11 @@ public sealed class ModrinthApi(ModrinthClient client, NetStack net) : ResourceA
 
     public static IReadOnlyList<string> MrpackHosts { get; } = ["cdn.modrinth.com", "github.com", "raw.githubusercontent.com", "gitlab.com"];
 
-    /// <summary>The net stack behind the raw NetRequest paths that have not moved onto the
-    /// client yet (the pinned-version and dependency-version fetches).</summary>
-    public override NetStack Net { get; } = net;
+    /// <summary>The client behind the raw NetRequest paths (the pinned-version and
+    /// dependency-version fetches that are not ModrinthClient queries).</summary>
+    public override HttpClient Http { get; } = http;
+
+    public override NetSettings Settings { get; } = settings;
 
     // ------------------------------------------------------------------ domain queries
 

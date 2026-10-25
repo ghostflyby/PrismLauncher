@@ -38,7 +38,7 @@ using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.ModPlatform.Technic;
 
-public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string version, string minecraftVersion, NetStack net)
+public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string version, string minecraftVersion, HttpClient http, NetSettings settings)
     : InstanceTask
 {
     private string _minecraftVersion = minecraftVersion;
@@ -48,7 +48,7 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
         EmitStatus("Resolving modpack files");
 
         var sourceUrl = TechnicApi.SolderBuildUrl(solderUrl.ToString(), pack, version);
-        var request = NetRequest.MakeByteArray(new Uri(sourceUrl), net);
+        var request = NetRequest.MakeByteArray(new Uri(sourceUrl), http, settings);
         var resolveJob = new NetJob("Resolving modpack files");
         resolveJob.AddNetRequest(request);
         await resolveJob.StartAsync(cancellationToken);
@@ -96,7 +96,7 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
                 var modUrl = mod?.Url
                              ?? throw new InvalidOperationException("the Solder build carries an unvalidated mod");
                 var path = outputDir / i.ToString();
-                var dl = NetRequest.MakeFile(new Uri(modUrl), path, net);
+                var dl = NetRequest.MakeFile(new Uri(modUrl), path, http, settings);
                 if (mod.Md5.Length != 0)
                 {
                     dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.MD5, mod.Md5));

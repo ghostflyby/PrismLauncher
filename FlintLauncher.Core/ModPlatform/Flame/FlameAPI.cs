@@ -4,7 +4,7 @@
 //
 // Port of modplatform/flame/FlameAPI.{h,cpp}: the CurseForge v1 API surface (search,
 // project/file endpoints, fingerprint matching, categories and the date-based
-// latest-version matching) on top of the Net stack.
+// latest-version matching) on top of the persistent client.
 //
 // The Application-singleton reach-ins become the static FlameConfig hooks (BaseUrl,
 // ApiKeyProvider — see FlameConfig.cs for the API key handling notes).
@@ -47,7 +47,7 @@ public sealed record FlameStringEnvelopeJson(
 [JsonSerializable(typeof(FlameStringEnvelopeJson))]
 internal sealed partial class FlameJsonContext : JsonSerializerContext;
 
-public sealed class FlameApi(NetStack net) : ResourceApi
+public sealed class FlameApi(HttpClient http, NetSettings settings) : ResourceApi
 {
     /// <summary>BuildConfig.FLAME_BASE_URL (per-instance; tests construct a client pointed
     /// at their stub).</summary>
@@ -63,7 +63,9 @@ public sealed class FlameApi(NetStack net) : ResourceApi
     public Func<string> ApiKeyProvider { get; set; } = static () => FlintConfig.Default.FlameApiKey;
 
     /// <summary>The network stack this client's requests go through.</summary>
-    public override NetStack Net { get; } = net;
+    public override HttpClient Http { get; } = http;
+
+    public override NetSettings Settings { get; } = settings;
 
     // ------------------------------------------------------------------ requests
 
@@ -513,14 +515,14 @@ public sealed class FlameApi(NetStack net) : ResourceApi
 
     private NetRequest MakeByteArrayRequest(string url)
     {
-        var request = NetRequest.MakeByteArray(new Uri(url), stack: Net);
+        var request = NetRequest.MakeByteArray(new Uri(url), http: Http, settings: Settings);
         AddApiKeyHeader(request);
         return request;
     }
 
     private NetRequest MakeByteArrayRequest(string url, byte[] postData)
     {
-        var request = NetRequest.MakeByteArray(new Uri(url), postData, stack: Net);
+        var request = NetRequest.MakeByteArray(new Uri(url), postData, http: Http, settings: Settings);
         AddApiKeyHeader(request);
         return request;
     }

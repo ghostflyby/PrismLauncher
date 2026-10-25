@@ -8,8 +8,8 @@ using FlintLauncher.ExternalApi;
 namespace FlintLauncher.Tests;
 
 /// <summary>Test factory for hermetic ModrinthApi instances: every client gets a throwaway
-/// HttpClient and its own NetStack (nothing process-global to leak in or out) pointed at the
-/// suite's stub — or at a discard address when the suite never exercises the Modrinth
+/// HttpClient with a private settings pair (nothing process-global to leak in or out) pointed
+/// at the suite's stub — or at a discard address when the suite never exercises the Modrinth
 /// paths.</summary>
 internal static class TestModrinthApi
 {
@@ -19,7 +19,7 @@ internal static class TestModrinthApi
         // intercept the loopback stub traffic (and answer 502)
         var http = new HttpClient(new SocketsHttpHandler { UseProxy = false });
         var options = new ModrinthClientOptions { BaseUrl = baseUrl };
-        return new ModrinthApi(new ModrinthClient(http, options), new NetStack());
+        return new ModrinthApi(new ModrinthClient(http, options), http, NetSettings.CreateDefault());
     }
 
     /// <summary>An API wired to a closed port: any surprise request fails fast and locally

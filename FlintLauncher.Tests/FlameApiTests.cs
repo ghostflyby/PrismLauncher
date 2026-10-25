@@ -27,7 +27,7 @@ namespace FlintLauncher.Tests;
 [Collection("FlameApi")]
 public class FlameApiTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new(TestNet.Stack);
+    private readonly FlameApi _flameApi = new(TestNet.Http, TestNet.Settings);
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-flame-{Guid.NewGuid():N}");
     private readonly StubFlameServer _server = new();
     private readonly string _baseUrl;

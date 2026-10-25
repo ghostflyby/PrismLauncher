@@ -34,7 +34,7 @@ public static class SkinDelete
     {
         var options = auth ?? new AuthEndpointsOptions();
         var url = options.MinecraftServices.TrimEnd('/') + "/minecraft/profile/skins/active";
-        var request = new NetRequest(new Uri(url), options.Net, RequestOptions.NoOptions, HttpMethodValue.Delete);
+        var request = new NetRequest(new Uri(url), options.Http, options.Settings, RequestOptions.NoOptions, HttpMethodValue.Delete);
         request.AddHeader("Authorization", $"Bearer {token}");
         return request;
     }

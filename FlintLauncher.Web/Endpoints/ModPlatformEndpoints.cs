@@ -243,7 +243,7 @@ public static class ModPlatformEndpoints
                 {
                     Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.Flame },
                 });
-                var request = NetRequest.MakeByteArray(new Uri(url), flame.Net);
+                var request = NetRequest.MakeByteArray(new Uri(url), flame.Http, flame.Settings);
                 flame.AddApiKeyHeader(request);
 
                 await request.StartAsync();
@@ -613,7 +613,7 @@ public static class ModPlatformEndpoints
 
         var url = flame.GetSearchUrl(args);
 
-        var request = NetRequest.MakeByteArray(new Uri(url), flame.Net);
+        var request = NetRequest.MakeByteArray(new Uri(url), flame.Http, flame.Settings);
         flame.AddApiKeyHeader(request);
         await request.StartAsync();
         if (request.State != TaskState.Succeeded)

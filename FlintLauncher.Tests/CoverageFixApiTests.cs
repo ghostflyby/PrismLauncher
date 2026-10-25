@@ -152,8 +152,9 @@ public class CoverageFixSettingsApiTests
     public async Task Proxy_Retry_Timeout_Settings_Reach_The_Http_Stack()
     {
         await using var host = await FlintApiHost.StartAsync();
-        // the host's own stack — private to this host, nothing process-wide to restore
-        var net = host.Services.GetRequiredService<NetStack>();
+        // the host's own settings snapshot — private to this host, nothing process-wide to
+        // restore
+        var settings = host.Services.GetRequiredService<NetSettings>();
 
         Assert.Equal(HttpStatusCode.NoContent, (await host.PutAsync("/api/v1/settings", new
         {
@@ -165,7 +166,7 @@ public class CoverageFixSettingsApiTests
                 ["ProxyPort"] = 39999,
             },
         })).StatusCode);
-        Assert.Equal(("HTTP", "127.0.0.1", 39999, "", ""), net.ProxyConfig);
+        Assert.Equal(("HTTP", "127.0.0.1", 39999, "", ""), settings.Current.Proxy);
 
         Assert.Equal(HttpStatusCode.NoContent, (await host.PutAsync("/api/v1/settings", new
         {
@@ -176,15 +177,15 @@ public class CoverageFixSettingsApiTests
                 ["RequestTimeout"] = 90,
             },
         })).StatusCode);
-        Assert.Equal(3, net.ManualRetries);
-        Assert.Equal(TimeSpan.FromSeconds(90), net.RequestTimeout);
+        Assert.Equal(3, settings.Current.ManualRetries);
+        Assert.Equal(TimeSpan.FromSeconds(90), settings.Current.RequestTimeout);
 
         Assert.Equal(HttpStatusCode.NoContent, (await host.PutAsync("/api/v1/settings", new
         {
             group = "api",
             values = new Dictionary<string, object> { ["UserAgentOverride"] = "Flint-Api-Agent/1.0" },
         })).StatusCode);
-        Assert.Equal("Flint-Api-Agent/1.0", net.UserAgent);
+        Assert.Equal("Flint-Api-Agent/1.0", settings.Current.UserAgent);
 
         // "None" disables the proxy again without a restart
         Assert.Equal(HttpStatusCode.NoContent, (await host.PutAsync("/api/v1/settings", new
@@ -192,7 +193,7 @@ public class CoverageFixSettingsApiTests
             group = "proxy",
             values = new Dictionary<string, object> { ["ProxyType"] = "None" },
         })).StatusCode);
-        Assert.Equal(("None", "127.0.0.1", 39999, "", ""), net.ProxyConfig);
+        Assert.Equal(("None", "127.0.0.1", 39999, "", ""), settings.Current.Proxy);
     }
 
     [Fact]

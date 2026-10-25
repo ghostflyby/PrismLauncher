@@ -40,12 +40,12 @@ public static class CapeChange
         if (capeId.Length == 0)
         {
             // removing the cape is a bare DELETE
-            request = new NetRequest(new Uri(url), options.Net, RequestOptions.NoOptions, HttpMethodValue.Delete);
+            request = new NetRequest(new Uri(url), options.Http, options.Settings, RequestOptions.NoOptions, HttpMethodValue.Delete);
         }
         else
         {
             var body = "{\"capeId\":\"" + capeId + "\"}";
-            request = new NetRequest(new Uri(url), options.Net, RequestOptions.NoOptions, HttpMethodValue.Put,
+            request = new NetRequest(new Uri(url), options.Http, options.Settings, RequestOptions.NoOptions, HttpMethodValue.Put,
                 Encoding.UTF8.GetBytes(body));
         }
 

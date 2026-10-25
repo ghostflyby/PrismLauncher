@@ -265,7 +265,7 @@ public class GetModDependenciesTaskTests : IDisposable
 [Collection("FlameApi")]
 public class GetModDependenciesFlameTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new(TestNet.Stack);
+    private readonly FlameApi _flameApi = new(TestNet.Http, TestNet.Settings);
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-deps-flame-{Guid.NewGuid():N}");
     private readonly StubFlameServer _server = new();
     private readonly ModInstallTestEnv _env;

@@ -33,10 +33,12 @@ internal sealed class LauncherRuntime : IDisposable
     public FlintPaths Paths { get; }
     public AbsolutePath DataDir => Paths.DataDir;
 
-    /// <summary>The network stack this runtime's activity flows through: the injected one, else
-    /// a private default stack owned by this runtime (tests isolate by constructing their own;
-    /// there is no process-wide stack).</summary>
-    public NetStack Net { get; }
+    /// <summary>The persistent client and settings this runtime's activity flows through: the
+    /// injected pair, else a private default pair owned by this runtime (tests isolate by
+    /// constructing their own; there is no process-wide client).</summary>
+    public HttpClient Http { get; }
+
+    public NetSettings Settings { get; }
 
     /// <summary>The Modrinth client (injected into platform tasks/endpoints; tests construct
     /// a runtime with a client pointed at their stub).</summary>
@@ -102,19 +104,21 @@ internal sealed class LauncherRuntime : IDisposable
     /// host surfaces this after Build (the flint-legacy result pattern).</summary>
     public FlintConfigImporter.ImportResult ConfigImport { get; }
 
-    public LauncherRuntime(FlintPaths paths, NetStack? net = null, ModrinthApi? modrinth = null,
+    public LauncherRuntime(FlintPaths paths, HttpClient? http = null, NetSettings? settings = null,
+        ModrinthApi? modrinth = null,
         FlameApi? flame = null, TechnicApi? technic = null, AtLauncherApi? atlauncher = null,
         FtbApi? ftb = null, ImgurApi? imgur = null, AuthEndpointsOptions? auth = null)
     {
         Paths = paths;
-        Net = net ?? new NetStack();
-        Modrinth = modrinth ?? new ModrinthApi(new ModrinthClient(Net.Client), Net);
-        Auth = auth ?? new AuthEndpointsOptions { Net = Net };
-        Flame = flame ?? new FlameApi(Net);
-        Technic = technic ?? new TechnicApi(Net);
-        AtLauncher = atlauncher ?? new AtLauncherApi(Net);
-        Ftb = ftb ?? new FtbApi(Net);
-        Imgur = imgur ?? new ImgurApi(Net);
+        Settings = settings ?? NetSettings.CreateDefault();
+        Http = http ?? NetPrimaryHandler.CreateClient(Settings);
+        Modrinth = modrinth ?? new ModrinthApi(new ModrinthClient(Http), Http, Settings);
+        Auth = auth ?? new AuthEndpointsOptions { Http = Http, Settings = Settings };
+        Flame = flame ?? new FlameApi(Http, Settings);
+        Technic = technic ?? new TechnicApi(Http, Settings);
+        AtLauncher = atlauncher ?? new AtLauncherApi(Http, Settings);
+        Ftb = ftb ?? new FtbApi(Http, Settings);
+        Imgur = imgur ?? new ImgurApi(Http, Settings);
 
         // the watched-directory tenancy (the restored C++ watcher glue): reconciles are
         // serialized through the instance lock — watch events arrive on threadpool threads
@@ -164,7 +168,7 @@ internal sealed class LauncherRuntime : IDisposable
         // registration is never lazy enough to resolve against the process CWD), then the
         // ledger Load(): the persisted index restores, so existing entries do not
         // re-download on every run
-        MetaCache = HttpMetaCache.ForRoots(paths, Net);
+        MetaCache = HttpMetaCache.ForRoots(paths, Http, Settings);
         MetaCache.Load();
 
         // instance list: <dataDir>/instances; the typed instance

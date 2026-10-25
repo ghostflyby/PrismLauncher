@@ -42,7 +42,7 @@ public class LegacyFtbTests : IDisposable
 
     /// <summary>A fetch task whose CDN points at the stub server.</summary>
     private LegacyFtbPackFetchTask CreateFetchTask() =>
-        new() { CdnBaseUrl = _server.Url + "/", Net = TestNet.Stack };
+        new() { CdnBaseUrl = _server.Url + "/", Http = TestNet.Http, Settings = TestNet.Settings };
 
     private InstanceList CreateList()
     {
@@ -249,7 +249,7 @@ public class LegacyFtbTests : IDisposable
             });
 
         var list = CreateList();
-        var task = new LegacyFtbPackInstallTask(pack, "1.2.3", TestNet.Stack) { CdnBaseUrl = _server.Url + "/" };
+        var task = new LegacyFtbPackInstallTask(pack, "1.2.3", TestNet.Http, TestNet.Settings) { CdnBaseUrl = _server.Url + "/" };
         task.SetName("Legacy FTB Forge");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
@@ -287,7 +287,7 @@ public class LegacyFtbTests : IDisposable
             });
 
         var list = CreateList();
-        var task = new LegacyFtbPackInstallTask(pack, "2.0.0", TestNet.Stack) { CdnBaseUrl = _server.Url + "/" };
+        var task = new LegacyFtbPackInstallTask(pack, "2.0.0", TestNet.Http, TestNet.Settings) { CdnBaseUrl = _server.Url + "/" };
         task.SetName("Legacy FTB JarMods");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
@@ -315,7 +315,7 @@ public class LegacyFtbTests : IDisposable
             });
 
         var list = CreateList();
-        var task = new LegacyFtbPackInstallTask(pack, "1.0", TestNet.Stack) { CdnBaseUrl = _server.Url + "/" };
+        var task = new LegacyFtbPackInstallTask(pack, "1.0", TestNet.Http, TestNet.Settings) { CdnBaseUrl = _server.Url + "/" };
         task.SetName("Legacy FTB Private");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
@@ -336,7 +336,7 @@ public class LegacyFtbTests : IDisposable
             });
 
         var list = CreateList();
-        var task = new LegacyFtbPackInstallTask(pack, "0.1", TestNet.Stack) { CdnBaseUrl = _server.Url + "/" };
+        var task = new LegacyFtbPackInstallTask(pack, "0.1", TestNet.Http, TestNet.Settings) { CdnBaseUrl = _server.Url + "/" };
         task.SetName("Legacy FTB Bare");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();

@@ -30,7 +30,7 @@ public class TechnicTests : IDisposable
     public TechnicTests()
     {
         Directory.CreateDirectory(_root);
-        _api = new TechnicApi(TestNet.Stack) { BaseUrl = _server.Url + "/", ApiBuild = "testbuild" };
+        _api = new TechnicApi(TestNet.Http, TestNet.Settings) { BaseUrl = _server.Url + "/", ApiBuild = "testbuild" };
     }
 
     public void Dispose()
@@ -61,7 +61,7 @@ public class TechnicTests : IDisposable
 
         var list = CreateList();
         var task = new SingleZipPackInstallTask(new Uri($"{_server.Url}/{zipName}"), minecraftVersion,
-            TestNet.Stack);
+            TestNet.Http, TestNet.Settings);
         task.SetName(name);
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
@@ -105,7 +105,7 @@ public class TechnicTests : IDisposable
                                  ]}
                                  """;
         var (url, mode) = _api.SearchUrl("");
-        var request = NetRequest.MakeByteArray(new Uri(url), TestNet.Stack);
+        var request = NetRequest.MakeByteArray(new Uri(url), TestNet.Http, TestNet.Settings);
         var job = new NetJob("search");
         job.AddNetRequest(request);
         await job.StartAsync();
@@ -423,7 +423,7 @@ public class TechnicTests : IDisposable
         _server.Downloads["soldermod.zip"] = modBytes;
 
         var list = CreateList();
-        var task = new SolderPackInstallTask(new Uri(_server.Url), "testpack", "1.0.0", minecraftVersion: "", TestNet.Stack);
+        var task = new SolderPackInstallTask(new Uri(_server.Url), "testpack", "1.0.0", minecraftVersion: "", TestNet.Http, TestNet.Settings);
         task.SetName("Solder Imported");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
@@ -460,7 +460,7 @@ public class TechnicTests : IDisposable
         _server.Downloads["soldermod.zip"] = modBytes;
 
         var list = CreateList();
-        var task = new SolderPackInstallTask(new Uri(_server.Url), "testpack", "1.0.0", minecraftVersion: "", TestNet.Stack);
+        var task = new SolderPackInstallTask(new Uri(_server.Url), "testpack", "1.0.0", minecraftVersion: "", TestNet.Http, TestNet.Settings);
         task.SetName("Solder BadMd5");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
@@ -474,7 +474,7 @@ public class TechnicTests : IDisposable
         // the surfaced parse error keeps the requireDocument wrapping around the node parse
         _server.SolderBuildJson["testpack/1.0.0"] = """{"minecraft":}""";
         var list = CreateList();
-        var task = new SolderPackInstallTask(new Uri(_server.Url), "testpack", "1.0.0", minecraftVersion: "", TestNet.Stack);
+        var task = new SolderPackInstallTask(new Uri(_server.Url), "testpack", "1.0.0", minecraftVersion: "", TestNet.Http, TestNet.Settings);
         task.SetName("Solder BadManifest");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
@@ -495,7 +495,7 @@ public class TechnicTests : IDisposable
         }.ToJsonString();
 
         var list = CreateList();
-        var task = new SolderPackInstallTask(new Uri(_server.Url), "vanillapack", "2.0", minecraftVersion: "1.12.2", TestNet.Stack);
+        var task = new SolderPackInstallTask(new Uri(_server.Url), "vanillapack", "2.0", minecraftVersion: "1.12.2", TestNet.Http, TestNet.Settings);
         task.SetName("Solder Vanilla");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();

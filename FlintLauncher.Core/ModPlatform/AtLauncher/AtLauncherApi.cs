@@ -8,7 +8,7 @@
 //
 // BuildConfig.ATL_DOWNLOAD_SERVER_URL / ATL_API_BASE_URL became injected instance state:
 // DownloadServerUrl / ApiBaseUrl are per-instance (tests construct their own client pointed
-// at a stub); the client rides the injected NetStack (LauncherRuntime.AtLauncher — see the
+// at a stub); the client rides the injected persistent client pair (LauncherRuntime.AtLauncher — see the
 // Modrinth/Flame/Technic de-singletoning for the same story). The parsers are pure helpers
 // and stay static; the wire shapes deserialize through the source-generated
 // AtLauncherJsonContext (the ATL models carry their own annotations; the document parse of
@@ -30,7 +30,7 @@ namespace FlintLauncher.Core.ModPlatform.AtLauncher;
 [JsonSerializable(typeof(PackVersion))]
 internal sealed partial class AtLauncherJsonContext : JsonSerializerContext;
 
-public sealed class AtLauncherApi(NetStack net)
+public sealed class AtLauncherApi(HttpClient http, NetSettings settings)
 {
     /// <summary>BuildConfig.ATL_DOWNLOAD_SERVER_URL (per-instance; tests construct a client
     /// pointed at their stub).</summary>
@@ -40,7 +40,9 @@ public sealed class AtLauncherApi(NetStack net)
     public string ApiBaseUrl { get; init; } = FlintConfig.Default.AtlApiBaseUrl;
 
     /// <summary>The network stack this client's requests go through.</summary>
-    public NetStack Net { get; } = net;
+    public HttpClient Http { get; } = http;
+
+    public NetSettings Settings { get; } = settings;
 
     // ------------------------------------------------------------------ URL builders
 
@@ -67,7 +69,7 @@ public sealed class AtLauncherApi(NetStack net)
     public (NetJob Job, NetRequest Request) FetchPackIndex()
     {
         var netJob = new NetJob("ATLauncher::IndexFetch");
-        var request = NetRequest.MakeByteArray(new Uri(PackIndexUrl()), stack: Net);
+        var request = NetRequest.MakeByteArray(new Uri(PackIndexUrl()), http: Http, settings: Settings);
         netJob.AddNetRequest(request);
         return (netJob, request);
     }
@@ -76,7 +78,7 @@ public sealed class AtLauncherApi(NetStack net)
     public (NetJob Job, NetRequest Request) FetchShareCode(string code)
     {
         var netJob = new NetJob("Atl::Request");
-        var request = NetRequest.MakeByteArray(new Uri(ShareCodeUrl(code)), stack: Net);
+        var request = NetRequest.MakeByteArray(new Uri(ShareCodeUrl(code)), http: Http, settings: Settings);
         netJob.AddNetRequest(request);
         return (netJob, request);
     }

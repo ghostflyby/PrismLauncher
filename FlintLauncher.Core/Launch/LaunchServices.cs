@@ -32,7 +32,9 @@ public sealed class LaunchServices
     /// <summary>The network stack the launch pipeline's uncached downloads ride (the java
     /// runtime manifest and archive); the host wires its shared, settings-configured stack.
     /// Cached fetches and the asset objects ride the instance's meta cache stack.</summary>
-    public required NetStack Net { get; init; }
+    public required HttpClient Http { get; init; }
+
+    public required NetSettings Settings { get; init; }
 
     /// <summary>The typed flint.json store (the user layer of the stack — the
     /// SettingsObject adapter view is retired). AutoInstallJava reads the java/download switches from

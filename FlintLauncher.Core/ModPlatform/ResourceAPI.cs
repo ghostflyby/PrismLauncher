@@ -89,8 +89,11 @@ public sealed class DependencySearchArgs
 /// </summary>
 public abstract class ResourceApi
 {
-    /// <summary>The network stack this platform's requests go through.</summary>
-    public abstract NetStack Net { get; }
+    /// <summary>The persistent client this platform's requests go through, and the settings
+    /// its request-level behavior (retries, timeout) reads.</summary>
+    public abstract HttpClient Http { get; }
+
+    public abstract NetSettings Settings { get; }
 
     /// <summary>Gets a list of available sorting methods for this API.</summary>
     public abstract List<SortingMethod> GetSortingMethods();

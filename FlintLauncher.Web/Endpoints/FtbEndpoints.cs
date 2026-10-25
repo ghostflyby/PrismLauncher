@@ -199,7 +199,7 @@ public static class FtbEndpoints
 
         // the FTB URL builders concatenate "/modpack/..." onto the base, so unlike the
         // ATLauncher one this derived base must NOT carry a trailing slash
-        return new FtbApi(ftb.Net) { BaseUrl = trimmed.TrimEnd('/') };
+        return new FtbApi(ftb.Http, ftb.Settings) { BaseUrl = trimmed.TrimEnd('/') };
     }
 
     /// <summary>Fetch + parse /modpack/{id} (the shared logic of the two GET endpoints) and

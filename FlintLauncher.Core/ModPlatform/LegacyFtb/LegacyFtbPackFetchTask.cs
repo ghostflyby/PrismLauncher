@@ -44,7 +44,9 @@ public sealed class LegacyFtbPackFetchTask : FlintTask
     public string CdnBaseUrl { get; init; } = FlintConfig.Default.LegacyFtbCdnBaseUrl;
 
     /// <summary>The network stack the pack-list fetches ride.</summary>
-    public required NetStack Net { get; init; }
+    public required HttpClient Http { get; init; }
+
+    public required NetSettings Settings { get; init; }
 
     public List<LegacyFtbModpack> PublicPacks { get; } = [];
     public List<LegacyFtbModpack> ThirdPartyPacks { get; } = [];
@@ -61,8 +63,8 @@ public sealed class LegacyFtbPackFetchTask : FlintTask
         var thirdPartyUrl = CdnBaseUrl + "static/thirdparty.xml";
 
         var job = new NetJob("LegacyFTB::ModpackFetch");
-        var publicRequest = NetRequest.MakeByteArray(new Uri(publicPacksUrl), Net);
-        var thirdPartyRequest = NetRequest.MakeByteArray(new Uri(thirdPartyUrl), Net);
+        var publicRequest = NetRequest.MakeByteArray(new Uri(publicPacksUrl), Http, Settings);
+        var thirdPartyRequest = NetRequest.MakeByteArray(new Uri(thirdPartyUrl), Http, Settings);
         job.AddNetRequest(publicRequest);
         job.AddNetRequest(thirdPartyRequest);
 
@@ -88,7 +90,7 @@ public sealed class LegacyFtbPackFetchTask : FlintTask
         {
             var url = privatePackBaseUrl.Replace("%1", packCode);
             var job = new NetJob("Fetching private pack");
-            var request = NetRequest.MakeByteArray(new Uri(url), Net);
+            var request = NetRequest.MakeByteArray(new Uri(url), Http, Settings);
             job.AddNetRequest(request);
 
             await job.StartAsync(cancellationToken);

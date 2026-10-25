@@ -31,7 +31,7 @@
 // Deviations:
 //  - Upstream builds the requests through QHttpMultiPart on QNetworkAccessManager; the port
 //    pre-builds an identical multipart body (same part headers and CRLF framing, like
-//    Skins/SkinUpload.cs) and sends it through the injected NetStack's HttpClient, because
+//    Skins/SkinUpload.cs) and sends it through the injected client, because
 //    NetRequest cannot express multipart Content-Type headers.
 //  - The imgur base URL / client id come from FlintConfig (BuildConfig.IMGUR_BASE_URL /
 //    IMGUR_CLIENT_ID) by default but are factory-injectable so tests can stub them.
@@ -64,12 +64,14 @@ public sealed record ImgurDataJson(
 internal sealed partial class ImgurJsonContext : JsonSerializerContext;
 
 /// <summary>Port of the ImgurAPI namespace: the two imgur request factories. An instance
-/// rides the injected NetStack (LauncherRuntime.Imgur — same de-singletoning story as the
+/// rides the injected client pair (LauncherRuntime.Imgur — same de-singletoning story as the
 /// platform clients); the tasks it builds send through that stack's client.</summary>
-public sealed class ImgurApi(NetStack net)
+public sealed class ImgurApi(HttpClient http, NetSettings settings)
 {
     /// <summary>The network stack this client's uploads flow through.</summary>
-    public NetStack Net { get; } = net;
+    public HttpClient Http { get; } = http;
+
+    public NetSettings Settings { get; } = settings;
 
     /// <summary>Port of ImgurAPI::AlbumResult.</summary>
     public sealed record AlbumResult
@@ -86,26 +88,28 @@ public sealed class ImgurApi(NetStack net)
 
     /// <summary>Port of ImgurAPI::makeUpload: upload one screenshot as an image.</summary>
     public ImgurUpload MakeUpload(ScreenShot shot, string? baseUrl = null, string? clientId = null) =>
-        new(shot, Net, baseUrl, clientId);
+        new(shot, Http, Settings, baseUrl, clientId);
 
     /// <summary>Port of ImgurAPI::makeAlbum: group uploaded screenshots into an album
     /// (the payload needs the delete hashes left by the earlier uploads).</summary>
     public ImgurAlbumCreation MakeAlbum(AlbumResult result, IReadOnlyList<ScreenShot> screenshots,
         string? baseUrl = null, string? clientId = null) =>
-        new(result, screenshots, Net, baseUrl, clientId);
+        new(result, screenshots, Http, Settings, baseUrl, clientId);
 }
 
 /// <summary>The upload half of ImgurAPI::makeUpload (the Net::Request + RPC::Sink&lt;QString&gt;
 /// pair): fills the ScreenShot metadata from the response JSON.</summary>
 public sealed class ImgurUpload(
     ScreenShot shot,
-    NetStack net,
+    HttpClient http,
+    NetSettings settings,
     string? baseUrl = null,
     string? clientId = null)
     : FlintTask
 {
     private readonly string _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
-    private readonly NetStack _net = net;
+    private readonly HttpClient _http = http;
+    private readonly NetSettings _settings = settings;
 
     /// <summary>The imgur endpoint: BuildConfig.IMGUR_BASE_URL + "image".</summary>
     public string EndpointUrl
@@ -136,7 +140,7 @@ public sealed class ImgurUpload(
         message.Content = new ByteArrayContent(body);
         message.Content.Headers.TryAddWithoutValidation("Content-Type", "multipart/form-data; boundary=" + boundary);
 
-        using var response = await _net.Client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
+        using var response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
             cancellationToken).ConfigureAwait(false);
         var statusCode = (int)response.StatusCode;
         string responseBody;
@@ -221,13 +225,15 @@ public sealed class ImgurUpload(
 public sealed class ImgurAlbumCreation(
     ImgurApi.AlbumResult result,
     IReadOnlyList<ScreenShot> screenshots,
-    NetStack net,
+    HttpClient http,
+    NetSettings settings,
     string? baseUrl = null,
     string? clientId = null)
     : FlintTask
 {
     private readonly string _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
-    private readonly NetStack _net = net;
+    private readonly HttpClient _http = http;
+    private readonly NetSettings _settings = settings;
 
     /// <summary>The imgur endpoint: BuildConfig.IMGUR_BASE_URL + "album".</summary>
     public string EndpointUrl
@@ -250,7 +256,7 @@ public sealed class ImgurAlbumCreation(
         message.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(data));
         message.Content.Headers.TryAddWithoutValidation("Content-Type", "application/x-www-form-urlencoded");
 
-        using var response = await _net.Client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
+        using var response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
             cancellationToken).ConfigureAwait(false);
         var statusCode = (int)response.StatusCode;
         string responseBody;

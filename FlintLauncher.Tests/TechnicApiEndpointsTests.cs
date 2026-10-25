@@ -27,7 +27,7 @@ public class TechnicApiEndpointsTests : IDisposable
 
     public TechnicApiEndpointsTests()
     {
-        _api = new TechnicApi(TestNet.Stack) { BaseUrl = _server.Url + "/", ApiBuild = "testbuild" };
+        _api = new TechnicApi(TestNet.Http, TestNet.Settings) { BaseUrl = _server.Url + "/", ApiBuild = "testbuild" };
     }
 
     public void Dispose()
@@ -91,7 +91,7 @@ public class TechnicApiEndpointsTests : IDisposable
         SeedSearchList();
         // a dead base on the injected client forces the query's serverUrl override to be
         // the only working route
-        var api = new TechnicApi(TestNet.Stack) { BaseUrl = "http://127.0.0.1:9/", ApiBuild = "testbuild" };
+        var api = new TechnicApi(TestNet.Http, TestNet.Settings) { BaseUrl = "http://127.0.0.1:9/", ApiBuild = "testbuild" };
         await using var host = await FlintApiHost.StartAsync(technic: api);
 
         var response = await host.GetAsync(
@@ -354,7 +354,7 @@ public class TechnicApiEndpointsTests : IDisposable
         _server.Downloads[zipName] = await File.ReadAllBytesAsync(zipPath);
         try
         {
-            var api = new TechnicApi(TestNet.Stack) { BaseUrl = "http://127.0.0.1:9/", ApiBuild = "testbuild" };
+            var api = new TechnicApi(TestNet.Http, TestNet.Settings) { BaseUrl = "http://127.0.0.1:9/", ApiBuild = "testbuild" };
             await using var host = await FlintApiHost.StartAsync(technic: api);
 
             var post = await host.PostAsync("/api/v1/modplatform/technic/install", new

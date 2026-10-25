@@ -92,7 +92,7 @@ public static class ModPlatformTasks
 public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType loaders, IReadOnlyList<ModLoaderType> loaderList, ModrinthApi modrinth, FlameApi? flame = null)
 {
     private readonly ModrinthApi _modrinth = modrinth;
-    private readonly FlameApi _flame = flame ?? new FlameApi(modrinth.Net);
+    private readonly FlameApi _flame = flame ?? new FlameApi(modrinth.Http, modrinth.Settings);
 
     public async Task<(IndexedPack Pack, IndexedVersion Version)> ResolveAsync(
         ResourceProvider provider, string projectId, string versionId, CancellationToken cancellationToken)
@@ -206,7 +206,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         if (provider == ResourceProvider.Flame)
         {
             var request = NetRequest.MakeByteArray(new Uri(_flame.GetVersionsUrl(
-                new VersionSearchArgs { Pack = pack, McVersions = [mcVersion] })), _flame.Net);
+                new VersionSearchArgs { Pack = pack, McVersions = [mcVersion] })), _flame.Http, _flame.Settings);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
             {
@@ -312,7 +312,7 @@ public sealed class ModInstallTask(
     private readonly List<ModLoaderType> _loaderList = ModIndex.ModLoaderTypesToList(loaders);
     private readonly List<ModInstallEntryView> _installed = [];
     private readonly ModrinthApi _modrinth = modrinth;
-    private readonly FlameApi _flame = flame ?? new FlameApi(modrinth.Net);
+    private readonly FlameApi _flame = flame ?? new FlameApi(modrinth.Http, modrinth.Settings);
 
     /// <summary>The entries for the task view's optional result payload.</summary>
     public TaskResultView BuildResult() => new(null, _installed);

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
 // End-to-end tests for the Java download tasks against a local HTTP server (TestHttpServer
-// pattern from NetStackTests): archive installs (zip + a hand-built ustar tar.gz), manifest
+// pattern from NetRequestTests): archive installs (zip + a hand-built ustar tar.gz), manifest
 // installs (files/directories/symlinks with sha1 validation) and the macOS SymlinkTask.
 
 using System.IO.Compression;
@@ -63,7 +63,7 @@ public class JavaDownloadTests : IDisposable
 
         var finalPath = TempPath("install-zip");
         var task = new ArchiveDownloadTask(new Uri($"{server.Url}/jdk-17.0.9.zip"), new AbsolutePath(finalPath),
-            TestNet.Stack);
+            TestNet.Http, TestNet.Settings);
 
         await task.StartAsync();
 
@@ -86,7 +86,7 @@ public class JavaDownloadTests : IDisposable
 
         var finalPath = TempPath("install-bad-sha");
         var task = new ArchiveDownloadTask(new Uri($"{server.Url}/jdk.zip"), new AbsolutePath(finalPath),
-            TestNet.Stack, "sha1", new string('0', 40));
+            TestNet.Http, TestNet.Settings, "sha1", new string('0', 40));
 
         await task.StartAsync();
 
@@ -123,7 +123,7 @@ public class JavaDownloadTests : IDisposable
         Assert.True(names is not null, $"ListTarGzFile failed: {listError}");
         Assert.Equal("jdk-17.0.9/", names[0]);
         var task = new ArchiveDownloadTask(new Uri($"{server.Url}/jdk-17.0.9.tar.gz"), new AbsolutePath(finalPath),
-            TestNet.Stack);
+            TestNet.Http, TestNet.Settings);
 
         await task.StartAsync();
 
@@ -216,7 +216,7 @@ public class JavaDownloadTests : IDisposable
 
         var finalPath = TempPath("install-manifest");
         var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), new AbsolutePath(finalPath),
-            TestNet.Stack);
+            TestNet.Http, TestNet.Settings);
 
         await task.StartAsync();
 
@@ -249,7 +249,7 @@ public class JavaDownloadTests : IDisposable
 
         var finalPath = TempPath("install-manifest-bad");
         var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), new AbsolutePath(finalPath),
-            TestNet.Stack, "sha1", new string('1', 40));
+            TestNet.Http, TestNet.Settings, "sha1", new string('1', 40));
 
         await task.StartAsync();
 
@@ -291,7 +291,7 @@ public class JavaDownloadTests : IDisposable
 
         var finalPath = TempPath("install-manifest-badfile");
         var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), new AbsolutePath(finalPath),
-            TestNet.Stack);
+            TestNet.Http, TestNet.Settings);
 
         await task.StartAsync();
 

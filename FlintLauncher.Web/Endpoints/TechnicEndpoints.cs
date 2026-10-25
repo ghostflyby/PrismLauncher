@@ -65,7 +65,7 @@ public static class TechnicEndpoints
                 return hookError;
             }
 
-            var (metaError, metaFailReason, metaBody) = await FetchAsync(technicApi.PackMetadataUrl(slug), technicApi.Net);
+            var (metaError, metaFailReason, metaBody) = await FetchAsync(technicApi.PackMetadataUrl(slug), technicApi.Http, technicApi.Settings);
             if (metaError is not null)
             {
                 // an upstream 404 is an unknown slug (the REST mapping of the C++ page's
@@ -92,7 +92,7 @@ public static class TechnicEndpoints
             if (solderUrl is not null)
             {
                 var (solderError, _, solderBody) = await FetchAsync(
-                    TechnicApi.SolderPackUrl(solderUrl, slug), technicApi.Net);
+                    TechnicApi.SolderPackUrl(solderUrl, slug), technicApi.Http, technicApi.Settings);
                 var listing = solderError is null ? TechnicApi.LoadSolderPack(solderBody) : null;
                 if (listing is not null)
                 {
@@ -179,7 +179,7 @@ public static class TechnicEndpoints
                 if (zipUrl.Length != 0)
                 {
                     var packUri = new Uri(zipUrl, UriKind.Absolute);
-                    task = new SingleZipPackInstallTask(packUri, request.MinecraftVersion ?? "", technic.Net)
+                    task = new SingleZipPackInstallTask(packUri, request.MinecraftVersion ?? "", technic.Http, technic.Settings)
                     {
                         MetaCache = metaCache,
                         Group = request.Group ?? "",
@@ -205,7 +205,7 @@ public static class TechnicEndpoints
                     }
 
                     task = new SolderPackInstallTask(new Uri(solder), slug, build,
-                        request.MinecraftVersion ?? "", technic.Net)
+                        request.MinecraftVersion ?? "", technic.Http, technic.Settings)
                     {
                         Group = request.Group ?? "",
                     };
@@ -270,7 +270,7 @@ public static class TechnicEndpoints
         }
 
         // the URL builders concatenate directly onto the base, so keep the slash
-        return new TechnicApi(technic.Net)
+        return new TechnicApi(technic.Http, technic.Settings)
         {
             BaseUrl = trimmed.EndsWith('/') ? trimmed : trimmed + "/",
             ApiBuild = technic.ApiBuild,
@@ -289,7 +289,7 @@ public static class TechnicEndpoints
         }
 
         var (url, mode) = technicApi.SearchUrl(term);
-        var request = NetRequest.MakeByteArray(new Uri(url), stack: technicApi.Net);
+        var request = NetRequest.MakeByteArray(new Uri(url), technicApi.Http, technicApi.Settings);
         await request.StartAsync();
         if (request.State != TaskState.Succeeded)
         {
@@ -310,9 +310,9 @@ public static class TechnicEndpoints
     /// <summary>Fetches a Technic/Solder URL; fetch failures map to the uniform 502 error
     /// envelope, success yields the raw body for the caller's parser.</summary>
     private static async Task<(IResult? Error, string FailReason, string Body)> FetchAsync(
-        string url, NetStack net)
+        string url, HttpClient http, NetSettings settings)
     {
-        var request = NetRequest.MakeByteArray(new Uri(url), net);
+        var request = NetRequest.MakeByteArray(new Uri(url), http, settings);
         await request.StartAsync();
         return request.State != TaskState.Succeeded
             ? (ApiJson.Error("technic_unavailable",
@@ -326,7 +326,7 @@ public static class TechnicEndpoints
     private static async Task<(IResult? Error, string Build)> ResolveDefaultBuildAsync(
         TechnicApi api, string solderUrl, string slug)
     {
-        var (_, failReason, body) = await FetchAsync(TechnicApi.SolderPackUrl(solderUrl, slug), api.Net);
+        var (_, failReason, body) = await FetchAsync(TechnicApi.SolderPackUrl(solderUrl, slug), api.Http, api.Settings);
         if (failReason.Length != 0)
         {
             return (ApiJson.Error("creation_failed",

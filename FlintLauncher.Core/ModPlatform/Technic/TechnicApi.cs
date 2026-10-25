@@ -29,7 +29,7 @@
 //
 // BuildConfig.TECHNIC_API_BASE_URL / TECHNIC_API_BUILD became injected instance state:
 // BaseUrl / ApiBuild are per-instance (tests construct their own client pointed at a stub);
-// the client rides the injected NetStack (LauncherRuntime.Technic — see the Modrinth/Flame
+// the client rides the injected persistent client pair (LauncherRuntime.Technic — see the Modrinth/Flame
 // de-singletoning for the same story). The parsers and the Solder URL builders are pure
 // helpers and stay static; the wire shapes deserialize through the source-generated
 // TechnicJsonContext (the Solder models carry their annotations themselves).
@@ -137,7 +137,7 @@ public enum TechnicSearchMode : byte
     Single,
 }
 
-public sealed class TechnicApi(NetStack net)
+public sealed class TechnicApi(HttpClient http, NetSettings settings)
 {
     /// <summary>BuildConfig.TECHNIC_API_BASE_URL (per-instance; tests construct a client
     /// pointed at their stub).</summary>
@@ -147,7 +147,9 @@ public sealed class TechnicApi(NetStack net)
     public string ApiBuild { get; init; } = FlintConfig.Default.TechnicApiBuild;
 
     /// <summary>The network stack this client's requests go through.</summary>
-    public NetStack Net { get; } = net;
+    public HttpClient Http { get; } = http;
+
+    public NetSettings Settings { get; } = settings;
 
     // ------------------------------------------------------------------ URL builders
 

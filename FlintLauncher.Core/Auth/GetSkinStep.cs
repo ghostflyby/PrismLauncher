@@ -26,7 +26,7 @@ public sealed class GetSkinStep(AccountData data, AuthEndpointsOptions? auth = n
             {
                 Url = url,
                 AutoRetry = true,
-            }, _auth.Net, cancellationToken).ConfigureAwait(false);
+            }, _auth.Http, _auth.Settings, cancellationToken).ConfigureAwait(false);
             if (response.Success)
             {
                 Data.MinecraftProfile.SkinField.Data = response.Body;

@@ -332,7 +332,8 @@ public class ExtractNativesTests
         var instanceCache = new HttpMetaCache(
             Temporary.SystemTempDirectory() / $"flint-asset-indexes-{Guid.NewGuid():N}" / "metacache.json")
         {
-            Net = TestNet.Stack,
+            Http = TestNet.Http,
+            Settings = TestNet.Settings,
         };
         instanceCache.AddBase("asset_indexes", new AbsolutePath(Path.Combine(assetsRoot.Root, "indexes")));
         instance.MetaCache = instanceCache;
@@ -354,7 +355,8 @@ public class ExtractNativesTests
                 StateRoot = baseDir,
             },
             LoggerFactory = NullLoggerFactory.Instance,
-            Net = TestNet.Stack,
+            Http = TestNet.Http,
+            Settings = TestNet.Settings,
             ResourceUrlOverride = server.Url + "/objects/",
         };
         try
@@ -466,7 +468,7 @@ internal sealed class AssetsRootRedirect : IDisposable
     }
 }
 
-/// <summary>Free-port HTTP stub (the NetStackTests pattern).</summary>
+/// <summary>Free-port HTTP stub (the NetRequestTests pattern).</summary>
 internal sealed class TestHttpServer : IDisposable
 {
     private readonly HttpListener _listener;
