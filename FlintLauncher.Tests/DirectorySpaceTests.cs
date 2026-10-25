@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the watched-directory tenancy (the restored C++ watcher glue): pulse-driven
 // reconcile is deterministic; the one real-FSW smoke test carries a generous budget
 // because the macOS backend's start latency makes event timing inherently loose.

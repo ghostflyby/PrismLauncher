@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The instance.json store: one TypedJsonFile per instance directory holding the
 // RAW instance layer — no fold at load time, because a member being null IS the layering
 // signal; the user layer joins at read time through InstanceConfigKeys.

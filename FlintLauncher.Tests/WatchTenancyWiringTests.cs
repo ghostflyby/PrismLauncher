@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The tenancy wiring end to end: cooperative root moves re-point every tenant's own
 // state (the list's configured roots, the folder models' Dir), and instances leaving
 // the list release their folder-model watches instead of stranding them in retry.

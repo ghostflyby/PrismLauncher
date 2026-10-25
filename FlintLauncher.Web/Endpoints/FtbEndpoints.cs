@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // FTB endpoints, mirroring the ATLauncher surface: the /modpack/all index
 // pass-through, the per-pack description + version list (mapped through FtbPackManifest's
 // loaders like the C++ FtbListModel) and the pack install — FtbPackInstallTask run through

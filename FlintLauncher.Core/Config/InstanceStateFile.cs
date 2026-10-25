@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // instance-state.json: the per-instance runtime time trio — lastLaunchTime /
 // lastTimePlayed / totalTimePlayed — machine-local, aligned with the
 // launcher-state.json shape (one TypedJsonFile, stateVersion evolution, atomic writes).

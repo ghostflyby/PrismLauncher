@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Launch endpoint: builds a headless LaunchController (AutoProceed=false — the client
 // drives the ReadyForLaunch gate through POST /tasks/{id}/proceed) and hands the tracked
 // task id back (202).

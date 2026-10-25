@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The unified five-root test fixture: stamps a fresh temp directory tree and
 // hands out the resulting FlintPaths, replacing the bare temp-dir fallbacks the
 // cleanup removed the last production excuse for. Two shapes:

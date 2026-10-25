@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The three former "opaque JSON-text blob" config members (InstanceBlobConverters): the
 // dual-form READ compatibility (the legacy wire form was a string holding the embedded
 // JSON, the modern form is the native collection) and the free native WRITE shape —

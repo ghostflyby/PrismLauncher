@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022 flowln <flowlnlnln@gmail.com>
+//
 // Port of tests/ResourcePackParse_test.cpp (fixtures: TestData/ResourcePackParse, copied
 // from tests/testdata/Resources — the upstream QFINDTESTDATA("testdata/Resources") dir).
 

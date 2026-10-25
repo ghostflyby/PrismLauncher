@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022 flowln <flowlnlnln@gmail.com>
+// SPDX-FileCopyrightText: 2022 Sefa Eyeoglu <contact@scrumplex.net>
+//
 // Port of tests/TexturePackParse_test.cpp (fixtures: TestData/TexturePackParse, copied
 // from tests/testdata/TexturePackParse).
 

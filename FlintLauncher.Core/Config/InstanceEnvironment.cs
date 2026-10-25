@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The instance-layer environment: everything an instance's typed settings stack needs —
 // the user layer's live store (flint.json) plus the source-generated type infos for
 // instance.json / instance-state.json (Core only sees the opaque JsonTypeInfo

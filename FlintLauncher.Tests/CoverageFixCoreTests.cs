@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Core-level coverage tests: the C++-aligned config defaults (the record
 // property defaults are the single source, read through the typed flint.json store; the
 // batch retired the SettingsObject adapter view), the

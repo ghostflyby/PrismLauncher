@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The typed layer-stack fold: a layer stack resolves by folding each layer
 // over the one below it — the UPPER layer wins wherever its member is non-null, null
 // inherits. The bottom of every fold is a fresh record, so the record property defaults

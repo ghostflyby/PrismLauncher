@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Technic endpoints, mirroring the ATLauncher/FTB surface: the search/trending
 // pass-through (TechnicModel::performQuery's URL selection + ListModel::searchRequestFinished
 // mapping), the per-slug pack metadata with the url-vs-solder detection

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the Flame (CurseForge) layer: the x-api-key header, request shapes (search URL,
 // POST /fingerprints murmur2 batch, batch project/file fetches), the version loader
 // (gameVersions parsing, hashes, dependencies), the date/loader-based latest-version

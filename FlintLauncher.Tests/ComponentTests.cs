@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // New tests locking the Component behavior ported from launcher/minecraft/Component.{h,cpp}:
 // the enabled/important/removable flag matrix, the UpdateAction variant plumbing, problem
 // aggregation and the customize/revert (local override file) flow.

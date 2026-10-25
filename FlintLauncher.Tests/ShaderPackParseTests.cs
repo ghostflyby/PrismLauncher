@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022 Rachel Powers <508861+Ryex@users.noreply.github.com>
+//
 // Port of tests/ShaderPackParse_test.cpp (fixtures: TestData/ShaderPackParse, copied
 // from tests/testdata/ShaderPackParse).
 

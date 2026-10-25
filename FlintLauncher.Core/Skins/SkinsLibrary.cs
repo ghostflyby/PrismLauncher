@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The local skin library: a minimal local store of skin
 // textures backed by the SkinsDir SETTING (default "skins", data-root-relative — the
 // setting is honored now that a model actually lives there; the directory was dead weight

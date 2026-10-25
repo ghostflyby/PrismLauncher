@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Qt-read-compat pins for the Variant coercions and the ini codec's @-types:
 //  - Variant.AsBool's string branch must judge strings the way QVariant(QString).toBool()
 //    does (toLower(), then ONLY empty/"0"/"false" are false — everything else reads true,

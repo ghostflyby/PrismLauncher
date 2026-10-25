@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // API tests for the local skin library: the GET/POST/DELETE /skins
 // surface over the SkinsDir setting (default "skins" under the home layout's data root)
 // and the apply endpoint's guard rails (unknown account / missing skin / missing texture).

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Read-only smoke test against the real PrismLauncher accounts.json (same pattern as
 // RealDataSmokeTests): loads the account list through the port, then re-saves to a temp file and
 // compares the JSON structure (key sets, never bytes). Never writes to the real file.

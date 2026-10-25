@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of the "apply update" orchestration the C++ drives from the UI layer
 // (ModFolderPage::updateMods / downloadDialogFinished + ResourceUpdateDialog::getTasks):
 // every checked update is a ResourceDownloadTask built by the check pass

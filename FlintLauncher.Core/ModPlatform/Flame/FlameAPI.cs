@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of modplatform/flame/FlameAPI.{h,cpp}: the CurseForge v1 API surface (search,
 // project/file endpoints, fingerprint matching, categories and the date-based
 // latest-version matching) on top of the Net stack.

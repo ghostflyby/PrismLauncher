@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for Worlds/ServersDat.cs: synthesize a servers.dat, round-trip it, edit it,
 // save, and reload — mirroring the ServersPage.cpp parse/serialize logic.
 

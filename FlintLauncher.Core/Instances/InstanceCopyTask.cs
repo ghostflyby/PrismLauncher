@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of launcher/InstanceCopyTask.{h,cpp}: copies an instance folder into the staging
 // area honoring the InstanceCopyPrefs exclusion filters, then fixes up the copy's metadata
 // (new name/icon/uuid, optional playtime reset) through a generic NullInstance shell —

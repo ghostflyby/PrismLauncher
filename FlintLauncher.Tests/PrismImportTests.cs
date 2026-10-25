@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the Prism→Flint import layer: transfer modes, idempotent resume, the planner
 // and the source detector, plus a full PrismImportTask run over a synthetic Prism layout.
 

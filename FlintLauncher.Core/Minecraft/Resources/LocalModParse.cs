@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of launcher/minecraft/mod/tasks/LocalModParseTask.{h,cpp} (the ModUtils namespace):
 // the mod-metadata readers for fabric.mod.json, quilt.mod.json, META-INF/mods.toml (and
 // neoforge.mods.toml), mcmod.info, forgeversion.properties, litemod.json and nilmod.css

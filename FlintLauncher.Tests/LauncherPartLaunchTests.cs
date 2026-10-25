@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for LauncherPartLaunch: the game runs as
 // `java [javaArguments] -Djava.library.path=<natives> -cp <jars> org.prismlauncher.EntryPoint`
 // with the launch script piped to stdin followed by "launch\n" (or "abort\n"). A fake

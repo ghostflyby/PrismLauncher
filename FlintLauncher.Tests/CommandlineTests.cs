@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Focused tests for the port of launcher/Commandline.{h,cpp}.
 
 using FlintLauncher.Core.Text;

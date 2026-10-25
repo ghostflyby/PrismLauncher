@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2023 Trial97 <alexandru.tripon97@gmail.com>
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of launcher/minecraft/mod/tasks/GetModDependenciesTask.{h,cpp}: the recursive
 // dependency resolver. Given the selected (pack, version) pairs and the instance's
 // mc-version/loader filter, walk every required entry of each version's `dependencies`,

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the InstanceImportTask dispatch: modpack type detection by marker file
 // (modrinth.index.json -> Modrinth, manifest.json -> Flame (FlameCreationTask),
 // bin/modpack.jar -> Technic (TechnicPackProcessor), instance.cfg -> plain folder

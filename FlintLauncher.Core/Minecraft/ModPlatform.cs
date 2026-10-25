@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022 flowln <flowlnlnln@gmail.com>
+// SPDX-FileCopyrightText: 2023 Trial97 <alexandru.tripon97@gmail.com>
+//
 // Port of the ModPlatform::ModLoaderType subset of launcher/modplatform/ModIndex.h that the
 // instance component stack (Component/PackProfile) needs. The rest of ModIndex (mod metadata
 // scraping types) belongs to the modplatform layer and is not ported here.

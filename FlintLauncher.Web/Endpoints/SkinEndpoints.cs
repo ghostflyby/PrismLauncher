@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Account skin endpoints: the AccountPage/SkinManageDialog skin surface —
 //   GET    /accounts/{profileId}/skin   -> the profile's current skin {url, variant}
 //   PUT    /accounts/{profileId}/skin   -> SkinUpload (multipart {file, model}, sync)

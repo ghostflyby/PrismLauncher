@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Byte-level compatibility tests for the INI layer against golden files produced by real
 // QSettings (Qt 6.11) — see FlintLauncher/tools/qt-ini-golden. The *_dump.tsv fixtures record
 // what QSettings itself reads back from the same files, so the parser is compared against Qt's

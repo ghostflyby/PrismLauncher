@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The FTB App API surface used by the platform layer: the modpacks.ch index URL
 // (/modpack/all -> {"packs":[id,...]}), the per-pack description (/modpack/{id}) and the
 // per-version payload (/modpack/{id}/{versionId}).

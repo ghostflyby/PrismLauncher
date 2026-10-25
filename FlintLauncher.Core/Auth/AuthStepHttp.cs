@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022 Sefa Eyeoglu <contact@scrumplex.net>
+//
 // Port of launcher/net/NetUtils.h (error classification) plus a small HTTP runner used by the
 // auth steps (no direct C++ counterpart file).
 //

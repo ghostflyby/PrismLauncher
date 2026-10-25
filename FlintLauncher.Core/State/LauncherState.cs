@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The launcher-state.json schema: the machine-local runtime state the C++ used to
 // disguise as settings keys (TotalPlayTime*/LastHostname/Java probe
 // quintet/UserAskedAboutAutomaticJavaDownload/LastOfflinePlayerName) plus the local group

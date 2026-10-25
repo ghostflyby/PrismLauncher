@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the seeded-profile launch pipeline data pieces: createLaunchScript's exact line
 // set (MinecraftInstance::createLaunchScript), processMinecraftArgs token substitution
 // (including the auth tokens) and LaunchTask's censorPrivateInfo session filter.

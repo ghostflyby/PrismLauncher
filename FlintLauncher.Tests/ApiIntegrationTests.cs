@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // API integration tests: host the real FlintLauncher.Web app in-process
 // (WebHostBuilder.BuildWebApplication with --data-dir <temp> + a random port) and drive the
 // whole HTTP surface with HttpClient.

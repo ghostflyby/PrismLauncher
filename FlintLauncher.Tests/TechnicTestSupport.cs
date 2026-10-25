@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Test doubles for the Technic layer tests: a stub Technic Platform/Solder server
 // (free-port HttpListener pattern, see ModrinthTestSupport) serving search/trending
 // results, pack metadata, Solder pack/build listings and file downloads, plus synthetic

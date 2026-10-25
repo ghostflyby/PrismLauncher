@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Read-side behavior pins for the Meta metadata parsers (launcher/meta/JsonFormat port) on the
 // JsonNode model: format-version number semantics (no TryGetValue<T>), Require/Ensure message
 // parity, require-set round trips and the requireIsArrayOf<QJsonObject> quirks.

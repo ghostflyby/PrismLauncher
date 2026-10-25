@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The port of the C++ network-settings application paths — Application::updateProxySettings
 // (the Proxy* five), NumberOfManualRetries, RequestTimeout and the UserAgentOverride — applied
 // to the runtime's NetStack. Called by the host at startup and after every successful

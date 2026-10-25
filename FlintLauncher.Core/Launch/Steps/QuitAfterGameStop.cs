@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022 dada513 <dada513@protonmail.com>
+//
 // Port of launcher/launch/steps/QuitAfterGameStop.{h,cpp}: quit the launcher after the game
 // stops. Upstream calls APPLICATION->quit() and never finishes the step (the process exits
 // under it); the headless port raises Services.Ui.QuitRequested and then succeeds (documented

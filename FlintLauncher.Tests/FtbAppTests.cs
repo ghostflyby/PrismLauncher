@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the FTB App import: the FTB App root/instances-path discovery, the
 // instance.json parsing (fields, modLoader string, legacy version.json fallback, icon
 // detection) and the end-to-end import of a synthetic FTB App instance folder (minecraft/

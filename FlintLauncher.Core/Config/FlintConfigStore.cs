@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The flint.json store: one TypedJsonFile per config root, load-or-default with
 // the record-merge fold (absent members take the record property defaults), atomic writes,
 // and an immediate save on every mutation (the C++ INI settings object saved per Set; the

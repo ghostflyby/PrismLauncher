@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the launch step engine (LaunchTask/LaunchStep/TaskStepWrapper): step order,
 // failure propagation, abort semantics, the proceed gate, substituteVariables and the
 // LaunchCommand step (real /bin/echo sub-process, LogPrePostOutput of a real command).

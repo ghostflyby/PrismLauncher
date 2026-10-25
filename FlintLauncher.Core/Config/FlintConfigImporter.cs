@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The global-side INI import pipeline (plus the MultiMC dual-name rider):
 // when flint.json is missing, the first file of the INI chain
 //     flint.cfg ← prismlauncher.cfg / polymc.cfg / multimc.cfg | mmc.cfg

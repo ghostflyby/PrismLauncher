@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Settings groups (the global settings pages of the C++ UI collapse into named key groups
 // over the typed flint.json stack; the group KEYS are the wire contract and
 // stay, while the values come from the single key registry FlintConfigKeys — the old

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The instance settings object over the typed layer stack (the
 // SettingsObject shape the instance/launch layer reads through, backed by
 // flint.json -> instance.json instead of instance.cfg):

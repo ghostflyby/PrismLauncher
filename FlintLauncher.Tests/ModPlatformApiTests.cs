@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // API integration tests: the modplatform endpoints (CurseForge search pass-through,
 // per-provider indexed version lists) and the per-instance mods surface (list / tracked
 // install with the dependency chain / tracked update) against the real in-process web host

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the PasteUpload port (launcher/net/PasteUpload.{h,cpp} + logs/AnonymizeLog.cpp):
 // the provider table, the URL resolution (incl. the paste.gg api.paste.gg HACK), the exact
 // request bodies of all four providers, the anonymization rules and the response parsing of

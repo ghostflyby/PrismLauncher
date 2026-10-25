@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2023 Trial97 <alexandru.tripon97@gmail.com>
+//
 // Port of modplatform/import_ftb/PackInstallTask.{h,cpp}: import a local FTB App instance
 // — copy the modpack folder into staging/minecraft and rebuild the instance settings:
 // InstanceType=OneSix, totalTimePlayed (from the ms totalPlayTime), the jvmArgs override,

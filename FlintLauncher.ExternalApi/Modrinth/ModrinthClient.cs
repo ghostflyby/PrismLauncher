@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The Modrinth v2 client: queries return the wire models of ModrinthJson, decoded straight
 // from the response stream by the source-generated serializer; file downloads land on disk
 // through a checksum-verified temp-file dance. The client is a thin forwarder — one send

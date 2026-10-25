@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // In-memory Microsoft.Extensions.Logging sink for asserting the diagnostics channel. The
 // core receives its ILoggerFactory by constructor injection, so Attach() hands the built
 // factory to the test (inject it into the object under test) and Detach() must bracket the

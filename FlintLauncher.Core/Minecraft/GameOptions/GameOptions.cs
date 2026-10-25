@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of launcher/minecraft/gameoptions/GameOptions.{h,cpp}: the model behind the instance
 // "Game Options" page — a flat <key>:<value> view of an instance's .minecraft/options.txt.
 //

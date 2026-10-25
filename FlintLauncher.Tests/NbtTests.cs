@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the FlintLauncher.Nbt port of libnbt++: synthetic round-trips over all tag
 // types, deep nesting, lists of compounds, gzip vs raw IO, Java modified UTF-8 vectors
 // and truncation/corruption errors. No real user level.dat data is used.

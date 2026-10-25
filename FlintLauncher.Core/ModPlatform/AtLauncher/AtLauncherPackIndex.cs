@@ -1,4 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
+// This file incorporates work covered by the following copyright and
+// permission notice:
+//
+//     Copyright 2020-2021 Jamie Mansfield <jmansfield@cadixdev.org>
+//     Copyright 2021 Petr Mrazek <peterix@gmail.com>
+//
+//     Licensed under the Apache License, Version 2.0 (the "License");
+//     you may not use this file except in compliance with the License.
+//     You may obtain a copy of the License at
+//
+//         http://www.apache.org/licenses/LICENSE-2.0
+//
+//     Unless required by applicable law or agreed to in writing, software
+//     distributed under the License is distributed on an "AS IS" BASIS,
+//     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//     See the License for the specific language governing permissions and
+//     limitations under the License.
+//
 // Port of modplatform/atlauncher/ATLPackIndex.{h,cpp}: the packsnew.json index model
 // (IndexedPack/IndexedVersion) and its parser. The safeName is the C++ normalized pack
 // image name ("[^A-Za-z0-9]" stripped, lowercased, ".png" appended). The wire shape is

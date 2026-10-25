@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for Worlds/World.cs + Worlds/WorldList.cs: synthesize a minimal gzipped
 // level.dat in-test, parse it, rename the world, re-read it, plus zip-world handling,
 // the world_gen_settings seed fallback, icon handling and the WorldList directory ops.

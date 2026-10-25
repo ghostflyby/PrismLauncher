@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022 flowln <flowlnlnln@gmail.com>
+// SPDX-FileCopyrightText: 2023 Trial97 <alexandru.tripon97@gmail.com>
+//
 // Port of modplatform/packwiz/Packwiz.{h,cpp} (the MetadataHandler storage backend): the
 // .pw.toml per-mod metadata index. The toml++ dependency is replaced by MiniToml (see the
 // subset documentation there); the writer emits the same key layout toml++ produces for

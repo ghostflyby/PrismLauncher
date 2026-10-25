@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2023 Trial97 <alexandru.tripon97@gmail.com>
+//
 // Port of modplatform/import_ftb/PackHelpers.{h,cpp} (+ the data half of the import_ftb
 // ListModel): parse a local FTB App installation. Each modpack lives in its own folder
 // holding an instance.json (uuid/id/versionId/name/version/mcVersion/totalPlayTime/

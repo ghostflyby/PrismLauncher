@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Response-body entry point shared by the ATL parsers (the wire models deserialize through
 // the AtLauncherJsonContext — see AtLauncherApi.cs): JsonNode.Parse with the C++
 // Json::requireDocument "{what}: Error parsing JSON: ..." wrapping, kept for the surfaced

@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022 flowln <flowlnlnln@gmail.com>
+// SPDX-FileCopyrightText: 2022 Sefa Eyeoglu <contact@scrumplex.net>
+//
 // Port of launcher/minecraft/mod/TexturePack.{h,cpp}.
 //
 // Deviation: the QPixmapCache image plumbing is replaced by the PngImage header info;

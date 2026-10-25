@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Minimal ustar/tar.gz reader used by Java::ArchiveDownloadTask. Upstream runs every archive
 // through libarchive (MMCZip::ArchiveReader); the .NET port ships this dedicated reader for
 // the tar.gz flavour the Java runtime distributions are shipped in (System.IO.Compression only

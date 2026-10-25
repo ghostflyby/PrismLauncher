@@ -1,4 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2024 Trial97 <alexandru.tripon97@gmail.com>
+// SPDX-FileCopyrightText: 2022 Sefa Eyeoglu <contact@scrumplex.net>
+// SPDX-FileCopyrightText: 2022 Rachel Powers <508861+Ryex@users.noreply.github.com>
+// SPDX-FileCopyrightText: 2022 kumquat-ir <66188216+kumquat-ir@users.noreply.github.com>
+//
 // Port of modplatform/flame/FileResolvingTask.{h,cpp} (+ the BlockedMod data struct of
 // ui/dialogs/BlockedModsDialog.h): resolve the manifest's project/file ids through the
 // CurseForge API, recover blocked downloads from Modrinth by sha1 when possible, and load

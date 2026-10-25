@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // New tests locking the resolution algorithm ported from
 // launcher/minecraft/ComponentUpdateTask.{h,cpp}:
 //   - offline Launch/Resolution with locally loaded components builds the LaunchProfile in

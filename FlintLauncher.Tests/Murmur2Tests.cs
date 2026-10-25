@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the murmur2 port (libraries/murmur2) and the HashUtils helpers.
 //
 // Vector provenance: libraries/murmur2 forces seed 1 and is byte-identical to the canonical

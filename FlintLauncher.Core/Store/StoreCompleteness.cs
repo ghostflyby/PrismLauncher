@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The layered completeness derivation view (the "dpkg --verify" model): the store roots are content
 // stores whose completeness is DERIVED from the manifests that installed them — the version
 // manifest's libraries[] for the libraries root, the asset index's objects map for the

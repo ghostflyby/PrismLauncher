@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The mod-metadata wire: typed probes
 // over the four JSON schemas LocalModParse consumes — mcmod.info, fabric.mod.json,
 // quilt.mod.json and litemod.json. These are fixed structured formats of files WE consume,

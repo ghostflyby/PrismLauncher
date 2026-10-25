@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of libraries/murmur2/src/MurmurHash2.{h,cpp}: the modified, incrementally-usable
 // MurmurHash2 variant (forced seed 1) that CurseForge fingerprints are based on.
 //

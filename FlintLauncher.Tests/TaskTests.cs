@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of tests/Task_test.cpp, adapted to async xUnit (Task::start() -> await task.StartAsync()).
 // Keeps the original scenarios (status/progress setters, basic/concurrent/sequential/multiple
 // options runs, the 4096-subtask stack safety check) and adds coverage for the ConcurrentTask

@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of modplatform/modrinth/ModrinthAPI.{h,cpp}: the launcher-domain adapter over
 // ModrinthClient. URL building (search facets, version/dependency URLs), the
 // McVersion/ModLoaderType/release-type mappings and the NetRequest-based download path live

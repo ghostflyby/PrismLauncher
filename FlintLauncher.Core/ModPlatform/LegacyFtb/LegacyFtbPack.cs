@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of modplatform/legacy_ftb/PackHelpers.h: the legacy FTB modpack description parsed
 // from modpacks.xml/thirdparty.xml/{code}.xml (data layer only — the Qt models of the UI
 // are not ported).

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Shared helpers for the mod install/update flow tests (ResourceDownloadTask /
 // GetModDependenciesTask / ModUpdateTask): the typed user layer (a real FlintConfigStore,
 // seeded with the same values the former in-memory stub registered) and a builder that

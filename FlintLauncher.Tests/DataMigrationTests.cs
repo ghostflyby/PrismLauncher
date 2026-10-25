@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the data-migration port (launcher/DataMigrationTask.{h,cpp} plus the data-level
 // half of Application::handleDataMigration): the whitelist inventory, the dry-run/copy task
 // flow, the migration decision records (with the legacy "_nomigrate.txt" marker upgrade)

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Manual verification against a real PrismLauncher data directory.
 // Read-only: skips silently when the directory is absent, never writes to the data dir.
 // Instances load through the typed layer stack — a Prism-format instance.cfg imports in

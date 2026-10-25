@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // File transfer primitives for the Prism→Flint data import: CoW reflink (APFS clonefile /
 // Linux FICLONE), move and copy, with a "destination exists → skip" idempotency rule that
 // matches FS::copy (the migration can be re-run and simply resumes).

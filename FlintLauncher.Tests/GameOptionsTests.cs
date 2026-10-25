@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the GameOptions port (launcher/minecraft/gameoptions/GameOptions.{h,cpp}): the
 // key:value parsing (first ':' separator, untrimmed raw values, "version" line extraction),
 // the whole-file rewrite through a save file and the edit helpers.

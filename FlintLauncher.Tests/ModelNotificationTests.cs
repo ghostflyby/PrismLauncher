@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The BCL notification contracts on the directory-backed models: Reset-only INCC (the
 // update model is reconcile-and-swap — a pass that changed membership fires exactly ONE
 // reset, a pass that changed nothing fires none) and INPC on the instance view properties.

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for GetModDependenciesTask (the recursive dependency resolver of the install/update
 // flow): a two-level Modrinth chain (A requires B requires C, with C already installed ->
 // only B is resolved), the optional-dependency skip, the version-pinned (Modrinth

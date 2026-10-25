@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the JVM discovery (macOS-first, matching the host machine), the process environment
 // cleaner. Discovery runs on the JdkFind facilities (LocateAsync primary + FromExecutable
 // fallback) and both layers are tested here with synthetic homes; real-machine assertions are

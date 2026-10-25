@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the CurseForge export round-trip: import a manifest.zip first, then export the
 // instance back to a CF zip and assert manifest.json (files from the local .pw.toml Flame
 // metadata and from the fingerprint API), modlist.html and the overrides/ zip layout

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the Technic platform: the Platform API URL building and search/metadata
 // parsing (including the url-vs-solder detection), the SingleZipPackInstallTask over the
 // three pack flavors (bin/version.json, bin/modpack.jar, vanilla), the Solder pack install

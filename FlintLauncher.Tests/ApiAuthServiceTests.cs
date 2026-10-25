@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Pins for the auth red lines: the default resolution path writes NOTHING to disk (the
 // token is process-lifetime, generated in-process), a leftover pre-reform
 // <dataRoot>/api-token file is deleted on startup and NEVER read, and the host-injection /

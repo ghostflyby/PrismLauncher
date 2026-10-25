@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // New tests locking the persistence behavior ported from launcher/minecraft/PackProfile.{h,cpp}:
 // mmc-pack.json round trips (the typed write; values are the gate — docs/JSON-MIGRATION.md),
 // patches/*.json handling and the jar mod / custom jar / agent installers.

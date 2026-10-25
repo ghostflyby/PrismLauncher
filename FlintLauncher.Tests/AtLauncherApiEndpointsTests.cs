@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // API-level tests for the ATLauncher endpoints: the packsnew.json
 // pass-through (list + per-pack versions), the staged pack install against the stub ATL CDN
 // (reusing the AtlTestSupport fixture builders — the endpoint runs the same

@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of launcher/minecraft/auth/AuthStep.h (including the AccountTaskState enum).
 //
 // The Qt signal finished(AccountTaskState, QString) becomes the Finished event and the

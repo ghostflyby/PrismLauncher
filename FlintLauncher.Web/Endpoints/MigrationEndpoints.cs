@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Migration endpoints: detect Prism-family data directories, plan the import, run it as a
 // background task (move / CoW-clone / copy), and record declined sources (decision
 // records under the state root). The prism-family endpoints are strictly user-triggered —

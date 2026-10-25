@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for ResourceDownloadTask (the install/update download of an IndexedVersion into an
 // existing instance's mods folder): jar lands in mods/, the .pw.toml metadata is written,
 // a checksum mismatch fails cleanly without leaving payload behind, and the previously

@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2024 Leia uwu <leia@tutamail.com>
+//
 // Port of launcher/launch/steps/PrintServers.{h,cpp}: resolve the auth/session server host
 // names and print the addresses once every lookup finished. QHostInfo::lookupHost maps to
 // Dns.GetHostAddressesAsync; the in-order output and the N/A fallback are ported.

@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of launcher/minecraft/update/AssetUpdateTask.{h,cpp}: download the assets index for
 // the profile's asset version, then fetch the asset objects into assets/objects/<first2>/<hash>.
 //

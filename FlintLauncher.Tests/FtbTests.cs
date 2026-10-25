@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the FTB App API platform: the /modpack/all index, the pack description and the
 // version payload parsing, the data-level pack model (dud-pack skipping + search filter)
 // and the end-to-end pack install against the stub servers (instance layout, component

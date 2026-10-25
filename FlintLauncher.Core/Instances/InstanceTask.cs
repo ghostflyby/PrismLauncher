@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of launcher/InstanceTask.{h,cpp}: the base class of instance *creation* tasks
 // (copy / import / vanilla creation). A task runs inside a staging folder that the
 // InstanceList hands out and commits once the task succeeds (InstanceList.WrapInstanceTask).

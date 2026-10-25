@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Instance-content endpoints: the per-instance functional clusters
 // of the Qt pages — WorldListPage (worlds), ServersPage (servers.dat CRUD + status ping),
 // the external-resource pages (resources/{type}), ScreenshotsPage (listing + imgur upload)

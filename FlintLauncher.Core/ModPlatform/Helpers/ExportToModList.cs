@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2023 Trial97 <alexandru.tripon97@gmail.com>
+//
 // Port of modplatform/helpers/ExportToModList.{h,cpp}: render a mod list as HTML,
 // Markdown, plain text, JSON, CSV or through a custom line template. The C++ walks Mod*
 // objects; here the per-mod data (name/version/authors/url/filename/mod id plus the

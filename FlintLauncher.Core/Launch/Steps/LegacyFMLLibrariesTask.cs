@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of launcher/minecraft/update/LegacyFMLLibrariesTask.{h,cpp}: download the extra FML
 // libraries old Forge versions need and copy them into the instance's lib folder.
 //

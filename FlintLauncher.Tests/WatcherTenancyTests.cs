@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The adopted directory-model tenants (IconPool/SkinsLibrary/WorldList) in watcher mode:
 // the resident state is refreshed by coalesced watcher events, surfaced through the
 // synchronous pulse — no test waits on real watcher timing (DirectorySpaceTests covers

@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2023-2024 Trial97 <alexandru.tripon97@gmail.com>
+//
 // Port of launcher/java/download/ArchiveDownloadTask.{h,cpp}: download a JDK archive (optionally
 // checksum-verified) and extract it into the target folder with the first top-level directory
 // stripped (ExtractZipTask semantics: "jdk-17.0.9/..." lands directly in the final path).

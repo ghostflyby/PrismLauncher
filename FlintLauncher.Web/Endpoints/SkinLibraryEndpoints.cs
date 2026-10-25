@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The local skin library endpoints — the SkinManageDialog's
 // LOCAL half, which the port never had:
 //   GET    /skins                -> the stored skins (index.json via SkinListStore)

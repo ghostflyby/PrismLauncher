@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of launcher/minecraft/auth/AuthFlow.{h,cpp} on top of FlintTask.
 //
 // The Qt signal chain (AuthStep::finished -> AuthFlow::stepFinished -> nextStep) becomes an

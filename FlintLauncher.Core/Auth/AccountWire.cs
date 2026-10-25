@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The accounts.json wire domain:
 // the typed probe records over the format AccountData::saveState/resumeStateFromV3 speak.
 //

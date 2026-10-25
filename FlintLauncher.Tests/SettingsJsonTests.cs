@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The settings-layer dynamic-JSON text helpers (SettingsJson — the former JsonUtils tail,
 // relocated next to its consumers; the deleted Require*/Ensure* node family's number-kind
 // pins retired with it, docs/JSON-MIGRATION.md).

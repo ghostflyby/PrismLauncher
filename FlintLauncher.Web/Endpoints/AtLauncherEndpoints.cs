@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // ATLauncher endpoints: the packsnew.json pass-through (the pack list and the
 // per-pack version list, both mapped through AtLauncherPackIndex.LoadIndexedPack like the
 // C++ AtlListModel) and the pack install — AtLauncherPackInstallTask run through the same

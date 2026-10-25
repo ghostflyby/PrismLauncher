@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Regression tests for the subagent-review fixes on the typed JSON readers: every fix
 // pins input compatibility that the first typed conversion had silently narrowed.
 //

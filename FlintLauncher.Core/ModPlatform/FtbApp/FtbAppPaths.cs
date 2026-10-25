@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2023 Trial97 <alexandru.tripon97@gmail.com>
+//
 // Port of the FTB App root-path discovery of ui/pages/modplatform/import_ftb/ListModel.cpp
 // (getFTBRoot/getDynamicPath): the FTB App root is ~/.ftba (macOS: under Library/
 // Application Support) and the instances folder comes from the "instanceLocation" key of

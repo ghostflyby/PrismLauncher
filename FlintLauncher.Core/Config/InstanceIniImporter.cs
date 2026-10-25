@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The instance-side INI import (read-compat + gate folding): a
 // Prism/PolyMC/MultiMC instance.cfg is parsed into the typed instance layer. Flint never
 // writes the INI back — the import is the READ half of the dual-track format determination:

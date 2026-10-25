@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The instance.json record domain — Identity / Launch / Managed / Export / Misc — the
 // same domain split as the core config. One file per instance directory next
 // to the untouched mmc-pack.json + patches/ (read-compat) and the machine-local

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the InstanceCopyPrefs/InstanceCopyTask port. Everything synthetic (temp dirs);
 // the copy flows go through the real staging machinery of the InstanceList port, like the
 // upstream MainWindow::on_actionCopyInstance_triggered flow (dialog -> task -> staging).

@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022 flowln <flowlnlnln@gmail.com>
+// SPDX-FileCopyrightText: 2022 Sefa Eyeoglu <contact@scrumplex.net>
+//
 // Port of launcher/minecraft/mod/tasks/LocalResourceUpdateTask.{h,cpp}: write (or refresh)
 // a downloaded resource's .pw.toml index entry, reporting the previously installed file
 // through the hasOldResource signal so the caller can delete it once the new download

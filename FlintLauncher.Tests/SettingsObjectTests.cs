@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the typed instance settings stack (the SettingsObject shape over
 // flint.json -> instance.json): fold resolution, the derived gates, the passthrough
 // pair, persistence through instance.json and the state-trio routing. The former

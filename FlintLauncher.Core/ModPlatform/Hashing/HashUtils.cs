@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of modplatform/helpers/HashUtils.{h,cpp}: hashing helpers for the mod platforms
 // (sha1/sha256/sha512/md5/md5 via the crypto stack, and the CurseForge murmur2 variant
 // with its tab/LF/CR/space filter). The QtConcurrent Hasher task becomes the awaitable

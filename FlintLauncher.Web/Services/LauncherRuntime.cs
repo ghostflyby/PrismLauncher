@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The host's core-object wiring: the singletons a C++ Application object would own, built
 // once by WebHostBuilder against the resolved data dir. All paths come from the injected
 // FlintPaths — the process working directory is not load-bearing.

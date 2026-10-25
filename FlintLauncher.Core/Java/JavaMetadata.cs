@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2023-2024 Trial97 <alexandru.tripon97@gmail.com>
+//
 // Port of launcher/java/JavaMetadata.{h,cpp}. The parse-half (parseJavaMeta, DownloadType
 // and the Metadata record) lived in Minecraft/JavaMetadata.cs and has been MOVED here so the
 // whole java/ subsystem sits in the Java/ folder + FlintLauncher.Core.Java namespace; the

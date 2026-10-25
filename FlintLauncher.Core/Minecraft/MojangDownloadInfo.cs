@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of launcher/minecraft/MojangDownloadInfo.h, including the hardcoded legacy/S3
 // fallback asset index URLs of MojangAssetIndexInfo.
 

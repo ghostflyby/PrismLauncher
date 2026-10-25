@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Instance endpoints: list/get/create-vanilla/import/delete/patch + instance settings.
 
 using System.Text.Json;

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the "apply update" orchestration (ModUpdateTask over per-mod
 // ResourceDownloadTasks, the headless port of ModFolderPage::updateMods): an existing mod
 // with old .pw.toml metadata, the Flame check-update pass returning a newer file, then the

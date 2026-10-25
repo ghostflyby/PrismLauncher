@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of tests/MojangVersionFormat_test.cpp: JSON round trips. The C++ test compares
 // QJsonDocument::toJson() of the parsed fixture against toJson() of the re-serialized model
 // byte-wise; the typed write keeps the VALUES but not the Qt byte shape (member order is

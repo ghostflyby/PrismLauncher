@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the imgur screenshot layer (launcher/screenshots/ImgurAPI.{h,cpp}, the unified
 // shape that replaced ImgurUpload/ImgurAlbumCreation): the exact multipart/form shape and
 // headers, the JSON response parsing into the ScreenShot metadata, and every failure path.

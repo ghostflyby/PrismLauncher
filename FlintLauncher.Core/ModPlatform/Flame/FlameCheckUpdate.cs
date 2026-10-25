@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+//
 // Port of modplatform/flame/FlameCheckUpdate.{h,cpp}: CurseForge update detection.
 // For every resource (its installed state taken from the packwiz Flame metadata), fetch the
 // project's file list, pick the latest file matching the instance loaders (FlameApi.

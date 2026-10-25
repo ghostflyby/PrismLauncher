@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the CurseForge update check: a local mod with Flame .pw.toml metadata
 // (murmur2 hash + project/file ids), the stub returning a newer file -> update candidate
 // mapped (with the changelog fetched), and the blocked-update path (no download URL)

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for JavaCommon's JVM args sanity check (the only surviving half of the C++
 // JavaCommon after the JavaCheck.jar retirement — the TestCheck flow had no production
 // consumer in the headless core).

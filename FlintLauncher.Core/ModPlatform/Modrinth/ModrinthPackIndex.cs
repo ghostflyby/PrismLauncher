@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
+// SPDX-FileCopyrightText: 2022 flowln <flowlnlnln@gmail.com>
+// SPDX-FileCopyrightText: 2023 Trial97 <alexandru.tripon97@gmail.com>
+//
 // Port of modplatform/modrinth/ModrinthPackIndex.{h,cpp}: load Modrinth project/version
 // payloads into the provider-neutral ModIndex models. The wire shapes arrive as the
 // source-generated DTOs in ModrinthJson (ModrinthProject / ModrinthVersion); these

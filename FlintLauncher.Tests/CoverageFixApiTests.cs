@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // API-surface coverage tests: the completed settings whitelist (new groups + aligned
 // defaults), the proxy/retry/timeout wiring reaching the shared Http stack, the world
 // copy/detail endpoints, the paste/about/meta-cache endpoints and the launch join-target

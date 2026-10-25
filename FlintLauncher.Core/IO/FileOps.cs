@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The fault-tolerant file operations of launcher/FileSystem.{h,cpp} (FS::copy, FS::move,
 // FS::deletePath, FS::ensure*PathExists) and the atomic save of launcher/PSaveFile.h — the
 // parts of the C++ FS namespace that have no BCL counterpart. Path arithmetic is TruePath's

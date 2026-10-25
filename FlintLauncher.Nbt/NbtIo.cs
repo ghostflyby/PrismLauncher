@@ -1,8 +1,33 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+// SPDX-FileCopyrightText: 2013, 2015 ljfa-ag
+// SPDX-FileCopyrightText: 2022 Sefa Eyeoglu <contact@scrumplex.net>
+// SPDX-FileCopyrightText: 2022 TheKodeToad <TheKodeToad@proton.me>
+// SPDX-FileCopyrightText: 2022 Jamie Mansfield <jmansfield@cadixdev.org>
+// SPDX-FileCopyrightText: 2023 TheKodeToad <TheKodeToad@proton.me>
+//
+// This file incorporates work covered by the following copyright and
+// permission notice:
+//
+//     Copyright 2013-2021 MultiMC Contributors
+//
+//     Licensed under the Apache License, Version 2.0 (the "License");
+//     you may not use this file except in compliance with the License.
+//     You may obtain a copy of the License at
+//
+//         http://www.apache.org/licenses/LICENSE-2.0
+//
+//     Unless required by applicable law or agreed to in writing, software
+//     distributed under the License is distributed on an "AS IS" BASIS,
+//     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//     See the License for the specific language governing permissions and
+//     limitations under the License.
+//
 // Port of libnbt++'s nbt::io entry points (include/io/stream_reader.h: read_compound /
 // read_tag; include/io/stream_writer.h: write_tag) plus the gzip handling the launcher
 // does around them (launcher/minecraft/World.cpp parseLevelDat/serializeLevelDat + GZip;
 // launcher/ui/pages/instance/ServersPage.cpp reads/writes raw).
+// libnbt++ is LGPL-3.0-or-later (see COPYING.md); this port is conveyed under GPL-3.0-only per LGPL-3.0 section 2.
 //
 // Compression model: level.dat is gzipped while servers.dat is raw NBT, so reads
 // auto-detect the gzip magic (0x1F 0x8B) at the start of the stream and writes select

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Flint test infrastructure (no upstream counterpart): the PortAllocator/PortLease pair —
 // the single allocation source for test TCP ports (16 call sites converged here).
 

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // Tests for the InstanceList port. Everything synthetic (temp dirs); instance.cfg and
 // instgroups.json are exercised through the real QSettings-compatible INI layer and the
 // Qt-style JSON writer.

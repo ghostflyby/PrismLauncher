@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
+//
 // The instance list's watcher tenancy (the restored C++ watcher glue): external changes
 // to the instance roots reload the list through a pulse — no test waits on real watcher
 // timing (DirectorySpaceTests covers the real-event wiring once).
