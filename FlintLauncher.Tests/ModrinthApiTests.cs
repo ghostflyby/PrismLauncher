@@ -209,17 +209,16 @@ public class ModrinthApiTests : IDisposable
         var url = _api.GetSearchUrl(args);
         Assert.NotNull(url);
 
-        var request = NetRequest.MakeByteArray(new Uri(url), TestNet.Http, TestNet.Settings);
-        await request.StartAsync();
+        var body = await FlintHttp.GetStringAsync(TestNet.Http, TestNet.Settings,
+            new HttpRequestMessage(HttpMethod.Get, url));
 
-        Assert.Equal(TaskState.Succeeded, request.State);
         Assert.Contains("/search", _server.LastPath);
         Assert.Equal("0", _server.LastQuery["offset"]);
         Assert.Equal("25", _server.LastQuery["limit"]);
         Assert.Equal("jei", _server.LastQuery["query"]);
         // facets survive the round trip as JSON
         Assert.Equal("""[["project_type:mod"]]""", _server.LastQuery["facets"]);
-        Assert.Equal("""{"hits":[]}""", request.BodyAsString);
+        Assert.Equal("""{"hits":[]}""", body);
     }
 
     [Fact]

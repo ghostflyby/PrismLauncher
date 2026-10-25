@@ -43,19 +43,19 @@ public sealed class ArchiveDownloadTask(
         EmitStatus("Downloading Java");
 
         AbsolutePath fullPath;
-        NetRequest action;
+        HttpDownloadTask action;
         var tempDownload = false;
         if (cache is not null)
         {
             var entry = cache.ResolveEntry("java", FileName());
-            action = NetRequest.MakeCached(cache, url, entry);
+            action = HttpDownloadTask.Cached(cache, url, entry);
             fullPath = entry.GetFullPath();
         }
         else
         {
             string a1 = $"flint-java-{Guid.NewGuid():N}-{FileName()}";
             fullPath = Temporary.CreateTempFolder() / a1;
-            action = NetRequest.MakeFile(url, fullPath, http, settings);
+            action = HttpDownloadTask.ToFile(url, fullPath, http, settings);
             tempDownload = true;
         }
 

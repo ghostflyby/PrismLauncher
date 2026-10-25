@@ -98,13 +98,13 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
                 var modUrl = mod?.Url
                              ?? throw new InvalidOperationException("the Solder build carries an unvalidated mod");
                 var path = outputDir / i.ToString();
-                var dl = NetRequest.MakeFile(new Uri(modUrl), path, http, settings);
+                var dl = HttpDownloadTask.ToFile(new Uri(modUrl), path, http, settings);
                 if (mod.Md5.Length != 0)
                 {
                     dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.MD5, mod.Md5));
                 }
 
-                filesJob.AddNetRequest(dl);
+                filesJob.AddDownload(dl);
 
                 i++;
             }

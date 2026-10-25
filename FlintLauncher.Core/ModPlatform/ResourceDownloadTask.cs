@@ -17,7 +17,7 @@
 //  - The shader-config (.txt) rename of downloadSucceeded is dropped: ShaderPackFolderModel
 //    is not ported, and this task only ever runs against the mods folder for now.
 //  - The file download runs on the ModrinthClient's DownloadFileAsync (temp-file +
-//    checksum-gated move) instead of the NetRequest engine.
+//    checksum-gated move) instead of the shared download task.
 
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft.Resources;

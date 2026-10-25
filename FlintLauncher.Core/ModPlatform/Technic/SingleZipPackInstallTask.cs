@@ -54,8 +54,8 @@ public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVers
             entry.IsStale = true;
 
             var filesNetJob = new NetJob("Modpack download");
-            var request = NetRequest.MakeCached(MetaCache, sourceUrl, entry);
-            filesNetJob.AddNetRequest(request);
+            var request = HttpDownloadTask.Cached(MetaCache, sourceUrl, entry);
+            filesNetJob.AddDownload(request);
             _archivePath = entry.GetFullPath();
             await filesNetJob.StartAsync(cancellationToken);
             if (!filesNetJob.WasSuccessful)
@@ -72,7 +72,7 @@ public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVers
                         Path.GetFileName(sourceUrl.AbsolutePath);
             _archivePath = Temporary.CreateTempFolder() / a1;
             FileOps.EnsureFilePathExists(_archivePath);
-            var request = NetRequest.MakeFile(sourceUrl, _archivePath, http, settings);
+            var request = HttpDownloadTask.ToFile(sourceUrl, _archivePath, http, settings);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
             {

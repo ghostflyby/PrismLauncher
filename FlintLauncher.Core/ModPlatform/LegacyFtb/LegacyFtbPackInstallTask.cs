@@ -78,10 +78,10 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
         // (the C++ routed this through APPLICATION->metacache()'s "FTBPacks" base; nothing
         // in the port wires a cache here, so the download always goes to a temp file)
         _archivePath = TempCachePath(path);
-        var request = NetRequest.MakeFile(new Uri(url), _archivePath, http, settings);
+        var request = HttpDownloadTask.ToFile(new Uri(url), _archivePath, http, settings);
 
         var job = new NetJob("Download FTB Pack");
-        job.AddNetRequest(request);
+        job.AddDownload(request);
 
         await job.StartAsync(cancellationToken);
         if (!job.WasSuccessful)

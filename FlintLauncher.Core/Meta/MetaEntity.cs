@@ -26,7 +26,7 @@
 //    NO static fallback: a load without a stamp fails fast. The "MetaURLOverride" setting
 //    is not part of the settings layer yet, so Url() always resolves against
 //    BuildConfig.META_URL (FlintConfig.MetaUrl).
-//  - The NetJob wrapper of BaseEntityLoadTask is reduced to awaiting the single NetRequest
+//  - The NetJob wrapper of BaseEntityLoadTask is reduced to awaiting the single download task
 //    directly (NetJob + setAskRetry(false) + one request has no extra semantics); progress,
 //    status and details signal propagation from the inner request is not ported.
 //  - The QFile/CSRF-era details (partial downloads, etag bookkeeping beyond the cache entry)
@@ -251,7 +251,7 @@ public abstract class MetaEntity
 
             entry.IsStale = true;
             // Net::ApiRequest::makeCached == makeCached + AddAPIHeaders
-            var dl = NetRequest.MakeCached(cache, entity.Url(), entry, RequestOptions.AddApiHeaders);
+            var dl = HttpDownloadTask.Cached(cache, entity.Url(), entry, RequestOptions.AddApiHeaders);
             /*
              * The validator parses the file and loads it into the object.
              * If that fails, the file is not written to storage.

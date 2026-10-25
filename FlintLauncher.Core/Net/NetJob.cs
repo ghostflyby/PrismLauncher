@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 // SPDX-FileCopyrightText: 2022 flowln <flowlnlnln@gmail.com>
-// SPDX-FileCopyrightText: 2023 Rachel Powers <508861+Ryex@users.noreply.github.com>
-// SPDX-FileCopyrightText: 2022 Sefa Eyeoglu <contact@scrumplex.net>
 //
 // This file incorporates work covered by the following copyright and
 // permission notice:
@@ -21,7 +19,8 @@
 //     See the License for the specific language governing permissions and
 //     limitations under the License.
 //
-// Port of launcher/net/NetJob.{h,cpp}: a ConcurrentTask of NetRequests sharing one HttpClient.
+// Port of launcher/net/NetJob.{h,cpp}: a ConcurrentTask of download tasks over the shared
+// persistent client.
 
 using FlintLauncher.Core.Tasks;
 
@@ -29,7 +28,8 @@ namespace FlintLauncher.Core.Net;
 
 public class NetJob(string name = "", int maxConcurrent = ConcurrentTask.DefaultMaxConcurrent) : ConcurrentTask(name, maxConcurrent)
 {
-    public void AddNetRequest(NetRequest request) => AddTask(request);
+    public void AddDownload(HttpDownloadTask download) => AddTask(download);
 
-    public IReadOnlyList<NetRequest> Requests => Queue.OfType<NetRequest>().Concat(Done.Keys.OfType<NetRequest>()).ToList();
+    public IReadOnlyList<HttpDownloadTask> Downloads => Queue.OfType<HttpDownloadTask>()
+        .Concat(Done.Keys.OfType<HttpDownloadTask>()).ToList();
 }

@@ -4,7 +4,7 @@
 //
 // Port of modplatform/modrinth/ModrinthAPI.{h,cpp}: the launcher-domain adapter over
 // ModrinthClient. URL building (search facets, version/dependency URLs), the
-// McVersion/ModLoaderType/release-type mappings and the NetRequest-based download path live
+// McVersion/ModLoaderType/release-type mappings and the download path live
 // here; the executed queries and the wire models live in the ExternalApi client. The
 // Application-singleton reach-ins became injected instance state:
 //  - BuildConfig.MODRINTH_PROD_URL / _STAGING_URL -> BaseUrl / StagingBaseUrl (per-instance,
@@ -39,7 +39,7 @@ public sealed class ModrinthApi(ModrinthClient client, HttpClient http, NetSetti
 
     public static IReadOnlyList<string> MrpackHosts { get; } = ["cdn.modrinth.com", "github.com", "raw.githubusercontent.com", "gitlab.com"];
 
-    /// <summary>The client behind the raw NetRequest paths (the pinned-version and
+    /// <summary>The client behind the raw download paths (the pinned-version and
     /// dependency-version fetches that are not ModrinthClient queries).</summary>
     public override HttpClient Http { get; } = http;
 

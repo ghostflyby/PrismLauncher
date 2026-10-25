@@ -696,18 +696,18 @@ public sealed partial class AtLauncherPackInstallTask(
         var path = $"Configs/{PackSafeName}/{VersionName}.zip";
         var url = _api.PackConfigsZipUrl(PackSafeName, VersionName);
 
-        NetRequest dl;
+        HttpDownloadTask dl;
         if (MetaCache is not null)
         {
             var entry = MetaCache.ResolveEntry("ATLauncherPacks", path);
             entry.IsStale = true;
-            dl = NetRequest.MakeCached(MetaCache, new Uri(url), entry, http: _api.Http, settings: _api.Settings);
+            dl = HttpDownloadTask.Cached(MetaCache, new Uri(url), entry, http: _api.Http, settings: _api.Settings);
             _archivePath = entry.GetFullPath();
         }
         else
         {
             _archivePath = TempCachePath(path);
-            dl = NetRequest.MakeFile(new Uri(url), _archivePath, http: _api.Http, settings: _api.Settings);
+            dl = HttpDownloadTask.ToFile(new Uri(url), _archivePath, http: _api.Http, settings: _api.Settings);
         }
 
         if (Configs.Configs.Sha1.Length != 0)
@@ -767,7 +767,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
         _jarMods.Clear();
         var modJob = new NetJob("Mod download");
-        var downloadRequests = new List<NetRequest>();
+        var downloadRequests = new List<HttpDownloadTask>();
         var blockedMods = new List<(VersionMod Mod, BlockedMod Blocked)>();
 
         foreach (var mod in Configs.Mods)
@@ -963,22 +963,22 @@ public sealed partial class AtLauncherPackInstallTask(
     }
 
     /// <summary>Queue a mod download; returns the local path the file lands in.</summary>
-    private AbsolutePath CachePathFor(string cacheName, string url, NetJob modJob, List<NetRequest> downloadRequests,
+    private AbsolutePath CachePathFor(string cacheName, string url, NetJob modJob, List<HttpDownloadTask> downloadRequests,
         VersionMod mod)
     {
         AbsolutePath cachePath;
-        NetRequest dl;
+        HttpDownloadTask dl;
         if (MetaCache is not null)
         {
             var entry = MetaCache.ResolveEntry("ATLauncherPacks", cacheName);
             entry.IsStale = true;
             cachePath = entry.GetFullPath();
-            dl = NetRequest.MakeCached(MetaCache, new Uri(url), entry, http: _api.Http, settings: _api.Settings);
+            dl = HttpDownloadTask.Cached(MetaCache, new Uri(url), entry, http: _api.Http, settings: _api.Settings);
         }
         else
         {
             cachePath = TempCachePath(cacheName);
-            dl = NetRequest.MakeFile(new Uri(url), cachePath, http: _api.Http, settings: _api.Settings);
+            dl = HttpDownloadTask.ToFile(new Uri(url), cachePath, http: _api.Http, settings: _api.Settings);
         }
 
         if (mod.Md5.Length != 0)
@@ -986,7 +986,7 @@ public sealed partial class AtLauncherPackInstallTask(
             dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.MD5, mod.Md5));
         }
 
-        modJob.AddNetRequest(dl);
+        modJob.AddDownload(dl);
         downloadRequests.Add(dl);
         return cachePath;
     }

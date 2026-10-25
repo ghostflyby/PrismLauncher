@@ -32,7 +32,7 @@
 //  - Upstream builds the requests through QHttpMultiPart on QNetworkAccessManager; the port
 //    pre-builds an identical multipart body (same part headers and CRLF framing, like
 //    Skins/SkinUpload.cs) and sends it through the injected client, because
-//    NetRequest cannot express multipart Content-Type headers.
+//    the plain fetch helper cannot express multipart Content-Type headers.
 //  - The imgur base URL / client id come from FlintConfig (BuildConfig.IMGUR_BASE_URL /
 //    IMGUR_CLIENT_ID) by default but are factory-injectable so tests can stub them.
 

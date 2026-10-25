@@ -522,7 +522,7 @@ public sealed partial class FlameCreationTask : InstanceTask
     private async Task SetupDownloadJob(FileResolvingTask modIdResolver, CancellationToken cancellationToken)
     {
         var filesJob = new NetJob("Mod Download Flame");
-        var downloadTasks = new List<NetRequest>();
+        var downloadTasks = new List<HttpDownloadTask>();
         var results = modIdResolver.GetResults().Files.Values;
 
         foreach (var result in results)
@@ -539,8 +539,8 @@ public sealed partial class FlameCreationTask : InstanceTask
 
             if (result.Version.DownloadUrl.Length != 0)
             {
-                var dl = NetRequest.MakeFile(new Uri(result.Version.DownloadUrl), path, _flame.Http, _flame.Settings);
-                filesJob.AddNetRequest(dl);
+                var dl = HttpDownloadTask.ToFile(new Uri(result.Version.DownloadUrl), path, _flame.Http, _flame.Settings);
+                filesJob.AddDownload(dl);
                 downloadTasks.Add(dl);
             }
         }

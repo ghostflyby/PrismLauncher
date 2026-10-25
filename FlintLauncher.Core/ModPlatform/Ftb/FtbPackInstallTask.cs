@@ -309,7 +309,7 @@ public sealed class FtbPackInstallTask(
 
         // FTB blocks multiple requests at a time
         var jobPtr = new NetJob("Mod download", maxConcurrent: 1);
-        var downloadRequests = new List<NetRequest>();
+        var downloadRequests = new List<HttpDownloadTask>();
         foreach (var file in Manifest.Files)
         {
             if (file.ServerOnly || file.Url.Length == 0)
@@ -319,13 +319,13 @@ public sealed class FtbPackInstallTask(
 
             var path = StagingPath / ".minecraft" / file.Path / file.Name;
 
-            var dl = NetRequest.MakeFile(new Uri(file.Url), path, _ftb.Http, _ftb.Settings);
+            var dl = HttpDownloadTask.ToFile(new Uri(file.Url), path, _ftb.Http, _ftb.Settings);
             if (file.Sha1.Length != 0)
             {
                 dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, file.Sha1));
             }
 
-            jobPtr.AddNetRequest(dl);
+            jobPtr.AddDownload(dl);
             downloadRequests.Add(dl);
         }
 

@@ -109,7 +109,7 @@ public sealed partial class InstanceImportTask(
             _archivePath = new AbsolutePath(entry.GetFullPath());
 
             var filesNetJob = new NetJob("Modpack download");
-            filesNetJob.AddNetRequest(NetRequest.MakeCached(MetaCache, sourceUrl, entry));
+            filesNetJob.AddDownload(HttpDownloadTask.Cached(MetaCache, sourceUrl, entry));
             await filesNetJob.StartAsync(cancellationToken);
             if (!filesNetJob.WasSuccessful)
             {
@@ -123,7 +123,7 @@ public sealed partial class InstanceImportTask(
             string a1 = Path.GetFileName(sourceUrl.AbsolutePath);
             _archivePath = StagingPath / a1;
             FileOps.EnsureFilePathExists(_archivePath);
-            var request = NetRequest.MakeFile(sourceUrl, _archivePath, _modrinth.Http, _modrinth.Settings);
+            var request = HttpDownloadTask.ToFile(sourceUrl, _archivePath, _modrinth.Http, _modrinth.Settings);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
             {

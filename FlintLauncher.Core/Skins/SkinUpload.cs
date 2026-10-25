@@ -28,7 +28,7 @@
 //    pre-builds an identical multipart body (same part headers, CRLF framing) and sends it
 //    with an injected client pair (defaulting to the auth options' client). This stays a
 //    FlintTask like the C++ Net::Request subclass. The multipart Content-Type must be set on
-//    the content headers, which NetRequest cannot do.
+//    the content headers, which the plain fetch helper cannot do.
 //  - QHttpMultiPart generates a random boundary of a different shape — any legal boundary is
 //    equivalent, so the port uses a "flint-<32 hex>" one.
 //  - The endpoint base goes through the injected AuthEndpointsOptions.MinecraftServices

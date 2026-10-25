@@ -28,7 +28,7 @@
 // Deviations:
 //  - Upstream is a Net::Request subclass posting through QNetworkAccessManager; the port is a
 //    FlintTask sending the identical request through an injected client pair (like
-//    Skins/SkinUpload.cs), because NetRequest cannot express multipart/JSON Content-Type headers.
+//    Skins/SkinUpload.cs), because the plain fetch helper cannot express multipart/JSON Content-Type headers.
 //  - The C++ constructor anonymizes the log in place (logs/AnonymizeLog.cpp); the port applies
 //    the same seven rules in AnonymizeLog() before the request is built.
 //  - mclo.gs bodies: QUrlQuery percent-encoding is reproduced with Uri.EscapeDataString. Qt

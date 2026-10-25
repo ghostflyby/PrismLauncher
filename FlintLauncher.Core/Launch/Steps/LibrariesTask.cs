@@ -111,7 +111,7 @@ public sealed class LibrariesTask(MinecraftInstance inst) : FlintTask
             var dls = lib.GetDownloads(inst.RuntimeContext, metacache, errors, localPath);
             foreach (var dl in dls)
             {
-                job.AddNetRequest(dl);
+                job.AddDownload(dl);
             }
         }
 

@@ -105,14 +105,11 @@ public class TechnicTests : IDisposable
                                  ]}
                                  """;
         var (url, mode) = _api.SearchUrl("");
-        var request = NetRequest.MakeByteArray(new Uri(url), TestNet.Http, TestNet.Settings);
-        var job = new NetJob("search");
-        job.AddNetRequest(request);
-        await job.StartAsync();
-        Assert.True(job.WasSuccessful, job.FailReason);
+        var body = await FlintHttp.GetStringAsync(TestNet.Http, TestNet.Settings,
+            new HttpRequestMessage(HttpMethod.Get, url));
         Assert.Equal("testbuild", _server.LastQuery["build"]);
 
-        var packs = TechnicApi.LoadSearchResults(request.BodyAsString, mode);
+        var packs = TechnicApi.LoadSearchResults(body, mode);
 
         Assert.Equal(2, packs.Count);
         Assert.Equal("bevo", packs[0].Slug);

@@ -51,18 +51,6 @@ public class NetRequestTests : IDisposable
         Assert.False(bad.Validate(new NetResponseInfo { StatusCode = 200 }));
     }
 
-    [Fact]
-    public void ByteArraySink_StoresData()
-    {
-        var sink = new ByteArraySink();
-        var spec = new NetRequestSpec();
-        Assert.True(sink.Init(spec));
-        Assert.True(sink.Write("chunk1 "u8.ToArray()));
-        Assert.True(sink.Write("chunk2"u8.ToArray()));
-        Assert.Equal("chunk1 chunk2", sink.DataAsString);
-        Assert.True(sink.HasLocalData());
-    }
-
     // ---------------------------------------------------------------- HttpMetaCache
 
     [Fact]
@@ -300,7 +288,7 @@ public class NetRequestTests : IDisposable
         });
 
         var target = TempPath("download.bin");
-        var request = NetRequest.MakeFile(new Uri(server.Url + "/file"), new AbsolutePath(target), TestNet.Http, TestNet.Settings);
+        var request = HttpDownloadTask.ToFile(new Uri(server.Url + "/file"), new AbsolutePath(target), TestNet.Http, TestNet.Settings);
         request.AddValidator(ChecksumValidator.FromHex(
             HashAlgorithmName.SHA1,
             Convert.ToHexString(SHA1.HashData("file-content-0123456789"u8.ToArray())).ToLowerInvariant()));
@@ -340,7 +328,7 @@ public class NetRequestTests : IDisposable
 
         // first fetch: downloads and records the entry
         var entry = cache.ResolveEntry("general", "thing.txt");
-        var first = NetRequest.MakeCached(cache, new Uri(server.Url + "/thing.txt"), entry, RequestOptions.MakeEternal);
+        var first = HttpDownloadTask.Cached(cache, new Uri(server.Url + "/thing.txt"), entry, RequestOptions.MakeEternal);
         await first.StartAsync();
         Assert.Equal(TaskState.Succeeded, first.State);
         Assert.Equal(1, requestCount);
@@ -350,7 +338,7 @@ public class NetRequestTests : IDisposable
         // second fetch: server answers 304, local data is used (no rewrite)
         var entry2 = cache.ResolveEntry("general", "thing.txt");
         Assert.False(entry2.IsStale);
-        var second = NetRequest.MakeCached(cache, new Uri(server.Url + "/thing.txt"), entry2);
+        var second = HttpDownloadTask.Cached(cache, new Uri(server.Url + "/thing.txt"), entry2);
         await second.StartAsync();
         Assert.Equal(TaskState.Succeeded, second.State);
         Assert.Equal(2, requestCount);
@@ -435,12 +423,14 @@ public class NetRequestTests : IDisposable
             ctx.Response.OutputStream.Write(body);
         });
 
-        var request = NetRequest.MakeByteArray(new Uri(server.Url + "/x"), TestNet.Http, TestNet.Settings, RequestOptions.AutoRetry);
+        var target = TempPath("retry-429.txt");
+        var request = HttpDownloadTask.ToFile(new Uri(server.Url + "/x"), new AbsolutePath(target),
+            TestNet.Http, TestNet.Settings, RequestOptions.AutoRetry);
         await request.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, request.State);
         Assert.Equal(3, attempts);
-        Assert.Equal("ok", request.BodyAsString);
+        Assert.Equal("ok", await File.ReadAllTextAsync(target));
     }
 
     [Fact]
@@ -448,7 +438,9 @@ public class NetRequestTests : IDisposable
     {
         using var server = new TestHttpServer(ctx => { ctx.Response.StatusCode = 404; });
 
-        var request = NetRequest.MakeByteArray(new Uri(server.Url + "/missing"), TestNet.Http, TestNet.Settings);
+        var target = TempPath("missing.bin");
+        var request = HttpDownloadTask.ToFile(new Uri(server.Url + "/missing"), new AbsolutePath(target),
+            TestNet.Http, TestNet.Settings);
         await request.StartAsync();
 
         Assert.Equal(TaskState.Failed, request.State);
@@ -468,21 +460,25 @@ public class NetRequestTests : IDisposable
         });
 
         var job = new NetJob("test-job");
-        var requests = new List<NetRequest>();
+        var downloads = new List<HttpDownloadTask>();
+        var targets = new List<string>();
         for (var i = 0; i < 5; i++)
         {
-            var request = NetRequest.MakeByteArray(new Uri($"{server.Url}/item{i}"), TestNet.Http, TestNet.Settings);
-            requests.Add(request);
-            job.AddNetRequest(request);
+            var target = TempPath($"item{i}.txt");
+            var download = HttpDownloadTask.ToFile(new Uri($"{server.Url}/item{i}"), new AbsolutePath(target),
+                TestNet.Http, TestNet.Settings);
+            downloads.Add(download);
+            targets.Add(target);
+            job.AddDownload(download);
         }
 
         await job.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, job.State);
-        foreach (var (request, i) in requests.Select((r, i) => (r, i)))
+        foreach (var (download, i) in downloads.Select((d, i) => (d, i)))
         {
-            Assert.Equal(TaskState.Succeeded, request.State);
-            Assert.Equal($"/item{i}", request.BodyAsString);
+            Assert.Equal(TaskState.Succeeded, download.State);
+            Assert.Equal($"/item{i}", await File.ReadAllTextAsync(targets[i]));
         }
     }
 

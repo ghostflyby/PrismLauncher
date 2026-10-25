@@ -7,7 +7,7 @@
 //
 // Deviations:
 //  - Upstream steps go through Net::Request/NetJob on QNetworkAccessManager. FlintLauncher.Core's
-//    NetRequest discards non-2xx response bodies, but the XSTS error responses (HTTP 401 with an
+//    the plain request executor discards non-2xx response bodies, but the XSTS error responses (HTTP 401 with an
 //    XErr object) and the device-code error JSON must be readable by the steps, so the auth layer
 //    performs its requests through this helper on the shared net stack instead. The 429/503
 //    auto-retry (3 attempts, Retry-After honored) mirrors RequestOptions.AutoRetry.

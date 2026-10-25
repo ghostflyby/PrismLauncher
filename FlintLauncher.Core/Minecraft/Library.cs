@@ -26,8 +26,8 @@
 // friends, and hiding them behind mutable accessors would not change the coupling.
 // Deviations:
 //  - getDownloads() creates Net::Request objects exactly like upstream (no network activity
-//    happens until the requests are actually started), but returns List<NetRequest>.
-//  - Net::ApiRequest::makeCached (makeCached + AddAPIHeaders) maps to NetRequest.MakeCached
+//    happens until the requests are actually started), but returns List<HttpDownloadTask>.
+//  - Net::ApiRequest::makeCached (makeCached + AddAPIHeaders) maps to HttpDownloadTask.Cached
 //    with the AddAPIHeaders option.
 //  - The qDebug()/qWarning() log lines are dropped.
 //  - This checkout has no ".pack.xz" handling in Library::getDownloads (older MultiMC branches
@@ -266,13 +266,13 @@ public class Library
     /// request objects (resolving the cache entry); starting the requests performs the actual
     /// transfers.
     /// </summary>
-    public List<NetRequest> GetDownloads(
+    public List<HttpDownloadTask> GetDownloads(
         RuntimeContext runtimeContext,
         HttpMetaCache cache,
         List<string> failedLocalFiles,
         string overridePath)
     {
-        var result = new List<NetRequest>();
+        var result = new List<HttpDownloadTask>();
         var stale = IsAlwaysStale();
         var local = IsLocal();
 
@@ -321,7 +321,7 @@ public class Library
             // Net::ApiRequest::makeCached == makeCached + AddAPIHeaders
             options |= RequestOptions.AddApiHeaders;
 
-            var dl = NetRequest.MakeCached(cache, new Uri(url), entry, options);
+            var dl = HttpDownloadTask.Cached(cache, new Uri(url), entry, options);
             if (sha1.Length != 0)
             {
                 dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, sha1));

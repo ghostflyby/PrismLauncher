@@ -152,7 +152,7 @@ public sealed class ManifestDownloadTask(Uri url, AbsolutePath finalPath, HttpCl
         var elementDownload = new NetJob("JRE::FileDownload");
         foreach (var file in toDownload)
         {
-            var dl = NetRequest.MakeFile(file.Url, file.Path, http, settings);
+            var dl = HttpDownloadTask.ToFile(file.Url, file.Path, http, settings);
             if (file.Hash.Length != 0)
             {
                 dl.AddValidator(new ChecksumValidator(HashAlgorithmName.SHA1, file.Hash));
@@ -164,7 +164,7 @@ public sealed class ManifestDownloadTask(Uri url, AbsolutePath finalPath, HttpCl
                 dl.Succeeded += _ => SetExecutable(target.Value);
             }
 
-            elementDownload.AddNetRequest(dl);
+            elementDownload.AddDownload(dl);
         }
 
         await elementDownload.StartAsync(cancellationToken).ConfigureAwait(false);

@@ -24,7 +24,7 @@
 // Port of the data/abstract part of modplatform/ResourceAPI.{h,cpp}: the common interface
 // for interacting with mod-platform APIs (search args/sorting models and the shared
 // version-string mapping helpers). The Qt slot/callback machinery (searchProjects and the
-// Callback<T> plumbing) is not ported — callers drive the returned NetRequest directly.
+// Callback<T> plumbing) is not ported — callers run the fetches themselves.
 
 using System.Text;
 using FlintLauncher.Core.Minecraft;

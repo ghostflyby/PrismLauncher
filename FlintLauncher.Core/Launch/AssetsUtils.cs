@@ -71,12 +71,12 @@ public sealed class AssetObject
     }
 
     /// <summary>Port of AssetObject::getDownloadAction; null when the local file is present.</summary>
-    public NetRequest? GetDownloadAction(AbsolutePath assetsRoot, string resourceUrl, HttpClient http, NetSettings settings)
+    public HttpDownloadTask? GetDownloadAction(AbsolutePath assetsRoot, string resourceUrl, HttpClient http, NetSettings settings)
     {
         var objectFile = new FileInfo(GetAbsolutePath(assetsRoot));
         if (!objectFile.Exists || objectFile.Length != Size)
         {
-            var objectDl = NetRequest.MakeFile(new Uri(resourceUrl + GetRelPath()),
+            var objectDl = HttpDownloadTask.ToFile(new Uri(resourceUrl + GetRelPath()),
                 new AbsolutePath(objectFile.FullName), http, settings);
             if (Hash.Length != 0)
             {
@@ -112,11 +112,11 @@ public sealed class AssetsIndex
             var dl = @object.GetDownloadAction(assetsRoot, resourceUrl, http, settings);
             if (dl is not null)
             {
-                job.AddNetRequest(dl);
+                job.AddDownload(dl);
             }
         }
 
-        return job.Requests.Count != 0 ? job : null;
+        return job.Downloads.Count != 0 ? job : null;
     }
 }
 

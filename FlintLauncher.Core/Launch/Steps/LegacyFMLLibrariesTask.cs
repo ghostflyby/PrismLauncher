@@ -92,7 +92,7 @@ public sealed class LegacyFmlLibrariesTask(MinecraftInstance inst) : FlintTask
             var entry = metacache.ResolveEntry("fmllibs", lib.Filename);
             entry.IsStale = true;
             var urlString = BaseUrl() + lib.Filename;
-            dlJob.AddNetRequest(NetRequest.MakeCached(metacache, new Uri(urlString), entry, RequestOptions.MakeEternal));
+            dlJob.AddDownload(HttpDownloadTask.Cached(metacache, new Uri(urlString), entry, RequestOptions.MakeEternal));
         }
 
         await dlJob.StartAsync(cancellationToken).ConfigureAwait(false);

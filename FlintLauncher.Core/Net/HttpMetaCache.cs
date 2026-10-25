@@ -149,7 +149,7 @@ public sealed class HttpMetaCache(AbsolutePath path) : IDisposable
     private HttpClient? _http;
     private NetSettings? _settings;
 
-    /// <summary>The client and settings the cached downloads (<see cref="NetRequest.MakeCached"/>)
+    /// <summary>The client and settings the cached downloads (<see cref="HttpDownloadTask.Cached"/>)
     /// ride when the caller names none: the cache is the download plane — where a fetch lands
     /// and through which client it travels. The composition root wires its shared, persistent
     /// client; unset falls back to a private default client, which keeps a bare fixture

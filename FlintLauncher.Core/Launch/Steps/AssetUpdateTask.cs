@@ -44,13 +44,13 @@ public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
         var job = new NetJob($"Asset index for {inst.Name()}");
 
         // Net::ApiRequest::makeCached(indexUrl, entry) — no extra options upstream
-        var dl = NetRequest.MakeCached(metacache, new Uri(indexUrl), entry);
+        var dl = HttpDownloadTask.Cached(metacache, new Uri(indexUrl), entry);
         if (assets.Sha1.Length != 0)
         {
             dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, assets.Sha1));
         }
 
-        job.AddNetRequest(dl);
+        job.AddDownload(dl);
 
         _downloadJob = job;
         await job.StartAsync(cancellationToken).ConfigureAwait(false);
