@@ -18,6 +18,7 @@ using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 using TruePath;
@@ -159,18 +160,21 @@ public static class AtLauncherEndpoints
     private static async Task<IResult> WithIndexAsync(AtLauncherApi atlauncher,
         Func<List<IndexedPack>, IResult> map)
     {
-        var (job, request) = atlauncher.FetchPackIndex();
-        await job.StartAsync();
-        if (!job.WasSuccessful)
+        string body;
+        try
+        {
+            body = await atlauncher.FetchPackIndexAsync();
+        }
+        catch (FlintHttpException e)
         {
             return ApiJson.Error("atlauncher_unavailable",
-                $"atlauncher pack index failed: {job.FailReason}", 502);
+                $"atlauncher pack index failed: {e.Reason}", 502);
         }
 
         List<IndexedPack> packs;
         try
         {
-            packs = AtLauncherApi.LoadPackIndex(request.BodyAsString);
+            packs = AtLauncherApi.LoadPackIndex(body);
         }
         catch (JsonException e)
         {

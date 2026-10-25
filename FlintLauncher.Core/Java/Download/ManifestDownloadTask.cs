@@ -14,6 +14,7 @@
 //    which would fail the request later); the meta server only issues absolute URLs.
 
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.IO;
@@ -52,23 +53,34 @@ public sealed class ManifestDownloadTask(Uri url, AbsolutePath finalPath, HttpCl
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Downloading Java");
-        var download = NetRequest.MakeByteArray(url, http, settings);
-        if (checksumHash.Length != 0 && checksumType.Length != 0)
+        byte[] manifestBytes;
+        try
         {
-            download.AddValidator(new ChecksumValidator(HashType(checksumType), Convert.FromHexString(checksumHash)));
+            manifestBytes = await FlintHttp.SendAsync(http, settings,
+                new HttpRequestMessage(HttpMethod.Get, url), cancellationToken).ConfigureAwait(false);
+        }
+        catch (FlintHttpException e)
+        {
+            EmitFailed(e.Reason);
+            return;
         }
 
-        await download.StartAsync(cancellationToken).ConfigureAwait(false);
-        if (download.State != TaskState.Succeeded)
+        if (checksumHash.Length != 0 && checksumType.Length != 0)
         {
-            EmitFailed(download.FailReason);
-            return;
+            var validator = new ChecksumValidator(HashType(checksumType), Convert.FromHexString(checksumHash));
+            var spec = new NetRequestSpec();
+            if (!validator.Init(spec) || !validator.Write(manifestBytes) ||
+                !validator.Validate(new NetResponseInfo { StatusCode = 200 }))
+            {
+                EmitFailed($"checksum verification failed for {url}");
+                return;
+            }
         }
 
         JavaRuntimeManifestJson? manifest;
         try
         {
-            manifest = JsonSerializer.Deserialize(download.BodyAsString,
+            manifest = JsonSerializer.Deserialize(Encoding.UTF8.GetString(manifestBytes),
                 JavaManifestJsonContext.Default.JavaRuntimeManifestJson);
         }
         catch (Exception e) when (e is JsonException)

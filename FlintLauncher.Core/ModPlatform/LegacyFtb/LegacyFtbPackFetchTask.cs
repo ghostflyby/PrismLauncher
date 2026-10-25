@@ -62,20 +62,22 @@ public sealed class LegacyFtbPackFetchTask : FlintTask
         var publicPacksUrl = CdnBaseUrl + "static/modpacks.xml";
         var thirdPartyUrl = CdnBaseUrl + "static/thirdparty.xml";
 
-        var job = new NetJob("LegacyFTB::ModpackFetch");
-        var publicRequest = NetRequest.MakeByteArray(new Uri(publicPacksUrl), Http, Settings);
-        var thirdPartyRequest = NetRequest.MakeByteArray(new Uri(thirdPartyUrl), Http, Settings);
-        job.AddNetRequest(publicRequest);
-        job.AddNetRequest(thirdPartyRequest);
-
-        await job.StartAsync(cancellationToken);
-        if (!job.WasSuccessful)
+        string publicXml;
+        string thirdPartyXml;
+        try
         {
-            EmitFailed(job.FailReason);
+            publicXml = await FlintHttp.GetStringAsync(Http, Settings,
+                new HttpRequestMessage(HttpMethod.Get, publicPacksUrl), cancellationToken);
+            thirdPartyXml = await FlintHttp.GetStringAsync(Http, Settings,
+                new HttpRequestMessage(HttpMethod.Get, thirdPartyUrl), cancellationToken);
+        }
+        catch (FlintHttpException e)
+        {
+            EmitFailed(e.Reason);
             return;
         }
 
-        await FileDownloadFinished(publicRequest.BodyAsString, thirdPartyRequest.BodyAsString);
+        await FileDownloadFinished(publicXml, thirdPartyXml);
     }
 
     /// <summary>Port of PackFetchTask::fetchPrivate: fetch static/{code}.xml per pack code;
@@ -89,18 +91,20 @@ public sealed class LegacyFtbPackFetchTask : FlintTask
         foreach (var packCode in toFetch)
         {
             var url = privatePackBaseUrl.Replace("%1", packCode);
-            var job = new NetJob("Fetching private pack");
-            var request = NetRequest.MakeByteArray(new Uri(url), Http, Settings);
-            job.AddNetRequest(request);
 
-            await job.StartAsync(cancellationToken);
-            if (!job.WasSuccessful)
+            string body;
+            try
+            {
+                body = await FlintHttp.GetStringAsync(Http, Settings,
+                    new HttpRequestMessage(HttpMethod.Get, url), cancellationToken);
+            }
+            catch (FlintHttpException)
             {
                 continue;
             }
 
             var packs = new List<LegacyFtbModpack>();
-            if (!ParseAndAddPacks(request.BodyAsString, PackType.Private, packs))
+            if (!ParseAndAddPacks(body, PackType.Private, packs))
             {
                 // (the C++ signals nothing for an unparseable private pack body — the
                 //  finished signal simply never fires for it)

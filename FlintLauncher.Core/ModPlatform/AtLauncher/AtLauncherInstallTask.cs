@@ -147,18 +147,20 @@ public sealed partial class AtLauncherPackInstallTask(
     {
         EmitStatus("Fetching pack version...");
 
-        var netJob = new NetJob("ATLauncher::VersionFetch");
-        var request = NetRequest.MakeByteArray(new Uri(_api.PackConfigsUrl(PackSafeName, VersionName)),
-            http: _api.Http, settings: _api.Settings);
-        netJob.AddNetRequest(request);
-        await netJob.StartAsync(cancellationToken);
-        if (!netJob.WasSuccessful)
+        string configs;
+        try
         {
-            EmitFailed(netJob.FailReason);
+            configs = await FlintHttp.GetStringAsync(_api.Http, _api.Settings,
+                new HttpRequestMessage(HttpMethod.Get, _api.PackConfigsUrl(PackSafeName, VersionName)),
+                cancellationToken);
+        }
+        catch (FlintHttpException e)
+        {
+            EmitFailed(e.Reason);
             return;
         }
 
-        await OnDownloadSucceeded(request.BodyAsString, cancellationToken);
+        await OnDownloadSucceeded(configs, cancellationToken);
     }
 
     private async Task OnDownloadSucceeded(string response, CancellationToken cancellationToken)

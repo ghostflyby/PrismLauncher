@@ -65,23 +65,16 @@ public sealed class AtLauncherApi(HttpClient http, NetSettings settings)
 
     // ------------------------------------------------------------------ requests
 
-    /// <summary>makeByteArray(packsnew.json).</summary>
-    public (NetJob Job, NetRequest Request) FetchPackIndex()
-    {
-        var netJob = new NetJob("ATLauncher::IndexFetch");
-        var request = NetRequest.MakeByteArray(new Uri(PackIndexUrl()), http: Http, settings: Settings);
-        netJob.AddNetRequest(request);
-        return (netJob, request);
-    }
+    /// <summary>makeByteArray(packsnew.json); failures surface as
+    /// <see cref="FlintHttpException"/> (the old NetRequest status gate).</summary>
+    public Task<string> FetchPackIndexAsync(CancellationToken cancellationToken = default) =>
+        FlintHttp.GetStringAsync(Http, Settings,
+            new HttpRequestMessage(HttpMethod.Get, PackIndexUrl()), cancellationToken);
 
     /// <summary>makeByteArray(share-codes/{code}) (AtlOptionalModListModel::useShareCode).</summary>
-    public (NetJob Job, NetRequest Request) FetchShareCode(string code)
-    {
-        var netJob = new NetJob("Atl::Request");
-        var request = NetRequest.MakeByteArray(new Uri(ShareCodeUrl(code)), http: Http, settings: Settings);
-        netJob.AddNetRequest(request);
-        return (netJob, request);
-    }
+    public Task<string> FetchShareCodeAsync(string code, CancellationToken cancellationToken = default) =>
+        FlintHttp.GetStringAsync(Http, Settings,
+            new HttpRequestMessage(HttpMethod.Get, ShareCodeUrl(code)), cancellationToken);
 
     // ------------------------------------------------------------------ parsers
 

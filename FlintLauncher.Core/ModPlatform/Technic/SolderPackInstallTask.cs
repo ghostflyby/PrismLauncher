@@ -48,17 +48,19 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
         EmitStatus("Resolving modpack files");
 
         var sourceUrl = TechnicApi.SolderBuildUrl(solderUrl.ToString(), pack, version);
-        var request = NetRequest.MakeByteArray(new Uri(sourceUrl), http, settings);
-        var resolveJob = new NetJob("Resolving modpack files");
-        resolveJob.AddNetRequest(request);
-        await resolveJob.StartAsync(cancellationToken);
-        if (!resolveJob.WasSuccessful)
+        string listing;
+        try
         {
-            EmitFailed(resolveJob.FailReason);
+            listing = await FlintHttp.GetStringAsync(http, settings,
+                new HttpRequestMessage(HttpMethod.Get, sourceUrl), cancellationToken);
+        }
+        catch (FlintHttpException e)
+        {
+            EmitFailed(e.Reason);
             return;
         }
 
-        await FileListSucceeded(request.BodyAsString, cancellationToken);
+        await FileListSucceeded(listing, cancellationToken);
     }
 
     private async Task FileListSucceeded(string response, CancellationToken cancellationToken)

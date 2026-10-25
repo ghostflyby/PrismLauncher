@@ -89,10 +89,8 @@ public class SkinApiTests : IDisposable
     [Fact]
     public async Task SkinDelete_Calls_The_Active_Skin_Endpoint()
     {
-        var request = SkinDelete.Make("SKIN_TOKEN", _auth);
-        await request.StartAsync();
+        await SkinDelete.DeleteAsync("SKIN_TOKEN", _auth);
 
-        Assert.Equal(TaskState.Succeeded, request.State);
         var recorded = _server.Request("DELETE", "/minecraft/profile/skins/active");
         Assert.NotNull(recorded);
         Assert.Equal("Bearer SKIN_TOKEN", recorded.Headers["Authorization"]);
@@ -101,10 +99,8 @@ public class SkinApiTests : IDisposable
     [Fact]
     public async Task CapeChange_Puts_The_CapeId()
     {
-        var request = CapeChange.Make("SKIN_TOKEN", "1234-abcd", _auth);
-        await request.StartAsync();
+        await CapeChange.ChangeAsync("SKIN_TOKEN", "1234-abcd", _auth);
 
-        Assert.Equal(TaskState.Succeeded, request.State);
         var recorded = _server.Request("PUT", "/minecraft/profile/capes/active");
         Assert.NotNull(recorded);
         Assert.Equal("Bearer SKIN_TOKEN", recorded.Headers["Authorization"]);
@@ -114,10 +110,8 @@ public class SkinApiTests : IDisposable
     [Fact]
     public async Task CapeChange_With_Empty_Id_Deletes_The_Cape()
     {
-        var request = CapeChange.Make("SKIN_TOKEN", "", _auth);
-        await request.StartAsync();
+        await CapeChange.ChangeAsync("SKIN_TOKEN", "", _auth);
 
-        Assert.Equal(TaskState.Succeeded, request.State);
         var recorded = _server.Request("DELETE", "/minecraft/profile/capes/active");
         Assert.NotNull(recorded);
         Assert.Equal("Bearer SKIN_TOKEN", recorded.Headers["Authorization"]);

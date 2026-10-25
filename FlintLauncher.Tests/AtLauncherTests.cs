@@ -131,12 +131,9 @@ public class AtLauncherTests : IDisposable
                 ["versions"] = new JsonArray(),
             }).ToJsonString();
 
-        var (job, request) = _api.FetchPackIndex();
-        Assert.Equal(_api.PackIndexUrl(), request.Url.ToString());
-        await job.StartAsync();
-        Assert.True(job.WasSuccessful, job.FailReason);
+        var body = await _api.FetchPackIndexAsync();
 
-        var packs = AtLauncherApi.LoadPackIndex(request.BodyAsString);
+        var packs = AtLauncherApi.LoadPackIndex(body);
 
         Assert.Equal(2, packs.Count);
         Assert.Equal(1, packs[0].Id);
@@ -176,12 +173,9 @@ public class AtLauncherTests : IDisposable
             },
         }.ToJsonString();
 
-        var (job, request) = _api.FetchShareCode("goodcode");
-        Assert.Equal(_api.ShareCodeUrl("goodcode"), request.Url.ToString());
-        await job.StartAsync();
-        Assert.True(job.WasSuccessful, job.FailReason);
+        var body = await _api.FetchShareCodeAsync("goodcode");
 
-        var shareCode = AtLauncherApi.LoadShareCode(request.BodyAsString, out var error);
+        var shareCode = AtLauncherApi.LoadShareCode(body, out var error);
 
         Assert.Null(error);
         Assert.NotNull(shareCode);

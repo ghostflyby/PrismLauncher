@@ -29,13 +29,15 @@ namespace FlintLauncher.Core.Skins;
 
 public static class SkinDelete
 {
-    /// <summary>Port of SkinDelete::make(token).</summary>
-    public static NetRequest Make(string token, AuthEndpointsOptions? auth = null)
+    /// <summary>Port of SkinDelete::delete(token); failures surface as
+    /// <see cref="FlintHttpException"/> (the old NetRequest status gate).</summary>
+    public static Task DeleteAsync(string token, AuthEndpointsOptions? auth = null,
+        CancellationToken cancellationToken = default)
     {
         var options = auth ?? new AuthEndpointsOptions();
         var url = options.MinecraftServices.TrimEnd('/') + "/minecraft/profile/skins/active";
-        var request = new NetRequest(new Uri(url), options.Http, options.Settings, RequestOptions.NoOptions, HttpMethodValue.Delete);
-        request.AddHeader("Authorization", $"Bearer {token}");
-        return request;
+        var message = new HttpRequestMessage(HttpMethod.Delete, url);
+        message.Headers.TryAddWithoutValidation("Authorization", $"Bearer {token}");
+        return FlintHttp.SendAsync(options.Http, options.Settings, message, cancellationToken);
     }
 }

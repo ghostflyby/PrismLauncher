@@ -86,14 +86,18 @@ public sealed class FlameCheckUpdate(
             };
             var versionsUrl = GetVersionsUrl(project);
 
-            var request = NetRequest.MakeByteArray(new Uri(versionsUrl), _flame.Http, _flame.Settings);
-            await request.StartAsync(cancellationToken);
-            if (!request.WasSuccessful)
+            string versionsBody;
+            try
+            {
+                versionsBody = await FlintHttp.GetStringAsync(_flame.Http, _flame.Settings,
+                    new HttpRequestMessage(HttpMethod.Get, versionsUrl), cancellationToken);
+            }
+            catch (FlintHttpException)
             {
                 continue; // (the C++ reports per-request failures through the NetJob callbacks)
             }
 
-            await GetLatestVersionCallback(resource, metadata, request.BodyAsString, cancellationToken);
+            await GetLatestVersionCallback(resource, metadata, versionsBody, cancellationToken);
         }
 
         await CollectBlockedMods(cancellationToken);

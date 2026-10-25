@@ -289,15 +289,19 @@ public static class TechnicEndpoints
         }
 
         var (url, mode) = technicApi.SearchUrl(term);
-        var request = NetRequest.MakeByteArray(new Uri(url), technicApi.Http, technicApi.Settings);
-        await request.StartAsync();
-        if (request.State != TaskState.Succeeded)
+        string body;
+        try
+        {
+            body = await FlintHttp.GetStringAsync(technicApi.Http, technicApi.Settings,
+                new HttpRequestMessage(HttpMethod.Get, url));
+        }
+        catch (FlintHttpException e)
         {
             return ApiJson.Error("technic_unavailable",
-                $"technic search failed: {request.FailReason}", 502);
+                $"technic search failed: {e.Reason}", 502);
         }
 
-        var packs = TechnicApi.LoadSearchResults(request.BodyAsString, mode);
+        var packs = TechnicApi.LoadSearchResults(body, mode);
         // LoadSearchResults maps the single-pack mode's displayName into Name (the
         // displayed name); the list mode only knows "name"
         return Results.Ok(packs.Select(pack => new TechnicSearchResultView(
@@ -312,12 +316,17 @@ public static class TechnicEndpoints
     private static async Task<(IResult? Error, string FailReason, string Body)> FetchAsync(
         string url, HttpClient http, NetSettings settings)
     {
-        var request = NetRequest.MakeByteArray(new Uri(url), http, settings);
-        await request.StartAsync();
-        return request.State != TaskState.Succeeded
-            ? (ApiJson.Error("technic_unavailable",
-                $"technic request failed: {request.FailReason}", 502), request.FailReason, "")
-            : (null, "", request.BodyAsString);
+        try
+        {
+            var body = await FlintHttp.GetStringAsync(http, settings,
+                new HttpRequestMessage(HttpMethod.Get, url));
+            return (null, "", body);
+        }
+        catch (FlintHttpException e)
+        {
+            return (ApiJson.Error("technic_unavailable",
+                $"technic request failed: {e.Reason}", 502), e.Reason, "");
+        }
     }
 
     /// <summary>The Solder listing's default build (recommended, then latest, then the first

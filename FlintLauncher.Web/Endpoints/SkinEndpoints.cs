@@ -93,11 +93,16 @@ public static class SkinEndpoints
                 return notFound;
             }
 
-            var request = SkinDelete.Make(account.AccessToken(), auth);
-            await request.StartAsync();
-            return request.WasSuccessful
-                ? Results.NoContent()
-                : ApiJson.Error("skin_delete_failed", request.FailReason, 400);
+            try
+            {
+                await SkinDelete.DeleteAsync(account.AccessToken(), auth);
+            }
+            catch (FlintHttpException e)
+            {
+                return ApiJson.Error("skin_delete_failed", e.Reason, 400);
+            }
+
+            return Results.NoContent();
         }).Produces(204);
 
         // ------------------------------------------------- accounts/{id}/cape (equip)
@@ -119,11 +124,16 @@ public static class SkinEndpoints
                     "a 'capeId' form field is required (capes cannot be uploaded as files)", 400);
             }
 
-            var change = CapeChange.Make(account.AccessToken(), capeId, auth);
-            await change.StartAsync();
-            return change.WasSuccessful
-                ? Results.NoContent()
-                : ApiJson.Error("cape_change_failed", change.FailReason, 400);
+            try
+            {
+                await CapeChange.ChangeAsync(account.AccessToken(), capeId, auth);
+            }
+            catch (FlintHttpException e)
+            {
+                return ApiJson.Error("cape_change_failed", e.Reason, 400);
+            }
+
+            return Results.NoContent();
         }).WithMetadata(new FormUploadMarker("form field capeId")).Produces(204);
 
         // ------------------------------------------------- accounts/{id}/cape (remove)
@@ -137,11 +147,16 @@ public static class SkinEndpoints
                 return notFound;
             }
 
-            var change = CapeChange.Make(account.AccessToken(), "", auth);
-            await change.StartAsync();
-            return change.WasSuccessful
-                ? Results.NoContent()
-                : ApiJson.Error("cape_change_failed", change.FailReason, 400);
+            try
+            {
+                await CapeChange.ChangeAsync(account.AccessToken(), "", auth);
+            }
+            catch (FlintHttpException e)
+            {
+                return ApiJson.Error("cape_change_failed", e.Reason, 400);
+            }
+
+            return Results.NoContent();
         }).Produces(204);
     }
 

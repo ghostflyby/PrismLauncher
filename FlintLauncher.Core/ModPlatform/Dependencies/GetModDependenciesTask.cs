@@ -296,15 +296,17 @@ public class GetModDependenciesTask : SequentialTask
 
             if (provider == ResourceProvider.Flame)
             {
-                var job = new NetJob($"{dep.AddonId}::Dependency");
                 var api = GetApi(provider);
-                var request = NetRequest.MakeByteArray(new Uri(api.GetDependencyUrl(args)), api.Http, api.Settings);
-                job.AddNetRequest(request);
-                await job.StartAsync(cancellationToken);
-                if (!job.WasSuccessful)
+                string dependencyBody;
+                try
+                {
+                    dependencyBody = await FlintHttp.GetStringAsync(api.Http, api.Settings,
+                        new HttpRequestMessage(HttpMethod.Get, api.GetDependencyUrl(args)), cancellationToken);
+                }
+                catch (FlintHttpException e)
                 {
                     RemovePack(pDep.Pack.AddonId);
-                    throw new HttpRequestException(job.FailReason);
+                    throw new HttpRequestException(e.Reason);
                 }
 
                 try
@@ -312,10 +314,10 @@ public class GetModDependenciesTask : SequentialTask
                     var entries = dep.Version.Length != 0
                         ?
                         [
-                            FlameMod.ParseResponse(request.BodyAsString,
+                            FlameMod.ParseResponse(dependencyBody,
                                 FlameModJsonContext.Default.FlameModFileJson)
                         ]
-                        : FlameMod.ParseResponse(request.BodyAsString,
+                        : FlameMod.ParseResponse(dependencyBody,
                             FlameModJsonContext.Default.FlameFileListJson).Data ?? [];
 
                     foreach (var fileDto in entries)

@@ -211,17 +211,22 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
     {
         if (provider == ResourceProvider.Flame)
         {
-            var request = NetRequest.MakeByteArray(new Uri(_flame.GetVersionsUrl(
-                new VersionSearchArgs { Pack = pack, McVersions = [mcVersion] })), _flame.Http, _flame.Settings);
-            await request.StartAsync(cancellationToken);
-            if (!request.WasSuccessful)
+            string versionsBody;
+            try
             {
-                throw new ModResolveException($"fetching the version list of {pack.AddonId} failed: {request.FailReason}");
+                versionsBody = await FlintHttp.GetStringAsync(_flame.Http, _flame.Settings,
+                    new HttpRequestMessage(HttpMethod.Get, _flame.GetVersionsUrl(
+                        new VersionSearchArgs { Pack = pack, McVersions = [mcVersion] })),
+                    cancellationToken);
+            }
+            catch (FlintHttpException e)
+            {
+                throw new ModResolveException($"fetching the version list of {pack.AddonId} failed: {e.Reason}");
             }
 
             try
             {
-                if (!FlameMod.LoadIndexedPackVersionsFromResponse(pack, request.BodyAsString))
+                if (!FlameMod.LoadIndexedPackVersionsFromResponse(pack, versionsBody))
                 {
                     throw new ModResolveException($"the CurseForge version list of {pack.AddonId} has no data array");
                 }

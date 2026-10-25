@@ -31,25 +31,29 @@ namespace FlintLauncher.Core.Skins;
 
 public static class CapeChange
 {
-    /// <summary>Port of CapeChange::make(token, capeId).</summary>
-    public static NetRequest Make(string token, string capeId, AuthEndpointsOptions? auth = null)
+    /// <summary>Port of CapeChange::change(token, capeId): PUT applies the cape, an empty id
+    /// is the bare DELETE that removes it; failures surface as <see cref="FlintHttpException"/>
+    /// (the old NetRequest status gate).</summary>
+    public static Task ChangeAsync(string token, string capeId, AuthEndpointsOptions? auth = null,
+        CancellationToken cancellationToken = default)
     {
         var options = auth ?? new AuthEndpointsOptions();
         var url = options.MinecraftServices.TrimEnd('/') + "/minecraft/profile/capes/active";
-        NetRequest request;
+        HttpRequestMessage message;
         if (capeId.Length == 0)
         {
-            // removing the cape is a bare DELETE
-            request = new NetRequest(new Uri(url), options.Http, options.Settings, RequestOptions.NoOptions, HttpMethodValue.Delete);
+            message = new HttpRequestMessage(HttpMethod.Delete, url);
         }
         else
         {
             var body = "{\"capeId\":\"" + capeId + "\"}";
-            request = new NetRequest(new Uri(url), options.Http, options.Settings, RequestOptions.NoOptions, HttpMethodValue.Put,
-                Encoding.UTF8.GetBytes(body));
+            message = new HttpRequestMessage(HttpMethod.Put, url)
+            {
+                Content = new ByteArrayContent(Encoding.UTF8.GetBytes(body)),
+            };
         }
 
-        request.AddHeader("Authorization", $"Bearer {token}");
-        return request;
+        message.Headers.TryAddWithoutValidation("Authorization", $"Bearer {token}");
+        return FlintHttp.SendAsync(options.Http, options.Settings, message, cancellationToken);
     }
 }
