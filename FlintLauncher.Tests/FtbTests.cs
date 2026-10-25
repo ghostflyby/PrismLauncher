@@ -73,12 +73,9 @@ public class FtbTests : IDisposable
     {
         _server.ModpacksIndexJson = """{"packs":[42, 43]}""";
 
-        var (job, request) = _ftbApi.FetchModpacks();
-        Assert.Equal(_ftbApi.ModpacksUrl(), request.Url.ToString());
-        await job.StartAsync();
-        Assert.True(job.WasSuccessful, job.FailReason);
+        var body = await _ftbApi.FetchModpacksAsync();
 
-        var packs = FtbApi.LoadModpackIndex(request.BodyAsString);
+        var packs = FtbApi.LoadModpackIndex(body);
         Assert.Equal(new[] { 42, 43 }, packs);
     }
 
@@ -88,12 +85,9 @@ public class FtbTests : IDisposable
         var fixture = FtbPackFixture.Create();
         _server.Modpacks[FtbPackFixture.PackId.ToString()] = fixture.PackJson;
 
-        var (job, request) = _ftbApi.FetchModpack(FtbPackFixture.PackId);
-        Assert.Equal(_ftbApi.ModpackUrl(FtbPackFixture.PackId), request.Url.ToString());
-        await job.StartAsync();
-        Assert.True(job.WasSuccessful, job.FailReason);
+        var body = await _ftbApi.FetchModpackAsync(FtbPackFixture.PackId);
 
-        var pack = FtbApi.LoadModpack(request.BodyAsString);
+        var pack = FtbApi.LoadModpack(body);
 
         Assert.Equal(42, pack.Id);
         Assert.Equal("Test FTB Pack", pack.Name);
@@ -125,11 +119,9 @@ public class FtbTests : IDisposable
         var fixture = FtbPackFixture.Create();
         fixture.Register(_server);
 
-        var (job, request) = _ftbApi.FetchVersion(FtbPackFixture.PackId, FtbPackFixture.VersionId);
-        await job.StartAsync();
-        Assert.True(job.WasSuccessful, job.FailReason);
+        var body = await _ftbApi.FetchVersionAsync(FtbPackFixture.PackId, FtbPackFixture.VersionId);
 
-        var version = FtbApi.LoadVersion(request.BodyAsString);
+        var version = FtbApi.LoadVersion(body);
 
         Assert.Equal(FtbPackFixture.VersionId, version.Id);
         Assert.Equal(42, version.Parent);

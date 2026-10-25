@@ -24,6 +24,7 @@
 // QAbstractListModel/logos machinery is not ported — this is the plain data layer.
 
 using System.Text.Json;
+using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.ModPlatform.Ftb;
 
@@ -58,9 +59,12 @@ public sealed class FtbPackModel(FtbApi ftb)
     {
         _modpacks.Clear();
 
-        var (indexJob, indexRequest) = _ftb.FetchModpacks();
-        await indexJob.StartAsync(cancellationToken);
-        if (!indexJob.WasSuccessful)
+        string index;
+        try
+        {
+            index = await _ftb.FetchModpacksAsync(cancellationToken);
+        }
+        catch (FlintHttpException)
         {
             // (ListModel::requestFailed: the model stays empty)
             return;
@@ -69,7 +73,7 @@ public sealed class FtbPackModel(FtbApi ftb)
         List<int> remainingPacks;
         try
         {
-            remainingPacks = FtbApi.LoadModpackIndex(indexRequest.BodyAsString);
+            remainingPacks = FtbApi.LoadModpackIndex(index);
         }
         catch (JsonException)
         {
@@ -80,10 +84,14 @@ public sealed class FtbPackModel(FtbApi ftb)
         while (remainingPacks.Count != 0)
         {
             var currentPack = remainingPacks[0];
-            var (job, request) = _ftb.FetchModpack(currentPack);
-            await job.StartAsync(cancellationToken);
             remainingPacks.Remove(currentPack);
-            if (!job.WasSuccessful)
+
+            string body;
+            try
+            {
+                body = await _ftb.FetchModpackAsync(currentPack, cancellationToken);
+            }
+            catch (FlintHttpException)
             {
                 // (ListModel::packRequestFailed: drop the pack and continue)
                 continue;
@@ -91,7 +99,7 @@ public sealed class FtbPackModel(FtbApi ftb)
 
             try
             {
-                var pack = FtbApi.LoadModpack(request.BodyAsString);
+                var pack = FtbApi.LoadModpack(body);
 
                 // Since there is no guarantee that packs have a version, this will just
                 // ignore those "dud" packs.

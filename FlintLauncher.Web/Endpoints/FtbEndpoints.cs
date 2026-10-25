@@ -19,6 +19,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Core.ModPlatform.Modrinth;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 using TruePath;
@@ -35,18 +36,21 @@ public static class FtbEndpoints
         // index payload only carries pack ids, so the response is {"packs":[{"id"},...]}
         api.MapGet("/modplatform/ftb/packs", async (FtbApi ftb) =>
         {
-            var (job, request) = ftb.FetchModpacks();
-            await job.StartAsync();
-            if (!job.WasSuccessful)
+            string body;
+            try
+            {
+                body = await ftb.FetchModpacksAsync();
+            }
+            catch (FlintHttpException e)
             {
                 return ApiJson.Error("ftb_unavailable",
-                    $"ftb pack index failed: {job.FailReason}", 502);
+                    $"ftb pack index failed: {e.Reason}", 502);
             }
 
             List<int> ids;
             try
             {
-                ids = FtbApi.LoadModpackIndex(request.BodyAsString);
+                ids = FtbApi.LoadModpackIndex(body);
             }
             catch (JsonException e)
             {
@@ -99,18 +103,21 @@ public static class FtbEndpoints
             {
                 // the ctor needs the parsed pack description (its version list is what the
                 // task's own lookup matches the version name against)
-                var (job, fetchRequest) = ftb.FetchModpack(request.PackId);
-                await job.StartAsync();
-                if (!job.WasSuccessful)
+                string manifest;
+                try
+                {
+                    manifest = await ftb.FetchModpackAsync(request.PackId);
+                }
+                catch (FlintHttpException e)
                 {
                     return ApiJson.Error("creation_failed",
-                        $"fetching the pack failed: {job.FailReason}", 500);
+                        $"fetching the pack failed: {e.Reason}", 500);
                 }
 
                 FtbModpack pack;
                 try
                 {
-                    pack = FtbApi.LoadModpack(fetchRequest.BodyAsString);
+                    pack = FtbApi.LoadModpack(manifest);
                 }
                 catch (JsonException e)
                 {
@@ -208,18 +215,21 @@ public static class FtbEndpoints
     private static async Task<IResult> WithPackAsync(FtbApi ftb, int packId,
         Func<FtbModpack, IResult> map)
     {
-        var (job, request) = ftb.FetchModpack(packId);
-        await job.StartAsync();
-        if (!job.WasSuccessful)
+        string body;
+        try
+        {
+            body = await ftb.FetchModpackAsync(packId);
+        }
+        catch (FlintHttpException e)
         {
             return ApiJson.Error("ftb_unavailable",
-                $"ftb pack fetch failed: {job.FailReason}", 502);
+                $"ftb pack fetch failed: {e.Reason}", 502);
         }
 
         FtbModpack pack;
         try
         {
-            pack = FtbApi.LoadModpack(request.BodyAsString);
+            pack = FtbApi.LoadModpack(body);
         }
         catch (JsonException e)
         {

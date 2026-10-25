@@ -60,32 +60,22 @@ public sealed class FtbApi(HttpClient http, NetSettings settings)
 
     // ---------------------------------------------------------------------- requests
 
-    /// <summary>makeByteArray(/modpack/all).</summary>
-    public (NetJob Job, NetRequest Request) FetchModpacks()
-    {
-        var netJob = new NetJob("Ftb::Request");
-        var request = NetRequest.MakeByteArray(new Uri(ModpacksUrl()), http: Http, settings: Settings);
-        netJob.AddNetRequest(request);
-        return (netJob, request);
-    }
+    /// <summary>makeByteArray(/modpack/all): the raw index payload; failures surface as
+    /// <see cref="FlintHttpException"/> (the old NetRequest status gate).</summary>
+    public Task<string> FetchModpacksAsync(CancellationToken cancellationToken = default) =>
+        FlintHttp.GetStringAsync(Http, Settings,
+            new HttpRequestMessage(HttpMethod.Get, ModpacksUrl()), cancellationToken);
 
     /// <summary>makeByteArray(/modpack/{id}).</summary>
-    public (NetJob Job, NetRequest Request) FetchModpack(int packId)
-    {
-        var netJob = new NetJob("Ftb::Search");
-        var request = NetRequest.MakeByteArray(new Uri(ModpackUrl(packId)), http: Http, settings: Settings);
-        netJob.AddNetRequest(request);
-        return (netJob, request);
-    }
+    public Task<string> FetchModpackAsync(int packId, CancellationToken cancellationToken = default) =>
+        FlintHttp.GetStringAsync(Http, Settings,
+            new HttpRequestMessage(HttpMethod.Get, ModpackUrl(packId)), cancellationToken);
 
     /// <summary>makeByteArray(/modpack/{id}/{versionId}).</summary>
-    public (NetJob Job, NetRequest Request) FetchVersion(int packId, int versionId)
-    {
-        var netJob = new NetJob("FTB::VersionFetch");
-        var request = NetRequest.MakeByteArray(new Uri(VersionUrl(packId, versionId)), http: Http, settings: Settings);
-        netJob.AddNetRequest(request);
-        return (netJob, request);
-    }
+    public Task<string> FetchVersionAsync(int packId, int versionId,
+        CancellationToken cancellationToken = default) =>
+        FlintHttp.GetStringAsync(Http, Settings,
+            new HttpRequestMessage(HttpMethod.Get, VersionUrl(packId, versionId)), cancellationToken);
 
     // ----------------------------------------------------------------------- parsers
 

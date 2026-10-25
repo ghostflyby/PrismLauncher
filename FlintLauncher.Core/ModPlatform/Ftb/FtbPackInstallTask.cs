@@ -100,15 +100,18 @@ public sealed class FtbPackInstallTask(
             return;
         }
 
-        var (job, request) = _ftb.FetchVersion(pack.Id, versionInfo.Id);
-        await job.StartAsync(cancellationToken);
-        if (!job.WasSuccessful)
+        string manifest;
+        try
         {
-            EmitFailed(job.FailReason);
+            manifest = await _ftb.FetchVersionAsync(pack.Id, versionInfo.Id, cancellationToken);
+        }
+        catch (FlintHttpException e)
+        {
+            EmitFailed(e.Reason);
             return;
         }
 
-        await OnManifestDownloadSucceeded(request.BodyAsString, cancellationToken);
+        await OnManifestDownloadSucceeded(manifest, cancellationToken);
     }
 
     private async Task OnManifestDownloadSucceeded(string response, CancellationToken cancellationToken)
