@@ -20,18 +20,27 @@ namespace FlintLauncher.Tests;
 public class AuthFlowTests : IDisposable
 {
     private readonly AuthStubServer _server = new();
-    private readonly AuthEndpointsOptions _auth = new();
+    private readonly AuthEndpointsOptions _auth;
 
     public AuthFlowTests()
     {
-        _auth.MsaDeviceCode = _server.BaseUrl + "/devicecode";
-        _auth.MsaToken = _server.BaseUrl + "/token";
-        _auth.MsaAuthorize = _server.BaseUrl + "/authorize";
-        _auth.XboxUserAuth = _server.BaseUrl + "/user/authenticate";
-        _auth.XboxXstsAuthorize = _server.BaseUrl + "/xsts/authorize";
-        _auth.MinecraftServices = _server.BaseUrl;
-        _auth.MsaClientId = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
+        _auth = StubOptions(new NetStack());
     }
+
+    /// <summary>The stub-pointed options over one network stack: every endpoint URL
+    /// redirected to the local stub. The single wiring site, so a new endpoint property
+    /// cannot silently fall back to the production URL in a test.</summary>
+    private AuthEndpointsOptions StubOptions(NetStack net) => new()
+    {
+        Net = net,
+        MsaDeviceCode = _server.BaseUrl + "/devicecode",
+        MsaToken = _server.BaseUrl + "/token",
+        MsaAuthorize = _server.BaseUrl + "/authorize",
+        XboxUserAuth = _server.BaseUrl + "/user/authenticate",
+        XboxXstsAuthorize = _server.BaseUrl + "/xsts/authorize",
+        MinecraftServices = _server.BaseUrl,
+        MsaClientId = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb",
+    };
 
     public void Dispose()
     {
@@ -452,5 +461,24 @@ public class AuthFlowTests : IDisposable
         Assert.Equal("token:0:" + account.ProfileId(), session.Session);
         Assert.Equal(32, session.Uuid.Length);
         Assert.False(session.Uuid.Contains('-'));
+    }
+
+    [Fact]
+    public async Task Auth_Steps_Send_Through_The_Injected_NetStack()
+    {
+        // the stack carries the proxy/user-agent configuration, so every auth request —
+        // including the skin download — must leave through the injected one; the user agent
+        // is the observable stamp
+        var auth = StubOptions(new NetStack("Flint-AuthStackProbe/1.0",
+            manualRetries: 1, TimeSpan.FromSeconds(30)));
+        var account = MinecraftAccount.CreateBlankMsa();
+        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, auth);
+
+        await flow.StartAsync();
+
+        Assert.Equal(TaskState.Succeeded, flow.State);
+        Assert.NotEmpty(_server.Requests);
+        Assert.All(_server.Requests,
+            request => Assert.Equal("Flint-AuthStackProbe/1.0", request.Headers["User-Agent"]));
     }
 }

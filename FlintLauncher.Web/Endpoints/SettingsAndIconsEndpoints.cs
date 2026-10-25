@@ -16,6 +16,7 @@ using System.Text.Json;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Icons;
 using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.Secrets;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
@@ -133,7 +134,7 @@ public static class SettingsAndIconsEndpoints
             ],
             ["proxy"] =
             [
-                // ProxyPage: written values reach the NetStack through RuntimeNetConfig;
+                // ProxyPage: written values reach the NetStack through NetSettingsApplier;
                 // ProxyPass is a secret — same wire key, ISecretStore storage
                 "ProxyType",
                 "ProxyAddr",
@@ -164,7 +165,7 @@ public static class SettingsAndIconsEndpoints
     public static void MapSettingsAndIcons(this RouteGroupBuilder api)
     {
         api.WithTags("Settings");
-        api.MapGet("/settings", (LauncherRuntime runtime) =>
+        api.MapGet("/settings", (FlintConfigStore config, ISecretStore secrets) =>
         {
             var groups = new Dictionary<string, object>(StringComparer.Ordinal);
             foreach (var (group, keys) in Groups)
@@ -175,8 +176,8 @@ public static class SettingsAndIconsEndpoints
                     // the secret trio serves from the store; everything else from the
                     // typed stack's resolved fold (defaults = the record property defaults)
                     values[key] = FlintConfigKeys.IsSecret(key)
-                        ? runtime.Secrets.Get(key) ?? ""
-                        : TypedValue(runtime.Config.Get(key), FlintConfigKeys.Default(key));
+                        ? secrets.Get(key) ?? ""
+                        : TypedValue(config.Get(key), FlintConfigKeys.Default(key));
                 }
 
                 groups[group] = values;
@@ -185,7 +186,8 @@ public static class SettingsAndIconsEndpoints
             return Results.Ok(new SettingsGroupsResponse(groups));
         }).Produces<SettingsGroupsResponse>();
 
-        api.MapPut("/settings", (LauncherRuntime runtime, GlobalSettingsPutRequest? body) =>
+        api.MapPut("/settings", (FlintConfigStore config, ISecretStore secrets,
+            NetSettingsApplier netSettings, DirSettingsApplier dirSettings, GlobalSettingsPutRequest? body) =>
         {
             if (body is null || !Groups.TryGetValue(body.Group, out var keys))
             {
@@ -210,28 +212,28 @@ public static class SettingsAndIconsEndpoints
                     // ISecretStore (empty clears the stored secret)
                     if (Variant.AsString(value) is { Length: > 0 } secret)
                     {
-                        runtime.Secrets.Set(prop.Name, secret);
+                        secrets.Set(prop.Name, secret);
                     }
                     else
                     {
-                        runtime.Secrets.Delete(prop.Name);
+                        secrets.Delete(prop.Name);
                     }
                 }
                 else
                 {
-                    runtime.Config.Set(prop.Name, value);
+                    config.Set(prop.Name, value);
                 }
             }
 
             // proxy / retries / timeout / user-agent take effect immediately (Application
             // re-runs updateProxySettings from the ProxyPage the same way); the apply also
             // re-reads the store-backed secrets and the mod-platform API credentials
-            RuntimeNetConfig.Apply(runtime);
+            netSettings.Apply();
 
             // the dir-kind models re-point to their (created-on-demand) new roots
             if (body.Group == "dirs")
             {
-                runtime.ApplyDirsSettings();
+                dirSettings.Apply();
             }
 
             return Results.NoContent();
@@ -292,9 +294,9 @@ public static class SettingsAndIconsEndpoints
                 : ApiJson.NotFound("icon_not_found", $"no icon '{key}'")).Produces(204);
 
         api.MapPut("/instances/{ref}/icon", async (string @ref, HttpRequest request,
-            LauncherRuntime runtime) =>
+            InstanceList instances, IconPool icons) =>
         {
-            if (runtime.Instances.ResolveInstance(@ref) is not MinecraftInstance instance)
+            if (instances.ResolveInstance(@ref) is not MinecraftInstance instance)
             {
                 return ApiJson.NotFound("instance_not_found", $"no launchable instance '{@ref}'");
             }
@@ -302,7 +304,7 @@ public static class SettingsAndIconsEndpoints
             string key;
             if (request is { HasFormContentType: true, Form.Files.Count: > 0 })
             {
-                runtime.Icons.IconsDir.CreateDirectory();
+                icons.IconsDir.CreateDirectory();
                 var file = request.Form.Files[0];
                 var temp = new AbsolutePath(Path.GetTempPath())
                            / $"flint-icon-{Guid.NewGuid():N}{Path.GetExtension(file.FileName)}";
@@ -311,7 +313,7 @@ public static class SettingsAndIconsEndpoints
                     await file.CopyToAsync(stream);
                 }
 
-                if (!runtime.Icons.Install(temp, instance.Id()))
+                if (!icons.Install(temp, instance.Id()))
                 {
                     return ApiJson.Error("invalid_icon", $"could not install {file.FileName}", 400);
                 }

@@ -20,13 +20,13 @@ public static class AccountEndpoints
         // equip/remove; see SkinEndpoints for the mapping)
         api.MapSkins();
 
-        api.MapGet("/accounts", (LauncherRuntime runtime) =>
-                Results.Ok(Enumerable.Range(0, runtime.Accounts.Count)
-                    .Select(i => View(runtime.Accounts.At(i), runtime.Accounts))
+        api.MapGet("/accounts", (AccountList accounts) =>
+                Results.Ok(Enumerable.Range(0, accounts.Count)
+                    .Select(i => View(accounts.At(i), accounts))
                     .ToArray()))
             .Produces<AccountView[]>();
 
-        api.MapPost("/accounts/offline", (OfflineAccountRequest request, LauncherRuntime runtime) =>
+        api.MapPost("/accounts/offline", (OfflineAccountRequest request, AccountList accounts) =>
         {
             if (string.IsNullOrWhiteSpace(request.Name))
             {
@@ -34,40 +34,40 @@ public static class AccountEndpoints
             }
 
             var account = MinecraftAccount.CreateOffline(request.Name);
-            runtime.Accounts.AddAccount(account);
+            accounts.AddAccount(account);
             return Results.Created($"/api/v1/accounts/{account.ProfileId()}",
-                View(account, runtime.Accounts));
+                View(account, accounts));
         }).Produces<AccountView>(201);
 
-        api.MapDelete("/accounts/{profileId}", (string profileId, LauncherRuntime runtime) =>
+        api.MapDelete("/accounts/{profileId}", (string profileId, AccountList accounts) =>
         {
-            var index = runtime.Accounts.FindAccountByProfileId(profileId);
+            var index = accounts.FindAccountByProfileId(profileId);
             if (index == -1)
             {
                 return ApiJson.NotFound("account_not_found", $"no account with profile id '{profileId}'");
             }
 
-            runtime.Accounts.RemoveAccount(index);
+            accounts.RemoveAccount(index);
             return Results.NoContent();
         }).Produces(204);
 
-        api.MapPut("/accounts/{profileId}/default", (string profileId, LauncherRuntime runtime) =>
+        api.MapPut("/accounts/{profileId}/default", (string profileId, AccountList accounts) =>
         {
-            var index = runtime.Accounts.FindAccountByProfileId(profileId);
+            var index = accounts.FindAccountByProfileId(profileId);
             if (index == -1)
             {
                 return ApiJson.NotFound("account_not_found", $"no account with profile id '{profileId}'");
             }
 
-            runtime.Accounts.SetDefaultAccount(runtime.Accounts.At(index));
+            accounts.SetDefaultAccount(accounts.At(index));
             return Results.NoContent();
         }).Produces(204);
 
         // ------------------------------------------------------- MSA device-code login
         api.MapPost("/accounts/msa/devicecode", async (DeviceCodeSessionStore store,
-            LauncherRuntime runtime) =>
+            AuthEndpointsOptions auth) =>
         {
-            var session = store.Start(runtime.Auth);
+            var session = store.Start(auth);
             // wait (bounded) for Microsoft to hand out the device/user code pair
             var issued = await store.WaitForCodeAsync(session, TimeSpan.FromSeconds(10));
             if (!issued)
@@ -87,12 +87,12 @@ public static class AccountEndpoints
 
         api.MapPost("/accounts/msa/devicecode/{deviceId}/poll", (string deviceId,
             DeviceCodeSessionStore store,
-            LauncherRuntime runtime) =>
+            AccountList accounts) =>
         {
             var session = store.Get(deviceId);
             return session is null
                 ? ApiJson.NotFound("device_not_found", $"no device-code session '{deviceId}'")
-                : Results.Ok(store.Poll(session, runtime.Accounts));
+                : Results.Ok(store.Poll(session, accounts));
         }).Produces<DeviceCodePollResponse>();
     }
 

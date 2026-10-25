@@ -12,6 +12,8 @@
 
 using System.Collections.Concurrent;
 using FlintLauncher.Core.Config;
+using FlintLauncher.Core.Instances;
+using FlintLauncher.Core.IO;
 using FlintLauncher.Core.State;
 using FlintLauncher.Web;
 using TruePath;
@@ -74,6 +76,17 @@ internal sealed class TestGlobalSettings
         FlintJsonContext.Default.InstanceConfigFile, FlintJsonContext.Default.InstanceStateFile);
 
     public static implicit operator InstanceEnvironment(TestGlobalSettings settings) => settings.Environment;
+
+    /// <summary>The bare-fixture instance list over one instances directory: this store as
+    /// the user layer, a throwaway groups file beside the instances, no cache and no state
+    /// store. The one construction the platform import tests share, so a new InstanceList
+    /// dependency lands here once.</summary>
+    public InstanceList BareInstanceList(string instancesDir) =>
+        new(
+            [MaterializedDirectory.Ensure(new AbsolutePath(instancesDir))!],
+            Environment,
+            new AbsolutePath(instancesDir) / ".test-groups.json",
+            []);
 
     /// <summary>A throwaway user-layer store (fresh flint.json at the record defaults).</summary>
     public static FlintConfigStore CreateStore() =>

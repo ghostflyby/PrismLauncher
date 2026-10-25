@@ -13,10 +13,12 @@
 // uploaded through the same SkinUpload core the PUT /accounts/{profileId}/skin endpoint
 // uses (Mojang minecraftservices "minecraft/profile/skins") — no second upload mechanism,
 // no new account surface. The account skin/cape endpoints themselves are untouched.
-// The SkinsDir SETTING decides where the library lives (LauncherRuntime resolves it
+// The SkinsDir SETTING decides where the library lives (resolved
 // data-root-relative, the C++ convention).
 
 using System.Diagnostics.CodeAnalysis;
+using FlintLauncher.Core.Auth;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Skins;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
@@ -31,17 +33,17 @@ public static class SkinLibraryEndpoints
     public static void MapSkinLibrary(this RouteGroupBuilder api)
     {
         api.WithTags("Skins");
-        api.MapGet("/skins", (LauncherRuntime runtime) =>
-            Results.Ok(runtime.Skins.List()
+        api.MapGet("/skins", (SkinsLibrary skins) =>
+            Results.Ok(skins.List()
                 .Select(ToView)
                 .ToArray())).Produces<SkinView[]>();
 
-        api.MapGet("/skins/{name}", (string name, LauncherRuntime runtime) =>
-            runtime.Skins.Get(name) is { } skin
+        api.MapGet("/skins/{name}", (string name, SkinsLibrary skins) =>
+            skins.Get(name) is { } skin
                 ? Results.Ok(ToView(skin))
                 : ApiJson.NotFound("skin_not_found", $"no stored skin '{name}'")).Produces<SkinView>();
 
-        api.MapPost("/skins", async (HttpRequest request, LauncherRuntime runtime) =>
+        api.MapPost("/skins", async (HttpRequest request, SkinsLibrary skins) =>
         {
             if (!request.HasFormContentType)
             {
@@ -83,11 +85,11 @@ public static class SkinLibraryEndpoints
 
             try
             {
-                return runtime.Skins.Install(temp, name, model)
+                return skins.Install(temp, name, model)
                     ? Results.Created($"/api/v1/skins/{Uri.EscapeDataString(name)}",
                         new SkinStoredResponse(name))
                     : ApiJson.Error("skin_store_failed",
-                        (runtime.Skins.SkinsDir / (name + ".png")).ExistsFile()
+                        (skins.SkinsDir / (name + ".png")).ExistsFile()
                             ? $"a skin named '{name}' already exists (delete it first to replace)"
                             : $"could not store skin '{name}'", 409);
             }
@@ -101,44 +103,45 @@ public static class SkinLibraryEndpoints
             }
         }).WithMetadata(new FormUploadMarker("multipart form: skin image file (png) + optional name/model fields")).Produces<SkinStoredResponse>(201);
 
-        api.MapDelete("/skins/{name}", (string name, LauncherRuntime runtime) =>
-            runtime.Skins.Delete(name)
+        api.MapDelete("/skins/{name}", (string name, SkinsLibrary skins) =>
+            skins.Delete(name)
                 ? Results.NoContent()
                 : ApiJson.NotFound("skin_not_found", $"no stored skin '{name}'")).Produces(204);
 
         // apply = the composition: SkinUpload (the account upload core) over the stored
         // texture; the model override picks classic/slim, defaulting to the stored variant
         api.MapPost("/skins/{name}/apply", async Task<IResult> (string name,
-            SkinApplyRequest? request, LauncherRuntime runtime) =>
+            SkinApplyRequest? request, SkinsLibrary skins, AccountList accounts,
+            AuthEndpointsOptions auth, NetStack net) =>
         {
             if (string.IsNullOrWhiteSpace(request?.ProfileId))
             {
                 return ApiJson.Error("invalid_body", "'profileId' is required", 400);
             }
 
-            var skin = runtime.Skins.Get(name);
+            var skin = skins.Get(name);
             if (skin is null)
             {
                 return ApiJson.NotFound("skin_not_found", $"no stored skin '{name}'");
             }
 
-            var texture = runtime.Skins.TextureFileOf(skin);
+            var texture = skins.TextureFileOf(skin);
             if (texture.Value is not { Length: > 0 })
             {
                 return ApiJson.Error("skin_texture_missing",
-                    $"the texture of skin '{name}' is missing from {runtime.Skins.SkinsDir}", 409);
+                    $"the texture of skin '{name}' is missing from {skins.SkinsDir}", 409);
             }
 
-            var index = runtime.Accounts.FindAccountByProfileId(request.ProfileId);
+            var index = accounts.FindAccountByProfileId(request.ProfileId);
             if (index == -1)
             {
                 return ApiJson.Error("unknown_account",
                     $"no account with profile id '{request.ProfileId}'", 400);
             }
 
-            var account = runtime.Accounts.At(index);
+            var account = accounts.At(index);
             var variant = ParseVariant(request.Model) ?? (skin.Model == SkinModelKind.Slim ? "slim" : "classic");
-            var upload = SkinUpload.Make(account.AccessToken(), texture, variant, runtime.Auth, runtime.Net);
+            var upload = SkinUpload.Make(account.AccessToken(), texture, variant, auth, net);
             await upload.StartAsync();
             return upload.WasSuccessful
                 ? Results.NoContent()

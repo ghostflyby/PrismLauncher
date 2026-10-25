@@ -105,10 +105,9 @@ public sealed class LaunchFixture : IDisposable
     /// <summary>The fixture's five-root stamp (home layout); disposed with the fixture.</summary>
     private readonly TestFlintPaths _paths = TestFlintPaths.UnderHome();
 
-    /// <summary>The fixture's stamped meta cache (fixture injection: the runtime cache the
-    /// composition root owns, "meta" base under the fixture's cache root — the CWD-anchored
-    /// static fallback is gone). Instances created here carry it, which also stamps their
-    /// pack profiles' metadata index.</summary>
+    /// <summary>The fixture's stamped meta cache: the standard base table over the fixture's
+    /// roots (the same table the composition root registers). Instances created here carry
+    /// it, which also stamps their pack profiles' metadata index.</summary>
     public HttpMetaCache MetaCache { get; }
 
     /// <summary>The launcher runtime state store over the fixture's state root — launch
@@ -122,11 +121,7 @@ public sealed class LaunchFixture : IDisposable
         State = new LauncherStateStore(
             _paths.Paths.StateRoot / "launcher-state.json",
             FlintJsonContext.Default.LauncherState);
-        MetaCache = new HttpMetaCache(
-            _paths.Paths.CacheRoot / "metacache.json");
-        MetaCache.AddBase("meta", _paths.Paths.MetaDir);
-        MetaCache.AddBase("libraries", _paths.Paths.LibrariesRoot);
-        MetaCache.AddBase("asset_indexes", _paths.Paths.AssetIndexesDir);
+        MetaCache = HttpMetaCache.ForRoots(_paths.Paths);
     }
 
     /// <summary>Seed the java probe cache for a configured java path so CheckJava trusts

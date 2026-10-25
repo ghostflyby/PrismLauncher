@@ -11,7 +11,6 @@ using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Icons;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.ModPlatform.Flame;
@@ -29,7 +28,7 @@ using TruePath;
 
 namespace FlintLauncher.Web.Services;
 
-public sealed class LauncherRuntime : IDisposable
+internal sealed class LauncherRuntime : IDisposable
 {
     public FlintPaths Paths { get; }
     public AbsolutePath DataDir => Paths.DataDir;
@@ -62,10 +61,13 @@ public sealed class LauncherRuntime : IDisposable
     public AuthEndpointsOptions Auth { get; }
 
     /// <summary>The C++ APPLICATION->settings(): the typed flint.json store —
-    /// load-or-default, atomic writes; the /settings surface and RuntimeNetConfig read the
+    /// load-or-default, atomic writes; the /settings surface and NetSettingsApplier read the
     /// resolved fold through it). The instance layer folds it as the user layer of its own
     /// instance.json stack.</summary>
     public FlintConfigStore Config { get; }
+
+    /// <summary>The dir-kind settings (JavaDir/IconsDir/SkinsDir) resolved against the roots.</summary>
+    public ConfiguredDirs Dirs { get; }
 
     /// <summary>The launcher runtime state (launcher-state.json):
     /// loaded BEFORE the config so the importer can strip state keys into it later).</summary>
@@ -99,13 +101,6 @@ public sealed class LauncherRuntime : IDisposable
     /// host surfaces this after Build (the flint-legacy result pattern).</summary>
     public FlintConfigImporter.ImportResult ConfigImport { get; }
 
-    /// <summary>The launch-pipeline dependencies (paths, logger factory, global settings,
-    /// meta cache, install root). Built by the composition root (WebHostBuilder) once the
-    /// app's LoggerFactory exists — the constructor runs before the host is built, so this is
-    /// assigned right after builder.Build(); launch endpoints hand it to the controller and
-    /// the instance list stamps it onto (re)discovered instances.</summary>
-    public LaunchServices? LaunchServices { get; set; }
-
     public LauncherRuntime(FlintPaths paths, NetStack? net = null, ModrinthApi? modrinth = null,
         FlameApi? flame = null, TechnicApi? technic = null, AtLauncherApi? atlauncher = null,
         FtbApi? ftb = null, ImgurApi? imgur = null, AuthEndpointsOptions? auth = null)
@@ -113,7 +108,7 @@ public sealed class LauncherRuntime : IDisposable
         Paths = paths;
         Net = net ?? NetStack.Default;
         Modrinth = modrinth ?? new ModrinthApi(new ModrinthClient(Net.Client), Net);
-        Auth = auth ?? new AuthEndpointsOptions();
+        Auth = auth ?? new AuthEndpointsOptions { Net = Net };
         Flame = flame ?? new FlameApi(Net);
         Technic = technic ?? new TechnicApi(Net);
         AtLauncher = atlauncher ?? new AtLauncherApi(Net);
@@ -138,7 +133,7 @@ public sealed class LauncherRuntime : IDisposable
 
         // secrets init: <dataDir>/secrets.json (0600) — the transitional
         // store; the secret trio (ProxyPass/ModrinthToken/FlameKeyOverride) reads and
-        // writes here (PUT /settings reroutes, RuntimeNetConfig/API clients read the store)
+        // writes here (PUT /settings reroutes, NetSettingsApplier/API clients read the store)
         Secrets = new FileSecretStore(paths.SecretsFile, FlintJsonContext.Default.SecretsFile);
 
         // state load: launcher-state.json BEFORE the config import — the
@@ -162,27 +157,13 @@ public sealed class LauncherRuntime : IDisposable
         // state store (loaded above), the rest → the record domains. Flint never writes INI.
         Config = new FlintConfigStore(paths.ConfigFile, FlintJsonContext.Default.FlintConfigFile);
         ConfigImport = FlintConfigImporter.ImportIfNeeded(paths, Config, Secrets, State);
+        Dirs = new ConfiguredDirs(paths, Config);
 
-        // meta cache (the C++ Application.cpp:1036-1051 startup
-        // shape: ONE registration of every base, then the ledger Load()). The store bases
-        // (libraries/assets/asset_indexes/java) hang off the store
-        // root, the true-cache bases (meta/ledger/general/icons/fmllibs/pack downloads) off
-        // the cache root. Bases are registered exactly once, here, before any use — a
-        // registration is never lazy enough to resolve against the process CWD. There is
-        // no "screenshots" base (nothing consumes it).
-        MetaCache = new HttpMetaCache(paths.MetacacheFile);
-        MetaCache.AddBase("meta", paths.MetaDir);
-        MetaCache.AddBase("libraries", paths.LibrariesRoot);
-        MetaCache.AddBase("assets", paths.AssetsRoot);
-        MetaCache.AddBase("asset_indexes", paths.AssetIndexesDir);
-        MetaCache.AddBase("java", paths.JavaRoot);
-        MetaCache.AddBase("general", paths.CacheRoot);             // import staging etc.
-        MetaCache.AddBase("icons", paths.CacheRoot / "icons");
-        MetaCache.AddBase("fmllibs", paths.FmllibsCacheDir);
-        MetaCache.AddBase("ATLauncherPacks", paths.CacheRoot / "ATLauncherPacks");
-        MetaCache.AddBase("FTBPacks", paths.CacheRoot / "FTBPacks");
-        // the ledger is read at startup: the persisted index restores, so existing
-        // entries do not re-download on every run
+        // meta cache: the standard base table (registered exactly once, before any use — a
+        // registration is never lazy enough to resolve against the process CWD), then the
+        // ledger Load(): the persisted index restores, so existing entries do not
+        // re-download on every run
+        MetaCache = HttpMetaCache.ForRoots(paths);
         MetaCache.Load();
 
         // instance list: <dataDir>/instances; the typed instance
@@ -209,13 +190,11 @@ public sealed class LauncherRuntime : IDisposable
         // icon pool: the IconList successor over the IconsDir
         // SETTING (default "icons", data-root-relative — previously three hardcoded
         // Path.Combine(DataDir, "icons") sites ignored the setting)
-        Icons = new IconPool(MaterializedDirectory.Ensure(
-            ResolveDataRelativeDir(Config.Current.Dirs.IconsDir, "icons"))!);
+        Icons = new IconPool(MaterializedDirectory.Ensure(Dirs.IconsDir)!);
 
         // local skin library: the SkinsDir SETTING
         // (default "skins", data-root-relative) finally has a resident model
-        Skins = new SkinsLibrary(MaterializedDirectory.Ensure(
-            ResolveDataRelativeDir(Config.Current.Dirs.SkinsDir, "skins"))!);
+        Skins = new SkinsLibrary(MaterializedDirectory.Ensure(Dirs.SkinsDir)!);
         // the restored watcher glue now covers the dir-kind models too; a rename/move of
         // a watched root re-points them (the index/list rebuilds over the new location)
         Icons.AttachWatcher(InstanceWatchSpace);
@@ -244,16 +223,7 @@ public sealed class LauncherRuntime : IDisposable
 
     /// <summary>Serialize the instance-list mutations (create/delete/rename + LoadList):
     /// InstanceList is not thread-safe and the API handlers can interleave.</summary>
-    public SemaphoreSlim InstanceLock { get; } = new(1, 1);
-
-    /// <summary>Re-points the dir-kind models (icons/skins) after a Dirs settings write:
-    /// the new roots are created on demand and the models rebuild their indexes and
-    /// re-point their watches.</summary>
-    public void ApplyDirsSettings()
-    {
-        Icons.SetIconsDir(ResolveDataRelativeDir(Config.Current.Dirs.IconsDir, "icons"));
-        Skins.SetSkinsDir(ResolveDataRelativeDir(Config.Current.Dirs.SkinsDir, "skins"));
-    }
+    public InstanceMutationLock InstanceLock { get; } = new();
 
     /// <summary>The watched-directory tenancy: instance-root watchers live here so external
     /// changes reload the instance list (the restored C++ watcher glue). Owned by the
@@ -261,29 +231,6 @@ public sealed class LauncherRuntime : IDisposable
     public DirectorySpace InstanceWatchSpace { get; }
 
     public void Dispose() => InstanceWatchSpace.Dispose();
-
-    /// <summary>The launcher-managed java root: the JavaDir
-    /// setting under store semantics — absolute wins as-is, relative joins the store root
-    /// (the C++ "relative to the data dir" convention re-anchored by the store remount),
-    /// empty/null falls back to the store/java anchor. Consumed by the java scan
-    /// (JavaUtils.FindJavaPaths), the JavaInstallList managed-versions probe and the
-    /// launch pipeline's AutoInstallJava (through LaunchServices.JavaRoot).</summary>
-    public AbsolutePath JavaRoot =>
-        string.IsNullOrWhiteSpace(Config.Current.Dirs.JavaDir)
-            ? Paths.JavaRoot
-            : Path.IsPathRooted(Config.Current.Dirs.JavaDir)
-                ? new AbsolutePath(Config.Current.Dirs.JavaDir)
-                : Paths.StoreRoot / Config.Current.Dirs.JavaDir;
-
-    /// <summary>A dir-kind setting (IconsDir/SkinsDir — the C++ "relative to the data dir"
-    /// convention): absolute wins as-is, relative joins the data root,
-    /// empty/null falls back to the C++ default name.</summary>
-    private AbsolutePath ResolveDataRelativeDir(string? configured, string fallbackName) =>
-        string.IsNullOrWhiteSpace(configured)
-            ? DataDir / fallbackName
-            : Path.IsPathRooted(configured)
-                ? new AbsolutePath(configured)
-                : DataDir / configured;
 }
 
 /// <summary>Small JSON helpers shared by the endpoints (AOT-safe: explicit nodes).</summary>

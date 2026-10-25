@@ -9,12 +9,13 @@
 // task's FailReason otherwise, e.g. a Configs.json 404 for an unknown pack/version).
 //
 // The ATL download-server/API URL hooks (AtLauncherApi.DownloadServerUrl / ApiBaseUrl) are
-// per-host state (runtime.AtLauncher — the headless equivalent of the C++ BuildConfig
+// per-host state (AtLauncherApi — the headless equivalent of the C++ BuildConfig
 // constants). The install's `serverUrl` body field selects a per-request derived client
 // instead of mutating the shared one, so an override can never leak into other requests
 // (and needs no restore).
 
 using System.Text.Json;
+using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Web.Models;
@@ -30,16 +31,16 @@ public static class AtLauncherEndpoints
         api.WithTags("ModPlatform");
         // ------------------------------------------------ modplatform/atlauncher/packs
         // the packsnew.json pass-through (AtlListModel::loadIndexedPack's mapping)
-        api.MapGet("/modplatform/atlauncher/packs", (LauncherRuntime runtime) => WithIndexAsync(
-                runtime, packs => Results.Ok(packs.Select(PackView).ToArray())))
+        api.MapGet("/modplatform/atlauncher/packs", (AtLauncherApi atlauncher) => WithIndexAsync(
+                atlauncher, packs => Results.Ok(packs.Select(PackView).ToArray())))
             .Produces<AtLauncherPackView[]>();
 
         // ---------------------------------------- modplatform/atlauncher/packs/{name}/versions
         // the index carries each pack's version list (the ATL CDN has no per-pack index URL,
         // so this re-reads packsnew.json and matches the pack by name, case-insensitively)
         api.MapGet("/modplatform/atlauncher/packs/{name}/versions", (string name,
-                LauncherRuntime runtime) => WithIndexAsync(
-                runtime,
+                AtLauncherApi atlauncher) => WithIndexAsync(
+                atlauncher,
                 packs =>
                 {
                     var pack = packs.FirstOrDefault(candidate =>
@@ -54,7 +55,8 @@ public static class AtLauncherEndpoints
 
         // ------------------------------------------------ modplatform/atlauncher/install
         api.MapPost("/modplatform/atlauncher/install", async Task<IResult> (
-            AtLauncherInstallRequest request, LauncherRuntime runtime) =>
+            AtLauncherInstallRequest request, AtLauncherApi atlauncherApi, InstanceList instances,
+            InstanceMutationLock instanceLock) =>
         {
             if (string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.Version))
             {
@@ -62,14 +64,14 @@ public static class AtLauncherEndpoints
             }
 
             // the request's client is resolved up front: a serverUrl override derives its own
-            // client, the runtime's shared one is never mutated (nothing to restore)
-            var atlauncher = ResolveApi(runtime, request.ServerUrl, out var serverError);
+            // client, the shared one is never mutated (nothing to restore)
+            var atlauncher = ResolveApi(atlauncherApi, request.ServerUrl, out var serverError);
             if (serverError is not null)
             {
                 return serverError;
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
                 var task = new AtLauncherPackInstallTask(request.Name, request.Version, api: atlauncher)
@@ -77,8 +79,8 @@ public static class AtLauncherEndpoints
                     TargetDir = default,
                     Group = request.Group ?? "",
                     OptionalModsSelection = request.OptionalMods ?? new Dictionary<string, bool>(),
-                    // the headless runtime registers no "ATLauncherPacks" meta-cache base, so
-                    // the task downloads into a temporary folder (see the task header note)
+                    // the task is created without a MetaCache, so it downloads into a
+                    // temporary folder (see the task header note)
                 };
                 // the staged commit derives the folder from the display name: the pack name is
                 // the instance name (like the C++ ATL import dialog's default), the icon
@@ -93,10 +95,10 @@ public static class AtLauncherEndpoints
 
                 // staged-commit path: the task runs inside an InstanceList staging folder that
                 // InstanceStaging commits into instances/ on success (WrapInstanceTask)
-                var wrapped = runtime.Instances.WrapInstanceTask(task);
+                var wrapped = instances.WrapInstanceTask(task);
                 // compute the expected id BEFORE running the task: after the commit the
                 // directory already exists and DirNameFromString would return "<name>(1)"
-                AbsolutePath inDir = runtime.Instances.PrimaryDir();
+                AbsolutePath inDir = instances.PrimaryDir();
                 var expectedId = FileNaming.DirNameFromString(request.Name, [inDir]);
                 await wrapped.StartAsync();
                 if (!wrapped.WasSuccessful)
@@ -106,9 +108,9 @@ public static class AtLauncherEndpoints
                     return ApiJson.Error("creation_failed", wrapped.FailReason, 500);
                 }
 
-                runtime.Instances.LoadList();
+                instances.LoadList();
                 // the staged commit's expected dirname, resolved through the chain
-                var inst = runtime.Instances.ResolveInstance(expectedId);
+                var inst = instances.ResolveInstance(expectedId);
                 return inst is null
                     ? ApiJson.Error("creation_failed", "instance was committed but not discovered", 500)
                     : Results.Created($"/api/v1/instances/{inst.Uuid}",
@@ -116,22 +118,22 @@ public static class AtLauncherEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<InstanceCreatedResponse>(201);
     }
 
     // ----------------------------------------------------------------- helpers
 
-    /// <summary>The request's ATLauncher client: the runtime's own, or — with a `serverUrl`
+    /// <summary>The request's ATLauncher client: the shared one, or — with a `serverUrl`
     /// override — a derived client (same net stack), leaving the shared instance untouched.
     /// Returns the error result for a malformed override.</summary>
-    private static AtLauncherApi ResolveApi(LauncherRuntime runtime, string? serverUrl, out IResult? error)
+    private static AtLauncherApi ResolveApi(AtLauncherApi atlauncher, string? serverUrl, out IResult? error)
     {
         error = null;
         if (string.IsNullOrWhiteSpace(serverUrl))
         {
-            return runtime.AtLauncher;
+            return atlauncher;
         }
 
         var trimmed = serverUrl.Trim();
@@ -140,11 +142,11 @@ public static class AtLauncherEndpoints
         {
             error = ApiJson.Error("invalid_server_url",
                 "'serverUrl' must be an absolute http(s) URL", 400);
-            return runtime.AtLauncher;
+            return atlauncher;
         }
 
         // the URL builders concatenate directly onto the base, so keep the slash
-        return new AtLauncherApi(runtime.AtLauncher.Net)
+        return new AtLauncherApi(atlauncher.Net)
         {
             DownloadServerUrl = trimmed.EndsWith('/') ? trimmed : trimmed + "/",
             // (ApiBaseUrl is only read by the share-code flow, never by the install)
@@ -154,10 +156,10 @@ public static class AtLauncherEndpoints
     /// <summary>Fetch + parse packsnew.json (the shared logic of the two GET endpoints) and
     /// hand the packs to <paramref name="map"/>; fetch/parse failures map to the uniform
     /// 502 error envelope instead.</summary>
-    private static async Task<IResult> WithIndexAsync(LauncherRuntime runtime,
+    private static async Task<IResult> WithIndexAsync(AtLauncherApi atlauncher,
         Func<List<IndexedPack>, IResult> map)
     {
-        var (job, request) = runtime.AtLauncher.FetchPackIndex();
+        var (job, request) = atlauncher.FetchPackIndex();
         await job.StartAsync();
         if (!job.WasSuccessful)
         {

@@ -9,6 +9,9 @@ using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Instances.Creation;
 using FlintLauncher.Core.IO;
+using FlintLauncher.Core.ModPlatform.Flame;
+using FlintLauncher.Core.ModPlatform.Modrinth;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
@@ -21,15 +24,16 @@ public static class InstanceEndpoints
     public static void MapInstances(this RouteGroupBuilder api)
     {
         api.WithTags("Instances");
-        api.MapGet("/instances", async (LauncherRuntime runtime, string? search, string? group) =>
+        api.MapGet("/instances", async (InstanceList instances, InstanceMutationLock instanceLock,
+            string? search, string? group) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
                 // MainWindow's instance-view filter: name contains + group equals (both
                 // case-insensitive; the group match is exact except for casing)
-                IEnumerable<InstanceSummary> summaries = runtime.Instances.Instances
-                    .Select(inst => Summary(inst, runtime));
+                IEnumerable<InstanceSummary> summaries = instances.Instances
+                    .Select(inst => Summary(inst, instances));
                 if (!string.IsNullOrEmpty(search))
                 {
                     summaries = summaries.Where(summary =>
@@ -46,20 +50,21 @@ public static class InstanceEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<InstanceSummary[]>();
 
         // the group index of the instance list (MainWindow's group view)
-        api.MapGet("/instances/groups", async (LauncherRuntime runtime) =>
+        api.MapGet("/instances/groups", async (InstanceList instances,
+            InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
                 var byGroup = new SortedDictionary<string, List<string>>(StringComparer.Ordinal);
-                foreach (var inst in runtime.Instances.Instances)
+                foreach (var inst in instances.Instances)
                 {
-                    var group = runtime.Instances.GetInstanceGroup(inst.Id());
+                    var group = instances.GetInstanceGroup(inst.Id());
                     if (group.Length == 0)
                     {
                         continue; // ungrouped instances are not a group
@@ -80,36 +85,38 @@ public static class InstanceEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<InstanceGroupView[]>();
 
         // {ref} resolves through the addressing chain (inode → uuid → dirname); direct
         // GetInstanceById is banned at the API boundary
-        api.MapGet("/instances/{ref}", async (string @ref, LauncherRuntime runtime) =>
+        api.MapGet("/instances/{ref}", async (string @ref,
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                var inst = runtime.Instances.ResolveInstance(@ref);
+                var inst = instances.ResolveInstance(@ref);
                 return inst is null
                     ? ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'")
-                    : Results.Ok(Detail(inst, runtime));
+                    : Results.Ok(Detail(inst, instances));
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<InstanceDetail>();
 
-        api.MapPost("/instances/vanilla", async (VanillaCreateRequest request, LauncherRuntime runtime) =>
+        api.MapPost("/instances/vanilla", async (VanillaCreateRequest request,
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
             if (string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.McVersion))
             {
                 return ApiJson.Error("invalid_body", "'name' and 'mcVersion' are required", 400);
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
                 // staged-commit path: VanillaCreationTask runs inside an InstanceList staging
@@ -124,11 +131,11 @@ public static class InstanceEndpoints
                 task.SetName(request.Name);
                 task.Icon = request.IconKey ?? "default";
 
-                var wrapped = runtime.Instances.WrapInstanceTask(task);
+                var wrapped = instances.WrapInstanceTask(task);
                 // the commit derives the folder from the display name: compute the expected
                 // id BEFORE running the task (after the commit the directory already exists
                 // and DirNameFromString would return "<name>(1)")
-                AbsolutePath inDir = new AbsolutePath(runtime.Instances.PrimaryDir());
+                AbsolutePath inDir = new AbsolutePath(instances.PrimaryDir());
                 var expectedId = FileNaming.DirNameFromString(request.Name, [inDir]);
                 await wrapped.StartAsync();
                 if (!wrapped.WasSuccessful)
@@ -136,8 +143,8 @@ public static class InstanceEndpoints
                     return ApiJson.Error("creation_failed", wrapped.FailReason, 500);
                 }
 
-                runtime.Instances.LoadList();
-                var inst = runtime.Instances.ResolveInstance(expectedId);
+                instances.LoadList();
+                var inst = instances.ResolveInstance(expectedId);
                 return inst is null
                     ? ApiJson.Error("creation_failed", "instance was committed but not discovered", 500)
                     : Results.Created($"/api/v1/instances/{inst.Uuid}",
@@ -145,12 +152,13 @@ public static class InstanceEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<InstanceCreatedResponse>(201);
 
-        api.MapPost("/instances/import", async (ImportRequest request, LauncherRuntime runtime,
-            FlintTaskRegistry registry) =>
+        api.MapPost("/instances/import", async (ImportRequest request, InstanceList instances,
+            InstanceMutationLock instanceLock, ModrinthApi modrinth, FlameApi flame,
+            HttpMetaCache metaCache, FlintTaskRegistry registry) =>
         {
             if (string.IsNullOrWhiteSpace(request.Url) ||
                 !Uri.TryCreate(request.Url, UriKind.Absolute, out var uri) ||
@@ -159,12 +167,12 @@ public static class InstanceEndpoints
                 return ApiJson.Error("invalid_url", "'url' must be an absolute http(s)/file URL", 400);
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                var importTask = new InstanceImportTask(uri, trustedSource: true, modrinth: runtime.Modrinth, flame: runtime.Flame)
+                var importTask = new InstanceImportTask(uri, trustedSource: true, modrinth: modrinth, flame: flame)
                 {
-                    MetaCache = runtime.MetaCache,
+                    MetaCache = metaCache,
                     // the OptionalModDialog answers for mrpack/CurseForge packs:
                     // keys are the manifest file paths, unselected files install disabled
                     OptionalModsSelection = request.OptionalMods ?? new Dictionary<string, bool>(),
@@ -176,20 +184,20 @@ public static class InstanceEndpoints
                     importTask.SetName(request.Name);
                 }
 
-                var wrapped = runtime.Instances.WrapInstanceTask(importTask);
+                var wrapped = instances.WrapInstanceTask(importTask);
                 // NOTE: the hook runs via Task.Run — the fire-and-forget StartAsync below can
                 // complete synchronously on this thread (small/file packs), and an inline
                 // InstanceLock.Wait() here would deadlock against this very handler
                 var entry = registry.Register("import", wrapped, onFinished: () => _ = Task.Run(() =>
                 {
-                    runtime.InstanceLock.Wait();
+                    instanceLock.Wait();
                     try
                     {
-                        runtime.Instances.LoadList();
+                        instances.LoadList();
                     }
                     finally
                     {
-                        runtime.InstanceLock.Release();
+                        instanceLock.Release();
                     }
                 }));
                 _ = wrapped.StartAsync(); // 202: downloads/modpack processing run in background
@@ -197,24 +205,25 @@ public static class InstanceEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<TaskAcceptedResponse>(202);
 
         // CopyInstanceDialog: a selective copy runs as a staged instance task (the copy is
         // committed into instances/ on success) and is tracked like import
         api.MapPost("/instances/{ref}/copy", async (string @ref, CopyInstanceRequest request,
-            LauncherRuntime runtime, FlintTaskRegistry registry) =>
+            InstanceList instances, InstanceMutationLock instanceLock,
+            FlintTaskRegistry registry) =>
         {
             if (string.IsNullOrWhiteSpace(request.Name))
             {
                 return ApiJson.Error("invalid_body", "'name' is required", 400);
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                var original = runtime.Instances.ResolveInstance(@ref);
+                var original = instances.ResolveInstance(@ref);
                 if (original is null)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
@@ -248,18 +257,18 @@ public static class InstanceEndpoints
                 // carries the original's iconKey inside instance.cfg either way)
                 task.Icon = request.IconKey ?? original.IconKey();
 
-                var wrapped = runtime.Instances.WrapInstanceTask(task);
+                var wrapped = instances.WrapInstanceTask(task);
                 var entry = registry.Register("copy", wrapped, instanceId: @ref,
                     onFinished: () => _ = Task.Run(() =>
                     {
-                        runtime.InstanceLock.Wait();
+                        instanceLock.Wait();
                         try
                         {
-                            runtime.Instances.LoadList();
+                            instances.LoadList();
                         }
                         finally
                         {
-                            runtime.InstanceLock.Release();
+                            instanceLock.Release();
                         }
                     }));
                 _ = wrapped.StartAsync(); // 202: the folder copy + commit run in the background
@@ -267,27 +276,28 @@ public static class InstanceEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<TaskAcceptedResponse>(202);
 
-        api.MapDelete("/instances/{ref}", async (string @ref, LauncherRuntime runtime) =>
+        api.MapDelete("/instances/{ref}", async (string @ref,
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                var inst = runtime.Instances.ResolveInstance(@ref);
+                var inst = instances.ResolveInstance(@ref);
                 if (inst is null)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
                 }
 
-                runtime.Instances.DeleteInstance(inst.Id());
+                instances.DeleteInstance(inst.Id());
                 return Results.NoContent();
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces(204);
 
@@ -296,12 +306,12 @@ public static class InstanceEndpoints
         // so there is no directory move, no LoadList reload and no group re-attachment
         // (the old syncInstanceDirName flow is gone).
         api.MapPatch("/instances/{ref}", async (string @ref, PatchInstanceRequest request,
-            LauncherRuntime runtime) =>
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                var inst = runtime.Instances.ResolveInstance(@ref);
+                var inst = instances.ResolveInstance(@ref);
                 if (inst is null)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
@@ -324,25 +334,26 @@ public static class InstanceEndpoints
 
                 if (request.Group is { } group)
                 {
-                    runtime.Instances.SetInstanceGroup(inst.Id(), group);
+                    instances.SetInstanceGroup(inst.Id(), group);
                 }
 
-                runtime.Instances.SaveNow();
+                instances.SaveNow();
                 return Results.NoContent();
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces(204);
 
         // ------------------------------------------------------------ instance settings
-        api.MapGet("/instances/{ref}/settings", async (string @ref, LauncherRuntime runtime) =>
+        api.MapGet("/instances/{ref}/settings", async (string @ref,
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                var inst = runtime.Instances.ResolveInstance(@ref);
+                var inst = instances.ResolveInstance(@ref);
                 if (inst is null)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
@@ -388,22 +399,22 @@ public static class InstanceEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<Dictionary<string, JsonElement>>();
 
         api.MapPut("/instances/{ref}/settings", async (string @ref, SettingsPutRequest request,
-            LauncherRuntime runtime) =>
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
             if (request.Overrides.ValueKind != JsonValueKind.Object)
             {
                 return ApiJson.Error("invalid_body", "body must be {\"overrides\": {key: value}}", 400);
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                var inst = runtime.Instances.ResolveInstance(@ref);
+                var inst = instances.ResolveInstance(@ref);
                 if (inst is null)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
@@ -427,43 +438,41 @@ public static class InstanceEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces(204);
     }
 
     // ----------------------------------------------------------------- DTO mapping
 
-    public static InstanceSummary Summary(BaseInstance inst, LauncherRuntime runtime)
+    public static InstanceSummary Summary(BaseInstance inst, InstanceList instances)
     {
         _ = inst.Settings; // ensure the type-specific settings (and InstanceType) are loaded
-        var list = runtime.Instances;
         return new InstanceSummary(
             inst.Id(),
             inst.Uuid,
-            runtime.Instances.InodeOf(inst),
+            instances.InodeOf(inst),
             inst.Id(),
             inst.Name(),
             inst.IconKey(),
-            list.GetInstanceGroup(inst.Id()),
+            instances.GetInstanceGroup(inst.Id()),
             inst.LastLaunch(),
             inst.TotalTimePlayed(),
             inst.IsRunning,
             InstanceType(inst));
     }
 
-    public static InstanceDetail Detail(BaseInstance inst, LauncherRuntime runtime)
+    public static InstanceDetail Detail(BaseInstance inst, InstanceList instances)
     {
         _ = inst.Settings;
-        var list = runtime.Instances;
         return new InstanceDetail(
             inst.Id(),
             inst.Uuid,
-            runtime.Instances.InodeOf(inst),
+            instances.InodeOf(inst),
             inst.Id(),
             inst.Name(),
             inst.IconKey(),
-            list.GetInstanceGroup(inst.Id()),
+            instances.GetInstanceGroup(inst.Id()),
             inst.LastLaunch(),
             inst.TotalTimePlayed(),
             inst.IsRunning,

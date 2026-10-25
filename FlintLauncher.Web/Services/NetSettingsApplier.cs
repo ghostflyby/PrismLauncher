@@ -15,56 +15,66 @@
 
 using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
+using FlintLauncher.Core.Config;
+using FlintLauncher.Core.ModPlatform.Flame;
+using FlintLauncher.Core.ModPlatform.Modrinth;
+using FlintLauncher.Core.Net;
+using FlintLauncher.Core.Secrets;
 
 namespace FlintLauncher.Web.Services;
 
-public static class RuntimeNetConfig
+public sealed class NetSettingsApplier(
+    FlintConfigStore configStore,
+    ISecretStore secrets,
+    NetStack net,
+    ModrinthApi modrinth,
+    FlameApi flame,
+    AuthEndpointsOptions auth)
 {
     public const string ProxyPassSecret = "ProxyPass";
     public const string ModrinthTokenSecret = "ModrinthToken";
     public const string FlameKeySecret = "FlameKeyOverride";
 
-    public static void Apply(LauncherRuntime runtime)
+    public void Apply()
     {
         // the typed user layer (the SettingsObject adapter view retired)
-        var config = runtime.Config.Current;
-        var stack = runtime.Net;
+        var config = configStore.Current;
         var userAgent = config.Api.UserAgentOverride ?? "";
-        stack.Configure(
+        net.Configure(
             userAgent.Length > 0 ? userAgent : FlintConfig.Default.UserAgent,
             config.Proxy.ProxyType ?? "None",
             config.Proxy.ProxyAddr ?? "127.0.0.1",
             config.Proxy.ProxyPort ?? 8080,
             config.Proxy.ProxyUser ?? "",
-            runtime.Secrets.Get(ProxyPassSecret) ?? "");
+            secrets.Get(ProxyPassSecret) ?? "");
 
         var retries = config.Launcher.NumberOfManualRetries ?? 1;
-        stack.ManualRetries = retries < 0 ? 0 : retries;
+        net.ManualRetries = retries < 0 ? 0 : retries;
 
         // C++ RequestTimeout is in seconds; 0/negative would cancel instantly, so clamp to the default
         var timeoutSeconds = config.Launcher.RequestTimeout ?? 60;
-        stack.RequestTimeout = TimeSpan.FromSeconds(timeoutSeconds < 1 ? 60 : timeoutSeconds);
+        net.RequestTimeout = TimeSpan.FromSeconds(timeoutSeconds < 1 ? 60 : timeoutSeconds);
 
-        ApplyApiCredentials(runtime);
+        ApplyApiCredentials();
     }
 
     /// <summary>The secret-consuming client options read the store. The Modrinth PAT and
     /// the Flame key are secrets (store); the MSA client id is a public override and reads
     /// the typed config (Api domain — explicitly kept out of the secret store).</summary>
-    private static void ApplyApiCredentials(LauncherRuntime runtime)
+    private void ApplyApiCredentials()
     {
-        var modrinthToken = runtime.Secrets.Get(ModrinthTokenSecret) ?? "";
-        if (runtime.Modrinth.ApiToken != modrinthToken)
+        var modrinthToken = secrets.Get(ModrinthTokenSecret) ?? "";
+        if (modrinth.ApiToken != modrinthToken)
         {
-            runtime.Modrinth.ApiToken = modrinthToken;
+            modrinth.ApiToken = modrinthToken;
         }
 
-        var flameKey = runtime.Secrets.Get(FlameKeySecret);
-        runtime.Flame.ApiKeyProvider = () =>
+        var flameKey = secrets.Get(FlameKeySecret);
+        flame.ApiKeyProvider = () =>
             !string.IsNullOrEmpty(flameKey) ? flameKey : FlintConfig.Default.FlameApiKey;
 
-        var msaOverride = runtime.Config.Current.Api.MsaClientIdOverride ?? "";
-        runtime.Auth.MsaClientId = msaOverride.Length > 0
+        var msaOverride = configStore.Current.Api.MsaClientIdOverride ?? "";
+        auth.MsaClientId = msaOverride.Length > 0
             ? msaOverride
             : AuthEndpointsOptions.DefaultMsaClientId;
     }

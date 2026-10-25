@@ -16,7 +16,8 @@ using FlintLauncher.Core.Auth;
 namespace FlintLauncher.Web.Services;
 
 public sealed class AccountRefreshService(
-    LauncherRuntime runtime,
+    AccountList accounts,
+    AuthEndpointsOptions auth,
     ILogger<AccountRefreshService> logger) : BackgroundService
 {
     private static readonly TimeSpan StartupDelay = TimeSpan.FromSeconds(10);
@@ -54,7 +55,6 @@ public sealed class AccountRefreshService(
 
     internal async Task RefreshStaleAccountsAsync(CancellationToken cancellationToken)
     {
-        var accounts = runtime.Accounts;
         for (var i = 0; i < accounts.Count; i++)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -71,7 +71,7 @@ public sealed class AccountRefreshService(
             logger.LogInformation("Refreshing account '{Profile}'", account.ProfileName());
             try
             {
-                var refresh = account.Refresh();
+                var refresh = account.Refresh(auth);
                 if (refresh is not null && !refresh.IsFinished)
                 {
                     await refresh.StartAsync(cancellationToken).ConfigureAwait(false);

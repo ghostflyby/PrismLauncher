@@ -55,7 +55,7 @@ public sealed class AuthFlow : FlintTask
             _steps.Add(new LauncherLoginStep(data, endpoints));
             _steps.Add(new EntitlementsStep(data, endpoints));
             _steps.Add(new MinecraftProfileStep(data, endpoints));
-            _steps.Add(new GetSkinStep(data));
+            _steps.Add(new GetSkinStep(data, endpoints));
         }
 
         ChangeState(AccountTaskState.Created);

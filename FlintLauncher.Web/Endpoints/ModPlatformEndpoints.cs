@@ -12,6 +12,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform;
@@ -57,7 +58,8 @@ public static class ModPlatformEndpoints
             string? loader,
             string? index,
             string? type,
-            LauncherRuntime runtime,
+            ModrinthApi modrinth,
+            FlameApi flame,
             CancellationToken cancellationToken,
             int offset = 0) =>
         {
@@ -78,8 +80,8 @@ public static class ModPlatformEndpoints
             }
 
             return parsedProvider == ResourceProvider.Flame
-                ? await FlameSearchAsync(resourceType, query, version, loader, index, offset, runtime)
-                : await ModrinthSearchAsync(resourceType, query, version, loader, index, offset, runtime,
+                ? await FlameSearchAsync(resourceType, query, version, loader, index, offset, flame)
+                : await ModrinthSearchAsync(resourceType, query, version, loader, index, offset, modrinth,
                     cancellationToken);
         }).Produces<FlameSearchResult[]>().Produces<ModrinthSearchResultView[]>();
 
@@ -88,7 +90,7 @@ public static class ModPlatformEndpoints
         // project_type (Modrinth), mapped to [{id, name, icon}]. An explicit numeric classId
         // wins over `type` on Flame (search hits carry the raw CurseForge class id).
         api.MapGet("/modplatform/{provider}/categories", async Task<IResult> (
-            string provider, string? type, string? classId, LauncherRuntime runtime,
+            string provider, string? type, string? classId, ModrinthApi modrinth, FlameApi flame,
             CancellationToken cancellationToken) =>
         {
             if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
@@ -122,8 +124,8 @@ public static class ModPlatformEndpoints
                     effectiveClassId = FlameApi.GetClassId(resourceType);
                 }
 
-                var (_, flameRequest) = runtime.Flame.GetCategoriesForClassId(effectiveClassId);
-                runtime.Flame.AddApiKeyHeader(flameRequest);
+                var (_, flameRequest) = flame.GetCategoriesForClassId(effectiveClassId);
+                flame.AddApiKeyHeader(flameRequest);
                 await flameRequest.StartAsync();
                 if (flameRequest.State != TaskState.Succeeded)
                 {
@@ -148,7 +150,7 @@ public static class ModPlatformEndpoints
             List<ModrinthCategory>? modrinthCategories;
             try
             {
-                modrinthCategories = await runtime.Modrinth.Client.GetCategoriesAsync(cancellationToken);
+                modrinthCategories = await modrinth.Client.GetCategoriesAsync(cancellationToken);
             }
             catch (Exception e) when (e is HttpRequestException or JsonException)
             {
@@ -161,8 +163,8 @@ public static class ModPlatformEndpoints
 
         // --------------------------------------------------- modplatform/{provider}/mods/{projectId}/description
         api.MapGet("/modplatform/{provider}/mods/{projectId}/description",
-            async Task<IResult> (string provider, string projectId, LauncherRuntime runtime,
-                CancellationToken cancellationToken) =>
+            async Task<IResult> (string provider, string projectId, ModrinthApi modrinth,
+                FlameApi flame, CancellationToken cancellationToken) =>
             {
                 if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
                 {
@@ -177,12 +179,12 @@ public static class ModPlatformEndpoints
                         return ApiJson.Error("invalid_request", "'projectId' must be a CurseForge project id", 400);
                     }
 
-                    body = await runtime.Flame.GetModDescription(modId);
+                    body = await flame.GetModDescription(modId);
                 }
                 else
                 {
                     // the Modrinth body endpoint answers with plain text
-                    body = await runtime.Modrinth.Client.GetProjectDescriptionAsync(projectId, cancellationToken);
+                    body = await modrinth.Client.GetProjectDescriptionAsync(projectId, cancellationToken);
                 }
 
                 return Results.Ok(new ProviderBodyView(body));
@@ -191,7 +193,7 @@ public static class ModPlatformEndpoints
         // ------------------------------------------------ modplatform/{provider}/mods/{projectId}/changelog
         api.MapGet("/modplatform/{provider}/mods/{projectId}/changelog",
             async Task<IResult> (string provider, string projectId, string? fileId,
-                LauncherRuntime runtime) =>
+                FlameApi flame) =>
             {
                 if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
                 {
@@ -215,14 +217,14 @@ public static class ModPlatformEndpoints
                     return ApiJson.Error("invalid_request", "'projectId' must be a CurseForge project id", 400);
                 }
 
-                var body = await runtime.Flame.GetModFileChangelog(modId, fileIdNum);
+                var body = await flame.GetModFileChangelog(modId, fileIdNum);
                 return Results.Ok(new ProviderBodyView(body));
             }).Produces<ProviderBodyView>();
 
         // ------------------------------------------------ modplatform/{provider}/versions
         api.MapGet("/modplatform/{provider}/versions", async Task<IResult> (
             string provider,
-            string? projectId, LauncherRuntime runtime) =>
+            string? projectId, ModrinthApi modrinth, FlameApi flame) =>
         {
             if (string.IsNullOrWhiteSpace(projectId))
             {
@@ -237,12 +239,12 @@ public static class ModPlatformEndpoints
             var pack = new IndexedPack { AddonId = projectId, Provider = parsedProvider };
             if (parsedProvider == ResourceProvider.Flame)
             {
-                var url = runtime.Flame.GetVersionsUrl(new VersionSearchArgs
+                var url = flame.GetVersionsUrl(new VersionSearchArgs
                 {
                     Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.Flame },
                 });
                 var request = NetRequest.MakeByteArray(new Uri(url));
-                runtime.Flame.AddApiKeyHeader(request);
+                flame.AddApiKeyHeader(request);
 
                 await request.StartAsync();
                 if (request.State != TaskState.Succeeded)
@@ -265,14 +267,14 @@ public static class ModPlatformEndpoints
             }
             else
             {
-                var versionsUrl = runtime.Modrinth.GetVersionsUrl(new VersionSearchArgs
+                var versionsUrl = modrinth.GetVersionsUrl(new VersionSearchArgs
                 {
                     Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.Modrinth },
                 });
                 List<ModrinthVersion> versionDtos;
                 try
                 {
-                    versionDtos = await runtime.Modrinth.Client.GetVersionListAsync(versionsUrl);
+                    versionDtos = await modrinth.Client.GetVersionListAsync(versionsUrl);
                 }
                 catch (Exception e) when (e is HttpRequestException or JsonException)
                 {
@@ -301,12 +303,13 @@ public static class ModPlatformEndpoints
         }).Produces<ProviderVersionView[]>();
 
         // ------------------------------------------------------ instances/{id}/mods
-        api.MapGet("/instances/{id}/mods", async (string id, LauncherRuntime runtime) =>
+        api.MapGet("/instances/{id}/mods", async (string id,
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -334,12 +337,13 @@ public static class ModPlatformEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<InstalledModView[]>();
 
         api.MapPost("/instances/{id}/mods/install", async (string id, List<ModInstallSelection>? selections,
-            LauncherRuntime runtime, FlintTaskRegistry registry) =>
+            InstanceList instances, InstanceMutationLock instanceLock,
+            ModrinthApi modrinth, FlameApi flame, FlintTaskRegistry registry) =>
         {
             if (selections is null || selections.Count == 0)
             {
@@ -363,10 +367,10 @@ public static class ModPlatformEndpoints
                 requests.Add(new ModInstallRequest(provider, selection.ProjectId, selection.VersionId ?? ""));
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -381,7 +385,7 @@ public static class ModPlatformEndpoints
                 }
 
                 var task = new ModInstallTask(instance, instance.LoaderModList(), requests,
-                    mcVersion, profile.GetSupportedModLoaders() ?? ModLoaderType.None, runtime.Modrinth, runtime.Flame);
+                    mcVersion, profile.GetSupportedModLoaders() ?? ModLoaderType.None, modrinth, flame);
                 var entry = registry.Register("mods-install", task, instanceId: instance.Id());
                 // the result payload lists the installed entries (selected + dependencies);
                 // published on terminal events so a download failure still shows what landed
@@ -392,17 +396,18 @@ public static class ModPlatformEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<TaskAcceptedResponse>(202);
 
         api.MapPost("/instances/{id}/mods/update", async (string id, ModsUpdateRequest? filter,
-            LauncherRuntime runtime, FlintTaskRegistry registry) =>
+            InstanceList instances, InstanceMutationLock instanceLock, FlintConfigStore config,
+            ModrinthApi modrinth, FlintTaskRegistry registry) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -416,9 +421,9 @@ public static class ModPlatformEndpoints
                     filter?.ReleaseTypes is { Count: > 0 } requested
                         ? IndexedVersionType.FromStringList(requested)
                         : IndexedVersionType.FromStringList(SettingsJson.ToStringList(
-                            runtime.Config.Current.ModDownload.ModUpdateReleaseTypes ?? "[]"));
+                            config.Current.ModDownload.ModUpdateReleaseTypes ?? "[]"));
 
-                var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, runtime.Modrinth, releaseTypes);
+                var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, modrinth, releaseTypes);
                 var entry = registry.Register("mods-update", task, instanceId: instance.Id());
                 // the result payload carries the found/applied updates; it is published once
                 // the task reaches a terminal state (the check pass fills it before applying)
@@ -429,7 +434,7 @@ public static class ModPlatformEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<TaskAcceptedResponse>(202);
     }
@@ -584,7 +589,7 @@ public static class ModPlatformEndpoints
     /// <summary>The CurseForge search pass-through (the x-api-key header is attached through
     /// the FlameConfig provider hook; hits map through FlameMod.LoadIndexedPack).</summary>
     private static async Task<IResult> FlameSearchAsync(ResourceType resourceType, string? query, string? version,
-        string? loader, string? index, int offset, LauncherRuntime runtime)
+        string? loader, string? index, int offset, FlameApi flame)
     {
         var loaders = string.IsNullOrWhiteSpace(loader)
             ? (ModLoaderType?)null
@@ -603,13 +608,13 @@ public static class ModPlatformEndpoints
             Search = string.IsNullOrWhiteSpace(query) ? null : query,
             Versions = string.IsNullOrWhiteSpace(version) ? null : [new McVersion(version)],
             Loaders = loaders,
-            Sorting = FlameSorting(index, runtime),
+            Sorting = FlameSorting(index, flame),
         };
 
-        var url = runtime.Flame.GetSearchUrl(args);
+        var url = flame.GetSearchUrl(args);
 
         var request = NetRequest.MakeByteArray(new Uri(url));
-        runtime.Flame.AddApiKeyHeader(request);
+        flame.AddApiKeyHeader(request);
         await request.StartAsync();
         if (request.State != TaskState.Succeeded)
         {
@@ -666,7 +671,7 @@ public static class ModPlatformEndpoints
     /// <summary>The Modrinth search pass-through (PAT header through ModrinthApi.AddApiHeaders
     /// inside the core request builder; facets like the C++ search model builds them).</summary>
     private static async Task<IResult> ModrinthSearchAsync(ResourceType resourceType, string? query, string? version,
-        string? loader, string? index, int offset, LauncherRuntime runtime, CancellationToken cancellationToken)
+        string? loader, string? index, int offset, ModrinthApi modrinth, CancellationToken cancellationToken)
     {
         var args = new SearchArgs
         {
@@ -684,7 +689,7 @@ public static class ModPlatformEndpoints
             },
         };
 
-        var url = runtime.Modrinth.GetSearchUrl(args);
+        var url = modrinth.GetSearchUrl(args);
         if (url is null)
         {
             return ApiJson.Error("invalid_loader", $"loader '{loader}' is not supported by Modrinth", 400);
@@ -693,7 +698,7 @@ public static class ModPlatformEndpoints
         ModrinthSearchResults search;
         try
         {
-            search = await runtime.Modrinth.Client.GetSearchResultsAsync(url, cancellationToken);
+            search = await modrinth.Client.GetSearchResultsAsync(url, cancellationToken);
         }
         catch (Exception e) when (e is HttpRequestException or JsonException)
         {
@@ -722,14 +727,14 @@ public static class ModPlatformEndpoints
     /// <summary>The MinecraftInstance for a {ref} (null when missing or not a Minecraft
     /// instance — the mods surface only exists for real instances, like launch).
     /// every endpoint resolves through the addressing chain.</summary>
-    private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string reference) =>
-        runtime.Instances.ResolveInstance(reference) as MinecraftInstance;
+    private static MinecraftInstance? LookupInstance(InstanceList instances, string reference) =>
+        instances.ResolveInstance(reference) as MinecraftInstance;
 
     /// <summary>The Flame sorting method by (case-insensitive) name, defaulting to Popularity
     /// (the CurseForge API's default sortField).</summary>
-    private static SortingMethod FlameSorting(string? index, LauncherRuntime runtime)
+    private static SortingMethod FlameSorting(string? index, FlameApi flame)
     {
-        var methods = runtime.Flame.GetSortingMethods();
+        var methods = flame.GetSortingMethods();
         if (!string.IsNullOrWhiteSpace(index))
         {
             foreach (var method in methods)

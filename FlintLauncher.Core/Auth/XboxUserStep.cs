@@ -44,7 +44,7 @@ public sealed class XboxUserStep(AccountData data, AuthEndpointsOptions? auth = 
             Body = xboxAuthData,
             Headers = Headers,
             AutoRetry = true,
-        }, cancellationToken).ConfigureAwait(false);
+        }, _auth.Net, cancellationToken).ConfigureAwait(false);
 
         if (!response.Success)
         {

@@ -5,7 +5,7 @@
 // property defaults are the single source, read through the typed flint.json store; the
 // batch retired the SettingsObject adapter view), the
 // LaunchTask.parseXmlLogs wiring (LogParser behind the LaunchServices.XmlLogParsing gate),
-// the Http proxy/timeout hook application (RuntimeNetConfig) and the meta-cache eviction the
+// the Http proxy/timeout hook application (NetSettingsApplier) and the meta-cache eviction the
 // DELETE /api/v1/meta-cache endpoint delegates to.
 //
 // Joins "LauncherJars": NetStack.Default.Configure/ManualRetries/RequestTimeout are process-global
@@ -190,7 +190,7 @@ public class CoverageFixCoreTests
     // --------------------------------------------------- net config application
 
     [Fact]
-    public void RuntimeNetConfig_Applies_Proxy_Retries_Timeout_And_Ua()
+    public void NetSettingsApplier_Applies_Proxy_Retries_Timeout_And_Ua()
     {
         var dataDir = Path.Combine(Path.GetTempPath(), $"flint-netcfg-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dataDir);
@@ -206,7 +206,8 @@ public class CoverageFixCoreTests
             runtime.Config.Set("RequestTimeout", 120);
             runtime.Config.Set("UserAgentOverride", "Flint-NetCfg-Agent/9.9");
 
-            RuntimeNetConfig.Apply(runtime);
+            new NetSettingsApplier(runtime.Config, runtime.Secrets, runtime.Net,
+                runtime.Modrinth, runtime.Flame, runtime.Auth).Apply();
 
             Assert.Equal(("HTTP", "10.1.2.3", 8118, "", ""), NetStack.Default.ProxyConfig);
             Assert.Equal(4, NetStack.Default.ManualRetries);

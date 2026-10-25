@@ -8,6 +8,8 @@
 // an injected AuthEndpointsOptions instance so tests can point the whole flow at a local stub
 // server (pass the options through AuthFlow / the step constructors / LauncherRuntime.Auth).
 
+using FlintLauncher.Core.Net;
+
 namespace FlintLauncher.Core.Auth;
 
 public sealed class AuthEndpointsOptions
@@ -42,4 +44,16 @@ public sealed class AuthEndpointsOptions
 
     /// <summary>Base of launcher/login, entitlements, minecraft/profile, skins and capes endpoints.</summary>
     public string MinecraftServices { get; set; } = DefaultMinecraftServices;
+
+    /// <summary>The network stack the auth steps send through — the host wires its shared,
+    /// settings-configured stack (proxy, user agent, timeout) so the auth traffic follows the
+    /// same configuration as every other request. Unset falls back to a private default
+    /// stack, which keeps a bare fixture working without process-global state.</summary>
+    public NetStack Net
+    {
+        get => _net ??= new NetStack();
+        init => _net = value;
+    }
+
+    private NetStack? _net;
 }

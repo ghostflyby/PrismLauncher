@@ -13,6 +13,7 @@
 // adjust UiHooks/XmlLogParsing on ITS OWN LaunchServices before handing it to a launch, and
 // no other pipeline in the process can observe that.
 
+using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.State;
@@ -40,6 +41,12 @@ public sealed class LaunchServices
     /// persistence silently degrades to per-launch defaults. All in-repo construction sites
     /// (WebHostBuilder, launch fixtures) wire it.</summary>
     public LauncherStateStore? LauncherState { get; init; }
+
+    /// <summary>The auth environment (service endpoints, MSA client id, network stack) the
+    /// pre-launch account refresh runs through — the host's configured options, so the refresh
+    /// honors the MSA client-id override and the proxy like every other auth call. Null keeps
+    /// the bare-fixture defaults (built-in endpoints over a private stack).</summary>
+    public AuthEndpointsOptions? Auth { get; init; }
 
     /// <summary>Parse log4j XML events out of the game output (LaunchTask::parseXmlLogs; the
     /// C++ had no switch — the host enables it).</summary>

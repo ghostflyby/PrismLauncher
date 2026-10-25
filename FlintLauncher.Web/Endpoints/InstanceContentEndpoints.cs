@@ -39,12 +39,12 @@ public static class InstanceContentEndpoints
 
     private static void MapWorlds(IEndpointRouteBuilder api)
     {
-        api.MapGet("/instances/{id}/worlds", async (string id, LauncherRuntime runtime) =>
+        api.MapGet("/instances/{id}/worlds", async (string id, InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -57,17 +57,17 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<WorldView[]>();
 
         api.MapDelete("/instances/{id}/worlds/{folderName}", async (string id, string folderName,
-            LauncherRuntime runtime) =>
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -88,19 +88,19 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces(204);
 
         // world detail: the listing view plus the parsed seed and the icon.png path
         // (WorldPage's info pane / "reset icon" target)
         api.MapGet("/instances/{id}/worlds/{folderName}", async (string id, string folderName,
-            LauncherRuntime runtime) =>
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -128,24 +128,24 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<WorldDetailView>();
 
         // world copy (WorldPage's "copy" action -> CopyWorldTask): the copy lands in the same
         // saves folder under the given name (folder rename + level.dat LevelName rewrite)
         api.MapPost("/instances/{id}/worlds/{folderName}/copy", async (string id, string folderName,
-            WorldCopyRequest request, LauncherRuntime runtime) =>
+            WorldCopyRequest request, InstanceList instances, InstanceMutationLock instanceLock) =>
         {
             if (string.IsNullOrWhiteSpace(request.Name))
             {
                 return ApiJson.Error("invalid_body", "'name' is required", 400);
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -176,22 +176,22 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<WorldView>(201);
 
         api.MapPost("/instances/{id}/worlds/{folderName}/rename", async (string id, string folderName,
-            WorldRenameRequest request, LauncherRuntime runtime) =>
+            WorldRenameRequest request, InstanceList instances, InstanceMutationLock instanceLock) =>
         {
             if (string.IsNullOrWhiteSpace(request.NewName))
             {
                 return ApiJson.Error("invalid_body", "'newName' is required", 400);
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -216,13 +216,13 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces(204);
 
         // multipart zip upload (WorldListPage's "add world" drag & drop / file dialog)
         api.MapPost("/instances/{id}/worlds/install", async (string id, HttpRequest request,
-            LauncherRuntime runtime) =>
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
             var form = await request.ReadFormAsync();
             var file = form.Files.FirstOrDefault();
@@ -231,10 +231,10 @@ public static class InstanceContentEndpoints
                 return ApiJson.Error("invalid_body", "a multipart 'file' part with a world zip is required", 400);
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -294,7 +294,7 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).WithMetadata(new FormUploadMarker("multipart form: world archive file (zip)")).Produces<WorldView>(201);
     }
@@ -303,12 +303,12 @@ public static class InstanceContentEndpoints
 
     private static void MapServers(IEndpointRouteBuilder api)
     {
-        api.MapGet("/instances/{id}/servers", async (string id, LauncherRuntime runtime) =>
+        api.MapGet("/instances/{id}/servers", async (string id, InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -319,22 +319,22 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<ServerEntryView[]>();
 
         api.MapPost("/instances/{id}/servers", async (string id, ServerAddRequest request,
-            LauncherRuntime runtime) =>
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
             if (string.IsNullOrWhiteSpace(request.Address))
             {
                 return ApiJson.Error("invalid_body", "'address' is required", 400);
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -351,17 +351,17 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<ServerEntryView>(201);
 
         api.MapDelete("/instances/{id}/servers/{index}", async (string id, int index,
-            LauncherRuntime runtime) =>
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -378,19 +378,19 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces(204);
 
         // status ping (ServersPage's queryServersStatus): SRV-resolve then the minimal
         // McClient handshake; synchronous with a 5s bound, like the page's single query
         api.MapPost("/instances/{id}/servers/{index}/ping", async (string id, int index,
-            LauncherRuntime runtime) =>
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -415,7 +415,7 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<ServerPingView>();
     }
@@ -427,12 +427,12 @@ public static class InstanceContentEndpoints
         // NOTE: the resources family EXCLUDES mods — the metadata-rich
         // /instances/{id}/mods surface below is the single mods source of truth.
         api.MapGet("/instances/{id}/resources/{type}", async (string id, string type,
-            LauncherRuntime runtime) =>
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -454,25 +454,25 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<ResourceView[]>();
 
         api.MapPost("/instances/{id}/resources/{type}/{name}/enable", async (string id, string type,
-                string name, LauncherRuntime runtime) =>
-            await SetResourceEnabled(id, type, name, EnableAction.Enable, runtime)).Produces(204);
+                string name, InstanceList instances, InstanceMutationLock instanceLock) =>
+            await SetResourceEnabled(id, type, name, EnableAction.Enable, instances, instanceLock)).Produces(204);
 
         api.MapPost("/instances/{id}/resources/{type}/{name}/disable", async (string id, string type,
-                string name, LauncherRuntime runtime) =>
-            await SetResourceEnabled(id, type, name, EnableAction.Disable, runtime)).Produces(204);
+                string name, InstanceList instances, InstanceMutationLock instanceLock) =>
+            await SetResourceEnabled(id, type, name, EnableAction.Disable, instances, instanceLock)).Produces(204);
 
         api.MapDelete("/instances/{id}/resources/{type}/{name}", async (string id, string type,
-            string name, LauncherRuntime runtime) =>
+            string name, InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -497,18 +497,18 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces(204);
     }
 
     private static async Task<IResult> SetResourceEnabled(string id, string type, string name,
-        EnableAction action, LauncherRuntime runtime)
+        EnableAction action, InstanceList instances, InstanceMutationLock instanceLock)
     {
-        await runtime.InstanceLock.WaitAsync();
+        await instanceLock.WaitAsync();
         try
         {
-            if (LookupInstance(runtime, id) is not { } instance)
+            if (LookupInstance(instances, id) is not { } instance)
             {
                 return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
             }
@@ -545,7 +545,7 @@ public static class InstanceContentEndpoints
         }
         finally
         {
-            runtime.InstanceLock.Release();
+            instanceLock.Release();
         }
     }
 
@@ -558,20 +558,20 @@ public static class InstanceContentEndpoints
     private static void MapMods(IEndpointRouteBuilder api)
     {
         api.MapPost("/instances/{id}/mods/{name}/enable", async (string id, string name,
-                LauncherRuntime runtime) =>
-            await SetModEnabled(id, name, EnableAction.Enable, runtime)).Produces(204);
+                InstanceList instances, InstanceMutationLock instanceLock) =>
+            await SetModEnabled(id, name, EnableAction.Enable, instances, instanceLock)).Produces(204);
 
         api.MapPost("/instances/{id}/mods/{name}/disable", async (string id, string name,
-                LauncherRuntime runtime) =>
-            await SetModEnabled(id, name, EnableAction.Disable, runtime)).Produces(204);
+                InstanceList instances, InstanceMutationLock instanceLock) =>
+            await SetModEnabled(id, name, EnableAction.Disable, instances, instanceLock)).Produces(204);
 
         api.MapDelete("/instances/{id}/mods/{name}", async (string id, string name,
-            LauncherRuntime runtime) =>
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -584,18 +584,18 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces(204);
     }
 
     private static async Task<IResult> SetModEnabled(string id, string name, EnableAction action,
-        LauncherRuntime runtime)
+        InstanceList instances, InstanceMutationLock instanceLock)
     {
-        await runtime.InstanceLock.WaitAsync();
+        await instanceLock.WaitAsync();
         try
         {
-            if (LookupInstance(runtime, id) is not { } instance)
+            if (LookupInstance(instances, id) is not { } instance)
             {
                 return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
             }
@@ -621,7 +621,7 @@ public static class InstanceContentEndpoints
         }
         finally
         {
-            runtime.InstanceLock.Release();
+            instanceLock.Release();
         }
     }
 
@@ -629,12 +629,12 @@ public static class InstanceContentEndpoints
 
     private static void MapScreenshots(IEndpointRouteBuilder api)
     {
-        api.MapGet("/instances/{id}/screenshots", async (string id, LauncherRuntime runtime) =>
+        api.MapGet("/instances/{id}/screenshots", async (string id, InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -643,24 +643,25 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<ScreenshotView[]>();
 
         // ScreenshotsPage's imgur upload: each named file uploads as an image; more than one
         // also creates an album (the C++ SequentialTask shape)
         api.MapPost("/instances/{id}/screenshots/upload", async (string id,
-            ScreenshotUploadRequest? request, LauncherRuntime runtime, FlintTaskRegistry registry) =>
+            ScreenshotUploadRequest? request, InstanceList instances, InstanceMutationLock instanceLock,
+            ImgurApi imgur, FlintTaskRegistry registry) =>
         {
             if (request?.Names is null || request.Names.Count == 0)
             {
                 return ApiJson.Error("invalid_body", "body must be {\"names\": [file, ...]}", 400);
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -679,7 +680,7 @@ public static class InstanceContentEndpoints
                 }
 
                 // test/hermetic hook: the imgur endpoint + client id are overridable like the
-                // news feed URL (LauncherRuntime)
+                // news feed URL
                 var baseUrl = Environment.GetEnvironmentVariable("FLINT_IMGUR_BASE_URL");
                 var clientId = Environment.GetEnvironmentVariable("FLINT_IMGUR_CLIENT_ID");
 
@@ -687,12 +688,12 @@ public static class InstanceContentEndpoints
                 var task = new SequentialTask("Uploading screenshots");
                 foreach (var shot in shots)
                 {
-                    task.AddTask(runtime.Imgur.MakeUpload(shot, baseUrl, clientId));
+                    task.AddTask(imgur.MakeUpload(shot, baseUrl, clientId));
                 }
 
                 if (shots.Count > 1)
                 {
-                    task.AddTask(runtime.Imgur.MakeAlbum(new ImgurApi.AlbumResult(), shots, baseUrl, clientId));
+                    task.AddTask(imgur.MakeAlbum(new ImgurApi.AlbumResult(), shots, baseUrl, clientId));
                 }
 
                 var entry = registry.Register("screenshots-upload", task, instanceId: instance.Id());
@@ -701,17 +702,17 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<TaskAcceptedResponse>(202);
 
         api.MapDelete("/instances/{id}/screenshots/{name}", async (string id, string name,
-            LauncherRuntime runtime) =>
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -736,7 +737,7 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces(204);
     }
@@ -745,12 +746,12 @@ public static class InstanceContentEndpoints
 
     private static void MapGameOptions(IEndpointRouteBuilder api)
     {
-        api.MapGet("/instances/{id}/gameoptions", async (string id, LauncherRuntime runtime) =>
+        api.MapGet("/instances/{id}/gameoptions", async (string id, InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -761,22 +762,22 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<GameOptionView[]>();
 
         api.MapPut("/instances/{id}/gameoptions", async (string id, GameOptionsPutRequest? request,
-            LauncherRuntime runtime) =>
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
             if (request?.Options is null || request.Options.Count == 0)
             {
                 return ApiJson.Error("invalid_body", "body must be {\"options\": [{key, value}]}", 400);
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -797,7 +798,7 @@ public static class InstanceContentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces(204);
     }
@@ -807,8 +808,8 @@ public static class InstanceContentEndpoints
     /// <summary>The MinecraftInstance for a {ref} (the content surfaces need the game
     /// root). Every endpoint resolves through the addressing chain — direct
     /// GetInstanceById is banned at the API boundary.</summary>
-    private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string reference) =>
-        runtime.Instances.ResolveInstance(reference) as MinecraftInstance;
+    private static MinecraftInstance? LookupInstance(InstanceList instances, string reference) =>
+        instances.ResolveInstance(reference) as MinecraftInstance;
 
     private static AbsolutePath ServersPath(MinecraftInstance instance) =>
         (instance.GameRoot / "servers.dat");

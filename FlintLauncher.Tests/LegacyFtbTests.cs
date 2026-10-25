@@ -48,11 +48,7 @@ public class LegacyFtbTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList(
-            [MaterializedDirectory.Ensure(new AbsolutePath(instancesDir))!],
-            _global,
-            new AbsolutePath(instancesDir) / ".test-groups.json",
-            []);
+        return _global.BareInstanceList(instancesDir);
     }
 
     private static List<(string? Uid, string? Version)> Components(string staging)

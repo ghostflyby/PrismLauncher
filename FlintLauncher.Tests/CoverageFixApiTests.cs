@@ -539,7 +539,7 @@ public class CoverageFixLaunchJoinApiTests
 
             // seed the java probe cache in the launcher state (the former settings-key
             // seeding — the probe quintet moved out of the settings world)
-            app.Services.GetRequiredService<LauncherRuntime>().State.Update(state => state with
+            app.Services.GetRequiredService<LauncherStateStore>().Update(state => state with
             {
                 Java = state.Java with
                 {

@@ -97,7 +97,8 @@ public static class AuthStepHttp
 {
     public const int MaxAutoRetries = 3;
 
-    public static async Task<AuthStepResponse> SendAsync(AuthStepRequest request, CancellationToken cancellationToken)
+    public static async Task<AuthStepResponse> SendAsync(AuthStepRequest request, NetStack net,
+        CancellationToken cancellationToken)
     {
         var retries = 0;
         while (true)
@@ -125,7 +126,7 @@ public static class AuthStepHttp
             HttpResponseMessage response;
             try
             {
-                response = await NetStack.Default.Client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
+                response = await net.Client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
                     cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

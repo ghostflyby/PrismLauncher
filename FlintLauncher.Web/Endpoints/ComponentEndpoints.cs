@@ -35,12 +35,12 @@ public static class ComponentEndpoints
     {
         api.WithTags("Components");
         // ------------------------------------------------------------------ list
-        api.MapGet("/instances/{id}/components", async (string id, LauncherRuntime runtime) =>
+        api.MapGet("/instances/{id}/components", async (string id, InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -53,13 +53,13 @@ public static class ComponentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<ComponentView[]>();
 
         // ------------------------------------------------- change version / important
         api.MapPatch("/instances/{id}/components/{uid}", async (string id, string uid,
-            ComponentPatchRequest request, LauncherRuntime runtime) =>
+            ComponentPatchRequest request, InstanceList instances, InstanceMutationLock instanceLock) =>
         {
             if (request.Version is null && request.Important is null)
             {
@@ -71,10 +71,10 @@ public static class ComponentEndpoints
                 return ApiJson.Error("invalid_body", "'version' must not be empty", 400);
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -108,13 +108,13 @@ public static class ComponentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces(204);
 
         // ---------------------------------------------------------------- install loader
         api.MapPost("/instances/{id}/components", async (string id, ComponentInstallRequest request,
-            LauncherRuntime runtime) =>
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
             if (string.IsNullOrWhiteSpace(request.Uid))
             {
@@ -126,10 +126,10 @@ public static class ComponentEndpoints
                 return ApiJson.Error("invalid_body", "'version' must not be empty", 400);
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -160,18 +160,18 @@ public static class ComponentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<ComponentView>(201);
 
         // -------------------------------------------------------------- customize/revert
         api.MapPost("/instances/{id}/components/{uid}/customize", async (string id, string uid,
-            LauncherRuntime runtime) =>
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -195,17 +195,17 @@ public static class ComponentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces(204);
 
         api.MapPost("/instances/{id}/components/{uid}/revert", async (string id, string uid,
-            LauncherRuntime runtime) =>
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -229,18 +229,18 @@ public static class ComponentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces(204);
 
         // ----------------------------------------------------------------------- remove
         api.MapDelete("/instances/{id}/components/{uid}", async (string id, string uid,
-            LauncherRuntime runtime) =>
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -263,23 +263,23 @@ public static class ComponentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces(204);
 
         // ------------------------------------------------------------------------- move
         api.MapPost("/instances/{id}/components/{uid}/move", async (string id, string uid,
-            ComponentMoveRequest request, LauncherRuntime runtime) =>
+            ComponentMoveRequest request, InstanceList instances, InstanceMutationLock instanceLock) =>
         {
             if (request.Delta is not (-1 or 1))
             {
                 return ApiJson.Error("invalid_body", "'delta' must be -1 (up) or 1 (down)", 400);
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -302,7 +302,7 @@ public static class ComponentEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces(204);
     }
@@ -311,8 +311,8 @@ public static class ComponentEndpoints
 
     /// <summary>The MinecraftInstance for a {ref} (the component stack needs the PackProfile).
     /// every endpoint resolves through the addressing chain.</summary>
-    private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string reference) =>
-        runtime.Instances.ResolveInstance(reference) as MinecraftInstance;
+    private static MinecraftInstance? LookupInstance(InstanceList instances, string reference) =>
+        instances.ResolveInstance(reference) as MinecraftInstance;
 
     private static int IndexOfUid(PackProfile profile, string uid)
     {

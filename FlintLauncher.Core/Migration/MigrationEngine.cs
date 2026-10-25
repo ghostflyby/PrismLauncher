@@ -293,7 +293,7 @@ public static class FlintLegacyMigration
 
         // BOTH legacy roots remount in one eager pass (a double-legacy state: a prism import
         // landed shared content at the data root and the process died before the
-        // OnImportFinished remount, while the home root is itself a pre-reform total
+        // import-completion remount, while the home root is itself a pre-reform total
         // directory — remounting only the first detected root would strand the other behind
         // the sealed record forever). The probe mirrors LegacySourceRoot's predicates: data
         // root first, home root second; a single-legacy layout degenerates to one iteration.
@@ -359,8 +359,8 @@ public static class FlintLegacyMigration
         return new Result(ran, moved, bytes, ledgerCleaned, error);
     }
 
-    /// <summary>The RECORD-LESS transfer entry (the prism import-finished hook,
-    /// MigrationEndpoints.OnImportFinished): performs exactly the startup remount — the
+    /// <summary>The RECORD-LESS transfer entry (the prism import-completion hook,
+    /// PrismImportCompletion.Run): performs exactly the startup remount — the
     /// whitelist mounts, the in-data cache children, the bare-ledger cleanup — WITHOUT
     /// consulting or writing the decision record. The record exists to keep the startup
     /// AUTO-RUN one-shot; the hook runs after every prism import, where a recorded

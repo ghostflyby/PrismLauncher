@@ -11,8 +11,8 @@
 //                                          a bare DELETE of capes/active (cape removal)
 // The upload/delete/change requests are single-round-trip Minecraft services calls, so they
 // run synchronously: 204 on success, 400 with the task/request FailReason otherwise. They go
-// through the injected AuthEndpointsOptions (runtime.Auth; defaults byte-identical to the
-// hardcoded upstream URL; tests construct a runtime pointed at their stub).
+// through the injected AuthEndpointsOptions (defaults byte-identical to the hardcoded
+// upstream URL; tests construct options pointed at their stub).
 //
 // Cape equip by id is the whole upstream capability: neither the Mojang API nor the ported
 // CapeChange accepts a cape *file*, so a file-only PUT body is rejected (a file part may
@@ -20,6 +20,7 @@
 
 using System.Diagnostics.CodeAnalysis;
 using FlintLauncher.Core.Auth;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Skins;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
@@ -33,9 +34,9 @@ public static class SkinEndpoints
     {
         api.WithTags("Accounts");
         // ------------------------------------------------- accounts/{id}/skin (read)
-        api.MapGet("/accounts/{profileId}/skin", (string profileId, LauncherRuntime runtime) =>
+        api.MapGet("/accounts/{profileId}/skin", (string profileId, AccountList accounts) =>
         {
-            if (!TryLookupAccount(runtime, profileId, out var account, out var notFound))
+            if (!TryLookupAccount(accounts, profileId, out var account, out var notFound))
             {
                 return notFound;
             }
@@ -48,9 +49,9 @@ public static class SkinEndpoints
 
         // ------------------------------------------------- accounts/{id}/skin (upload)
         api.MapPut("/accounts/{profileId}/skin", async Task<IResult> (string profileId,
-            HttpRequest request, LauncherRuntime runtime) =>
+            HttpRequest request, AccountList accounts, AuthEndpointsOptions auth, NetStack net) =>
         {
-            if (!TryLookupAccount(runtime, profileId, out var account, out var notFound))
+            if (!TryLookupAccount(accounts, profileId, out var account, out var notFound))
             {
                 return notFound;
             }
@@ -76,7 +77,7 @@ public static class SkinEndpoints
 
             using var body = new MemoryStream();
             await file.CopyToAsync(body);
-            var upload = SkinUpload.Make(account.AccessToken(), body.ToArray(), model, runtime.Auth, runtime.Net);
+            var upload = SkinUpload.Make(account.AccessToken(), body.ToArray(), model, auth, net);
             await upload.StartAsync();
             return upload.WasSuccessful
                 ? Results.NoContent()
@@ -85,14 +86,14 @@ public static class SkinEndpoints
 
         // ------------------------------------------------- accounts/{id}/skin (delete)
         api.MapDelete("/accounts/{profileId}/skin", async Task<IResult> (string profileId,
-            LauncherRuntime runtime) =>
+            AccountList accounts, AuthEndpointsOptions auth) =>
         {
-            if (!TryLookupAccount(runtime, profileId, out var account, out var notFound))
+            if (!TryLookupAccount(accounts, profileId, out var account, out var notFound))
             {
                 return notFound;
             }
 
-            var request = SkinDelete.Make(account.AccessToken(), runtime.Auth);
+            var request = SkinDelete.Make(account.AccessToken(), auth);
             await request.StartAsync();
             return request.WasSuccessful
                 ? Results.NoContent()
@@ -101,9 +102,9 @@ public static class SkinEndpoints
 
         // ------------------------------------------------- accounts/{id}/cape (equip)
         api.MapPut("/accounts/{profileId}/cape", async Task<IResult> (string profileId,
-            HttpRequest request, LauncherRuntime runtime) =>
+            HttpRequest request, AccountList accounts, AuthEndpointsOptions auth) =>
         {
-            if (!TryLookupAccount(runtime, profileId, out var account, out var notFound))
+            if (!TryLookupAccount(accounts, profileId, out var account, out var notFound))
             {
                 return notFound;
             }
@@ -118,7 +119,7 @@ public static class SkinEndpoints
                     "a 'capeId' form field is required (capes cannot be uploaded as files)", 400);
             }
 
-            var change = CapeChange.Make(account.AccessToken(), capeId, runtime.Auth);
+            var change = CapeChange.Make(account.AccessToken(), capeId, auth);
             await change.StartAsync();
             return change.WasSuccessful
                 ? Results.NoContent()
@@ -129,14 +130,14 @@ public static class SkinEndpoints
         // CapeChange's delete semantics: the empty cape id turns the request into a bare
         // DELETE of minecraft/profile/capes/active
         api.MapDelete("/accounts/{profileId}/cape", async Task<IResult> (string profileId,
-            LauncherRuntime runtime) =>
+            AccountList accounts, AuthEndpointsOptions auth) =>
         {
-            if (!TryLookupAccount(runtime, profileId, out var account, out var notFound))
+            if (!TryLookupAccount(accounts, profileId, out var account, out var notFound))
             {
                 return notFound;
             }
 
-            var change = CapeChange.Make(account.AccessToken(), "", runtime.Auth);
+            var change = CapeChange.Make(account.AccessToken(), "", auth);
             await change.StartAsync();
             return change.WasSuccessful
                 ? Results.NoContent()
@@ -146,10 +147,10 @@ public static class SkinEndpoints
 
     /// <summary>The account for a profile id, or the uniform 404 through
     /// <paramref name="notFound"/> (AccountList lookups are index-based).</summary>
-    private static bool TryLookupAccount(LauncherRuntime runtime, string profileId,
+    private static bool TryLookupAccount(AccountList accounts, string profileId,
         [NotNullWhen(true)] out MinecraftAccount? account, [NotNullWhen(false)] out IResult? notFound)
     {
-        var index = runtime.Accounts.FindAccountByProfileId(profileId);
+        var index = accounts.FindAccountByProfileId(profileId);
         if (index == -1)
         {
             account = null;
@@ -158,7 +159,7 @@ public static class SkinEndpoints
             return false;
         }
 
-        account = runtime.Accounts.At(index);
+        account = accounts.At(index);
         notFound = null;
         return true;
     }

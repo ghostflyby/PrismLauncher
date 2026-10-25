@@ -6,7 +6,9 @@
 // (the launcher news half left — GUI-bound, not ported material)
 
 using FlintLauncher.Core;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Java;
+using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
@@ -45,7 +47,7 @@ public static class MiscEndpoints
         // GuiUtil::uploadPaste: either the raw content or a finished task's buffered log goes
         // to the configured paste provider (PastebinType + PastebinCustomAPIBase global
         // settings, provider default = mclo.gs). Paste bodies are small; this runs synchronously.
-        api.MapPost("/paste", async (PasteRequest? request, LauncherRuntime runtime,
+        api.MapPost("/paste", async (PasteRequest? request, FlintConfigStore config, NetStack net,
             FlintTaskRegistry registry) =>
         {
             if (request is null)
@@ -91,12 +93,12 @@ public static class MiscEndpoints
             }
 
             // the typed user layer (the SettingsObject view retired)
-            var typeIndex = runtime.Config.Current.Api.PastebinType ?? (int)PasteUpload.PasteType.Mclogs;
+            var typeIndex = config.Current.Api.PastebinType ?? (int)PasteUpload.PasteType.Mclogs;
             var pasteType = typeIndex >= 0 && typeIndex < PasteUpload.PasteTypes.Length
                 ? (PasteUpload.PasteType)typeIndex
                 : PasteUpload.PasteType.Mclogs;
-            var upload = new PasteUpload(content, runtime.Config.Current.Api.PastebinCustomApiBase ?? "",
-                pasteType, runtime.Net);
+            var upload = new PasteUpload(content, config.Current.Api.PastebinCustomApiBase ?? "",
+                pasteType, net);
             await upload.StartAsync();
             return upload is { WasSuccessful: true, PasteLink.Length: > 0 }
                 ? Results.Created("/api/v1/paste", new PasteCreatedResponse(upload.PasteLink))
@@ -109,8 +111,8 @@ public static class MiscEndpoints
         // --------------------------------------------------------------- meta cache
         // evict every cached download (index entries + cached files at the base roots);
         // subsequent fetches re-download like a cold cache
-        api.MapDelete("/meta-cache", (LauncherRuntime runtime) =>
-            runtime.MetaCache.EvictAll()
+        api.MapDelete("/meta-cache", (HttpMetaCache metaCache) =>
+            metaCache.EvictAll()
                 ? Results.NoContent()
                 : ApiJson.Error("meta_cache_evict_failed",
                     "some cached files could not be deleted", 500)).Produces(204);
@@ -122,7 +124,7 @@ public static class MiscEndpoints
 /// legacy/launcher fallback, so the launcher-managed java root — the JavaDir setting under
 /// store semantics — is covered like the system-wide sources. Wire shape unchanged:
 /// invalid fallback candidates list as ("unknown", "unknown").</summary>
-public sealed class JavaScanService(LauncherRuntime runtime)
+public sealed class JavaScanService(LaunchServices services)
 {
     private readonly SemaphoreSlim _lock = new(1, 1);
     private volatile IReadOnlyList<JavaView>? _cache;
@@ -169,7 +171,7 @@ public sealed class JavaScanService(LauncherRuntime runtime)
     /// this must stay lock-free because both entry points already hold it.</summary>
     private async Task<IReadOnlyList<JavaView>> ScanCoreAsync()
     {
-        var candidates = await JavaDetection.DetectAsync(runtime.JavaRoot);
+        var candidates = await JavaDetection.DetectAsync(services.JavaRoot);
         var scanned = candidates
             .Select(candidate => new JavaView(candidate.Path, candidate.Version.Original, candidate.Architecture))
             .ToArray();

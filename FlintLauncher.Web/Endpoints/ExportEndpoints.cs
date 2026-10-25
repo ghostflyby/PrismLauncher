@@ -34,7 +34,8 @@ public static class ExportEndpoints
         api.WithTags("Export");
         // -------------------------------------------------------------------- export
         api.MapPost("/instances/{id}/export", async (string id, ExportRequest request,
-            LauncherRuntime runtime, FlintTaskRegistry registry) =>
+            InstanceList instances, InstanceMutationLock instanceLock,
+            ModrinthApi modrinth, FlameApi flame, FlintTaskRegistry registry) =>
         {
             var format = (request.Format ?? "").Trim().ToLowerInvariant();
             if (format is not ("modrinth" or "flame" or "modlist"))
@@ -53,10 +54,10 @@ public static class ExportEndpoints
                 }
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -93,7 +94,7 @@ public static class ExportEndpoints
                 {
                     case "modrinth":
                         task = new ModrinthPackExportTask(name, versionId, request.Summary ?? "",
-                            optionalFiles: true, instance, output, modrinth: runtime.Modrinth);
+                            optionalFiles: true, instance, output, modrinth: modrinth);
                         break;
                     case "flame":
                         task = new FlamePackExportTask(new FlamePackExportTask.Options
@@ -104,7 +105,7 @@ public static class ExportEndpoints
                             OptionalFiles = true,
                             Instance = instance,
                             Output = output,
-                            Flame = runtime.Flame,
+                            Flame = flame,
                         });
                         break;
                     default:
@@ -131,17 +132,18 @@ public static class ExportEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<TaskAcceptedResponse>(202);
 
         // ----------------------------------------------------------------- log listing
-        api.MapGet("/instances/{id}/logs", async (string id, LauncherRuntime runtime) =>
+        api.MapGet("/instances/{id}/logs", async (string id,
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -150,23 +152,23 @@ public static class ExportEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<LogFileView[]>();
 
         // ---------------------------------------------------------------- log contents
         api.MapGet("/instances/{id}/logs/{dir}/{name}", async (string id, string dir, string name,
-            LauncherRuntime runtime) =>
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
             if (dir is not ("logs" or "crash-reports"))
             {
                 return ApiJson.Error("unknown_dir", "dir must be one of logs|crash-reports", 400);
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (LookupInstance(runtime, id) is not { } instance)
+                if (LookupInstance(instances, id) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{id}'");
                 }
@@ -182,7 +184,7 @@ public static class ExportEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).WithMetadata(new PlainTextMarker());
     }
@@ -191,8 +193,8 @@ public static class ExportEndpoints
 
     /// <summary>The MinecraftInstance for a {ref} (logs/exports need the game root).
     /// every endpoint resolves through the addressing chain.</summary>
-    private static MinecraftInstance? LookupInstance(LauncherRuntime runtime, string reference) =>
-        runtime.Instances.ResolveInstance(reference) as MinecraftInstance;
+    private static MinecraftInstance? LookupInstance(InstanceList instances, string reference) =>
+        instances.ResolveInstance(reference) as MinecraftInstance;
 
     private static AbsolutePath LogDir(MinecraftInstance instance, string dir) =>
         (instance.GameRoot / dir);

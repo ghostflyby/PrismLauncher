@@ -19,7 +19,10 @@ public static class LaunchEndpoints
     {
         api.WithTags("Launch");
         api.MapPost("/instances/{ref}/launch", async (string @ref, LaunchRequest request,
-            LauncherRuntime runtime,
+            InstanceList instances,
+            InstanceMutationLock instanceLock,
+            AccountList accounts,
+            LaunchServices services,
             FlintTaskRegistry registry) =>
         {
             var mode = (request.Mode ?? "normal").ToLowerInvariant() switch
@@ -66,10 +69,10 @@ public static class LaunchEndpoints
                 targetToJoin = MinecraftTarget.Parse(request.World, useWorld: true);
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                var inst = runtime.Instances.ResolveInstance(@ref); // the addressing chain
+                var inst = instances.ResolveInstance(@ref); // the addressing chain
                 if (inst is null)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
@@ -95,13 +98,13 @@ public static class LaunchEndpoints
                 MinecraftAccount? account = null;
                 if (request.AccountProfileId is { } profileId)
                 {
-                    var index = runtime.Accounts.FindAccountByProfileId(profileId);
+                    var index = accounts.FindAccountByProfileId(profileId);
                     if (index == -1)
                     {
                         return ApiJson.Error("unknown_account", $"no account with profile id '{profileId}'", 400);
                     }
 
-                    account = runtime.Accounts.At(index);
+                    account = accounts.At(index);
                 }
 
                 var controller = new LaunchController
@@ -110,12 +113,12 @@ public static class LaunchEndpoints
                     WantedLaunchMode = mode.Value,
                     OfflineName = request.OfflineName ?? "",
                     AccountToUse = account,
-                    AccountsProvider = () => runtime.Accounts,
+                    AccountsProvider = () => accounts,
                     AutoProceed = false,
                     TargetToJoin = targetToJoin,
-                    // injected launch dependencies (C++ APPLICATION->settings()/logger): built
-                    // by the composition root (WebHostBuilder) for this app
-                    Services = runtime.LaunchServices,
+                    // injected launch dependencies (C++ APPLICATION->settings()/logger),
+                    // built by the composition root (WebHostBuilder) for this app
+                    Services = services,
                 };
 
                 var entry = registry.Register("launch", controller, instanceId: inst.Id(), controller: controller);
@@ -124,7 +127,7 @@ public static class LaunchEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<TaskAcceptedResponse>(202);
     }

@@ -48,11 +48,7 @@ public class InstanceImportTaskTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList(
-            [MaterializedDirectory.Ensure(new AbsolutePath(instancesDir))!],
-            _global,
-            new AbsolutePath(instancesDir) / ".test-groups.json",
-            []);
+        return _global.BareInstanceList(instancesDir);
     }
 
     private async Task<FlintTask> RunImport(Uri source, IReadOnlyDictionary<string, string>? extraInfo = null,

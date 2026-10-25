@@ -154,6 +154,29 @@ public sealed class HttpMetaCache(AbsolutePath path) : IDisposable
         SaveNow();
     }
 
+    /// <summary>The ledger over the standard base table (the C++ Application.cpp:1036-1051
+    /// startup shape — every base registered exactly once, before any use): the store bases
+    /// (libraries/assets/asset_indexes/java) hang off the store root, the true-cache bases
+    /// (meta/general/icons/fmllibs/pack downloads) off the cache root; there is no
+    /// "screenshots" base (nothing consumes it). Not loaded — the caller runs
+    /// <see cref="Load"/> once the roots are final (after the legacy remount). The one base
+    /// table the host and the fixtures share.</summary>
+    public static HttpMetaCache ForRoots(FlintPaths paths)
+    {
+        var cache = new HttpMetaCache(paths.MetacacheFile);
+        cache.AddBase("meta", paths.MetaDir);
+        cache.AddBase("libraries", paths.LibrariesRoot);
+        cache.AddBase("assets", paths.AssetsRoot);
+        cache.AddBase("asset_indexes", paths.AssetIndexesDir);
+        cache.AddBase("java", paths.JavaRoot);
+        cache.AddBase("general", paths.CacheRoot);
+        cache.AddBase("icons", paths.CacheRoot / "icons");
+        cache.AddBase("fmllibs", paths.FmllibsCacheDir);
+        cache.AddBase("ATLauncherPacks", paths.CacheRoot / "ATLauncherPacks");
+        cache.AddBase("FTBPacks", paths.CacheRoot / "FTBPacks");
+        return cache;
+    }
+
     public void AddBase(string baseId, AbsolutePath basePath)
     {
         lock (_lock)

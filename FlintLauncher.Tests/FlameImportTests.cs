@@ -73,11 +73,7 @@ public class FlameImportTests : IDisposable
     {
         var instancesDir = TempPath("instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList(
-            [MaterializedDirectory.Ensure(new AbsolutePath(instancesDir))!],
-            _global,
-            new AbsolutePath(instancesDir) / ".test-groups.json",
-            []);
+        return _global.BareInstanceList(instancesDir);
     }
 
     // ------------------------------------------------------------- dispatch (e2e)

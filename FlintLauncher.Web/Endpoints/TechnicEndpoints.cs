@@ -10,7 +10,7 @@
 // small, so the flow is synchronous: 201 with the committed instance, 500 creation_failed
 // with the task's FailReason otherwise).
 //
-// The Technic client is per-host state (runtime.Technic — the headless equivalent of the C++
+// The Technic client is per-host state (TechnicApi — the headless equivalent of the C++
 // BuildConfig.TECHNIC_API_BASE_URL constant). The optional `serverUrl` (query param on the
 // GETs, body field on the install) selects a per-request derived client instead of mutating
 // the shared one, so an override can never leak into other requests (and needs no restore).
@@ -38,28 +38,28 @@ public static class TechnicEndpoints
         // (GET /modplatform/technic/trending below). Results map through
         // TechnicApi.LoadSearchResults (the "vanilla" slug exclusion included).
         api.MapGet("/modplatform/technic/search", async Task<IResult> (string? query, string? serverUrl,
-                    LauncherRuntime runtime) =>
-                await SearchAsync(string.IsNullOrWhiteSpace(query) ? "" : query.Trim(), serverUrl, runtime))
+            TechnicApi technic) =>
+                await SearchAsync(string.IsNullOrWhiteSpace(query) ? "" : query.Trim(), serverUrl, technic))
             .Produces<TechnicSearchResultView[]>();
 
         // ----------------------------------------------- modplatform/technic/trending
         api.MapGet("/modplatform/technic/trending", async Task<IResult> (string? serverUrl,
-                    LauncherRuntime runtime) =>
-                await SearchAsync("", serverUrl, runtime))
+            TechnicApi technic) =>
+                await SearchAsync("", serverUrl, technic))
             .Produces<TechnicSearchResultView[]>();
 
         // --------------------------------------------- modplatform/technic/modpack/{slug}
         // TechnicPage::suggestCurrent's metadata step (+ metadataLoaded's Solder build
         // listing for Solder packs, with the "fall back to the current version" rule).
         api.MapGet("/modplatform/technic/modpack/{slug}", async Task<IResult> (string slug, string? serverUrl,
-            LauncherRuntime runtime) =>
+            TechnicApi technic) =>
         {
             if (string.IsNullOrWhiteSpace(slug))
             {
                 return ApiJson.Error("invalid_request", "'slug' is required", 400);
             }
 
-            var technicApi = ResolveApi(runtime, serverUrl, out var hookError);
+            var technicApi = ResolveApi(technic, serverUrl, out var hookError);
             if (hookError is not null)
             {
                 return hookError;
@@ -129,7 +129,8 @@ public static class TechnicEndpoints
 
         // ------------------------------------------------- modplatform/technic/install
         api.MapPost("/modplatform/technic/install", async Task<IResult> (
-            TechnicInstallRequest request, LauncherRuntime runtime) =>
+            TechnicInstallRequest request, TechnicApi technic, InstanceList instances,
+            InstanceMutationLock instanceLock, HttpMetaCache metaCache) =>
         {
             // two request shapes: {url, minecraftVersion?} (zip download) or
             // {solder, slug, build?} (Solder instance); build omitted = the recommended one
@@ -162,14 +163,14 @@ public static class TechnicEndpoints
             }
 
             // the request's client is resolved up front: a serverUrl override derives its own
-            // client, the runtime's shared one is never mutated (nothing to restore)
-            var technicApi = ResolveApi(runtime, request.ServerUrl, out var serverError);
+            // client, the shared one is never mutated (nothing to restore)
+            var technicApi = ResolveApi(technic, request.ServerUrl, out var serverError);
             if (serverError is not null)
             {
                 return serverError;
             }
 
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
                 InstanceTask task;
@@ -180,7 +181,7 @@ public static class TechnicEndpoints
                     var packUri = new Uri(zipUrl, UriKind.Absolute);
                     task = new SingleZipPackInstallTask(packUri, request.MinecraftVersion ?? "")
                     {
-                        MetaCache = runtime.MetaCache,
+                        MetaCache = metaCache,
                         Group = request.Group ?? "",
                     };
                     taskName = requestedName ?? FileNameWithoutExtension(packUri);
@@ -219,10 +220,10 @@ public static class TechnicEndpoints
 
                 // staged-commit path: the task runs inside an InstanceList staging folder
                 // that InstanceStaging commits into instances/ on success (WrapInstanceTask)
-                var wrapped = runtime.Instances.WrapInstanceTask(task);
+                var wrapped = instances.WrapInstanceTask(task);
                 // compute the expected id BEFORE running the task: after the commit the
                 // directory already exists and DirNameFromString would return "<name>(1)"
-                AbsolutePath inDir = new AbsolutePath(runtime.Instances.PrimaryDir());
+                AbsolutePath inDir = new AbsolutePath(instances.PrimaryDir());
                 var expectedId = FileNaming.DirNameFromString(task.Name(), [inDir]);
                 await wrapped.StartAsync();
                 if (!wrapped.WasSuccessful)
@@ -231,9 +232,9 @@ public static class TechnicEndpoints
                     return ApiJson.Error("creation_failed", wrapped.FailReason, 500);
                 }
 
-                runtime.Instances.LoadList();
+                instances.LoadList();
                 // the staged commit's expected dirname, resolved through the chain
-                var inst = runtime.Instances.ResolveInstance(expectedId);
+                var inst = instances.ResolveInstance(expectedId);
                 return inst is null
                     ? ApiJson.Error("creation_failed", "instance was committed but not discovered", 500)
                     : Results.Created($"/api/v1/instances/{inst.Uuid}",
@@ -241,22 +242,22 @@ public static class TechnicEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<InstanceCreatedResponse>(201);
     }
 
     // ------------------------------------------------------------------ helpers
 
-    /// <summary>The request's Technic client: the runtime's own, or — with a `serverUrl`
+    /// <summary>The request's Technic client: the shared one, or — with a `serverUrl`
     /// override — a derived client (same net stack and API build), leaving the shared
     /// instance untouched. Returns the error result for a malformed override.</summary>
-    private static TechnicApi ResolveApi(LauncherRuntime runtime, string? serverUrl, out IResult? error)
+    private static TechnicApi ResolveApi(TechnicApi technic, string? serverUrl, out IResult? error)
     {
         error = null;
         if (string.IsNullOrWhiteSpace(serverUrl))
         {
-            return runtime.Technic;
+            return technic;
         }
 
         var trimmed = serverUrl.Trim();
@@ -265,23 +266,23 @@ public static class TechnicEndpoints
         {
             error = ApiJson.Error("invalid_server_url",
                 "'serverUrl' must be an absolute http(s) URL", 400);
-            return runtime.Technic;
+            return technic;
         }
 
         // the URL builders concatenate directly onto the base, so keep the slash
-        return new TechnicApi(runtime.Technic.Net)
+        return new TechnicApi(technic.Net)
         {
             BaseUrl = trimmed.EndsWith('/') ? trimmed : trimmed + "/",
-            ApiBuild = runtime.Technic.ApiBuild,
+            ApiBuild = technic.ApiBuild,
         };
     }
 
     /// <summary>The search/trending pass-through shared by the two GET endpoints: the
     /// TechnicApi URL builder (empty term = trending), then LoadSearchResults mapped to
     /// [{id, name, displayName?, iconUrl}].</summary>
-    private static async Task<IResult> SearchAsync(string term, string? serverUrl, LauncherRuntime runtime)
+    private static async Task<IResult> SearchAsync(string term, string? serverUrl, TechnicApi technic)
     {
-        var technicApi = ResolveApi(runtime, serverUrl, out var hookError);
+        var technicApi = ResolveApi(technic, serverUrl, out var hookError);
         if (hookError is not null)
         {
             return hookError;

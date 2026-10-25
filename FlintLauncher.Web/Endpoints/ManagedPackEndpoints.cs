@@ -14,6 +14,8 @@
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform;
+using FlintLauncher.Core.ModPlatform.Flame;
+using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Versioning;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
@@ -25,13 +27,14 @@ public static class ManagedPackEndpoints
     public static void MapManagedPack(this RouteGroupBuilder api)
     {
         api.WithTags("ManagedPack");
-        api.MapGet("/instances/{ref}/managedpack", async (string @ref, LauncherRuntime runtime) =>
+        api.MapGet("/instances/{ref}/managedpack", async (string @ref,
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
                 // the managed-pack metadata lives in instance.cfg on every instance type
-                if (runtime.Instances.ResolveInstance(@ref) is not { } instance)
+                if (instances.ResolveInstance(@ref) is not { } instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no instance '{@ref}'");
                 }
@@ -46,17 +49,18 @@ public static class ManagedPackEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<ManagedPackView>();
 
         api.MapPost("/instances/{ref}/managedpack/update-check", async (string @ref,
-            HttpContext httpContext, LauncherRuntime runtime) =>
+            HttpContext httpContext, InstanceList instances, InstanceMutationLock instanceLock,
+            ModrinthApi modrinth, FlameApi flame) =>
         {
-            await runtime.InstanceLock.WaitAsync();
+            await instanceLock.WaitAsync();
             try
             {
-                if (runtime.Instances.ResolveInstance(@ref) is not MinecraftInstance instance)
+                if (instances.ResolveInstance(@ref) is not MinecraftInstance instance)
                 {
                     return ApiJson.NotFound("instance_not_found", $"no launchable instance '{@ref}'");
                 }
@@ -87,7 +91,7 @@ public static class ManagedPackEndpoints
                     : ResourceProvider.Modrinth;
                 var loadersList = profile.GetModLoadersList();
                 var resolver = new ModSelectionResolver(new McVersion(mcVersion),
-                    profile.GetModLoaders() ?? ModLoaderType.None, loadersList, runtime.Modrinth, runtime.Flame);
+                    profile.GetModLoaders() ?? ModLoaderType.None, loadersList, modrinth, flame);
                 IndexedVersion latest;
                 try
                 {
@@ -110,7 +114,7 @@ public static class ManagedPackEndpoints
             }
             finally
             {
-                runtime.InstanceLock.Release();
+                instanceLock.Release();
             }
         }).Produces<ManagedPackUpdateResponse>();
     }

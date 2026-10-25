@@ -11,8 +11,10 @@
 // layer (per-file ledger entry queries) is the metacache eviction surface that exists.
 
 using System.Text.Json;
+using FlintLauncher.Core;
 using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Minecraft;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Store;
 using FlintLauncher.Web.Services;
 
@@ -25,12 +27,12 @@ public static class StoreEndpoints
         api.WithTags("Store");
         var group = api.MapGroup("/store");
 
-        group.MapGet("/status/libraries/{versionRef}", (LauncherRuntime runtime, string versionRef) =>
+        group.MapGet("/status/libraries/{versionRef}", (FlintPaths paths, HttpMetaCache metaCache, string versionRef) =>
         {
             StoreStatusReport? report;
             try
             {
-                report = StoreCompleteness.LibrariesStatus(runtime.Paths, runtime.MetaCache, versionRef,
+                report = StoreCompleteness.LibrariesStatus(paths, metaCache, versionRef,
                     new RuntimeContext());
             }
             catch (Exception e) when (e is MetaParseException or JsonException)
@@ -45,9 +47,9 @@ public static class StoreEndpoints
                 : Results.Ok(report);
         }).Produces<StoreStatusReport>();
 
-        group.MapGet("/status/assets/{assetsId}", (LauncherRuntime runtime, string assetsId) =>
+        group.MapGet("/status/assets/{assetsId}", (FlintPaths paths, string assetsId) =>
         {
-            var report = StoreCompleteness.AssetsStatus(runtime.Paths, assetsId);
+            var report = StoreCompleteness.AssetsStatus(paths, assetsId);
             return report is null
                 ? ApiJson.NotFound("index_not_found",
                     $"no asset index '{assetsId}' under the store's indexes — the assets must be installed first")

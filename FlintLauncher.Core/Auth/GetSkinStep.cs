@@ -12,8 +12,10 @@
 
 namespace FlintLauncher.Core.Auth;
 
-public sealed class GetSkinStep(AccountData data) : AuthStep(data)
+public sealed class GetSkinStep(AccountData data, AuthEndpointsOptions? auth = null) : AuthStep(data)
 {
+    private readonly AuthEndpointsOptions _auth = auth ?? new AuthEndpointsOptions();
+
     public override string Describe() => "Getting skin.";
 
     public override async Task PerformAsync(CancellationToken cancellationToken)
@@ -24,7 +26,7 @@ public sealed class GetSkinStep(AccountData data) : AuthStep(data)
             {
                 Url = url,
                 AutoRetry = true,
-            }, cancellationToken).ConfigureAwait(false);
+            }, _auth.Net, cancellationToken).ConfigureAwait(false);
             if (response.Success)
             {
                 Data.MinecraftProfile.SkinField.Data = response.Body;

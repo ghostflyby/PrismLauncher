@@ -90,7 +90,7 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
             Body = payload,
             Headers = FormHeaders,
             AutoRetry = true,
-        }, cancellationToken).ConfigureAwait(false);
+        }, _auth.Net, cancellationToken).ConfigureAwait(false);
 
         if (!response.Success)
         {
@@ -133,7 +133,7 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
             Url = new Uri(_auth.MsaToken),
             Body = payload,
             Headers = FormHeaders,
-        }, cancellationToken).ConfigureAwait(false);
+        }, _auth.Net, cancellationToken).ConfigureAwait(false);
 
         if (response.Error == (int)QtNetworkError.TimeoutError)
         {

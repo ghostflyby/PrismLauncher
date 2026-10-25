@@ -233,7 +233,7 @@ public class LaunchController : FlintTask
         if (state is AccountState.Unchecked or AccountState.Errored || needsRefresh)
         {
             // MinecraftAccount::refresh(): start the auth flow and wait for the state to settle
-            var refresh = accountToCheck.Refresh();
+            var refresh = accountToCheck.Refresh(Services?.Auth);
             if (refresh is not null && !refresh.IsFinished)
             {
                 await refresh.StartAsync(cancellationToken).ConfigureAwait(false);

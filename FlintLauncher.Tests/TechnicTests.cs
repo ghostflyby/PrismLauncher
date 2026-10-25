@@ -13,11 +13,9 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
-using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -49,11 +47,7 @@ public class TechnicTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList(
-            [MaterializedDirectory.Ensure(new AbsolutePath(instancesDir))!],
-            _global,
-            new AbsolutePath(instancesDir) / ".test-groups.json",
-            []);
+        return _global.BareInstanceList(instancesDir);
     }
 
     private async Task<SingleZipPackInstallTask> RunZipInstall(TechnicZipPackBuilder pack, string minecraftVersion = "",

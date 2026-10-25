@@ -118,15 +118,58 @@ public static class WebHostBuilder
         }
 
         builder.Services.AddSingleton(FlintConfig.Default);
-        builder.Services.AddSingleton(runtime);
-        // the icon/skin data models are injectable like the rest of the runtime's singletons
+        // the assembled runtime is not registered itself — a handler depends on the members
+        // it uses, each injectable on its own
+        builder.Services.AddSingleton(paths);
+        builder.Services.AddSingleton(runtime.Net);
+        builder.Services.AddSingleton(runtime.Config);
+        builder.Services.AddSingleton(runtime.Dirs);
+        builder.Services.AddSingleton(runtime.State);
+        builder.Services.AddSingleton(runtime.Secrets);
+        builder.Services.AddSingleton(runtime.MigrationDecisions);
+        builder.Services.AddSingleton(runtime.MetaCache);
+        builder.Services.AddSingleton(runtime.Instances);
+        builder.Services.AddSingleton(runtime.InstanceLock);
         builder.Services.AddSingleton(runtime.Icons);
         builder.Services.AddSingleton(runtime.Skins);
+        builder.Services.AddSingleton(runtime.Accounts);
+        builder.Services.AddSingleton(runtime.Modrinth);
+        builder.Services.AddSingleton(runtime.Flame);
+        builder.Services.AddSingleton(runtime.Technic);
+        builder.Services.AddSingleton(runtime.AtLauncher);
+        builder.Services.AddSingleton(runtime.Ftb);
+        builder.Services.AddSingleton(runtime.Imgur);
+        builder.Services.AddSingleton(runtime.Auth);
         builder.Services.AddSingleton<FlintTaskRegistry>();
         builder.Services.AddSingleton<DeviceCodeSessionStore>();
         builder.Services.AddSingleton<JavaScanService>();
+        builder.Services.AddSingleton<PrismImportCompletion>();
+        builder.Services.AddSingleton<NetSettingsApplier>();
+        builder.Services.AddSingleton<DirSettingsApplier>();
         builder.Services.AddSingleton(apiAuth);
         builder.Services.AddHostedService<AccountRefreshService>();
+
+        // the launch pipeline's dependencies (the C++ APPLICATION singleton's launch half):
+        // global settings and runtime state from the runtime, the logger factory from the
+        // app services (it only exists after Build — hence the factory). The launch
+        // endpoints inject it; the instance list is stamped with it after Build.
+        builder.Services.AddSingleton(sp => new LaunchServices
+        {
+            Paths = paths,
+            LoggerFactory = sp.GetRequiredService<ILoggerFactory>(),
+            Config = runtime.Config,
+            LauncherState = runtime.State,
+            Auth = runtime.Auth,
+            // the java root follows the JavaDir setting under store
+            // semantics, and the managed-versions javalist scans it (the C++
+            // APPLICATION->javalist() the AutoInstallJava "no download" branch reads)
+            JavaRootProvider = () => runtime.Dirs.JavaRoot,
+            JavaInstallListProvider = () => new JavaInstallList(javaRoot: runtime.Dirs.JavaRoot),
+            // the C++ LaunchTask always parses log4j XML events out of the game output
+            // (LaunchTask::parseXmlLogs); the port keeps it behind an opt-in gate for
+            // pure-core consumers and this host turns it on
+            XmlLogParsing = true,
+        });
 
         var app = builder.Build();
         var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
@@ -139,27 +182,10 @@ public static class WebHostBuilder
                 "Flint API token (temporary, process-lifetime): {Token}", apiAuth.Token);
         }
 
-        // the launch pipeline's dependencies (the C++ APPLICATION singleton's launch half):
-        // logger factory from the app services, paths from the FlintPaths layout, global
-        // settings and runtime state from the runtime. The launch endpoints hand it to the
-        // controller and the instance list stamps it onto (re)discovered instances.
-        runtime.LaunchServices = new LaunchServices
-        {
-            Paths = paths,
-            LoggerFactory = loggerFactory,
-            Config = runtime.Config,
-            LauncherState = runtime.State,
-            // the java root follows the JavaDir setting under store
-            // semantics, and the managed-versions javalist scans it (the C++
-            // APPLICATION->javalist() the AutoInstallJava "no download" branch reads)
-            JavaRootProvider = () => runtime.JavaRoot,
-            JavaInstallListProvider = () => new JavaInstallList(javaRoot: runtime.JavaRoot),
-            // the C++ LaunchTask always parses log4j XML events out of the game output
-            // (LaunchTask::parseXmlLogs); the port keeps it behind an opt-in gate for
-            // pure-core consumers and this host turns it on
-            XmlLogParsing = true,
-        };
-        runtime.Instances.LaunchServices = runtime.LaunchServices;
+        // stamp the launch-pipeline dependencies onto the instance list (re-stamps the
+        // already-discovered residents); resolving here is also the factory's eager,
+        // fail-fast construction
+        runtime.Instances.LaunchServices = app.Services.GetRequiredService<LaunchServices>();
 
         // the flint-legacy startup remount already ran inside the runtime
         // constructor — surface what it did (informational; a failed pass retries next start)
@@ -215,7 +241,7 @@ public static class WebHostBuilder
 
         // proxy / NumberOfManualRetries / RequestTimeout / UserAgentOverride reach the
         // shared Http stack (also re-applied after every settings write)
-        RuntimeNetConfig.Apply(runtime);
+        app.Services.GetRequiredService<NetSettingsApplier>().Apply();
 
         // uniform {"error":{...}} body for unhandled faults
         app.Use(async (context, next) =>

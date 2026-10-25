@@ -13,11 +13,9 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -56,11 +54,7 @@ public class FtbTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList(
-            [MaterializedDirectory.Ensure(new AbsolutePath(instancesDir))!],
-            _global,
-            new AbsolutePath(instancesDir) / ".test-groups.json",
-            []);
+        return _global.BareInstanceList(instancesDir);
     }
 
     private static List<(string? Uid, string? Version)> Components(string staging)

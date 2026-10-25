@@ -12,7 +12,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
@@ -68,11 +67,7 @@ public class AtLauncherTests : IDisposable
     {
         var instancesDir = Path.Combine(_root, "instances");
         Directory.CreateDirectory(instancesDir);
-        return new InstanceList(
-            [MaterializedDirectory.Ensure(new AbsolutePath(instancesDir))!],
-            _global,
-            new AbsolutePath(instancesDir) / ".test-groups.json",
-            []);
+        return _global.BareInstanceList(instancesDir);
     }
 
     /// <summary>The (uid, version) component list of the created instance's mmc-pack.json;
