@@ -5,6 +5,7 @@
 // JSON index), and live requests against a local HTTP server (304 revalidation, checksums, retry).
 
 using System.Net;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using FlintLauncher.Core.Net;
@@ -354,6 +355,64 @@ public class NetRequestTests : IDisposable
         Assert.Equal(TaskState.Succeeded, second.State);
         Assert.Equal(2, requestCount);
         Assert.Equal("cached-body", await entry2.GetFullPath().ReadAllTextAsync());
+    }
+
+    [Fact]
+    public async Task RetryHandler_Retries_Only_When_Opted_In()
+    {
+        // the transport gate is strictly per request: the manual gate (NumberOfManualRetries)
+        // needs its option flag, so a caller without flags — the auth steps, the C++
+        // setAskRetry(false) — gets exactly one attempt
+        var settings = NetSettings.CreateDefault();
+        settings.Update(NetSettings.CreateDefault().Current.UserAgent, "None", "", 0, "", "",
+            manualRetries: 2, TimeSpan.FromSeconds(30));
+        using var inner = new CountingHandler(_ =>
+            throw new HttpRequestException("connection reset"));
+        using var http = new HttpClient(new RetryHandler(settings) { InnerHandler = inner });
+
+        using (var message = new HttpRequestMessage(HttpMethod.Get, new Uri("http://stub/x")))
+        {
+            await Assert.ThrowsAsync<HttpRequestException>(() => http.SendAsync(message));
+            Assert.Equal(1, inner.Calls);
+        }
+
+        using (var message = new HttpRequestMessage(HttpMethod.Get, new Uri("http://stub/x")))
+        {
+            var before = inner.Calls;
+            message.Options.Set(RetryHandler.ManualRetryOption, true);
+            await Assert.ThrowsAsync<HttpRequestException>(() => http.SendAsync(message));
+            Assert.Equal(1 + 2, inner.Calls - before);
+        }
+    }
+
+    [Fact]
+    public async Task RetryHandler_AutoRetry_Honors_The_Attempt_Cap()
+    {
+        var settings = NetSettings.CreateDefault();
+        using var inner = new CountingHandler(_ => new HttpResponseMessage(HttpStatusCode.TooManyRequests)
+        {
+            Headers = { RetryAfter = new RetryConditionHeaderValue(TimeSpan.Zero) },
+        });
+        using var http = new HttpClient(new RetryHandler(settings) { InnerHandler = inner });
+
+        using var message = new HttpRequestMessage(HttpMethod.Get, new Uri("http://stub/x"));
+        message.Options.Set(RetryHandler.AutoRetryOption, true);
+        using var response = await http.SendAsync(message);
+
+        Assert.Equal(429, (int)response.StatusCode);
+        Assert.Equal(4, inner.Calls);
+    }
+
+    private sealed class CountingHandler(Func<int, HttpResponseMessage> respond) : HttpMessageHandler
+    {
+        public int Calls { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Calls++;
+            return Task.FromResult(respond(Calls));
+        }
     }
 
     [Fact]

@@ -95,121 +95,102 @@ public sealed class AuthStepResponse
 /// <summary>Minimal HTTP runner for the auth steps (see file header for why it exists).</summary>
 public static class AuthStepHttp
 {
-    public const int MaxAutoRetries = 3;
-
     public static async Task<AuthStepResponse> SendAsync(AuthStepRequest request, HttpClient http,
         NetSettings settings, CancellationToken cancellationToken)
     {
         var requestTimeout = settings.Current.RequestTimeout;
-        var retries = 0;
-        while (true)
+
+        // RequestTimeout port (QNetworkReply::setTransferTimeout): the persistent client
+        // carries no total-duration timeout, so each phase (headers, body) gets an inactivity
+        // window instead. The source rides the request options so the transport's
+        // RetryHandler resets the window around a 429/503 wait (the manual retry gate stays
+        // off for auth — the C++ steps ran setAskRetry(false)).
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(requestTimeout);
+
+        using var message = new HttpRequestMessage(
+            request.Body is null ? HttpMethod.Get : HttpMethod.Post, request.Url);
+        if (request.Body is not null)
         {
-            // RequestTimeout port (QNetworkReply::setTransferTimeout): the persistent client
-            // carries no total-duration timeout, so each phase (headers, body) gets an
-            // inactivity window instead
-            using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutSource.CancelAfter(requestTimeout);
+            message.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(request.Body));
+        }
 
-            using var message = new HttpRequestMessage(
-                request.Body is null ? HttpMethod.Get : HttpMethod.Post, request.Url);
-            if (request.Body is not null)
+        foreach (var (name, value) in request.Headers)
+        {
+            if (message.Content is not null && name.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
             {
-                message.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(request.Body));
+                // Content-Type is a content header; request headers silently drop it
+                message.Content.Headers.TryAddWithoutValidation(name, value);
             }
-
-            foreach (var (name, value) in request.Headers)
+            else
             {
-                if (message.Content is not null && name.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Content-Type is a content header; request headers silently drop it
-                    message.Content.Headers.TryAddWithoutValidation(name, value);
-                }
-                else
-                {
-                    message.Headers.TryAddWithoutValidation(name, value);
-                }
+                message.Headers.TryAddWithoutValidation(name, value);
             }
+        }
 
-            HttpResponseMessage response;
+        message.Options.Set(RetryHandler.AutoRetryOption, request.AutoRetry);
+        message.Options.Set(RetryHandler.TimeoutSourceOption, timeoutSource);
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
+                timeoutSource.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw; // user abort: let the task machinery route this to the aborted state
+        }
+        catch (OperationCanceledException)
+        {
+            // the RequestTimeout window elapsed before the headers arrived
+            return new AuthStepResponse
+            {
+                Error = (int)QtNetworkError.TimeoutError,
+                ErrorString = "Operation timed out",
+            };
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException)
+        {
+            return new AuthStepResponse
+            {
+                Error = (int)QtNetworkError.UnknownNetworkError,
+                ErrorString = ex.Message,
+            };
+        }
+
+        using (response)
+        {
+            var statusCode = (int)response.StatusCode;
+            byte[] body;
             try
             {
-                response = await http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
-                    timeoutSource.Token).ConfigureAwait(false);
+                timeoutSource.CancelAfter(requestTimeout);
+                body = await response.Content.ReadAsByteArrayAsync(timeoutSource.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                throw; // user abort: let the task machinery route this to the aborted state
+                throw;
             }
             catch (OperationCanceledException)
             {
-                // the RequestTimeout window elapsed before the headers arrived
                 return new AuthStepResponse
                 {
                     Error = (int)QtNetworkError.TimeoutError,
                     ErrorString = "Operation timed out",
                 };
             }
-            catch (Exception ex) when (ex is HttpRequestException or IOException)
+            catch (Exception)
             {
-                return new AuthStepResponse
-                {
-                    Error = (int)QtNetworkError.UnknownNetworkError,
-                    ErrorString = ex.Message,
-                };
+                body = [];
             }
 
-            using (response)
+            return new AuthStepResponse
             {
-                var statusCode = (int)response.StatusCode;
-                if (request.AutoRetry &&
-                    statusCode is 429 or 503 &&
-                    retries < MaxAutoRetries)
-                {
-                    retries++;
-                    var delay = response.Headers.RetryAfter?.Delta ?? TimeSpan.Zero;
-                    if (delay < TimeSpan.Zero)
-                    {
-                        delay = TimeSpan.Zero;
-                    }
-
-                    if (delay > TimeSpan.Zero)
-                    {
-                        await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-                    }
-
-                    continue;
-                }
-
-                byte[] body;
-                try
-                {
-                    timeoutSource.CancelAfter(requestTimeout);
-                    body = await response.Content.ReadAsByteArrayAsync(timeoutSource.Token).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (OperationCanceledException)
-                {
-                    return new AuthStepResponse
-                    {
-                        Error = (int)QtNetworkError.TimeoutError,
-                        ErrorString = "Operation timed out",
-                    };
-                }
-                catch (Exception)
-                {
-                    body = [];
-                }
-
-                return new AuthStepResponse
-                {
-                    Error = StatusCodeToQtError(statusCode),
-                    ErrorString = $"HTTP status {statusCode} for {request.Url}",
-                    Body = body,
-                };
-            }
+                Error = StatusCodeToQtError(statusCode),
+                ErrorString = $"HTTP status {statusCode} for {request.Url}",
+                Body = body,
+            };
         }
     }
 

@@ -39,11 +39,13 @@ public sealed class NetPrimaryHandler : HttpMessageHandler
 
     public NetSettings Settings { get; }
 
-    /// <summary>The persistent client over this handler: no total-duration timeout — the
-    /// request executors carry the RequestTimeout inactivity timeout instead (the C++
-    /// setTransferTimeout port), so a large steady download is never cut mid-transfer.</summary>
+    /// <summary>The persistent client over this handler: the retry gate rides above it, and
+    /// there is no total-duration timeout — the request executors carry the RequestTimeout
+    /// inactivity timeout instead (the C++ setTransferTimeout port), so a large steady
+    /// download is never cut mid-transfer.</summary>
     public static HttpClient CreateClient(NetSettings settings) =>
-        new(new NetPrimaryHandler(settings), disposeHandler: false)
+        new(new RetryHandler(settings) { InnerHandler = new NetPrimaryHandler(settings) },
+            disposeHandler: false)
         {
             Timeout = Timeout.InfiniteTimeSpan,
         };

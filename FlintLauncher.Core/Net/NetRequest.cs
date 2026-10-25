@@ -65,14 +65,11 @@ public sealed class NetRequest(
     string? name = null)
     : FlintTask
 {
-    public const int MaxAutoRetries = 3;
-
     private readonly HttpClient _http = http;
     private readonly NetSettings _settings = settings;
 
     private readonly List<(string name, string value)> _headers = [];
     private Sink? _sink;
-    private int _retryCount;
 
     /// <summary>Set for makeCached-style requests: the entry is re-registered after success.</summary>
     internal HttpMetaCache? MetaCache { get; init; }
@@ -150,32 +147,11 @@ public sealed class NetRequest(
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        // Port of the NetJob manual-retry gate (NumberOfManualRetries): a request that failed
-        // on the network level (connection refused/reset, DNS, the RequestTimeout idle timeout)
-        // is retried up to the settings' ManualRetries times before it finally fails. HTTP
-        // error statuses are not retried here (the AutoRetry option covers 429/503 like the
-        // C++).
-        var attempt = 0;
-        var retries = _settings.Current.ManualRetries;
-        while (true)
-        {
-            try
-            {
-                await ExecuteOnceAsync(cancellationToken).ConfigureAwait(false);
-                return;
-            }
-            catch (HttpRequestException e) when (attempt < retries &&
-                                                 !cancellationToken.IsCancellationRequested)
-            {
-                EmitStatus($"Network error ({e.Message}); retrying ({retries - attempt} tries left)");
-            }
-
-            attempt++;
-        }
-    }
-
-    private async Task ExecuteOnceAsync(CancellationToken cancellationToken)
-    {
+        // the network-level manual retry gate (NumberOfManualRetries) and the 429/503
+        // auto-retry live in the transport's RetryHandler, opted in per request below; this
+        // executor only converts the idle-timeout cancellation into the network error the
+        // rest of the flow expects (the C++ setTransferTimeout surfaces as
+        // OperationCanceledError too)
         var requestTimeout = _settings.Current.RequestTimeout;
         var spec = new NetRequestSpec();
         foreach (var (name, value) in _headers)
@@ -186,73 +162,45 @@ public sealed class NetRequest(
         // RequestTimeout port (QNetworkReply::setTransferTimeout): an inactivity timeout that
         // cancels the linked token. CancelAfter replaces the pending delay on each re-arm, so
         // the timeout state stays inside the CTS: a Timer callback would instead capture the
-        // using-scoped source from a threadpool context and depend on disposal ordering.
+        // using-scoped source from a threadpool context and depend on disposal ordering. The
+        // source rides the request options so the RetryHandler resets the window around its
+        // retry waits.
         using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-        void ArmIdleTimer(CancellationTokenSource source)
+        void ArmIdleTimer()
         {
-            source.CancelAfter(requestTimeout);
+            timeoutSource.CancelAfter(requestTimeout);
         }
 
         try
         {
-            HttpResponseMessage response;
             var effectiveSink = _sink;
-            while (true)
+            if (effectiveSink is not null && !effectiveSink.Init(spec))
             {
-                if (effectiveSink is not null && !effectiveSink.Init(spec))
-                {
-                    EmitFailed(effectiveSink.FailReason);
-                    return;
-                }
-
-                using var message = new HttpRequestMessage(ToHttpMethod(method), url);
-                foreach (var (name, value) in spec.Headers)
-                {
-                    message.Headers.TryAddWithoutValidation(name, value);
-                }
-
-                if (postData is not null)
-                {
-                    message.Content = new ByteArrayContent(postData);
-                }
-
-                ArmIdleTimer(timeoutSource);
-                response = await _http.SendAsync(
-                    message,
-                    HttpCompletionOption.ResponseHeadersRead,
-                    timeoutSource.Token).ConfigureAwait(false);
-
-                // automatically handle HTTP 429 Too Many Requests / 503 errors and retry
-                var statusCode = (int)response.StatusCode;
-                if (options.HasFlag(RequestOptions.AutoRetry) &&
-                    statusCode is 429 or 503 &&
-                    _retryCount < MaxAutoRetries)
-                {
-                    _retryCount++;
-                    var delay = TimeSpan.Zero;
-                    if (response.Headers.RetryAfter?.Delta is { } delta)
-                    {
-                        delay = delta;
-                    }
-                    else if (response.Headers.RetryAfter?.Date is { } date)
-                    {
-                        delay = date - DateTimeOffset.Now;
-                    }
-
-                    if (delay < TimeSpan.Zero)
-                    {
-                        delay = TimeSpan.Zero;
-                    }
-
-                    response.Dispose();
-                    EmitStatus($"HTTP {statusCode}, retrying in {delay.TotalSeconds} seconds");
-                    await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-                    continue;
-                }
-
-                break;
+                EmitFailed(effectiveSink.FailReason);
+                return;
             }
+
+            using var message = new HttpRequestMessage(ToHttpMethod(method), url);
+            foreach (var (name, value) in spec.Headers)
+            {
+                message.Headers.TryAddWithoutValidation(name, value);
+            }
+
+            if (postData is not null)
+            {
+                message.Content = new ByteArrayContent(postData);
+            }
+
+            message.Options.Set(RetryHandler.ManualRetryOption, true);
+            message.Options.Set(RetryHandler.AutoRetryOption, options.HasFlag(RequestOptions.AutoRetry));
+            message.Options.Set(RetryHandler.TimeoutSourceOption, timeoutSource);
+
+            ArmIdleTimer();
+            var response = await _http.SendAsync(
+                message,
+                HttpCompletionOption.ResponseHeadersRead,
+                timeoutSource.Token).ConfigureAwait(false);
 
             using (response)
             {
@@ -311,7 +259,7 @@ public sealed class NetRequest(
                 {
                     while (true)
                     {
-                        ArmIdleTimer(timeoutSource);
+                        ArmIdleTimer();
                         var read = await stream.ReadAsync(buffer, timeoutSource.Token).ConfigureAwait(false);
                         if (read == 0)
                         {
