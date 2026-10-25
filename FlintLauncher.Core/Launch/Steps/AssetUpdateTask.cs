@@ -89,7 +89,11 @@ public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
             return;
         }
 
-        var job = index.GetDownloadJob(ResourceUrl(), inst.AssetsRoot);
+        // the object downloads ride the instance's cache plane — the stack the index itself
+        // came through
+        var net = (inst.MetaCache ?? throw new InvalidOperationException(
+            $"no meta cache stamped on instance '{inst.Name()}' — the composition root must inject it")).Net;
+        var job = index.GetDownloadJob(ResourceUrl(), inst.AssetsRoot, net);
         if (job is not null)
         {
             var resourceUrl = ResourceUrl();

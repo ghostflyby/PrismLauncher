@@ -36,14 +36,14 @@ public sealed class FtbPackIndexFile
 [JsonSerializable(typeof(FtbVersion))]
 internal sealed partial class FtbJsonContext : JsonSerializerContext;
 
-public sealed class FtbApi(NetStack? net = null)
+public sealed class FtbApi(NetStack net)
 {
     /// <summary>BuildConfig.FTB_API_BASE_URL (per-instance; tests construct a client
     /// pointed at their stub).</summary>
     public string BaseUrl { get; init; } = FlintConfig.Default.FtbApiBaseUrl;
 
     /// <summary>The network stack this client's requests go through.</summary>
-    public NetStack Net { get; } = net ?? NetStack.Default;
+    public NetStack Net { get; } = net;
 
     // ------------------------------------------------------------------ URL builders
 

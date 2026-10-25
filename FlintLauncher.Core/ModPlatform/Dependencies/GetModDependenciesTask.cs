@@ -61,7 +61,7 @@ public class GetModDependenciesTask : SequentialTask
         ModrinthApi modrinth, FlameApi? flame = null)
     {
         _selected = selected;
-        _flame = flame ?? new FlameApi();
+        _flame = flame ?? new FlameApi(modrinth.Net);
         _version = new McVersion(instance.GetPackProfile().GetComponentVersion("net.minecraft"));
         _loaderType = instance.GetPackProfile().GetSupportedModLoaders() ?? ModLoaderType.None;
         _modrinth = modrinth;
@@ -294,7 +294,8 @@ public class GetModDependenciesTask : SequentialTask
             if (provider == ResourceProvider.Flame)
             {
                 var job = new NetJob($"{dep.AddonId}::Dependency");
-                var request = NetRequest.MakeByteArray(new Uri(GetApi(provider).GetDependencyUrl(args)));
+                var api = GetApi(provider);
+                var request = NetRequest.MakeByteArray(new Uri(api.GetDependencyUrl(args)), api.Net);
                 job.AddNetRequest(request);
                 await job.StartAsync(cancellationToken);
                 if (!job.WasSuccessful)

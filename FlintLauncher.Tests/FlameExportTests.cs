@@ -22,7 +22,7 @@ namespace FlintLauncher.Tests;
 [Collection("FlameApi")]
 public class FlameExportTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new();
+    private readonly FlameApi _flameApi = new(TestNet.Stack);
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-flame-export-{Guid.NewGuid():N}");
     private readonly TestGlobalSettings _global = new();
     private readonly StubFlameServer _server = new();

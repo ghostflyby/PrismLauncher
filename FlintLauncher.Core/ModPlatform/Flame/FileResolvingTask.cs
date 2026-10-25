@@ -41,7 +41,7 @@ public sealed class BlockedMod
 public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi modrinth, FlameApi? flame = null) : FlintTask
 {
     private readonly ModrinthApi _modrinth = modrinth;
-    private readonly FlameApi _flame = flame ?? new FlameApi();
+    private readonly FlameApi _flame = flame ?? new FlameApi(modrinth.Net);
 
     public FlameManifest GetResults() => toProcess;
 

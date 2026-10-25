@@ -56,7 +56,7 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
         public bool OptionalFiles { get; init; }
         public required MinecraftInstance Instance { get; init; }
         public required AbsolutePath? Output { get; init; }
-        public FlameApi? Flame { get; init; }
+        public required FlameApi Flame { get; init; }
     }
 
     private sealed class ResolvedFile
@@ -79,7 +79,7 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
     }
 
     private readonly AbsolutePath _gameRoot = options.Instance.GameRoot;
-    private readonly FlameApi _flame = options.Flame ?? new FlameApi();
+    private readonly FlameApi _flame = options.Flame;
 
     private readonly List<string> _files = [];
     private readonly Dictionary<string, HashInfo> _pendingHashes = new(StringComparer.Ordinal);

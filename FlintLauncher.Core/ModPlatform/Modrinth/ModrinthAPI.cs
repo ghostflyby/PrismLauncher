@@ -25,7 +25,7 @@ using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
-public sealed class ModrinthApi(ModrinthClient client, NetStack? net = null) : ResourceApi
+public sealed class ModrinthApi(ModrinthClient client, NetStack net) : ResourceApi
 {
     /// <summary>The executed client behind every query; its Options carry the hosts and PAT
     /// this adapter forwards.</summary>
@@ -41,7 +41,7 @@ public sealed class ModrinthApi(ModrinthClient client, NetStack? net = null) : R
 
     /// <summary>The net stack behind the raw NetRequest paths that have not moved onto the
     /// client yet (the pinned-version and dependency-version fetches).</summary>
-    public NetStack Net { get; } = net ?? NetStack.Default;
+    public override NetStack Net { get; } = net;
 
     // ------------------------------------------------------------------ domain queries
 

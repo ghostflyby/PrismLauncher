@@ -157,6 +157,7 @@ public static class WebHostBuilder
         {
             Paths = paths,
             LoggerFactory = sp.GetRequiredService<ILoggerFactory>(),
+            Net = runtime.Net,
             Config = runtime.Config,
             LauncherState = runtime.State,
             Auth = runtime.Auth,

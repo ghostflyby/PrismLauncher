@@ -28,6 +28,7 @@
 
 using System.Text;
 using FlintLauncher.Core.Minecraft;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.ModPlatform;
@@ -88,6 +89,9 @@ public sealed class DependencySearchArgs
 /// </summary>
 public abstract class ResourceApi
 {
+    /// <summary>The network stack this platform's requests go through.</summary>
+    public abstract NetStack Net { get; }
+
     /// <summary>Gets a list of available sorting methods for this API.</summary>
     public abstract List<SortingMethod> GetSortingMethods();
 

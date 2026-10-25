@@ -33,8 +33,9 @@ internal sealed class LauncherRuntime : IDisposable
     public FlintPaths Paths { get; }
     public AbsolutePath DataDir => Paths.DataDir;
 
-    /// <summary>The network stack this runtime's activity flows through (defaults to the
-    /// canonical process-wide stack; tests may isolate by constructing their own).</summary>
+    /// <summary>The network stack this runtime's activity flows through: the injected one, else
+    /// a private default stack owned by this runtime (tests isolate by constructing their own;
+    /// there is no process-wide stack).</summary>
     public NetStack Net { get; }
 
     /// <summary>The Modrinth client (injected into platform tasks/endpoints; tests construct
@@ -106,7 +107,7 @@ internal sealed class LauncherRuntime : IDisposable
         FtbApi? ftb = null, ImgurApi? imgur = null, AuthEndpointsOptions? auth = null)
     {
         Paths = paths;
-        Net = net ?? NetStack.Default;
+        Net = net ?? new NetStack();
         Modrinth = modrinth ?? new ModrinthApi(new ModrinthClient(Net.Client), Net);
         Auth = auth ?? new AuthEndpointsOptions { Net = Net };
         Flame = flame ?? new FlameApi(Net);
@@ -163,7 +164,7 @@ internal sealed class LauncherRuntime : IDisposable
         // registration is never lazy enough to resolve against the process CWD), then the
         // ledger Load(): the persisted index restores, so existing entries do not
         // re-download on every run
-        MetaCache = HttpMetaCache.ForRoots(paths);
+        MetaCache = HttpMetaCache.ForRoots(paths, Net);
         MetaCache.Load();
 
         // instance list: <dataDir>/instances; the typed instance

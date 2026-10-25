@@ -38,7 +38,7 @@ public sealed class EnsureMetadataTask(
 {
     // hash -> resource
     private readonly ModrinthApi _modrinth = modrinth;
-    private readonly FlameApi _flame = flame ?? new FlameApi();
+    private readonly FlameApi _flame = flame ?? new FlameApi(modrinth.Net);
     private readonly Dictionary<string, IndexedVersion> _tempVersions = new(StringComparer.Ordinal);
     public bool LockUpdate { get; init; }
 

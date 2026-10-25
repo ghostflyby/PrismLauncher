@@ -45,7 +45,7 @@ using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.ModPlatform.LegacyFtb;
 
-public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string version) : InstanceTask
+public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string version, NetStack net) : InstanceTask
 {
     private AbsolutePath _archivePath;
 
@@ -78,7 +78,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
         // (the C++ routed this through APPLICATION->metacache()'s "FTBPacks" base; nothing
         // in the port wires a cache here, so the download always goes to a temp file)
         _archivePath = TempCachePath(path);
-        var request = NetRequest.MakeFile(new Uri(url), _archivePath);
+        var request = NetRequest.MakeFile(new Uri(url), _archivePath, net);
 
         var job = new NetJob("Download FTB Pack");
         job.AddNetRequest(request);

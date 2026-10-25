@@ -27,9 +27,9 @@ using System.Text.Json;
 
 namespace FlintLauncher.Core.ModPlatform.Ftb;
 
-public sealed class FtbPackModel(FtbApi? ftb = null)
+public sealed class FtbPackModel(FtbApi ftb)
 {
-    private readonly FtbApi _ftb = ftb ?? new FtbApi();
+    private readonly FtbApi _ftb = ftb;
     private readonly List<FtbModpack> _modpacks = [];
 
     public IReadOnlyList<FtbModpack> Packs => _modpacks;

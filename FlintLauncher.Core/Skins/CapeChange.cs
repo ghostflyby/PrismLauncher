@@ -34,17 +34,18 @@ public static class CapeChange
     /// <summary>Port of CapeChange::make(token, capeId).</summary>
     public static NetRequest Make(string token, string capeId, AuthEndpointsOptions? auth = null)
     {
-        var url = (auth ?? new AuthEndpointsOptions()).MinecraftServices.TrimEnd('/') + "/minecraft/profile/capes/active";
+        var options = auth ?? new AuthEndpointsOptions();
+        var url = options.MinecraftServices.TrimEnd('/') + "/minecraft/profile/capes/active";
         NetRequest request;
         if (capeId.Length == 0)
         {
             // removing the cape is a bare DELETE
-            request = new NetRequest(new Uri(url), RequestOptions.NoOptions, HttpMethodValue.Delete);
+            request = new NetRequest(new Uri(url), options.Net, RequestOptions.NoOptions, HttpMethodValue.Delete);
         }
         else
         {
             var body = "{\"capeId\":\"" + capeId + "\"}";
-            request = new NetRequest(new Uri(url), RequestOptions.NoOptions, HttpMethodValue.Put,
+            request = new NetRequest(new Uri(url), options.Net, RequestOptions.NoOptions, HttpMethodValue.Put,
                 Encoding.UTF8.GetBytes(body));
         }
 

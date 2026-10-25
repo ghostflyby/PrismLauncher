@@ -179,7 +179,7 @@ public static class TechnicEndpoints
                 if (zipUrl.Length != 0)
                 {
                     var packUri = new Uri(zipUrl, UriKind.Absolute);
-                    task = new SingleZipPackInstallTask(packUri, request.MinecraftVersion ?? "")
+                    task = new SingleZipPackInstallTask(packUri, request.MinecraftVersion ?? "", technic.Net)
                     {
                         MetaCache = metaCache,
                         Group = request.Group ?? "",
@@ -205,7 +205,7 @@ public static class TechnicEndpoints
                     }
 
                     task = new SolderPackInstallTask(new Uri(solder), slug, build,
-                        request.MinecraftVersion ?? "")
+                        request.MinecraftVersion ?? "", technic.Net)
                     {
                         Group = request.Group ?? "",
                     };
@@ -310,9 +310,9 @@ public static class TechnicEndpoints
     /// <summary>Fetches a Technic/Solder URL; fetch failures map to the uniform 502 error
     /// envelope, success yields the raw body for the caller's parser.</summary>
     private static async Task<(IResult? Error, string FailReason, string Body)> FetchAsync(
-        string url, NetStack? net = null)
+        string url, NetStack net)
     {
-        var request = NetRequest.MakeByteArray(new Uri(url), stack: net);
+        var request = NetRequest.MakeByteArray(new Uri(url), net);
         await request.StartAsync();
         return request.State != TaskState.Succeeded
             ? (ApiJson.Error("technic_unavailable",

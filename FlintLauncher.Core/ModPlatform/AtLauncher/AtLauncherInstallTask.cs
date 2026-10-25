@@ -69,8 +69,8 @@ namespace FlintLauncher.Core.ModPlatform.AtLauncher;
 public sealed partial class AtLauncherPackInstallTask(
     string packName,
     string version,
-    AtLauncherPackInstallTask.InstallMode installMode = AtLauncherPackInstallTask.InstallMode.Install,
-    AtLauncherApi? api = null)
+    AtLauncherApi api,
+    AtLauncherPackInstallTask.InstallMode installMode = AtLauncherPackInstallTask.InstallMode.Install)
     : InstanceTask
 {
     /// <summary>Port of ATLauncher::InstallMode.</summary>
@@ -88,7 +88,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
     /// <summary>The injected ATLauncher client (URL builders + the net stack the pack's
     /// requests ride; per-instance since the DownloadServerUrl de-singletoning).</summary>
-    private readonly AtLauncherApi _api = api ?? new AtLauncherApi();
+    private readonly AtLauncherApi _api = api;
 
     /// <summary>APPLICATION->metacache() hook ("ATLauncherPacks" base); null = plain downloads.</summary>
     public HttpMetaCache? MetaCache { get; set; }

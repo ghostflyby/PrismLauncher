@@ -7,9 +7,6 @@
 // LaunchTask.parseXmlLogs wiring (LogParser behind the LaunchServices.XmlLogParsing gate),
 // the Http proxy/timeout hook application (NetSettingsApplier) and the meta-cache eviction the
 // DELETE /api/v1/meta-cache endpoint delegates to.
-//
-// Joins "LauncherJars": NetStack.Default.Configure/ManualRetries/RequestTimeout are process-global
-// statics — the tests mutate and restore them, so they must not race the API-host suites.
 
 using System.Security.Cryptography;
 using FlintLauncher.Core;
@@ -25,7 +22,6 @@ using Xunit;
 
 namespace FlintLauncher.Tests;
 
-[Collection("LauncherJars")]
 public class CoverageFixCoreTests
 {
     /// <summary>A fresh typed store over a temp flint.json: the resolved fold IS the record
@@ -194,10 +190,9 @@ public class CoverageFixCoreTests
     {
         var dataDir = Path.Combine(Path.GetTempPath(), $"flint-netcfg-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dataDir);
-        var previousRetries = NetStack.Default.ManualRetries;
-        var previousTimeout = NetStack.Default.RequestTimeout;
         try
         {
+            // the runtime's own stack — private to it, nothing process-wide to restore
             var runtime = new LauncherRuntime(FlintPaths.FromHomeDir(new AbsolutePath(dataDir)));
             runtime.Config.Set("ProxyType", "HTTP");
             runtime.Config.Set("ProxyAddr", "10.1.2.3");
@@ -209,19 +204,13 @@ public class CoverageFixCoreTests
             new NetSettingsApplier(runtime.Config, runtime.Secrets, runtime.Net,
                 runtime.Modrinth, runtime.Flame, runtime.Auth).Apply();
 
-            Assert.Equal(("HTTP", "10.1.2.3", 8118, "", ""), NetStack.Default.ProxyConfig);
-            Assert.Equal(4, NetStack.Default.ManualRetries);
-            Assert.Equal(TimeSpan.FromSeconds(120), NetStack.Default.RequestTimeout);
-            Assert.Equal("Flint-NetCfg-Agent/9.9", NetStack.Default.UserAgent);
+            Assert.Equal(("HTTP", "10.1.2.3", 8118, "", ""), runtime.Net.ProxyConfig);
+            Assert.Equal(4, runtime.Net.ManualRetries);
+            Assert.Equal(TimeSpan.FromSeconds(120), runtime.Net.RequestTimeout);
+            Assert.Equal("Flint-NetCfg-Agent/9.9", runtime.Net.UserAgent);
         }
         finally
         {
-            // restore the steady state a host startup produces (the registered defaults)
-            NetStack.Default.Configure(FlintConfig.Default.UserAgent, "None", "127.0.0.1", 8080, "", "");
-            NetStack.Default.ManualRetries = previousRetries;
-            NetStack.Default.RequestTimeout = previousTimeout;
-            Assert.Equal(("None", "127.0.0.1", 8080, "", ""), NetStack.Default.ProxyConfig);
-            Assert.Equal(FlintConfig.Default.UserAgent, NetStack.Default.UserAgent);
             try
             {
                 Directory.Delete(dataDir, recursive: true);
@@ -233,22 +222,16 @@ public class CoverageFixCoreTests
     [Fact]
     public void Http_Configure_Is_Idempotent_For_An_Unchanged_Config()
     {
-        try
-        {
-            NetStack.Default.Configure("Flint-Idempotent/1.0", "None", "", 0, "", "");
-            var client = NetStack.Default.Client;
-            // same configuration -> no client rebuild (connection pool survives)
-            NetStack.Default.Configure("Flint-Idempotent/1.0", "None", "", 0, "", "");
-            Assert.Same(client, NetStack.Default.Client);
-            // a UA change rebuilds the client so the new header lands
-            NetStack.Default.Configure("Flint-Idempotent/2.0", "None", "", 0, "", "");
-            Assert.NotSame(client, NetStack.Default.Client);
-            Assert.Equal("Flint-Idempotent/2.0", NetStack.Default.UserAgent);
-        }
-        finally
-        {
-            NetStack.Default.Configure(FlintConfig.Default.UserAgent, "None", "", 0, "", "");
-        }
+        var stack = new NetStack();
+        stack.Configure("Flint-Idempotent/1.0", "None", "", 0, "", "");
+        var client = stack.Client;
+        // same configuration -> no client rebuild (connection pool survives)
+        stack.Configure("Flint-Idempotent/1.0", "None", "", 0, "", "");
+        Assert.Same(client, stack.Client);
+        // a UA change rebuilds the client so the new header lands
+        stack.Configure("Flint-Idempotent/2.0", "None", "", 0, "", "");
+        Assert.NotSame(client, stack.Client);
+        Assert.Equal("Flint-Idempotent/2.0", stack.UserAgent);
     }
 
     // ------------------------------------------------------- meta cache eviction

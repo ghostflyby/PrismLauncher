@@ -66,10 +66,10 @@ internal sealed partial class ImgurJsonContext : JsonSerializerContext;
 /// <summary>Port of the ImgurAPI namespace: the two imgur request factories. An instance
 /// rides the injected NetStack (LauncherRuntime.Imgur — same de-singletoning story as the
 /// platform clients); the tasks it builds send through that stack's client.</summary>
-public sealed class ImgurApi(NetStack? net = null)
+public sealed class ImgurApi(NetStack net)
 {
     /// <summary>The network stack this client's uploads flow through.</summary>
-    public NetStack Net { get; } = net ?? NetStack.Default;
+    public NetStack Net { get; } = net;
 
     /// <summary>Port of ImgurAPI::AlbumResult.</summary>
     public sealed record AlbumResult
@@ -86,26 +86,26 @@ public sealed class ImgurApi(NetStack? net = null)
 
     /// <summary>Port of ImgurAPI::makeUpload: upload one screenshot as an image.</summary>
     public ImgurUpload MakeUpload(ScreenShot shot, string? baseUrl = null, string? clientId = null) =>
-        new(shot, baseUrl, clientId, Net);
+        new(shot, Net, baseUrl, clientId);
 
     /// <summary>Port of ImgurAPI::makeAlbum: group uploaded screenshots into an album
     /// (the payload needs the delete hashes left by the earlier uploads).</summary>
     public ImgurAlbumCreation MakeAlbum(AlbumResult result, IReadOnlyList<ScreenShot> screenshots,
         string? baseUrl = null, string? clientId = null) =>
-        new(result, screenshots, baseUrl, clientId, Net);
+        new(result, screenshots, Net, baseUrl, clientId);
 }
 
 /// <summary>The upload half of ImgurAPI::makeUpload (the Net::Request + RPC::Sink&lt;QString&gt;
 /// pair): fills the ScreenShot metadata from the response JSON.</summary>
 public sealed class ImgurUpload(
     ScreenShot shot,
+    NetStack net,
     string? baseUrl = null,
-    string? clientId = null,
-    NetStack? net = null)
+    string? clientId = null)
     : FlintTask
 {
     private readonly string _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
-    private readonly NetStack _net = net ?? NetStack.Default;
+    private readonly NetStack _net = net;
 
     /// <summary>The imgur endpoint: BuildConfig.IMGUR_BASE_URL + "image".</summary>
     public string EndpointUrl
@@ -221,13 +221,13 @@ public sealed class ImgurUpload(
 public sealed class ImgurAlbumCreation(
     ImgurApi.AlbumResult result,
     IReadOnlyList<ScreenShot> screenshots,
+    NetStack net,
     string? baseUrl = null,
-    string? clientId = null,
-    NetStack? net = null)
+    string? clientId = null)
     : FlintTask
 {
     private readonly string _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
-    private readonly NetStack _net = net ?? NetStack.Default;
+    private readonly NetStack _net = net;
 
     /// <summary>The imgur endpoint: BuildConfig.IMGUR_BASE_URL + "album".</summary>
     public string EndpointUrl

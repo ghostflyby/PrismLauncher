@@ -78,7 +78,7 @@ public sealed partial class FlameCreationTask : InstanceTask
         FlameApi? flame = null)
     {
         _modrinth = modrinth;
-        _flame = flame ?? new FlameApi();
+        _flame = flame ?? new FlameApi(modrinth.Net);
         StagingPath = stagingPath;
         TrustedSource = trustedSource;
         SetParentEnvironment(environment);
@@ -539,7 +539,7 @@ public sealed partial class FlameCreationTask : InstanceTask
 
             if (result.Version.DownloadUrl.Length != 0)
             {
-                var dl = NetRequest.MakeFile(new Uri(result.Version.DownloadUrl), path);
+                var dl = NetRequest.MakeFile(new Uri(result.Version.DownloadUrl), path, _flame.Net);
                 filesJob.AddNetRequest(dl);
                 downloadTasks.Add(dl);
             }

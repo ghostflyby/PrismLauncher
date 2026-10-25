@@ -19,7 +19,7 @@ namespace FlintLauncher.Tests;
 
 public class ImgurTests : IDisposable
 {
-    private readonly ImgurApi _imgur = new();
+    private readonly ImgurApi _imgur = new(TestNet.Stack);
     private readonly PeripheralStubServer _server = new();
     private readonly string _dir = Path.Combine(Path.GetTempPath(), $"flint-imgur-{Guid.NewGuid():N}");
 

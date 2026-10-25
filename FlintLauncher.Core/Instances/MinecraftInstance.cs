@@ -524,6 +524,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                 HomeRoot = cwd,
             },
             LoggerFactory = NullLoggerFactory.Instance,
+            Net = MetaCache?.Net ?? new NetStack(),
             Config = UserConfigStore,
         };
     }

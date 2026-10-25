@@ -32,8 +32,9 @@ public static class SkinDelete
     /// <summary>Port of SkinDelete::make(token).</summary>
     public static NetRequest Make(string token, AuthEndpointsOptions? auth = null)
     {
-        var url = (auth ?? new AuthEndpointsOptions()).MinecraftServices.TrimEnd('/') + "/minecraft/profile/skins/active";
-        var request = new NetRequest(new Uri(url), RequestOptions.NoOptions, HttpMethodValue.Delete);
+        var options = auth ?? new AuthEndpointsOptions();
+        var url = options.MinecraftServices.TrimEnd('/') + "/minecraft/profile/skins/active";
+        var request = new NetRequest(new Uri(url), options.Net, RequestOptions.NoOptions, HttpMethodValue.Delete);
         request.AddHeader("Authorization", $"Bearer {token}");
         return request;
     }

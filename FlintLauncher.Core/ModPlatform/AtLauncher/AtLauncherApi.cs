@@ -30,7 +30,7 @@ namespace FlintLauncher.Core.ModPlatform.AtLauncher;
 [JsonSerializable(typeof(PackVersion))]
 internal sealed partial class AtLauncherJsonContext : JsonSerializerContext;
 
-public sealed class AtLauncherApi(NetStack? net = null)
+public sealed class AtLauncherApi(NetStack net)
 {
     /// <summary>BuildConfig.ATL_DOWNLOAD_SERVER_URL (per-instance; tests construct a client
     /// pointed at their stub).</summary>
@@ -40,7 +40,7 @@ public sealed class AtLauncherApi(NetStack? net = null)
     public string ApiBaseUrl { get; init; } = FlintConfig.Default.AtlApiBaseUrl;
 
     /// <summary>The network stack this client's requests go through.</summary>
-    public NetStack Net { get; } = net ?? NetStack.Default;
+    public NetStack Net { get; } = net;
 
     // ------------------------------------------------------------------ URL builders
 

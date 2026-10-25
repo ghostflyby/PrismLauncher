@@ -22,7 +22,7 @@ namespace FlintLauncher.Tests;
 [Collection("FlameApi")]
 public class FlameCheckUpdateTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new();
+    private readonly FlameApi _flameApi = new(TestNet.Stack);
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-flame-update-{Guid.NewGuid():N}");
     private readonly StubFlameServer _server = new();
 

@@ -31,8 +31,8 @@ public sealed class FlameCheckUpdate(
     IReadOnlyList<McVersion> mcVersions,
     IReadOnlyList<ModLoaderType> loadersList,
     Func<Resource, MetadataHandler.ModStruct?> metadataLookup,
-    IReadOnlyList<IndexedVersionType>? releaseTypes = null,
-    FlameApi? flame = null)
+    FlameApi flame,
+    IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     : FlintTask
 {
     /// <summary>Port of CheckUpdateTask::Update (minus the download task, see header note);
@@ -53,7 +53,7 @@ public sealed class FlameCheckUpdate(
 
     private readonly List<ModLoaderType> _loadersList = [.. loadersList];
     private readonly IReadOnlyList<IndexedVersionType> _releaseTypes = releaseTypes ?? [];
-    private readonly FlameApi _flame = flame ?? new FlameApi();
+    private readonly FlameApi _flame = flame;
 
     private readonly Dictionary<Resource, string> _blocked = new();
 
@@ -86,7 +86,7 @@ public sealed class FlameCheckUpdate(
             };
             var versionsUrl = GetVersionsUrl(project);
 
-            var request = NetRequest.MakeByteArray(new Uri(versionsUrl));
+            var request = NetRequest.MakeByteArray(new Uri(versionsUrl), _flame.Net);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
             {

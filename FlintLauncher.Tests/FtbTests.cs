@@ -23,7 +23,7 @@ namespace FlintLauncher.Tests;
 public class FtbTests : IDisposable
 {
     private readonly ModrinthApi _modrinthApi = TestModrinthApi.Unreachable();
-    private readonly FlameApi _flameApi = new();
+    private readonly FlameApi _flameApi = new(TestNet.Stack);
     private readonly FtbApi _ftbApi;
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-ftb-{Guid.NewGuid():N}");
     private readonly TestGlobalSettings _global = new();
@@ -34,7 +34,7 @@ public class FtbTests : IDisposable
     public FtbTests()
     {
         Directory.CreateDirectory(_root);
-        _ftbApi = new FtbApi { BaseUrl = _server.Url };
+        _ftbApi = new FtbApi(TestNet.Stack) { BaseUrl = _server.Url };
         // the FTB install resolves CurseForge-only files through the Flame layer
         _flameApi.BaseUrl = _flameServer.Url;
     }

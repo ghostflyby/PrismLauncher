@@ -137,7 +137,7 @@ public enum TechnicSearchMode : byte
     Single,
 }
 
-public sealed class TechnicApi(NetStack? net = null)
+public sealed class TechnicApi(NetStack net)
 {
     /// <summary>BuildConfig.TECHNIC_API_BASE_URL (per-instance; tests construct a client
     /// pointed at their stub).</summary>
@@ -147,7 +147,7 @@ public sealed class TechnicApi(NetStack? net = null)
     public string ApiBuild { get; init; } = FlintConfig.Default.TechnicApiBuild;
 
     /// <summary>The network stack this client's requests go through.</summary>
-    public NetStack Net { get; } = net ?? NetStack.Default;
+    public NetStack Net { get; } = net;
 
     // ------------------------------------------------------------------ URL builders
 

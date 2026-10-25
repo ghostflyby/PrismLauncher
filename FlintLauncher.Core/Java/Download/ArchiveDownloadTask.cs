@@ -30,6 +30,7 @@ namespace FlintLauncher.Core.Java.Download;
 public sealed class ArchiveDownloadTask(
     Uri url,
     AbsolutePath finalPath,
+    NetStack net,
     string checksumType = "",
     string checksumHash = "",
     HttpMetaCache? cache = null)
@@ -53,7 +54,7 @@ public sealed class ArchiveDownloadTask(
         {
             string a1 = $"flint-java-{Guid.NewGuid():N}-{FileName()}";
             fullPath = Temporary.CreateTempFolder() / a1;
-            action = NetRequest.MakeFile(url, fullPath);
+            action = NetRequest.MakeFile(url, fullPath, net);
             tempDownload = true;
         }
 

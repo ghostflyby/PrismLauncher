@@ -146,6 +146,18 @@ public sealed class HttpMetaCache(AbsolutePath path) : IDisposable
 
     private readonly Dictionary<string, AbsolutePath> _basePaths = new(StringComparer.Ordinal);
     private Timer? _saveTimer;
+    private NetStack? _net;
+
+    /// <summary>The network stack the cached downloads (<see cref="NetRequest.MakeCached"/>)
+    /// ride when the caller names none: the cache is the download plane — where a fetch lands
+    /// and through which stack it travels. The composition root wires its shared,
+    /// settings-configured stack; unset falls back to a private default stack, which keeps a
+    /// bare fixture working without process-global state.</summary>
+    public NetStack Net
+    {
+        get => _net ??= new NetStack();
+        init => _net = value;
+    }
 
     public void Dispose()
     {
@@ -160,10 +172,11 @@ public sealed class HttpMetaCache(AbsolutePath path) : IDisposable
     /// (meta/general/icons/fmllibs/pack downloads) off the cache root; there is no
     /// "screenshots" base (nothing consumes it). Not loaded — the caller runs
     /// <see cref="Load"/> once the roots are final (after the legacy remount). The one base
-    /// table the host and the fixtures share.</summary>
-    public static HttpMetaCache ForRoots(FlintPaths paths)
+    /// table the host and the fixtures share; <paramref name="net"/> is the stack its cached
+    /// downloads ride.</summary>
+    public static HttpMetaCache ForRoots(FlintPaths paths, NetStack net)
     {
-        var cache = new HttpMetaCache(paths.MetacacheFile);
+        var cache = new HttpMetaCache(paths.MetacacheFile) { Net = net };
         cache.AddBase("meta", paths.MetaDir);
         cache.AddBase("libraries", paths.LibrariesRoot);
         cache.AddBase("assets", paths.AssetsRoot);

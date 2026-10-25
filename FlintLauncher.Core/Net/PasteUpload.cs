@@ -95,14 +95,13 @@ public sealed class PasteUpload : FlintTask
     /// <summary>Port of PasteUpload::PasteUpload(log, url, pasteType): anonymizes the log,
     /// falls back to the provider default base when url is empty and resolves the request URL
     /// (with the paste.gg api subdomain HACK kept verbatim). The request rides the injected
-    /// NetStack (the runtime's — tests may isolate their own; the default falls back to the
-    /// canonical process-wide stack).</summary>
-    public PasteUpload(string log, string url, PasteType pasteType, NetStack? net = null)
+    /// NetStack (the host's; tests isolate their own).</summary>
+    public PasteUpload(string log, string url, PasteType pasteType, NetStack net)
     {
         _log = AnonymizeLog(log);
         _baseUrl = url;
         _pasteType = pasteType;
-        _net = net ?? NetStack.Default;
+        _net = net;
 
         var @base = PasteTypes[(int)pasteType];
         if (string.IsNullOrEmpty(_baseUrl))

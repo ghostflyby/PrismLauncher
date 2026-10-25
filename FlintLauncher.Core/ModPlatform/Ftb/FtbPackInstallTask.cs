@@ -57,8 +57,8 @@ public sealed class FtbPackInstallTask(
     FtbApi? ftb = null)
     : InstanceTask
 {
-    private readonly FlameApi _flame = flame ?? new FlameApi();
-    private readonly FtbApi _ftb = ftb ?? new FtbApi();
+    private readonly FlameApi _flame = flame ?? new FlameApi(modrinth.Net);
+    private readonly FtbApi _ftb = ftb ?? new FtbApi(modrinth.Net);
     private readonly ModrinthApi _modrinth = modrinth;
 
     // assigned by OnManifestDownloadSucceeded before any read
@@ -316,7 +316,7 @@ public sealed class FtbPackInstallTask(
 
             var path = StagingPath / ".minecraft" / file.Path / file.Name;
 
-            var dl = NetRequest.MakeFile(new Uri(file.Url), path);
+            var dl = NetRequest.MakeFile(new Uri(file.Url), path, _ftb.Net);
             if (file.Sha1.Length != 0)
             {
                 dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, file.Sha1));

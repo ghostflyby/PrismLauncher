@@ -6,8 +6,8 @@
 // copy/detail endpoints, the paste/about/meta-cache endpoints and the launch join-target
 // parameters (e2e with the fake java).
 //
-// All classes join "LauncherJars": the hosts chdir (process-global) and the Http proxy/
-// retry hooks are process-global statics that must not race the other API suites.
+// All classes join "LauncherJars": the hosts chdir (process-global), which must not race
+// the other API suites.
 
 using System.Net;
 using System.Net.Http.Json;
@@ -151,60 +151,48 @@ public class CoverageFixSettingsApiTests
     [Fact]
     public async Task Proxy_Retry_Timeout_Settings_Reach_The_Http_Stack()
     {
-        var previousRetries = NetStack.Default.ManualRetries;
-        var previousTimeout = NetStack.Default.RequestTimeout;
-        try
+        await using var host = await FlintApiHost.StartAsync();
+        // the host's own stack — private to this host, nothing process-wide to restore
+        var net = host.Services.GetRequiredService<NetStack>();
+
+        Assert.Equal(HttpStatusCode.NoContent, (await host.PutAsync("/api/v1/settings", new
         {
-            await using var host = await FlintApiHost.StartAsync();
-
-            Assert.Equal(HttpStatusCode.NoContent, (await host.PutAsync("/api/v1/settings", new
+            group = "proxy",
+            values = new Dictionary<string, object>
             {
-                group = "proxy",
-                values = new Dictionary<string, object>
-                {
-                    ["ProxyType"] = "HTTP",
-                    ["ProxyAddr"] = "127.0.0.1",
-                    ["ProxyPort"] = 39999,
-                },
-            })).StatusCode);
-            Assert.Equal(("HTTP", "127.0.0.1", 39999, "", ""), NetStack.Default.ProxyConfig);
+                ["ProxyType"] = "HTTP",
+                ["ProxyAddr"] = "127.0.0.1",
+                ["ProxyPort"] = 39999,
+            },
+        })).StatusCode);
+        Assert.Equal(("HTTP", "127.0.0.1", 39999, "", ""), net.ProxyConfig);
 
-            Assert.Equal(HttpStatusCode.NoContent, (await host.PutAsync("/api/v1/settings", new
-            {
-                group = "launcher",
-                values = new Dictionary<string, object>
-                {
-                    ["NumberOfManualRetries"] = 3,
-                    ["RequestTimeout"] = 90,
-                },
-            })).StatusCode);
-            Assert.Equal(3, NetStack.Default.ManualRetries);
-            Assert.Equal(TimeSpan.FromSeconds(90), NetStack.Default.RequestTimeout);
-
-            Assert.Equal(HttpStatusCode.NoContent, (await host.PutAsync("/api/v1/settings", new
-            {
-                group = "api",
-                values = new Dictionary<string, object> { ["UserAgentOverride"] = "Flint-Api-Agent/1.0" },
-            })).StatusCode);
-            Assert.Equal("Flint-Api-Agent/1.0", NetStack.Default.UserAgent);
-
-            // "None" disables the proxy again without a restart
-            Assert.Equal(HttpStatusCode.NoContent, (await host.PutAsync("/api/v1/settings", new
-            {
-                group = "proxy",
-                values = new Dictionary<string, object> { ["ProxyType"] = "None" },
-            })).StatusCode);
-            Assert.Equal(("None", "127.0.0.1", 39999, "", ""), NetStack.Default.ProxyConfig);
-        }
-        finally
+        Assert.Equal(HttpStatusCode.NoContent, (await host.PutAsync("/api/v1/settings", new
         {
-            // restore the steady state a host startup produces (the registered defaults)
-            NetStack.Default.Configure(FlintConfig.Default.UserAgent, "None", "127.0.0.1", 8080, "", "");
-            NetStack.Default.ManualRetries = previousRetries;
-            NetStack.Default.RequestTimeout = previousTimeout;
-            Assert.Equal(("None", "127.0.0.1", 8080, "", ""), NetStack.Default.ProxyConfig);
-            Assert.Equal(FlintConfig.Default.UserAgent, NetStack.Default.UserAgent);
-        }
+            group = "launcher",
+            values = new Dictionary<string, object>
+            {
+                ["NumberOfManualRetries"] = 3,
+                ["RequestTimeout"] = 90,
+            },
+        })).StatusCode);
+        Assert.Equal(3, net.ManualRetries);
+        Assert.Equal(TimeSpan.FromSeconds(90), net.RequestTimeout);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await host.PutAsync("/api/v1/settings", new
+        {
+            group = "api",
+            values = new Dictionary<string, object> { ["UserAgentOverride"] = "Flint-Api-Agent/1.0" },
+        })).StatusCode);
+        Assert.Equal("Flint-Api-Agent/1.0", net.UserAgent);
+
+        // "None" disables the proxy again without a restart
+        Assert.Equal(HttpStatusCode.NoContent, (await host.PutAsync("/api/v1/settings", new
+        {
+            group = "proxy",
+            values = new Dictionary<string, object> { ["ProxyType"] = "None" },
+        })).StatusCode);
+        Assert.Equal(("None", "127.0.0.1", 39999, "", ""), net.ProxyConfig);
     }
 
     [Fact]

@@ -329,7 +329,11 @@ public class ExtractNativesTests
         // instance stamp reads its assets anchors through the <BaseDirectory>/assets symlink
         // (the CWD-lexical fallback of FILE-LAYOUT §1.5), so the STORE root is BaseDirectory
         // (assets hang off the store root)
-        var instanceCache = new HttpMetaCache(Temporary.SystemTempDirectory() / $"flint-asset-indexes-{Guid.NewGuid():N}" / "metacache.json");
+        var instanceCache = new HttpMetaCache(
+            Temporary.SystemTempDirectory() / $"flint-asset-indexes-{Guid.NewGuid():N}" / "metacache.json")
+        {
+            Net = TestNet.Stack,
+        };
         instanceCache.AddBase("asset_indexes", new AbsolutePath(Path.Combine(assetsRoot.Root, "indexes")));
         instance.MetaCache = instanceCache;
         // the layout arrives through the injected LaunchServices (the instance derives its
@@ -350,6 +354,7 @@ public class ExtractNativesTests
                 StateRoot = baseDir,
             },
             LoggerFactory = NullLoggerFactory.Instance,
+            Net = TestNet.Stack,
             ResourceUrlOverride = server.Url + "/objects/",
         };
         try

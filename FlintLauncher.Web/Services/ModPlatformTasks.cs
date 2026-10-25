@@ -92,7 +92,7 @@ public static class ModPlatformTasks
 public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType loaders, IReadOnlyList<ModLoaderType> loaderList, ModrinthApi modrinth, FlameApi? flame = null)
 {
     private readonly ModrinthApi _modrinth = modrinth;
-    private readonly FlameApi _flame = flame ?? new FlameApi();
+    private readonly FlameApi _flame = flame ?? new FlameApi(modrinth.Net);
 
     public async Task<(IndexedPack Pack, IndexedVersion Version)> ResolveAsync(
         ResourceProvider provider, string projectId, string versionId, CancellationToken cancellationToken)
@@ -206,7 +206,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         if (provider == ResourceProvider.Flame)
         {
             var request = NetRequest.MakeByteArray(new Uri(_flame.GetVersionsUrl(
-                new VersionSearchArgs { Pack = pack, McVersions = [mcVersion] })));
+                new VersionSearchArgs { Pack = pack, McVersions = [mcVersion] })), _flame.Net);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
             {
@@ -312,7 +312,7 @@ public sealed class ModInstallTask(
     private readonly List<ModLoaderType> _loaderList = ModIndex.ModLoaderTypesToList(loaders);
     private readonly List<ModInstallEntryView> _installed = [];
     private readonly ModrinthApi _modrinth = modrinth;
-    private readonly FlameApi _flame = flame ?? new FlameApi();
+    private readonly FlameApi _flame = flame ?? new FlameApi(modrinth.Net);
 
     /// <summary>The entries for the task view's optional result payload.</summary>
     public TaskResultView BuildResult() => new(null, _installed);
@@ -343,7 +343,7 @@ public sealed class ModInstallTask(
         }
 
         EmitStatus("Resolving dependencies...");
-        var dependencyTask = new GetModDependenciesTask(instance, folder, selected, _modrinth);
+        var dependencyTask = new GetModDependenciesTask(instance, folder, selected, _modrinth, _flame);
         await dependencyTask.StartAsync(cancellationToken);
         if (!dependencyTask.WasSuccessful)
         {
@@ -431,6 +431,7 @@ public sealed class ModsUpdateTask(
     ModFolderModel folder,
     IReadOnlyList<string>? filter,
     ModrinthApi modrinth,
+    FlameApi flameApi,
     IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     : FlintTask
 {
@@ -438,6 +439,7 @@ public sealed class ModsUpdateTask(
 
     private readonly List<PendingUpdate> _updates = [];
     private readonly ModrinthApi _modrinth = modrinth;
+    private readonly FlameApi _flame = flameApi;
 
     /// <summary>The update entries for the task view's optional result payload.</summary>
     public TaskResultView BuildResult() => new(_updates.Select(u => u.View).ToArray(), null);
@@ -507,7 +509,7 @@ public sealed class ModsUpdateTask(
         {
             EmitStatus("Checking CurseForge updates...");
             var check = new FlameCheckUpdate(flame, gameVersions, loadersList,
-                resource => folder.GetMetadata(resource), releaseTypes);
+                resource => folder.GetMetadata(resource), _flame, releaseTypes);
             await check.StartAsync(cancellationToken);
             if (!check.WasSuccessful)
             {

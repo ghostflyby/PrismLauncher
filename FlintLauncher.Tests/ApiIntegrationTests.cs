@@ -58,6 +58,10 @@ internal sealed class FlintApiHost : IAsyncDisposable
 
     public HttpClient Client { get; }
 
+    /// <summary>The host's service provider — the registered singletons (the network stack,
+    /// the stores) a test asserts against directly.</summary>
+    public IServiceProvider Services => _app.Services;
+
     /// <summary>The temp home root (passed as --home-dir; cleaned up on dispose).</summary>
     public string HomeDir { get; }
 

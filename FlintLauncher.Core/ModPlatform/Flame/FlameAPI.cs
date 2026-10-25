@@ -47,7 +47,7 @@ public sealed record FlameStringEnvelopeJson(
 [JsonSerializable(typeof(FlameStringEnvelopeJson))]
 internal sealed partial class FlameJsonContext : JsonSerializerContext;
 
-public sealed class FlameApi(NetStack? net = null) : ResourceApi
+public sealed class FlameApi(NetStack net) : ResourceApi
 {
     /// <summary>BuildConfig.FLAME_BASE_URL (per-instance; tests construct a client pointed
     /// at their stub).</summary>
@@ -63,7 +63,7 @@ public sealed class FlameApi(NetStack? net = null) : ResourceApi
     public Func<string> ApiKeyProvider { get; set; } = static () => FlintConfig.Default.FlameApiKey;
 
     /// <summary>The network stack this client's requests go through.</summary>
-    public NetStack Net { get; } = net ?? NetStack.Default;
+    public override NetStack Net { get; } = net;
 
     // ------------------------------------------------------------------ requests
 

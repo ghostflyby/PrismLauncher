@@ -26,7 +26,7 @@
 // Deviations:
 //  - Upstream builds the request through QHttpMultiPart on QNetworkAccessManager; the port
 //    pre-builds an identical multipart body (same part headers, CRLF framing) and sends it
-//    with an injected NetStack (defaulting to the canonical process-wide stack). This stays a
+//    with an injected NetStack (defaulting to the auth options' stack). This stays a
 //    FlintTask like the C++ Net::Request subclass. The multipart Content-Type must be set on
 //    the content headers, which NetRequest cannot do.
 //  - QHttpMultiPart generates a random boundary of a different shape — any legal boundary is
@@ -56,7 +56,7 @@ public sealed class SkinUpload : FlintTask
         _skinData = skinData;
         _variant = variant;
         _auth = auth ?? new AuthEndpointsOptions();
-        _net = net ?? NetStack.Default;
+        _net = net ?? _auth.Net;
     }
 
     /// <summary>Port of SkinUpload::make(token, path, variant) — the file is read eagerly.</summary>

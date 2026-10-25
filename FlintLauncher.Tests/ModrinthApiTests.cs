@@ -209,7 +209,7 @@ public class ModrinthApiTests : IDisposable
         var url = _api.GetSearchUrl(args);
         Assert.NotNull(url);
 
-        var request = NetRequest.MakeByteArray(new Uri(url));
+        var request = NetRequest.MakeByteArray(new Uri(url), TestNet.Stack);
         await request.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, request.State);

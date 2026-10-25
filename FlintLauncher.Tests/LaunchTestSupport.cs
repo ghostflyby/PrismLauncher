@@ -105,6 +105,10 @@ public sealed class LaunchFixture : IDisposable
     /// <summary>The fixture's five-root stamp (home layout); disposed with the fixture.</summary>
     private readonly TestFlintPaths _paths = TestFlintPaths.UnderHome();
 
+    /// <summary>The fixture's network stack: the meta cache and the launch services it builds
+    /// ride it, so a launch fixture never touches a shared stack.</summary>
+    public NetStack Net { get; } = new();
+
     /// <summary>The fixture's stamped meta cache: the standard base table over the fixture's
     /// roots (the same table the composition root registers). Instances created here carry
     /// it, which also stamps their pack profiles' metadata index.</summary>
@@ -121,7 +125,7 @@ public sealed class LaunchFixture : IDisposable
         State = new LauncherStateStore(
             _paths.Paths.StateRoot / "launcher-state.json",
             FlintJsonContext.Default.LauncherState);
-        MetaCache = HttpMetaCache.ForRoots(_paths.Paths);
+        MetaCache = HttpMetaCache.ForRoots(_paths.Paths, Net);
     }
 
     /// <summary>Seed the java probe cache for a configured java path so CheckJava trusts
@@ -177,6 +181,7 @@ public sealed class LaunchFixture : IDisposable
         {
             Paths = _paths.Paths with { InstallRoot = installRoot ?? AppContext.BaseDirectory },
             LoggerFactory = loggerFactory ?? NullLoggerFactory.Instance,
+            Net = Net,
             LauncherState = State,
             XmlLogParsing = xmlLogParsing,
         };

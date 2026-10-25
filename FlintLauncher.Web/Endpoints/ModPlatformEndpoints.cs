@@ -243,7 +243,7 @@ public static class ModPlatformEndpoints
                 {
                     Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.Flame },
                 });
-                var request = NetRequest.MakeByteArray(new Uri(url));
+                var request = NetRequest.MakeByteArray(new Uri(url), flame.Net);
                 flame.AddApiKeyHeader(request);
 
                 await request.StartAsync();
@@ -402,7 +402,7 @@ public static class ModPlatformEndpoints
 
         api.MapPost("/instances/{id}/mods/update", async (string id, ModsUpdateRequest? filter,
             InstanceList instances, InstanceMutationLock instanceLock, FlintConfigStore config,
-            ModrinthApi modrinth, FlintTaskRegistry registry) =>
+            ModrinthApi modrinth, FlameApi flame, FlintTaskRegistry registry) =>
         {
             await instanceLock.WaitAsync();
             try
@@ -423,7 +423,7 @@ public static class ModPlatformEndpoints
                         : IndexedVersionType.FromStringList(SettingsJson.ToStringList(
                             config.Current.ModDownload.ModUpdateReleaseTypes ?? "[]"));
 
-                var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, modrinth, releaseTypes);
+                var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, modrinth, flame, releaseTypes);
                 var entry = registry.Register("mods-update", task, instanceId: instance.Id());
                 // the result payload carries the found/applied updates; it is published once
                 // the task reaches a terminal state (the check pass fills it before applying)
@@ -613,7 +613,7 @@ public static class ModPlatformEndpoints
 
         var url = flame.GetSearchUrl(args);
 
-        var request = NetRequest.MakeByteArray(new Uri(url));
+        var request = NetRequest.MakeByteArray(new Uri(url), flame.Net);
         flame.AddApiKeyHeader(request);
         await request.StartAsync();
         if (request.State != TaskState.Succeeded)
