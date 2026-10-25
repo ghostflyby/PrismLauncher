@@ -29,6 +29,7 @@ public sealed class NetPrimaryHandler : HttpMessageHandler
     }
 
     private volatile Generation _current;
+    private readonly object _swapLock = new();
 
     public NetPrimaryHandler(NetSettings settings)
     {
@@ -55,7 +56,7 @@ public sealed class NetPrimaryHandler : HttpMessageHandler
     {
         var snapshot = Settings.Current;
         var generation = _current;
-        if (generation.ProxyVersion != snapshot.ProxyVersion)
+        if (generation.ProxyVersion < snapshot.ProxyVersion)
         {
             generation = Swap(snapshot);
         }
@@ -71,10 +72,12 @@ public sealed class NetPrimaryHandler : HttpMessageHandler
 
     private Generation Swap(NetSettingsSnapshot snapshot)
     {
-        lock (this)
+        lock (_swapLock)
         {
-            if (_current.ProxyVersion == snapshot.ProxyVersion)
+            if (_current.ProxyVersion >= snapshot.ProxyVersion)
             {
+                // another thread already installed this version or a newer one — never
+                // regress to a stale snapshot read before that swap
                 return _current;
             }
 

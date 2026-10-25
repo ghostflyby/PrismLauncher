@@ -48,6 +48,7 @@ public sealed class NetSettings
     }
 
     private volatile Box _current = new(Defaults);
+    private readonly object _updateLock = new();
 
     /// <summary>The settings requests and the transport read; a stable reference until the
     /// next <see cref="Update"/>.</summary>
@@ -87,7 +88,7 @@ public sealed class NetSettings
             requestTimeout = TimeSpan.FromSeconds(60);
         }
 
-        lock (this)
+        lock (_updateLock)
         {
             var previous = _current.Value;
             var proxyChanged = previous.Proxy != (type, host, port, user, pass);

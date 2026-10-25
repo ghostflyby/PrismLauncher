@@ -177,6 +177,10 @@ public static class WebHostBuilder
         var app = builder.Build();
         var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
 
+        // the runtime owns no hosted-service lifetime of its own — its disposal (the watch
+        // tenancy, the metacache ledger flush) rides application stop
+        app.Lifetime.ApplicationStopping.Register(runtime.Dispose);
+
         // a generated token exists only in this process — announce it once at startup
         // (Information, single line) so the host's client can pick it up; nothing is written
         if (apiAuth is { Enabled: true, TokenGenerated: true })

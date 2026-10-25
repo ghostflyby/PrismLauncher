@@ -20,6 +20,11 @@ public sealed class RetryHandler : DelegatingHandler
     /// <summary>The 429/503 retry cap (the C++ 4-retry/60s gate's attempt half).</summary>
     public const int MaxAutoRetries = 3;
 
+    /// <summary>The C++ gate's delay half: a Retry-After never holds the request longer
+    /// than this (a huge or HTTP-date delay would otherwise park a bare-token caller for
+    /// days).</summary>
+    public static readonly TimeSpan MaxRetryAfterDelay = TimeSpan.FromSeconds(60);
+
     /// <summary>Opt in to the HTTP 429/503 retry (the RequestOptions.AutoRetry port).</summary>
     public static readonly HttpRequestOptionsKey<bool> AutoRetryOption = new("Flint.AutoRetry429");
 
@@ -81,6 +86,11 @@ public sealed class RetryHandler : DelegatingHandler
                     {
                         delay = TimeSpan.Zero;
                     }
+                }
+
+                if (delay > MaxRetryAfterDelay)
+                {
+                    delay = MaxRetryAfterDelay;
                 }
 
                 response.Dispose();

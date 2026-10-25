@@ -434,6 +434,82 @@ public class NetRequestTests : IDisposable
     }
 
     [Fact]
+    public async Task CachedDownload_RefreshesChangedContent()
+    {
+        // regression: seeding the bookkeeping md5 with the ledger's old sum failed every
+        // refresh of changed content (validate consumed the hash against the old value)
+        // and left the entry md5 stale forever
+        var requestCount = 0;
+        using var server = new TestHttpServer(ctx =>
+        {
+            requestCount++;
+            var (etag, body) = requestCount == 1
+                ? ("\"v1\"", "content-v1"u8.ToArray())
+                : ("\"v2\"", "content-v2-updated"u8.ToArray());
+            ctx.Response.StatusCode = 200;
+            ctx.Response.Headers["ETag"] = etag;
+            ctx.Response.ContentLength64 = body.Length;
+            ctx.Response.OutputStream.Write(body);
+        });
+
+        var indexPath = TempPath("metacache");
+        var basePath = TempPath("cache");
+        Directory.CreateDirectory(basePath);
+        var cache = new HttpMetaCache(new AbsolutePath(indexPath));
+        cache.AddBase("general", new AbsolutePath(basePath));
+
+        var entry = cache.ResolveEntry("general", "thing.txt");
+        var first = HttpDownloadTask.Cached(cache, new Uri(server.Url + "/thing.txt"), entry);
+        await first.StartAsync();
+        Assert.Equal(TaskState.Succeeded, first.State);
+        Assert.Equal("content-v1", await entry.GetFullPath().ReadAllTextAsync());
+        Assert.Equal("\"v1\"", entry.Etag);
+        Assert.Equal(Convert.ToHexString(MD5.HashData("content-v1"u8.ToArray())).ToLowerInvariant(),
+            entry.Md5Sum);
+
+        // the remote content changed (200 with a new etag despite the conditional): the
+        // refresh must succeed and re-record the new body's md5/etag
+        var entry2 = cache.ResolveEntry("general", "thing.txt");
+        Assert.False(entry2.IsStale);
+        var second = HttpDownloadTask.Cached(cache, new Uri(server.Url + "/thing.txt"), entry2);
+        await second.StartAsync();
+        Assert.Equal(TaskState.Succeeded, second.State);
+        Assert.Equal("content-v2-updated", await entry2.GetFullPath().ReadAllTextAsync());
+        Assert.Equal("\"v2\"", entry2.Etag);
+        Assert.Equal(Convert.ToHexString(MD5.HashData("content-v2-updated"u8.ToArray())).ToLowerInvariant(),
+            entry2.Md5Sum);
+    }
+
+    [Fact]
+    public async Task FlintHttp_StatusGate_Carries_The_Truncated_Body()
+    {
+        using var server = new TestHttpServer(ctx =>
+        {
+            ctx.Response.StatusCode = 404;
+            var body = "nope"u8.ToArray();
+            ctx.Response.ContentLength64 = body.Length;
+            ctx.Response.OutputStream.Write(body);
+        });
+
+        var ex = await Assert.ThrowsAsync<FlintHttpException>(() => FlintHttp.GetStringAsync(
+            TestNet.Http, TestNet.Settings, new HttpRequestMessage(HttpMethod.Get, server.Url + "/missing")));
+
+        Assert.Contains("HTTP status 404 for", ex.Reason);
+        Assert.Contains("nope", ex.Reason);
+    }
+
+    [Fact]
+    public async Task FlintHttp_ConnectionError_Surfaces_As_FlintHttpException()
+    {
+        // port 9 (discard): connection refused — the envelope callers catch
+        // FlintHttpException, so the transport error must arrive as one
+        var ex = await Assert.ThrowsAsync<FlintHttpException>(() => FlintHttp.GetStringAsync(
+            TestNet.Http, TestNet.Settings, new HttpRequestMessage(HttpMethod.Get, "http://127.0.0.1:9/x")));
+
+        Assert.NotEmpty(ex.Reason);
+    }
+
+    [Fact]
     public async Task NetRequest_Fails_On404_WithStatus()
     {
         using var server = new TestHttpServer(ctx => { ctx.Response.StatusCode = 404; });

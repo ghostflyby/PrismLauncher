@@ -24,9 +24,16 @@ namespace FlintLauncher.Core.Net;
 public enum RequestOptions
 {
     NoOptions = 0,
+
+    /// <summary>Deliberately unconsumed (C++ Request.cpp's failed-request local fallback
+    /// was never ported); carried so the MakeCached call sites read like upstream.</summary>
     AcceptLocalFiles = 1,
+
     MakeEternal = 2,
     AutoRetry = 4,
+
+    /// <summary>Deliberately unconsumed: the C++ ApiHeaderProxy was host-gated and produced
+    /// no headers for the meta/library hosts this flag's call sites download from.</summary>
     AddApiHeaders = 8,
 }
 
@@ -70,8 +77,10 @@ public sealed class HttpDownloadTask(
     public static HttpDownloadTask Cached(HttpMetaCache cache, Uri url, MetaEntry entry,
         RequestOptions options = RequestOptions.NoOptions, HttpClient? http = null, NetSettings? settings = null)
     {
-        var checksum = new ChecksumValidator(HashAlgorithmName.MD5,
-            entry.Md5Sum.Length == 0 ? null : Convert.FromHexString(entry.Md5Sum));
+        // the md5 node is bookkeeping only (the C++ MetaCacheSink created it with no
+        // expected value): seeding it from the ledger would fail every refresh of changed
+        // content and consume the hash before the bookkeeping can record the new sum
+        var checksum = new ChecksumValidator(HashAlgorithmName.MD5);
         var task = new HttpDownloadTask(url, http ?? cache.Http, settings ?? cache.Settings,
             entry.GetFullPath(), options | RequestOptions.AcceptLocalFiles)
         {
@@ -112,7 +121,7 @@ public sealed class HttpDownloadTask(
                 return;
             }
 
-            using var message = new HttpRequestMessage(HttpMethod.Get, url);
+            using var message = new HttpRequestMessage(HttpMethod.Get, Url);
             if (CachedEntry is { } entry && !entry.IsStale && (HasTargetData() || entry.Md5Sum.Length > 0))
             {
                 if (entry.Etag.Length > 0)
@@ -162,7 +171,7 @@ public sealed class HttpDownloadTask(
                     body = body[..FlintHttp.MaxErrorBodyLength];
                 }
 
-                Fail($"HTTP status {statusCode} for {url}\n{body}");
+                Fail($"HTTP status {statusCode} for {Url}\n{body}");
                 return;
             }
 
@@ -214,11 +223,19 @@ public sealed class HttpDownloadTask(
         catch (OperationCanceledException) when (timeoutSource.IsCancellationRequested &&
                                                  !cancellationToken.IsCancellationRequested)
         {
-            // our inactivity timer fired: surface as a network error so the transport's
-            // manual-retry gate sees it (the C++ setTransferTimeout surfaces as
-            // OperationCanceledError too)
-            throw new HttpRequestException(
-                $"transfer timed out: no data for {requestTimeout.TotalSeconds:F0} seconds (RequestTimeout)");
+            // our inactivity timer fired mid-transfer (the header phase is covered by the
+            // transport's manual-retry gate via the option above; this late conversion is
+            // the task-level failure surface — a stalled body fails after one window)
+            CancelWriting();
+            Fail($"transfer timed out: no data for {requestTimeout.TotalSeconds:F0} seconds (RequestTimeout)");
+        }
+        catch (Exception)
+        {
+            // a network error or user abort must not leave the temp file behind (the C++
+            // sink's abort deleted it too); the failure state itself is handled by the
+            // task machinery / rethrow below
+            CancelWriting();
+            throw;
         }
     }
 
@@ -360,15 +377,20 @@ public sealed class HttpDownloadTask(
             }
         }
 
+        // snapshot before CancelWriting zeroes the flag: the cache bookkeeping needs to
+        // know whether THIS transfer wrote (the old sink order zeroed first, so the md5
+        // bookkeeping never fired — the new regression test pins the fix)
+        var wroteAnyData = _wroteAnyData;
         CancelWriting();
-        FinalizeCacheEntry(statusCode, headers);
+        FinalizeCacheEntry(statusCode, headers, wroteAnyData);
         return true;
     }
 
     /// <summary>Port of MetaCacheSink::finalizeCache (the cached plane's bookkeeping): md5
     /// only when data was written, etag/last-modified/max-age/Age, then UpdateEntry. Always
     /// succeeds; a no-op for plain file targets.</summary>
-    private void FinalizeCacheEntry(int statusCode, System.Net.Http.Headers.HttpResponseHeaders headers)
+    private void FinalizeCacheEntry(int statusCode, System.Net.Http.Headers.HttpResponseHeaders headers,
+        bool wroteAnyData)
     {
         if (CachedEntry is not { } entry)
         {
@@ -379,7 +401,7 @@ public sealed class HttpDownloadTask(
             ? string.Join(", ", values)
             : "";
 
-        if (_wroteAnyData && _md5 is { } md5)
+        if (wroteAnyData && _md5 is { } md5)
         {
             var hash = md5.Hash();
             if (hash.Length > 0)

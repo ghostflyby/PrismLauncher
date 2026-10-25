@@ -346,6 +346,10 @@ public sealed class HttpMetaCache(AbsolutePath path) : IDisposable
         }
 
         entry.IsStale = true;
+        // the C++ HttpMetaCache::evict removed the entry outright — staying in the map
+        // would let the next resolve resurrect it (file checks pass) and serve the very
+        // content the eviction was meant to drop
+        Disown(entry.BaseId, entry.RelativePath);
         SaveEventually();
         return true;
     }

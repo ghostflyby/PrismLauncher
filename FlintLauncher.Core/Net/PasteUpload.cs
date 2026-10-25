@@ -138,8 +138,12 @@ public sealed class PasteUpload : FlintTask
         HttpResponseMessage response;
         try
         {
+            // the inactivity window (RequestTimeout): the persistent client carries no
+            // total-duration timeout, so every direct sender arms its own
+            using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutSource.CancelAfter(_settings.Current.RequestTimeout);
             response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken).ConfigureAwait(false);
+                timeoutSource.Token).ConfigureAwait(false);
         }
         catch (HttpRequestException e)
         {

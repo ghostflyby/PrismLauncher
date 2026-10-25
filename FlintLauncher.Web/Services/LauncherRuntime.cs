@@ -235,7 +235,13 @@ internal sealed class LauncherRuntime : IDisposable
     /// runtime; disposed with it.</summary>
     public DirectorySpace InstanceWatchSpace { get; }
 
-    public void Dispose() => InstanceWatchSpace.Dispose();
+    public void Dispose()
+    {
+        InstanceWatchSpace.Dispose();
+        // the metacache ledger's deferred write (the 30s timer) flushes now, so shutdown
+        // after activity does not cost re-hashes and revalidations on the next start
+        MetaCache.Dispose();
+    }
 }
 
 /// <summary>Small JSON helpers shared by the endpoints (AOT-safe: explicit nodes).</summary>

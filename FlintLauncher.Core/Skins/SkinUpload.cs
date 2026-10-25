@@ -82,6 +82,10 @@ public sealed class SkinUpload : FlintTask
         var body = BuildMultipartBody(boundary, _skinData, _variant);
 
         EmitStatus("Uploading skin");
+        // the inactivity window (RequestTimeout): the persistent client carries no
+        // total-duration timeout, so every direct sender arms its own
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(_settings.Current.RequestTimeout);
         using var message = new HttpRequestMessage(HttpMethod.Post,
             new Uri(_auth.MinecraftServices.TrimEnd('/') + "/minecraft/profile/skins"));
         message.Headers.TryAddWithoutValidation("Authorization", $"Bearer {_token}");
@@ -89,7 +93,7 @@ public sealed class SkinUpload : FlintTask
         message.Content.Headers.TryAddWithoutValidation("Content-Type", "multipart/form-data; boundary=" + boundary);
 
         using var response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken).ConfigureAwait(false);
+            timeoutSource.Token).ConfigureAwait(false);
         var statusCode = (int)response.StatusCode;
         if (statusCode is not 200 and not 201 and not 202 and not 203 and not 204 and not 206)
         {

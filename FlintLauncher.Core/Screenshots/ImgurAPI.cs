@@ -140,6 +140,10 @@ public sealed class ImgurUpload(
         message.Content = new ByteArrayContent(body);
         message.Content.Headers.TryAddWithoutValidation("Content-Type", "multipart/form-data; boundary=" + boundary);
 
+        // the inactivity window (RequestTimeout): the persistent client carries no
+        // total-duration timeout, so every direct sender arms its own
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(_settings.Current.RequestTimeout);
         using var response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
             cancellationToken).ConfigureAwait(false);
         var statusCode = (int)response.StatusCode;
@@ -256,6 +260,10 @@ public sealed class ImgurAlbumCreation(
         message.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(data));
         message.Content.Headers.TryAddWithoutValidation("Content-Type", "application/x-www-form-urlencoded");
 
+        // the inactivity window (RequestTimeout): the persistent client carries no
+        // total-duration timeout, so every direct sender arms its own
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(_settings.Current.RequestTimeout);
         using var response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
             cancellationToken).ConfigureAwait(false);
         var statusCode = (int)response.StatusCode;

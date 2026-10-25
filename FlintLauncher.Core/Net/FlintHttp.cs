@@ -58,6 +58,12 @@ public static class FlintHttp
             throw new FlintHttpException(
                 $"transfer timed out: no data for {requestTimeout.TotalSeconds:F0} seconds (RequestTimeout)");
         }
+        catch (Exception e) when (e is HttpRequestException or IOException)
+        {
+            // connection-level failure (DNS, refused, reset) after the retry gate — the
+            // old NetRequest surfaced it as job.FailReason, so the envelopes keep the text
+            throw new FlintHttpException(e.Message);
+        }
 
         using (response)
         {
@@ -70,6 +76,11 @@ public static class FlintHttp
                 {
                     timeoutSource.CancelAfter(requestTimeout);
                     body = await response.Content.ReadAsStringAsync(timeoutSource.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    throw new FlintHttpException(
+                        $"transfer timed out: no data for {requestTimeout.TotalSeconds:F0} seconds (RequestTimeout)");
                 }
                 catch (Exception)
                 {
@@ -85,7 +96,16 @@ public static class FlintHttp
             }
 
             timeoutSource.CancelAfter(requestTimeout);
-            return await response.Content.ReadAsByteArrayAsync(timeoutSource.Token).ConfigureAwait(false);
+            try
+            {
+                return await response.Content.ReadAsByteArrayAsync(timeoutSource.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // a body read stalled past the window: a network failure, not a user abort
+                throw new FlintHttpException(
+                    $"transfer timed out: no data for {requestTimeout.TotalSeconds:F0} seconds (RequestTimeout)");
+            }
         }
     }
 }
