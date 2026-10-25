@@ -17,7 +17,6 @@ CMakeCache.txt
 CMakeUserPresets.json
 /.project
 /.settings
-/.idea
 /.vscode
 /.vs
 cmake-build-*/
