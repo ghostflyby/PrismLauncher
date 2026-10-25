@@ -168,18 +168,21 @@ public sealed class EnsureMetadataTask(
             }
         }
 
-        var (job, request) = _flame.MatchFingerprints(fingerprints);
-        await job.StartAsync(cancellationToken);
-        if (!job.WasSuccessful)
+        string fingerprintBody;
+        try
         {
-            EmitFailed(job.FailReason);
+            fingerprintBody = await _flame.MatchFingerprintsAsync(fingerprints, cancellationToken);
+        }
+        catch (FlintHttpException e)
+        {
+            EmitFailed(e.Reason);
             return;
         }
 
         FlameFingerprintResponseJson? response;
         try
         {
-            response = FlameMod.ParseResponse(request.BodyAsString,
+            response = FlameMod.ParseResponse(fingerprintBody,
                 FlameModJsonContext.Default.FlameFingerprintResponseJson);
         }
         catch (JsonException)
@@ -240,24 +243,17 @@ public sealed class EnsureMetadataTask(
             return;
         }
 
-        NetJob projectJob;
-        NetRequest projectRequest;
-        bool multiple;
-        if (addonIds.Count == 1)
+        var multiple = addonIds.Count != 1;
+        string projectBody;
+        try
         {
-            (projectJob, projectRequest) = _flame.GetProject(addonIds.Keys.First());
-            multiple = false;
+            projectBody = multiple
+                ? await _flame.GetProjectsAsync(addonIds.Keys.ToList(), cancellationToken)
+                : await _flame.GetProjectAsync(addonIds.Keys.First(), cancellationToken);
         }
-        else
+        catch (FlintHttpException e)
         {
-            (projectJob, projectRequest) = _flame.GetProjects(addonIds.Keys.ToList());
-            multiple = true;
-        }
-
-        await projectJob.StartAsync(cancellationToken);
-        if (!projectJob.WasSuccessful)
-        {
-            EmitFailed(projectJob.FailReason);
+            EmitFailed(e.Reason);
             return;
         }
 
@@ -267,7 +263,7 @@ public sealed class EnsureMetadataTask(
             {
                 if (multiple)
                 {
-                    entries = FlameMod.ParseResponse(projectRequest.BodyAsString,
+                    entries = FlameMod.ParseResponse(projectBody,
                                   FlameModJsonContext.Default.FlameProjectListJson).Data
                               ?? throw new JsonException("'data' is not an array");
                 }
@@ -275,7 +271,7 @@ public sealed class EnsureMetadataTask(
                 {
                     entries =
                     [
-                        FlameMod.ParseResponse(projectRequest.BodyAsString,
+                        FlameMod.ParseResponse(projectBody,
                             FlameModJsonContext.Default.FlameProjectEnvelopeJson).Data
                         ?? throw new JsonException("'data' is not an object"),
                     ];

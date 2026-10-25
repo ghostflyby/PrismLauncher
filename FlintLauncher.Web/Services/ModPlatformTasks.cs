@@ -101,15 +101,18 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
 
         if (provider == ResourceProvider.Flame)
         {
-            var (job, request) = _flame.GetProject(projectId);
-            await job.StartAsync(cancellationToken);
-            if (!job.WasSuccessful)
+            string projectBody;
+            try
             {
-                throw new ModResolveException($"fetching the CurseForge project {projectId} failed: {job.FailReason}");
+                projectBody = await _flame.GetProjectAsync(projectId, cancellationToken);
+            }
+            catch (FlintHttpException e)
+            {
+                throw new ModResolveException($"fetching the CurseForge project {projectId} failed: {e.Reason}");
             }
 
             // Flame nests the project under "data" (the C++ Json::requireObject(doc, "data"))
-            if (ParseBodyNode(request.BodyAsString, $"the CurseForge project {projectId}") is not JsonObject root ||
+            if (ParseBodyNode(projectBody, $"the CurseForge project {projectId}") is not JsonObject root ||
                 root["data"] is not JsonObject data)
             {
                 throw new ModResolveException($"the CurseForge project response for {projectId} has no data object");
@@ -161,14 +164,17 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         {
             if (provider == ResourceProvider.Flame)
             {
-                var (job, request) = _flame.GetFile(projectId, versionId);
-                await job.StartAsync(cancellationToken);
-                if (!job.WasSuccessful)
+                string fileBody;
+                try
                 {
-                    throw new ModResolveException($"fetching the CurseForge file {versionId} failed: {job.FailReason}");
+                    fileBody = await _flame.GetFileAsync(projectId, versionId, cancellationToken);
+                }
+                catch (FlintHttpException e)
+                {
+                    throw new ModResolveException($"fetching the CurseForge file {versionId} failed: {e.Reason}");
                 }
 
-                if (ParseBodyNode(request.BodyAsString, $"the CurseForge file {versionId}") is not JsonObject root ||
+                if (ParseBodyNode(fileBody, $"the CurseForge file {versionId}") is not JsonObject root ||
                     root["data"] is not JsonObject data)
                 {
                     throw new ModResolveException($"the CurseForge file response for {versionId} has no data object");

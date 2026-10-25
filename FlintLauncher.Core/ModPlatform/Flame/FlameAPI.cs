@@ -69,17 +69,17 @@ public sealed class FlameApi(HttpClient http, NetSettings settings) : ResourceAp
 
     // ------------------------------------------------------------------ requests
 
-    /// <summary>Port of FlameAPI::matchFingerprints (POST /fingerprints, batch murmur2).</summary>
-    public (NetJob Job, NetRequest Request) MatchFingerprints(IReadOnlyList<uint> fingerprints)
+    /// <summary>Port of FlameAPI::matchFingerprints (POST /fingerprints, batch murmur2);
+    /// failures surface as <see cref="FlintHttpException"/> (the old NetRequest status
+    /// gate).</summary>
+    public Task<string> MatchFingerprintsAsync(IReadOnlyList<uint> fingerprints,
+        CancellationToken cancellationToken = default)
     {
-        var netJob = new NetJob("Flame::MatchFingerprints");
-
         var body = new FlameFingerprintsRequest(
             [.. fingerprints.Select(fp => fp.ToString(CultureInfo.InvariantCulture))]);
         var bodyRaw = JsonSerializer.SerializeToUtf8Bytes(body, FlameJsonContext.Default.FlameFingerprintsRequest);
-        var request = MakeByteArrayRequest($"{BaseUrl}/fingerprints", bodyRaw);
-        netJob.AddNetRequest(request);
-        return (netJob, request);
+        return FlintHttp.GetStringAsync(Http, Settings,
+            BuildRequest(HttpMethod.Post, $"{BaseUrl}/fingerprints", bodyRaw), cancellationToken);
     }
 
     /// <summary>Port of FlameAPI::getModFileChangelog (GET /mods/{id}/files/{fid}/changelog);
@@ -87,16 +87,21 @@ public sealed class FlameApi(HttpClient http, NetSettings settings) : ResourceAp
     public async Task<string> GetModFileChangelog(int modId, int fileId,
         CancellationToken cancellationToken = default)
     {
-        var request = MakeByteArrayRequest($"{BaseUrl}/mods/{modId}/files/{fileId}/changelog");
-        await request.StartAsync(cancellationToken);
-        if (!request.WasSuccessful)
+        string body;
+        try
+        {
+            body = await FlintHttp.GetStringAsync(Http, Settings,
+                BuildRequest(HttpMethod.Get, $"{BaseUrl}/mods/{modId}/files/{fileId}/changelog"),
+                cancellationToken);
+        }
+        catch (FlintHttpException)
         {
             return "";
         }
 
         try
         {
-            return JsonSerializer.Deserialize(request.BodyAsString,
+            return JsonSerializer.Deserialize(body,
                 FlameJsonContext.Default.FlameStringEnvelopeJson)?.Data ?? "";
         }
         catch (JsonException)
@@ -108,16 +113,20 @@ public sealed class FlameApi(HttpClient http, NetSettings settings) : ResourceAp
     /// <summary>Port of FlameAPI::getModDescription (GET /mods/{id}/description).</summary>
     public async Task<string> GetModDescription(int modId, CancellationToken cancellationToken = default)
     {
-        var request = MakeByteArrayRequest($"{BaseUrl}/mods/{modId}/description");
-        await request.StartAsync(cancellationToken);
-        if (!request.WasSuccessful)
+        string body;
+        try
+        {
+            body = await FlintHttp.GetStringAsync(Http, Settings,
+                BuildRequest(HttpMethod.Get, $"{BaseUrl}/mods/{modId}/description"), cancellationToken);
+        }
+        catch (FlintHttpException)
         {
             return "";
         }
 
         try
         {
-            return JsonSerializer.Deserialize(request.BodyAsString,
+            return JsonSerializer.Deserialize(body,
                 FlameJsonContext.Default.FlameStringEnvelopeJson)?.Data ?? "";
         }
         catch (JsonException)
@@ -127,65 +136,53 @@ public sealed class FlameApi(HttpClient http, NetSettings settings) : ResourceAp
     }
 
     /// <summary>Port of FlameAPI::getProjects (POST /mods, multiple project ids).</summary>
-    public (NetJob Job, NetRequest Request) GetProjects(IReadOnlyList<string> addonIds)
+    public Task<string> GetProjectsAsync(IReadOnlyList<string> addonIds,
+        CancellationToken cancellationToken = default)
     {
-        var netJob = new NetJob("Flame::GetProjects");
-
         var body = new FlameModsRequest([.. addonIds]);
         var bodyRaw = JsonSerializer.SerializeToUtf8Bytes(body, FlameJsonContext.Default.FlameModsRequest);
-        var request = MakeByteArrayRequest($"{BaseUrl}/mods", bodyRaw);
-        netJob.AddNetRequest(request);
-        return (netJob, request);
+        return FlintHttp.GetStringAsync(Http, Settings,
+            BuildRequest(HttpMethod.Post, $"{BaseUrl}/mods", bodyRaw), cancellationToken);
     }
 
     /// <summary>Port of ResourceAPI::getProject for Flame (GET /mods/{id}; the single-project
     /// variant the callers use when only one id is needed).</summary>
-    public (NetJob Job, NetRequest Request) GetProject(string addonId)
-    {
-        var netJob = new NetJob("Flame::GetProject");
-        var request = MakeByteArrayRequest(GetInfoUrl(addonId));
-        netJob.AddNetRequest(request);
-        return (netJob, request);
-    }
+    public Task<string> GetProjectAsync(string addonId, CancellationToken cancellationToken = default) =>
+        FlintHttp.GetStringAsync(Http, Settings,
+            BuildRequest(HttpMethod.Get, GetInfoUrl(addonId)), cancellationToken);
 
     /// <summary>Port of FlameAPI::getFiles (POST /mods/files, multiple file ids).</summary>
-    public (NetJob Job, NetRequest Request) GetFiles(IReadOnlyList<string> fileIds)
+    public Task<string> GetFilesAsync(IReadOnlyList<string> fileIds,
+        CancellationToken cancellationToken = default)
     {
-        var netJob = new NetJob("Flame::GetFiles");
-
         var body = new FlameFilesRequest([.. fileIds]);
         var bodyRaw = JsonSerializer.SerializeToUtf8Bytes(body, FlameJsonContext.Default.FlameFilesRequest);
-        var request = MakeByteArrayRequest($"{BaseUrl}/mods/files", bodyRaw);
-        netJob.AddNetRequest(request);
-        return (netJob, request);
+        return FlintHttp.GetStringAsync(Http, Settings,
+            BuildRequest(HttpMethod.Post, $"{BaseUrl}/mods/files", bodyRaw), cancellationToken);
     }
 
     /// <summary>Port of FlameAPI::getFile (GET /mods/{addonId}/files/{fileId}).</summary>
-    public (NetJob Job, NetRequest Request) GetFile(string addonId, string fileId)
-    {
-        var netJob = new NetJob("Flame::GetFile");
-        var request = MakeByteArrayRequest($"{BaseUrl}/mods/{addonId}/files/{fileId}");
-        netJob.AddNetRequest(request);
-        return (netJob, request);
-    }
+    public Task<string> GetFileAsync(string addonId, string fileId,
+        CancellationToken cancellationToken = default) =>
+        FlintHttp.GetStringAsync(Http, Settings,
+            BuildRequest(HttpMethod.Get, $"{BaseUrl}/mods/{addonId}/files/{fileId}"), cancellationToken);
 
     /// <summary>Port of FlameAPI::getCategories (GET /categories?gameId=432&amp;classId=...).</summary>
-    public (NetJob Job, NetRequest Request) GetCategories(ResourceType type)
+    public Task<string> GetCategoriesAsync(ResourceType type, CancellationToken cancellationToken = default)
     {
-        return GetCategoriesForClassId(GetClassId(type));
+        return GetCategoriesForClassIdAsync(GetClassId(type), cancellationToken);
     }
 
     /// <summary>The raw-classId variant the categories endpoint uses (search hits carry a
     /// CurseForge classId that may not have a ResourceType in the map above).</summary>
-    public (NetJob Job, NetRequest Request) GetCategoriesForClassId(int classId)
-    {
-        var netJob = new NetJob("Flame::GetCategories");
-        var request = MakeByteArrayRequest($"{BaseUrl}/categories?gameId=432&classId={classId}");
-        netJob.AddNetRequest(request);
-        return (netJob, request);
-    }
+    public Task<string> GetCategoriesForClassIdAsync(int classId,
+        CancellationToken cancellationToken = default) =>
+        FlintHttp.GetStringAsync(Http, Settings,
+            BuildRequest(HttpMethod.Get, $"{BaseUrl}/categories?gameId=432&classId={classId}"),
+            cancellationToken);
 
-    public (NetJob Job, NetRequest Request) GetModCategories() => GetCategories(ResourceType.Mod);
+    public Task<string> GetModCategoriesAsync(CancellationToken cancellationToken = default) =>
+        GetCategoriesAsync(ResourceType.Mod, cancellationToken);
 
     /// <summary>Port of FlameAPI::loadModCategories (parse the /categories response).</summary>
     public List<Category> LoadModCategories(string response)
@@ -504,26 +501,24 @@ public sealed class FlameApi(HttpClient http, NetSettings settings) : ResourceAp
 
     /// <summary>The x-api-key header the C++ ApiHeaderProxy attaches to Flame API requests
     /// (only sent when a key is configured; see FlameConfig for the shipping story).</summary>
-    public void AddApiKeyHeader(NetRequest request)
+    public void AddApiKeyHeader(HttpRequestMessage message)
     {
         var key = ApiKeyProvider();
         if (key.Length != 0)
         {
-            request.AddHeader("x-api-key", key);
+            message.Headers.TryAddWithoutValidation("x-api-key", key);
         }
     }
 
-    private NetRequest MakeByteArrayRequest(string url)
+    private HttpRequestMessage BuildRequest(HttpMethod method, string url, byte[]? postData = null)
     {
-        var request = NetRequest.MakeByteArray(new Uri(url), http: Http, settings: Settings);
-        AddApiKeyHeader(request);
-        return request;
-    }
+        var message = new HttpRequestMessage(method, url);
+        if (postData is not null)
+        {
+            message.Content = new ByteArrayContent(postData);
+        }
 
-    private NetRequest MakeByteArrayRequest(string url, byte[] postData)
-    {
-        var request = NetRequest.MakeByteArray(new Uri(url), postData, http: Http, settings: Settings);
-        AddApiKeyHeader(request);
-        return request;
+        AddApiKeyHeader(message);
+        return message;
     }
 }

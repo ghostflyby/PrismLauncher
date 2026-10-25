@@ -207,11 +207,13 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
             }
         }
 
-        var (matchJob, response) = _flame.MatchFingerprints(fingerprints);
-        await matchJob.StartAsync(cancellationToken);
-        if (matchJob.WasSuccessful)
+        try
         {
-            ParseApiResponse(response.BodyAsString);
+            ParseApiResponse(await _flame.MatchFingerprintsAsync(fingerprints, cancellationToken));
+        }
+        catch (FlintHttpException)
+        {
+            // (the C++ only logged the fingerprint failure and continued to the info pass)
         }
 
         _pendingHashes.Clear();
@@ -284,22 +286,17 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
             return;
         }
 
-        NetJob projJob;
-        NetRequest projRequest;
         var single = addonIds.Count == 1;
-        if (single)
+        string projBody;
+        try
         {
-            (projJob, projRequest) = _flame.GetProject(addonIds[0]);
+            projBody = single
+                ? await _flame.GetProjectAsync(addonIds[0], cancellationToken)
+                : await _flame.GetProjectsAsync(addonIds, cancellationToken);
         }
-        else
+        catch (FlintHttpException e)
         {
-            (projJob, projRequest) = _flame.GetProjects(addonIds);
-        }
-
-        await projJob.StartAsync(cancellationToken);
-        if (!projJob.WasSuccessful)
-        {
-            EmitFailed(projJob.FailReason);
+            EmitFailed(e.Reason);
             return;
         }
 
@@ -313,14 +310,14 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
             {
                 entries =
                 [
-                    FlameMod.ParseResponse(projRequest.BodyAsString,
+                    FlameMod.ParseResponse(projBody,
                         FlameModJsonContext.Default.FlameProjectEnvelopeJson).Data
                     ?? throw new JsonException("'data' is not an object"),
                 ];
             }
             else
             {
-                entries = FlameMod.ParseResponse(projRequest.BodyAsString,
+                entries = FlameMod.ParseResponse(projBody,
                               FlameModJsonContext.Default.FlameProjectListJson).Data
                           ?? throw new JsonException("'data' is not an array");
             }

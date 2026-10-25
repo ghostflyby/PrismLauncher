@@ -198,16 +198,19 @@ public class GetModDependenciesTask : SequentialTask
             {
                 if (provider == ResourceProvider.Flame)
                 {
-                    var (job, request) = _flame.GetProject(pDep.Pack.AddonId);
-                    await job.StartAsync(cancellationToken);
-                    if (!job.WasSuccessful)
+                    string projectBody;
+                    try
                     {
-                        throw new HttpRequestException(job.FailReason);
+                        projectBody = await _flame.GetProjectAsync(pDep.Pack.AddonId, cancellationToken);
+                    }
+                    catch (FlintHttpException e)
+                    {
+                        throw new HttpRequestException(e.Reason);
                     }
 
                     // Flame nests the project under "data" (the C++
                     // Json::requireObject(Json::requireObject(doc), "data") form)
-                    var envelope = FlameMod.ParseResponse(request.BodyAsString,
+                    var envelope = FlameMod.ParseResponse(projectBody,
                         FlameModJsonContext.Default.FlameProjectEnvelopeJson);
                     if (envelope.Data is { } project)
                     {

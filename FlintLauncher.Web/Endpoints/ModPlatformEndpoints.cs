@@ -124,16 +124,18 @@ public static class ModPlatformEndpoints
                     effectiveClassId = FlameApi.GetClassId(resourceType);
                 }
 
-                var (_, flameRequest) = flame.GetCategoriesForClassId(effectiveClassId);
-                flame.AddApiKeyHeader(flameRequest);
-                await flameRequest.StartAsync();
-                if (flameRequest.State != TaskState.Succeeded)
+                string categories;
+                try
+                {
+                    categories = await flame.GetCategoriesForClassIdAsync(effectiveClassId);
+                }
+                catch (FlintHttpException e)
                 {
                     return ApiJson.Error("flame_unavailable",
-                        $"curseforge categories failed: {flameRequest.FailReason}", 502);
+                        $"curseforge categories failed: {e.Reason}", 502);
                 }
 
-                return Results.Ok(ParseFlameCategories(flameRequest.BodyAsString).ToArray());
+                return Results.Ok(ParseFlameCategories(categories).ToArray());
             }
 
             if (!TryParseSearchType(type, out var modrinthType, out var modrinthTypeError))
@@ -243,21 +245,24 @@ public static class ModPlatformEndpoints
                 {
                     Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.Flame },
                 });
-                var request = NetRequest.MakeByteArray(new Uri(url), flame.Http, flame.Settings);
-                flame.AddApiKeyHeader(request);
-
-                await request.StartAsync();
-                if (request.State != TaskState.Succeeded)
+                string body;
+                try
+                {
+                    var message = new HttpRequestMessage(HttpMethod.Get, url);
+                    flame.AddApiKeyHeader(message);
+                    body = await FlintHttp.GetStringAsync(flame.Http, flame.Settings, message);
+                }
+                catch (FlintHttpException e)
                 {
                     return ApiJson.Error("flame_unavailable",
-                        $"{provider} version list failed: {request.FailReason}", 502);
+                        $"{provider} version list failed: {e.Reason}", 502);
                 }
 
                 try
                 {
                     // loads + validates every file, sorted newest first (a broken body
                     // surfaces as the invalid-response error below)
-                    FlameMod.LoadIndexedPackVersionsFromResponse(pack, request.BodyAsString);
+                    FlameMod.LoadIndexedPackVersionsFromResponse(pack, body);
                 }
                 catch (JsonException e)
                 {
@@ -613,19 +618,23 @@ public static class ModPlatformEndpoints
 
         var url = flame.GetSearchUrl(args);
 
-        var request = NetRequest.MakeByteArray(new Uri(url), flame.Http, flame.Settings);
-        flame.AddApiKeyHeader(request);
-        await request.StartAsync();
-        if (request.State != TaskState.Succeeded)
+        string body;
+        try
+        {
+            var message = new HttpRequestMessage(HttpMethod.Get, url);
+            flame.AddApiKeyHeader(message);
+            body = await FlintHttp.GetStringAsync(flame.Http, flame.Settings, message);
+        }
+        catch (FlintHttpException e)
         {
             return ApiJson.Error("flame_unavailable",
-                $"curseforge search failed: {request.FailReason}", 502);
+                $"curseforge search failed: {e.Reason}", 502);
         }
 
         JsonNode? bodyRoot;
         try
         {
-            bodyRoot = JsonNode.Parse(request.BodyAsString);
+            bodyRoot = JsonNode.Parse(body);
         }
         catch (JsonException)
         {

@@ -217,20 +217,20 @@ public sealed class FlameCheckUpdate(
             return;
         }
 
-        NetJob projJob;
-        NetRequest projRequest;
         var single = addonIds.Count == 1;
-        if (single)
+        string projBody;
+        try
         {
-            (projJob, projRequest) = _flame.GetProject(addonIds[0]);
+            projBody = single
+                ? await _flame.GetProjectAsync(addonIds[0], cancellationToken)
+                : await _flame.GetProjectsAsync(addonIds, cancellationToken);
         }
-        else
+        catch (FlintHttpException)
         {
-            (projJob, projRequest) = _flame.GetProjects(addonIds);
+            projBody = "";
         }
 
-        await projJob.StartAsync(cancellationToken);
-        if (projJob.WasSuccessful)
+        if (projBody.Length != 0)
         {
             // a broken response body only skips the blocked-download recovery lookup (the
             // task finishes regardless, like the C++)
@@ -241,14 +241,14 @@ public sealed class FlameCheckUpdate(
                 {
                     entries =
                     [
-                        FlameMod.ParseResponse(projRequest.BodyAsString,
+                        FlameMod.ParseResponse(projBody,
                             FlameModJsonContext.Default.FlameProjectEnvelopeJson).Data
                         ?? throw new JsonException("'data' is not an object"),
                     ];
                 }
                 else
                 {
-                    entries = FlameMod.ParseResponse(projRequest.BodyAsString,
+                    entries = FlameMod.ParseResponse(projBody,
                                   FlameModJsonContext.Default.FlameProjectListJson).Data
                               ?? throw new JsonException("'data' is not an array");
                 }

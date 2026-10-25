@@ -21,6 +21,7 @@
 using System.Globalization;
 using System.Text.Json;
 using FlintLauncher.Core.ModPlatform.Modrinth;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
@@ -65,15 +66,18 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi modri
 
         var fileIds = toProcess.Files.Values
             .Select(f => f.FileId.ToString(CultureInfo.InvariantCulture)).ToList();
-        var (job, response) = _flame.GetFiles(fileIds);
-        await job.StartAsync(cancellationToken);
-        if (!job.WasSuccessful)
+        string body;
+        try
         {
-            EmitFailed(job.FailReason);
+            body = await _flame.GetFilesAsync(fileIds, cancellationToken);
+        }
+        catch (FlintHttpException e)
+        {
+            EmitFailed(e.Reason);
             return;
         }
 
-        await NetJobFinished(response.BodyAsString, cancellationToken);
+        await NetJobFinished(body, cancellationToken);
     }
 
     private async Task NetJobFinished(string responseBody, CancellationToken cancellationToken)
@@ -186,11 +190,14 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi modri
         var addonIds = toProcess.Files.Values
             .Select(f => f.ProjectId.ToString(CultureInfo.InvariantCulture)).ToList();
 
-        var (job, response) = _flame.GetProjects(addonIds);
-        await job.StartAsync(cancellationToken);
-        if (!job.WasSuccessful)
+        string body;
+        try
         {
-            EmitFailed(job.FailReason);
+            body = await _flame.GetProjectsAsync(addonIds, cancellationToken);
+        }
+        catch (FlintHttpException e)
+        {
+            EmitFailed(e.Reason);
             return;
         }
 
@@ -198,7 +205,7 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi modri
         FlameProjectListJson? doc = null;
         try
         {
-            doc = FlameMod.ParseResponse(response.BodyAsString,
+            doc = FlameMod.ParseResponse(body,
                 FlameModJsonContext.Default.FlameProjectListJson);
         }
         catch (JsonException) { }

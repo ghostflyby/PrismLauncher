@@ -87,20 +87,16 @@ public class FlameApiTests : IDisposable
     {
         _flameApi.ApiKeyProvider = static () => "user-supplied-key";
 
-        var (job, _) = _flameApi.MatchFingerprints([123456]);
-        await job.StartAsync();
+        await _flameApi.MatchFingerprintsAsync([123456]);
 
-        Assert.Equal(TaskState.Succeeded, job.State);
         Assert.Equal("user-supplied-key", _server.LastHeaders["x-api-key"]);
     }
 
     [Fact]
     public async Task MatchFingerprints_PostsMurmur2List()
     {
-        var (job, request) = _flameApi.MatchFingerprints([123456789, 42]);
-        await job.StartAsync();
+        await _flameApi.MatchFingerprintsAsync([123456789, 42]);
 
-        Assert.Equal(TaskState.Succeeded, job.State);
         Assert.Equal(_baseUrl + "/fingerprints", _server.LastPath);
 
         var body = Assert.IsType<JsonObject>(JsonNode.Parse(Encoding.UTF8.GetString(_server.LastBody ?? [])));
@@ -108,16 +104,13 @@ public class FlameApiTests : IDisposable
             .Select(f => Assert.IsType<JsonValue>(f, exactMatch: false).GetValue<string>()).ToList();
         // the C++ sends the fingerprints as JSON strings
         Assert.Equal(["123456789", "42"], fingerprints);
-        _ = request;
     }
 
     [Fact]
     public async Task GetFiles_PostsFileIdList()
     {
-        var (job, _) = _flameApi.GetFiles(["456", "789"]);
-        await job.StartAsync();
+        await _flameApi.GetFilesAsync(["456", "789"]);
 
-        Assert.Equal(TaskState.Succeeded, job.State);
         Assert.Equal(_baseUrl + "/mods/files", _server.LastPath);
 
         var body = Assert.IsType<JsonObject>(JsonNode.Parse(Encoding.UTF8.GetString(_server.LastBody ?? [])));
@@ -129,10 +122,8 @@ public class FlameApiTests : IDisposable
     [Fact]
     public async Task GetProjects_PostsModIdList()
     {
-        var (job, _) = _flameApi.GetProjects(["123", "222"]);
-        await job.StartAsync();
+        await _flameApi.GetProjectsAsync(["123", "222"]);
 
-        Assert.Equal(TaskState.Succeeded, job.State);
         Assert.Equal(_baseUrl + "/mods", _server.LastPath);
 
         var body = Assert.IsType<JsonObject>(JsonNode.Parse(Encoding.UTF8.GetString(_server.LastBody ?? [])));
@@ -145,10 +136,8 @@ public class FlameApiTests : IDisposable
     public async Task GetFile_FetchesSingleEndpoint()
     {
         _server.FileJson = FlamePayloads.FileJson(_server.Url, fileId: 456);
-        var (job, _) = _flameApi.GetFile("123", "456");
-        await job.StartAsync();
+        await _flameApi.GetFileAsync("123", "456");
 
-        Assert.Equal(TaskState.Succeeded, job.State);
         Assert.Equal(_baseUrl + "/mods/123/files/456", _server.LastPath);
     }
 
@@ -166,13 +155,11 @@ public class FlameApiTests : IDisposable
     public async Task Categories_UrlAndParsing()
     {
         _server.CategoriesJson = """{"data":[{"id":6,"name":"Mods"},{"id":4471,"name":"Modpacks"}]}""";
-        var (_, request) = _flameApi.GetCategories(ResourceType.Mod);
-        await request.StartAsync();
+        var categoriesBody = await _flameApi.GetCategoriesAsync(ResourceType.Mod);
 
-        Assert.Equal(TaskState.Succeeded, request.State);
         Assert.Equal(_baseUrl + "/categories?gameId=432&classId=6", _server.LastPath);
 
-        var categories = _flameApi.LoadModCategories(request.BodyAsString);
+        var categories = _flameApi.LoadModCategories(categoriesBody);
         Assert.Equal(2, categories.Count);
         Assert.Equal("Mods", categories[0].Name);
         Assert.Equal("6", categories[0].Id);
