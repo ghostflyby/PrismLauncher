@@ -223,7 +223,7 @@ public class GetModDependenciesTask : SequentialTask
                 }
                 else
                 {
-                    var dto = await _modrinth.Client.Projects.ById(pDep.Pack.AddonId).SendTo(cancellationToken);
+                    var dto = await _modrinth.Client.Projects.ById(pDep.Pack.AddonId).SendTo(_modrinth.Client, cancellationToken);
                     ModrinthPackIndex.LoadIndexedPack(pDep.Pack, dto);
                 }
             }
@@ -344,9 +344,9 @@ public class GetModDependenciesTask : SequentialTask
                 try
                 {
                     dtos = dep.Version.Length != 0
-                        ? [await _modrinth.Client.Versions.ById(dep.Version).SendTo(cancellationToken)]
+                        ? [await _modrinth.Client.Versions.ById(dep.Version).SendTo(_modrinth.Client, cancellationToken)]
                         : await _modrinth.Client.Versions.At(_modrinth.GetDependencyUrl(args))
-                            .SendTo(cancellationToken);
+                            .SendTo(_modrinth.Client, cancellationToken);
                 }
                 catch (Exception e) when (e is ModrinthApiException)
                 {

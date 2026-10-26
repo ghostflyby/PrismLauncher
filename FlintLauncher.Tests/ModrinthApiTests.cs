@@ -87,7 +87,7 @@ public class ModrinthApiTests : IDisposable
         var failure = await Assert.ThrowsAsync<ModrinthApiException>(() => _api.Client.Downloads.File(
                 $"{_server.Url}/payload.bin",
                 checksum: ("sha512", Convert.ToHexString(SHA512.HashData("different payload"u8.ToArray())).ToLowerInvariant()))
-            .SendTo(destination));
+            .SendTo(destination, _api.Client));
         Assert.IsType<InvalidDataException>(failure.InnerException);
 
         // neither the destination nor the temp file survives the failed attempt
@@ -104,12 +104,12 @@ public class ModrinthApiTests : IDisposable
 
         // the first URL 404s (the real API's answer for an unknown path)...
         await Assert.ThrowsAsync<ModrinthApiException>(() =>
-            _api.Client.Downloads.File($"{_server.Url}/missing.bin").SendTo(destination));
+            _api.Client.Downloads.File($"{_server.Url}/missing.bin").SendTo(destination, _api.Client));
         Assert.False(File.Exists(destination));
         Assert.False(File.Exists(destination + ".download"));
 
         // ...and the caller's fallback walk retries with the next URL
-        await _api.Client.Downloads.File($"{_server.Url}/good.bin").SendTo(destination);
+        await _api.Client.Downloads.File($"{_server.Url}/good.bin").SendTo(destination, _api.Client);
         Assert.Equal(payload, await File.ReadAllBytesAsync(destination));
     }
 
@@ -121,7 +121,7 @@ public class ModrinthApiTests : IDisposable
         _server.Downloads["meta.bin"] = payload;
 
         await _api.Client.Downloads.File($"{_server.Url}/meta.bin",
-            new ModrinthDownloadMeta("update", "1.20.1", "fabric", "pack-a")).SendTo(destination);
+            new ModrinthDownloadMeta("update", "1.20.1", "fabric", "pack-a")).SendTo(destination, _api.Client);
 
         Assert.Contains("\"reason\":\"update\"", _server.LastDownloadHeaders["modrinth-download-meta"]);
         Assert.Equal(payload, await File.ReadAllBytesAsync(destination));
@@ -227,7 +227,7 @@ public class ModrinthApiTests : IDisposable
     public async Task CurrentVersion_FetchesByHashAndAlgorithm()
     {
         _server.VersionFiles["cafebabecafebabe"] = """{"version_number":"1.2.3","id":"v1","project_id":"p1","date_published":"2023-01-01T00:00:00Z","game_versions":["1.20.1"],"loaders":["fabric"],"name":"n","version_number":"1.2.3","version_type":"release","files":[]}""";
-        var version = await _api.Client.Versions.ByFileHash("cafebabecafebabe", "sha1").SendTo();
+        var version = await _api.Client.Versions.ByFileHash("cafebabecafebabe", "sha1").SendTo(_api.Client);
 
         Assert.NotNull(version);
         Assert.EndsWith("/version_file/cafebabecafebabe?algorithm=sha1", _server.LastPath);
@@ -239,7 +239,7 @@ public class ModrinthApiTests : IDisposable
     {
         _api.ApiToken = "mrpat_token";
         _server.VersionFiles["cafebabecafebabe"] = """{"id":"v1","project_id":"p1","date_published":"2023-01-01T00:00:00Z","game_versions":["1.20.1"],"loaders":["fabric"],"name":"n","version_number":"1.2.3","version_type":"release","files":[]}""";
-        await _api.Client.Versions.ByFileHash("cafebabecafebabe", "sha1").SendTo();
+        await _api.Client.Versions.ByFileHash("cafebabecafebabe", "sha1").SendTo(_api.Client);
 
         Assert.Equal("mrpat_token", _server.LastHeaders["Authorization"]);
     }
@@ -247,7 +247,7 @@ public class ModrinthApiTests : IDisposable
     [Fact]
     public async Task CurrentVersions_PostsHashList()
     {
-        await _api.Client.Versions.ByFileHashes(["hash1", "hash2"], "sha512").SendTo();
+        await _api.Client.Versions.ByFileHashes(["hash1", "hash2"], "sha512").SendTo(_api.Client);
 
         Assert.EndsWith("/version_files", _server.LastPath);
 

@@ -132,7 +132,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             ModrinthProject dto;
             try
             {
-                dto = await _modrinth.Client.Projects.ById(projectId).SendTo(cancellationToken);
+                dto = await _modrinth.Client.Projects.ById(projectId).SendTo(_modrinth.Client, cancellationToken);
             }
             catch (Exception e) when (e is ModrinthApiException)
             {
@@ -186,7 +186,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             ModrinthVersion dto;
             try
             {
-                dto = await _modrinth.Client.Versions.ById(versionId).SendTo(cancellationToken);
+                dto = await _modrinth.Client.Versions.ById(versionId).SendTo(_modrinth.Client, cancellationToken);
             }
             catch (Exception e) when (e is ModrinthApiException)
             {
@@ -249,7 +249,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         List<ModrinthVersion> dtos;
         try
         {
-            dtos = await _modrinth.Client.Versions.At(versionsUrl).SendTo(cancellationToken);
+            dtos = await _modrinth.Client.Versions.At(versionsUrl).SendTo(_modrinth.Client, cancellationToken);
         }
         catch (Exception e) when (e is ModrinthApiException)
         {

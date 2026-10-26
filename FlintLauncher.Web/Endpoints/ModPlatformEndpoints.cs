@@ -152,7 +152,7 @@ public static class ModPlatformEndpoints
             List<ModrinthCategory>? modrinthCategories;
             try
             {
-                modrinthCategories = await modrinth.Client.Tags.Categories().SendTo(cancellationToken);
+                modrinthCategories = await modrinth.Client.Tags.Categories().SendTo(modrinth.Client, cancellationToken);
             }
             catch (Exception e) when (e is ModrinthApiException)
             {
@@ -189,7 +189,7 @@ public static class ModPlatformEndpoints
                     // degrades to an empty body (the endpoint's own status rule)
                     try
                     {
-                        body = await modrinth.Client.Projects.Description(projectId).SendTo(cancellationToken);
+                        body = await modrinth.Client.Projects.Description(projectId).SendTo(modrinth.Client, cancellationToken);
                     }
                     catch (ModrinthApiException)
                     {
@@ -287,7 +287,7 @@ public static class ModPlatformEndpoints
                 List<ModrinthVersion> versionDtos;
                 try
                 {
-                    versionDtos = await modrinth.Client.Versions.At(versionsUrl).SendTo();
+                    versionDtos = await modrinth.Client.Versions.At(versionsUrl).SendTo(modrinth.Client);
                 }
                 catch (Exception e) when (e is ModrinthApiException)
                 {
@@ -715,7 +715,7 @@ public static class ModPlatformEndpoints
         ModrinthSearchResults search;
         try
         {
-            search = await modrinth.Client.Search.At(url).SendTo(cancellationToken);
+            search = await modrinth.Client.Search.At(url).SendTo(modrinth.Client, cancellationToken);
         }
         catch (Exception e) when (e is ModrinthApiException)
         {

@@ -3,12 +3,13 @@
 //
 // The Modrinth v2 client: the navigation root of the typed endpoint operations — the groups
 // (Versions / Projects / Tags / Search / Downloads) return operation values bound to this
-// instance, and as the executor it sends them, reading the live hosts and PAT from Options
-// per send and wrapping transport, gate and read failures into the Modrinth failure type.
-// The wire models and the strict decoding live in ModrinthJson; the download streams to
-// disk through its operation's checksum-verified temp-file commit. Everything
-// transport-shaped — proxy, user agent, timeouts, retries, resilience — belongs to the
-// injected HttpClient and its handler pipeline, not here.
+// root's live Options, and as the executor it is the pure transport they are sent through,
+// reading the hosts and PAT from Options per send. The operations themselves own the read
+// and decide the failure shape (ModrinthApiException, uniform across this root). The wire
+// models and the strict decoding live in ModrinthJson; the download streams to disk
+// through its operation's checksum-verified temp-file commit. Everything transport-shaped —
+// proxy, user agent, timeouts, retries, resilience — belongs to the injected HttpClient and
+// its handler pipeline, not here.
 
 using System.Text.Json;
 
@@ -48,6 +49,8 @@ public sealed class ModrinthClient : IApiExecutor
 
     // ------------------------------------------------------------------ executor face
 
+    /// <summary>Pure transport: the PAT header rides on the request when a token is set,
+    /// and the response streams back with only its headers received.</summary>
     async Task<HttpResponseMessage> IApiExecutor.SendAsync(HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
@@ -59,6 +62,4 @@ public sealed class ModrinthClient : IApiExecutor
         return await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
     }
-
-    Exception IApiExecutor.WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 }

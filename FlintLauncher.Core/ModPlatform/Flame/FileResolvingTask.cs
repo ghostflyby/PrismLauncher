@@ -159,7 +159,7 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi modri
             if (FallbackMrBlockedMods)
             {
                 var entries = await _modrinth.Client.Versions.ByFileHashes(hashes, "sha1")
-                    .SendTo(cancellationToken);
+                    .SendTo(_modrinth.Client, cancellationToken);
                 foreach (var outFile in toProcess.Files.Values)
                 {
                     var urlValid = Uri.TryCreate(outFile.Version.DownloadUrl, UriKind.Absolute, out _);
