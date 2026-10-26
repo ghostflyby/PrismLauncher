@@ -5,10 +5,10 @@
 // (CreateRequest, replayable — fresh message and buffered content per call) and owns how its
 // response is read into the result type, status semantics included. The shared pipeline sends
 // the request through the executor the operation was created from and hands the
-// (request, response, body) triple to the operation's reader; everything transport-shaped —
-// proxy, user agent, timeouts, retries, resilience — belongs to the executor's handler chain,
-// not here. A send, gate or decode failure is wrapped by the executor into the API's own
-// failure type; cancellation is never wrapped.
+// (request, response, body stream) triple to the operation's reader; everything
+// transport-shaped — proxy, user agent, timeouts, retries, resilience — belongs to the
+// executor's handler chain, not here. A send, gate or read failure is wrapped by the
+// executor into the API's own failure type; cancellation is never wrapped.
 
 namespace FlintLauncher.ExternalApi;
 
@@ -20,7 +20,7 @@ public interface IApiExecutor
     /// <summary>Sends one request; the message is owned and disposed by the caller.</summary>
     Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct);
 
-    /// <summary>Wraps a transport, status-gate or decode failure into the API's failure
+    /// <summary>Wraps a transport, status-gate or read failure into the API's failure
     /// type; the pipeline throws the result. Cancellation never reaches this.</summary>
     Exception WrapFailure(Exception failure);
 }
@@ -29,7 +29,7 @@ public interface IApiExecutor
 /// at construction, the request content is replayable (buffered or empty), and the value
 /// knows the executor it belongs to — so it can be sent repeatedly, independently of whoever
 /// built it.</summary>
-/// <typeparam name="TResult">The decoded result; always a reference type.</typeparam>
+/// <typeparam name="TResult">The read result.</typeparam>
 public interface IApiOperation<TResult>
 {
     /// <summary>The executor this operation was created from — the send target of
@@ -42,16 +42,18 @@ public interface IApiOperation<TResult>
     HttpRequestMessage CreateRequest();
 
     /// <summary>Reads the response into the result type, owning the endpoint's status
-    /// semantics: gate through <see cref="ApiOperation.EnsureSuccess"/> (or the endpoint's
-    /// own rule) and decode the fully buffered body. The message and the response stay
-    /// owned by the pipeline and must not be disposed here.</summary>
-    ValueTask<TResult> ReadResponseAsync(HttpRequestMessage request, HttpResponseMessage response,
-        byte[] body, CancellationToken ct);
+    /// semantics and the body's shape: gate through
+    /// <see cref="ApiOperation.EnsureSuccessAsync"/> (or the endpoint's own rule), then
+    /// decode — the body streams (JSON through the serializer's stream API, text through a
+    /// reader, files straight to disk). The message, the response and the stream stay owned
+    /// by the pipeline and must not be disposed here.</summary>
+    Task<TResult> ReadResponseAsync(HttpRequestMessage request, HttpResponseMessage response,
+        Stream body, CancellationToken ct);
 }
 
 /// <summary>The shared execution pipeline for all typed API operations: send through the
-/// executor, buffer the body, and hand the triple to the operation's own reader. Owns the
-/// disposal of the request and the response.</summary>
+/// executor and hand the (request, response, body stream) triple to the operation's own
+/// reader. Owns the disposal of the request and the response.</summary>
 public static class ApiOperation
 {
     /// <summary>The body excerpt cap of the status-gate message.</summary>
@@ -60,21 +62,18 @@ public static class ApiOperation
     /// <summary>The status gate most endpoints share: non-2xx raises HttpRequestException
     /// carrying the status, the URL and up to <see cref="MaxErrorBodyLength"/> characters
     /// of the body.</summary>
-    public static void EnsureSuccess(HttpRequestMessage request, HttpResponseMessage response, byte[] body)
+    public static async Task EnsureSuccessAsync(HttpRequestMessage request, HttpResponseMessage response,
+        Stream body, CancellationToken ct)
     {
         if (response.IsSuccessStatusCode)
         {
             return;
         }
 
-        string excerpt;
-        using (var reader = new StreamReader(new MemoryStream(body)))
-        {
-            var buffer = new char[MaxErrorBodyLength + 1];
-            var read = reader.ReadBlock(buffer, 0, buffer.Length);
-            excerpt = new string(buffer, 0, Math.Min(read, MaxErrorBodyLength));
-        }
-
+        using var reader = new StreamReader(body);
+        var buffer = new char[MaxErrorBodyLength + 1];
+        var read = await reader.ReadBlockAsync(buffer, ct).ConfigureAwait(false);
+        var excerpt = new string(buffer, 0, Math.Min(read, MaxErrorBodyLength));
         throw new HttpRequestException(
             $"HTTP status {(int)response.StatusCode} for {request.RequestUri}\n{excerpt}",
             inner: null,
@@ -82,10 +81,10 @@ public static class ApiOperation
     }
 
     /// <summary>Sends the operation through the executor it was created from. Transport,
-    /// gate and decode failures surface as the executor's wrapped failure; cancellation
+    /// gate and read failures surface as the executor's wrapped failure; cancellation
     /// propagates untouched.</summary>
     public static async Task<TResult> SendTo<TResult>(this IApiOperation<TResult> operation,
-        CancellationToken ct = default) where TResult : class
+        CancellationToken ct = default)
     {
         try
         {
@@ -101,14 +100,15 @@ public static class ApiOperation
         }
     }
 
-    /// <summary>The raw pipeline: send through the given executor, buffer the body, hand the
-    /// triple to the operation's reader. No failure shaping happens here.</summary>
+    /// <summary>The raw pipeline: send through the given executor and hand the
+    /// (request, response, body stream) triple to the operation's reader. No failure shaping
+    /// happens here.</summary>
     public static async Task<TResult> SendTo<TResult>(this IApiOperation<TResult> operation,
-        IApiExecutor executor, CancellationToken ct) where TResult : class
+        IApiExecutor executor, CancellationToken ct)
     {
         using var request = operation.CreateRequest();
         using var response = await executor.SendAsync(request, ct).ConfigureAwait(false);
-        var body = await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+        await using var body = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
         return await operation.ReadResponseAsync(request, response, body, ct).ConfigureAwait(false);
     }
 }

@@ -39,8 +39,8 @@ public sealed class ModrinthApi(ModrinthClient client, HttpClient http, NetSetti
 
     public static IReadOnlyList<string> MrpackHosts { get; } = ["cdn.modrinth.com", "github.com", "raw.githubusercontent.com", "gitlab.com"];
 
-    /// <summary>The client behind the raw download paths (the pinned-version and
-    /// dependency-version fetches that are not ModrinthClient queries).</summary>
+    /// <summary>The shared transport behind the sibling adapters built on this instance's
+    /// client pair (the Flame/FTB fallback wiring).</summary>
     public override HttpClient Http { get; } = http;
 
     public override NetSettings Settings { get; } = settings;
@@ -323,13 +323,13 @@ public sealed class ModrinthApi(ModrinthClient client, HttpClient http, NetSetti
 
     // ------------------------------------------------------------------ downloads
 
-    /// <summary>The mod download path: stream the URL to disk through the client's
-    /// checksum-gated temp-file dance. Hash types are the launcher-domain spellings the
-    /// metadata files use (md4 degrades to md5 — no managed MD4 in .NET, see HashUtils);
-    /// unknown types download without a check, like the C++ default branch.</summary>
+    /// <summary>The mod download path: stream the URL to disk through the download
+    /// operation's checksum-gated temp-file commit. Hash types are the launcher-domain
+    /// spellings the metadata files use (md4 degrades to md5 — no managed MD4 in .NET, see
+    /// HashUtils); unknown types download without a check, like the C++ default branch.</summary>
     public Task DownloadModFileAsync(string url, AbsolutePath path, ModrinthDownloadMeta? meta = null,
         string? hashType = null, string? hash = null, CancellationToken cancellationToken = default) =>
-        Client.DownloadFileAsync(url, path.Value, meta, MapChecksum(hashType, hash), cancellationToken);
+        Client.Downloads.File(url, path.Value, meta, MapChecksum(hashType, hash)).SendTo(cancellationToken);
 
     /// <summary>Port of the ChecksumValidator switch: md4/md5 -> MD5, sha1/sha256/sha512 map
     /// directly; anything else (murmur2, unknown) downloads unchecked.</summary>

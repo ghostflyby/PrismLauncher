@@ -588,8 +588,11 @@ public sealed class ModrinthCreationTask : InstanceTask
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
             FileOps.EnsureFilePathExists(filePath);
-            // md4 degrades to md5 (no managed MD4 in .NET); the adapter maps it back
-            var hashAlgorithm = file.HashAlgorithm == HashAlgorithmName.MD5 ? "md4" : file.HashAlgorithm.Name.ToLowerInvariant();
+            // md4 degrades to md5 (no managed MD4 in .NET); the adapter maps it back.
+            // A missing name (default HashAlgorithmName) degrades to "" -> unchecked download
+            var hashAlgorithm = file.HashAlgorithm == HashAlgorithmName.MD5
+                ? "md4"
+                : (file.HashAlgorithm.Name ?? "").ToLowerInvariant();
 
             while (file.Downloads.Count > 0)
             {
@@ -602,7 +605,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                     EmitSucceeded();
                     return;
                 }
-                catch (Exception e) when (e is HttpRequestException or InvalidDataException or IOException)
+                catch (Exception e) when (e is ModrinthApiException)
                 {
                     if (!IsRunning)
                     {
