@@ -85,9 +85,9 @@ public class ModrinthApiTests : IDisposable
         _server.Downloads["payload.bin"] = "actual payload"u8.ToArray();
 
         var failure = await Assert.ThrowsAsync<ModrinthApiException>(() => _api.Client.Downloads.File(
-            $"{_server.Url}/payload.bin", destination,
-            checksum: ("sha512", Convert.ToHexString(SHA512.HashData("different payload"u8.ToArray())).ToLowerInvariant()))
-            .SendTo());
+                $"{_server.Url}/payload.bin",
+                checksum: ("sha512", Convert.ToHexString(SHA512.HashData("different payload"u8.ToArray())).ToLowerInvariant()))
+            .SendTo(destination));
         Assert.IsType<InvalidDataException>(failure.InnerException);
 
         // neither the destination nor the temp file survives the failed attempt
@@ -104,12 +104,12 @@ public class ModrinthApiTests : IDisposable
 
         // the first URL 404s (the real API's answer for an unknown path)...
         await Assert.ThrowsAsync<ModrinthApiException>(() =>
-            _api.Client.Downloads.File($"{_server.Url}/missing.bin", destination).SendTo());
+            _api.Client.Downloads.File($"{_server.Url}/missing.bin").SendTo(destination));
         Assert.False(File.Exists(destination));
         Assert.False(File.Exists(destination + ".download"));
 
         // ...and the caller's fallback walk retries with the next URL
-        await _api.Client.Downloads.File($"{_server.Url}/good.bin", destination).SendTo();
+        await _api.Client.Downloads.File($"{_server.Url}/good.bin").SendTo(destination);
         Assert.Equal(payload, await File.ReadAllBytesAsync(destination));
     }
 
@@ -120,8 +120,8 @@ public class ModrinthApiTests : IDisposable
         var payload = "meta payload"u8.ToArray();
         _server.Downloads["meta.bin"] = payload;
 
-        await _api.Client.Downloads.File($"{_server.Url}/meta.bin", destination,
-            new ModrinthDownloadMeta("update", "1.20.1", "fabric", "pack-a")).SendTo();
+        await _api.Client.Downloads.File($"{_server.Url}/meta.bin",
+            new ModrinthDownloadMeta("update", "1.20.1", "fabric", "pack-a")).SendTo(destination);
 
         Assert.Contains("\"reason\":\"update\"", _server.LastDownloadHeaders["modrinth-download-meta"]);
         Assert.Equal(payload, await File.ReadAllBytesAsync(destination));

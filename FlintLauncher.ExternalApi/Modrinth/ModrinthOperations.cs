@@ -2,13 +2,15 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
 // The Modrinth v2 endpoints as operation values: each endpoint is a struct bound to the
-// client (the navigation root whose Options carry the base URL) plus its arguments, and
-// knows how to build its request and read its response. The client exposes them through
-// per-area groups (Versions / Projects / Tags / Search / Downloads) whose methods return
-// the values; sending goes through the shared ApiOperation pipeline. The JSON readers
-// decode strictly (RespectNullableAnnotations) straight from the response stream through
-// the serializer's stream API and share the status gate; the description endpoint reads
-// plain text and the download streams to disk, each with its own status rule.
+// client (the navigation root whose Options carry the base URL) plus its replayable
+// arguments, and knows how to build its request and read its response. The client exposes
+// them through per-area groups (Versions / Projects / Tags / Search / Downloads) whose
+// methods return the values; sending goes through the shared ApiOperation pipeline. The
+// JSON readers decode strictly (RespectNullableAnnotations) straight from the response
+// stream through the serializer's stream API and share the status gate; the description
+// endpoint reads plain text and the download streams to disk, each with its own status
+// rule. The download's destination file is execution state, not request description — it
+// is parameterized at SendTo time, not bound on the value.
 
 using System.Security.Cryptography;
 using System.Text;
@@ -225,17 +227,19 @@ public readonly record struct ModrinthSearchQuery(ModrinthClient Root, string Se
 
 // ----------------------------------------------------------------------------- downloads
 
-/// <summary>GET a download URL: the body streams into a sibling temp file and the file is
-/// moved into place only after the checksum matched (a null checksum or an unknown
-/// algorithm downloads unchecked), so a failed attempt never leaves a half-written
-/// artifact. The download-meta header rides on the request when the meta carries content.
-/// Resolves to the number of bytes written.</summary>
-public readonly record struct ModrinthFileDownload(ModrinthClient Root, string Url, string DestinationPath,
-    ModrinthDownloadMeta? Meta = null, (string Algorithm, string Hash)? Checksum = null) : IApiOperation<long>
+/// <summary>GET a download URL: the body streams into a sibling temp file next to the
+/// destination and the file is moved into place only after the checksum matched (a null
+/// checksum or an unknown algorithm downloads unchecked), so a failed attempt never leaves
+/// a half-written artifact. The download-meta header rides on the request when the meta
+/// carries content. The destination file is not part of the request — it is the execution
+/// argument of the send and resolves to the number of bytes written.</summary>
+public readonly record struct ModrinthFileDownload(ModrinthClient Root, string Url,
+    ModrinthDownloadMeta? Meta = null, (string Algorithm, string Hash)? Checksum = null)
+    : IApiOperation<string, long>
 {
     public IApiExecutor Executor => Root;
 
-    public HttpRequestMessage CreateRequest()
+    public HttpRequestMessage CreateRequest(string destinationPath)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, Url);
         if (Meta is { } downloadMeta && !downloadMeta.IsEmpty)
@@ -247,12 +251,12 @@ public readonly record struct ModrinthFileDownload(ModrinthClient Root, string U
         return request;
     }
 
-    public async Task<long> ReadResponseAsync(HttpRequestMessage request,
+    public async Task<long> ReadResponseAsync(string destinationPath, HttpRequestMessage request,
         HttpResponseMessage response, Stream body, CancellationToken ct)
     {
         await ApiOperation.EnsureSuccessAsync(request, response, body, ct).ConfigureAwait(false);
 
-        var tempPath = DestinationPath + ".download";
+        var tempPath = destinationPath + ".download";
         try
         {
             long written = 0;
@@ -282,7 +286,7 @@ public readonly record struct ModrinthFileDownload(ModrinthClient Root, string U
                 }
             }
 
-            File.Move(tempPath, DestinationPath, overwrite: true);
+            File.Move(tempPath, destinationPath, overwrite: true);
             return written;
         }
         catch
@@ -368,9 +372,9 @@ public readonly struct ModrinthSearchQueries(ModrinthClient root)
 /// <summary>The download endpoints: CDN files streamed to disk.</summary>
 public readonly struct ModrinthDownloadQueries(ModrinthClient root)
 {
-    /// <summary>GET a download URL into the destination file (checksum-gated temp-file
-    /// commit; resolves to the bytes written).</summary>
-    public ModrinthFileDownload File(string url, string destinationPath,
+    /// <summary>GET a download URL (checksum-gated temp-file commit); the destination file
+    /// is the send's execution argument and the result is the bytes written.</summary>
+    public ModrinthFileDownload File(string url,
         ModrinthDownloadMeta? meta = null, (string Algorithm, string Hash)? checksum = null) =>
-        new(root, url, destinationPath, meta, checksum);
+        new(root, url, meta, checksum);
 }

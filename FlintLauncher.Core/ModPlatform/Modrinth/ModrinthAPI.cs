@@ -329,7 +329,7 @@ public sealed class ModrinthApi(ModrinthClient client, HttpClient http, NetSetti
     /// HashUtils); unknown types download without a check, like the C++ default branch.</summary>
     public Task DownloadModFileAsync(string url, AbsolutePath path, ModrinthDownloadMeta? meta = null,
         string? hashType = null, string? hash = null, CancellationToken cancellationToken = default) =>
-        Client.Downloads.File(url, path.Value, meta, MapChecksum(hashType, hash)).SendTo(cancellationToken);
+        Client.Downloads.File(url, meta, MapChecksum(hashType, hash)).SendTo(path.Value, cancellationToken);
 
     /// <summary>Port of the ChecksumValidator switch: md4/md5 -> MD5, sha1/sha256/sha512 map
     /// directly; anything else (murmur2, unknown) downloads unchecked.</summary>
