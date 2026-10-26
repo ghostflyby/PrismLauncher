@@ -225,7 +225,7 @@ public class ModrinthApiTests : IDisposable
     public async Task CurrentVersion_FetchesByHashAndAlgorithm()
     {
         _server.VersionFiles["cafebabecafebabe"] = """{"version_number":"1.2.3","id":"v1","project_id":"p1","date_published":"2023-01-01T00:00:00Z","game_versions":["1.20.1"],"loaders":["fabric"],"name":"n","version_number":"1.2.3","version_type":"release","files":[]}""";
-        var version = await _api.Client.GetCurrentVersionAsync("cafebabecafebabe", "sha1");
+        var version = await _api.Client.Versions.ByFileHash("cafebabecafebabe", "sha1").SendTo();
 
         Assert.NotNull(version);
         Assert.EndsWith("/version_file/cafebabecafebabe?algorithm=sha1", _server.LastPath);
@@ -237,7 +237,7 @@ public class ModrinthApiTests : IDisposable
     {
         _api.ApiToken = "mrpat_token";
         _server.VersionFiles["cafebabecafebabe"] = """{"id":"v1","project_id":"p1","date_published":"2023-01-01T00:00:00Z","game_versions":["1.20.1"],"loaders":["fabric"],"name":"n","version_number":"1.2.3","version_type":"release","files":[]}""";
-        await _api.Client.GetCurrentVersionAsync("cafebabecafebabe", "sha1");
+        await _api.Client.Versions.ByFileHash("cafebabecafebabe", "sha1").SendTo();
 
         Assert.Equal("mrpat_token", _server.LastHeaders["Authorization"]);
     }
@@ -245,7 +245,7 @@ public class ModrinthApiTests : IDisposable
     [Fact]
     public async Task CurrentVersions_PostsHashList()
     {
-        await _api.Client.GetCurrentVersionsAsync(["hash1", "hash2"], "sha512");
+        await _api.Client.Versions.ByFileHashes(["hash1", "hash2"], "sha512").SendTo();
 
         Assert.EndsWith("/version_files", _server.LastPath);
 

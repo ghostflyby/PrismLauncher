@@ -23,6 +23,7 @@ using System.Text.Json;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using FlintLauncher.ExternalApi;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
@@ -157,7 +158,8 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi modri
             // treated the same as the C++ parse-error path
             if (FallbackMrBlockedMods)
             {
-                var entries = await _modrinth.Client.GetCurrentVersionsAsync(hashes, "sha1", cancellationToken);
+                var entries = await _modrinth.Client.Versions.ByFileHashes(hashes, "sha1")
+                    .SendTo(cancellationToken);
                 foreach (var outFile in toProcess.Files.Values)
                 {
                     var urlValid = Uri.TryCreate(outFile.Version.DownloadUrl, UriKind.Absolute, out _);
@@ -175,7 +177,7 @@ public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthApi modri
                 }
             }
         }
-        catch (Exception e) when (e is HttpRequestException or JsonException)
+        catch (Exception e) when (e is ModrinthApiException)
         {
             // the fallback is best-effort: the sha1-lookup failing must not fail the resolution
         }

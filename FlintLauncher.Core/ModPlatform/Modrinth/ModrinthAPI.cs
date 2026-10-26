@@ -47,9 +47,9 @@ public sealed class ModrinthApi(ModrinthClient client, HttpClient http, NetSetti
 
     // ------------------------------------------------------------------ domain queries
 
-    /// <summary>Domain-arg forwarding to <see cref="ModrinthClient.GetLatestVersionsAsync"/>:
-    /// the batch update check for mod update scanning (the optional release types become the
-    /// body's "version_types" list, #3404).</summary>
+    /// <summary>Domain-arg forwarding to the client's Latest operation: the batch update
+    /// check for mod update scanning (the optional release types become the body's
+    /// "version_types" list, #3404).</summary>
     public Task<Dictionary<string, ModrinthVersion>> GetLatestVersionsAsync(IReadOnlyList<string> hashes,
         string hashFormat,
         IReadOnlyList<McVersion>? mcVersions,
@@ -57,11 +57,10 @@ public sealed class ModrinthApi(ModrinthClient client, HttpClient http, NetSetti
         IReadOnlyList<IndexedVersionType>? releaseTypes = null,
         CancellationToken cancellationToken = default)
     {
-        return Client.GetLatestVersionsAsync(hashes, hashFormat,
+        return Client.Versions.Latest(hashes, hashFormat,
             loaders is { } loaderValue ? NonEmptyOrNull(GetModLoaderStrings(loaderValue)) : null,
             mcVersions is null ? null : NonEmptyOrNull([.. mcVersions.Select(MapMcVersionToModrinth)]),
-            VersionTypesOrNull(releaseTypes),
-            cancellationToken);
+            VersionTypesOrNull(releaseTypes)).SendTo(cancellationToken);
     }
 
     /// <summary>WriteStringList semantics: an empty list is omitted.</summary>

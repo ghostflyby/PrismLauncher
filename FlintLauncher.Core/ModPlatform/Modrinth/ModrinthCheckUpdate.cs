@@ -155,7 +155,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
             entries = await _modrinth.GetLatestVersionsAsync(hashes, _hashType, _gameVersions, loader,
                 _releaseTypes, cancellationToken);
         }
-        catch (Exception e) when (e is HttpRequestException or JsonException)
+        catch (Exception e) when (e is ModrinthApiException)
         {
             await CheckNextLoader(cancellationToken);
             return;

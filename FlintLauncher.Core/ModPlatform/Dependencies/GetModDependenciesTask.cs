@@ -223,11 +223,11 @@ public class GetModDependenciesTask : SequentialTask
                 }
                 else
                 {
-                    var dto = await _modrinth.Client.GetProjectAsync(pDep.Pack.AddonId, cancellationToken);
+                    var dto = await _modrinth.Client.Projects.ById(pDep.Pack.AddonId).SendTo(cancellationToken);
                     ModrinthPackIndex.LoadIndexedPack(pDep.Pack, dto);
                 }
             }
-            catch (Exception e) when (e is HttpRequestException or JsonException)
+            catch (Exception e) when (e is HttpRequestException or JsonException or ModrinthApiException)
             {
                 // (upstream logs the parse error / the error cause)
                 RemovePack(pDep.Pack.AddonId);
@@ -344,11 +344,11 @@ public class GetModDependenciesTask : SequentialTask
                 try
                 {
                     dtos = dep.Version.Length != 0
-                        ? [await _modrinth.Client.GetVersionAsync(dep.Version, cancellationToken)]
-                        : await _modrinth.Client.GetVersionListAsync(_modrinth.GetDependencyUrl(args),
-                            cancellationToken);
+                        ? [await _modrinth.Client.Versions.ById(dep.Version).SendTo(cancellationToken)]
+                        : await _modrinth.Client.Versions.At(_modrinth.GetDependencyUrl(args))
+                            .SendTo(cancellationToken);
                 }
-                catch (Exception e) when (e is HttpRequestException or JsonException)
+                catch (Exception e) when (e is ModrinthApiException)
                 {
                     RemovePack(pDep.Pack.AddonId);
                     throw;

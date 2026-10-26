@@ -132,9 +132,9 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             ModrinthProject dto;
             try
             {
-                dto = await _modrinth.Client.GetProjectAsync(projectId, cancellationToken);
+                dto = await _modrinth.Client.Projects.ById(projectId).SendTo(cancellationToken);
             }
-            catch (Exception e) when (e is HttpRequestException or JsonException)
+            catch (Exception e) when (e is ModrinthApiException)
             {
                 throw new ModResolveException($"fetching the Modrinth project {projectId} failed: {e.Message}");
             }
@@ -186,9 +186,9 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             ModrinthVersion dto;
             try
             {
-                dto = await _modrinth.Client.GetVersionAsync(versionId, cancellationToken);
+                dto = await _modrinth.Client.Versions.ById(versionId).SendTo(cancellationToken);
             }
-            catch (Exception e) when (e is HttpRequestException or JsonException)
+            catch (Exception e) when (e is ModrinthApiException)
             {
                 throw new ModResolveException($"fetching the Modrinth version {versionId} failed: {e.Message}");
             }
@@ -249,9 +249,9 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         List<ModrinthVersion> dtos;
         try
         {
-            dtos = await _modrinth.Client.GetVersionListAsync(versionsUrl, cancellationToken);
+            dtos = await _modrinth.Client.Versions.At(versionsUrl).SendTo(cancellationToken);
         }
-        catch (Exception e) when (e is HttpRequestException or JsonException)
+        catch (Exception e) when (e is ModrinthApiException)
         {
             throw new ModResolveException($"fetching the version list of {pack.AddonId} failed: {e.Message}");
         }

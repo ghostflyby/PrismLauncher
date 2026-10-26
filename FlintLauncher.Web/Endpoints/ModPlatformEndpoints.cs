@@ -152,9 +152,9 @@ public static class ModPlatformEndpoints
             List<ModrinthCategory>? modrinthCategories;
             try
             {
-                modrinthCategories = await modrinth.Client.GetCategoriesAsync(cancellationToken);
+                modrinthCategories = await modrinth.Client.Tags.Categories().SendTo(cancellationToken);
             }
-            catch (Exception e) when (e is HttpRequestException or JsonException)
+            catch (Exception e) when (e is ModrinthApiException)
             {
                 return ApiJson.Error("modrinth_unavailable",
                     $"modrinth categories failed: {e.Message}", 502);
@@ -185,8 +185,16 @@ public static class ModPlatformEndpoints
                 }
                 else
                 {
-                    // the Modrinth body endpoint answers with plain text
-                    body = await modrinth.Client.GetProjectDescriptionAsync(projectId, cancellationToken);
+                    // the Modrinth body endpoint answers with plain text; a failed fetch
+                    // degrades to an empty body (the endpoint's own status rule)
+                    try
+                    {
+                        body = await modrinth.Client.Projects.Description(projectId).SendTo(cancellationToken);
+                    }
+                    catch (ModrinthApiException)
+                    {
+                        body = "";
+                    }
                 }
 
                 return Results.Ok(new ProviderBodyView(body));
@@ -279,9 +287,9 @@ public static class ModPlatformEndpoints
                 List<ModrinthVersion> versionDtos;
                 try
                 {
-                    versionDtos = await modrinth.Client.GetVersionListAsync(versionsUrl);
+                    versionDtos = await modrinth.Client.Versions.At(versionsUrl).SendTo();
                 }
-                catch (Exception e) when (e is HttpRequestException or JsonException)
+                catch (Exception e) when (e is ModrinthApiException)
                 {
                     return ApiJson.Error("modrinth_unavailable",
                         $"{provider} version list failed: {e.Message}", 502);
@@ -707,9 +715,9 @@ public static class ModPlatformEndpoints
         ModrinthSearchResults search;
         try
         {
-            search = await modrinth.Client.GetSearchResultsAsync(url, cancellationToken);
+            search = await modrinth.Client.Search.At(url).SendTo(cancellationToken);
         }
-        catch (Exception e) when (e is HttpRequestException or JsonException)
+        catch (Exception e) when (e is ModrinthApiException)
         {
             return ApiJson.Error("modrinth_unavailable", $"modrinth search failed: {e.Message}", 502);
         }

@@ -154,8 +154,8 @@ public sealed class ModrinthPackExportTask(
         }
 
         EmitStatus("Finding versions for hashes...");
-        var entries = await _modrinth.Client.GetCurrentVersionsAsync(_pendingHashes.Values.ToList(), "sha512",
-            cancellationToken);
+        var entries = await _modrinth.Client.Versions
+            .ByFileHashes(_pendingHashes.Values.ToList(), "sha512").SendTo(cancellationToken);
 
         ParseApiResponse(entries);
         BuildZip();
