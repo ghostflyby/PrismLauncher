@@ -49,4 +49,18 @@ public class ParseUtilsTests
         Assert.Equal(17, parsed.Value.Day);
         Assert.Equal(15, parsed.Value.Hour);
     }
+
+    [Theory]
+    [InlineData(5, 30, "2016-02-17T15:23:19+05:30")]
+    [InlineData(-8, 0, "2016-02-17T15:23:19-08:00")]
+    [InlineData(0, 0, "2016-02-17T15:23:19+00:00")]
+    [InlineData(-3, -30, "2016-02-17T15:23:19-03:30")]
+    public void TimeToS3Time_RendersTheOffset(int offsetHours, int offsetMinutes,
+        string expected)
+    {
+        var time = new DateTimeOffset(2016, 2, 17, 15, 23, 19,
+            new TimeSpan(offsetHours, offsetMinutes, 0));
+
+        Assert.Equal(expected, ParseUtils.TimeToS3Time(time));
+    }
 }
