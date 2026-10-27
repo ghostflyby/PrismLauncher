@@ -34,7 +34,7 @@ public class ResourceDownloadTaskTests : IDisposable
     public ResourceDownloadTaskTests()
     {
         Directory.CreateDirectory(_root);
-        (_modrinth, _http, _) = TestModrinthApi.At(_server.Url);
+        (_modrinth, _http) = TestModrinthApi.At(_server.Url);
     }
 
     public void Dispose()

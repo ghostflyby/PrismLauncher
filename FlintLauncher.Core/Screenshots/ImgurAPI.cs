@@ -64,14 +64,12 @@ public sealed record ImgurDataJson(
 internal sealed partial class ImgurJsonContext : JsonSerializerContext;
 
 /// <summary>Port of the ImgurAPI namespace: the two imgur request factories. An instance
-/// rides the injected client pair (LauncherRuntime.Imgur — same de-singletoning story as the
+/// rides the injected client (LauncherRuntime.Imgur — same de-singletoning story as the
 /// platform clients); the tasks it builds send through that stack's client.</summary>
-public sealed class ImgurApi(HttpClient http, NetSettings settings)
+public sealed class ImgurApi(HttpClient http)
 {
     /// <summary>The network stack this client's uploads flow through.</summary>
     public HttpClient Http { get; } = http;
-
-    public NetSettings Settings { get; } = settings;
 
     /// <summary>Port of ImgurAPI::AlbumResult.</summary>
     public sealed record AlbumResult
@@ -88,13 +86,13 @@ public sealed class ImgurApi(HttpClient http, NetSettings settings)
 
     /// <summary>Port of ImgurAPI::makeUpload: upload one screenshot as an image.</summary>
     public ImgurUpload MakeUpload(ScreenShot shot, string? baseUrl = null, string? clientId = null) =>
-        new(shot, Http, Settings, baseUrl, clientId);
+        new(shot, Http, baseUrl, clientId);
 
     /// <summary>Port of ImgurAPI::makeAlbum: group uploaded screenshots into an album
     /// (the payload needs the delete hashes left by the earlier uploads).</summary>
     public ImgurAlbumCreation MakeAlbum(AlbumResult result, IReadOnlyList<ScreenShot> screenshots,
         string? baseUrl = null, string? clientId = null) =>
-        new(result, screenshots, Http, Settings, baseUrl, clientId);
+        new(result, screenshots, Http, baseUrl, clientId);
 }
 
 /// <summary>The upload half of ImgurAPI::makeUpload (the Net::Request + RPC::Sink&lt;QString&gt;
@@ -102,14 +100,12 @@ public sealed class ImgurApi(HttpClient http, NetSettings settings)
 public sealed class ImgurUpload(
     ScreenShot shot,
     HttpClient http,
-    NetSettings settings,
     string? baseUrl = null,
     string? clientId = null)
     : FlintTask
 {
     private readonly string _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
     private readonly HttpClient _http = http;
-    private readonly NetSettings _settings = settings;
 
     /// <summary>The imgur endpoint: BuildConfig.IMGUR_BASE_URL + "image".</summary>
     public string EndpointUrl
@@ -140,12 +136,11 @@ public sealed class ImgurUpload(
         message.Content = new ByteArrayContent(body);
         message.Content.Headers.TryAddWithoutValidation("Content-Type", "multipart/form-data; boundary=" + boundary);
 
-        // the inactivity window (RequestTimeout): the persistent client carries no
-        // total-duration timeout, so every direct sender arms its own
-        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutSource.CancelAfter(_settings.Current.RequestTimeout);
+        // the inactivity window (RequestTimeout): the transport's retry gate arms it with
+        // its configured length and covers the send with it
+        using var window = new RetryHandler.Window(message, cancellationToken);
         using var response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken).ConfigureAwait(false);
+            window.Token).ConfigureAwait(false);
         var statusCode = (int)response.StatusCode;
         string responseBody;
         try
@@ -230,14 +225,12 @@ public sealed class ImgurAlbumCreation(
     ImgurApi.AlbumResult result,
     IReadOnlyList<ScreenShot> screenshots,
     HttpClient http,
-    NetSettings settings,
     string? baseUrl = null,
     string? clientId = null)
     : FlintTask
 {
     private readonly string _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
     private readonly HttpClient _http = http;
-    private readonly NetSettings _settings = settings;
 
     /// <summary>The imgur endpoint: BuildConfig.IMGUR_BASE_URL + "album".</summary>
     public string EndpointUrl
@@ -260,12 +253,11 @@ public sealed class ImgurAlbumCreation(
         message.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(data));
         message.Content.Headers.TryAddWithoutValidation("Content-Type", "application/x-www-form-urlencoded");
 
-        // the inactivity window (RequestTimeout): the persistent client carries no
-        // total-duration timeout, so every direct sender arms its own
-        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutSource.CancelAfter(_settings.Current.RequestTimeout);
+        // the inactivity window (RequestTimeout): the transport's retry gate arms it with
+        // its configured length and covers the send with it
+        using var window = new RetryHandler.Window(message, cancellationToken);
         using var response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken).ConfigureAwait(false);
+            window.Token).ConfigureAwait(false);
         var statusCode = (int)response.StatusCode;
         string responseBody;
         try

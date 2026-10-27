@@ -150,7 +150,7 @@ public sealed partial class AtLauncherPackInstallTask(
         string configs;
         try
         {
-            configs = await FlintHttp.GetStringAsync(_api.Http, _api.Settings,
+            configs = await FlintHttp.GetStringAsync(_api.Http,
                 new HttpRequestMessage(HttpMethod.Get, _api.PackConfigsUrl(PackSafeName, VersionName)),
                 cancellationToken);
         }
@@ -701,13 +701,13 @@ public sealed partial class AtLauncherPackInstallTask(
         {
             var entry = MetaCache.ResolveEntry("ATLauncherPacks", path);
             entry.IsStale = true;
-            dl = HttpDownloadTask.Cached(MetaCache, new Uri(url), entry, http: _api.Http, settings: _api.Settings);
+            dl = HttpDownloadTask.Cached(MetaCache, new Uri(url), entry, http: _api.Http);
             _archivePath = entry.GetFullPath();
         }
         else
         {
             _archivePath = TempCachePath(path);
-            dl = HttpDownloadTask.ToFile(new Uri(url), _archivePath, http: _api.Http, settings: _api.Settings);
+            dl = HttpDownloadTask.ToFile(new Uri(url), _archivePath, http: _api.Http);
         }
 
         if (Configs.Configs.Sha1.Length != 0)
@@ -973,12 +973,12 @@ public sealed partial class AtLauncherPackInstallTask(
             var entry = MetaCache.ResolveEntry("ATLauncherPacks", cacheName);
             entry.IsStale = true;
             cachePath = entry.GetFullPath();
-            dl = HttpDownloadTask.Cached(MetaCache, new Uri(url), entry, http: _api.Http, settings: _api.Settings);
+            dl = HttpDownloadTask.Cached(MetaCache, new Uri(url), entry, http: _api.Http);
         }
         else
         {
             cachePath = TempCachePath(cacheName);
-            dl = HttpDownloadTask.ToFile(new Uri(url), cachePath, http: _api.Http, settings: _api.Settings);
+            dl = HttpDownloadTask.ToFile(new Uri(url), cachePath, http: _api.Http);
         }
 
         if (mod.Md5.Length != 0)

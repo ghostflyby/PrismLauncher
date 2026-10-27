@@ -8,7 +8,7 @@
 //
 // BuildConfig.ATL_DOWNLOAD_SERVER_URL / ATL_API_BASE_URL became injected instance state:
 // DownloadServerUrl / ApiBaseUrl are per-instance (tests construct their own client pointed
-// at a stub); the client rides the injected persistent client pair (LauncherRuntime.AtLauncher — see the
+// at a stub); the client rides the injected persistent client (LauncherRuntime.AtLauncher — see the
 // Modrinth/Flame/Technic de-singletoning for the same story). The parsers are pure helpers
 // and stay static; the wire shapes deserialize through the source-generated
 // AtLauncherJsonContext (the ATL models carry their own annotations; the document parse of
@@ -30,7 +30,7 @@ namespace FlintLauncher.Core.ModPlatform.AtLauncher;
 [JsonSerializable(typeof(PackVersion))]
 internal sealed partial class AtLauncherJsonContext : JsonSerializerContext;
 
-public sealed class AtLauncherApi(HttpClient http, NetSettings settings)
+public sealed class AtLauncherApi(HttpClient http)
 {
     /// <summary>BuildConfig.ATL_DOWNLOAD_SERVER_URL (per-instance; tests construct a client
     /// pointed at their stub).</summary>
@@ -42,7 +42,6 @@ public sealed class AtLauncherApi(HttpClient http, NetSettings settings)
     /// <summary>The network stack this client's requests go through.</summary>
     public HttpClient Http { get; } = http;
 
-    public NetSettings Settings { get; } = settings;
 
     // ------------------------------------------------------------------ URL builders
 
@@ -68,12 +67,12 @@ public sealed class AtLauncherApi(HttpClient http, NetSettings settings)
     /// <summary>makeByteArray(packsnew.json); failures surface as
     /// <see cref="FlintHttpException"/> (the old NetRequest status gate).</summary>
     public Task<string> FetchPackIndexAsync(CancellationToken cancellationToken = default) =>
-        FlintHttp.GetStringAsync(Http, Settings,
+        FlintHttp.GetStringAsync(Http,
             new HttpRequestMessage(HttpMethod.Get, PackIndexUrl()), cancellationToken);
 
     /// <summary>makeByteArray(share-codes/{code}) (AtlOptionalModListModel::useShareCode).</summary>
     public Task<string> FetchShareCodeAsync(string code, CancellationToken cancellationToken = default) =>
-        FlintHttp.GetStringAsync(Http, Settings,
+        FlintHttp.GetStringAsync(Http,
             new HttpRequestMessage(HttpMethod.Get, ShareCodeUrl(code)), cancellationToken);
 
     // ------------------------------------------------------------------ parsers

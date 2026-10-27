@@ -26,7 +26,7 @@ namespace FlintLauncher.Tests;
 [Collection("FlameApi")]
 public class FlintApiFlameResourceTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new(TestNet.Http, TestNet.Settings);
+    private readonly FlameApi _flameApi = new(TestNet.Http);
     private readonly StubFlameServer _server = new();
 
     public FlintApiFlameResourceTests()

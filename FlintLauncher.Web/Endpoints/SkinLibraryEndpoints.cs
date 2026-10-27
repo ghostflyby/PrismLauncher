@@ -18,7 +18,6 @@
 
 using System.Diagnostics.CodeAnalysis;
 using FlintLauncher.Core.Auth;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Skins;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
@@ -112,7 +111,7 @@ public static class SkinLibraryEndpoints
         // texture; the model override picks classic/slim, defaulting to the stored variant
         api.MapPost("/skins/{name}/apply", async Task<IResult> (string name,
             SkinApplyRequest? request, SkinsLibrary skins, AccountList accounts,
-            AuthEndpointsOptions auth, HttpClient http, NetSettings settings) =>
+            AuthEndpointsOptions auth, HttpClient http) =>
         {
             if (string.IsNullOrWhiteSpace(request?.ProfileId))
             {
@@ -141,7 +140,7 @@ public static class SkinLibraryEndpoints
 
             var account = accounts.At(index);
             var variant = ParseVariant(request.Model) ?? (skin.Model == SkinModelKind.Slim ? "slim" : "classic");
-            var upload = SkinUpload.Make(account.AccessToken(), texture, variant, auth, http, settings);
+            var upload = SkinUpload.Make(account.AccessToken(), texture, variant, auth, http);
             await upload.StartAsync();
             return upload.WasSuccessful
                 ? Results.NoContent()

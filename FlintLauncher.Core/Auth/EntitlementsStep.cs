@@ -37,7 +37,7 @@ public sealed class EntitlementsStep(AccountData data, AuthEndpointsOptions? aut
             Url = new Uri(url),
             Headers = headers,
             AutoRetry = true,
-        }, _auth.Http, _auth.Settings, cancellationToken).ConfigureAwait(false);
+        }, _auth.Http, cancellationToken).ConfigureAwait(false);
 
         // TODO: check presence of same entitlementsRequestId?
         // TODO: validate JWTs?

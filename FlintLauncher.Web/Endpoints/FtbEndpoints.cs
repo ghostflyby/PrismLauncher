@@ -82,8 +82,7 @@ public static class FtbEndpoints
 
         // -------------------------------------------------- modplatform/ftb/install
         api.MapPost("/modplatform/ftb/install", async Task<IResult> (
-            FtbInstallRequest request, FtbApi ftbApi, ModrinthClient modrinth, HttpClient http, NetSettings settings,
-            FlameApi flame, InstanceList instances, InstanceMutationLock instanceLock) =>
+            FtbInstallRequest request, FtbApi ftbApi, ModrinthClient modrinth, HttpClient http, FlameApi flame, InstanceList instances, InstanceMutationLock instanceLock) =>
         {
             if (request.PackId <= 0)
             {
@@ -138,7 +137,7 @@ public static class FtbEndpoints
                         ? pack.Versions[0].Name
                         : "";
 
-                var task = new FtbPackInstallTask(pack, versionName, modrinth, http, settings, flame, ftb)
+                var task = new FtbPackInstallTask(pack, versionName, modrinth, http, flame, ftb)
                 {
                     Group = request.Group ?? "",
                 };
@@ -207,7 +206,7 @@ public static class FtbEndpoints
 
         // the FTB URL builders concatenate "/modpack/..." onto the base, so unlike the
         // ATLauncher one this derived base must NOT carry a trailing slash
-        return new FtbApi(ftb.Http, ftb.Settings) { BaseUrl = trimmed.TrimEnd('/') };
+        return new FtbApi(ftb.Http) { BaseUrl = trimmed.TrimEnd('/') };
     }
 
     /// <summary>Fetch + parse /modpack/{id} (the shared logic of the two GET endpoints) and

@@ -31,7 +31,6 @@ public sealed class ArchiveDownloadTask(
     Uri url,
     AbsolutePath finalPath,
     HttpClient http,
-    NetSettings settings,
     string checksumType = "",
     string checksumHash = "",
     HttpMetaCache? cache = null)
@@ -55,7 +54,7 @@ public sealed class ArchiveDownloadTask(
         {
             string a1 = $"flint-java-{Guid.NewGuid():N}-{FileName()}";
             fullPath = Temporary.CreateTempFolder() / a1;
-            action = HttpDownloadTask.ToFile(url, fullPath, http, settings);
+            action = HttpDownloadTask.ToFile(url, fullPath, http);
             tempDownload = true;
         }
 

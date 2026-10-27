@@ -89,7 +89,7 @@ public sealed class FlameCheckUpdate(
             string versionsBody;
             try
             {
-                versionsBody = await FlintHttp.GetStringAsync(_flame.Http, _flame.Settings,
+                versionsBody = await FlintHttp.GetStringAsync(_flame.Http,
                     new HttpRequestMessage(HttpMethod.Get, versionsUrl), cancellationToken);
             }
             catch (FlintHttpException)

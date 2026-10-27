@@ -333,7 +333,6 @@ public class ExtractNativesTests
             Temporary.SystemTempDirectory() / $"flint-asset-indexes-{Guid.NewGuid():N}" / "metacache.json")
         {
             Http = TestNet.Http,
-            Settings = TestNet.Settings,
         };
         instanceCache.AddBase("asset_indexes", new AbsolutePath(Path.Combine(assetsRoot.Root, "indexes")));
         instance.MetaCache = instanceCache;
@@ -356,7 +355,6 @@ public class ExtractNativesTests
             },
             LoggerFactory = NullLoggerFactory.Instance,
             Http = TestNet.Http,
-            Settings = TestNet.Settings,
             ResourceUrlOverride = server.Url + "/objects/",
         };
         try

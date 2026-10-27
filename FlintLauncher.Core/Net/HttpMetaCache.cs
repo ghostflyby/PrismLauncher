@@ -147,23 +147,16 @@ public sealed class HttpMetaCache(AbsolutePath path) : IDisposable
     private readonly Dictionary<string, AbsolutePath> _basePaths = new(StringComparer.Ordinal);
     private Timer? _saveTimer;
     private HttpClient? _http;
-    private NetSettings? _settings;
 
-    /// <summary>The client and settings the cached downloads (<see cref="HttpDownloadTask.Cached"/>)
-    /// ride when the caller names none: the cache is the download plane — where a fetch lands
-    /// and through which client it travels. The composition root wires its shared, persistent
+    /// <summary>The client the cached downloads (<see cref="HttpDownloadTask.Cached"/>) ride
+    /// when the caller names none: the cache is the download plane — where a fetch lands and
+    /// through which client it travels. The composition root wires its shared, persistent
     /// client; unset falls back to a private default client, which keeps a bare fixture
     /// working without process-global state.</summary>
     public HttpClient Http
     {
-        get => _http ??= NetPrimaryHandler.CreateClient(Settings);
+        get => _http ??= NetPrimaryHandler.CreateClient();
         init => _http = value;
-    }
-
-    public NetSettings Settings
-    {
-        get => _settings ??= NetSettings.CreateDefault();
-        init => _settings = value;
     }
 
     public void Dispose()
@@ -181,9 +174,9 @@ public sealed class HttpMetaCache(AbsolutePath path) : IDisposable
     /// <see cref="Load"/> once the roots are final (after the legacy remount). The one base
     /// table the host and the fixtures share; the cached downloads ride the named client
     /// pair.</summary>
-    public static HttpMetaCache ForRoots(FlintPaths paths, HttpClient http, NetSettings settings)
+    public static HttpMetaCache ForRoots(FlintPaths paths, HttpClient http)
     {
-        var cache = new HttpMetaCache(paths.MetacacheFile) { Http = http, Settings = settings };
+        var cache = new HttpMetaCache(paths.MetacacheFile) { Http = http };
         cache.AddBase("meta", paths.MetaDir);
         cache.AddBase("libraries", paths.LibrariesRoot);
         cache.AddBase("assets", paths.AssetsRoot);

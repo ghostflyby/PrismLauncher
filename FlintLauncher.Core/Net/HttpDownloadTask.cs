@@ -40,7 +40,6 @@ public enum RequestOptions
 public sealed class HttpDownloadTask(
     Uri url,
     HttpClient http,
-    NetSettings settings,
     AbsolutePath target,
     RequestOptions options = RequestOptions.NoOptions,
     byte[]? postData = null,
@@ -48,7 +47,6 @@ public sealed class HttpDownloadTask(
     : FlintTask
 {
     private readonly HttpClient _http = http;
-    private readonly NetSettings _settings = settings;
     private readonly byte[]? _postData = postData;
 
     private readonly List<Validator> _validators = [];
@@ -75,13 +73,13 @@ public sealed class HttpDownloadTask(
     /// success. The MD5 validator (the entry bookkeeping's own) is wired here; callers add
     /// their content validators on top.</summary>
     public static HttpDownloadTask Cached(HttpMetaCache cache, Uri url, MetaEntry entry,
-        RequestOptions options = RequestOptions.NoOptions, HttpClient? http = null, NetSettings? settings = null)
+        RequestOptions options = RequestOptions.NoOptions, HttpClient? http = null)
     {
         // the md5 node is bookkeeping only (the C++ MetaCacheSink created it with no
         // expected value): seeding it from the ledger would fail every refresh of changed
         // content and consume the hash before the bookkeeping can record the new sum
         var checksum = new ChecksumValidator(HashAlgorithmName.MD5);
-        var task = new HttpDownloadTask(url, http ?? cache.Http, settings ?? cache.Settings,
+        var task = new HttpDownloadTask(url, http ?? cache.Http,
             entry.GetFullPath(), options | RequestOptions.AcceptLocalFiles)
         {
             MetaCache = cache,
@@ -93,9 +91,9 @@ public sealed class HttpDownloadTask(
     }
 
     /// <summary>Port of Net::Request::makeFile.</summary>
-    public static HttpDownloadTask ToFile(Uri url, AbsolutePath path, HttpClient http, NetSettings settings,
+    public static HttpDownloadTask ToFile(Uri url, AbsolutePath path, HttpClient http,
         RequestOptions options = RequestOptions.NoOptions) =>
-        new(url, http, settings, path, options);
+        new(url, http, path, options);
 
     private ChecksumValidator? _md5;
 
@@ -103,15 +101,12 @@ public sealed class HttpDownloadTask(
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        var requestTimeout = _settings.Current.RequestTimeout;
-        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-
-        void ArmIdleTimer()
-        {
-            // RequestTimeout port (QNetworkReply::setTransferTimeout): an inactivity window;
-            // CancelAfter replaces the pending delay on each re-arm
-            timeoutSource.CancelAfter(requestTimeout);
-        }
+        // RequestTimeout port (QNetworkReply::setTransferTimeout): an inactivity window, not
+        // a total duration. The transport's retry gate arms the window for the send; every
+        // chunk read below renews it, so a steady transfer runs unbounded and only a real
+        // stall fails.
+        using var message = new HttpRequestMessage(HttpMethod.Get, Url);
+        using var window = new RetryHandler.Window(message, cancellationToken);
 
         try
         {
@@ -121,7 +116,6 @@ public sealed class HttpDownloadTask(
                 return;
             }
 
-            using var message = new HttpRequestMessage(HttpMethod.Get, Url);
             if (CachedEntry is { } entry && !entry.IsStale && (HasTargetData() || entry.Md5Sum.Length > 0))
             {
                 if (entry.Etag.Length > 0)
@@ -137,11 +131,9 @@ public sealed class HttpDownloadTask(
 
             message.Options.Set(RetryHandler.ManualRetryOption, true);
             message.Options.Set(RetryHandler.AutoRetryOption, options.HasFlag(RequestOptions.AutoRetry));
-            message.Options.Set(RetryHandler.TimeoutSourceOption, timeoutSource);
 
-            ArmIdleTimer();
             using var response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
-                timeoutSource.Token).ConfigureAwait(false);
+                window.Token).ConfigureAwait(false);
 
             var statusCode = (int)response.StatusCode;
             if (statusCode == 304 && HasTargetData())
@@ -184,8 +176,8 @@ public sealed class HttpDownloadTask(
             {
                 while (true)
                 {
-                    ArmIdleTimer();
-                    var read = await stream.ReadAsync(buffer, timeoutSource.Token).ConfigureAwait(false);
+                    window.Progress();
+                    var read = await stream.ReadAsync(buffer, window.Token).ConfigureAwait(false);
                     if (read == 0)
                     {
                         break;
@@ -220,14 +212,13 @@ public sealed class HttpDownloadTask(
 
             EmitSucceeded();
         }
-        catch (OperationCanceledException) when (timeoutSource.IsCancellationRequested &&
-                                                 !cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (window.TimedOut)
         {
             // our inactivity timer fired mid-transfer (the header phase is covered by the
             // transport's manual-retry gate via the option above; this late conversion is
             // the task-level failure surface — a stalled body fails after one window)
             CancelWriting();
-            Fail($"transfer timed out: no data for {requestTimeout.TotalSeconds:F0} seconds (RequestTimeout)");
+            Fail(window.TimeoutMessage);
         }
         catch (Exception)
         {

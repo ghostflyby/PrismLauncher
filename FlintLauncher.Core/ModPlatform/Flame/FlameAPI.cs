@@ -47,7 +47,7 @@ public sealed record FlameStringEnvelopeJson(
 [JsonSerializable(typeof(FlameStringEnvelopeJson))]
 internal sealed partial class FlameJsonContext : JsonSerializerContext;
 
-public sealed class FlameApi(HttpClient http, NetSettings settings) : ResourceApi
+public sealed class FlameApi(HttpClient http) : ResourceApi
 {
     /// <summary>BuildConfig.FLAME_BASE_URL (per-instance; tests construct a client pointed
     /// at their stub).</summary>
@@ -65,7 +65,6 @@ public sealed class FlameApi(HttpClient http, NetSettings settings) : ResourceAp
     /// <summary>The network stack this client's requests go through.</summary>
     public override HttpClient Http { get; } = http;
 
-    public override NetSettings Settings { get; } = settings;
 
     // ------------------------------------------------------------------ requests
 
@@ -78,7 +77,7 @@ public sealed class FlameApi(HttpClient http, NetSettings settings) : ResourceAp
         var body = new FlameFingerprintsRequest(
             [.. fingerprints.Select(fp => fp.ToString(CultureInfo.InvariantCulture))]);
         var bodyRaw = JsonSerializer.SerializeToUtf8Bytes(body, FlameJsonContext.Default.FlameFingerprintsRequest);
-        return FlintHttp.GetStringAsync(Http, Settings,
+        return FlintHttp.GetStringAsync(Http,
             BuildRequest(HttpMethod.Post, $"{BaseUrl}/fingerprints", bodyRaw), cancellationToken);
     }
 
@@ -90,7 +89,7 @@ public sealed class FlameApi(HttpClient http, NetSettings settings) : ResourceAp
         string body;
         try
         {
-            body = await FlintHttp.GetStringAsync(Http, Settings,
+            body = await FlintHttp.GetStringAsync(Http,
                 BuildRequest(HttpMethod.Get, $"{BaseUrl}/mods/{modId}/files/{fileId}/changelog"),
                 cancellationToken);
         }
@@ -116,7 +115,7 @@ public sealed class FlameApi(HttpClient http, NetSettings settings) : ResourceAp
         string body;
         try
         {
-            body = await FlintHttp.GetStringAsync(Http, Settings,
+            body = await FlintHttp.GetStringAsync(Http,
                 BuildRequest(HttpMethod.Get, $"{BaseUrl}/mods/{modId}/description"), cancellationToken);
         }
         catch (FlintHttpException)
@@ -141,14 +140,14 @@ public sealed class FlameApi(HttpClient http, NetSettings settings) : ResourceAp
     {
         var body = new FlameModsRequest([.. addonIds]);
         var bodyRaw = JsonSerializer.SerializeToUtf8Bytes(body, FlameJsonContext.Default.FlameModsRequest);
-        return FlintHttp.GetStringAsync(Http, Settings,
+        return FlintHttp.GetStringAsync(Http,
             BuildRequest(HttpMethod.Post, $"{BaseUrl}/mods", bodyRaw), cancellationToken);
     }
 
     /// <summary>Port of ResourceAPI::getProject for Flame (GET /mods/{id}; the single-project
     /// variant the callers use when only one id is needed).</summary>
     public Task<string> GetProjectAsync(string addonId, CancellationToken cancellationToken = default) =>
-        FlintHttp.GetStringAsync(Http, Settings,
+        FlintHttp.GetStringAsync(Http,
             BuildRequest(HttpMethod.Get, GetInfoUrl(addonId)), cancellationToken);
 
     /// <summary>Port of FlameAPI::getFiles (POST /mods/files, multiple file ids).</summary>
@@ -157,14 +156,14 @@ public sealed class FlameApi(HttpClient http, NetSettings settings) : ResourceAp
     {
         var body = new FlameFilesRequest([.. fileIds]);
         var bodyRaw = JsonSerializer.SerializeToUtf8Bytes(body, FlameJsonContext.Default.FlameFilesRequest);
-        return FlintHttp.GetStringAsync(Http, Settings,
+        return FlintHttp.GetStringAsync(Http,
             BuildRequest(HttpMethod.Post, $"{BaseUrl}/mods/files", bodyRaw), cancellationToken);
     }
 
     /// <summary>Port of FlameAPI::getFile (GET /mods/{addonId}/files/{fileId}).</summary>
     public Task<string> GetFileAsync(string addonId, string fileId,
         CancellationToken cancellationToken = default) =>
-        FlintHttp.GetStringAsync(Http, Settings,
+        FlintHttp.GetStringAsync(Http,
             BuildRequest(HttpMethod.Get, $"{BaseUrl}/mods/{addonId}/files/{fileId}"), cancellationToken);
 
     /// <summary>Port of FlameAPI::getCategories (GET /categories?gameId=432&amp;classId=...).</summary>
@@ -177,7 +176,7 @@ public sealed class FlameApi(HttpClient http, NetSettings settings) : ResourceAp
     /// CurseForge classId that may not have a ResourceType in the map above).</summary>
     public Task<string> GetCategoriesForClassIdAsync(int classId,
         CancellationToken cancellationToken = default) =>
-        FlintHttp.GetStringAsync(Http, Settings,
+        FlintHttp.GetStringAsync(Http,
             BuildRequest(HttpMethod.Get, $"{BaseUrl}/categories?gameId=432&classId={classId}"),
             cancellationToken);
 

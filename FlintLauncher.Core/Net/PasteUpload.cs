@@ -27,7 +27,7 @@
 //
 // Deviations:
 //  - Upstream is a Net::Request subclass posting through QNetworkAccessManager; the port is a
-//    FlintTask sending the identical request through an injected client pair (like
+//    FlintTask sending the identical request through an injected client (like
 //    Skins/SkinUpload.cs), because the plain fetch helper cannot express multipart/JSON Content-Type headers.
 //  - The C++ constructor anonymizes the log in place (logs/AnonymizeLog.cpp); the port applies
 //    the same seven rules in AnonymizeLog() before the request is built.
@@ -91,19 +91,17 @@ public sealed class PasteUpload : FlintTask
     private readonly string _baseUrl;
     private readonly PasteType _pasteType;
     private readonly HttpClient _http;
-    private readonly NetSettings _settings;
 
     /// <summary>Port of PasteUpload::PasteUpload(log, url, pasteType): anonymizes the log,
     /// falls back to the provider default base when url is empty and resolves the request URL
     /// (with the paste.gg api subdomain HACK kept verbatim). The request rides the injected
-    /// client pair (the host's; tests isolate their own).</summary>
-    public PasteUpload(string log, string url, PasteType pasteType, HttpClient http, NetSettings settings)
+    /// client (the host's; tests isolate their own).</summary>
+    public PasteUpload(string log, string url, PasteType pasteType, HttpClient http)
     {
         _log = AnonymizeLog(log);
         _baseUrl = url;
         _pasteType = pasteType;
         _http = http;
-        _settings = settings;
 
         var @base = PasteTypes[(int)pasteType];
         if (string.IsNullOrEmpty(_baseUrl))
@@ -138,12 +136,11 @@ public sealed class PasteUpload : FlintTask
         HttpResponseMessage response;
         try
         {
-            // the inactivity window (RequestTimeout): the persistent client carries no
-            // total-duration timeout, so every direct sender arms its own
-            using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutSource.CancelAfter(_settings.Current.RequestTimeout);
+            // the inactivity window (RequestTimeout): the transport's retry gate arms it
+            // with its configured length and covers the send with it
+            using var window = new RetryHandler.Window(request, cancellationToken);
             response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead,
-                timeoutSource.Token).ConfigureAwait(false);
+                window.Token).ConfigureAwait(false);
         }
         catch (HttpRequestException e)
         {

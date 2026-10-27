@@ -24,16 +24,15 @@ public class AuthFlowTests : IDisposable
 
     public AuthFlowTests()
     {
-        _auth = StubOptions(TestNet.Http, TestNet.Settings);
+        _auth = StubOptions(TestNet.Http);
     }
 
-    /// <summary>The stub-pointed options over one client pair: every endpoint URL
-    /// redirected to the local stub. The single wiring site, so a new endpoint property
-    /// cannot silently fall back to the production URL in a test.</summary>
-    private AuthEndpointsOptions StubOptions(HttpClient http, NetSettings settings) => new()
+    /// <summary>The stub-pointed options over one client: every endpoint URL redirected to
+    /// the local stub. The single wiring site, so a new endpoint property cannot silently
+    /// fall back to the production URL in a test.</summary>
+    private AuthEndpointsOptions StubOptions(HttpClient http) => new()
     {
         Http = http,
-        Settings = settings,
         MsaDeviceCode = _server.BaseUrl + "/devicecode",
         MsaToken = _server.BaseUrl + "/token",
         MsaAuthorize = _server.BaseUrl + "/authorize",
@@ -465,15 +464,16 @@ public class AuthFlowTests : IDisposable
     }
 
     [Fact]
-    public async Task Auth_Steps_Send_Through_The_Injected_Client_Pair()
+    public async Task Auth_Steps_Send_Through_The_Injected_Client()
     {
-        // the settings carry the user-agent configuration, so every auth request —
+        // the primary handler carries the user-agent configuration, so every auth request —
         // including the skin download — must leave stamped with it; the user agent is the
         // observable stamp
-        var settings = NetSettings.CreateDefault();
-        settings.Update("Flint-AuthStackProbe/1.0", "None", "", 0, "", "",
-            manualRetries: 1, TimeSpan.FromSeconds(30));
-        var auth = StubOptions(NetPrimaryHandler.CreateClient(settings), settings);
+        var primary = new NetPrimaryHandler { UserAgent = "Flint-AuthStackProbe/1.0" };
+        var auth = StubOptions(new HttpClient(new RetryHandler { InnerHandler = primary }, disposeHandler: false)
+        {
+            Timeout = Timeout.InfiniteTimeSpan,
+        });
         var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, auth);
 

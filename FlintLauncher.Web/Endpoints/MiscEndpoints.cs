@@ -47,8 +47,7 @@ public static class MiscEndpoints
         // GuiUtil::uploadPaste: either the raw content or a finished task's buffered log goes
         // to the configured paste provider (PastebinType + PastebinCustomAPIBase global
         // settings, provider default = mclo.gs). Paste bodies are small; this runs synchronously.
-        api.MapPost("/paste", async (PasteRequest? request, FlintConfigStore config, HttpClient http, NetSettings settings,
-            FlintTaskRegistry registry) =>
+        api.MapPost("/paste", async (PasteRequest? request, FlintConfigStore config, HttpClient http, FlintTaskRegistry registry) =>
         {
             if (request is null)
             {
@@ -98,7 +97,7 @@ public static class MiscEndpoints
                 ? (PasteUpload.PasteType)typeIndex
                 : PasteUpload.PasteType.Mclogs;
             var upload = new PasteUpload(content, config.Current.Api.PastebinCustomApiBase ?? "",
-                pasteType, http, settings);
+                pasteType, http);
             await upload.StartAsync();
             return upload is { WasSuccessful: true, PasteLink.Length: > 0 }
                 ? Results.Created("/api/v1/paste", new PasteCreatedResponse(upload.PasteLink))

@@ -134,7 +134,7 @@ public static class SettingsAndIconsEndpoints
             ],
             ["proxy"] =
             [
-                // ProxyPage: written values reach the shared settings through NetSettingsApplier;
+                // ProxyPage: written values reach the client's handlers through NetConfigApplier;
                 // ProxyPass is a secret — same wire key, ISecretStore storage
                 "ProxyType",
                 "ProxyAddr",
@@ -187,7 +187,7 @@ public static class SettingsAndIconsEndpoints
         }).Produces<SettingsGroupsResponse>();
 
         api.MapPut("/settings", (FlintConfigStore config, ISecretStore secrets,
-            NetSettingsApplier netSettings, DirSettingsApplier dirSettings, GlobalSettingsPutRequest? body) =>
+            NetConfigApplier netConfig, DirSettingsApplier dirSettings, GlobalSettingsPutRequest? body) =>
         {
             if (body is null || !Groups.TryGetValue(body.Group, out var keys))
             {
@@ -228,7 +228,7 @@ public static class SettingsAndIconsEndpoints
             // proxy / retries / timeout / user-agent take effect immediately (Application
             // re-runs updateProxySettings from the ProxyPage the same way); the apply also
             // re-reads the store-backed secrets and the mod-platform API credentials
-            netSettings.Apply();
+            netConfig.Apply();
 
             // the dir-kind models re-point to their (created-on-demand) new roots
             if (body.Group == "dirs")

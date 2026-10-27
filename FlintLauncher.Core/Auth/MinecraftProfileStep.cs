@@ -31,7 +31,7 @@ public sealed class MinecraftProfileStep(AccountData data, AuthEndpointsOptions?
             Url = new Uri(url),
             Headers = headers,
             AutoRetry = true,
-        }, _auth.Http, _auth.Settings, cancellationToken).ConfigureAwait(false);
+        }, _auth.Http, cancellationToken).ConfigureAwait(false);
 
         if (response.Error == (int)QtNetworkError.ContentNotFoundError)
         {

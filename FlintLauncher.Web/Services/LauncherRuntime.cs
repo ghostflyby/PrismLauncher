@@ -33,12 +33,12 @@ internal sealed class LauncherRuntime : IDisposable
     public FlintPaths Paths { get; }
     public AbsolutePath DataDir => Paths.DataDir;
 
-    /// <summary>The persistent client and settings this runtime's activity flows through: the
-    /// injected pair, else a private default pair owned by this runtime (tests isolate by
-    /// constructing their own; there is no process-wide client).</summary>
+    /// <summary>The persistent client this runtime's activity flows through: the injected
+    /// host client, else a private default client owned by this runtime (tests isolate by
+    /// constructing their own; there is no process-wide client). The request-level
+    /// configuration (proxy, user agent, retries, timeout) rides the client's handlers and
+    /// is written by the host — this runtime only threads the client through.</summary>
     public HttpClient Http { get; }
-
-    public NetSettings Settings { get; }
 
     /// <summary>The Modrinth client (injected into platform tasks/endpoints; tests construct
     /// a runtime with a client pointed at their stub).</summary>
@@ -64,7 +64,7 @@ internal sealed class LauncherRuntime : IDisposable
     public AuthEndpointsOptions Auth { get; }
 
     /// <summary>The C++ APPLICATION->settings(): the typed flint.json store —
-    /// load-or-default, atomic writes; the /settings surface and NetSettingsApplier read the
+    /// load-or-default, atomic writes; the /settings surface and NetConfigApplier read the
     /// resolved fold through it). The instance layer folds it as the user layer of its own
     /// instance.json stack.</summary>
     public FlintConfigStore Config { get; }
@@ -104,21 +104,20 @@ internal sealed class LauncherRuntime : IDisposable
     /// host surfaces this after Build (the flint-legacy result pattern).</summary>
     public FlintConfigImporter.ImportResult ConfigImport { get; }
 
-    public LauncherRuntime(FlintPaths paths, HttpClient? http = null, NetSettings? settings = null,
+    public LauncherRuntime(FlintPaths paths, HttpClient? http = null,
         ModrinthClient? modrinth = null,
         FlameApi? flame = null, TechnicApi? technic = null, AtLauncherApi? atlauncher = null,
         FtbApi? ftb = null, ImgurApi? imgur = null, AuthEndpointsOptions? auth = null)
     {
         Paths = paths;
-        Settings = settings ?? NetSettings.CreateDefault();
-        Http = http ?? NetPrimaryHandler.CreateClient(Settings);
+        Http = http ?? NetPrimaryHandler.CreateClient();
         Modrinth = modrinth ?? new ModrinthClient();
-        Auth = auth ?? new AuthEndpointsOptions { Http = Http, Settings = Settings };
-        Flame = flame ?? new FlameApi(Http, Settings);
-        Technic = technic ?? new TechnicApi(Http, Settings);
-        AtLauncher = atlauncher ?? new AtLauncherApi(Http, Settings);
-        Ftb = ftb ?? new FtbApi(Http, Settings);
-        Imgur = imgur ?? new ImgurApi(Http, Settings);
+        Auth = auth ?? new AuthEndpointsOptions { Http = Http };
+        Flame = flame ?? new FlameApi(Http);
+        Technic = technic ?? new TechnicApi(Http);
+        AtLauncher = atlauncher ?? new AtLauncherApi(Http);
+        Ftb = ftb ?? new FtbApi(Http);
+        Imgur = imgur ?? new ImgurApi(Http);
 
         // the watched-directory tenancy (the restored C++ watcher glue): reconciles are
         // serialized through the instance lock — watch events arrive on threadpool threads
@@ -138,7 +137,7 @@ internal sealed class LauncherRuntime : IDisposable
 
         // secrets init: <dataDir>/secrets.json (0600) — the transitional
         // store; the secret trio (ProxyPass/ModrinthToken/FlameKeyOverride) reads and
-        // writes here (PUT /settings reroutes, NetSettingsApplier/API clients read the store)
+        // writes here (PUT /settings reroutes, NetConfigApplier/API clients read the store)
         Secrets = new FileSecretStore(paths.SecretsFile, FlintJsonContext.Default.SecretsFile);
 
         // state load: launcher-state.json BEFORE the config import — the
@@ -168,7 +167,7 @@ internal sealed class LauncherRuntime : IDisposable
         // registration is never lazy enough to resolve against the process CWD), then the
         // ledger Load(): the persisted index restores, so existing entries do not
         // re-download on every run
-        MetaCache = HttpMetaCache.ForRoots(paths, Http, Settings);
+        MetaCache = HttpMetaCache.ForRoots(paths, Http);
         MetaCache.Load();
 
         // instance list: <dataDir>/instances; the typed instance

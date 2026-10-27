@@ -57,7 +57,6 @@ public sealed partial class InstanceImportTask(
     bool trustedSource,
     ModrinthClient modrinth,
     HttpClient http,
-    NetSettings settings,
     IReadOnlyDictionary<string, string>? extraInfo = null,
     FlameApi? flame = null)
     : InstanceTask
@@ -73,8 +72,7 @@ public sealed partial class InstanceImportTask(
 
     private readonly ModrinthClient _modrinth = modrinth;
     private readonly HttpClient _http = http;
-    private readonly NetSettings _settings = settings;
-    private readonly FlameApi _flame = flame ?? new FlameApi(http, settings);
+    private readonly FlameApi _flame = flame ?? new FlameApi(http);
     private readonly IReadOnlyDictionary<string, string> _extraInfo = extraInfo ?? new Dictionary<string, string>();
     private AbsolutePath _archivePath;
     private ModpackType _modpackType = ModpackType.Unknown;
@@ -129,7 +127,7 @@ public sealed partial class InstanceImportTask(
             string a1 = Path.GetFileName(sourceUrl.AbsolutePath);
             _archivePath = StagingPath / a1;
             FileOps.EnsureFilePathExists(_archivePath);
-            var request = HttpDownloadTask.ToFile(sourceUrl, _archivePath, _http, _settings);
+            var request = HttpDownloadTask.ToFile(sourceUrl, _archivePath, _http);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
             {
@@ -250,7 +248,7 @@ public sealed partial class InstanceImportTask(
         var instCreationTask = new FlameCreationTask(StagingPath, trustedSource,
             Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution."),
-            _modrinth, _http, _settings, packId, packVersionId, flame: _flame)
+            _modrinth, _http, packId, packVersionId, flame: _flame)
         {
             OptionalModsSelection = OptionalModsSelection,
         };
@@ -345,7 +343,7 @@ public sealed partial class InstanceImportTask(
         var instCreationTask = new ModrinthCreationTask(StagingPath, trustedSource,
             Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution."),
-            _modrinth, _http, _settings, packId, packVersionId)
+            _modrinth, _http, packId, packVersionId)
         {
             OptionalModsSelection = OptionalModsSelection,
         };

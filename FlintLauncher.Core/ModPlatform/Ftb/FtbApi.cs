@@ -7,7 +7,7 @@
 //
 // BuildConfig.FTB_API_BASE_URL became injected instance state: BaseUrl is per-instance
 // (tests construct their own client pointed at a stub; the install endpoint derives one
-// for its serverUrl override — see FtbEndpoints); the client rides the injected persistent client pair
+// for its serverUrl override — see FtbEndpoints); the client rides the injected persistent client
 // (LauncherRuntime.Ftb — see the Modrinth/Flame de-singletoning for the same story). The
 // parsers are pure helpers and stay static; the wire shapes deserialize through the
 // source-generated FtbJsonContext (the FTB models carry their annotations themselves).
@@ -36,7 +36,7 @@ public sealed class FtbPackIndexFile
 [JsonSerializable(typeof(FtbVersion))]
 internal sealed partial class FtbJsonContext : JsonSerializerContext;
 
-public sealed class FtbApi(HttpClient http, NetSettings settings)
+public sealed class FtbApi(HttpClient http)
 {
     /// <summary>BuildConfig.FTB_API_BASE_URL (per-instance; tests construct a client
     /// pointed at their stub).</summary>
@@ -45,7 +45,6 @@ public sealed class FtbApi(HttpClient http, NetSettings settings)
     /// <summary>The network stack this client's requests go through.</summary>
     public HttpClient Http { get; } = http;
 
-    public NetSettings Settings { get; } = settings;
 
     // ------------------------------------------------------------------ URL builders
 
@@ -63,18 +62,18 @@ public sealed class FtbApi(HttpClient http, NetSettings settings)
     /// <summary>makeByteArray(/modpack/all): the raw index payload; failures surface as
     /// <see cref="FlintHttpException"/> (the old NetRequest status gate).</summary>
     public Task<string> FetchModpacksAsync(CancellationToken cancellationToken = default) =>
-        FlintHttp.GetStringAsync(Http, Settings,
+        FlintHttp.GetStringAsync(Http,
             new HttpRequestMessage(HttpMethod.Get, ModpacksUrl()), cancellationToken);
 
     /// <summary>makeByteArray(/modpack/{id}).</summary>
     public Task<string> FetchModpackAsync(int packId, CancellationToken cancellationToken = default) =>
-        FlintHttp.GetStringAsync(Http, Settings,
+        FlintHttp.GetStringAsync(Http,
             new HttpRequestMessage(HttpMethod.Get, ModpackUrl(packId)), cancellationToken);
 
     /// <summary>makeByteArray(/modpack/{id}/{versionId}).</summary>
     public Task<string> FetchVersionAsync(int packId, int versionId,
         CancellationToken cancellationToken = default) =>
-        FlintHttp.GetStringAsync(Http, Settings,
+        FlintHttp.GetStringAsync(Http,
             new HttpRequestMessage(HttpMethod.Get, VersionUrl(packId, versionId)), cancellationToken);
 
     // ----------------------------------------------------------------------- parsers

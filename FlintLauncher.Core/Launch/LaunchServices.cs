@@ -16,7 +16,6 @@
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Java;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.State;
 using Microsoft.Extensions.Logging;
 using TruePath;
@@ -30,11 +29,10 @@ public sealed class LaunchServices
     public required ILoggerFactory LoggerFactory { get; init; }
 
     /// <summary>The network stack the launch pipeline's uncached downloads ride (the java
-    /// runtime manifest and archive); the host wires its shared, settings-configured stack.
-    /// Cached fetches and the asset objects ride the instance's meta cache stack.</summary>
+    /// runtime manifest and archive); the host wires its shared client, whose handlers carry
+    /// the request-level configuration. Cached fetches and the asset objects ride the
+    /// instance's meta cache stack.</summary>
     public required HttpClient Http { get; init; }
-
-    public required NetSettings Settings { get; init; }
 
     /// <summary>The typed flint.json store (the user layer of the stack — the
     /// SettingsObject adapter view is retired). AutoInstallJava reads the java/download switches from

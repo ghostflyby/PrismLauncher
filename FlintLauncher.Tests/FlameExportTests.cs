@@ -16,7 +16,6 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using TruePath;
 using Xunit;
-using FlintLauncher.Core.Net;
 using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Modrinth;
 
@@ -25,10 +24,9 @@ namespace FlintLauncher.Tests;
 [Collection("FlameApi")]
 public class FlameExportTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new(TestNet.Http, TestNet.Settings);
+    private readonly FlameApi _flameApi = new(TestNet.Http);
     private readonly ModrinthClient _modrinth;
     private readonly HttpClient _http;
-    private readonly NetSettings _settings;
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-flame-export-{Guid.NewGuid():N}");
     private readonly TestGlobalSettings _global = new();
     private readonly StubFlameServer _server = new();
@@ -36,7 +34,7 @@ public class FlameExportTests : IDisposable
 
     public FlameExportTests()
     {
-        (_modrinth, _http, _settings) = TestModrinthApi.Unreachable();
+        (_modrinth, _http) = TestModrinthApi.Unreachable();
         Directory.CreateDirectory(_root);
         _flameApi.BaseUrl = _server.Url;
     }
@@ -74,7 +72,7 @@ public class FlameExportTests : IDisposable
         Directory.CreateDirectory(staging);
         Assert.NotNull(MmcZip.ExtractDir(new AbsolutePath(zipPath), "", new AbsolutePath(staging)));
 
-        var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, _modrinth, _http, _settings, flame: _flameApi);
+        var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, _modrinth, _http, flame: _flameApi);
         task.SetName(name);
         await task.StartAsync();
         Assert.True(task.WasSuccessful, task.FailReason);

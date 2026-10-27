@@ -51,18 +51,9 @@ public sealed class AuthEndpointsOptions
     /// which keeps a bare fixture working without process-global state.</summary>
     public HttpClient Http
     {
-        get => _http ??= NetPrimaryHandler.CreateClient(Settings);
+        get => _http ??= NetPrimaryHandler.CreateClient();
         init => _http = value;
     }
 
-    /// <summary>The settings the auth client and the step timeouts read; same lazy-default
-    /// story as <see cref="Http"/>.</summary>
-    public NetSettings Settings
-    {
-        get => _settings ??= NetSettings.CreateDefault();
-        init => _settings = value;
-    }
-
     private HttpClient? _http;
-    private NetSettings? _settings;
 }

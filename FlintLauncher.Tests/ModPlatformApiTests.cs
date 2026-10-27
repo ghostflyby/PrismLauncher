@@ -29,7 +29,7 @@ namespace FlintLauncher.Tests;
 [Collection("FlameApi")]
 public class FlintApiFlameSearchTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new(TestNet.Http, TestNet.Settings);
+    private readonly FlameApi _flameApi = new(TestNet.Http);
     private readonly StubFlameServer _server = new();
 
     public FlintApiFlameSearchTests()
@@ -129,7 +129,7 @@ public class FlintApiFlameSearchTests : IDisposable
 [Collection("ModrinthApi")]
 public class FlintApiVersionsTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new(TestNet.Http, TestNet.Settings);
+    private readonly FlameApi _flameApi = new(TestNet.Http);
     private readonly StubModrinthServer _modrinth = new();
     private readonly StubFlameServer _flame = new();
 

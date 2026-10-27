@@ -22,7 +22,7 @@ namespace FlintLauncher.Tests;
 
 public class FtbApiEndpointsTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new(TestNet.Http, TestNet.Settings);
+    private readonly FlameApi _flameApi = new(TestNet.Http);
     private readonly FtbApi _ftbApi;
     private readonly StubFtbServer _server = new();
     private readonly StubFlameServer _flameServer = new();
@@ -30,7 +30,7 @@ public class FtbApiEndpointsTests : IDisposable
 
     public FtbApiEndpointsTests()
     {
-        _ftbApi = new FtbApi(TestNet.Http, TestNet.Settings) { BaseUrl = _server.Url };
+        _ftbApi = new FtbApi(TestNet.Http) { BaseUrl = _server.Url };
         // the FTB install resolves CurseForge-only files through the Flame layer
         _flameApi.BaseUrl = _flameServer.Url;
     }
@@ -271,7 +271,7 @@ public class FtbApiEndpointsTests : IDisposable
         SetupFlameResolution();
         // a dead runtime client forces the request's serverUrl override to be the only
         // working route
-        var deadClient = new FtbApi(TestNet.Http, TestNet.Settings) { BaseUrl = "http://127.0.0.1:9" };
+        var deadClient = new FtbApi(TestNet.Http) { BaseUrl = "http://127.0.0.1:9" };
         await using var host = await FlintApiHost.StartAsync(flame: _flameApi, ftb: deadClient);
 
         var post = await host.PostAsync("/api/v1/modplatform/ftb/install", new

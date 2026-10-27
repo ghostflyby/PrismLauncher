@@ -26,7 +26,7 @@ namespace FlintLauncher.Tests;
 [Collection("FlameApi")]
 public class ModUpdateTaskTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new(TestNet.Http, TestNet.Settings);
+    private readonly FlameApi _flameApi = new(TestNet.Http);
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-mod-update-{Guid.NewGuid():N}");
     private readonly StubFlameServer _server = new();
     private readonly ModInstallTestEnv _env;

@@ -74,7 +74,6 @@ public sealed partial class FlameCreationTask : InstanceTask
         InstanceEnvironment environment,
         ModrinthClient modrinth,
         HttpClient http,
-        NetSettings settings,
         string id = "",
         string versionId = "",
         string originalInstanceId = "",
@@ -82,8 +81,7 @@ public sealed partial class FlameCreationTask : InstanceTask
     {
         _modrinth = modrinth;
         _http = http;
-        _settings = settings;
-        _flame = flame ?? new FlameApi(http, settings);
+        _flame = flame ?? new FlameApi(http);
         StagingPath = stagingPath;
         TrustedSource = trustedSource;
         SetParentEnvironment(environment);
@@ -97,7 +95,6 @@ public sealed partial class FlameCreationTask : InstanceTask
     private readonly FlameManifest _pack = new();
     private readonly ModrinthClient _modrinth;
     private readonly HttpClient _http;
-    private readonly NetSettings _settings;
     private readonly FlameApi _flame;
     private readonly string _managedId;
     private readonly string _managedVersionId;
@@ -348,7 +345,7 @@ public sealed partial class FlameCreationTask : InstanceTask
         _newInstance.SaveNow();
 
         // ---------------------------------------------------------- resolve + download
-        var modIdResolver = new FileResolvingTask(_pack, _modrinth, _http, _settings, _flame);
+        var modIdResolver = new FileResolvingTask(_pack, _modrinth, _http, _flame);
         EmitStatus("Resolving mod IDs...");
         await modIdResolver.StartAsync(cancellationToken);
         if (!modIdResolver.WasSuccessful)
@@ -546,7 +543,7 @@ public sealed partial class FlameCreationTask : InstanceTask
 
             if (result.Version.DownloadUrl.Length != 0)
             {
-                var dl = HttpDownloadTask.ToFile(new Uri(result.Version.DownloadUrl), path, _flame.Http, _flame.Settings);
+                var dl = HttpDownloadTask.ToFile(new Uri(result.Version.DownloadUrl), path, _flame.Http);
                 filesJob.AddDownload(dl);
                 downloadTasks.Add(dl);
             }

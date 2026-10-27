@@ -118,7 +118,7 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
             Url = new Uri(_auth.MsaToken),
             Body = payload,
             Headers = FormHeaders,
-        }, _auth.Http, _auth.Settings, cancellationToken).ConfigureAwait(false);
+        }, _auth.Http, cancellationToken).ConfigureAwait(false);
 
         var rsp = ParseTokenResponse(response.Body);
         if (rsp.Error.Length != 0)
@@ -209,7 +209,7 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
             Url = new Uri(_auth.MsaToken),
             Body = payload,
             Headers = FormHeaders,
-        }, _auth.Http, _auth.Settings, cancellationToken).ConfigureAwait(false);
+        }, _auth.Http, cancellationToken).ConfigureAwait(false);
 
         var rsp = ParseTokenResponse(response.Body);
         if (rsp.Error.Length != 0)

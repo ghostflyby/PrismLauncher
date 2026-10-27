@@ -257,7 +257,7 @@ public static class ModPlatformEndpoints
                 {
                     var message = new HttpRequestMessage(HttpMethod.Get, url);
                     flame.AddApiKeyHeader(message);
-                    body = await FlintHttp.GetStringAsync(flame.Http, flame.Settings, message);
+                    body = await FlintHttp.GetStringAsync(flame.Http, message);
                 }
                 catch (FlintHttpException e)
                 {
@@ -351,7 +351,7 @@ public static class ModPlatformEndpoints
 
         api.MapPost("/instances/{id}/mods/install", async (string id, List<ModInstallSelection>? selections,
             InstanceList instances, InstanceMutationLock instanceLock,
-            ModrinthClient modrinth, HttpClient http, NetSettings settings, FlameApi flame,
+            ModrinthClient modrinth, HttpClient http, FlameApi flame,
             FlintTaskRegistry registry) =>
         {
             if (selections is null || selections.Count == 0)
@@ -395,7 +395,7 @@ public static class ModPlatformEndpoints
 
                 var task = new ModInstallTask(instance, instance.LoaderModList(), requests,
                     mcVersion, profile.GetSupportedModLoaders() ?? ModLoaderType.None,
-                    modrinth, http, settings, flame);
+                    modrinth, http, flame);
                 var entry = registry.Register("mods-install", task, instanceId: instance.Id());
                 // the result payload lists the installed entries (selected + dependencies);
                 // published on terminal events so a download failure still shows what landed
@@ -628,7 +628,7 @@ public static class ModPlatformEndpoints
         {
             var message = new HttpRequestMessage(HttpMethod.Get, url);
             flame.AddApiKeyHeader(message);
-            body = await FlintHttp.GetStringAsync(flame.Http, flame.Settings, message);
+            body = await FlintHttp.GetStringAsync(flame.Http, message);
         }
         catch (FlintHttpException e)
         {

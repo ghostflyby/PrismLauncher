@@ -46,7 +46,6 @@ public sealed class LegacyFtbPackFetchTask : FlintTask
     /// <summary>The network stack the pack-list fetches ride.</summary>
     public required HttpClient Http { get; init; }
 
-    public required NetSettings Settings { get; init; }
 
     public List<LegacyFtbModpack> PublicPacks { get; } = [];
     public List<LegacyFtbModpack> ThirdPartyPacks { get; } = [];
@@ -66,9 +65,9 @@ public sealed class LegacyFtbPackFetchTask : FlintTask
         string thirdPartyXml;
         try
         {
-            publicXml = await FlintHttp.GetStringAsync(Http, Settings,
+            publicXml = await FlintHttp.GetStringAsync(Http,
                 new HttpRequestMessage(HttpMethod.Get, publicPacksUrl), cancellationToken);
-            thirdPartyXml = await FlintHttp.GetStringAsync(Http, Settings,
+            thirdPartyXml = await FlintHttp.GetStringAsync(Http,
                 new HttpRequestMessage(HttpMethod.Get, thirdPartyUrl), cancellationToken);
         }
         catch (FlintHttpException e)
@@ -95,7 +94,7 @@ public sealed class LegacyFtbPackFetchTask : FlintTask
             string body;
             try
             {
-                body = await FlintHttp.GetStringAsync(Http, Settings,
+                body = await FlintHttp.GetStringAsync(Http,
                     new HttpRequestMessage(HttpMethod.Get, url), cancellationToken);
             }
             catch (FlintHttpException)

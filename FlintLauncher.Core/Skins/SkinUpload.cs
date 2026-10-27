@@ -26,7 +26,7 @@
 // Deviations:
 //  - Upstream builds the request through QHttpMultiPart on QNetworkAccessManager; the port
 //    pre-builds an identical multipart body (same part headers, CRLF framing) and sends it
-//    with an injected client pair (defaulting to the auth options' client). This stays a
+//    with an injected client (defaulting to the auth options' client). This stays a
 //    FlintTask like the C++ Net::Request subclass. The multipart Content-Type must be set on
 //    the content headers, which the plain fetch helper cannot do.
 //  - QHttpMultiPart generates a random boundary of a different shape — any legal boundary is
@@ -49,31 +49,29 @@ public sealed class SkinUpload : FlintTask
     private readonly string _variant;
     private readonly AuthEndpointsOptions _auth;
     private readonly HttpClient _http;
-    private readonly NetSettings _settings;
 
     private SkinUpload(string token, byte[] skinData, string variant, AuthEndpointsOptions? auth,
-        HttpClient? http, NetSettings? settings)
+        HttpClient? http)
     {
         _token = token;
         _skinData = skinData;
         _variant = variant;
         _auth = auth ?? new AuthEndpointsOptions();
         _http = http ?? _auth.Http;
-        _settings = settings ?? _auth.Settings;
     }
 
     /// <summary>Port of SkinUpload::make(token, path, variant) — the file is read eagerly.</summary>
     public static SkinUpload Make(string token, AbsolutePath path, string variant,
-        AuthEndpointsOptions? auth = null, HttpClient? http = null, NetSettings? settings = null)
+        AuthEndpointsOptions? auth = null, HttpClient? http = null)
     {
-        return Make(token, File.ReadAllBytes(path.Value), variant, auth, http, settings);
+        return Make(token, File.ReadAllBytes(path.Value), variant, auth, http);
     }
 
     /// <summary>Body-bytes variant (FS::read(m_path) upstream).</summary>
     public static SkinUpload Make(string token, byte[] skinData, string variant,
-        AuthEndpointsOptions? auth = null, HttpClient? http = null, NetSettings? settings = null)
+        AuthEndpointsOptions? auth = null, HttpClient? http = null)
     {
-        return new SkinUpload(token, skinData, variant, auth, http, settings);
+        return new SkinUpload(token, skinData, variant, auth, http);
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -82,18 +80,17 @@ public sealed class SkinUpload : FlintTask
         var body = BuildMultipartBody(boundary, _skinData, _variant);
 
         EmitStatus("Uploading skin");
-        // the inactivity window (RequestTimeout): the persistent client carries no
-        // total-duration timeout, so every direct sender arms its own
-        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutSource.CancelAfter(_settings.Current.RequestTimeout);
+        // the inactivity window (RequestTimeout): the transport's retry gate arms it with
+        // its configured length and covers the send with it
         using var message = new HttpRequestMessage(HttpMethod.Post,
             new Uri(_auth.MinecraftServices.TrimEnd('/') + "/minecraft/profile/skins"));
+        using var window = new RetryHandler.Window(message, cancellationToken);
         message.Headers.TryAddWithoutValidation("Authorization", $"Bearer {_token}");
         message.Content = new ByteArrayContent(body);
         message.Content.Headers.TryAddWithoutValidation("Content-Type", "multipart/form-data; boundary=" + boundary);
 
         using var response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
-            timeoutSource.Token).ConfigureAwait(false);
+            window.Token).ConfigureAwait(false);
         var statusCode = (int)response.StatusCode;
         if (statusCode is not 200 and not 201 and not 202 and not 203 and not 204 and not 206)
         {

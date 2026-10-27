@@ -22,7 +22,6 @@ using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using FlintLauncher.ExternalApi;
@@ -44,13 +43,12 @@ public class ModrinthApiTests : IDisposable
 
     private readonly ModrinthClient _modrinth;
     private readonly HttpClient _http;
-    private readonly NetSettings _settings;
 
     public ModrinthApiTests()
     {
         Directory.CreateDirectory(_root);
         _baseUrl = _server.Url;
-        (_modrinth, _http, _settings) = TestModrinthApi.At(_baseUrl);
+        (_modrinth, _http) = TestModrinthApi.At(_baseUrl);
         // make the download host match the stub so the modrinth-download-meta header path is used
         _modrinth.DownloadHost = "127.0.0.1";
     }
@@ -217,7 +215,7 @@ public class ModrinthApiTests : IDisposable
 
         UnpackInto(mrpackPath, staging);
 
-        var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http, settings: _settings);
+        var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http);
         task.SetName("Imported Pack");
         await task.StartAsync();
 
@@ -282,7 +280,7 @@ public class ModrinthApiTests : IDisposable
         _server.Projects["projId1"] = MrPackBuilder.ProjectJson();
         _server.VersionFiles[pack.ModSha512] = MrPackBuilder.VersionJson(_server.Url, pack);
 
-        var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http, settings: _settings);
+        var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http);
         task.SetName("Meta Pack");
         await task.StartAsync();
 
@@ -313,7 +311,7 @@ public class ModrinthApiTests : IDisposable
         _server.Projects["projId1"] = MrPackBuilder.ProjectJson();
         _server.VersionFiles[pack.ModSha512] = MrPackBuilder.VersionJson(_server.Url, pack);
 
-        var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http, settings: _settings);
+        var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http);
         task.SetName("Optional Pack");
         await task.StartAsync();
 
@@ -337,7 +335,7 @@ public class ModrinthApiTests : IDisposable
 
         _server.VersionFiles[pack.ModSha512] = MrPackBuilder.VersionJson(_server.Url, pack);
 
-        var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http, settings: _settings);
+        var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http);
         task.SetName("Bad Pack");
         await task.StartAsync();
 
@@ -358,7 +356,7 @@ public class ModrinthApiTests : IDisposable
 
         _server.VersionFiles[pack.ModSha512] = MrPackBuilder.VersionJson(_server.Url, pack);
 
-        var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http, settings: _settings);
+        var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http);
         task.SetName("Escape Pack");
         await task.StartAsync();
 
@@ -378,7 +376,7 @@ public class ModrinthApiTests : IDisposable
         Assert.True(pack.WriteZip(mrpackPath));
         UnpackInto(mrpackPath, staging);
 
-        var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http, settings: _settings);
+        var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http);
         task.SetName("Dep Pack");
         await task.StartAsync();
 
@@ -402,7 +400,7 @@ public class ModrinthApiTests : IDisposable
         _server.VersionFiles[pack.ModSha512] = MrPackBuilder.VersionJson(_server.Url, pack);
         _server.Projects["projId1"] = MrPackBuilder.ProjectJson();
 
-        var import = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http, settings: _settings);
+        var import = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http);
         import.SetName("Round Trip Pack");
         await import.StartAsync();
         Assert.True(import.WasSuccessful, import.FailReason);
@@ -593,9 +591,9 @@ public class ModrinthCreationTaskManifestTests : IDisposable
         var staging = Path.Combine(_root, "staging");
         Directory.CreateDirectory(staging);
 
-        var (modrinth, http, settings) = TestModrinthApi.Unreachable();
+        var (modrinth, http) = TestModrinthApi.Unreachable();
         var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global,
-            modrinth, http, settings);
+            modrinth, http);
         task.SetName("M");
         await File.WriteAllTextAsync(Path.Combine(staging, "modrinth.index.json"),
             """{"formatVersion":1,"game":"terraria","files":[],"dependencies":{}}""");
@@ -603,9 +601,9 @@ public class ModrinthCreationTaskManifestTests : IDisposable
         Assert.Equal(TaskState.Failed, task.State);
         Assert.Contains("Unknown game", task.FailReason);
 
-        var (modrinth2, http2, settings2) = TestModrinthApi.Unreachable();
+        var (modrinth2, http2) = TestModrinthApi.Unreachable();
         var task2 = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global,
-            modrinth2, http2, settings2);
+            modrinth2, http2);
         await File.WriteAllTextAsync(Path.Combine(staging, "modrinth.index.json"),
             """{"formatVersion":42,"game":"minecraft","files":[],"dependencies":{}}""");
         await task2.StartAsync();

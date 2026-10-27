@@ -36,7 +36,7 @@ using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.Technic;
 
-public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVersion, HttpClient http, NetSettings settings) : InstanceTask
+public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVersion, HttpClient http) : InstanceTask
 {
     private AbsolutePath _archivePath;
 
@@ -72,7 +72,7 @@ public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVers
                         Path.GetFileName(sourceUrl.AbsolutePath);
             _archivePath = Temporary.CreateTempFolder() / a1;
             FileOps.EnsureFilePathExists(_archivePath);
-            var request = HttpDownloadTask.ToFile(sourceUrl, _archivePath, http, settings);
+            var request = HttpDownloadTask.ToFile(sourceUrl, _archivePath, http);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
             {

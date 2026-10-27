@@ -105,9 +105,8 @@ public sealed class LaunchFixture : IDisposable
     /// <summary>The fixture's five-root stamp (home layout); disposed with the fixture.</summary>
     private readonly TestFlintPaths _paths = TestFlintPaths.UnderHome();
 
-    /// <summary>The fixture's client pair: the meta cache and the launch services it builds
+    /// <summary>The fixture's client: the meta cache and the launch services it builds
     /// ride it, so a launch fixture never touches a shared client.</summary>
-    public NetSettings Settings { get; } = NetSettings.CreateDefault();
 
     public HttpClient Http { get; }
 
@@ -124,11 +123,11 @@ public sealed class LaunchFixture : IDisposable
     public LaunchFixture()
     {
         Directory.CreateDirectory(Root);
-        Http = NetPrimaryHandler.CreateClient(Settings);
+        Http = NetPrimaryHandler.CreateClient();
         State = new LauncherStateStore(
             _paths.Paths.StateRoot / "launcher-state.json",
             FlintJsonContext.Default.LauncherState);
-        MetaCache = HttpMetaCache.ForRoots(_paths.Paths, Http, Settings);
+        MetaCache = HttpMetaCache.ForRoots(_paths.Paths, Http);
     }
 
     /// <summary>Seed the java probe cache for a configured java path so CheckJava trusts
@@ -185,7 +184,6 @@ public sealed class LaunchFixture : IDisposable
             Paths = _paths.Paths with { InstallRoot = installRoot ?? AppContext.BaseDirectory },
             LoggerFactory = loggerFactory ?? NullLoggerFactory.Instance,
             Http = Http,
-            Settings = Settings,
             LauncherState = State,
             XmlLogParsing = xmlLogParsing,
         };

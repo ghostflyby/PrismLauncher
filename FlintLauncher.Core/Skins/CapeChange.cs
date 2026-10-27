@@ -54,6 +54,6 @@ public static class CapeChange
         }
 
         message.Headers.TryAddWithoutValidation("Authorization", $"Bearer {token}");
-        return FlintHttp.SendAsync(options.Http, options.Settings, message, cancellationToken);
+        return FlintHttp.SendAsync(options.Http, message, cancellationToken);
     }
 }

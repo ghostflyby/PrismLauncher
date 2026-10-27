@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
-// The one-shot fetch helpers over the persistent client pair: they carry the semantics the
+// The one-shot fetch helpers over the persistent client: they carry the semantics the
 // retired NetRequest gave every plain query — the RequestTimeout inactivity window, the
 // network-level manual retry gate, and the uniform failure shape ("HTTP status <code> for
 // <url>" plus the truncated response body) as a <see cref="FlintHttpException"/>. The
@@ -24,25 +24,21 @@ public static class FlintHttp
     public const int MaxErrorBodyLength = 4096;
 
     /// <summary>Send and read the body as UTF-8 text with the standard failure gate.</summary>
-    public static async Task<string> GetStringAsync(HttpClient http, NetSettings settings,
+    public static async Task<string> GetStringAsync(HttpClient http,
         HttpRequestMessage message, CancellationToken cancellationToken = default)
     {
-        var bytes = await SendAsync(http, settings, message, cancellationToken).ConfigureAwait(false);
+        var bytes = await SendAsync(http, message, cancellationToken).ConfigureAwait(false);
         return Encoding.UTF8.GetString(bytes);
     }
 
     /// <summary>Send and read the body with the standard failure gate. The message is
     /// disposed here; a non-2xx status (or an idle-timeout) raises
     /// <see cref="FlintHttpException"/>.</summary>
-    public static async Task<byte[]> SendAsync(HttpClient http, NetSettings settings,
+    public static async Task<byte[]> SendAsync(HttpClient http,
         HttpRequestMessage message, CancellationToken cancellationToken = default)
     {
-        var requestTimeout = settings.Current.RequestTimeout;
-        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutSource.CancelAfter(requestTimeout);
-
         message.Options.Set(RetryHandler.ManualRetryOption, true);
-        message.Options.Set(RetryHandler.TimeoutSourceOption, timeoutSource);
+        using var window = new RetryHandler.Window(message, cancellationToken);
 
         HttpResponseMessage response;
         try
@@ -50,13 +46,12 @@ public static class FlintHttp
             using (message)
             {
                 response = await http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
-                    timeoutSource.Token).ConfigureAwait(false);
+                    window.Token).ConfigureAwait(false);
             }
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (window.TimedOut)
         {
-            throw new FlintHttpException(
-                $"transfer timed out: no data for {requestTimeout.TotalSeconds:F0} seconds (RequestTimeout)");
+            throw new FlintHttpException(window.TimeoutMessage);
         }
         catch (Exception e) when (e is HttpRequestException or IOException)
         {
@@ -74,13 +69,12 @@ public static class FlintHttp
                 var body = "";
                 try
                 {
-                    timeoutSource.CancelAfter(requestTimeout);
-                    body = await response.Content.ReadAsStringAsync(timeoutSource.Token).ConfigureAwait(false);
+                    window.Progress();
+                    body = await response.Content.ReadAsStringAsync(window.Token).ConfigureAwait(false);
                 }
-                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                catch (OperationCanceledException) when (window.TimedOut)
                 {
-                    throw new FlintHttpException(
-                        $"transfer timed out: no data for {requestTimeout.TotalSeconds:F0} seconds (RequestTimeout)");
+                    throw new FlintHttpException(window.TimeoutMessage);
                 }
                 catch (Exception)
                 {
@@ -95,16 +89,15 @@ public static class FlintHttp
                     $"HTTP status {statusCode} for {message.RequestUri}\n{body}");
             }
 
-            timeoutSource.CancelAfter(requestTimeout);
+            window.Progress();
             try
             {
-                return await response.Content.ReadAsByteArrayAsync(timeoutSource.Token).ConfigureAwait(false);
+                return await response.Content.ReadAsByteArrayAsync(window.Token).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (window.TimedOut)
             {
                 // a body read stalled past the window: a network failure, not a user abort
-                throw new FlintHttpException(
-                    $"transfer timed out: no data for {requestTimeout.TotalSeconds:F0} seconds (RequestTimeout)");
+                throw new FlintHttpException(window.TimeoutMessage);
             }
         }
     }

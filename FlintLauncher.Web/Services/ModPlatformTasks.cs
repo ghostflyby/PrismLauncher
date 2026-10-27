@@ -96,12 +96,11 @@ public sealed class ModSelectionResolver(
     IReadOnlyList<ModLoaderType> loaderList,
     ModrinthClient modrinth,
     HttpClient http,
-    NetSettings settings,
     FlameApi? flame = null)
 {
     private readonly ModrinthClient _modrinth = modrinth;
     private readonly HttpClient _http = http;
-    private readonly FlameApi _flame = flame ?? new FlameApi(http, settings);
+    private readonly FlameApi _flame = flame ?? new FlameApi(http);
 
     public async Task<(IndexedPack Pack, IndexedVersion Version)> ResolveAsync(
         ResourceProvider provider, string projectId, string versionId, CancellationToken cancellationToken)
@@ -223,7 +222,7 @@ public sealed class ModSelectionResolver(
             string versionsBody;
             try
             {
-                versionsBody = await FlintHttp.GetStringAsync(_flame.Http, _flame.Settings,
+                versionsBody = await FlintHttp.GetStringAsync(_flame.Http,
                     new HttpRequestMessage(HttpMethod.Get, _flame.GetVersionsUrl(
                         new VersionSearchArgs { Pack = pack, McVersions = [mcVersion] })),
                     cancellationToken);
@@ -323,7 +322,6 @@ public sealed class ModInstallTask(
     ModLoaderType loaders,
     ModrinthClient modrinth,
     HttpClient http,
-    NetSettings settings,
     FlameApi? flame = null)
     : FlintTask
 {
@@ -332,8 +330,7 @@ public sealed class ModInstallTask(
     private readonly List<ModInstallEntryView> _installed = [];
     private readonly ModrinthClient _modrinth = modrinth;
     private readonly HttpClient _http = http;
-    private readonly NetSettings _settings = settings;
-    private readonly FlameApi _flame = flame ?? new FlameApi(http, settings);
+    private readonly FlameApi _flame = flame ?? new FlameApi(http);
 
     /// <summary>The entries for the task view's optional result payload.</summary>
     public TaskResultView BuildResult() => new(null, _installed);
@@ -347,7 +344,7 @@ public sealed class ModInstallTask(
         try
         {
             var resolver = new ModSelectionResolver(_mcVersion, loaders, _loaderList,
-                _modrinth, _http, _settings, _flame);
+                _modrinth, _http, _flame);
             var current = 0;
             foreach (var selection in selections)
             {
@@ -366,7 +363,7 @@ public sealed class ModInstallTask(
 
         EmitStatus("Resolving dependencies...");
         var dependencyTask = new GetModDependenciesTask(instance, folder, selected,
-            _modrinth, _http, _settings, _flame);
+            _modrinth, _http, _flame);
         await dependencyTask.StartAsync(cancellationToken);
         if (!dependencyTask.WasSuccessful)
         {

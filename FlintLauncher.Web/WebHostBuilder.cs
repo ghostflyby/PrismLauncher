@@ -14,6 +14,7 @@ using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Java;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.ModPlatform.Flame;
@@ -93,9 +94,20 @@ public static class WebHostBuilder
         builder.Services.AddOpenApi("v1", ApiOpenApi.Configure);
 
         LauncherRuntime runtime;
+        // the host owns the persistent client and its configuration carriers: the two
+        // handlers hold the proxy/user agent/retries/timeout (the applier writes them), and
+        // the client over their chain is what the runtime and the endpoints thread through
+        var primaryHandler = new NetPrimaryHandler();
+        var retryHandler = new RetryHandler { InnerHandler = primaryHandler };
+        var http = new HttpClient(retryHandler, disposeHandler: false)
+        {
+            // no total-duration timeout — the request executors carry the RequestTimeout
+            // inactivity window instead
+            Timeout = Timeout.InfiniteTimeSpan,
+        };
         try
         {
-            runtime = new LauncherRuntime(paths, modrinth: modrinth, flame: flame, technic: technic,
+            runtime = new LauncherRuntime(paths, http: http, modrinth: modrinth, flame: flame, technic: technic,
                 atlauncher: atlauncher, ftb: ftb, auth: auth);
         }
         catch (Exception e)
@@ -122,7 +134,8 @@ public static class WebHostBuilder
         // the assembled runtime is not registered itself — a handler depends on the members
         // it uses, each injectable on its own
         builder.Services.AddSingleton(paths);
-        builder.Services.AddSingleton(runtime.Settings);
+        builder.Services.AddSingleton(primaryHandler);
+        builder.Services.AddSingleton(retryHandler);
         builder.Services.AddSingleton(runtime.Http);
         builder.Services.AddSingleton(runtime.Config);
         builder.Services.AddSingleton(runtime.Dirs);
@@ -146,7 +159,7 @@ public static class WebHostBuilder
         builder.Services.AddSingleton<DeviceCodeSessionStore>();
         builder.Services.AddSingleton<JavaScanService>();
         builder.Services.AddSingleton<PrismImportCompletion>();
-        builder.Services.AddSingleton<NetSettingsApplier>();
+        builder.Services.AddSingleton<NetConfigApplier>();
         builder.Services.AddSingleton<DirSettingsApplier>();
         builder.Services.AddSingleton(apiAuth);
         builder.Services.AddHostedService<AccountRefreshService>();
@@ -160,7 +173,6 @@ public static class WebHostBuilder
             Paths = paths,
             LoggerFactory = sp.GetRequiredService<ILoggerFactory>(),
             Http = runtime.Http,
-            Settings = runtime.Settings,
             Config = runtime.Config,
             LauncherState = runtime.State,
             Auth = runtime.Auth,
@@ -249,7 +261,7 @@ public static class WebHostBuilder
 
         // proxy / NumberOfManualRetries / RequestTimeout / UserAgentOverride reach the
         // shared Http stack (also re-applied after every settings write)
-        app.Services.GetRequiredService<NetSettingsApplier>().Apply();
+        app.Services.GetRequiredService<NetConfigApplier>().Apply();
 
         // uniform {"error":{...}} body for unhandled faults
         app.Use(async (context, next) =>

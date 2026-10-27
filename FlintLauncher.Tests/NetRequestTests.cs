@@ -288,7 +288,7 @@ public class NetRequestTests : IDisposable
         });
 
         var target = TempPath("download.bin");
-        var request = HttpDownloadTask.ToFile(new Uri(server.Url + "/file"), new AbsolutePath(target), TestNet.Http, TestNet.Settings);
+        var request = HttpDownloadTask.ToFile(new Uri(server.Url + "/file"), new AbsolutePath(target), TestNet.Http);
         request.AddValidator(ChecksumValidator.FromHex(
             HashAlgorithmName.SHA1,
             Convert.ToHexString(SHA1.HashData("file-content-0123456789"u8.ToArray())).ToLowerInvariant()));
@@ -351,12 +351,9 @@ public class NetRequestTests : IDisposable
         // the transport gate is strictly per request: the manual gate (NumberOfManualRetries)
         // needs its option flag, so a caller without flags — the auth steps, the C++
         // setAskRetry(false) — gets exactly one attempt
-        var settings = NetSettings.CreateDefault();
-        settings.Update(NetSettings.CreateDefault().Current.UserAgent, "None", "", 0, "", "",
-            manualRetries: 2, TimeSpan.FromSeconds(30));
         using var inner = new CountingHandler(_ =>
             throw new HttpRequestException("connection reset"));
-        using var http = new HttpClient(new RetryHandler(settings) { InnerHandler = inner });
+        using var http = new HttpClient(new RetryHandler { MaxManualRetries = 2, InnerHandler = inner });
 
         using (var message = new HttpRequestMessage(HttpMethod.Get, new Uri("http://stub/x")))
         {
@@ -376,12 +373,11 @@ public class NetRequestTests : IDisposable
     [Fact]
     public async Task RetryHandler_AutoRetry_Honors_The_Attempt_Cap()
     {
-        var settings = NetSettings.CreateDefault();
         using var inner = new CountingHandler(_ => new HttpResponseMessage(HttpStatusCode.TooManyRequests)
         {
             Headers = { RetryAfter = new RetryConditionHeaderValue(TimeSpan.Zero) },
         });
-        using var http = new HttpClient(new RetryHandler(settings) { InnerHandler = inner });
+        using var http = new HttpClient(new RetryHandler { InnerHandler = inner });
 
         using var message = new HttpRequestMessage(HttpMethod.Get, new Uri("http://stub/x"));
         message.Options.Set(RetryHandler.AutoRetryOption, true);
@@ -425,7 +421,7 @@ public class NetRequestTests : IDisposable
 
         var target = TempPath("retry-429.txt");
         var request = HttpDownloadTask.ToFile(new Uri(server.Url + "/x"), new AbsolutePath(target),
-            TestNet.Http, TestNet.Settings, RequestOptions.AutoRetry);
+            TestNet.Http, RequestOptions.AutoRetry);
         await request.StartAsync();
 
         Assert.Equal(TaskState.Succeeded, request.State);
@@ -492,7 +488,7 @@ public class NetRequestTests : IDisposable
         });
 
         var ex = await Assert.ThrowsAsync<FlintHttpException>(() => FlintHttp.GetStringAsync(
-            TestNet.Http, TestNet.Settings, new HttpRequestMessage(HttpMethod.Get, server.Url + "/missing")));
+            TestNet.Http, new HttpRequestMessage(HttpMethod.Get, server.Url + "/missing")));
 
         Assert.Contains("HTTP status 404 for", ex.Reason);
         Assert.Contains("nope", ex.Reason);
@@ -504,7 +500,7 @@ public class NetRequestTests : IDisposable
         // port 9 (discard): connection refused — the envelope callers catch
         // FlintHttpException, so the transport error must arrive as one
         var ex = await Assert.ThrowsAsync<FlintHttpException>(() => FlintHttp.GetStringAsync(
-            TestNet.Http, TestNet.Settings, new HttpRequestMessage(HttpMethod.Get, "http://127.0.0.1:9/x")));
+            TestNet.Http, new HttpRequestMessage(HttpMethod.Get, "http://127.0.0.1:9/x")));
 
         Assert.NotEmpty(ex.Reason);
     }
@@ -516,7 +512,7 @@ public class NetRequestTests : IDisposable
 
         var target = TempPath("missing.bin");
         var request = HttpDownloadTask.ToFile(new Uri(server.Url + "/missing"), new AbsolutePath(target),
-            TestNet.Http, TestNet.Settings);
+            TestNet.Http);
         await request.StartAsync();
 
         Assert.Equal(TaskState.Failed, request.State);
@@ -542,7 +538,7 @@ public class NetRequestTests : IDisposable
         {
             var target = TempPath($"item{i}.txt");
             var download = HttpDownloadTask.ToFile(new Uri($"{server.Url}/item{i}"), new AbsolutePath(target),
-                TestNet.Http, TestNet.Settings);
+                TestNet.Http);
             downloads.Add(download);
             targets.Add(target);
             job.AddDownload(download);

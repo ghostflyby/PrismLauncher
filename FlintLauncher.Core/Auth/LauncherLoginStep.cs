@@ -40,7 +40,7 @@ public sealed class LauncherLoginStep(AccountData data, AuthEndpointsOptions? au
             Body = requestBody,
             Headers = Headers,
             AutoRetry = true,
-        }, _auth.Http, _auth.Settings, cancellationToken).ConfigureAwait(false);
+        }, _auth.Http, cancellationToken).ConfigureAwait(false);
 
         if (!response.Success)
         {

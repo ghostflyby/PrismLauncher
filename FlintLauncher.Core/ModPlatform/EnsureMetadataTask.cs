@@ -35,14 +35,13 @@ public sealed class EnsureMetadataTask(
     ResourceProvider provider,
     ModrinthClient modrinth,
     HttpClient http,
-    NetSettings settings,
     FlameApi? flame = null)
     : FlintTask
 {
     // hash -> resource
     private readonly ModrinthClient _modrinth = modrinth;
     private readonly HttpClient _http = http;
-    private readonly FlameApi _flame = flame ?? new FlameApi(http, settings);
+    private readonly FlameApi _flame = flame ?? new FlameApi(http);
     private readonly Dictionary<string, IndexedVersion> _tempVersions = new(StringComparer.Ordinal);
     public bool LockUpdate { get; init; }
 

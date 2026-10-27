@@ -512,7 +512,6 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     {
         // the headless fallback layout: the CWD shape the former default Paths carried
         var cwd = AbsolutePath.CurrentWorkingDirectory;
-        var netSettings = MetaCache?.Settings ?? NetSettings.CreateDefault();
         return new()
         {
             Paths = new()
@@ -525,8 +524,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                 HomeRoot = cwd,
             },
             LoggerFactory = NullLoggerFactory.Instance,
-            Settings = netSettings,
-            Http = MetaCache?.Http ?? NetPrimaryHandler.CreateClient(netSettings),
+            Http = MetaCache?.Http ?? NetPrimaryHandler.CreateClient(),
             Config = UserConfigStore,
         };
     }

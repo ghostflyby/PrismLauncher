@@ -64,14 +64,12 @@ public sealed class ModrinthCreationTask : InstanceTask
         InstanceEnvironment environment,
         ModrinthClient modrinth,
         HttpClient http,
-        NetSettings settings,
         string id = "",
         string versionId = "",
         string originalInstanceId = "")
     {
         _modrinth = modrinth;
         _http = http;
-        _settings = settings;
         StagingPath = stagingPath;
         TrustedSource = trustedSource;
         SetParentEnvironment(environment);
@@ -84,7 +82,6 @@ public sealed class ModrinthCreationTask : InstanceTask
 
     private readonly ModrinthClient _modrinth;
     private readonly HttpClient _http;
-    private readonly NetSettings _settings;
     private string _minecraftVersion = "";
     private string _fabricVersion = "";
     private string _quiltVersion = "";
@@ -461,7 +458,7 @@ public sealed class ModrinthCreationTask : InstanceTask
     {
         var folder = newInstance.ModsRoot / ".index";
         var ensureMetadataTask = new EnsureMetadataTask(_resources, folder, ResourceProvider.Modrinth,
-            _modrinth, _http, _settings)
+            _modrinth, _http)
         {
             // setUpdateLock(true): updates for mods coming from an installed modpack are locked
             LockUpdate = true

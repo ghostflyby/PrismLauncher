@@ -58,10 +58,10 @@ public class GetModDependenciesTask : SequentialTask
     public sealed record PackDependencyExtraInfo(List<string> RequiredByIds);
 
     public GetModDependenciesTask(MinecraftInstance instance, ModFolderModel folder, List<PackDependency> selected,
-        ModrinthClient modrinth, HttpClient http, NetSettings settings, FlameApi? flame = null)
+        ModrinthClient modrinth, HttpClient http, FlameApi? flame = null)
     {
         _selected = selected;
-        _flame = flame ?? new FlameApi(http, settings);
+        _flame = flame ?? new FlameApi(http);
         _version = new McVersion(instance.GetPackProfile().GetComponentVersion("net.minecraft"));
         _loaderType = instance.GetPackProfile().GetSupportedModLoaders() ?? ModLoaderType.None;
         _modrinth = modrinth;
@@ -291,7 +291,7 @@ public class GetModDependenciesTask : SequentialTask
                 string dependencyBody;
                 try
                 {
-                    dependencyBody = await FlintHttp.GetStringAsync(_flame.Http, _flame.Settings,
+                    dependencyBody = await FlintHttp.GetStringAsync(_flame.Http,
                         new HttpRequestMessage(HttpMethod.Get, _flame.GetDependencyUrl(args)), cancellationToken);
                 }
                 catch (FlintHttpException e)

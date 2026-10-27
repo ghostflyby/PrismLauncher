@@ -45,12 +45,11 @@ public sealed class FileResolvingTask(
     FlameManifest toProcess,
     ModrinthClient modrinth,
     HttpClient http,
-    NetSettings settings,
     FlameApi? flame = null) : FlintTask
 {
     private readonly ModrinthClient _modrinth = modrinth;
     private readonly HttpClient _http = http;
-    private readonly FlameApi _flame = flame ?? new FlameApi(http, settings);
+    private readonly FlameApi _flame = flame ?? new FlameApi(http);
 
     public FlameManifest GetResults() => toProcess;
 

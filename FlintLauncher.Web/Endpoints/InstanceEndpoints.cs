@@ -158,8 +158,7 @@ public static class InstanceEndpoints
         }).Produces<InstanceCreatedResponse>(201);
 
         api.MapPost("/instances/import", async (ImportRequest request, InstanceList instances,
-            InstanceMutationLock instanceLock, ModrinthClient modrinth, HttpClient http, NetSettings settings,
-            FlameApi flame, HttpMetaCache metaCache, FlintTaskRegistry registry) =>
+            InstanceMutationLock instanceLock, ModrinthClient modrinth, HttpClient http, FlameApi flame, HttpMetaCache metaCache, FlintTaskRegistry registry) =>
         {
             if (string.IsNullOrWhiteSpace(request.Url) ||
                 !Uri.TryCreate(request.Url, UriKind.Absolute, out var uri) ||
@@ -172,7 +171,7 @@ public static class InstanceEndpoints
             try
             {
                 var importTask = new InstanceImportTask(uri, trustedSource: true,
-                    modrinth: modrinth, http: http, settings: settings, flame: flame)
+                    modrinth: modrinth, http: http, flame: flame)
                 {
                     MetaCache = metaCache,
                     // the OptionalModDialog answers for mrpack/CurseForge packs:

@@ -15,7 +15,6 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Versioning;
 using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Modrinth;
@@ -57,7 +56,7 @@ public static class ManagedPackEndpoints
 
         api.MapPost("/instances/{ref}/managedpack/update-check", async (string @ref,
             HttpContext httpContext, InstanceList instances, InstanceMutationLock instanceLock,
-            ModrinthClient modrinth, HttpClient http, NetSettings settings, FlameApi flame) =>
+            ModrinthClient modrinth, HttpClient http, FlameApi flame) =>
         {
             await instanceLock.WaitAsync();
             try
@@ -94,7 +93,7 @@ public static class ManagedPackEndpoints
                 var loadersList = profile.GetModLoadersList();
                 var resolver = new ModSelectionResolver(new McVersion(mcVersion),
                     profile.GetModLoaders() ?? ModLoaderType.None, loadersList,
-                    modrinth, http, settings, flame);
+                    modrinth, http, flame);
                 IndexedVersion latest;
                 try
                 {

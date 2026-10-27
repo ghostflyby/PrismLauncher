@@ -63,7 +63,7 @@ public class JavaDownloadTests : IDisposable
 
         var finalPath = TempPath("install-zip");
         var task = new ArchiveDownloadTask(new Uri($"{server.Url}/jdk-17.0.9.zip"), new AbsolutePath(finalPath),
-            TestNet.Http, TestNet.Settings);
+            TestNet.Http);
 
         await task.StartAsync();
 
@@ -86,7 +86,7 @@ public class JavaDownloadTests : IDisposable
 
         var finalPath = TempPath("install-bad-sha");
         var task = new ArchiveDownloadTask(new Uri($"{server.Url}/jdk.zip"), new AbsolutePath(finalPath),
-            TestNet.Http, TestNet.Settings, "sha1", new string('0', 40));
+            TestNet.Http, "sha1", new string('0', 40));
 
         await task.StartAsync();
 
@@ -123,7 +123,7 @@ public class JavaDownloadTests : IDisposable
         Assert.True(names is not null, $"ListTarGzFile failed: {listError}");
         Assert.Equal("jdk-17.0.9/", names[0]);
         var task = new ArchiveDownloadTask(new Uri($"{server.Url}/jdk-17.0.9.tar.gz"), new AbsolutePath(finalPath),
-            TestNet.Http, TestNet.Settings);
+            TestNet.Http);
 
         await task.StartAsync();
 
@@ -216,7 +216,7 @@ public class JavaDownloadTests : IDisposable
 
         var finalPath = TempPath("install-manifest");
         var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), new AbsolutePath(finalPath),
-            TestNet.Http, TestNet.Settings);
+            TestNet.Http);
 
         await task.StartAsync();
 
@@ -249,7 +249,7 @@ public class JavaDownloadTests : IDisposable
 
         var finalPath = TempPath("install-manifest-bad");
         var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), new AbsolutePath(finalPath),
-            TestNet.Http, TestNet.Settings, "sha1", new string('1', 40));
+            TestNet.Http, "sha1", new string('1', 40));
 
         await task.StartAsync();
 
@@ -291,7 +291,7 @@ public class JavaDownloadTests : IDisposable
 
         var finalPath = TempPath("install-manifest-badfile");
         var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), new AbsolutePath(finalPath),
-            TestNet.Http, TestNet.Settings);
+            TestNet.Http);
 
         await task.StartAsync();
 

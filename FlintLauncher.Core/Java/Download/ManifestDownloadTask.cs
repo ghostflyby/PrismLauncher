@@ -47,7 +47,7 @@ public sealed record JavaRuntimeRawJson(
 [JsonSerializable(typeof(JavaRuntimeManifestJson))]
 internal sealed partial class JavaManifestJsonContext : JsonSerializerContext;
 
-public sealed class ManifestDownloadTask(Uri url, AbsolutePath finalPath, HttpClient http, NetSettings settings, string checksumType = "", string checksumHash = "")
+public sealed class ManifestDownloadTask(Uri url, AbsolutePath finalPath, HttpClient http, string checksumType = "", string checksumHash = "")
     : FlintTask
 {
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -56,7 +56,7 @@ public sealed class ManifestDownloadTask(Uri url, AbsolutePath finalPath, HttpCl
         byte[] manifestBytes;
         try
         {
-            manifestBytes = await FlintHttp.SendAsync(http, settings,
+            manifestBytes = await FlintHttp.SendAsync(http,
                 new HttpRequestMessage(HttpMethod.Get, url), cancellationToken).ConfigureAwait(false);
         }
         catch (FlintHttpException e)
@@ -152,7 +152,7 @@ public sealed class ManifestDownloadTask(Uri url, AbsolutePath finalPath, HttpCl
         var elementDownload = new NetJob("JRE::FileDownload");
         foreach (var file in toDownload)
         {
-            var dl = HttpDownloadTask.ToFile(file.Url, file.Path, http, settings);
+            var dl = HttpDownloadTask.ToFile(file.Url, file.Path, http);
             if (file.Hash.Length != 0)
             {
                 dl.AddValidator(new ChecksumValidator(HashAlgorithmName.SHA1, file.Hash));

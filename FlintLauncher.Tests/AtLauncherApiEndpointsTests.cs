@@ -26,7 +26,7 @@ public class AtLauncherApiEndpointsTests : IDisposable
     public AtLauncherApiEndpointsTests()
     {
         // both URL hooks point at the stub (note the trailing slash like the C++ defaults)
-        _api = new AtLauncherApi(TestNet.Http, TestNet.Settings)
+        _api = new AtLauncherApi(TestNet.Http)
         {
             DownloadServerUrl = _server.Url + "/",
             ApiBaseUrl = _server.Url + "/",
@@ -196,7 +196,7 @@ public class AtLauncherApiEndpointsTests : IDisposable
         fixture.Register(_server);
         // a dead base on the injected client forces the request's serverUrl override to be
         // the only working route
-        var api = new AtLauncherApi(TestNet.Http, TestNet.Settings) { DownloadServerUrl = "http://127.0.0.1:9/" };
+        var api = new AtLauncherApi(TestNet.Http) { DownloadServerUrl = "http://127.0.0.1:9/" };
         await using var host = await FlintApiHost.StartAsync(atlauncher: api);
 
         var post = await host.PostAsync("/api/v1/modplatform/atlauncher/install", new

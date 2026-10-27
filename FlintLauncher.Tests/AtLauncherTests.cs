@@ -31,7 +31,7 @@ public class AtLauncherTests : IDisposable
     {
         Directory.CreateDirectory(_root);
         // both URL hooks point at the stub (note the trailing slash like the C++ defaults)
-        _api = new AtLauncherApi(TestNet.Http, TestNet.Settings)
+        _api = new AtLauncherApi(TestNet.Http)
         {
             DownloadServerUrl = _server.Url + "/",
             ApiBaseUrl = _server.Url + "/",

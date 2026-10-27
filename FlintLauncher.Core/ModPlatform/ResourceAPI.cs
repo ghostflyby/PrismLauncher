@@ -28,7 +28,6 @@
 
 using System.Text;
 using FlintLauncher.Core.Minecraft;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Versioning;
 
 namespace FlintLauncher.Core.ModPlatform;
@@ -90,11 +89,9 @@ public sealed class DependencySearchArgs
 /// </summary>
 public abstract class ResourceApi
 {
-    /// <summary>The persistent client this platform's requests go through, and the settings
-    /// its request-level behavior (retries, timeout) reads.</summary>
+    /// <summary>The persistent client this platform's requests go through; the request-level
+    /// behavior (user agent, proxy, retries, timeout) rides the client's own handlers.</summary>
     public abstract HttpClient Http { get; }
-
-    public abstract NetSettings Settings { get; }
 
     /// <summary>Gets a list of available sorting methods for this API.</summary>
     public abstract List<SortingMethod> GetSortingMethods();

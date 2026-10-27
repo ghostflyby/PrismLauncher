@@ -55,16 +55,14 @@ public sealed class FtbPackInstallTask(
     string versionName,
     ModrinthClient modrinth,
     HttpClient http,
-    NetSettings settings,
     FlameApi? flame = null,
     FtbApi? ftb = null)
     : InstanceTask
 {
-    private readonly FlameApi _flame = flame ?? new FlameApi(http, settings);
-    private readonly FtbApi _ftb = ftb ?? new FtbApi(http, settings);
+    private readonly FlameApi _flame = flame ?? new FlameApi(http);
+    private readonly FtbApi _ftb = ftb ?? new FtbApi(http);
     private readonly ModrinthClient _modrinth = modrinth;
     private readonly HttpClient _http = http;
-    private readonly NetSettings _settings = settings;
 
     // assigned by OnManifestDownloadSucceeded before any read
     private FtbVersion? _manifest;
@@ -169,7 +167,7 @@ public sealed class FtbPackInstallTask(
             }
         }
 
-        var modIdResolverTask = new FileResolvingTask(flameManifest, _modrinth, _http, _settings, flame: _flame);
+        var modIdResolverTask = new FileResolvingTask(flameManifest, _modrinth, _http, flame: _flame);
 
         EmitStatus("Resolving mods...");
         await modIdResolverTask.StartAsync(cancellationToken);
@@ -324,7 +322,7 @@ public sealed class FtbPackInstallTask(
 
             var path = StagingPath / ".minecraft" / file.Path / file.Name;
 
-            var dl = HttpDownloadTask.ToFile(new Uri(file.Url), path, _ftb.Http, _ftb.Settings);
+            var dl = HttpDownloadTask.ToFile(new Uri(file.Url), path, _ftb.Http);
             if (file.Sha1.Length != 0)
             {
                 dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, file.Sha1));

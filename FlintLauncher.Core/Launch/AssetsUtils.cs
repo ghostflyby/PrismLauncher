@@ -71,13 +71,13 @@ public sealed class AssetObject
     }
 
     /// <summary>Port of AssetObject::getDownloadAction; null when the local file is present.</summary>
-    public HttpDownloadTask? GetDownloadAction(AbsolutePath assetsRoot, string resourceUrl, HttpClient http, NetSettings settings)
+    public HttpDownloadTask? GetDownloadAction(AbsolutePath assetsRoot, string resourceUrl, HttpClient http)
     {
         var objectFile = new FileInfo(GetAbsolutePath(assetsRoot));
         if (!objectFile.Exists || objectFile.Length != Size)
         {
             var objectDl = HttpDownloadTask.ToFile(new Uri(resourceUrl + GetRelPath()),
-                new AbsolutePath(objectFile.FullName), http, settings);
+                new AbsolutePath(objectFile.FullName), http);
             if (Hash.Length != 0)
             {
                 objectDl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, Hash));
@@ -104,12 +104,12 @@ public sealed class AssetsIndex
     /// <summary>Port of AssetsIndex::getDownloadJob; null when everything is already present.
     /// <paramref name="assetsRoot"/> anchors the local object store (injected); the object
     /// downloads ride <paramref name="net"/>.</summary>
-    public NetJob? GetDownloadJob(string resourceUrl, AbsolutePath assetsRoot, HttpClient http, NetSettings settings)
+    public NetJob? GetDownloadJob(string resourceUrl, AbsolutePath assetsRoot, HttpClient http)
     {
         var job = new NetJob($"Assets for {Id}");
         foreach (var @object in Objects.Values)
         {
-            var dl = @object.GetDownloadAction(assetsRoot, resourceUrl, http, settings);
+            var dl = @object.GetDownloadAction(assetsRoot, resourceUrl, http);
             if (dl is not null)
             {
                 job.AddDownload(dl);

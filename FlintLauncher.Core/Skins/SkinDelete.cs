@@ -38,6 +38,6 @@ public static class SkinDelete
         var url = options.MinecraftServices.TrimEnd('/') + "/minecraft/profile/skins/active";
         var message = new HttpRequestMessage(HttpMethod.Delete, url);
         message.Headers.TryAddWithoutValidation("Authorization", $"Bearer {token}");
-        return FlintHttp.SendAsync(options.Http, options.Settings, message, cancellationToken);
+        return FlintHttp.SendAsync(options.Http, message, cancellationToken);
     }
 }

@@ -5,7 +5,7 @@
 // property defaults are the single source, read through the typed flint.json store; the
 // batch retired the SettingsObject adapter view), the
 // LaunchTask.parseXmlLogs wiring (LogParser behind the LaunchServices.XmlLogParsing gate),
-// the Http proxy/timeout hook application (NetSettingsApplier) and the meta-cache eviction the
+// the Http proxy/timeout hook application (NetConfigApplier) and the meta-cache eviction the
 // DELETE /api/v1/meta-cache endpoint delegates to.
 
 using System.Security.Cryptography;
@@ -186,13 +186,17 @@ public class CoverageFixCoreTests
     // --------------------------------------------------- net config application
 
     [Fact]
-    public void NetSettingsApplier_Applies_Proxy_Retries_Timeout_And_Ua()
+    public void NetConfigApplier_Applies_Proxy_Retries_Timeout_And_Ua()
     {
         var dataDir = Path.Combine(Path.GetTempPath(), $"flint-netcfg-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dataDir);
         try
         {
-            // the runtime's own stack — private to it, nothing process-wide to restore
+            // the host's own handler pair — private to this host, nothing process-wide to
+            // restore
+            var primary = new NetPrimaryHandler();
+            var retry = new RetryHandler { InnerHandler = primary };
+
             var runtime = new LauncherRuntime(FlintPaths.FromHomeDir(new AbsolutePath(dataDir)));
             runtime.Config.Set("ProxyType", "HTTP");
             runtime.Config.Set("ProxyAddr", "10.1.2.3");
@@ -201,13 +205,13 @@ public class CoverageFixCoreTests
             runtime.Config.Set("RequestTimeout", 120);
             runtime.Config.Set("UserAgentOverride", "Flint-NetCfg-Agent/9.9");
 
-            new NetSettingsApplier(runtime.Config, runtime.Secrets, runtime.Settings,
+            new NetConfigApplier(runtime.Config, runtime.Secrets, primary, retry,
                 runtime.Modrinth, runtime.Flame, runtime.Auth).Apply();
 
-            Assert.Equal(("HTTP", "10.1.2.3", 8118, "", ""), runtime.Settings.Current.Proxy);
-            Assert.Equal(4, runtime.Settings.Current.ManualRetries);
-            Assert.Equal(TimeSpan.FromSeconds(120), runtime.Settings.Current.RequestTimeout);
-            Assert.Equal("Flint-NetCfg-Agent/9.9", runtime.Settings.Current.UserAgent);
+            Assert.Equal(("HTTP", "10.1.2.3", 8118, "", ""), primary.Proxy);
+            Assert.Equal(4, retry.MaxManualRetries);
+            Assert.Equal(TimeSpan.FromSeconds(120), retry.RequestTimeout);
+            Assert.Equal("Flint-NetCfg-Agent/9.9", primary.UserAgent);
         }
         finally
         {
@@ -220,22 +224,18 @@ public class CoverageFixCoreTests
     }
 
     [Fact]
-    public void NetSettings_Update_Bumps_The_Proxy_Version_Only_On_A_Proxy_Change()
+    public void SetProxy_Bumps_The_Proxy_Version_Only_On_A_Proxy_Change()
     {
-        var settings = NetSettings.CreateDefault();
-        settings.Update("Flint-Idempotent/1.0", "None", "", 0, "", "",
-            manualRetries: 1, TimeSpan.FromSeconds(60));
-        var version = settings.Current.ProxyVersion;
+        var primary = new NetPrimaryHandler();
+        primary.UserAgent = "Flint-Idempotent/1.0";
+        var version = primary.ProxyVersion;
         // an identical proxy tuple -> no version bump (the transport keeps its handler, so
         // the connection pool survives a settings re-apply)
-        settings.Update("Flint-Idempotent/2.0", "None", "", 0, "", "",
-            manualRetries: 1, TimeSpan.FromSeconds(60));
-        Assert.Equal(version, settings.Current.ProxyVersion);
-        Assert.Equal("Flint-Idempotent/2.0", settings.Current.UserAgent);
+        primary.UserAgent = "Flint-Idempotent/2.0";
+        Assert.Equal(version, primary.ProxyVersion);
         // a proxy change advances the version the transport swaps on
-        settings.Update("Flint-Idempotent/2.0", "HTTP", "10.0.0.1", 8080, "", "",
-            manualRetries: 1, TimeSpan.FromSeconds(60));
-        Assert.Equal(version + 1, settings.Current.ProxyVersion);
+        primary.SetProxy("HTTP", "10.0.0.1", 8080, "", "");
+        Assert.Equal(version + 1, primary.ProxyVersion);
     }
 
     // ------------------------------------------------------- meta cache eviction
