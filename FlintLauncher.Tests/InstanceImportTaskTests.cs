@@ -10,10 +10,10 @@ using System.IO.Compression;
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
 using Xunit;
 

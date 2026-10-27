@@ -11,14 +11,12 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform;
-using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Tasks;
 using TruePath;
 using Xunit;
 using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
-
-using FlintLauncher.Core.Net;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Tests;
 

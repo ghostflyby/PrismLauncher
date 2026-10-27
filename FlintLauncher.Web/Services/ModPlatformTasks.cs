@@ -33,6 +33,7 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Modrinth;
 using FlintLauncher.Web.Models;
 
 namespace FlintLauncher.Web.Services;
@@ -89,8 +90,13 @@ public static class ModPlatformTasks
 /// (IndexedPack, IndexedVersion) pairs: project info through the provider getProject, the
 /// version either pinned by id or the latest one matching the instance's mc version/loader.
 /// </summary>
-public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType loaders,
-    IReadOnlyList<ModLoaderType> loaderList, ModrinthClient modrinth, HttpClient http, NetSettings settings,
+public sealed class ModSelectionResolver(
+    McVersion mcVersion,
+    ModLoaderType loaders,
+    IReadOnlyList<ModLoaderType> loaderList,
+    ModrinthClient modrinth,
+    HttpClient http,
+    NetSettings settings,
     FlameApi? flame = null)
 {
     private readonly ModrinthClient _modrinth = modrinth;
@@ -247,8 +253,8 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         try
         {
             dtos = await _modrinth.Versions.Query(pack.AddonId,
-                [ResourceApi.MapMcVersionToModrinth(mcVersion)],
-                ModIndex.ModLoaderTypesToList(loaders).Select(ModIndex.GetModLoaderAsString).ToList())
+                    [ResourceApi.MapMcVersionToModrinth(mcVersion)],
+                    ModIndex.ModLoaderTypesToList(loaders).Select(ModIndex.GetModLoaderAsString).ToList())
                 .SendTo(_http, cancellationToken);
         }
         catch (Exception e) when (e is ModrinthApiException)
@@ -411,13 +417,9 @@ public sealed class ModInstallTask(
                 folder,
                 _modrinth,
                 _http,
-
                 isIndexed: true,
-
                 downloadReason: isDependency ? "dependency" : "standalone",
-
                 dependentOn: requiredBy ?? "",
-
                 instance));
         }
 

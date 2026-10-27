@@ -2,11 +2,10 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 
-namespace FlintLauncher.ExternalApi;
+namespace FlintLauncher.ExternalApi.Modrinth;
 
 /// <summary>The PAT rides on every request when a token is set (the C++ ApiHeaderProxy
 /// header logic); the transport strategies stay on the executor's handler chain.</summary>
@@ -43,7 +42,9 @@ internal static class ModrinthDecoding
 
 /// <summary>GET /version_file/{hash}?algorithm= — the version for one file hash.</summary>
 public readonly record struct ModrinthFileVersionQuery(
-    ModrinthClientOptions Options, string Hash, string Algorithm) : IApiOperation<ModrinthVersion>
+    ModrinthClientOptions Options,
+    string Hash,
+    string Algorithm) : IApiOperation<ModrinthVersion>
 {
     public HttpRequestMessage CreateRequest() =>
         new HttpRequestMessage(HttpMethod.Get, $"{Options.BaseUrl}/version_file/{Hash}?algorithm={Algorithm}")
@@ -52,13 +53,15 @@ public readonly record struct ModrinthFileVersionQuery(
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
     public Task<ModrinthVersion> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync(response, ModrinthJsonContext.Default.ModrinthVersion, ct);
+        ModrinthDecoding.ReadJsonAsync<ModrinthVersion>(response, ModrinthJsonContext.Default.ModrinthVersion, ct);
 }
 
 /// <summary>POST /version_files — the versions for a batch of file hashes; an empty hash
 /// list or algorithm is omitted from the body.</summary>
 public readonly record struct ModrinthFileVersionLookupQuery(
-    ModrinthClientOptions Options, IReadOnlyList<string> Hashes, string Algorithm)
+    ModrinthClientOptions Options,
+    IReadOnlyList<string> Hashes,
+    string Algorithm)
     : IApiOperation<Dictionary<string, ModrinthVersion>>
 {
     public HttpRequestMessage CreateRequest()
@@ -77,15 +80,19 @@ public readonly record struct ModrinthFileVersionLookupQuery(
 
     public Task<Dictionary<string, ModrinthVersion>> ReadResponseAsync(HttpResponseMessage response,
         CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync(response,
+        ModrinthDecoding.ReadJsonAsync<Dictionary<string, ModrinthVersion>>(response,
             ModrinthJsonContext.Default.DictionaryStringModrinthVersion, ct);
 }
 
 /// <summary>POST /version_files/update — the latest versions for a batch of file hashes;
 /// the optional lists shape the body and are omitted when empty (#3404).</summary>
 public readonly record struct ModrinthLatestVersionsQuery(
-    ModrinthClientOptions Options, IReadOnlyList<string> Hashes, string Algorithm,
-    List<string>? Loaders, List<string>? GameVersions, List<string>? VersionTypes)
+    ModrinthClientOptions Options,
+    IReadOnlyList<string> Hashes,
+    string Algorithm,
+    List<string>? Loaders,
+    List<string>? GameVersions,
+    List<string>? VersionTypes)
     : IApiOperation<Dictionary<string, ModrinthVersion>>
 {
     public HttpRequestMessage CreateRequest()
@@ -107,7 +114,7 @@ public readonly record struct ModrinthLatestVersionsQuery(
 
     public Task<Dictionary<string, ModrinthVersion>> ReadResponseAsync(HttpResponseMessage response,
         CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync(response,
+        ModrinthDecoding.ReadJsonAsync<Dictionary<string, ModrinthVersion>>(response,
             ModrinthJsonContext.Default.DictionaryStringModrinthVersion, ct);
 }
 
@@ -122,14 +129,17 @@ public readonly record struct ModrinthVersionQuery(ModrinthClientOptions Options
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
     public Task<ModrinthVersion> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync(response, ModrinthJsonContext.Default.ModrinthVersion, ct);
+        ModrinthDecoding.ReadJsonAsync<ModrinthVersion>(response, ModrinthJsonContext.Default.ModrinthVersion, ct);
 }
 
 /// <summary>GET /project/{id}/version — the version list behind a project; the filters are
 /// the wire's JSON-array query parameters (omitted when empty), and the upstream
 /// include_changelog=false default stays explicit (the port has no changelog producer).</summary>
-public readonly record struct ModrinthVersionListQuery(ModrinthClientOptions Options, string ProjectId,
-    IReadOnlyList<string>? GameVersions = null, IReadOnlyList<string>? Loaders = null,
+public readonly record struct ModrinthVersionListQuery(
+    ModrinthClientOptions Options,
+    string ProjectId,
+    IReadOnlyList<string>? GameVersions = null,
+    IReadOnlyList<string>? Loaders = null,
     bool IncludeChangelog = false)
     : IApiOperation<List<ModrinthVersion>>
 {
@@ -153,7 +163,7 @@ public readonly record struct ModrinthVersionListQuery(ModrinthClientOptions Opt
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
     public Task<List<ModrinthVersion>> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync(response, ModrinthJsonContext.Default.ListModrinthVersion, ct);
+        ModrinthDecoding.ReadJsonAsync<List<ModrinthVersion>>(response, ModrinthJsonContext.Default.ListModrinthVersion, ct);
 }
 
 // ------------------------------------------------------------------------------ projects
@@ -169,7 +179,7 @@ public readonly record struct ModrinthProjectQuery(ModrinthClientOptions Options
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
     public Task<ModrinthProject> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync(response, ModrinthJsonContext.Default.ModrinthProject, ct);
+        ModrinthDecoding.ReadJsonAsync<ModrinthProject>(response, ModrinthJsonContext.Default.ModrinthProject, ct);
 }
 
 /// <summary>GET /projects?ids=[...] — the projects for a batch of ids.</summary>
@@ -182,7 +192,7 @@ public readonly record struct ModrinthProjectsQuery(ModrinthClientOptions Option
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
     public Task<List<ModrinthProject>> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync(response, ModrinthJsonContext.Default.ListModrinthProject, ct);
+        ModrinthDecoding.ReadJsonAsync<List<ModrinthProject>>(response, ModrinthJsonContext.Default.ListModrinthProject, ct);
 }
 
 /// <summary>GET /project/{id}/description — the project body as plain text. The endpoint
@@ -223,14 +233,19 @@ public readonly record struct ModrinthCategoriesQuery(ModrinthClientOptions Opti
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
     public Task<List<ModrinthCategory>> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync(response, ModrinthJsonContext.Default.ListModrinthCategory, ct);
+        ModrinthDecoding.ReadJsonAsync<List<ModrinthCategory>>(response, ModrinthJsonContext.Default.ListModrinthCategory, ct);
 }
 
 /// <summary>GET /search — the search envelope in wire vocabulary: the fixed page size, the
 /// free text, the sort index and the facet groups (each group OR-s its values, the groups
 /// AND together — the wire encodes them as a JSON array of arrays).</summary>
-public readonly record struct ModrinthSearchQuery(ModrinthClientOptions Options, int Offset,
-    string? Query, string? Index, string ProjectType, IReadOnlyList<IReadOnlyList<string>> Facets)
+public readonly record struct ModrinthSearchQuery(
+    ModrinthClientOptions Options,
+    int Offset,
+    string? Query,
+    string? Index,
+    string ProjectType,
+    IReadOnlyList<IReadOnlyList<string>> Facets)
     : IApiOperation<ModrinthSearchResults>
 {
     public HttpRequestMessage CreateRequest()
@@ -261,7 +276,7 @@ public readonly record struct ModrinthSearchQuery(ModrinthClientOptions Options,
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
     public Task<ModrinthSearchResults> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync(response, ModrinthJsonContext.Default.ModrinthSearchResults, ct);
+        ModrinthDecoding.ReadJsonAsync<ModrinthSearchResults>(response, ModrinthJsonContext.Default.ModrinthSearchResults, ct);
 }
 
 // ----------------------------------------------------------------------------- downloads
@@ -273,8 +288,11 @@ public readonly record struct ModrinthSearchQuery(ModrinthClientOptions Options,
 /// set; send it with the streaming read option (ResponseHeadersRead) so the body never
 /// buffers whole. The destination file is not part of the request — it is the execution
 /// argument of the send and resolves to the number of bytes written.</summary>
-public readonly record struct ModrinthFileDownload(ModrinthClientOptions Options, string Url,
-    ModrinthDownloadMeta? Meta = null, (string Algorithm, string Hash)? Checksum = null)
+public readonly record struct ModrinthFileDownload(
+    ModrinthClientOptions Options,
+    string Url,
+    ModrinthDownloadMeta? Meta = null,
+    (string Algorithm, string Hash)? Checksum = null)
     : IApiOperation<string, long>
 {
     public HttpRequestMessage CreateRequest(string destinationPath)

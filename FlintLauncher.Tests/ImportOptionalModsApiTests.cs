@@ -12,11 +12,9 @@
 
 using System.Net;
 using System.Text.Json;
-using FlintLauncher.Core.ModPlatform.Modrinth;
 using Xunit;
-
-using FlintLauncher.Core.Net;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Tests;
 

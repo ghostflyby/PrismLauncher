@@ -46,6 +46,7 @@ using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
 using TruePath.SystemIo;
 

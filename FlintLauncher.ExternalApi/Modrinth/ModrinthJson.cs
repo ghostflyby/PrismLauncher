@@ -18,7 +18,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace FlintLauncher.ExternalApi;
+namespace FlintLauncher.ExternalApi.Modrinth;
 
 // ------------------------------------------------------------------------- request bodies
 

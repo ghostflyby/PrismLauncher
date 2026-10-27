@@ -13,8 +13,8 @@
 
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
-
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 

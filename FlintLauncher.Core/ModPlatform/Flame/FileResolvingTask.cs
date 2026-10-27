@@ -24,6 +24,7 @@ using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
@@ -40,8 +41,12 @@ public sealed class BlockedMod
     public bool Disabled { get; set; }
 }
 
-public sealed class FileResolvingTask(FlameManifest toProcess, ModrinthClient modrinth, HttpClient http,
-    NetSettings settings, FlameApi? flame = null) : FlintTask
+public sealed class FileResolvingTask(
+    FlameManifest toProcess,
+    ModrinthClient modrinth,
+    HttpClient http,
+    NetSettings settings,
+    FlameApi? flame = null) : FlintTask
 {
     private readonly ModrinthClient _modrinth = modrinth;
     private readonly HttpClient _http = http;

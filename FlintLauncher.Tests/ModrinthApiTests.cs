@@ -10,7 +10,6 @@
 // is serialized through the "ModrinthApi" collection and restores the defaults in Dispose.
 
 using System.IO.Compression;
-using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -27,10 +26,11 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
 using Xunit;
+using ModrinthJsonContext = FlintLauncher.ExternalApi.Modrinth.ModrinthJsonContext;
 using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
-using ResourceType = FlintLauncher.Core.ModPlatform.ResourceType;
 
 namespace FlintLauncher.Tests;
 
@@ -254,7 +254,7 @@ public class ModrinthApiTests : IDisposable
 
         // the metadata layer attaches through ModFolderModel (status Installed)
         var modList = new ModFolderModel(MaterializedDirectory.Ensure(
-        new AbsolutePath(Path.Combine(staging, "minecraft", "mods")))!);
+            new AbsolutePath(Path.Combine(staging, "minecraft", "mods")))!);
         modList.Update();
         var mod = Assert.Single(modList.AllMods(),
             m => m.Type == FlintLauncher.Core.Minecraft.Resources.ResourceType.ZipFile);

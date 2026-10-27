@@ -25,8 +25,10 @@ using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
 using TruePath.SystemIo;
+using MrPackJsonContext = FlintLauncher.ExternalApi.Modrinth.MrPackJsonContext;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 

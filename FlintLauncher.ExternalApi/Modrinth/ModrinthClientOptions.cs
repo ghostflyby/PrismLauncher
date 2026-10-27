@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 
-namespace FlintLauncher.ExternalApi;
+namespace FlintLauncher.ExternalApi.Modrinth;
 
 /// <summary>The Modrinth client's configuration, read per request from the instance the
 /// composition root handed to the client. Apply settings changes through that same instance

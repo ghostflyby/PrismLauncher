@@ -14,13 +14,13 @@
 //    not ported yet; the update record carries the resolved IndexedVersion instead.
 //  - The dependency list (m_deps) is not ported.
 
-using System.Text.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
@@ -168,7 +168,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
                 loader is { } loaderFlags
                     ? ModIndex.ModLoaderTypesToList(loaderFlags).Select(ModIndex.GetModLoaderAsString).ToList()
                     : null,
-                _gameVersions is null ? null : [.. _gameVersions.Select(ResourceApi.MapMcVersionToModrinth)],
+                [.. _gameVersions.Select(ResourceApi.MapMcVersionToModrinth)],
                 versionTypes).SendTo(_http, cancellationToken);
         }
         catch (Exception e) when (e is ModrinthApiException)

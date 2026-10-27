@@ -37,8 +37,10 @@ using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
 using TruePath.SystemIo;
+using MrPackJsonContext = FlintLauncher.ExternalApi.Modrinth.MrPackJsonContext;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
@@ -591,8 +593,12 @@ public sealed class ModrinthCreationTask : InstanceTask
     /// One indexed file: try every download URL in order, checksum-verified (the per-file
     /// slice of the C++ download NetJob with its failed -> next-URL fallback chain).
     /// </summary>
-    private sealed class ModDownloadTask(File file, AbsolutePath filePath, ModrinthDownloadMeta meta,
-        ModrinthClient modrinth, HttpClient http)
+    private sealed class ModDownloadTask(
+        File file,
+        AbsolutePath filePath,
+        ModrinthDownloadMeta meta,
+        ModrinthClient modrinth,
+        HttpClient http)
         : FlintTask
     {
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)

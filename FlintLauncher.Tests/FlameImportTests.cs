@@ -17,9 +17,9 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Tasks;
 using TruePath;
 using Xunit;
-
 using FlintLauncher.Core.Net;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Tests;
 

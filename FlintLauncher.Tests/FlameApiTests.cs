@@ -17,13 +17,12 @@ using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Hashing;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using TruePath;
 using Xunit;
-
 using FlintLauncher.Core.Net;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Tests;
 

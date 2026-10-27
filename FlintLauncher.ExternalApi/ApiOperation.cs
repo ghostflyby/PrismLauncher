@@ -14,12 +14,12 @@ public interface IApiOperation<TResult>
 {
     /// <summary>Builds a fresh request message with the operation's method, URL, headers and
     /// body; the content must be replayable (buffered or empty).</summary>
-    HttpRequestMessage CreateRequest();
+    protected internal HttpRequestMessage CreateRequest();
 
     /// <summary>The failure decision of this builder: wraps a transport, gate or read
     /// failure into the exception the API wears — uniform across every operation of a root.
     /// The pipeline throws the result; cancellation never reaches this.</summary>
-    Exception WrapFailure(Exception failure);
+    protected internal Exception WrapFailure(Exception failure);
 
     /// <summary>Reads the response into the result type, owning the endpoint's status
     /// semantics and body shape: gate through <see cref="ApiOperation.EnsureSuccessAsync"/>
@@ -27,7 +27,7 @@ public interface IApiOperation<TResult>
     /// it in its natural shape (JSON through the serializer's stream API, text through a
     /// reader, files straight to disk). The response stays owned by the pipeline and must
     /// not be disposed here.</summary>
-    Task<TResult> ReadResponseAsync(HttpResponseMessage response,
+    protected internal Task<TResult> ReadResponseAsync(HttpResponseMessage response,
         CancellationToken ct);
 }
 
@@ -38,7 +38,7 @@ public interface IApiOperation<TResult>
 /// bound at construction under the <see cref="IApiOperation{TResult}"/> rules.</summary>
 /// <typeparam name="TArgs">The per-send arguments.</typeparam>
 /// <typeparam name="TResult">The read result.</typeparam>
-public interface IApiOperation<TArgs, TResult>
+public interface IApiOperation<in TArgs, TResult>
 {
     /// <summary>Builds a fresh request message for this send; the content must be replayable
     /// (buffered or empty).</summary>

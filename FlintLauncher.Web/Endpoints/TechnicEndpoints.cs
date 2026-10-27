@@ -21,7 +21,6 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 using TruePath;
@@ -38,13 +37,13 @@ public static class TechnicEndpoints
         // (GET /modplatform/technic/trending below). Results map through
         // TechnicApi.LoadSearchResults (the "vanilla" slug exclusion included).
         api.MapGet("/modplatform/technic/search", async Task<IResult> (string? query, string? serverUrl,
-            TechnicApi technic) =>
+                    TechnicApi technic) =>
                 await SearchAsync(string.IsNullOrWhiteSpace(query) ? "" : query.Trim(), serverUrl, technic))
             .Produces<TechnicSearchResultView[]>();
 
         // ----------------------------------------------- modplatform/technic/trending
         api.MapGet("/modplatform/technic/trending", async Task<IResult> (string? serverUrl,
-            TechnicApi technic) =>
+                    TechnicApi technic) =>
                 await SearchAsync("", serverUrl, technic))
             .Produces<TechnicSearchResultView[]>();
 

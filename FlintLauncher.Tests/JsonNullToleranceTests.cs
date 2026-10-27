@@ -26,6 +26,7 @@ using FlintLauncher.ExternalApi;
 using TruePath;
 using Xunit;
 using MetaIndex = FlintLauncher.Core.Meta.Index;
+using ModrinthJsonContext = FlintLauncher.ExternalApi.Modrinth.ModrinthJsonContext;
 
 namespace FlintLauncher.Tests;
 
