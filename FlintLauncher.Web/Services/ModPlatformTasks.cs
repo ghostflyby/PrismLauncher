@@ -96,8 +96,6 @@ public sealed class ModSelectionResolver(
     HttpClient http,
     FlameClient? flame = null)
 {
-    private readonly ModrinthClient _modrinth = modrinth;
-    private readonly HttpClient _http = http;
     private readonly FlameClient _flame = flame ?? new FlameClient();
 
     public async Task<(IndexedPack Pack, IndexedVersion Version)> ResolveAsync(
@@ -110,7 +108,7 @@ public sealed class ModSelectionResolver(
             FlameProjectEnvelope envelope;
             try
             {
-                envelope = await _flame.Projects.ById(projectId).SendTo(_http, cancellationToken);
+                envelope = await _flame.Projects.ById(projectId).SendTo(http, cancellationToken);
             }
             catch (Exception e) when (e is FlameApiException)
             {
@@ -136,7 +134,7 @@ public sealed class ModSelectionResolver(
             ModrinthProject dto;
             try
             {
-                dto = await _modrinth.Projects.ById(projectId).SendTo(_http, cancellationToken);
+                dto = await modrinth.Projects.ById(projectId).SendTo(http, cancellationToken);
             }
             catch (Exception e) when (e is ModrinthApiException)
             {
@@ -171,7 +169,7 @@ public sealed class ModSelectionResolver(
                 FlameFileEnvelope envelope;
                 try
                 {
-                    envelope = await _flame.Files.ById(projectId, versionId).SendTo(_http, cancellationToken);
+                    envelope = await _flame.Files.ById(projectId, versionId).SendTo(http, cancellationToken);
                 }
                 catch (Exception e) when (e is FlameApiException)
                 {
@@ -189,7 +187,7 @@ public sealed class ModSelectionResolver(
             ModrinthVersion dto;
             try
             {
-                dto = await _modrinth.Versions.ById(versionId).SendTo(_http, cancellationToken);
+                dto = await modrinth.Versions.ById(versionId).SendTo(http, cancellationToken);
             }
             catch (Exception e) when (e is ModrinthApiException)
             {
@@ -218,7 +216,7 @@ public sealed class ModSelectionResolver(
             try
             {
                 doc = await _flame.Files.List(pack.AddonId, gameVersion: mcVersion.ToString())
-                    .SendTo(_http, cancellationToken);
+                    .SendTo(http, cancellationToken);
             }
             catch (Exception e) when (e is FlameApiException)
             {
@@ -244,10 +242,10 @@ public sealed class ModSelectionResolver(
         List<ModrinthVersion> dtos;
         try
         {
-            dtos = await _modrinth.Versions.Query(pack.AddonId,
+            dtos = await modrinth.Versions.Query(pack.AddonId,
                     [ModrinthVersionFormat.ToWire(mcVersion)],
                     ModIndex.ModLoaderTypesToList(loaders).Select(ModIndex.GetModLoaderAsString).ToList())
-                .SendTo(_http, cancellationToken);
+                .SendTo(http, cancellationToken);
         }
         catch (Exception e) when (e is ModrinthApiException)
         {
@@ -293,8 +291,6 @@ public sealed class ModInstallTask(
     private readonly McVersion _mcVersion = new(mcVersion);
     private readonly List<ModLoaderType> _loaderList = ModIndex.ModLoaderTypesToList(loaders);
     private readonly List<ModInstallEntryView> _installed = [];
-    private readonly ModrinthClient _modrinth = modrinth;
-    private readonly HttpClient _http = http;
     private readonly FlameClient _flame = flame ?? new FlameClient();
 
     /// <summary>The entries for the task view's optional result payload.</summary>
@@ -309,7 +305,7 @@ public sealed class ModInstallTask(
         try
         {
             var resolver = new ModSelectionResolver(_mcVersion, loaders, _loaderList,
-                _modrinth, _http, _flame);
+                modrinth, http, _flame);
             var current = 0;
             foreach (var selection in selections)
             {
@@ -328,7 +324,7 @@ public sealed class ModInstallTask(
 
         EmitStatus("Resolving dependencies...");
         var dependencyTask = new GetModDependenciesTask(instance, folder, selected,
-            _modrinth, _http, _flame);
+            modrinth, http, _flame);
         await dependencyTask.StartAsync(cancellationToken);
         if (!dependencyTask.WasSuccessful)
         {
@@ -377,8 +373,8 @@ public sealed class ModInstallTask(
                 entry.Pack,
                 entry.Version,
                 folder,
-                _modrinth,
-                _http,
+                modrinth,
+                http,
                 isIndexed: true,
                 downloadReason: isDependency ? "dependency" : "standalone",
                 dependentOn: requiredBy ?? "",
@@ -421,9 +417,6 @@ public sealed class ModsUpdateTask(
     private sealed record PendingUpdate(ModUpdateEntryView View, IndexedVersion Version, string ProjectId, string Slug, string Name);
 
     private readonly List<PendingUpdate> _updates = [];
-    private readonly ModrinthClient _modrinth = modrinth;
-    private readonly HttpClient _http = http;
-    private readonly FlameClient _flame = flameApi;
 
     /// <summary>The update entries for the task view's optional result payload.</summary>
     public TaskResultView BuildResult() => new(_updates.Select(u => u.View).ToArray(), null);
@@ -447,8 +440,8 @@ public sealed class ModsUpdateTask(
         // the check passes refuse metadata-less resources; the API simply skips them.
         // Locked resources (metadata lockUpdate) are skipped too — the data-level half of
         // ResourceUpdateDialog::onMetadataEnsured's `!metadata() || lockUpdate()` guard.
-        var modrinth = new List<Resource>();
-        var flame = new List<Resource>();
+        var modrinthResources = new List<Resource>();
+        var flameResources = new List<Resource>();
         foreach (var mod in candidates)
         {
             var metadata = folder.GetMetadata(mod);
@@ -459,19 +452,19 @@ public sealed class ModsUpdateTask(
 
             if (metadata.Provider == ResourceProvider.Modrinth)
             {
-                modrinth.Add(mod);
+                modrinthResources.Add(mod);
             }
             else if (metadata.Provider == ResourceProvider.Flame)
             {
-                flame.Add(mod);
+                flameResources.Add(mod);
             }
         }
 
-        if (modrinth.Count != 0)
+        if (modrinthResources.Count != 0)
         {
             EmitStatus("Checking Modrinth updates...");
-            var check = new ModrinthCheckUpdate(modrinth, gameVersions, loadersList,
-                resource => folder.GetMetadata(resource), _modrinth, _http, releaseTypes);
+            var check = new ModrinthCheckUpdate(modrinthResources, gameVersions, loadersList,
+                resource => folder.GetMetadata(resource), modrinth, http, releaseTypes);
             await check.StartAsync(cancellationToken);
             if (!check.WasSuccessful)
             {
@@ -479,7 +472,7 @@ public sealed class ModsUpdateTask(
                 return;
             }
 
-            var byProject = MetadataByProject(modrinth);
+            var byProject = MetadataByProject(modrinthResources);
             foreach (var update in check.GetUpdates())
             {
                 if (byProject.TryGetValue(update.Version.AddonId, out var metadata))
@@ -489,11 +482,11 @@ public sealed class ModsUpdateTask(
             }
         }
 
-        if (flame.Count != 0)
+        if (flameResources.Count != 0)
         {
             EmitStatus("Checking CurseForge updates...");
-            var check = new FlameCheckUpdate(flame, gameVersions, loadersList,
-                resource => folder.GetMetadata(resource), _flame, _http, releaseTypes);
+            var check = new FlameCheckUpdate(flameResources, gameVersions, loadersList,
+                resource => folder.GetMetadata(resource), flameApi, http, releaseTypes);
             await check.StartAsync(cancellationToken);
             if (!check.WasSuccessful)
             {
@@ -501,7 +494,7 @@ public sealed class ModsUpdateTask(
                 return;
             }
 
-            var byProject = MetadataByProject(flame);
+            var byProject = MetadataByProject(flameResources);
             foreach (var update in check.GetUpdates())
             {
                 if (byProject.TryGetValue(update.Version.AddonId, out var metadata))
@@ -532,8 +525,8 @@ public sealed class ModsUpdateTask(
             isIndexed: true,
             downloadReason: "update",
             instance: instance,
-            modrinth: _modrinth,
-            http: _http));
+            modrinth: modrinth,
+            http: http));
         var apply = new ModUpdateTask(folder, downloads);
         await apply.StartAsync(cancellationToken);
         if (!apply.WasSuccessful)

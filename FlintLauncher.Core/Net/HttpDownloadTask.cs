@@ -46,9 +46,6 @@ public sealed class HttpDownloadTask(
     string? name = null)
     : FlintTask
 {
-    private readonly HttpClient _http = http;
-    private readonly byte[]? _postData = postData;
-
     private readonly List<Validator> _validators = [];
     private AbsolutePath? _tempFile;
     private bool _wroteAnyData;
@@ -124,15 +121,15 @@ public sealed class HttpDownloadTask(
                 }
             }
 
-            if (_postData is not null)
+            if (postData is not null)
             {
-                message.Content = new ByteArrayContent(_postData);
+                message.Content = new ByteArrayContent(postData);
             }
 
             message.Options.Set(RetryHandler.ManualRetryOption, true);
             message.Options.Set(RetryHandler.AutoRetryOption, options.HasFlag(RequestOptions.AutoRetry));
 
-            using var response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
+            using var response = await http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
                 window.Token).ConfigureAwait(false);
 
             var statusCode = (int)response.StatusCode;

@@ -47,8 +47,6 @@ public sealed class FileResolvingTask(
     HttpClient http,
     FlameClient? flame = null) : FlintTask
 {
-    private readonly ModrinthClient _modrinth = modrinth;
-    private readonly HttpClient _http = http;
     private readonly FlameClient _flame = flame ?? new FlameClient();
 
     public FlameManifest GetResults() => toProcess;
@@ -76,7 +74,7 @@ public sealed class FileResolvingTask(
         FlameFileList doc;
         try
         {
-            doc = await _flame.Files.ByIds(fileIds).SendTo(_http, cancellationToken);
+            doc = await _flame.Files.ByIds(fileIds).SendTo(http, cancellationToken);
         }
         catch (FlameApiException e)
         {
@@ -152,8 +150,8 @@ public sealed class FileResolvingTask(
             // treated the same as the C++ parse-error path
             if (FallbackMrBlockedMods)
             {
-                var entries = await _modrinth.Versions.ByFileHashes(hashes, "sha1")
-                    .SendTo(_http, cancellationToken);
+                var entries = await modrinth.Versions.ByFileHashes(hashes, "sha1")
+                    .SendTo(http, cancellationToken);
                 foreach (var outFile in toProcess.Files.Values)
                 {
                     var urlValid = Uri.TryCreate(outFile.Version.DownloadUrl, UriKind.Absolute, out _);
@@ -189,7 +187,7 @@ public sealed class FileResolvingTask(
         FlameProjectList doc;
         try
         {
-            doc = await _flame.Projects.ByIds(addonIds).SendTo(_http, cancellationToken);
+            doc = await _flame.Projects.ByIds(addonIds).SendTo(http, cancellationToken);
         }
         catch (FlameApiException e)
         {

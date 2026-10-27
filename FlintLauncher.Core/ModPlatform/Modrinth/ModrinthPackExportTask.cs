@@ -52,8 +52,6 @@ public sealed class ModrinthPackExportTask(
     private readonly List<string> _files = [];
     private readonly Dictionary<string, string> _pendingHashes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ResolvedFile> _resolvedFiles = new(StringComparer.Ordinal);
-    private readonly ModrinthClient _modrinth = modrinth;
-    private readonly HttpClient _http = http;
 
     private sealed record ResolvedFile(string Sha1, string Sha512, string Url, long Size, SideType Side);
 
@@ -158,8 +156,8 @@ public sealed class ModrinthPackExportTask(
         }
 
         EmitStatus("Finding versions for hashes...");
-        var entries = await _modrinth.Versions
-            .ByFileHashes(_pendingHashes.Values.ToList(), "sha512").SendTo(_http, cancellationToken);
+        var entries = await modrinth.Versions
+            .ByFileHashes(_pendingHashes.Values.ToList(), "sha512").SendTo(http, cancellationToken);
 
         ParseApiResponse(entries);
         BuildZip();

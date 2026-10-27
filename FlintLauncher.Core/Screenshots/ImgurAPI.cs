@@ -105,7 +105,6 @@ public sealed class ImgurUpload(
     : FlintTask
 {
     private readonly string _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
-    private readonly HttpClient _http = http;
 
     /// <summary>The imgur endpoint: BuildConfig.IMGUR_BASE_URL + "image".</summary>
     public string EndpointUrl
@@ -139,7 +138,7 @@ public sealed class ImgurUpload(
         // the inactivity window (RequestTimeout): the transport's retry gate arms it with
         // its configured length and covers the send with it
         using var window = new RetryHandler.Window(message, cancellationToken);
-        using var response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
+        using var response = await http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
             window.Token).ConfigureAwait(false);
         var statusCode = (int)response.StatusCode;
         string responseBody;
@@ -230,7 +229,6 @@ public sealed class ImgurAlbumCreation(
     : FlintTask
 {
     private readonly string _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
-    private readonly HttpClient _http = http;
 
     /// <summary>The imgur endpoint: BuildConfig.IMGUR_BASE_URL + "album".</summary>
     public string EndpointUrl
@@ -256,7 +254,7 @@ public sealed class ImgurAlbumCreation(
         // the inactivity window (RequestTimeout): the transport's retry gate arms it with
         // its configured length and covers the send with it
         using var window = new RetryHandler.Window(message, cancellationToken);
-        using var response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
+        using var response = await http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
             window.Token).ConfigureAwait(false);
         var statusCode = (int)response.StatusCode;
         string responseBody;

@@ -30,7 +30,6 @@ namespace FlintLauncher.Core.ModPlatform.Ftb;
 
 public sealed class FtbPackModel(FtbApi ftb)
 {
-    private readonly FtbApi _ftb = ftb;
     private readonly List<FtbModpack> _modpacks = [];
 
     public IReadOnlyList<FtbModpack> Packs => _modpacks;
@@ -62,7 +61,7 @@ public sealed class FtbPackModel(FtbApi ftb)
         string index;
         try
         {
-            index = await _ftb.FetchModpacksAsync(cancellationToken);
+            index = await ftb.FetchModpacksAsync(cancellationToken);
         }
         catch (FlintHttpException)
         {
@@ -89,7 +88,7 @@ public sealed class FtbPackModel(FtbApi ftb)
             string body;
             try
             {
-                body = await _ftb.FetchModpackAsync(currentPack, cancellationToken);
+                body = await ftb.FetchModpackAsync(currentPack, cancellationToken);
             }
             catch (FlintHttpException)
             {

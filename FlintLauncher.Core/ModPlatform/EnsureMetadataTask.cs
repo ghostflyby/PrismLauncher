@@ -39,8 +39,6 @@ public sealed class EnsureMetadataTask(
     : FlintTask
 {
     // hash -> resource
-    private readonly ModrinthClient _modrinth = modrinth;
-    private readonly HttpClient _http = http;
     private readonly FlameClient _flame = flame ?? new FlameClient();
     private readonly Dictionary<string, IndexedVersion> _tempVersions = new(StringComparer.Ordinal);
     public bool LockUpdate { get; init; }
@@ -79,8 +77,8 @@ public sealed class EnsureMetadataTask(
         var hashType = ProviderCapabilities.HashType(ResourceProvider.Modrinth)[0];
 
         // ---------------------------------------------------------- versions lookup
-        var versionEntries = await _modrinth.Versions
-            .ByFileHashes(resources.Keys.ToList(), hashType).SendTo(_http, cancellationToken);
+        var versionEntries = await modrinth.Versions
+            .ByFileHashes(resources.Keys.ToList(), hashType).SendTo(http, cancellationToken);
 
         {
             foreach (var hash in resources.Keys)
@@ -113,11 +111,11 @@ public sealed class EnsureMetadataTask(
         List<ModrinthProject> projectEntries;
         if (addonIds.Count == 1)
         {
-            projectEntries = [await _modrinth.Projects.ById(addonIds.Keys.First()).SendTo(_http, cancellationToken)];
+            projectEntries = [await modrinth.Projects.ById(addonIds.Keys.First()).SendTo(http, cancellationToken)];
         }
         else
         {
-            projectEntries = await _modrinth.Projects.ByIds(addonIds.Keys.ToList()).SendTo(_http, cancellationToken);
+            projectEntries = await modrinth.Projects.ByIds(addonIds.Keys.ToList()).SendTo(http, cancellationToken);
         }
 
         foreach (var dto in projectEntries)
@@ -174,7 +172,7 @@ public sealed class EnsureMetadataTask(
         FlameFingerprintResponse response;
         try
         {
-            response = await _flame.Fingerprints.Match(fingerprints).SendTo(_http, cancellationToken);
+            response = await _flame.Fingerprints.Match(fingerprints).SendTo(http, cancellationToken);
         }
         catch (FlameApiException e)
         {
@@ -239,10 +237,10 @@ public sealed class EnsureMetadataTask(
         try
         {
             entries = multiple
-                ? (await _flame.Projects.ByIds(addonIds.Keys.ToList()).SendTo(_http, cancellationToken)).Data
+                ? (await _flame.Projects.ByIds(addonIds.Keys.ToList()).SendTo(http, cancellationToken)).Data
                   ?? throw new JsonException("'data' is not an array")
                 : [(
-                    await _flame.Projects.ById(addonIds.Keys.First()).SendTo(_http, cancellationToken)).Data
+                    await _flame.Projects.ById(addonIds.Keys.First()).SendTo(http, cancellationToken)).Data
                     ?? throw new JsonException("'data' is not an object")];
         }
         catch (FlameApiException e)

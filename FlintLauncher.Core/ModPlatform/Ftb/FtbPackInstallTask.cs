@@ -62,8 +62,6 @@ public sealed class FtbPackInstallTask(
 {
     private readonly FlameClient _flame = flame ?? new FlameClient();
     private readonly FtbApi _ftb = ftb ?? new FtbApi(http);
-    private readonly ModrinthClient _modrinth = modrinth;
-    private readonly HttpClient _http = http;
 
     // assigned by OnManifestDownloadSucceeded before any read
     private FtbVersion? _manifest;
@@ -168,7 +166,7 @@ public sealed class FtbPackInstallTask(
             }
         }
 
-        var modIdResolverTask = new FileResolvingTask(flameManifest, _modrinth, _http, flame: _flame);
+        var modIdResolverTask = new FileResolvingTask(flameManifest, modrinth, http, flame: _flame);
 
         EmitStatus("Resolving mods...");
         await modIdResolverTask.StartAsync(cancellationToken);

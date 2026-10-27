@@ -55,8 +55,6 @@ public sealed class FlameCheckUpdate(
 
     private readonly List<ModLoaderType> _loadersList = [.. loadersList];
     private readonly IReadOnlyList<IndexedVersionType> _releaseTypes = releaseTypes ?? [];
-    private readonly FlameClient _flame = flame;
-    private readonly HttpClient _http = http;
 
     private readonly Dictionary<Resource, string> _blocked = new();
 
@@ -91,9 +89,9 @@ public sealed class FlameCheckUpdate(
             FlameFileList versionsDoc;
             try
             {
-                versionsDoc = await _flame.Files
+                versionsDoc = await flame.Files
                     .List(project.AddonId, gameVersion: mcVersions.Count != 0 ? mcVersions[0].ToString() : null)
-                    .SendTo(_http, cancellationToken);
+                    .SendTo(http, cancellationToken);
             }
             catch (FlameApiException)
             {
@@ -159,10 +157,10 @@ public sealed class FlameCheckUpdate(
             var changelog = "";
             try
             {
-                changelog = await _flame.Files.Changelog(
+                changelog = await flame.Files.Changelog(
                     int.Parse(latestVer.AddonId, CultureInfo.InvariantCulture),
                     int.Parse(latestVer.FileId, CultureInfo.InvariantCulture))
-                    .SendTo(_http, cancellationToken);
+                    .SendTo(http, cancellationToken);
             }
             catch (FlameApiException)
             {
@@ -213,9 +211,9 @@ public sealed class FlameCheckUpdate(
         {
             entries = single
                 ? [(
-                    await _flame.Projects.ById(addonIds[0]).SendTo(_http, cancellationToken)).Data
+                    await flame.Projects.ById(addonIds[0]).SendTo(http, cancellationToken)).Data
                     ?? throw new JsonException("'data' is not an object")]
-                : (await _flame.Projects.ByIds(addonIds).SendTo(_http, cancellationToken)).Data
+                : (await flame.Projects.ByIds(addonIds).SendTo(http, cancellationToken)).Data
                   ?? throw new JsonException("'data' is not an array");
         }
         catch (Exception e) when (e is FlameApiException or JsonException)
