@@ -30,10 +30,10 @@ using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Core.ModPlatform.Dependencies;
@@ -58,10 +58,10 @@ public class GetModDependenciesTask : SequentialTask
     public sealed record PackDependencyExtraInfo(List<string> RequiredByIds);
 
     public GetModDependenciesTask(MinecraftInstance instance, ModFolderModel folder, List<PackDependency> selected,
-        ModrinthClient modrinth, HttpClient http, FlameApi? flame = null)
+        ModrinthClient modrinth, HttpClient http, FlameClient? flame = null)
     {
         _selected = selected;
-        _flame = flame ?? new FlameApi(http);
+        _flame = flame ?? new FlameClient();
         _version = new McVersion(instance.GetPackProfile().GetComponentVersion("net.minecraft"));
         _loaderType = instance.GetPackProfile().GetSupportedModLoaders() ?? ModLoaderType.None;
         _modrinth = modrinth;
@@ -95,7 +95,7 @@ public class GetModDependenciesTask : SequentialTask
     private readonly ModLoaderType _loaderType;
     private readonly ModrinthClient _modrinth;
     private readonly HttpClient _http;
-    private readonly FlameApi _flame;
+    private readonly FlameClient _flame;
 
     private void Prepare()
     {
@@ -190,27 +190,22 @@ public class GetModDependenciesTask : SequentialTask
             {
                 if (provider == ResourceProvider.Flame)
                 {
-                    string projectBody;
                     try
                     {
-                        projectBody = await _flame.GetProjectAsync(pDep.Pack.AddonId, cancellationToken);
+                        var envelope = await _flame.Projects.ById(pDep.Pack.AddonId)
+                            .SendTo(_http, cancellationToken);
+                        if (envelope.Data is { } project)
+                        {
+                            FlameMod.LoadIndexedPack(pDep.Pack, project);
+                        }
+                        else
+                        {
+                            throw new JsonException("'data' is not an object");
+                        }
                     }
-                    catch (FlintHttpException e)
+                    catch (FlameApiException e)
                     {
-                        throw new HttpRequestException(e.Reason);
-                    }
-
-                    // Flame nests the project under "data" (the C++
-                    // Json::requireObject(Json::requireObject(doc), "data") form)
-                    var envelope = FlameMod.ParseResponse(projectBody,
-                        FlameModJsonContext.Default.FlameProjectEnvelopeJson);
-                    if (envelope.Data is { } project)
-                    {
-                        FlameMod.LoadIndexedPack(pDep.Pack, project);
-                    }
-                    else
-                    {
-                        throw new JsonException("'data' is not an object");
+                        throw new HttpRequestException(e.Message, e);
                     }
                 }
                 else
@@ -219,7 +214,8 @@ public class GetModDependenciesTask : SequentialTask
                     ModrinthPackIndex.LoadIndexedPack(pDep.Pack, dto);
                 }
             }
-            catch (Exception e) when (e is HttpRequestException or JsonException or ModrinthApiException)
+            catch (Exception e) when (e is HttpRequestException or JsonException or ModrinthApiException
+                                      or FlameApiException)
             {
                 // (upstream logs the parse error / the error cause)
                 RemovePack(pDep.Pack.AddonId);
@@ -256,20 +252,11 @@ public class GetModDependenciesTask : SequentialTask
     /// </summary>
     private FlintTask DependencyVersionTask(Dependency dep, ResourceProvider provider, PackDependency pDep, int level)
     {
-        var args = new DependencySearchArgs
-        {
-            Dependency = dep,
-            McVersion = _version,
-            Loader = _loaderType,
-            IncludeChangelog = true,
-        };
-
         return new CallbackTask(async cancellationToken =>
         {
-            // the per-provider candidate lists: the Flame branch rides the raw request path
-            // (the document IS the version when a file id is pinned, else the {"data": [...]}
-            // envelope); the Modrinth branch runs on the client — pinned dependencies answer
-            // a single version document, the rest a bare array
+            // the per-provider candidate lists: the Flame branch answers the pinned
+            // single-file document or the {"data": [...]} envelope, the Modrinth branch a
+            // single version document or a bare array
             var versions = new List<IndexedVersion>();
 
             void Consider(IndexedVersion file)
@@ -280,7 +267,7 @@ public class GetModDependenciesTask : SequentialTask
                 }
 
                 // Heuristic to check if the returned value is valid
-                if (file.FileId.Length != 0 && (args.Loader == ModLoaderType.None || (args.Loader & file.Loaders) != 0))
+                if (file.FileId.Length != 0 && (_loaderType == ModLoaderType.None || (_loaderType & file.Loaders) != 0))
                 {
                     versions.Add(file);
                 }
@@ -288,45 +275,45 @@ public class GetModDependenciesTask : SequentialTask
 
             if (provider == ResourceProvider.Flame)
             {
-                string dependencyBody;
+                List<FlameModFile>? files;
                 try
                 {
-                    dependencyBody = await FlintHttp.GetStringAsync(_flame.Http,
-                        new HttpRequestMessage(HttpMethod.Get, _flame.GetDependencyUrl(args)), cancellationToken);
+                    // the pinned dependency names a file; the rest list the project's files
+                    // for the instance's game version and single selected loader
+                    files = dep.Version.Length != 0
+                        ? [(
+                            await _flame.Files.ById(dep.AddonId, dep.Version).SendTo(_http, cancellationToken)).Data
+                            ?? throw new JsonException("'data' is not an object")]
+                        : (await _flame.Files.List(dep.AddonId,
+                                gameVersion: _version.ToString(),
+                                modLoaderType: _loaderType != 0 && ModIndex.HasSingleModLoaderSelected(_loaderType)
+                                    ? FlameMod.GetMappedModLoader(_loaderType)
+                                    : null)
+                            .SendTo(_http, cancellationToken)).Data
+                          ?? throw new JsonException("'data' is not an array");
                 }
-                catch (FlintHttpException e)
+                catch (FlameApiException e) when (e.InnerException is HttpRequestException)
                 {
                     RemovePack(pDep.Pack.AddonId);
-                    throw new HttpRequestException(e.Reason);
+                    throw new HttpRequestException(e.Message, e);
                 }
-
-                try
+                catch (Exception e) when (e is FlameApiException or JsonException)
                 {
-                    var entries = dep.Version.Length != 0
-                        ?
-                        [
-                            FlameMod.ParseResponse(dependencyBody,
-                                FlameModJsonContext.Default.FlameModFileJson)
-                        ]
-                        : FlameMod.ParseResponse(dependencyBody,
-                            FlameModJsonContext.Default.FlameFileListJson).Data ?? [];
-
-                    foreach (var fileDto in entries)
-                    {
-                        try
-                        {
-                            Consider(FlameMod.LoadIndexedPackVersion(fileDto));
-                        }
-                        catch (JsonException) { }
-                    }
-                }
-                catch (JsonException)
-                {
-                    // like the C++ kind-failure path: degrade to an empty best match, which
-                    // the resolution step turns into an explicit missing-dependency
-                    // (RemovePack) instead of leaving a version-less pack dangling
+                    // like the C++ kind-failure path: a broken body degrades to an empty
+                    // best match, which the resolution step turns into an explicit
+                    // missing-dependency (RemovePack) instead of leaving a version-less
+                    // pack dangling
                     OnDependencyVersionResolved(dep, provider, pDep, level, new IndexedVersion());
                     return;
+                }
+
+                foreach (var fileDto in files)
+                {
+                    try
+                    {
+                        Consider(FlameMod.LoadIndexedPackVersion(fileDto));
+                    }
+                    catch (JsonException) { }
                 }
             }
             else
@@ -337,9 +324,9 @@ public class GetModDependenciesTask : SequentialTask
                     dtos = dep.Version.Length != 0
                         ? [await _modrinth.Versions.ById(dep.Version).SendTo(_http, cancellationToken)]
                         : await _modrinth.Versions.Query(dep.AddonId,
-                            [ResourceApi.MapMcVersionToModrinth(args.McVersion)],
-                            ModIndex.ModLoaderTypesToList(args.Loader).Select(ModIndex.GetModLoaderAsString).ToList(),
-                            args.IncludeChangelog).SendTo(_http, cancellationToken);
+                            [ModrinthVersionFormat.ToWire(_version)],
+                            ModIndex.ModLoaderTypesToList(_loaderType).Select(ModIndex.GetModLoaderAsString).ToList(),
+                            includeChangelog: true).SendTo(_http, cancellationToken);
                 }
                 catch (Exception e) when (e is ModrinthApiException)
                 {

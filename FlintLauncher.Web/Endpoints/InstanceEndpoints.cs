@@ -13,6 +13,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
@@ -158,7 +159,7 @@ public static class InstanceEndpoints
         }).Produces<InstanceCreatedResponse>(201);
 
         api.MapPost("/instances/import", async (ImportRequest request, InstanceList instances,
-            InstanceMutationLock instanceLock, ModrinthClient modrinth, HttpClient http, FlameApi flame, HttpMetaCache metaCache, FlintTaskRegistry registry) =>
+            InstanceMutationLock instanceLock, ModrinthClient modrinth, HttpClient http, FlameClient flame, HttpMetaCache metaCache, FlintTaskRegistry registry) =>
         {
             if (string.IsNullOrWhiteSpace(request.Url) ||
                 !Uri.TryCreate(request.Url, UriKind.Absolute, out var uri) ||

@@ -33,8 +33,9 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Hashing;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
@@ -56,7 +57,8 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
         public bool OptionalFiles { get; init; }
         public required MinecraftInstance Instance { get; init; }
         public required AbsolutePath? Output { get; init; }
-        public required FlameApi Flame { get; init; }
+        public required FlameClient Flame { get; init; }
+        public required HttpClient Http { get; init; }
     }
 
     private sealed class ResolvedFile
@@ -79,7 +81,8 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
     }
 
     private readonly AbsolutePath _gameRoot = options.Instance.GameRoot;
-    private readonly FlameApi _flame = options.Flame;
+    private readonly FlameClient _flame = options.Flame;
+    private readonly HttpClient _http = options.Http;
 
     private readonly List<string> _files = [];
     private readonly Dictionary<string, HashInfo> _pendingHashes = new(StringComparer.Ordinal);
@@ -209,9 +212,9 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
 
         try
         {
-            ParseApiResponse(await _flame.MatchFingerprintsAsync(fingerprints, cancellationToken));
+            ParseApiResponse(await _flame.Fingerprints.Match(fingerprints).SendTo(_http, cancellationToken));
         }
-        catch (FlintHttpException)
+        catch (FlameApiException)
         {
             // (the C++ only logged the fingerprint failure and continued to the info pass)
         }
@@ -220,19 +223,8 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
         await GetProjectsInfo(cancellationToken);
     }
 
-    private void ParseApiResponse(string responseBody)
+    private void ParseApiResponse(FlameFingerprintResponse response)
     {
-        // the same fingerprint envelope EnsureMetadataTask consumes
-        FlameFingerprintResponseJson? response;
-        try
-        {
-            response = FlameMod.ParseResponse(responseBody, FlameModJsonContext.Default.FlameFingerprintResponseJson);
-        }
-        catch (JsonException)
-        {
-            return;
-        }
-
         {
             var exactMatches = response.Data?.ExactMatches;
             if (exactMatches is null or { Count: 0 })
@@ -287,42 +279,26 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
         }
 
         var single = addonIds.Count == 1;
-        string projBody;
+        List<FlameProject?>? entries = null;
         try
         {
-            projBody = single
-                ? await _flame.GetProjectAsync(addonIds[0], cancellationToken)
-                : await _flame.GetProjectsAsync(addonIds, cancellationToken);
+            entries = single
+                ? [(
+                    await _flame.Projects.ById(addonIds[0]).SendTo(_http, cancellationToken)).Data
+                    ?? throw new JsonException("'data' is not an object")]
+                : (await _flame.Projects.ByIds(addonIds).SendTo(_http, cancellationToken)).Data
+                  ?? throw new JsonException("'data' is not an array");
         }
-        catch (FlintHttpException e)
+        catch (FlameApiException e) when (e.InnerException is HttpRequestException)
         {
-            EmitFailed(e.Reason);
+            EmitFailed(e.Message);
             return;
         }
-
-        // a broken response body only skips the project-info enrichment: the export still
-        // builds its zip (the former kind-failure flow; the syntax EmitFailed face is
-        // retired as the more reasonable failure — the export completes either way)
-        List<FlameProjectJson?>? entries = null;
-        try
+        catch (Exception e) when (e is FlameApiException or JsonException)
         {
-            if (single)
-            {
-                entries =
-                [
-                    FlameMod.ParseResponse(projBody,
-                        FlameModJsonContext.Default.FlameProjectEnvelopeJson).Data
-                    ?? throw new JsonException("'data' is not an object"),
-                ];
-            }
-            else
-            {
-                entries = FlameMod.ParseResponse(projBody,
-                              FlameModJsonContext.Default.FlameProjectListJson).Data
-                          ?? throw new JsonException("'data' is not an array");
-            }
+            // a broken response body (the wrapped decode) only skips the project-info
+            // enrichment: the export still builds its zip, like the former kind-failure flow
         }
-        catch (JsonException) { }
 
         if (entries is not null)
         {

@@ -44,6 +44,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Net;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
 using TruePath.SystemIo;
@@ -55,11 +56,11 @@ public sealed class FtbPackInstallTask(
     string versionName,
     ModrinthClient modrinth,
     HttpClient http,
-    FlameApi? flame = null,
+    FlameClient? flame = null,
     FtbApi? ftb = null)
     : InstanceTask
 {
-    private readonly FlameApi _flame = flame ?? new FlameApi(http);
+    private readonly FlameClient _flame = flame ?? new FlameClient();
     private readonly FtbApi _ftb = ftb ?? new FtbApi(http);
     private readonly ModrinthClient _modrinth = modrinth;
     private readonly HttpClient _http = http;

@@ -34,6 +34,7 @@ using Microsoft.Extensions.DependencyInjection;
 using TruePath;
 using Xunit;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Tests;
@@ -69,7 +70,7 @@ internal sealed class FlintApiHost : IAsyncDisposable
     /// and the API token live.</summary>
     public string DataDir { get; }
 
-    public static async Task<FlintApiHost> StartAsync(ModrinthClient? modrinth = null, FlameApi? flame = null,
+    public static async Task<FlintApiHost> StartAsync(ModrinthClient? modrinth = null, FlameClient? flame = null,
         TechnicApi? technic = null, AtLauncherApi? atlauncher = null, FtbApi? ftb = null,
         AuthEndpointsOptions? auth = null)
     {

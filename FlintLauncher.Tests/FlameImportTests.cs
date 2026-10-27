@@ -18,6 +18,7 @@ using FlintLauncher.Core.Tasks;
 using TruePath;
 using Xunit;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Tests;
@@ -25,7 +26,7 @@ namespace FlintLauncher.Tests;
 [Collection("FlameApi")]
 public class FlameImportTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new(TestNet.Http);
+    private readonly FlameClient _flameApi = new();
     private readonly ModrinthClient _modrinth;
     private readonly HttpClient _http;
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-flame-import-{Guid.NewGuid():N}");
@@ -39,7 +40,7 @@ public class FlameImportTests : IDisposable
     {
         (_modrinth, _http) = TestModrinthApi.Unreachable();
         Directory.CreateDirectory(_root);
-        _flameApi.BaseUrl = _server.Url;
+        _flameApi.Options.BaseUrl = _server.Url;
         _downloadSha1 = Convert.ToHexString(SHA1.HashData(_downloadBytes))
             .ToLowerInvariant();
     }

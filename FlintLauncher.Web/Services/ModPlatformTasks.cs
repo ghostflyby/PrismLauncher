@@ -20,8 +20,6 @@
 //    as an error row; the API surface has no per-resource error channel yet).
 
 using System.Text.Json;
-using System.Text.Json.Nodes;
-using System.Text.Json.Serialization.Metadata;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
@@ -29,10 +27,10 @@ using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Dependencies;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using FlintLauncher.Web.Models;
 
@@ -96,11 +94,11 @@ public sealed class ModSelectionResolver(
     IReadOnlyList<ModLoaderType> loaderList,
     ModrinthClient modrinth,
     HttpClient http,
-    FlameApi? flame = null)
+    FlameClient? flame = null)
 {
     private readonly ModrinthClient _modrinth = modrinth;
     private readonly HttpClient _http = http;
-    private readonly FlameApi _flame = flame ?? new FlameApi(http);
+    private readonly FlameClient _flame = flame ?? new FlameClient();
 
     public async Task<(IndexedPack Pack, IndexedVersion Version)> ResolveAsync(
         ResourceProvider provider, string projectId, string versionId, CancellationToken cancellationToken)
@@ -109,26 +107,24 @@ public sealed class ModSelectionResolver(
 
         if (provider == ResourceProvider.Flame)
         {
-            string projectBody;
+            FlameProjectEnvelope envelope;
             try
             {
-                projectBody = await _flame.GetProjectAsync(projectId, cancellationToken);
+                envelope = await _flame.Projects.ById(projectId).SendTo(_http, cancellationToken);
             }
-            catch (FlintHttpException e)
+            catch (Exception e) when (e is FlameApiException)
             {
-                throw new ModResolveException($"fetching the CurseForge project {projectId} failed: {e.Reason}");
+                throw new ModResolveException($"fetching the CurseForge project {projectId} failed: {e.Message}");
             }
 
-            // Flame nests the project under "data" (the C++ Json::requireObject(doc, "data"))
-            if (ParseBodyNode(projectBody, $"the CurseForge project {projectId}") is not JsonObject root ||
-                root["data"] is not JsonObject data)
+            if (envelope.Data is not { } project)
             {
                 throw new ModResolveException($"the CurseForge project response for {projectId} has no data object");
             }
 
             try
             {
-                FlameMod.LoadIndexedPack(pack, data);
+                FlameMod.LoadIndexedPack(pack, project);
             }
             catch (JsonException e)
             {
@@ -172,23 +168,22 @@ public sealed class ModSelectionResolver(
         {
             if (provider == ResourceProvider.Flame)
             {
-                string fileBody;
+                FlameFileEnvelope envelope;
                 try
                 {
-                    fileBody = await _flame.GetFileAsync(projectId, versionId, cancellationToken);
+                    envelope = await _flame.Files.ById(projectId, versionId).SendTo(_http, cancellationToken);
                 }
-                catch (FlintHttpException e)
+                catch (Exception e) when (e is FlameApiException)
                 {
-                    throw new ModResolveException($"fetching the CurseForge file {versionId} failed: {e.Reason}");
+                    throw new ModResolveException($"fetching the CurseForge file {versionId} failed: {e.Message}");
                 }
 
-                if (ParseBodyNode(fileBody, $"the CurseForge file {versionId}") is not JsonObject root ||
-                    root["data"] is not JsonObject data)
+                if (envelope.Data is not { } file)
                 {
                     throw new ModResolveException($"the CurseForge file response for {versionId} has no data object");
                 }
 
-                return FlameMod.LoadIndexedPackVersion(data);
+                return FlameMod.LoadIndexedPackVersion(file);
             }
 
             ModrinthVersion dto;
@@ -219,22 +214,20 @@ public sealed class ModSelectionResolver(
     {
         if (provider == ResourceProvider.Flame)
         {
-            string versionsBody;
+            FlameFileList doc;
             try
             {
-                versionsBody = await FlintHttp.GetStringAsync(_flame.Http,
-                    new HttpRequestMessage(HttpMethod.Get, _flame.GetVersionsUrl(
-                        new VersionSearchArgs { Pack = pack, McVersions = [mcVersion] })),
-                    cancellationToken);
+                doc = await _flame.Files.List(pack.AddonId, gameVersion: mcVersion.ToString())
+                    .SendTo(_http, cancellationToken);
             }
-            catch (FlintHttpException e)
+            catch (Exception e) when (e is FlameApiException)
             {
-                throw new ModResolveException($"fetching the version list of {pack.AddonId} failed: {e.Reason}");
+                throw new ModResolveException($"fetching the version list of {pack.AddonId} failed: {e.Message}");
             }
 
             try
             {
-                if (!FlameMod.LoadIndexedPackVersionsFromResponse(pack, versionsBody))
+                if (!FlameMod.LoadIndexedPackVersionsFromResponse(pack, doc))
                 {
                     throw new ModResolveException($"the CurseForge version list of {pack.AddonId} has no data array");
                 }
@@ -244,7 +237,7 @@ public sealed class ModSelectionResolver(
                 throw new ModResolveException($"the CurseForge version list of {pack.AddonId} is invalid: {e.Message}");
             }
 
-            return FlameApi.GetLatestVersion(pack.Versions, loaderList, ModLoaderType.None,
+            return FlameMod.GetLatestVersion(pack.Versions, loaderList, ModLoaderType.None,
                 checkLoaders: loaderList.Count != 0);
         }
 
@@ -252,7 +245,7 @@ public sealed class ModSelectionResolver(
         try
         {
             dtos = await _modrinth.Versions.Query(pack.AddonId,
-                    [ResourceApi.MapMcVersionToModrinth(mcVersion)],
+                    [ModrinthVersionFormat.ToWire(mcVersion)],
                     ModIndex.ModLoaderTypesToList(loaders).Select(ModIndex.GetModLoaderAsString).ToList())
                 .SendTo(_http, cancellationToken);
         }
@@ -278,34 +271,6 @@ public sealed class ModSelectionResolver(
         versions.Sort((a, b) => string.CompareOrdinal(b.Date, a.Date));
         return versions.Count != 0 ? versions[0] : null;
     }
-
-    /// <summary>Strict Modrinth DTO parse: a syntax error becomes "{what} is invalid: ...",
-    /// JSON null (or nothing at all) becomes null so callers keep their "not a JSON object"
-    /// branch (the former ParseBodyNode + loader contract).</summary>
-    private static T? ParseModrinthBody<T>(string body, string what, JsonTypeInfo<T> typeInfo) where T : class
-    {
-        try
-        {
-            return JsonSerializer.Deserialize(body, typeInfo);
-        }
-        catch (JsonException e)
-        {
-            throw new ModResolveException($"{what} is invalid: {e.Message}");
-        }
-    }
-
-    /// <summary>Node-side parse for the modplatform flows (single-DOM read model).</summary>
-    private static JsonNode? ParseBodyNode(string body, string what)
-    {
-        try
-        {
-            return JsonNode.Parse(body);
-        }
-        catch (JsonException e)
-        {
-            throw new ModResolveException($"{what} is invalid: {e.Message}");
-        }
-    }
 }
 
 /// <summary>
@@ -322,7 +287,7 @@ public sealed class ModInstallTask(
     ModLoaderType loaders,
     ModrinthClient modrinth,
     HttpClient http,
-    FlameApi? flame = null)
+    FlameClient? flame = null)
     : FlintTask
 {
     private readonly McVersion _mcVersion = new(mcVersion);
@@ -330,7 +295,7 @@ public sealed class ModInstallTask(
     private readonly List<ModInstallEntryView> _installed = [];
     private readonly ModrinthClient _modrinth = modrinth;
     private readonly HttpClient _http = http;
-    private readonly FlameApi _flame = flame ?? new FlameApi(http);
+    private readonly FlameClient _flame = flame ?? new FlameClient();
 
     /// <summary>The entries for the task view's optional result payload.</summary>
     public TaskResultView BuildResult() => new(null, _installed);
@@ -449,7 +414,7 @@ public sealed class ModsUpdateTask(
     IReadOnlyList<string>? filter,
     ModrinthClient modrinth,
     HttpClient http,
-    FlameApi flameApi,
+    FlameClient flameApi,
     IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     : FlintTask
 {
@@ -458,7 +423,7 @@ public sealed class ModsUpdateTask(
     private readonly List<PendingUpdate> _updates = [];
     private readonly ModrinthClient _modrinth = modrinth;
     private readonly HttpClient _http = http;
-    private readonly FlameApi _flame = flameApi;
+    private readonly FlameClient _flame = flameApi;
 
     /// <summary>The update entries for the task view's optional result payload.</summary>
     public TaskResultView BuildResult() => new(_updates.Select(u => u.View).ToArray(), null);
@@ -528,7 +493,7 @@ public sealed class ModsUpdateTask(
         {
             EmitStatus("Checking CurseForge updates...");
             var check = new FlameCheckUpdate(flame, gameVersions, loadersList,
-                resource => folder.GetMetadata(resource), _flame, releaseTypes);
+                resource => folder.GetMetadata(resource), _flame, _http, releaseTypes);
             await check.StartAsync(cancellationToken);
             if (!check.WasSuccessful)
             {

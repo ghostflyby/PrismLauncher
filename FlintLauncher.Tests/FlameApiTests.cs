@@ -21,6 +21,7 @@ using FlintLauncher.Core.Versioning;
 using TruePath;
 using Xunit;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Tests;
@@ -28,7 +29,7 @@ namespace FlintLauncher.Tests;
 [Collection("FlameApi")]
 public class FlameApiTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new(TestNet.Http);
+    private readonly FlameClient _flameApi = new();
     private readonly ModrinthClient _modrinth;
     private readonly HttpClient _http;
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-flame-{Guid.NewGuid():N}");
@@ -40,7 +41,7 @@ public class FlameApiTests : IDisposable
         (_modrinth, _http) = TestModrinthApi.Unreachable();
         Directory.CreateDirectory(_root);
         _baseUrl = _server.Url;
-        _flameApi.BaseUrl = _baseUrl;
+        _flameApi.Options.BaseUrl = _baseUrl;
     }
 
     public void Dispose()
@@ -57,22 +58,18 @@ public class FlameApiTests : IDisposable
     // ---------------------------------------------------------------- API shapes
 
     [Fact]
-    public void SearchUrl_BuildsCurseForgeShape()
+    public void SearchQuery_BuildsCurseForgeShape()
     {
-        var args = new SearchArgs
-        {
-            Type = ResourceType.Mod,
-            Offset = 50,
-            Search = "create mod",
-            Sorting = new SortingMethod { Index = 2, Name = "Popularity" },
-            Loaders = ModLoaderType.Fabric | ModLoaderType.Quilt,
-            Versions = [new McVersion("1.18.2")],
-            CategoryIds = ["adventure"],
-        };
+        // the launcher vocabulary translates through FlameMod; the operation owns the wire
+        var url = _flameApi.Search.Query(
+            classId: FlameMod.GetClassId(ResourceType.Mod),
+            offset: 50,
+            searchFilter: "create mod",
+            sortField: 2,
+            modLoaderTypes: FlameMod.GetModLoaderFilterIds(ModLoaderType.Fabric | ModLoaderType.Quilt),
+            categoryIds: ["adventure"],
+            gameVersion: "1.18.2").CreateRequest().RequestUri!.AbsoluteUri;
 
-        var url = _flameApi.GetSearchUrl(args);
-
-        Assert.NotNull(url);
         Assert.StartsWith(_baseUrl + "/mods/search?gameId=432&", url);
         Assert.Contains("classId=6", url);
         Assert.Contains("index=50", url);
@@ -89,9 +86,9 @@ public class FlameApiTests : IDisposable
     [Fact]
     public async Task Requests_SendApiKeyHeader()
     {
-        _flameApi.ApiKeyProvider = static () => "user-supplied-key";
+        _flameApi.Options.ApiKey = "user-supplied-key";
 
-        await _flameApi.MatchFingerprintsAsync([123456]);
+        await _flameApi.Fingerprints.Match([123456]).SendTo(_http);
 
         Assert.Equal("user-supplied-key", _server.LastHeaders["x-api-key"]);
     }
@@ -99,7 +96,7 @@ public class FlameApiTests : IDisposable
     [Fact]
     public async Task MatchFingerprints_PostsMurmur2List()
     {
-        await _flameApi.MatchFingerprintsAsync([123456789, 42]);
+        await _flameApi.Fingerprints.Match([123456789, 42]).SendTo(_http);
 
         Assert.Equal(_baseUrl + "/fingerprints", _server.LastPath);
 
@@ -113,7 +110,7 @@ public class FlameApiTests : IDisposable
     [Fact]
     public async Task GetFiles_PostsFileIdList()
     {
-        await _flameApi.GetFilesAsync(["456", "789"]);
+        await _flameApi.Files.ByIds(["456", "789"]).SendTo(_http);
 
         Assert.Equal(_baseUrl + "/mods/files", _server.LastPath);
 
@@ -126,7 +123,7 @@ public class FlameApiTests : IDisposable
     [Fact]
     public async Task GetProjects_PostsModIdList()
     {
-        await _flameApi.GetProjectsAsync(["123", "222"]);
+        await _flameApi.Projects.ByIds(["123", "222"]).SendTo(_http);
 
         Assert.Equal(_baseUrl + "/mods", _server.LastPath);
 
@@ -140,7 +137,7 @@ public class FlameApiTests : IDisposable
     public async Task GetFile_FetchesSingleEndpoint()
     {
         _server.FileJson = FlamePayloads.FileJson(_server.Url, fileId: 456);
-        await _flameApi.GetFileAsync("123", "456");
+        await _flameApi.Files.ById("123", "456").SendTo(_http);
 
         Assert.Equal(_baseUrl + "/mods/123/files/456", _server.LastPath);
     }
@@ -148,10 +145,10 @@ public class FlameApiTests : IDisposable
     [Fact]
     public async Task ChangelogAndDescription_ReadDataField()
     {
-        Assert.Equal("changelog text", await _flameApi.GetModFileChangelog(123, 456));
+        Assert.Equal("changelog text", await _flameApi.Files.Changelog(123, 456).SendTo(_http));
         Assert.Equal(_baseUrl + "/mods/123/files/456/changelog", _server.LastPath);
 
-        Assert.Equal("description text", await _flameApi.GetModDescription(123));
+        Assert.Equal("description text", await _flameApi.Projects.Description(123).SendTo(_http));
         Assert.Equal(_baseUrl + "/mods/123/description", _server.LastPath);
     }
 
@@ -159,11 +156,12 @@ public class FlameApiTests : IDisposable
     public async Task Categories_UrlAndParsing()
     {
         _server.CategoriesJson = """{"data":[{"id":6,"name":"Mods"},{"id":4471,"name":"Modpacks"}]}""";
-        var categoriesBody = await _flameApi.GetCategoriesAsync(ResourceType.Mod);
+        var doc = await _flameApi.Categories.ForClassId(FlameMod.GetClassId(ResourceType.Mod))
+            .SendTo(_http);
 
         Assert.Equal(_baseUrl + "/categories?gameId=432&classId=6", _server.LastPath);
 
-        var categories = _flameApi.LoadModCategories(categoriesBody);
+        var categories = FlameMod.LoadModCategories(doc);
         Assert.Equal(2, categories.Count);
         Assert.Equal("Mods", categories[0].Name);
         Assert.Equal("6", categories[0].Id);
@@ -172,57 +170,43 @@ public class FlameApiTests : IDisposable
     [Fact]
     public void ClassIdRoundTrip_MapsResourceTypes()
     {
-        Assert.Equal(6, FlameApi.GetClassId(ResourceType.Mod));
-        Assert.Equal(12, FlameApi.GetClassId(ResourceType.ResourcePack));
-        Assert.Equal(17, FlameApi.GetClassId(ResourceType.World));
-        Assert.Equal(6552, FlameApi.GetClassId(ResourceType.ShaderPack));
-        Assert.Equal(4471, FlameApi.GetClassId(ResourceType.Modpack));
-        Assert.Equal(6945, FlameApi.GetClassId(ResourceType.DataPack));
-        Assert.Equal(0, FlameApi.GetClassId(ResourceType.TexturePack));
+        Assert.Equal(6, FlameMod.GetClassId(ResourceType.Mod));
+        Assert.Equal(12, FlameMod.GetClassId(ResourceType.ResourcePack));
+        Assert.Equal(17, FlameMod.GetClassId(ResourceType.World));
+        Assert.Equal(6552, FlameMod.GetClassId(ResourceType.ShaderPack));
+        Assert.Equal(4471, FlameMod.GetClassId(ResourceType.Modpack));
+        Assert.Equal(6945, FlameMod.GetClassId(ResourceType.DataPack));
+        Assert.Equal(0, FlameMod.GetClassId(ResourceType.TexturePack));
 
-        Assert.Equal(ResourceType.Mod, FlameApi.GetResourceType(6));
-        Assert.Equal(ResourceType.Unknown, FlameApi.GetResourceType(999));
+        Assert.Equal(ResourceType.Mod, FlameMod.GetResourceType(6));
+        Assert.Equal(ResourceType.Unknown, FlameMod.GetResourceType(999));
     }
 
     [Fact]
     public void SortingMethods_ExposeCurseForgeOrder()
     {
-        var methods = _flameApi.GetSortingMethods();
+        var methods = FlameMod.GetSortingMethods();
         Assert.Equal(8, methods.Count);
         Assert.Equal("Featured", methods[0].Name);
         Assert.Equal("GameVersion", methods[7].Name);
     }
 
     [Fact]
-    public void VersionsUrl_PagesAndSingleLoaderFilter()
+    public void FileListQuery_PagesAndLoaderFilter()
     {
-        var pack = new IndexedPack { AddonId = "123" };
+        string Url(FlameFileListQuery query) => query.CreateRequest().RequestUri!.AbsoluteUri;
 
-        var url = _flameApi.GetVersionsUrl(new VersionSearchArgs { Pack = pack });
-        Assert.Equal(_baseUrl + "/mods/123/files?pageSize=10000", url);
+        Assert.Equal(_baseUrl + "/mods/123/files?pageSize=10000", Url(_flameApi.Files.List("123")));
+        Assert.Equal(_baseUrl + "/mods/123/files?pageSize=10000&gameVersion=1.18.2",
+            Url(_flameApi.Files.List("123", gameVersion: "1.18.2")));
+        Assert.Equal(_baseUrl + "/mods/123/files?pageSize=10000&gameVersion=1.18.2&modLoaderType=1",
+            Url(_flameApi.Files.List("123", gameVersion: "1.18.2",
+                modLoaderType: FlameMod.GetMappedModLoader(ModLoaderType.Forge))));
 
-        url = _flameApi.GetVersionsUrl(new VersionSearchArgs
-        {
-            Pack = pack,
-            McVersions = [new McVersion("1.18.2")],
-        });
-        Assert.Equal(_baseUrl + "/mods/123/files?pageSize=10000&gameVersion=1.18.2", url);
-
-        url = _flameApi.GetVersionsUrl(new VersionSearchArgs
-        {
-            Pack = pack,
-            McVersions = [new McVersion("1.18.2")],
-            Loaders = ModLoaderType.Forge,
-        });
-        Assert.Equal(_baseUrl + "/mods/123/files?pageSize=10000&gameVersion=1.18.2&modLoaderType=1", url);
-
-        // multiple loaders -> no modLoaderType filter
-        url = _flameApi.GetVersionsUrl(new VersionSearchArgs
-        {
-            Pack = pack,
-            Loaders = ModLoaderType.Forge | ModLoaderType.Fabric,
-        });
-        Assert.DoesNotContain("modLoaderType", url);
+        // the single-loader gate the call sites apply: multiple loaders -> no filter
+        Assert.True(ModIndex.HasSingleModLoaderSelected(ModLoaderType.Forge));
+        Assert.False(ModIndex.HasSingleModLoaderSelected(ModLoaderType.Forge | ModLoaderType.Fabric));
+        Assert.DoesNotContain("modLoaderType", Url(_flameApi.Files.List("123")));
     }
 
     // ------------------------------------------------------------- version loader
@@ -237,10 +221,10 @@ public class FlameApiTests : IDisposable
             gameVersions: """["1.18.2", "1.18.1", "forge", "client"]""",
             sha1: "abc123",
             dependencies: """[{"modId": 999, "relationType": 3}]""");
-        var obj = JsonNode.Parse(json);
-        Assert.NotNull(obj);
+        var dto = JsonSerializer.Deserialize(json, FlameJsonContext.Default.FlameModFile);
+        Assert.NotNull(dto);
 
-        var version = FlameMod.LoadIndexedPackVersion(obj);
+        var version = FlameMod.LoadIndexedPackVersion(dto);
 
         Assert.Equal("123", version.AddonId);
         Assert.Equal("456", version.FileId);
@@ -261,12 +245,12 @@ public class FlameApiTests : IDisposable
     [Fact]
     public void LoadIndexedPack_LoadsProjectFields()
     {
-        var obj = JsonNode.Parse(FlamePayloads.ProjectJson(
-            id: 123, name: "Test Mod", slug: "test-mod"));
+        var dto = JsonSerializer.Deserialize(FlamePayloads.ProjectJson(
+            id: 123, name: "Test Mod", slug: "test-mod"), FlameJsonContext.Default.FlameProject);
 
         var pack = new IndexedPack();
-        Assert.NotNull(obj);
-        FlameMod.LoadIndexedPack(pack, obj);
+        Assert.NotNull(dto);
+        FlameMod.LoadIndexedPack(pack, dto);
 
         Assert.Equal("123", pack.AddonId);
         Assert.Equal(ResourceProvider.Flame, pack.Provider);
@@ -287,8 +271,10 @@ public class FlameApiTests : IDisposable
         var newer = FlamePayloads.FileJson(_server.Url, fileId: 2, fileDate: "2024-01-01T00:00:00Z");
 
         var pack = new IndexedPack { AddonId = "123" };
-        Assert.True(FlameMod.LoadIndexedPackVersionsFromResponse(pack,
-            $$"""{"data": [{{older}},{{newer}}]}"""));
+        var doc = JsonSerializer.Deserialize(
+            $$"""{"data": [{{older}},{{newer}}]}""", FlameJsonContext.Default.FlameFileList);
+        Assert.NotNull(doc);
+        Assert.True(FlameMod.LoadIndexedPackVersionsFromResponse(pack, doc));
 
         Assert.True(pack.VersionsLoaded);
         Assert.Equal(["2", "1"], pack.Versions.Select(v => v.FileId));
@@ -316,7 +302,7 @@ public class FlameApiTests : IDisposable
             Ver("1", "2023-01-01T00:00:00Z"),
             Ver("2", "2024-01-01T00:00:00Z"),
         };
-        var latest = FlameApi.GetLatestVersion(versions, [], ModLoaderType.None, checkLoaders: false);
+        var latest = FlameMod.GetLatestVersion(versions, [], ModLoaderType.None, checkLoaders: false);
         Assert.NotNull(latest);
         Assert.Equal("2", latest.FileId);
     }
@@ -329,7 +315,7 @@ public class FlameApiTests : IDisposable
             Ver("forge1", "2023-01-01T00:00:00Z", ModLoaderType.Forge),
             Ver("fabric1", "2023-06-01T00:00:00Z", ModLoaderType.Fabric),
         };
-        var latest = FlameApi.GetLatestVersion(versions, [ModLoaderType.Forge], ModLoaderType.None, checkLoaders: true);
+        var latest = FlameMod.GetLatestVersion(versions, [ModLoaderType.Forge], ModLoaderType.None, checkLoaders: true);
         Assert.NotNull(latest);
         Assert.Equal("forge1", latest.FileId);
     }
@@ -344,7 +330,7 @@ public class FlameApiTests : IDisposable
             Ver("plain", "2024-01-01T00:00:00Z"),
             Ver("forge1", "2023-01-01T00:00:00Z", ModLoaderType.Forge),
         };
-        var latest = FlameApi.GetLatestVersion(versions, [ModLoaderType.Forge], ModLoaderType.None, checkLoaders: true);
+        var latest = FlameMod.GetLatestVersion(versions, [ModLoaderType.Forge], ModLoaderType.None, checkLoaders: true);
         Assert.NotNull(latest);
         Assert.Equal("plain", latest.FileId);
     }
@@ -359,7 +345,7 @@ public class FlameApiTests : IDisposable
             Ver("plain", "2023-01-01T00:00:00Z"),
             Ver("forge1", "2023-06-01T00:00:00Z", ModLoaderType.Forge),
         };
-        var latest = FlameApi.GetLatestVersion(versions, [ModLoaderType.Forge], ModLoaderType.None, checkLoaders: true);
+        var latest = FlameMod.GetLatestVersion(versions, [ModLoaderType.Forge], ModLoaderType.None, checkLoaders: true);
         Assert.NotNull(latest);
         Assert.Equal("forge1", latest.FileId);
 
@@ -369,7 +355,7 @@ public class FlameApiTests : IDisposable
             Ver("plain", "2024-01-01T00:00:00Z"),
             Ver("forge1", "2023-06-01T00:00:00Z", ModLoaderType.Forge),
         ];
-        latest = FlameApi.GetLatestVersion(versions, [ModLoaderType.Forge], ModLoaderType.None, checkLoaders: true);
+        latest = FlameMod.GetLatestVersion(versions, [ModLoaderType.Forge], ModLoaderType.None, checkLoaders: true);
         Assert.NotNull(latest);
         Assert.Equal("plain", latest.FileId);
     }
@@ -385,24 +371,24 @@ public class FlameApiTests : IDisposable
         };
 
         // no filter: the newest file (the beta) wins
-        var latest = FlameApi.GetLatestVersion(versions, [], ModLoaderType.None, checkLoaders: false);
+        var latest = FlameMod.GetLatestVersion(versions, [], ModLoaderType.None, checkLoaders: false);
         Assert.NotNull(latest);
         Assert.Equal("beta1", latest.FileId);
 
         // release-only: the beta is skipped in both the no-loader and loader-checked passes
         var releases = new List<IndexedVersionType> { new(IndexedVersionTypeValue.Release) };
-        latest = FlameApi.GetLatestVersion(versions, [], ModLoaderType.None, checkLoaders: false, releases);
+        latest = FlameMod.GetLatestVersion(versions, [], ModLoaderType.None, checkLoaders: false, releases);
         Assert.NotNull(latest);
         Assert.Equal("release1", latest.FileId);
 
-        latest = FlameApi.GetLatestVersion(versions, [ModLoaderType.Forge], ModLoaderType.None,
+        latest = FlameMod.GetLatestVersion(versions, [ModLoaderType.Forge], ModLoaderType.None,
             checkLoaders: true, releases);
         Assert.NotNull(latest);
         Assert.Equal("release1", latest.FileId);
 
         // alpha-only filter with no alpha files: no version at all
         var alphas = new List<IndexedVersionType> { new(IndexedVersionTypeValue.Alpha) };
-        Assert.Null(FlameApi.GetLatestVersion(versions, [], ModLoaderType.None, checkLoaders: false, alphas));
+        Assert.Null(FlameMod.GetLatestVersion(versions, [], ModLoaderType.None, checkLoaders: false, alphas));
     }
 
     [Fact]

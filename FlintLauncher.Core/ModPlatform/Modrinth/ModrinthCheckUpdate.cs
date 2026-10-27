@@ -168,7 +168,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
                 loader is { } loaderFlags
                     ? ModIndex.ModLoaderTypesToList(loaderFlags).Select(ModIndex.GetModLoaderAsString).ToList()
                     : null,
-                [.. _gameVersions.Select(ResourceApi.MapMcVersionToModrinth)],
+                [.. _gameVersions.Select(ModrinthVersionFormat.ToWire)],
                 versionTypes).SendTo(_http, cancellationToken);
         }
         catch (Exception e) when (e is ModrinthApiException)

@@ -4,9 +4,10 @@
 //
 // Port of modplatform/flame/FlameCheckUpdate.{h,cpp}: CurseForge update detection.
 // For every resource (its installed state taken from the packwiz Flame metadata), fetch the
-// project's file list, pick the latest file matching the instance loaders (FlameApi.
-// GetLatestVersion) and compare hashes; files without a download URL are reported through
-// the checkFailed(recoverUrl) path after the project info was fetched (collectBlockedMods).
+// project's file list, pick the latest file matching the instance loaders
+// (FlameMod.GetLatestVersion) and compare hashes; files without a download URL are reported
+// through the checkFailed(recoverUrl) path after the project info was fetched
+// (collectBlockedMods).
 //
 // Deviations (headless port):
 //  - Resource::metadata() becomes the injectable metadataLookup delegate (the ported Mod has
@@ -17,12 +18,12 @@
 
 using System.Globalization;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
+using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
@@ -31,7 +32,8 @@ public sealed class FlameCheckUpdate(
     IReadOnlyList<McVersion> mcVersions,
     IReadOnlyList<ModLoaderType> loadersList,
     Func<Resource, MetadataHandler.ModStruct?> metadataLookup,
-    FlameApi flame,
+    FlameClient flame,
+    HttpClient http,
     IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     : FlintTask
 {
@@ -53,7 +55,8 @@ public sealed class FlameCheckUpdate(
 
     private readonly List<ModLoaderType> _loadersList = [.. loadersList];
     private readonly IReadOnlyList<IndexedVersionType> _releaseTypes = releaseTypes ?? [];
-    private readonly FlameApi _flame = flame;
+    private readonly FlameClient _flame = flame;
+    private readonly HttpClient _http = http;
 
     private readonly Dictionary<Resource, string> _blocked = new();
 
@@ -84,49 +87,28 @@ public sealed class FlameCheckUpdate(
             {
                 AddonId = metadata.ProjectId,
             };
-            var versionsUrl = GetVersionsUrl(project);
 
-            string versionsBody;
+            FlameFileList versionsDoc;
             try
             {
-                versionsBody = await FlintHttp.GetStringAsync(_flame.Http,
-                    new HttpRequestMessage(HttpMethod.Get, versionsUrl), cancellationToken);
+                versionsDoc = await _flame.Files
+                    .List(project.AddonId, gameVersion: mcVersions.Count != 0 ? mcVersions[0].ToString() : null)
+                    .SendTo(_http, cancellationToken);
             }
-            catch (FlintHttpException)
+            catch (FlameApiException)
             {
                 continue; // (the C++ reports per-request failures through the NetJob callbacks)
             }
 
-            await GetLatestVersionCallback(resource, metadata, versionsBody, cancellationToken);
+            await GetLatestVersionCallback(resource, metadata, versionsDoc, cancellationToken);
         }
 
         await CollectBlockedMods(cancellationToken);
     }
 
-    private string GetVersionsUrl(IndexedPack project)
-    {
-        return _flame.GetVersionsUrl(new VersionSearchArgs
-        {
-            Pack = project,
-            McVersions = mcVersions.ToList(),
-        });
-    }
-
     private async Task GetLatestVersionCallback(Resource resource, MetadataHandler.ModStruct metadata,
-        string responseBody, CancellationToken cancellationToken)
+        FlameFileList versionsDoc, CancellationToken cancellationToken)
     {
-        try
-        {
-            // parse-shape validation only (the typed reads below re-parse the body)
-            JsonNode.Parse(responseBody);
-        }
-        catch (JsonException e)
-        {
-            // (the C++ only logs parse problems here)
-            EmitStatus("Failed to parse the API response: " + e.Message);
-            return;
-        }
-
         // Fake pack with the necessary info to pass to the download task :)
         var pack = new IndexedPack
         {
@@ -135,22 +117,17 @@ public sealed class FlameCheckUpdate(
             AddonId = metadata.ProjectId,
             Provider = ResourceProvider.Flame,
         };
+        try
         {
-            try
-            {
-                var versionsDoc = FlameMod.ParseResponse(responseBody,
-                    FlameModJsonContext.Default.FlameFileListJson);
-
-                FlameMod.LoadIndexedPackVersions(pack, versionsDoc.Data);
-            }
-            catch (JsonException e)
-            {
-                // "Failed to parse response from a version request."
-                EmitStatus(e.Message);
-            }
+            FlameMod.LoadIndexedPackVersions(pack, versionsDoc.Data);
+        }
+        catch (JsonException e)
+        {
+            // "Failed to parse response from a version request."
+            EmitStatus(e.Message);
         }
 
-        var latestVer = FlameApi.GetLatestVersion(pack.Versions, _loadersList, metadata.Loaders,
+        var latestVer = FlameMod.GetLatestVersion(pack.Versions, _loadersList, metadata.Loaders,
             checkLoaders: _loadersList.Count != 0, _releaseTypes);
 
         EmitStatus($"Parsing the API response from CurseForge for '{resource.Name}'...");
@@ -179,9 +156,18 @@ public sealed class FlameCheckUpdate(
                 oldVersion = resource.Status == ResourceStatus.NotInstalled ? "Not installed" : "Unknown";
             }
 
-            var changelog = await _flame.GetModFileChangelog(
-                int.Parse(latestVer.AddonId, CultureInfo.InvariantCulture),
-                int.Parse(latestVer.FileId, CultureInfo.InvariantCulture), cancellationToken);
+            var changelog = "";
+            try
+            {
+                changelog = await _flame.Files.Changelog(
+                    int.Parse(latestVer.AddonId, CultureInfo.InvariantCulture),
+                    int.Parse(latestVer.FileId, CultureInfo.InvariantCulture))
+                    .SendTo(_http, cancellationToken);
+            }
+            catch (FlameApiException)
+            {
+                // the changelog fetch is best-effort (the former "" on any failure)
+            }
 
             _updates.Add(new Update
             {
@@ -222,71 +208,49 @@ public sealed class FlameCheckUpdate(
         }
 
         var single = addonIds.Count == 1;
-        string projBody;
+        List<FlameProject?>? entries = null;
         try
         {
-            projBody = single
-                ? await _flame.GetProjectAsync(addonIds[0], cancellationToken)
-                : await _flame.GetProjectsAsync(addonIds, cancellationToken);
+            entries = single
+                ? [(
+                    await _flame.Projects.ById(addonIds[0]).SendTo(_http, cancellationToken)).Data
+                    ?? throw new JsonException("'data' is not an object")]
+                : (await _flame.Projects.ByIds(addonIds).SendTo(_http, cancellationToken)).Data
+                  ?? throw new JsonException("'data' is not an array");
         }
-        catch (FlintHttpException)
+        catch (Exception e) when (e is FlameApiException or JsonException)
         {
-            projBody = "";
+            // a failed fetch or a broken response body only skips the blocked-download
+            // recovery lookup (the task finishes regardless, like the C++)
         }
 
-        if (projBody.Length != 0)
+        if (entries is not null)
         {
-            // a broken response body only skips the blocked-download recovery lookup (the
-            // task finishes regardless, like the C++)
-            List<FlameProjectJson?>? entries = null;
-            try
+            foreach (var entryObj in entries)
             {
-                if (single)
+                if (entryObj is null)
                 {
-                    entries =
-                    [
-                        FlameMod.ParseResponse(projBody,
-                            FlameModJsonContext.Default.FlameProjectEnvelopeJson).Data
-                        ?? throw new JsonException("'data' is not an object"),
-                    ];
+                    continue;
                 }
-                else
+
+                var id = (entryObj.Id ?? 0).ToString(CultureInfo.InvariantCulture);
+                if (!quickSearch.TryGetValue(id, out var resource))
                 {
-                    entries = FlameMod.ParseResponse(projBody,
-                                  FlameModJsonContext.Default.FlameProjectListJson).Data
-                              ?? throw new JsonException("'data' is not an array");
+                    continue;
                 }
-            }
-            catch (JsonException) { }
 
-            if (entries is not null)
-            {
-                foreach (var entryObj in entries)
+                try
                 {
-                    if (entryObj is null)
-                    {
-                        continue;
-                    }
+                    EmitStatus($"Parsing API response from CurseForge for '{resource.Name}'...");
 
-                    var id = (entryObj.Id ?? 0).ToString(CultureInfo.InvariantCulture);
-                    if (!quickSearch.TryGetValue(id, out var resource))
-                    {
-                        continue;
-                    }
-
-                    try
-                    {
-                        EmitStatus($"Parsing API response from CurseForge for '{resource.Name}'...");
-
-                        var pack = new IndexedPack();
-                        FlameMod.LoadIndexedPack(pack, entryObj);
-                        var recoverUrl = $"{pack.WebsiteUrl}/download/{_blocked[resource]}";
-                        CheckFailed?.Invoke(resource,
-                            "Resource has a new update available, but is not downloadable using CurseForge.",
-                            recoverUrl);
-                    }
-                    catch (JsonException) { }
+                    var pack = new IndexedPack();
+                    FlameMod.LoadIndexedPack(pack, entryObj);
+                    var recoverUrl = $"{pack.WebsiteUrl}/download/{_blocked[resource]}";
+                    CheckFailed?.Invoke(resource,
+                        "Resource has a new update available, but is not downloadable using CurseForge.",
+                        recoverUrl);
                 }
+                catch (JsonException) { }
             }
         }
 

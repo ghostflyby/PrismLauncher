@@ -10,6 +10,8 @@
 
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
+using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
@@ -26,7 +28,7 @@ namespace FlintLauncher.Tests;
 [Collection("FlameApi")]
 public class ModUpdateTaskTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new(TestNet.Http);
+    private readonly FlameClient _flameApi = new();
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-mod-update-{Guid.NewGuid():N}");
     private readonly StubFlameServer _server = new();
     private readonly ModInstallTestEnv _env;
@@ -34,7 +36,7 @@ public class ModUpdateTaskTests : IDisposable
     public ModUpdateTaskTests()
     {
         Directory.CreateDirectory(_root);
-        _flameApi.BaseUrl = _server.Url;
+        _flameApi.Options.BaseUrl = _server.Url;
         _env = new ModInstallTestEnv(_root);
     }
 
@@ -97,7 +99,7 @@ public class ModUpdateTaskTests : IDisposable
 
         // 1. check: the Flame update pass finds the newer file 789
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
-            _ => MetadataHandler.Get(new AbsolutePath(IndexDir), "test-mod"), flame: _flameApi);
+            _ => MetadataHandler.Get(new AbsolutePath(IndexDir), "test-mod"), flame: _flameApi, http: TestNet.Http);
         await check.StartAsync();
         Assert.True(check.WasSuccessful, check.FailReason);
         var update = Assert.Single(check.GetUpdates());

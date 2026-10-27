@@ -2,173 +2,52 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 // SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
 //
-// Port of modplatform/flame/FlameModIndex.{h,cpp}: load CurseForge project/version JSON
-// documents into the provider-neutral ModIndex models.
+// Port of modplatform/flame/FlameModIndex.{h,cpp}: map the CurseForge wire models (the
+// ExternalApi.Flame types) into the provider-neutral ModIndex models, plus the
+// launcher-vocabulary translations the CurseForge wire needs (the class-id table, the
+// loader-flag mapping and the date-based latest-version pick of FlameAPI).
 //
 // Deviations:
 //  - loadIndexedPackVersion's `loadChangelog` parameter is dropped: every in-repo caller
-//    passes the default (false) and fetches changelogs explicitly through
-//    FlameApi.GetModFileChangelog (the C++ made it synchronous through a QEventLoop).
-//  - loadBody (the description fetch) becomes LoadBodyAsync for the same reason.
+//    passes the default (false) and fetches changelogs explicitly through the changelog
+//    operation (the C++ made it synchronous through a QEventLoop).
+//  - loadBody (the description fetch) is not ported: its only caller was the retired Core
+//    adapter — the description consumers run the operation themselves.
 //  - the upstream quirk that resets file.side to NoSide on every gameVersions iteration is
 //    kept verbatim (the "both sides" branch is unreachable, exactly like the C++).
 
 using System.Globalization;
 using System.Text.Json;
-using System.Text.Json.Nodes;
-using System.Text.Json.Serialization;
-using System.Text.Json.Serialization.Metadata;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
+using FlintLauncher.ExternalApi.Flame;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
-// ------------------------------------------------------------------ wire probes
-//
-// The CurseForge project/file shapes as parsed DTOs; every member is camel-conforming
-// (id/name/slug/links/logo/authors/classId/gameVersions/fileDate/downloadUrl/...), so the
-// context-wide policy carries the naming with zero explicit annotations.
+/// <summary>The CurseForge sort vocabulary (the sortField indexes of the search endpoint;
+/// https://docs.curseforge.com/?python#tocS_ModsSearchSortField).</summary>
+public sealed record SortingMethod
+{
+    /// <summary>The index used in the search request's sortField.</summary>
+    public required uint Index { get; init; }
 
-internal sealed record FlameProjectJson(
-    int? Id,
-    string? Name,
-    string? Slug,
-    FlameLinksJson? Links,
-    string? Summary,
-    FlameLogoJson? Logo,
-    List<FlameAuthorJson>? Authors,
-    int? ClassId);
-
-internal sealed record FlameLinksJson(
-    string? WebsiteUrl,
-    string? IssuesUrl,
-    string? SourceUrl,
-    string? WikiUrl);
-
-internal sealed record FlameLogoJson(
-    string? Title,
-    string? ThumbnailUrl,
-    string? Url);
-
-internal sealed record FlameAuthorJson(
-    string? Name,
-    string? Url);
-
-internal sealed record FlameModFileJson(
-    JsonElement? GameVersions,
-    int? ModId,
-    int? Id,
-    string? FileDate,
-    string? DisplayName,
-    string? DownloadUrl,
-    string? FileName,
-    int? ReleaseType,
-    List<FlameHashJson>? Hashes,
-    List<FlameDependencyJson>? Dependencies,
-    bool? IsAvailable,
-    long? FileFingerprint);
-
-internal sealed record FlameHashJson(
-    int? Algo,
-    string? Value);
-
-internal sealed record FlameDependencyJson(
-    int? ModId,
-    int? RelationType);
-
-/// <summary>The /categories response entry (FlameAPI::loadModCategories).</summary>
-internal sealed record FlameCategoryJson(
-    int? Id,
-    string? Name);
-
-internal sealed record FlameCategoryListJson(
-    List<FlameCategoryJson>? Data);
-
-/// <summary>The fingerprint-match response (EnsureMetadataTask's Flame flow).</summary>
-internal sealed record FlameFingerprintResponseJson(
-    FlameFingerprintDataJson? Data);
-
-internal sealed record FlameFingerprintDataJson(
-    List<FlameFingerprintMatchJson>? ExactMatches);
-
-/// <summary>One fingerprint-search match; the fingerprint itself is the FILE object's
-/// fileFingerprint member (the match level only carries "id", which nobody consumed).</summary>
-internal sealed record FlameFingerprintMatchJson(
-    FlameModFileJson? File);
-
-/// <summary>The {data: [...]} envelope of the files list response.</summary>
-internal sealed record FlameFileListJson(
-    List<FlameModFileJson>? Data);
-
-/// <summary>The {data: [...]} envelope of the projects list response. Elements stay
-/// nullable: a JSON null project is tolerated by the readers, not silently re-typed.</summary>
-internal sealed record FlameProjectListJson(
-    List<FlameProjectJson?>? Data);
-
-/// <summary>The {data: {...}} envelope of the single-project response.</summary>
-internal sealed record FlameProjectEnvelopeJson(
-    FlameProjectJson? Data);
-
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
-[JsonSerializable(typeof(FlameProjectJson))]
-[JsonSerializable(typeof(FlameModFileJson))]
-[JsonSerializable(typeof(FlameFingerprintResponseJson))]
-[JsonSerializable(typeof(FlameFileListJson))]
-[JsonSerializable(typeof(FlameProjectListJson))]
-[JsonSerializable(typeof(FlameProjectEnvelopeJson))]
-[JsonSerializable(typeof(FlameCategoryListJson))]
-[JsonSerializable(typeof(List<FlameModFileJson>))]
-internal sealed partial class FlameModJsonContext : JsonSerializerContext;
+    /// <summary>The name as used in the API specification.</summary>
+    public required string Name { get; init; }
+}
 
 // https://docs.curseforge.com/#tocS_Mod
 public static class FlameMod
 {
-    /// <summary>The probe read over a node: shape failures become JsonException like
-    /// the former Require* reads.</summary>
-    private static T Probe<T>(JsonNode node, JsonTypeInfo<T> typeInfo) where T : class
-    {
-        T? dto;
-        try
-        {
-            dto = node.Deserialize(typeInfo);
-        }
-        catch (JsonException e)
-        {
-            throw new JsonException(e.Message);
-        }
-
-        return dto ?? throw new JsonException("Value is not an object");
-    }
-
-    /// <summary>The response-body parse for the typed flow entries (the same
-    /// JsonException wrapper family).</summary>
-    internal static T ParseResponse<T>(string body, JsonTypeInfo<T> typeInfo) where T : class
-    {
-        T? dto;
-        try
-        {
-            dto = JsonSerializer.Deserialize(body, typeInfo);
-        }
-        catch (JsonException e)
-        {
-            throw new JsonException(e.Message);
-        }
-
-        return dto ?? throw new JsonException("the document is null");
-    }
-
     private static string Require(string? value, string key) =>
         value ?? throw new JsonException("'" + key + "' is not a string");
 
     private static int Require(int? value, string key) =>
         value ?? throw new JsonException("'" + key + "' is not an integer");
 
-    /// <summary>Port of FlameMod::loadIndexedPack (node entry).</summary>
-    public static void LoadIndexedPack(IndexedPack pack, JsonNode obj) =>
-        LoadIndexedPack(pack, Probe(obj, FlameModJsonContext.Default.FlameProjectJson));
+    // ------------------------------------------------------------------ pack loading
 
-    /// <summary>Port of FlameMod::loadIndexedPack (typed entry).</summary>
-    internal static void LoadIndexedPack(IndexedPack pack, FlameProjectJson dto)
+    /// <summary>Port of FlameMod::loadIndexedPack.</summary>
+    public static void LoadIndexedPack(IndexedPack pack, FlameProject dto)
     {
         pack.AddonId = Require(dto.Id, "id").ToString(CultureInfo.InvariantCulture);
         pack.Provider = ResourceProvider.Flame;
@@ -199,19 +78,13 @@ public static class FlameMod
             }
         }
 
-        pack.ResourceType = FlameApi.GetResourceType(dto.ClassId ?? 0);
+        pack.ResourceType = GetResourceType(dto.ClassId ?? 0);
         pack.ExtraDataLoaded = false;
         MapUrls(dto.Links, pack);
     }
 
     /// <summary>Port of FlameMod::loadURLs.</summary>
-    public static void LoadUrLs(IndexedPack pack, JsonNode obj)
-    {
-        var dto = Probe(obj, FlameModJsonContext.Default.FlameProjectJson);
-        MapUrls(dto.Links, pack);
-    }
-
-    private static void MapUrls(FlameLinksJson? links, IndexedPack pack)
+    private static void MapUrls(FlameLinks? links, IndexedPack pack)
     {
         pack.ExtraData.IssuesUrl = ChopTrailingSlash(links?.IssuesUrl ?? "");
         pack.ExtraData.SourceUrl = ChopTrailingSlash(links?.SourceUrl ?? "");
@@ -223,35 +96,15 @@ public static class FlameMod
         }
     }
 
-    /// <summary>Port of FlameMod::loadBody (the description fetch; see the header note).</summary>
-    public static async Task LoadBodyAsync(IndexedPack pack, FlameApi flame, CancellationToken cancellationToken = default)
-    {
-        pack.ExtraData.Body = await flame.GetModDescription(
-            int.Parse(pack.AddonId, CultureInfo.InvariantCulture), cancellationToken);
-
-        if (pack.ExtraData.IssuesUrl.Length != 0 || pack.ExtraData.SourceUrl.Length != 0
-                                                 || pack.ExtraData.WikiUrl.Length != 0)
-        {
-            pack.ExtraDataLoaded = true;
-        }
-    }
-
     private static string ChopTrailingSlash(string url) => url.EndsWith('/') ? url[..^1] : url;
 
-    /// <summary>enumToString helper: the CF hash algorithm ids (1=sha1, 2=md5).</summary>
-    private static string EnumToString(int hashAlgorithm) => hashAlgorithm switch
-    {
-        2 => "md5",
-        _ => "sha1",
-    };
+    // --------------------------------------------------------------- version loading
 
-    /// <summary>The Web-facing typed version-list load: parses the {"data": [...]} response
-    /// body and fills the pack (validated files, newest first). Returns false when the data
-    /// member is absent (the caller's "no data array" face); JsonException on a broken
-    /// body.</summary>
-    public static bool LoadIndexedPackVersionsFromResponse(IndexedPack pack, string responseBody)
+    /// <summary>The typed version-list load: fills the pack from the {"data": [...]}
+    /// response (validated files, newest first). Returns false when the data member is
+    /// absent (the caller's "no data array" face).</summary>
+    public static bool LoadIndexedPackVersionsFromResponse(IndexedPack pack, FlameFileList doc)
     {
-        var doc = ParseResponse(responseBody, FlameModJsonContext.Default.FlameFileListJson);
         if (doc.Data is null)
         {
             return false;
@@ -262,7 +115,7 @@ public static class FlameMod
     }
 
     /// <summary>Port of FlameMod::loadIndexedPackVersions (sorts by file date, newest first).</summary>
-    internal static void LoadIndexedPackVersions(IndexedPack pack, List<FlameModFileJson>? files)
+    public static void LoadIndexedPackVersions(IndexedPack pack, List<FlameModFile>? files)
     {
         var unsortedVersions = new List<IndexedVersion>();
         foreach (var versionIter in files ?? [])
@@ -292,12 +145,8 @@ public static class FlameMod
         pack.VersionsLoaded = true;
     }
 
-    /// <summary>Port of FlameMod::loadIndexedPackVersion (node entry).</summary>
-    public static IndexedVersion LoadIndexedPackVersion(JsonNode obj) =>
-        LoadIndexedPackVersion(Probe(obj, FlameModJsonContext.Default.FlameModFileJson));
-
-    /// <summary>Port of FlameMod::loadIndexedPackVersion (typed entry).</summary>
-    internal static IndexedVersion LoadIndexedPackVersion(FlameModFileJson dto)
+    /// <summary>Port of FlameMod::loadIndexedPackVersion.</summary>
+    public static IndexedVersion LoadIndexedPackVersion(FlameModFile dto)
     {
         // a missing gameVersions member is a require failure; a non-string element reads as
         // "" like the former AsString fallback (and simply misses every branch below)
@@ -406,4 +255,208 @@ public static class FlameMod
 
         return file;
     }
+
+    /// <summary>enumToString helper: the CF hash algorithm ids (1=sha1, 2=md5).</summary>
+    private static string EnumToString(int hashAlgorithm) => hashAlgorithm switch
+    {
+        2 => "md5",
+        _ => "sha1",
+    };
+
+    // --------------------------------------------------------------- category loading
+
+    /// <summary>Port of FlameAPI::loadModCategories (the /categories response).</summary>
+    public static List<Category> LoadModCategories(FlameCategoryList doc)
+    {
+        var categories = new List<Category>();
+        foreach (var cat in doc.Data ?? [])
+        {
+            // the former per-entry Require pair failed the whole parse into the same
+            // empty-list catch; a real CF response always carries both members
+            categories.Add(new Category(cat.Name ?? "", (cat.Id ?? 0).ToString(CultureInfo.InvariantCulture)));
+        }
+
+        return categories;
+    }
+
+    // -------------------------------------------------- latest-version & loader vocab
+
+    /// <summary>Port of FlameAPI::getLatestVersion: pick the newest file for the instance's
+    /// loaders (with the no-loader and stale-unspecified-loader tie-breaks of the C++); when
+    /// release types are given, files on other channels are skipped (#3404).</summary>
+    public static IndexedVersion? GetLatestVersion(IReadOnlyList<IndexedVersion> versions,
+        IReadOnlyList<ModLoaderType> instanceLoaders,
+        ModLoaderType fallback,
+        bool checkLoaders,
+        IReadOnlyList<IndexedVersionType>? releaseTypes = null)
+    {
+        const ModLoaderType noLoader = ModLoaderType.None;
+        if (!checkLoaders)
+        {
+            IndexedVersion? ver = null;
+            foreach (var fileTmp in versions)
+            {
+                if (releaseTypes is { Count: > 0 } && !releaseTypes.Contains(fileTmp.VersionType))
+                {
+                    continue;
+                }
+
+                if (ver is null || string.CompareOrdinal(fileTmp.Date, ver.Date) > 0)
+                {
+                    ver = fileTmp;
+                }
+            }
+
+            return ver;
+        }
+
+        var bestMatch = new Dictionary<ModLoaderType, IndexedVersion>();
+
+        void CheckVersion(IndexedVersion version, ModLoaderType loader)
+        {
+            if (bestMatch.TryGetValue(loader, out var best))
+            {
+                if (string.CompareOrdinal(version.Date, best.Date) > 0)
+                {
+                    bestMatch[loader] = version;
+                }
+            }
+            else
+            {
+                bestMatch[loader] = version;
+            }
+        }
+
+        foreach (var fileTmp in versions)
+        {
+            if (releaseTypes is { Count: > 0 } && !releaseTypes.Contains(fileTmp.VersionType))
+            {
+                continue;
+            }
+
+            var loaders = ModIndex.ModLoaderTypesToList(fileTmp.Loaders);
+            if (loaders.Count == 0)
+            {
+                CheckVersion(fileTmp, noLoader);
+            }
+            else
+            {
+                foreach (var loader in loaders)
+                {
+                    CheckVersion(fileTmp, loader);
+                }
+            }
+        }
+
+        // edge case: mod has installed for forge but the instance is fabric => fabric version
+        // will be prioritized on update
+        var currentLoaders = new List<ModLoaderType>(instanceLoaders);
+        currentLoaders.AddRange(ModIndex.ModLoaderTypesToList(fallback));
+        currentLoaders.Add(noLoader); // add a fallback in case the versions do not define a loader
+
+        foreach (var loader in currentLoaders)
+        {
+            if (bestMatch.TryGetValue(loader, out var bestForLoader))
+            {
+                // awkward case where the mod has only two loaders and one of them is not specified
+                if (loader != noLoader && bestMatch.TryGetValue(noLoader, out var bestForNoLoader)
+                                       && bestMatch.Count == 2
+                                       && string.CompareOrdinal(bestForNoLoader.Date, bestForLoader.Date) > 0)
+                {
+                    return bestForNoLoader;
+                }
+
+                return bestForLoader;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Port of FlameAPI::validateModLoaders.</summary>
+    public static bool ValidateModLoaders(ModLoaderType loaders)
+    {
+        return (loaders & (ModLoaderType.NeoForge | ModLoaderType.Forge | ModLoaderType.Fabric | ModLoaderType.Quilt)) != 0;
+    }
+
+    // https://docs.curseforge.com/?http#tocS_ModLoaderType
+    public static int GetMappedModLoader(ModLoaderType loaders) => loaders switch
+    {
+        ModLoaderType.Forge => 1,
+        ModLoaderType.Cauldron => 2,
+        ModLoaderType.LiteLoader => 3,
+        ModLoaderType.Fabric => 4,
+        ModLoaderType.Quilt => 5,
+        ModLoaderType.NeoForge => 6,
+        _ => 0, // DataPack/Babric/BTA/LegacyFabric/Ornithe/Rift/None: not supported
+    };
+
+    /// <summary>The loader ids the search endpoint's modLoaderTypes filter takes for a
+    /// loader-flag set.</summary>
+    public static List<int> GetModLoaderFilterIds(ModLoaderType types)
+    {
+        List<ModLoaderType> all = [ModLoaderType.NeoForge, ModLoaderType.Forge, ModLoaderType.Fabric, ModLoaderType.Quilt];
+        var l = new List<int>();
+        foreach (var loader in all)
+        {
+            if ((types & loader) != 0)
+            {
+                l.Add(GetMappedModLoader(loader));
+            }
+        }
+
+        return l;
+    }
+
+    // --------------------------------------------------------------- class ids
+
+    private static readonly (ResourceType Type, int ClassId)[] ClassIdMappings =
+    [
+        (ResourceType.Mod, 6),
+        (ResourceType.ResourcePack, 12),
+        (ResourceType.World, 17),
+        (ResourceType.ShaderPack, 6552),
+        (ResourceType.Modpack, 4471),
+        (ResourceType.DataPack, 6945),
+    ];
+
+    public static int GetClassId(ResourceType type)
+    {
+        foreach (var (t, classId) in ClassIdMappings)
+        {
+            if (t == type)
+            {
+                return classId;
+            }
+        }
+
+        return 0;
+    }
+
+    public static ResourceType GetResourceType(int classId)
+    {
+        foreach (var (type, c) in ClassIdMappings)
+        {
+            if (c == classId)
+            {
+                return type;
+            }
+        }
+
+        return ResourceType.Unknown;
+    }
+
+    // ------------------------------------------------------------- sorting methods
+
+    public static List<SortingMethod> GetSortingMethods() =>
+    [
+        new SortingMethod { Index = 1, Name = "Featured" },
+        new SortingMethod { Index = 2, Name = "Popularity" },
+        new SortingMethod { Index = 3, Name = "LastUpdated" },
+        new SortingMethod { Index = 4, Name = "Name" },
+        new SortingMethod { Index = 5, Name = "Author" },
+        new SortingMethod { Index = 6, Name = "TotalDownloads" },
+        new SortingMethod { Index = 7, Name = "Category" },
+        new SortingMethod { Index = 8, Name = "GameVersion" },
+    ];
 }

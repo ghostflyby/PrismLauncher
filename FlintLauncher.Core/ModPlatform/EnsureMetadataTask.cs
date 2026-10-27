@@ -21,9 +21,9 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
 
@@ -35,13 +35,13 @@ public sealed class EnsureMetadataTask(
     ResourceProvider provider,
     ModrinthClient modrinth,
     HttpClient http,
-    FlameApi? flame = null)
+    FlameClient? flame = null)
     : FlintTask
 {
     // hash -> resource
     private readonly ModrinthClient _modrinth = modrinth;
     private readonly HttpClient _http = http;
-    private readonly FlameApi _flame = flame ?? new FlameApi(http);
+    private readonly FlameClient _flame = flame ?? new FlameClient();
     private readonly Dictionary<string, IndexedVersion> _tempVersions = new(StringComparer.Ordinal);
     public bool LockUpdate { get; init; }
 
@@ -171,26 +171,14 @@ public sealed class EnsureMetadataTask(
             }
         }
 
-        string fingerprintBody;
+        FlameFingerprintResponse response;
         try
         {
-            fingerprintBody = await _flame.MatchFingerprintsAsync(fingerprints, cancellationToken);
+            response = await _flame.Fingerprints.Match(fingerprints).SendTo(_http, cancellationToken);
         }
-        catch (FlintHttpException e)
+        catch (FlameApiException e)
         {
-            EmitFailed(e.Reason);
-            return;
-        }
-
-        FlameFingerprintResponseJson? response;
-        try
-        {
-            response = FlameMod.ParseResponse(fingerprintBody,
-                FlameModJsonContext.Default.FlameFingerprintResponseJson);
-        }
-        catch (JsonException)
-        {
-            EmitFailed("Fingerprint response is not a JSON object");
+            EmitFailed(e.Message);
             return;
         }
 
@@ -247,72 +235,53 @@ public sealed class EnsureMetadataTask(
         }
 
         var multiple = addonIds.Count != 1;
-        string projectBody;
+        List<FlameProject?> entries;
         try
         {
-            projectBody = multiple
-                ? await _flame.GetProjectsAsync(addonIds.Keys.ToList(), cancellationToken)
-                : await _flame.GetProjectAsync(addonIds.Keys.First(), cancellationToken);
+            entries = multiple
+                ? (await _flame.Projects.ByIds(addonIds.Keys.ToList()).SendTo(_http, cancellationToken)).Data
+                  ?? throw new JsonException("'data' is not an array")
+                : [(
+                    await _flame.Projects.ById(addonIds.Keys.First()).SendTo(_http, cancellationToken)).Data
+                    ?? throw new JsonException("'data' is not an object")];
         }
-        catch (FlintHttpException e)
+        catch (FlameApiException e)
         {
-            EmitFailed(e.Reason);
+            EmitFailed(e.Message);
+            return;
+        }
+        catch (JsonException)
+        {
             return;
         }
 
+        foreach (var entry in entries)
         {
-            List<FlameProjectJson?> entries;
+            if (entry is null)
+            {
+                continue;
+            }
+
+            var id = (entry.Id ?? 0).ToString(CultureInfo.InvariantCulture);
+            if (!addonIds.TryGetValue(id, out var hash) || !resources.TryGetValue(hash, out var resource)
+                                                        || !_tempVersions.TryGetValue(hash, out var version))
+            {
+                continue;
+            }
+
+            var pack = new IndexedPack();
             try
             {
-                if (multiple)
-                {
-                    entries = FlameMod.ParseResponse(projectBody,
-                                  FlameModJsonContext.Default.FlameProjectListJson).Data
-                              ?? throw new JsonException("'data' is not an array");
-                }
-                else
-                {
-                    entries =
-                    [
-                        FlameMod.ParseResponse(projectBody,
-                            FlameModJsonContext.Default.FlameProjectEnvelopeJson).Data
-                        ?? throw new JsonException("'data' is not an object"),
-                    ];
-                }
+                EmitStatus($"Parsing API response from CurseForge for '{resource.Name}'...");
+                FlameMod.LoadIndexedPack(pack, entry);
             }
             catch (JsonException)
             {
-                return;
+                EmitMetadataFailed(resource, "Invalid data returned from the API.");
+                continue;
             }
 
-            foreach (var entry in entries)
-            {
-                if (entry is null)
-                {
-                    continue;
-                }
-
-                var id = (entry.Id ?? 0).ToString(CultureInfo.InvariantCulture);
-                if (!addonIds.TryGetValue(id, out var hash) || !resources.TryGetValue(hash, out var resource)
-                                                            || !_tempVersions.TryGetValue(hash, out var version))
-                {
-                    continue;
-                }
-
-                var pack = new IndexedPack();
-                try
-                {
-                    EmitStatus($"Parsing API response from CurseForge for '{resource.Name}'...");
-                    FlameMod.LoadIndexedPack(pack, entry);
-                }
-                catch (JsonException)
-                {
-                    EmitMetadataFailed(resource, "Invalid data returned from the API.");
-                    continue;
-                }
-
-                await UpdateMetadata(pack, version, resource);
-            }
+            await UpdateMetadata(pack, version, resource);
         }
     }
 

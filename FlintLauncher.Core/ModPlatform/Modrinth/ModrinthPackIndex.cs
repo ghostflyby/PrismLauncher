@@ -111,7 +111,7 @@ public static class ModrinthPackIndex
         foreach (var raw in dto.GameVersions)
         {
             // double this so we can check both strings when filtering
-            file.McVersion.Add(ResourceApi.MapMcVersionFromModrinth(raw));
+            file.McVersion.Add(ModrinthVersionFormat.FromWire(raw));
             file.McVersion.Add(raw);
         }
 

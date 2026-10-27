@@ -8,6 +8,8 @@
 
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
+using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform;
@@ -22,14 +24,14 @@ namespace FlintLauncher.Tests;
 [Collection("FlameApi")]
 public class FlameCheckUpdateTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new(TestNet.Http);
+    private readonly FlameClient _flameApi = new();
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-flame-update-{Guid.NewGuid():N}");
     private readonly StubFlameServer _server = new();
 
     public FlameCheckUpdateTests()
     {
         Directory.CreateDirectory(_root);
-        _flameApi.BaseUrl = _server.Url;
+        _flameApi.Options.BaseUrl = _server.Url;
     }
 
     public void Dispose()
@@ -89,7 +91,7 @@ public class FlameCheckUpdateTests : IDisposable
         }.ToJsonString();
 
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
-            _ => MetadataHandler.Get(new AbsolutePath(Path.Combine(TempPath("mods"), ".index")), "test-mod"), flame: _flameApi);
+            _ => MetadataHandler.Get(new AbsolutePath(Path.Combine(TempPath("mods"), ".index")), "test-mod"), flame: _flameApi, http: TestNet.Http);
 
         var failures = new List<(Resource Resource, string Reason, string RecoverUrl)>();
         check.CheckFailed += (resource, reason, recoverUrl) => failures.Add((resource, reason, recoverUrl));
@@ -124,7 +126,7 @@ public class FlameCheckUpdateTests : IDisposable
         }.ToJsonString();
 
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
-            _ => MetadataHandler.Get(new AbsolutePath(Path.Combine(TempPath("mods"), ".index")), "test-mod"), flame: _flameApi);
+            _ => MetadataHandler.Get(new AbsolutePath(Path.Combine(TempPath("mods"), ".index")), "test-mod"), flame: _flameApi, http: TestNet.Http);
         await check.StartAsync();
 
         Assert.True(check.WasSuccessful, check.FailReason);
@@ -150,7 +152,7 @@ public class FlameCheckUpdateTests : IDisposable
         }.ToJsonString();
 
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
-            _ => MetadataHandler.Get(new AbsolutePath(Path.Combine(TempPath("mods"), ".index")), "test-mod"), flame: _flameApi);
+            _ => MetadataHandler.Get(new AbsolutePath(Path.Combine(TempPath("mods"), ".index")), "test-mod"), flame: _flameApi, http: TestNet.Http);
 
         var failures = new List<(Resource Resource, string Reason, string RecoverUrl)>();
         check.CheckFailed += (resource, reason, recoverUrl) => failures.Add((resource, reason, recoverUrl));
@@ -180,7 +182,7 @@ public class FlameCheckUpdateTests : IDisposable
         }.ToJsonString();
 
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
-            _ => MetadataHandler.Get(new AbsolutePath(Path.Combine(TempPath("mods"), ".index")), "test-mod"), flame: _flameApi);
+            _ => MetadataHandler.Get(new AbsolutePath(Path.Combine(TempPath("mods"), ".index")), "test-mod"), flame: _flameApi, http: TestNet.Http);
 
         var failures = new List<(Resource Resource, string Reason, string RecoverUrl)>();
         check.CheckFailed += (resource, reason, recoverUrl) => failures.Add((resource, reason, recoverUrl));

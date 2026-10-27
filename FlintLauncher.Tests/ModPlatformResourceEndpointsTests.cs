@@ -7,7 +7,7 @@
 //
 // Collections: the provider base URLs / Flame key provider are process-global static hooks,
 // so these classes join the suites that own them (see ModPlatformApiTests):
-//  - the flame class joins "FlameApi" (FlameConfig.BaseUrl / ApiKeyProvider);
+//  - the flame class joins "FlameApi" (FlameClient Options.BaseUrl/ApiKey);
 //  - the modrinth class joins "ModrinthApi" (ModrinthClient Options.BaseUrl).
 
 using System.Net;
@@ -17,6 +17,7 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.ModPlatform.Flame;
 using Xunit;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Tests;
@@ -26,12 +27,12 @@ namespace FlintLauncher.Tests;
 [Collection("FlameApi")]
 public class FlintApiFlameResourceTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new(TestNet.Http);
+    private readonly FlameClient _flameApi = new();
     private readonly StubFlameServer _server = new();
 
     public FlintApiFlameResourceTests()
     {
-        _flameApi.BaseUrl = _server.Url;
+        _flameApi.Options.BaseUrl = _server.Url;
     }
 
     public void Dispose()

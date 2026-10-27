@@ -22,6 +22,7 @@ using FlintLauncher.Core.Secrets;
 using FlintLauncher.Core.Skins;
 using FlintLauncher.Core.State;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using FlintLauncher.Web.Models;
 using TruePath;
@@ -45,7 +46,7 @@ internal sealed class LauncherRuntime : IDisposable
     public ModrinthClient Modrinth { get; }
 
     /// <summary>The Flame (CurseForge) client — same injection story as Modrinth.</summary>
-    public FlameApi Flame { get; }
+    public FlameClient Flame { get; }
 
     /// <summary>The Technic client — same injection story as Modrinth/Flame.</summary>
     public TechnicApi Technic { get; }
@@ -106,14 +107,14 @@ internal sealed class LauncherRuntime : IDisposable
 
     public LauncherRuntime(FlintPaths paths, HttpClient? http = null,
         ModrinthClient? modrinth = null,
-        FlameApi? flame = null, TechnicApi? technic = null, AtLauncherApi? atlauncher = null,
+        FlameClient? flame = null, TechnicApi? technic = null, AtLauncherApi? atlauncher = null,
         FtbApi? ftb = null, ImgurApi? imgur = null, AuthEndpointsOptions? auth = null)
     {
         Paths = paths;
         Http = http ?? NetPrimaryHandler.CreateClient();
         Modrinth = modrinth ?? new ModrinthClient();
         Auth = auth ?? new AuthEndpointsOptions { Http = Http };
-        Flame = flame ?? new FlameApi(Http);
+        Flame = flame ?? new FlameClient();
         Technic = technic ?? new TechnicApi(Http);
         AtLauncher = atlauncher ?? new AtLauncherApi(Http);
         Ftb = ftb ?? new FtbApi(Http);

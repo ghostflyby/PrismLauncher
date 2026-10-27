@@ -8,12 +8,14 @@
 // CurseForge-only file) and the failure surface (unknown pack -> 500 creation_failed with
 // the fetch reason, unknown version -> the task's FailReason, validation -> 400).
 //
-// Each suite builds its own FtbApi/FlameApi clients pointed at the stubs and hands them to
+// Each suite builds its own FtbApi/FlameClient clients pointed at the stubs and hands them to
 // the host (per-instance BaseUrl, nothing process-global to restore).
 
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using Xunit;
@@ -22,7 +24,7 @@ namespace FlintLauncher.Tests;
 
 public class FtbApiEndpointsTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new(TestNet.Http);
+    private readonly FlameClient _flameApi = new();
     private readonly FtbApi _ftbApi;
     private readonly StubFtbServer _server = new();
     private readonly StubFlameServer _flameServer = new();
@@ -32,7 +34,7 @@ public class FtbApiEndpointsTests : IDisposable
     {
         _ftbApi = new FtbApi(TestNet.Http) { BaseUrl = _server.Url };
         // the FTB install resolves CurseForge-only files through the Flame layer
-        _flameApi.BaseUrl = _flameServer.Url;
+        _flameApi.Options.BaseUrl = _flameServer.Url;
     }
 
     public void Dispose()

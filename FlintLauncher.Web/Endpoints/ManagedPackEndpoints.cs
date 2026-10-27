@@ -17,6 +17,7 @@ using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Versioning;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
@@ -56,7 +57,7 @@ public static class ManagedPackEndpoints
 
         api.MapPost("/instances/{ref}/managedpack/update-check", async (string @ref,
             HttpContext httpContext, InstanceList instances, InstanceMutationLock instanceLock,
-            ModrinthClient modrinth, HttpClient http, FlameApi flame) =>
+            ModrinthClient modrinth, HttpClient http, FlameClient flame) =>
         {
             await instanceLock.WaitAsync();
             try

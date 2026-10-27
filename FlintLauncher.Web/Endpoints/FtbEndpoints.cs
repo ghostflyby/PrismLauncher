@@ -20,6 +20,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Core.Net;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
@@ -82,7 +83,7 @@ public static class FtbEndpoints
 
         // -------------------------------------------------- modplatform/ftb/install
         api.MapPost("/modplatform/ftb/install", async Task<IResult> (
-            FtbInstallRequest request, FtbApi ftbApi, ModrinthClient modrinth, HttpClient http, FlameApi flame, InstanceList instances, InstanceMutationLock instanceLock) =>
+            FtbInstallRequest request, FtbApi ftbApi, ModrinthClient modrinth, HttpClient http, FlameClient flame, InstanceList instances, InstanceMutationLock instanceLock) =>
         {
             if (request.PackId <= 0)
             {

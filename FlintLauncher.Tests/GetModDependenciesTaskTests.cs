@@ -19,6 +19,7 @@ using TruePath;
 using Xunit;
 using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Tests;
@@ -267,7 +268,7 @@ public class GetModDependenciesTaskTests : IDisposable
 [Collection("FlameApi")]
 public class GetModDependenciesFlameTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new(TestNet.Http);
+    private readonly FlameClient _flameApi = new();
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-deps-flame-{Guid.NewGuid():N}");
     private readonly StubFlameServer _server = new();
     private readonly ModInstallTestEnv _env;
@@ -275,7 +276,7 @@ public class GetModDependenciesFlameTests : IDisposable
     public GetModDependenciesFlameTests()
     {
         Directory.CreateDirectory(_root);
-        _flameApi.BaseUrl = _server.Url;
+        _flameApi.Options.BaseUrl = _server.Url;
         _env = new ModInstallTestEnv(_root);
     }
 

@@ -22,6 +22,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Secrets;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Web.Services;
@@ -32,7 +33,7 @@ public sealed class NetConfigApplier(
     NetPrimaryHandler primary,
     RetryHandler retry,
     ModrinthClient modrinth,
-    FlameApi flame,
+    FlameClient flame,
     AuthEndpointsOptions auth)
 {
     public const string ProxyPassSecret = "ProxyPass";
@@ -70,7 +71,7 @@ public sealed class NetConfigApplier(
         }
 
         var flameKey = secrets.Get(FlameKeySecret);
-        flame.ApiKeyProvider = () =>
+        flame.Options.ApiKey =
             !string.IsNullOrEmpty(flameKey) ? flameKey : FlintConfig.Default.FlameApiKey;
 
         var msaOverride = configStore.Current.Api.MsaClientIdOverride ?? "";

@@ -194,8 +194,8 @@ public class ModrinthApiTests : IDisposable
     public void VersionHelpers_MapMcVersionsBothWays()
     {
         // the modrinth<->launcher version string round trip
-        Assert.Equal("1.20.2-pre1", ResourceApi.MapMcVersionToModrinth(new McVersion("1.20.2 Pre-Release 1")));
-        Assert.Equal("1.20.2 Pre-Release 1", ResourceApi.MapMcVersionFromModrinth("1.20.2-pre1"));
+        Assert.Equal("1.20.2-pre1", ModrinthVersionFormat.ToWire(new McVersion("1.20.2 Pre-Release 1")));
+        Assert.Equal("1.20.2 Pre-Release 1", ModrinthVersionFormat.FromWire("1.20.2-pre1"));
     }
 
     // ------------------------------------------------------- mrpack import (e2e)

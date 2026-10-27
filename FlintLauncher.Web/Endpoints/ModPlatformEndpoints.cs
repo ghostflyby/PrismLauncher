@@ -11,17 +11,16 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Versioning;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
@@ -55,7 +54,7 @@ public static class ModPlatformEndpoints
             string provider,
             ModrinthClient modrinth,
             HttpClient http,
-            FlameApi flame,
+            FlameClient flame,
             CancellationToken cancellationToken,
             string query = "",
             string version = "",
@@ -81,7 +80,8 @@ public static class ModPlatformEndpoints
             }
 
             return parsedProvider == ResourceProvider.Flame
-                ? await FlameSearchAsync(resourceType, flame, query, version, loader, index, offset)
+                ? await FlameSearchAsync(resourceType, flame, http, cancellationToken,
+                    query, version, loader, index, offset)
                 : await ModrinthSearchAsync(resourceType, modrinth, http, cancellationToken,
                     query, version, loader, index, offset);
         }).Produces<FlameSearchResult[]>().Produces<ModrinthSearchResultView[]>();
@@ -91,7 +91,7 @@ public static class ModPlatformEndpoints
         // project_type (Modrinth), mapped to [{id, name, icon}]. An explicit numeric classId
         // wins over `type` on Flame (search hits carry the raw CurseForge class id).
         api.MapGet("/modplatform/{provider}/categories", async Task<IResult> (
-            string provider, ModrinthClient modrinth, HttpClient http, FlameApi flame,
+            string provider, ModrinthClient modrinth, HttpClient http, FlameClient flame,
             CancellationToken cancellationToken, string type = "", string classId = "") =>
         {
             if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
@@ -122,18 +122,19 @@ public static class ModPlatformEndpoints
                         return ApiJson.Error("invalid_type", unsupported, 400);
                     }
 
-                    effectiveClassId = FlameApi.GetClassId(resourceType);
+                    effectiveClassId = FlameMod.GetClassId(resourceType);
                 }
 
-                string categories;
+                FlameCategoryList categories;
                 try
                 {
-                    categories = await flame.GetCategoriesForClassIdAsync(effectiveClassId);
+                    categories = await flame.Categories.ForClassId(effectiveClassId)
+                        .SendTo(http, cancellationToken);
                 }
-                catch (FlintHttpException e)
+                catch (Exception e) when (e is FlameApiException)
                 {
                     return ApiJson.Error("flame_unavailable",
-                        $"curseforge categories failed: {e.Reason}", 502);
+                        $"curseforge categories failed: {e.Message}", 502);
                 }
 
                 return Results.Ok(ParseFlameCategories(categories).ToArray());
@@ -167,7 +168,7 @@ public static class ModPlatformEndpoints
         // --------------------------------------------------- modplatform/{provider}/mods/{projectId}/description
         api.MapGet("/modplatform/{provider}/mods/{projectId}/description",
             async Task<IResult> (string provider, string projectId, ModrinthClient modrinth, HttpClient http,
-                FlameApi flame, CancellationToken cancellationToken) =>
+                FlameClient flame, CancellationToken cancellationToken) =>
             {
                 if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
                 {
@@ -182,7 +183,15 @@ public static class ModPlatformEndpoints
                         return ApiJson.Error("invalid_request", "'projectId' must be a CurseForge project id", 400);
                     }
 
-                    body = await flame.GetModDescription(modId);
+                    try
+                    {
+                        body = await flame.Projects.Description(modId).SendTo(http, cancellationToken);
+                    }
+                    catch (FlameApiException)
+                    {
+                        // the failed fetch degrades to an empty body (the endpoint's own rule)
+                        body = "";
+                    }
                 }
                 else
                 {
@@ -203,7 +212,8 @@ public static class ModPlatformEndpoints
 
         // ------------------------------------------------ modplatform/{provider}/mods/{projectId}/changelog
         api.MapGet("/modplatform/{provider}/mods/{projectId}/changelog",
-            async Task<IResult> (string provider, string projectId, FlameApi flame, string fileId = "") =>
+            async Task<IResult> (string provider, string projectId, FlameClient flame, HttpClient http,
+                CancellationToken cancellationToken, string fileId = "") =>
         {
                 if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
                 {
@@ -227,13 +237,23 @@ public static class ModPlatformEndpoints
                     return ApiJson.Error("invalid_request", "'projectId' must be a CurseForge project id", 400);
                 }
 
-                var body = await flame.GetModFileChangelog(modId, fileIdNum);
+                string body;
+                try
+                {
+                    body = await flame.Files.Changelog(modId, fileIdNum).SendTo(http, cancellationToken);
+                }
+                catch (FlameApiException)
+                {
+                    // the failed fetch degrades to an empty body (the endpoint's own rule)
+                    body = "";
+                }
+
                 return Results.Ok(new ProviderBodyView(body));
             }).Produces<ProviderBodyView>();
 
         // ------------------------------------------------ modplatform/{provider}/versions
         api.MapGet("/modplatform/{provider}/versions", async Task<IResult> (
-            string provider, ModrinthClient modrinth, HttpClient http, FlameApi flame, string projectId = "") =>
+            string provider, ModrinthClient modrinth, HttpClient http, FlameClient flame, string projectId = "") =>
         {
             if (string.IsNullOrWhiteSpace(projectId))
             {
@@ -248,28 +268,22 @@ public static class ModPlatformEndpoints
             var pack = new IndexedPack { AddonId = projectId, Provider = parsedProvider };
             if (parsedProvider == ResourceProvider.Flame)
             {
-                var url = flame.GetVersionsUrl(new VersionSearchArgs
-                {
-                    Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.Flame },
-                });
-                string body;
+                FlameFileList doc;
                 try
                 {
-                    var message = new HttpRequestMessage(HttpMethod.Get, url);
-                    flame.AddApiKeyHeader(message);
-                    body = await FlintHttp.GetStringAsync(flame.Http, message);
+                    doc = await flame.Files.List(projectId).SendTo(http);
                 }
-                catch (FlintHttpException e)
+                catch (Exception e) when (e is FlameApiException)
                 {
                     return ApiJson.Error("flame_unavailable",
-                        $"{provider} version list failed: {e.Reason}", 502);
+                        $"{provider} version list failed: {e.Message}", 502);
                 }
 
                 try
                 {
                     // loads + validates every file, sorted newest first (a broken body
                     // surfaces as the invalid-response error below)
-                    FlameMod.LoadIndexedPackVersionsFromResponse(pack, body);
+                    FlameMod.LoadIndexedPackVersionsFromResponse(pack, doc);
                 }
                 catch (JsonException e)
                 {
@@ -351,7 +365,7 @@ public static class ModPlatformEndpoints
 
         api.MapPost("/instances/{id}/mods/install", async (string id, List<ModInstallSelection>? selections,
             InstanceList instances, InstanceMutationLock instanceLock,
-            ModrinthClient modrinth, HttpClient http, FlameApi flame,
+            ModrinthClient modrinth, HttpClient http, FlameClient flame,
             FlintTaskRegistry registry) =>
         {
             if (selections is null || selections.Count == 0)
@@ -412,7 +426,7 @@ public static class ModPlatformEndpoints
 
         api.MapPost("/instances/{id}/mods/update", async (string id, ModsUpdateRequest? filter,
             InstanceList instances, InstanceMutationLock instanceLock, FlintConfigStore config,
-            ModrinthClient modrinth, HttpClient http, FlameApi flame, FlintTaskRegistry registry) =>
+            ModrinthClient modrinth, HttpClient http, FlameClient flame, FlintTaskRegistry registry) =>
         {
             await instanceLock.WaitAsync();
             try
@@ -452,7 +466,7 @@ public static class ModPlatformEndpoints
     // ----------------------------------------------------------------- helpers
 
     /// <summary>
-    /// The search `type` query param → the ResourceType wired into SearchArgs.Type (the
+    /// The search `type` query param → the ResourceType of the search (the
     /// value set mirrors the C++ resource-type search surfaces; default mods/back-compat):
     /// mods | resourcepacks | texturepacks | shaderpacks | datapacks | modpacks | worlds.
     /// </summary>
@@ -536,36 +550,20 @@ public static class ModPlatformEndpoints
 
     /// <summary>The Flame /categories response mapped to [{id, name, icon}] (missing icons
     /// become "").</summary>
-    private static List<ProviderCategoryView> ParseFlameCategories(string response)
+    private static List<ProviderCategoryView> ParseFlameCategories(FlameCategoryList doc)
     {
         var result = new List<ProviderCategoryView>();
-        JsonNode? root;
-        try
+        foreach (var entry in doc.Data ?? [])
         {
-            root = JsonNode.Parse(response);
-        }
-        catch (JsonException)
-        {
-            return result;
-        }
-
-        if (root is JsonObject obj && obj["data"] is JsonArray data)
-        {
-            foreach (var entry in data)
+            if (entry is not { } cat)
             {
-                if (entry is not JsonObject entryObj)
-                {
-                    continue;
-                }
-
-                var id = entryObj["id"] is JsonValue idValue &&
-                         idValue.ToJsonString() is var idRaw &&
-                         idRaw.Length != 0 && idRaw[0] != '"' && // numbers only (GetInt64 upstream)
-                         long.TryParse(idRaw, CultureInfo.InvariantCulture, out var idNumber)
-                    ? idNumber.ToString(CultureInfo.InvariantCulture)
-                    : "";
-                result.Add(new ProviderCategoryView(id, Str(entryObj, "name"), Str(entryObj, "icon")));
+                continue;
             }
+
+            result.Add(new ProviderCategoryView(
+                (cat.Id ?? 0).ToString(CultureInfo.InvariantCulture),
+                cat.Name ?? "",
+                cat.Icon ?? ""));
         }
 
         return result;
@@ -596,90 +594,81 @@ public static class ModPlatformEndpoints
         return result;
     }
 
-    /// <summary>The CurseForge search pass-through (the x-api-key header is attached through
-    /// the FlameConfig provider hook; hits map through FlameMod.LoadIndexedPack).</summary>
-    private static async Task<IResult> FlameSearchAsync(ResourceType resourceType, FlameApi flame,
-        string query = "", string version = "", string loader = "", string index = "", int offset = 0)
+    /// <summary>The CurseForge search pass-through (the x-api-key header rides the
+    /// operation's request builder; hits map through FlameMod.LoadIndexedPack).</summary>
+    private static async Task<IResult> FlameSearchAsync(ResourceType resourceType, FlameClient flame,
+        HttpClient http, CancellationToken cancellationToken, string query = "", string version = "",
+        string loader = "", string index = "", int offset = 0)
     {
         var loaders = string.IsNullOrWhiteSpace(loader)
             ? (ModLoaderType?)null
             : ModIndex.GetModLoaderFromString(loader.ToLowerInvariant());
-        // the CurseForge search URL builder never rejects loaders (unlike the Modrinth
-        // one), so validate the parsed loader against Flame's supported set here
-        if (loaders is { } parsed && parsed != 0 && !FlameApi.ValidateModLoaders(parsed))
+        // the CurseForge search never rejects loaders (unlike the Modrinth one), so validate
+        // the parsed loader against Flame's supported set here
+        if (loaders is { } parsed && parsed != 0 && !FlameMod.ValidateModLoaders(parsed))
         {
             return ApiJson.Error("invalid_loader", $"loader '{loader}' is not supported by CurseForge", 400);
         }
 
-        var args = new SearchArgs
+        IReadOnlyList<int>? loaderIds = null;
+        if (loaders is { } selected)
         {
-            Type = resourceType,
-            Offset = offset < 0 ? 0 : offset,
-            Search = string.IsNullOrWhiteSpace(query) ? null : query,
-            Versions = string.IsNullOrWhiteSpace(version) ? null : [new McVersion(version)],
-            Loaders = loaders,
-            Sorting = FlameSorting(index, flame),
-        };
+            selected &= ~ModLoaderType.DataPack;
+            if (selected != 0)
+            {
+                loaderIds = FlameMod.GetModLoaderFilterIds(selected);
+            }
+        }
 
-        var url = flame.GetSearchUrl(args);
+        var sorting = FlameSorting(index);
 
-        string body;
+        FlameProjectList doc;
         try
         {
-            var message = new HttpRequestMessage(HttpMethod.Get, url);
-            flame.AddApiKeyHeader(message);
-            body = await FlintHttp.GetStringAsync(flame.Http, message);
+            doc = await flame.Search.Query(
+                classId: FlameMod.GetClassId(resourceType),
+                offset: offset < 0 ? 0 : offset,
+                searchFilter: string.IsNullOrWhiteSpace(query) ? null : query,
+                sortField: (int)sorting.Index,
+                modLoaderTypes: loaderIds,
+                gameVersion: string.IsNullOrWhiteSpace(version) ? null : version)
+                .SendTo(http, cancellationToken);
         }
-        catch (FlintHttpException e)
+        catch (Exception e) when (e is FlameApiException)
         {
             return ApiJson.Error("flame_unavailable",
-                $"curseforge search failed: {e.Reason}", 502);
+                $"curseforge search failed: {e.Message}", 502);
         }
 
-        JsonNode? bodyRoot;
-        try
+        var results = new List<FlameSearchResult>();
+        foreach (var hit in doc.Data ?? [])
         {
-            bodyRoot = JsonNode.Parse(body);
-        }
-        catch (JsonException)
-        {
-            return ApiJson.Error("flame_invalid_response", "curseforge returned invalid JSON", 502);
-        }
-
-        {
-            var results = new List<FlameSearchResult>();
-            if (bodyRoot is JsonObject obj && obj["data"] is JsonArray hits)
+            if (hit is not { } hitDto)
             {
-                foreach (var hit in hits)
-                {
-                    if (hit is not JsonObject hitObj)
-                    {
-                        continue;
-                    }
-
-                    // map the hit through the core loader, like the C++ search page does
-                    var pack = new IndexedPack();
-                    try
-                    {
-                        FlameMod.LoadIndexedPack(pack, hitObj);
-                    }
-                    catch (JsonException)
-                    {
-                        continue;
-                    }
-
-                    results.Add(new FlameSearchResult(
-                        pack.AddonId,
-                        pack.Slug,
-                        pack.Name,
-                        pack.LogoUrl,
-                        pack.Authors.Count != 0 ? pack.Authors[0].Name : "",
-                        Downloads(hitObj)));
-                }
+                continue;
             }
 
-            return Results.Ok(results.ToArray());
+            // map the hit through the core loader, like the C++ search page does
+            var pack = new IndexedPack();
+            try
+            {
+                FlameMod.LoadIndexedPack(pack, hitDto);
+            }
+            catch (JsonException)
+            {
+                continue;
+            }
+
+            results.Add(new FlameSearchResult(
+                pack.AddonId,
+                pack.Slug,
+                pack.Name,
+                pack.LogoUrl,
+                pack.Authors.Count != 0 ? pack.Authors[0].Name : "",
+                hitDto.DownloadCount));
         }
+
+        return Results.Ok(results.ToArray());
     }
 
     /// <summary>The loaders Modrinth search can facet (the C++ ModrinthAPI
@@ -723,7 +712,7 @@ public static class ModPlatformEndpoints
 
         if (!string.IsNullOrWhiteSpace(version))
         {
-            facets.Add(["versions:" + ResourceApi.MapMcVersionToModrinth(new McVersion(version))]);
+            facets.Add(["versions:" + ModrinthVersionFormat.ToWire(new McVersion(version))]);
         }
 
         facets.Add(["project_type:" + projectType]);
@@ -758,10 +747,6 @@ public static class ModPlatformEndpoints
         return Results.Ok(results.ToArray());
     }
 
-    /// <summary>A string property of a JSON hit object ("" when absent or of another kind).</summary>
-    private static string Str(JsonObject obj, string name) =>
-        obj[name] is JsonValue value && value.TryGetValue<string>(out var str) ? str : "";
-
     /// <summary>The MinecraftInstance for a {ref} (null when missing or not a Minecraft
     /// instance — the mods surface only exists for real instances, like launch).
     /// every endpoint resolves through the addressing chain.</summary>
@@ -770,9 +755,9 @@ public static class ModPlatformEndpoints
 
     /// <summary>The Flame sorting method by (case-insensitive) name, defaulting to Popularity
     /// (the CurseForge API's default sortField).</summary>
-    private static SortingMethod FlameSorting(string index, FlameApi flame)
+    private static SortingMethod FlameSorting(string index)
     {
-        var methods = flame.GetSortingMethods();
+        var methods = FlameMod.GetSortingMethods();
         if (!string.IsNullOrWhiteSpace(index))
         {
             foreach (var method in methods)
@@ -786,24 +771,6 @@ public static class ModPlatformEndpoints
 
         return methods.FirstOrDefault(m => m.Name == "Popularity",
             new SortingMethod { Index = 2, Name = "Popularity" });
-    }
-
-    /// <summary>The optional hit download count (FlameMod does not load it; read it raw).
-    /// Only JSON number tokens count — a quoted "123" string is not a number.</summary>
-    private static long? Downloads(JsonObject hit)
-    {
-        foreach (var key in new[] { "downloadCount", "downloads" })
-        {
-            if (hit[key] is JsonValue value &&
-                value.ToJsonString() is var raw &&
-                raw.Length != 0 && raw[0] != '"' &&
-                long.TryParse(raw, CultureInfo.InvariantCulture, out var number))
-            {
-                return number;
-            }
-        }
-
-        return null;
     }
 
     private static ProviderVersionView VersionView(IndexedVersion version) => new(

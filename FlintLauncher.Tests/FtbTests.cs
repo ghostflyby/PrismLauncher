@@ -6,7 +6,7 @@
 // and the end-to-end pack install against the stub servers (instance layout, component
 // ids, files by their path/type, sha1 verification, CurseForge resolution and the blocked
 // file flow) — the Flame stub backs the CurseForge file resolver. Each test suite builds
-// its own FtbApi/FlameApi clients pointed at the stubs (per-instance BaseUrl, nothing
+// its own FtbApi/FlameClient clients pointed at the stubs (per-instance BaseUrl, nothing
 // process-global to restore).
 
 using System.Text.Json;
@@ -17,6 +17,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using Xunit;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Tests;
@@ -25,7 +26,7 @@ public class FtbTests : IDisposable
 {
     private readonly ModrinthClient _modrinthApi;
     private readonly HttpClient _http;
-    private readonly FlameApi _flameApi = new(TestNet.Http);
+    private readonly FlameClient _flameApi = new();
     private readonly FtbApi _ftbApi;
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-ftb-{Guid.NewGuid():N}");
     private readonly TestGlobalSettings _global = new();
@@ -39,7 +40,7 @@ public class FtbTests : IDisposable
         Directory.CreateDirectory(_root);
         _ftbApi = new FtbApi(TestNet.Http) { BaseUrl = _server.Url };
         // the FTB install resolves CurseForge-only files through the Flame layer
-        _flameApi.BaseUrl = _flameServer.Url;
+        _flameApi.Options.BaseUrl = _flameServer.Url;
     }
 
     public void Dispose()

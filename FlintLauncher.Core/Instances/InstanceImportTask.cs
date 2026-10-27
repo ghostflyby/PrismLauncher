@@ -46,6 +46,7 @@ using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
 using TruePath.SystemIo;
@@ -58,7 +59,7 @@ public sealed partial class InstanceImportTask(
     ModrinthClient modrinth,
     HttpClient http,
     IReadOnlyDictionary<string, string>? extraInfo = null,
-    FlameApi? flame = null)
+    FlameClient? flame = null)
     : InstanceTask
 {
     private enum ModpackType : byte
@@ -72,7 +73,7 @@ public sealed partial class InstanceImportTask(
 
     private readonly ModrinthClient _modrinth = modrinth;
     private readonly HttpClient _http = http;
-    private readonly FlameApi _flame = flame ?? new FlameApi(http);
+    private readonly FlameClient _flame = flame ?? new FlameClient();
     private readonly IReadOnlyDictionary<string, string> _extraInfo = extraInfo ?? new Dictionary<string, string>();
     private AbsolutePath _archivePath;
     private ModpackType _modpackType = ModpackType.Unknown;

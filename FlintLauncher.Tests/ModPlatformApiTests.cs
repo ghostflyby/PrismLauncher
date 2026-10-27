@@ -10,7 +10,7 @@
 // hooks, so these tests are serialized with the suites that own them — same pattern as the
 // modrinth search test in ApiIntegrationTests; the runner also runs collections strictly
 // sequentially, which covers the classes below that touch both hooks):
-//  - the flame search class joins "FlameApi" (FlameConfig.BaseUrl / ApiKeyProvider);
+//  - the flame class joins "FlameApi" (FlameClient Options.BaseUrl/ApiKey);
 //  - the versions + mods classes join "ModrinthApi" (ModrinthClient Options.BaseUrl).
 
 using System.Net;
@@ -20,6 +20,7 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.ModPlatform.Flame;
 using Xunit;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Tests;
@@ -29,12 +30,12 @@ namespace FlintLauncher.Tests;
 [Collection("FlameApi")]
 public class FlintApiFlameSearchTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new(TestNet.Http);
+    private readonly FlameClient _flameApi = new();
     private readonly StubFlameServer _server = new();
 
     public FlintApiFlameSearchTests()
     {
-        _flameApi.BaseUrl = _server.Url;
+        _flameApi.Options.BaseUrl = _server.Url;
     }
 
     public void Dispose()
@@ -65,7 +66,7 @@ public class FlintApiFlameSearchTests : IDisposable
     {
         // the Flame key is a store secret — the host startup apply derives the provider
         // from the ISecretStore, so the key goes in through PUT /settings (the former direct
-        // ApiKeyProvider override no longer survives host startup)
+        // ApiKey write no longer survives host startup)
         _server.SearchJson = new JsonObject { ["data"] = new JsonArray(JsonNode.Parse(SearchHitJson)) }.ToJsonString();
 
         await using var host = await FlintApiHost.StartAsync(flame: _flameApi);
@@ -129,7 +130,7 @@ public class FlintApiFlameSearchTests : IDisposable
 [Collection("ModrinthApi")]
 public class FlintApiVersionsTests : IDisposable
 {
-    private readonly FlameApi _flameApi = new(TestNet.Http);
+    private readonly FlameClient _flameApi = new();
     private readonly StubModrinthServer _modrinth = new();
     private readonly StubFlameServer _flame = new();
 
@@ -138,7 +139,7 @@ public class FlintApiVersionsTests : IDisposable
     public FlintApiVersionsTests()
     {
         _modrinthApi = TestModrinthApi.At(_modrinth.Url).Client;
-        _flameApi.BaseUrl = _flame.Url;
+        _flameApi.Options.BaseUrl = _flame.Url;
     }
 
     public void Dispose()

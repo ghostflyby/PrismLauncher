@@ -59,6 +59,7 @@ using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
 using TruePath.SystemIo;
@@ -77,11 +78,11 @@ public sealed partial class FlameCreationTask : InstanceTask
         string id = "",
         string versionId = "",
         string originalInstanceId = "",
-        FlameApi? flame = null)
+        FlameClient? flame = null)
     {
         _modrinth = modrinth;
         _http = http;
-        _flame = flame ?? new FlameApi(http);
+        _flame = flame ?? new FlameClient();
         StagingPath = stagingPath;
         TrustedSource = trustedSource;
         SetParentEnvironment(environment);
@@ -95,7 +96,7 @@ public sealed partial class FlameCreationTask : InstanceTask
     private readonly FlameManifest _pack = new();
     private readonly ModrinthClient _modrinth;
     private readonly HttpClient _http;
-    private readonly FlameApi _flame;
+    private readonly FlameClient _flame;
     private readonly string _managedId;
     private readonly string _managedVersionId;
 
@@ -543,7 +544,7 @@ public sealed partial class FlameCreationTask : InstanceTask
 
             if (result.Version.DownloadUrl.Length != 0)
             {
-                var dl = HttpDownloadTask.ToFile(new Uri(result.Version.DownloadUrl), path, _flame.Http);
+                var dl = HttpDownloadTask.ToFile(new Uri(result.Version.DownloadUrl), path, _http);
                 filesJob.AddDownload(dl);
                 downloadTasks.Add(dl);
             }

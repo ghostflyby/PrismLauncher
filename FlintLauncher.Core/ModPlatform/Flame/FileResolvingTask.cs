@@ -21,9 +21,9 @@
 using System.Globalization;
 using System.Text.Json;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
@@ -45,11 +45,11 @@ public sealed class FileResolvingTask(
     FlameManifest toProcess,
     ModrinthClient modrinth,
     HttpClient http,
-    FlameApi? flame = null) : FlintTask
+    FlameClient? flame = null) : FlintTask
 {
     private readonly ModrinthClient _modrinth = modrinth;
     private readonly HttpClient _http = http;
-    private readonly FlameApi _flame = flame ?? new FlameApi(http);
+    private readonly FlameClient _flame = flame ?? new FlameClient();
 
     public FlameManifest GetResults() => toProcess;
 
@@ -73,36 +73,24 @@ public sealed class FileResolvingTask(
 
         var fileIds = toProcess.Files.Values
             .Select(f => f.FileId.ToString(CultureInfo.InvariantCulture)).ToList();
-        string body;
+        FlameFileList doc;
         try
         {
-            body = await _flame.GetFilesAsync(fileIds, cancellationToken);
+            doc = await _flame.Files.ByIds(fileIds).SendTo(_http, cancellationToken);
         }
-        catch (FlintHttpException e)
+        catch (FlameApiException e)
         {
-            EmitFailed(e.Reason);
+            EmitFailed(e.Message);
             return;
         }
 
-        await NetJobFinished(body, cancellationToken);
+        await NetJobFinished(doc, cancellationToken);
     }
 
-    private async Task NetJobFinished(string responseBody, CancellationToken cancellationToken)
+    private async Task NetJobFinished(FlameFileList doc, CancellationToken cancellationToken)
     {
         SetProgress(1, 3);
         // job to check modrinth for blocked projects
-        FlameFileListJson doc;
-        try
-        {
-            doc = FlameMod.ParseResponse(responseBody, FlameModJsonContext.Default.FlameFileListJson);
-        }
-        catch (JsonException)
-        {
-            // "Non-JSON data returned from the CF API" (syntax and kind errors alike)
-            EmitFailed("Invalid data returned from the API.");
-            return;
-        }
-
         if (doc.Data is null)
         {
             // the former RequireArray throw: an absent/null data member is a broken reply,
@@ -198,54 +186,43 @@ public sealed class FileResolvingTask(
         var addonIds = toProcess.Files.Values
             .Select(f => f.ProjectId.ToString(CultureInfo.InvariantCulture)).ToList();
 
-        string body;
+        FlameProjectList doc;
         try
         {
-            body = await _flame.GetProjectsAsync(addonIds, cancellationToken);
+            doc = await _flame.Projects.ByIds(addonIds).SendTo(_http, cancellationToken);
         }
-        catch (FlintHttpException e)
+        catch (FlameApiException e)
         {
-            EmitFailed(e.Reason);
+            EmitFailed(e.Message);
             return;
         }
 
         // (the C++ only logs parse problems in this step and still succeeds)
-        FlameProjectListJson? doc = null;
         try
         {
-            doc = FlameMod.ParseResponse(body,
-                FlameModJsonContext.Default.FlameProjectListJson);
-        }
-        catch (JsonException) { }
-
-        if (doc is not null)
-        {
-            try
+            foreach (var entry in doc.Data ?? [])
             {
-                foreach (var entry in doc.Data ?? [])
+                if (entry is not { } projectDto)
                 {
-                    if (entry is not { } projectDto)
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    var id = projectDto.Id ?? 0;
-                    var file = toProcess.Files.Values.FirstOrDefault(f => f.ProjectId == id);
-                    if (file is null)
-                    {
-                        continue;
-                    }
+                var id = projectDto.Id ?? 0;
+                var file = toProcess.Files.Values.FirstOrDefault(f => f.ProjectId == id);
+                if (file is null)
+                {
+                    continue;
+                }
 
-                    EmitStatus($"Parsing API response from CurseForge for '{file.Version.FileName}'...");
-                    FlameMod.LoadIndexedPack(file.Pack, projectDto);
-                    if (file.Pack.ResourceType == ResourceType.World)
-                    {
-                        file.TargetFolder = "saves";
-                    }
+                EmitStatus($"Parsing API response from CurseForge for '{file.Version.FileName}'...");
+                FlameMod.LoadIndexedPack(file.Pack, projectDto);
+                if (file.Pack.ResourceType == ResourceType.World)
+                {
+                    file.TargetFolder = "saves";
                 }
             }
-            catch (JsonException) { }
         }
+        catch (JsonException) { }
 
         EmitSucceeded();
     }
