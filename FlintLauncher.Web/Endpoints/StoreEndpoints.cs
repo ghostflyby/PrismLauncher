@@ -16,7 +16,6 @@ using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Store;
-using FlintLauncher.Web.Services;
 
 namespace FlintLauncher.Web.Endpoints;
 

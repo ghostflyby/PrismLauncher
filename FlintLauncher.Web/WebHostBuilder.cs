@@ -11,15 +11,22 @@ using System.Diagnostics;
 using System.Text.Json;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
+using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Diagnostics;
+using FlintLauncher.Core.Icons;
+using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Java;
+using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
-using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Core.ModPlatform.Technic;
+using FlintLauncher.Core.Screenshots;
+using FlintLauncher.Core.Secrets;
+using FlintLauncher.Core.Skins;
+using FlintLauncher.Core.State;
 using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
@@ -49,7 +56,7 @@ public static class WebHostBuilder
         // at a fixture root — the former JavaUtils.LauncherRootPath static test hook
         paths ??= ResolveFlintPaths(args);
         // fail-fast: five roots EnsureDir + writable probe; any unusable root refuses
-        // startup with its name (no silent degradation, no half-assembled runtime)
+        // startup with its name (no silent degradation, no half-assembled host)
         paths.EnsureUsable();
         // NOTE: the process working directory is NOT touched — every core path is explicit
         // (FlintPaths), so multiple hosts can coexist in one process (integration tests).
@@ -68,13 +75,13 @@ public static class WebHostBuilder
         // (LaunchServices.LoggerFactory / DI)
         builder.Logging.SetMinimumLevel(ResolveLogLevel(args));
         // the rolling file sink opens its writer IN ITS CONSTRUCTOR, so the provider instance
-        // exists before the runtime assembly below — a mid-assembly crash gets its
-        // last words into Flint-0.log through the catch around the ctor, instead of dying
+        // exists before the core assembly below — a mid-assembly crash gets its
+        // last words into Flint-0.log through the catch around the assembly, instead of dying
         // before any log file write
         // the logs directory is materialized here: when it is unusable (a file occupying
         // the path, unwritable) the host degrades to console-only logging and says so on
         // stderr — the C++ fatal dialog became a diagnosable, non-fatal startup line. The
-        // runtime-assembly crash handler below degrades with it (stderr instead of the
+        // the assembly-crash handler below degrades with it (stderr instead of the
         // file sink), so a broken logs path can never hide a startup failure.
         RollingFileLoggerProvider? fileLogger = null;
         if (MaterializedDirectory.Ensure(paths.LogsDir) is { } logsDir)
@@ -94,10 +101,9 @@ public static class WebHostBuilder
         // unauthenticated next to /healthz as a discovery-plane artifact
         builder.Services.AddOpenApi("v1", ApiOpenApi.Configure);
 
-        LauncherRuntime runtime;
         // the host owns the persistent client and its configuration carriers: the two
         // handlers hold the proxy/user agent/retries/timeout (the applier writes them), and
-        // the client over their chain is what the runtime and the endpoints thread through
+        // the client over their chain is what every caller threads through
         var primaryHandler = new NetPrimaryHandler();
         var retryHandler = new RetryHandler { InnerHandler = primaryHandler };
         var http = new HttpClient(retryHandler, disposeHandler: false)
@@ -106,16 +112,142 @@ public static class WebHostBuilder
             // inactivity window instead
             Timeout = Timeout.InfiniteTimeSpan,
         };
+
+        // ------------------------------------------------------------------ core assembly
+        // The singletons a C++ Application object would own, built once against the resolved
+        // roots. The order IS the dependency graph: platform clients over the shared
+        // transport → the watch tenancy and its lock → secrets → state (loaded before the
+        // config import, which sorts state keys into it) → the flint-legacy remount (eager,
+        // once — before the config import so a moved flint.cfg is found, and before the cache
+        // ledger so its Load reads the remounted ledger) → config + INI import → dir settings
+        // → cache ledger → instances → icons/skins → accounts.
+        InstanceMutationLock instanceLock;
+        DirectorySpace watchSpace;
+        ISecretStore secrets;
+        LauncherStateStore state;
+        MigrationDecisionStore migrationDecisions;
+        FlintLegacyMigration.Result legacyMigration;
+        FlintConfigStore config;
+        FlintConfigImporter.ImportResult configImport;
+        ConfiguredDirs dirs;
+        HttpMetaCache metaCache;
+        InstanceList instances;
+        IconPool icons;
+        SkinsLibrary skins;
+        AccountList accounts;
+        ModrinthClient modrinthClient;
+        FlameClient flameClient;
+        TechnicApi technicClient;
+        AtLauncherApi atLauncherClient;
+        FtbApi ftbClient;
+        ImgurApi imgurClient;
+        AuthEndpointsOptions authOptions;
         try
         {
-            runtime = new LauncherRuntime(paths, http: http, modrinth: modrinth, flame: flame, technic: technic,
-                atlauncher: atlauncher, ftb: ftb, auth: auth);
+            // platform clients: the injected instances from the host factory, else defaults
+            // over the shared client
+            modrinthClient = modrinth ?? new ModrinthClient();
+            authOptions = auth ?? new AuthEndpointsOptions { Http = http };
+            flameClient = flame ?? new FlameClient();
+            technicClient = technic ?? new TechnicApi(http);
+            atLauncherClient = atlauncher ?? new AtLauncherApi(http);
+            ftbClient = ftb ?? new FtbApi(http);
+            imgurClient = new ImgurApi(http);
+
+            // the watched-directory tenancy: reconciles are serialized through the instance
+            // lock — watch events arrive on threadpool threads and must not race endpoint
+            // mutations of the instance list
+            instanceLock = new InstanceMutationLock();
+            watchSpace = new DirectorySpace(action =>
+            {
+                instanceLock.Wait();
+                try
+                {
+                    action();
+                }
+                finally
+                {
+                    instanceLock.Release();
+                }
+            });
+
+            // secrets: <data>/secrets.json (0600) — the secret trio (ProxyPass,
+            // ModrinthToken, FlameKeyOverride) reads and writes here
+            secrets = new FileSecretStore(paths.SecretsFile, FlintJsonContext.Default.SecretsFile);
+
+            // state load: launcher-state.json BEFORE the config import — the importer strips
+            // the state keys into it
+            state = new LauncherStateStore(paths.LauncherStateFile, FlintJsonContext.Default.LauncherState);
+
+            // per-source migration decision records: <state>/migration/<source>.json
+            migrationDecisions = new MigrationDecisionStore(
+                paths.MigrationDir, FlintJsonContext.Default.MigrationDecisionRecord);
+
+            // the pre-reform flat layout remounts onto the five roots exactly once (eager,
+            // no lazy dual-read), before the config import and the cache ledger
+            legacyMigration = FlintLegacyMigration.ExecuteIfNeeded(paths, migrationDecisions);
+
+            // flint.json is the authoritative user layer; when it is missing, the one-shot
+            // importer reads the INI chain (flint.cfg ← prismlauncher.cfg ← polymc.cfg ←
+            // multimc.cfg|mmc.cfg) and sorts it in a single pass: secret trio → the store,
+            // state keys → the state store, the rest → the record domains
+            config = new FlintConfigStore(paths.ConfigFile, FlintJsonContext.Default.FlintConfigFile);
+            configImport = FlintConfigImporter.ImportIfNeeded(paths, config, secrets, state);
+            dirs = new ConfiguredDirs(paths, config);
+
+            // the standard base table, registered exactly once before any use, then the
+            // ledger Load(): the persisted index restores, so existing entries do not
+            // re-download on every run
+            metaCache = HttpMetaCache.ForRoots(paths, http);
+            metaCache.Load();
+
+            // instance discovery over <data>/instances; the typed environment carries the
+            // user flint.json layer, and discovered instances also carry the cache, the
+            // state store and the launch-pipeline stamp
+            var instanceDirs = MaterializedDirectory.Ensure(paths.InstancesDir)!;
+            instances = new InstanceList(
+                [instanceDirs],
+                new InstanceEnvironment(
+                    config, FlintJsonContext.Default.InstanceConfigFile,
+                    FlintJsonContext.Default.InstanceStateFile),
+                paths.GroupsFile,
+                [paths.InstgroupsFile, instanceDirs.Path / "instgroups.json"],
+                metaCache: metaCache,
+                launcherState: state);
+            instances.LoadList();
+            // external changes to the instance roots reload the list (coalesced, serialized
+            // through the instance lock) instead of waiting for a caller
+            instances.AttachWatcher(watchSpace);
+
+            // icon library and local skin library over their dir-kind settings
+            icons = new IconPool(MaterializedDirectory.Ensure(dirs.IconsDir)!);
+            skins = new SkinsLibrary(MaterializedDirectory.Ensure(dirs.SkinsDir)!);
+            icons.AttachWatcher(watchSpace);
+            skins.AttachWatcher(watchSpace);
+            // a rename/move of a watched root re-points the dir-kind models
+            watchSpace.TenantMoved += (oldDir, newDir) =>
+            {
+                if (oldDir == icons.IconsDir)
+                {
+                    icons.SetIconsDir(newDir);
+                }
+
+                if (oldDir == skins.SkinsDir)
+                {
+                    skins.SetSkinsDir(newDir);
+                }
+            };
+
+            // accounts: <data>/accounts.json, autosaved on every change
+            accounts = new AccountList();
+            accounts.SetListFilePath(paths.AccountsFile, enableAutosave: true);
+            accounts.LoadList();
         }
         catch (Exception e)
         {
-            // the file sink exists since before the ctor — the failure is diagnosable, not
+            // the file sink exists since before the assembly — the failure is diagnosable, not
             // unwritten; in the degraded (console-only) mode the same line goes to stderr.
-            // Either way: fail-fast as before (no silent degradation, no half runtime)
+            // Either way: fail-fast as before (no silent degradation, no half-booted host)
             if (fileLogger is { } sink)
             {
                 sink.CreateLogger(LogCategories.Startup).LogError(e,
@@ -132,30 +264,30 @@ public static class WebHostBuilder
         }
 
         builder.Services.AddSingleton(FlintConfig.Default);
-        // the assembled runtime is not registered itself — a handler depends on the members
-        // it uses, each injectable on its own
+        // each assembled service is registered by its own type — a handler depends on the
+        // members it uses, each injectable on its own
         builder.Services.AddSingleton(paths);
         builder.Services.AddSingleton(primaryHandler);
         builder.Services.AddSingleton(retryHandler);
-        builder.Services.AddSingleton(runtime.Http);
-        builder.Services.AddSingleton(runtime.Config);
-        builder.Services.AddSingleton(runtime.Dirs);
-        builder.Services.AddSingleton(runtime.State);
-        builder.Services.AddSingleton(runtime.Secrets);
-        builder.Services.AddSingleton(runtime.MigrationDecisions);
-        builder.Services.AddSingleton(runtime.MetaCache);
-        builder.Services.AddSingleton(runtime.Instances);
-        builder.Services.AddSingleton(runtime.InstanceLock);
-        builder.Services.AddSingleton(runtime.Icons);
-        builder.Services.AddSingleton(runtime.Skins);
-        builder.Services.AddSingleton(runtime.Accounts);
-        builder.Services.AddSingleton(runtime.Modrinth);
-        builder.Services.AddSingleton(runtime.Flame);
-        builder.Services.AddSingleton(runtime.Technic);
-        builder.Services.AddSingleton(runtime.AtLauncher);
-        builder.Services.AddSingleton(runtime.Ftb);
-        builder.Services.AddSingleton(runtime.Imgur);
-        builder.Services.AddSingleton(runtime.Auth);
+        builder.Services.AddSingleton(http);
+        builder.Services.AddSingleton(config);
+        builder.Services.AddSingleton(dirs);
+        builder.Services.AddSingleton(state);
+        builder.Services.AddSingleton(secrets);
+        builder.Services.AddSingleton(migrationDecisions);
+        builder.Services.AddSingleton(metaCache);
+        builder.Services.AddSingleton(instances);
+        builder.Services.AddSingleton(instanceLock);
+        builder.Services.AddSingleton(icons);
+        builder.Services.AddSingleton(skins);
+        builder.Services.AddSingleton(accounts);
+        builder.Services.AddSingleton(modrinthClient);
+        builder.Services.AddSingleton(flameClient);
+        builder.Services.AddSingleton(technicClient);
+        builder.Services.AddSingleton(atLauncherClient);
+        builder.Services.AddSingleton(ftbClient);
+        builder.Services.AddSingleton(imgurClient);
+        builder.Services.AddSingleton(authOptions);
         builder.Services.AddSingleton<FlintTaskRegistry>();
         builder.Services.AddSingleton<DeviceCodeSessionStore>();
         builder.Services.AddSingleton<JavaScanService>();
@@ -166,22 +298,22 @@ public static class WebHostBuilder
         builder.Services.AddHostedService<AccountRefreshService>();
 
         // the launch pipeline's dependencies (the C++ APPLICATION singleton's launch half):
-        // global settings and runtime state from the runtime, the logger factory from the
+        // the global settings and runtime state assembled above, the logger factory from the
         // app services (it only exists after Build — hence the factory). The launch
         // endpoints inject it; the instance list is stamped with it after Build.
         builder.Services.AddSingleton(sp => new LaunchServices
         {
             Paths = paths,
             LoggerFactory = sp.GetRequiredService<ILoggerFactory>(),
-            Http = runtime.Http,
-            Config = runtime.Config,
-            LauncherState = runtime.State,
-            Auth = runtime.Auth,
+            Http = http,
+            Config = config,
+            LauncherState = state,
+            Auth = authOptions,
             // the java root follows the JavaDir setting under store
             // semantics, and the managed-versions javalist scans it (the C++
             // APPLICATION->javalist() the AutoInstallJava "no download" branch reads)
-            JavaRootProvider = () => runtime.Dirs.JavaRoot,
-            JavaInstallListProvider = () => new JavaInstallList(javaRoot: runtime.Dirs.JavaRoot),
+            JavaRootProvider = () => dirs.JavaRoot,
+            JavaInstallListProvider = () => new JavaInstallList(javaRoot: dirs.JavaRoot),
             // the C++ LaunchTask always parses log4j XML events out of the game output
             // (LaunchTask::parseXmlLogs); the port keeps it behind an opt-in gate for
             // pure-core consumers and this host turns it on
@@ -191,9 +323,15 @@ public static class WebHostBuilder
         var app = builder.Build();
         var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
 
-        // the runtime owns no hosted-service lifetime of its own — its disposal (the watch
-        // tenancy, the metacache ledger flush) rides application stop
-        app.Lifetime.ApplicationStopping.Register(runtime.Dispose);
+        // the two assembled services with deferred shutdown work: the watch tenancy stops
+        // its watchers, the metacache ledger flushes its pending write (the 30s timer) so
+        // shutdown after activity does not cost re-hashes and revalidations on the next start.
+        // One callback in this order — the watchers must not fire into a flushed ledger.
+        app.Lifetime.ApplicationStopping.Register(() =>
+        {
+            watchSpace.Dispose();
+            metaCache.Dispose();
+        });
 
         // a generated token exists only in this process — announce it once at startup
         // (Information, single line) so the host's client can pick it up; nothing is written
@@ -206,11 +344,11 @@ public static class WebHostBuilder
         // stamp the launch-pipeline dependencies onto the instance list (re-stamps the
         // already-discovered residents); resolving here is also the factory's eager,
         // fail-fast construction
-        runtime.Instances.LaunchServices = app.Services.GetRequiredService<LaunchServices>();
+        instances.LaunchServices = app.Services.GetRequiredService<LaunchServices>();
 
-        // the flint-legacy startup remount already ran inside the runtime
-        // constructor — surface what it did (informational; a failed pass retries next start)
-        if (runtime.LegacyMigration is { Ran: true } legacy)
+        // the flint-legacy startup remount ran during assembly — surface what it did
+        // (informational; a failed pass retries next start)
+        if (legacyMigration is { Ran: true } legacy)
         {
             loggerFactory.CreateLogger(LogCategories.Migration).LogInformation(
                 "flint-legacy remount: {Items} item(s), {Bytes} bytes, legacy Prism ledger cleaned: {Cleaned}{Suffix}",
@@ -225,15 +363,15 @@ public static class WebHostBuilder
                 "flint-legacy remount: skipped (no undecided legacy layout at the data or home root)");
         }
 
-        // the INI import ran in the constructor too — surface its
-        // outcome, in particular the previously SILENT failure: a chain INI that exists but
-        // cannot be parsed (the launcher starts on a default flint.json behind it)
-        if (runtime.ConfigImport.ImportedIni is { } importedIni)
+        // the INI import ran during assembly too — surface its outcome, in particular the
+        // previously SILENT failure: a chain INI that exists but cannot be parsed (the
+        // launcher starts on a default flint.json behind it)
+        if (configImport.ImportedIni is { } importedIni)
         {
             loggerFactory.CreateLogger(LogCategories.Startup).LogInformation(
                 "INI import: flint.json seeded from {Ini}", importedIni);
         }
-        else if (runtime.ConfigImport.UnreadableIni is { } unreadableIni)
+        else if (configImport.UnreadableIni is { } unreadableIni)
         {
             loggerFactory.CreateLogger(LogCategories.Startup).LogWarning(
                 "INI import: {Ini} is unreadable — flint.json stays default (the INI is kept; the write side is JSON-only)",

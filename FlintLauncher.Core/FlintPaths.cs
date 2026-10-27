@@ -5,7 +5,7 @@
 // startup and several subsystems addressed files with data-dir-relative literals ("meta",
 // "assets/indexes", "instgroups.json", ...); the port inherited that via the process working
 // directory. This record makes every one of those anchors explicit: the composition root
-// builds one FlintPaths and threads it down (LauncherRuntime in the host, LaunchServices in
+// builds one FlintPaths and threads it down (the host's WebHostBuilder, LaunchServices in
 // the launch pipeline, constructor parameters elsewhere), so the process working directory
 // is no longer load-bearing and multiple runtimes can coexist in one process (integration
 // tests).

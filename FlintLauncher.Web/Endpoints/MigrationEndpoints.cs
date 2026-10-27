@@ -5,7 +5,7 @@
 // background task (move / CoW-clone / copy), and record declined sources (decision
 // records under the state root). The prism-family endpoints are strictly user-triggered —
 // prism-family never auto-runs; the flint-legacy profile is the one startup eager pass
-// (LauncherRuntime) and is not served here.
+// (composed by WebHostBuilder, which logs its outcome) and is not served here.
 
 using System.Security;
 using FlintLauncher.Core;

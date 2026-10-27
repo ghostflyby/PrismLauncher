@@ -46,7 +46,7 @@ public class RootMovedTests : IDisposable
         {
             if (oldDir == icons.Path)
             {
-                pool.SetIconsDir(newDir); // the runtime wiring's re-point, as in LauncherRuntime
+                pool.SetIconsDir(newDir); // the host wiring's re-point
             }
         };
         space.Register(icons, pool.Rescan);

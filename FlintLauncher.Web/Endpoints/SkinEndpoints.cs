@@ -24,7 +24,6 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Skins;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
-using FlintLauncher.Web.Services;
 
 namespace FlintLauncher.Web.Endpoints;
 

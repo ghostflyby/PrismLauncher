@@ -8,7 +8,7 @@
 // BuildConfig.FTB_API_BASE_URL became injected instance state: BaseUrl is per-instance
 // (tests construct their own client pointed at a stub; the install endpoint derives one
 // for its serverUrl override — see FtbEndpoints); the client rides the injected persistent client
-// (LauncherRuntime.Ftb — see the Modrinth/Flame de-singletoning for the same story). The
+// (the composition root's FtbApi — see the Modrinth/Flame de-singletoning for the same story). The
 // parsers are pure helpers and stay static; the wire shapes deserialize through the
 // source-generated FtbJsonContext (the FTB models carry their annotations themselves).
 

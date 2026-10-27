@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
 // Assembly-sequence diagnostics ("logger early, every later step
-// diagnosable"): a runtime-constructor crash must reach the state-root file sink — the
-// rolling file provider opens its writer in its own constructor, BEFORE the runtime
+// diagnosable"): a core-assembly crash must reach the state-root file sink — the
+// rolling file provider opens its writer in its own constructor, BEFORE the core
 // assembly, so the WebHostBuilder catch can write the failure into Flint-0.log before
 // rethrowing (fail-fast preserved, but the last words are on disk).
 
@@ -31,13 +31,13 @@ public class WebHostAssemblyTests
 
             File.SetUnixFileMode(ini, UnixFileMode.None);
 
-            // the unreadable chain INI makes the import throw inside the runtime
-            // constructor (IniFile.LoadFile catches IOException only) — the crash must be
+            // the unreadable chain INI makes the import throw during the core assembly
+            // (IniFile.LoadFile catches IOException only) — the crash must be
             // written to the file sink before the exception re-emerges
             var crash = Record.Exception(() =>
                 WebHostBuilder.BuildWebApplication(["--home-dir", home]));
 
-            Assert.NotNull(crash); // fail-fast preserved: no half runtime, no silent start
+            Assert.NotNull(crash); // fail-fast preserved: no half-assembled host, no silent start
             var log = File.ReadAllText(Path.Combine(home, "state", "logs", "Flint-0.log"));
             Assert.Contains("runtime assembly failed", log);
             Assert.Contains("UnauthorizedAccessException", log);

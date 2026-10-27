@@ -29,9 +29,9 @@
 //
 // BuildConfig.TECHNIC_API_BASE_URL / TECHNIC_API_BUILD became injected instance state:
 // BaseUrl / ApiBuild are per-instance (tests construct their own client pointed at a stub);
-// the client rides the injected persistent client (LauncherRuntime.Technic — see the Modrinth/Flame
-// de-singletoning for the same story). The parsers and the Solder URL builders are pure
-// helpers and stay static; the wire shapes deserialize through the source-generated
+// the client rides the injected persistent client (the composition root's TechnicApi — see
+// the Modrinth/Flame de-singletoning for the same story). The parsers and the Solder URL
+// builders are pure helpers and stay static; the wire shapes deserialize through the source-generated
 // TechnicJsonContext (the Solder models carry their annotations themselves).
 //
 // Wire-model notes:

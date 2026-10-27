@@ -65,7 +65,7 @@
 - dirs 组收拾：CentralModsDir 死（D8）、IconsDir/SkinsDir 由模型遵守（D5/D6）、DownloadsDir 保持本机。
 - instance-state.json 与 launcher-state.json 共用 TypedJsonFile 的 `stateVersion` 演进（D4/S5 对齐）。
 - 全部实例端点切 ResolveInstance；rename 流程简化落地（D3：去 LoadList 重载与手工搬组）。
-- `--data-dir` 语义收窄波及 LauncherRuntime/WebHostBuilder 的解析与全部测试旗标用法。
+- `--data-dir` 语义收窄波及 WebHostBuilder 的解析与全部测试旗标用法。
 - 旧文档落停：docs/MAPPING.md、UI-API-MAPPING.md 的相应条目随批次更新（news 删除、settings 强类型、/store 新面）。
 
 ## 4. 开放点（归统一迁移批次实施设计）

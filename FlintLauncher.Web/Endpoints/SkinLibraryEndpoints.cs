@@ -21,7 +21,6 @@ using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Skins;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
-using FlintLauncher.Web.Services;
 using TruePath;
 using TruePath.SystemIo;
 

@@ -6,7 +6,7 @@
 // the byte shape of), the skin/cape removals and the CapeChange equip/remove semantics —
 // against the shared AuthStubServer, which records every request.
 //
-// The skins calls go through the runtime's injected AuthEndpointsOptions (runtime.Auth), so
+// The skins calls go through the host's injected AuthEndpointsOptions, so
 // every host starts with a stub-pointed options instance. The host fixture seeds accounts.json
 // BEFORE the app builds (the runtime loads the account list at startup), which gives an
 // MSA-shaped account with real profile skin data plus a token the stub can assert on.

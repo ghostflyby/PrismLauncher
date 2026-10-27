@@ -64,8 +64,8 @@ public sealed record ImgurDataJson(
 internal sealed partial class ImgurJsonContext : JsonSerializerContext;
 
 /// <summary>Port of the ImgurAPI namespace: the two imgur request factories. An instance
-/// rides the injected client (LauncherRuntime.Imgur — same de-singletoning story as the
-/// platform clients); the tasks it builds send through that stack's client.</summary>
+/// rides the injected client (the composition root's ImgurApi — same de-singletoning story
+/// as the platform clients); the tasks it builds send through that stack's client.</summary>
 public sealed class ImgurApi(HttpClient http)
 {
     /// <summary>The network stack this client's uploads flow through.</summary>

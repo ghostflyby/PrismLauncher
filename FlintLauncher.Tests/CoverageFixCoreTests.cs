@@ -10,10 +10,14 @@
 
 using System.Security.Cryptography;
 using FlintLauncher.Core;
+using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Net;
+using FlintLauncher.Core.Secrets;
 using FlintLauncher.Core.Settings;
+using FlintLauncher.ExternalApi.Flame;
+using FlintLauncher.ExternalApi.Modrinth;
 using FlintLauncher.Web;
 using FlintLauncher.Web.Services;
 using TruePath;
@@ -197,16 +201,19 @@ public class CoverageFixCoreTests
             var primary = new NetPrimaryHandler();
             var retry = new RetryHandler { InnerHandler = primary };
 
-            var runtime = new LauncherRuntime(FlintPaths.FromHomeDir(new AbsolutePath(dataDir)));
-            runtime.Config.Set("ProxyType", "HTTP");
-            runtime.Config.Set("ProxyAddr", "10.1.2.3");
-            runtime.Config.Set("ProxyPort", 8118);
-            runtime.Config.Set("NumberOfManualRetries", 4);
-            runtime.Config.Set("RequestTimeout", 120);
-            runtime.Config.Set("UserAgentOverride", "Flint-NetCfg-Agent/9.9");
+            var config = new FlintConfigStore(new AbsolutePath(Path.Combine(dataDir, "flint.json")),
+                FlintJsonContext.Default.FlintConfigFile);
+            var secrets = new FileSecretStore(new AbsolutePath(Path.Combine(dataDir, "secrets.json")),
+                FlintJsonContext.Default.SecretsFile);
+            config.Set("ProxyType", "HTTP");
+            config.Set("ProxyAddr", "10.1.2.3");
+            config.Set("ProxyPort", 8118);
+            config.Set("NumberOfManualRetries", 4);
+            config.Set("RequestTimeout", 120);
+            config.Set("UserAgentOverride", "Flint-NetCfg-Agent/9.9");
 
-            new NetConfigApplier(runtime.Config, runtime.Secrets, primary, retry,
-                runtime.Modrinth, runtime.Flame, runtime.Auth).Apply();
+            new NetConfigApplier(config, secrets, primary, retry,
+                new ModrinthClient(), new FlameClient(), new AuthEndpointsOptions()).Apply();
 
             Assert.Equal(("HTTP", "10.1.2.3", 8118, "", ""), primary.Proxy);
             Assert.Equal(4, retry.MaxManualRetries);

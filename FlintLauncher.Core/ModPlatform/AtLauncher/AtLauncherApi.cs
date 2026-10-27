@@ -8,8 +8,9 @@
 //
 // BuildConfig.ATL_DOWNLOAD_SERVER_URL / ATL_API_BASE_URL became injected instance state:
 // DownloadServerUrl / ApiBaseUrl are per-instance (tests construct their own client pointed
-// at a stub); the client rides the injected persistent client (LauncherRuntime.AtLauncher — see the
-// Modrinth/Flame/Technic de-singletoning for the same story). The parsers are pure helpers
+// at a stub); the client rides the injected persistent client (the composition root's
+// AtLauncherApi — see the Modrinth/Flame/Technic de-singletoning for the same story). The
+// parsers are pure helpers
 // and stay static; the wire shapes deserialize through the source-generated
 // AtLauncherJsonContext (the ATL models carry their own annotations; the document parse of
 // each entry keeps the "{what}: Error parsing JSON: ..." wrapper via AtLauncherJson).

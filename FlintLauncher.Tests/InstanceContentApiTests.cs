@@ -30,7 +30,7 @@ namespace FlintLauncher.Tests;
 // --------------------------------------------------------------------------- host fixture
 
 /// <summary>Like FlintApiHost, but the temp home's data root is created (and seeded) by the
-/// caller BEFORE the host starts — the instance list loads once in the runtime constructor.
+/// caller BEFORE the host starts — the instance list loads once during core assembly.
 /// The caller passes the home root; instances live under &lt;home&gt;/data/instances (the
 /// home layout).</summary>
 internal sealed class WaveApiHost : IAsyncDisposable

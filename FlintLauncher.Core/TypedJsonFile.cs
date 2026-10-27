@@ -26,7 +26,8 @@ public interface IStateVersioned
 }
 
 /// <summary>A single strongly-typed JSON file. Not thread-safe: callers own serialization
-/// (the runtime keeps one writer per domain, e.g. LauncherRuntime.InstanceLock).</summary>
+/// (the composition root keeps one writer per domain, plus the instance-mutation lock for
+/// the instance-side files).</summary>
 public sealed class TypedJsonFile<T>(AbsolutePath filePath, JsonTypeInfo<T> typeInfo)
     where T : class
 {

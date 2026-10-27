@@ -41,7 +41,7 @@ public static class LogCategories
 
     /// <summary>Startup assembly diagnostics: the INI import outcome
     /// and the mid-assembly crash report — everything the host logs after Build for steps
-    /// the runtime constructor ran before any logger existed.</summary>
+    /// the assembly ran before any logger existed.</summary>
     public const string Startup = "flint.startup";
 }
 
