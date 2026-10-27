@@ -5,6 +5,7 @@
 // Port of launcher/minecraft/auth/steps/XboxAuthorizationStep.{h,cpp} (XSTS authorize), including
 // the full XErr error-code ladder of processSTSError().
 
+using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -55,7 +56,7 @@ public sealed class XboxAuthorizationStep(
 
         if (!response.Success)
         {
-            if (AuthNetUtils.IsApplicationError(response.Error) && !AuthNetUtils.IsServerError(response.Error))
+            if (response.IsClientError)
             {
                 if (ProcessStsError(response))
                 {
@@ -67,7 +68,7 @@ public sealed class XboxAuthorizationStep(
             }
             else
             {
-                Data.NetworkError = response.Error;
+                Data.NetworkError = response.StatusCode;
                 EmitFinished(AccountTaskState.Offline,
                     $"Failed to get authorization for {authorizationKind} services: {response.ErrorString}");
             }
@@ -104,7 +105,7 @@ public sealed class XboxAuthorizationStep(
     /// <summary>Port of processSTSError: true when the XSTS error object was handled.</summary>
     private bool ProcessStsError(AuthStepResponse response)
     {
-        if (response.Error != (int)QtNetworkError.AuthenticationRequiredError)
+        if (response.StatusCode != HttpStatusCode.Unauthorized)
         {
             return false;
         }

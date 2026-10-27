@@ -99,7 +99,7 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
         Data.MinecraftEntitlement = new MinecraftEntitlement();
         Data.Validity = Validity.None;
         Data.ErrorString = "";
-        Data.NetworkError = 0;
+        Data.NetworkError = null;
         Data.AccountState = AccountState.Unchecked;
 
         await GrantAsync(cancellationToken).ConfigureAwait(false);
@@ -132,7 +132,7 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
         {
             // QOAuth2AuthorizationCodeFlow::requestFailed(Error) path: silent + granted means
             // network errors are offline states, everything else is a soft failure.
-            var state = response.Error == (int)QtNetworkError.UnknownNetworkError
+            var state = response.Exception is HttpRequestException or IOException
                 ? AccountTaskState.Offline
                 : AccountTaskState.FailedSoft;
             EmitFinished(state, "Failed to refresh token.");

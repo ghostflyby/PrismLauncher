@@ -44,13 +44,13 @@ public sealed class LauncherLoginStep(AccountData data, AuthEndpointsOptions? au
 
         if (!response.Success)
         {
-            if (AuthNetUtils.IsApplicationError(response.Error) && !AuthNetUtils.IsServerError(response.Error))
+            if (response.IsClientError)
             {
                 EmitFinished(AccountTaskState.FailedSoft, $"Failed to get Minecraft access token: {response.ErrorString}");
             }
             else
             {
-                Data.NetworkError = response.Error;
+                Data.NetworkError = response.StatusCode;
                 EmitFinished(AccountTaskState.Offline, $"Failed to get Minecraft access token: {response.ErrorString}");
             }
 

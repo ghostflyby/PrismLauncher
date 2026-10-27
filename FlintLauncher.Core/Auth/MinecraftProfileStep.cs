@@ -4,6 +4,8 @@
 //
 // Port of launcher/minecraft/auth/steps/MinecraftProfileStep.{h,cpp}.
 
+using System.Net;
+
 namespace FlintLauncher.Core.Auth;
 
 public sealed class MinecraftProfileStep(AccountData data, AuthEndpointsOptions? auth = null) : AuthStep(data)
@@ -33,7 +35,7 @@ public sealed class MinecraftProfileStep(AccountData data, AuthEndpointsOptions?
             AutoRetry = true,
         }, _auth.Http, cancellationToken).ConfigureAwait(false);
 
-        if (response.Error == (int)QtNetworkError.ContentNotFoundError)
+        if (response.StatusCode == HttpStatusCode.NotFound)
         {
             // NOTE: Succeed even if we do not have a profile. This is a valid account state.
             Data.MinecraftProfile = new MinecraftProfile();
@@ -43,14 +45,14 @@ public sealed class MinecraftProfileStep(AccountData data, AuthEndpointsOptions?
 
         if (!response.Success)
         {
-            if (AuthNetUtils.IsApplicationError(response.Error) && !AuthNetUtils.IsServerError(response.Error))
+            if (response.IsClientError)
             {
                 EmitFinished(AccountTaskState.FailedSoft,
                     $"Minecraft Java profile acquisition failed: {response.ErrorString}");
             }
             else
             {
-                Data.NetworkError = response.Error;
+                Data.NetworkError = response.StatusCode;
                 EmitFinished(AccountTaskState.Offline,
                     $"Minecraft Java profile acquisition failed: {response.ErrorString}");
             }

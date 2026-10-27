@@ -135,7 +135,7 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
             Headers = FormHeaders,
         }, _auth.Http, cancellationToken).ConfigureAwait(false);
 
-        if (response.Error == (int)QtNetworkError.TimeoutError)
+        if (response.Exception is TimeoutException)
         {
             // rfc8628#section-3.5
             // "On encountering a connection timeout, clients MUST unilaterally

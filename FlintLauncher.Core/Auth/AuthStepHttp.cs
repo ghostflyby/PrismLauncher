@@ -2,8 +2,7 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 // SPDX-FileCopyrightText: 2022 Sefa Eyeoglu <contact@scrumplex.net>
 //
-// Port of launcher/net/NetUtils.h (error classification) plus a small HTTP runner used by the
-// auth steps (no direct C++ counterpart file).
+// A small HTTP runner used by the auth steps (no direct C++ counterpart file).
 //
 // Deviations:
 //  - Upstream steps go through Net::Request/NetJob on QNetworkAccessManager. FlintLauncher.Core's
@@ -11,57 +10,17 @@
 //    XErr object) and the device-code error JSON must be readable by the steps, so the auth layer
 //    performs its requests through this helper on the shared net stack instead. The 429/503
 //    auto-retry (3 attempts, Retry-After honored) mirrors RequestOptions.AutoRetry.
-//  - QNetworkReply::NetworkError is represented by its Qt integer code (see QtNetworkError) so
-//    AccountData::networkError and the isApplicationError/isServerError classification port 1:1.
+//  - QNetworkReply::NetworkError has no counterpart: a response carries its HttpStatusCode and a
+//    request that got none carries the exception (TimeoutException, HttpRequestException), so the
+//    Net::isApplicationError/isServerError classification becomes status-class tests on the response.
 //  - QNetworkReply::errorString() texts are replaced by plain "HTTP status <code> for <url>" /
 //    exception messages; the user-visible step messages embed them only in generic failures.
 
+using System.Net;
 using System.Text;
 using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.Auth;
-
-/// <summary>The subset of QNetworkReply::NetworkError the auth layer reasons about (Qt codes).</summary>
-public enum QtNetworkError
-{
-    NoError = 0,
-    TimeoutError = 4,
-    OperationCanceledError = 5,
-    ProxyAuthenticationRequiredError = 105,
-    ContentAccessDenied = 201,
-    ContentOperationNotPermittedError = 202,
-    ContentNotFoundError = 203,
-    AuthenticationRequiredError = 204,
-    ContentConflictError = 206,
-    ContentGoneError = 207,
-    UnknownContentError = 299,
-    InternalServerError = 401,
-    OperationNotImplementedError = 402,
-    ServiceUnavailableError = 403,
-    UnknownServerError = 499,
-    ProtocolInvalidOperationError = 302,
-    UnknownNetworkError = 99,
-}
-
-/// <summary>Port of Net::isApplicationError / Net::isServerError (Qt QNetworkReply error codes).</summary>
-public static class AuthNetUtils
-{
-    public static bool IsApplicationError(int e)
-    {
-        // ProtocolInvalidOperationError, AuthenticationRequiredError, ContentAccessDenied,
-        // ContentNotFoundError, ContentOperationNotPermittedError, ProxyAuthenticationRequiredError,
-        // ContentConflictError, ContentGoneError, InternalServerError, OperationNotImplementedError,
-        // ServiceUnavailableError, UnknownServerError, UnknownContentError
-        return e is 302 or 204 or 201 or 203 or 202 or 105 or 206 or 207 or 401 or 402 or 403 or 499 or 299;
-    }
-
-    // 500 class errors; microsoft may send these when the auth services are down. We treat this
-    // as a reason to launch in offline mode.
-    public static bool IsServerError(int e)
-    {
-        return e is 401 or 402 or 403 or 499; // InternalServer, NotImplemented, ServiceUnavailable, UnknownServer
-    }
-}
 
 /// <summary>Request description for <see cref="AuthStepHttp.SendAsync"/>.</summary>
 public sealed class AuthStepRequest
@@ -80,8 +39,13 @@ public sealed class AuthStepRequest
 /// <summary>Result of <see cref="AuthStepHttp.SendAsync"/>.</summary>
 public sealed class AuthStepResponse
 {
-    /// <summary>Qt QNetworkReply error code (0 == NoError).</summary>
-    public int Error { get; init; }
+    /// <summary>The status the service answered with; null when no response arrived.</summary>
+    public HttpStatusCode? StatusCode { get; init; }
+
+    /// <summary>Why no response arrived: a <see cref="TimeoutException"/> when the inactivity window
+    /// elapsed, otherwise the <see cref="HttpRequestException"/>/<see cref="IOException"/> the transport
+    /// threw. Null once a response of any status arrived.</summary>
+    public Exception? Exception { get; init; }
 
     public string ErrorString { get; init; } = "";
 
@@ -89,7 +53,12 @@ public sealed class AuthStepResponse
 
     public string BodyText => Encoding.UTF8.GetString(Body);
 
-    public bool Success => Error == (int)QtNetworkError.NoError;
+    public bool Success => StatusCode is { } status && (int)status is >= 200 and < 300;
+
+    /// <summary>The service answered, but neither with success nor with a server error (5xx): the
+    /// request itself is what it objected to, not its own availability.</summary>
+    public bool IsClientError =>
+        StatusCode is { } status && !Success && status < HttpStatusCode.InternalServerError;
 }
 
 /// <summary>Minimal HTTP runner for the auth steps (see file header for why it exists).</summary>
@@ -139,24 +108,25 @@ public static class AuthStepHttp
         catch (OperationCanceledException) when (window.TimedOut)
         {
             // the RequestTimeout window elapsed before the headers arrived
+            var timeout = new TimeoutException("Operation timed out");
             return new AuthStepResponse
             {
-                Error = (int)QtNetworkError.TimeoutError,
-                ErrorString = "Operation timed out",
+                Exception = timeout,
+                ErrorString = timeout.Message,
             };
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException)
         {
             return new AuthStepResponse
             {
-                Error = (int)QtNetworkError.UnknownNetworkError,
+                Exception = ex,
                 ErrorString = ex.Message,
             };
         }
 
         using (response)
         {
-            var statusCode = (int)response.StatusCode;
+            var statusCode = response.StatusCode;
             byte[] body;
             try
             {
@@ -169,10 +139,11 @@ public static class AuthStepHttp
             }
             catch (OperationCanceledException) when (window.TimedOut)
             {
+                var timeout = new TimeoutException("Operation timed out");
                 return new AuthStepResponse
                 {
-                    Error = (int)QtNetworkError.TimeoutError,
-                    ErrorString = "Operation timed out",
+                    Exception = timeout,
+                    ErrorString = timeout.Message,
                 };
             }
             catch (Exception)
@@ -182,27 +153,10 @@ public static class AuthStepHttp
 
             return new AuthStepResponse
             {
-                Error = StatusCodeToQtError(statusCode),
-                ErrorString = $"HTTP status {statusCode} for {request.Url}",
+                StatusCode = statusCode,
+                ErrorString = $"HTTP status {(int)statusCode} for {request.Url}",
                 Body = body,
             };
         }
     }
-
-    /// <summary>Maps HTTP status codes onto the QNetworkReply codes (qtbase qhttpthreaddelegate mapping).</summary>
-    private static int StatusCodeToQtError(int status) => status switch
-    {
-        >= 200 and < 300 => (int)QtNetworkError.NoError,
-        401 => (int)QtNetworkError.AuthenticationRequiredError,
-        403 => (int)QtNetworkError.ContentAccessDenied,
-        404 => (int)QtNetworkError.ContentNotFoundError,
-        405 => (int)QtNetworkError.ContentOperationNotPermittedError,
-        409 => (int)QtNetworkError.ContentConflictError,
-        410 => (int)QtNetworkError.ContentGoneError,
-        500 => (int)QtNetworkError.InternalServerError,
-        501 => (int)QtNetworkError.OperationNotImplementedError,
-        503 => (int)QtNetworkError.ServiceUnavailableError,
-        < 500 => (int)QtNetworkError.UnknownContentError,
-        _ => (int)QtNetworkError.UnknownServerError,
-    };
 }

@@ -36,12 +36,13 @@
 //    Dictionary{string,JsonElement} — an owned value bag; the key order on disk is insertion
 //    order (the write shape is ours, the QMap sorted-keys note is retired with the byte gate).
 //  - QDateTime validity is expressed through nullable DateTimes (Qt uses an invalid QDateTime).
-//  - QNetworkReply::NetworkError is ported as the int code of the mirrored QtNetworkError enum
-//    (see AuthNetUtils); 0 == NoError.
+//  - networkError (QNetworkReply::NetworkError) is the HttpStatusCode the auth service answered
+//    with, null when no answer arrived.
 //  - profileName()'s tr("No Minecraft profile") placeholder is kept as the English literal
 //    (the launcher core is not localized).
 //  - qWarning()/qDebug() diagnostics are dropped (comment markers where they carried meaning).
 
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -257,8 +258,9 @@ public sealed class AccountData
     public string InternalId = "";
     public string ErrorString = "";
 
-    /// <summary>QNetworkReply::NetworkError storage; see AuthNetUtils for the code meanings.</summary>
-    public int NetworkError;
+    /// <summary>networkError: the status the auth service answered with when the account last went
+    /// offline (a 5xx), or null when no answer arrived at all (timeout, transport failure).</summary>
+    public HttpStatusCode? NetworkError;
 
     public AccountState AccountState = AccountState.Unchecked;
 

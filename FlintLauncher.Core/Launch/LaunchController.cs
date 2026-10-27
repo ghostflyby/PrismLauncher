@@ -55,6 +55,7 @@
 //    UI-facing and are not ported.
 
 using System.Diagnostics;
+using System.Net;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Instances;
@@ -289,8 +290,7 @@ public class LaunchController : FlintTask
             case LaunchMode.Offline:
                 if (WantedLaunchMode == LaunchMode.Normal)
                 {
-                    var netErr = AccountToUse?.AccountData.NetworkError ?? 0;
-                    if (AuthNetUtils.IsServerError(netErr))
+                    if (AccountToUse?.AccountData.NetworkError >= HttpStatusCode.InternalServerError)
                     {
                         title = "Auth servers offline";
                         message = "The Minecraft authentication servers are currently unavailable, launching in offline mode.\n\n";
