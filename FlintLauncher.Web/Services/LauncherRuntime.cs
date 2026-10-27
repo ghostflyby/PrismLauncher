@@ -112,7 +112,7 @@ internal sealed class LauncherRuntime : IDisposable
         Paths = paths;
         Settings = settings ?? NetSettings.CreateDefault();
         Http = http ?? NetPrimaryHandler.CreateClient(Settings);
-        Modrinth = modrinth ?? new ModrinthApi(new ModrinthClient(Http), Http, Settings);
+        Modrinth = modrinth ?? new ModrinthApi(new ModrinthClient(), Http, Settings);
         Auth = auth ?? new AuthEndpointsOptions { Http = Http, Settings = Settings };
         Flame = flame ?? new FlameApi(Http, Settings);
         Technic = technic ?? new TechnicApi(Http, Settings);

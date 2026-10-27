@@ -19,7 +19,7 @@ internal static class TestModrinthApi
         // intercept the loopback stub traffic (and answer 502)
         var http = new HttpClient(new SocketsHttpHandler { UseProxy = false });
         var options = new ModrinthClientOptions { BaseUrl = baseUrl };
-        return new ModrinthApi(new ModrinthClient(http, options), http, NetSettings.CreateDefault());
+        return new ModrinthApi(new ModrinthClient(options), http, NetSettings.CreateDefault());
     }
 
     /// <summary>An API wired to a closed port: any surprise request fails fast and locally

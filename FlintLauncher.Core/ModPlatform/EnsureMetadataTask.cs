@@ -77,7 +77,7 @@ public sealed class EnsureMetadataTask(
 
         // ---------------------------------------------------------- versions lookup
         var versionEntries = await _modrinth.Client.Versions
-            .ByFileHashes(resources.Keys.ToList(), hashType).SendTo(_modrinth.Client, cancellationToken);
+            .ByFileHashes(resources.Keys.ToList(), hashType).SendTo(_modrinth.Http, cancellationToken);
 
         {
             foreach (var hash in resources.Keys)
@@ -110,11 +110,11 @@ public sealed class EnsureMetadataTask(
         List<ModrinthProject> projectEntries;
         if (addonIds.Count == 1)
         {
-            projectEntries = [await _modrinth.Client.Projects.ById(addonIds.Keys.First()).SendTo(_modrinth.Client, cancellationToken)];
+            projectEntries = [await _modrinth.Client.Projects.ById(addonIds.Keys.First()).SendTo(_modrinth.Http, cancellationToken)];
         }
         else
         {
-            projectEntries = await _modrinth.Client.Projects.ByIds(addonIds.Keys.ToList()).SendTo(_modrinth.Client, cancellationToken);
+            projectEntries = await _modrinth.Client.Projects.ByIds(addonIds.Keys.ToList()).SendTo(_modrinth.Http, cancellationToken);
         }
 
         foreach (var dto in projectEntries)

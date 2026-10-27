@@ -1,31 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
-//
-// The Modrinth v2 client: the navigation root of the typed endpoint operations — the groups
-// (Versions / Projects / Tags / Search / Downloads) return operation values bound to this
-// root's live Options, and as the executor it is the pure transport they are sent through,
-// reading the hosts and PAT from Options per send. The operations themselves own the read
-// and decide the failure shape (ModrinthApiException, uniform across this root). The wire
-// models and the strict decoding live in ModrinthJson; the download streams to disk
-// through its operation's checksum-verified temp-file commit. Everything transport-shaped —
-// proxy, user agent, timeouts, retries, resilience — belongs to the injected HttpClient and
-// its handler pipeline, not here.
-
-using System.Text.Json;
 
 namespace FlintLauncher.ExternalApi;
 
-public sealed class ModrinthClient : IApiExecutor
+/// <summary>The stateless navigation root of the typed Modrinth v2 endpoint operations: the
+/// groups return operation values bound to the root's live Options (hosts and PAT). It
+/// holds no executor — sending is the caller's SendTo with the HttpClient (or any
+/// HttpMessageInvoker) of its choice; the operations own the read and decide the failure
+/// shape, uniform across this root.</summary>
+public sealed class ModrinthClient
 {
-    private readonly HttpClient _http;
-
-    public ModrinthClient(HttpClient http, ModrinthClientOptions? options = null)
+    public ModrinthClient(ModrinthClientOptions? options = null)
     {
-        _http = http;
         Options = options ?? new();
     }
 
-    /// <summary>The live configuration (hosts, PAT) this client reads per request; shared
+    /// <summary>The live configuration (hosts, PAT) the operations read per send; shared
     /// with whoever constructed it (the Core adapter forwards its properties here).</summary>
     public ModrinthClientOptions Options { get; }
 
@@ -46,20 +36,4 @@ public sealed class ModrinthClient : IApiExecutor
 
     /// <summary>The download endpoints: CDN files streamed to disk.</summary>
     public ModrinthDownloadQueries Downloads => new(this);
-
-    // ------------------------------------------------------------------ executor face
-
-    /// <summary>Pure transport: the PAT header rides on the request when a token is set,
-    /// and the response streams back with only its headers received.</summary>
-    async Task<HttpResponseMessage> IApiExecutor.SendAsync(HttpRequestMessage request,
-        CancellationToken cancellationToken)
-    {
-        if (Options.ApiToken.Length != 0)
-        {
-            request.Headers.TryAddWithoutValidation("Authorization", Options.ApiToken);
-        }
-
-        return await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
-            .ConfigureAwait(false);
-    }
 }
