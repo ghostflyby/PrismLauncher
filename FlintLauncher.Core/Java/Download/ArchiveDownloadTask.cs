@@ -12,8 +12,8 @@
 //    the same resolveEntry("java", <filename>) + MakeCached flow is used, otherwise the archive
 //    downloads to a temporary file that is removed after extraction.
 //  - MMCZip::ArchiveReader is libarchive-based and reads zip and tar alike; the port handles
-//    zip through MMCZip and tar.gz/plain tar through the hand-rolled ustar reader in
-//    TarArchive.cs (no new packages), selected by gzip magic bytes like libarchive does.
+//    zip through MMCZip and tar.gz/plain tar through System.Formats.Tar (TarArchive.cs),
+//    selected by gzip magic bytes like libarchive does.
 //  - Unix permission bits and symlinks stored in zip entries are not restored (the MMCZip
 //    port's known limitation; the tar.gz path preserves the execute bits and symlinks).
 

@@ -345,6 +345,74 @@ public class JavaDownloadTests : IDisposable
         Assert.Contains("Failed to find Java binary path", empty.FailReason);
     }
 
+    // ------------------------------------------------------------------- tar edges
+
+    [Fact]
+    public void TarArchive_RefusesEntriesEscapingTheTargetDirectory()
+    {
+        Directory.CreateDirectory(_dir);
+        var tarPath = TempPath("slip.tar.gz");
+        File.WriteAllBytes(tarPath, BuildTarGz(
+            ("../../escaped.txt", "pwned"u8.ToArray(), '0', Mode0644, "")));
+
+        var target = TempPath("slip-out");
+        Directory.CreateDirectory(target);
+        var extracted = TarArchive.ExtractTarGzFile(tarPath, target, null, out var error);
+
+        Assert.Null(extracted);
+        Assert.Contains("outside of the target path", error);
+        Assert.False(File.Exists(Path.Combine(_dir, "escaped.txt")));
+        // nothing survives a refused pass, not even the entries extracted before the escape
+        Assert.Empty(Directory.GetFileSystemEntries(target));
+    }
+
+    [Fact]
+    public void TarArchive_StripsOnlyTheGivenPrefix_AndSkipsTheRest()
+    {
+        Directory.CreateDirectory(_dir);
+        var tarPath = TempPath("mixed.tar.gz");
+        File.WriteAllBytes(tarPath, BuildTarGz(
+            ("keep/a.txt", "A"u8.ToArray(), '0', Mode0644, ""),
+            ("drop/b.txt", "B"u8.ToArray(), '0', Mode0644, "")));
+
+        var target = TempPath("mixed-out");
+        var extracted = TarArchive.ExtractTarGzFile(tarPath, target, "keep/", out var error);
+
+        Assert.True(extracted is not null, error);
+        Assert.Equal("A", File.ReadAllText(Path.Combine(target, "a.txt")));
+        Assert.False(File.Exists(Path.Combine(target, "b.txt")));
+        Assert.False(Directory.Exists(Path.Combine(target, "drop")));
+    }
+
+    [Fact]
+    public void TarArchive_ListingReturnsEveryEntryName()
+    {
+        Directory.CreateDirectory(_dir);
+        var tarPath = TempPath("list.tar.gz");
+        File.WriteAllBytes(tarPath, BuildTarGz(
+            ("jdk-17.0.9/", null, '5', Mode0755, ""),
+            ("jdk-17.0.9/bin/java", "x"u8.ToArray(), '0', Mode0755, "")));
+
+        var names = TarArchive.ListTarGzFile(tarPath, out var error);
+
+        Assert.True(names is not null, error);
+        Assert.Equal(["jdk-17.0.9/", "jdk-17.0.9/bin/java"], names);
+    }
+
+    [Fact]
+    public void TarArchive_ReportsUnreadableArchivesAsErrors()
+    {
+        Directory.CreateDirectory(_dir);
+        var notAnArchive = TempPath("not-an-archive.tar.gz");
+        File.WriteAllText(notAnArchive, "this is not gzip data");
+
+        Assert.Null(TarArchive.ListTarGzFile(notAnArchive, out var listError));
+        Assert.NotEmpty(listError);
+
+        Assert.Null(TarArchive.ExtractTarGzFile(notAnArchive, TempPath("bad-out"), null, out var extractError));
+        Assert.NotEmpty(extractError);
+    }
+
     // ------------------------------------------------------------------- helpers
 
     private static byte[] BuildTarGz(params (string Name, byte[]? Data, char TypeFlag, int Mode, string LinkTarget)[] entries)
