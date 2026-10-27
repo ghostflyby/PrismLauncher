@@ -22,6 +22,7 @@
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Dependencies;
+using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi;
@@ -75,12 +76,13 @@ public class ResourceDownloadTask : SequentialTask
         var download = new CallbackTask(async cancellationToken =>
         {
             EmitStatus($"Downloading resource:\n{_packVersion.DownloadUrl}");
-            await _modrinth.DownloadModFileAsync(_http, _packVersion.DownloadUrl,
-                (AbsolutePath)_packModel.Dir / GetFilename(),
+            await _modrinth.Downloads.File(_packVersion.DownloadUrl,
                 CreateModrinthMeta(_instance, _downloadReason, _dependentOn),
-                _packVersion.HashType.Length != 0 ? _packVersion.HashType : null,
-                _packVersion.Hash.Length != 0 ? _packVersion.Hash : null,
-                cancellationToken);
+                HashUtils.VerifiedChecksum(
+                    _packVersion.HashType.Length != 0 ? _packVersion.HashType : null,
+                    _packVersion.Hash.Length != 0 ? _packVersion.Hash : null))
+                .SendTo(_http, HttpCompletionOption.ResponseHeadersRead,
+                    ((AbsolutePath)_packModel.Dir / GetFilename()).Value, cancellationToken);
         });
         download.Succeeded += DownloadSucceeded;
         AddTask(download);

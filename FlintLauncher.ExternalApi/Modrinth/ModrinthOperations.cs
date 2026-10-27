@@ -125,14 +125,30 @@ public readonly record struct ModrinthVersionQuery(ModrinthClientOptions Options
         ModrinthDecoding.ReadJsonAsync(response, ModrinthJsonContext.Default.ModrinthVersion, ct);
 }
 
-/// <summary>GET a version-list URL — the array of versions behind a project's /version
-/// endpoint; the query string is built by the caller (the Core adapter owns the
-/// game-version/loader filters).</summary>
-public readonly record struct ModrinthVersionListQuery(ModrinthClientOptions Options, string VersionsUrl)
+/// <summary>GET /project/{id}/version — the version list behind a project; the filters are
+/// the wire's JSON-array query parameters (omitted when empty), and the upstream
+/// include_changelog=false default stays explicit (the port has no changelog producer).</summary>
+public readonly record struct ModrinthVersionListQuery(ModrinthClientOptions Options, string ProjectId,
+    IReadOnlyList<string>? GameVersions = null, IReadOnlyList<string>? Loaders = null,
+    bool IncludeChangelog = false)
     : IApiOperation<List<ModrinthVersion>>
 {
-    public HttpRequestMessage CreateRequest() =>
-        new HttpRequestMessage(HttpMethod.Get, VersionsUrl).WithAuthorization(Options);
+    public HttpRequestMessage CreateRequest()
+    {
+        var query = "include_changelog=" + (IncludeChangelog ? "true" : "false");
+        if (GameVersions is { Count: > 0 })
+        {
+            query = $"game_versions=[\"{string.Join("\",\"", GameVersions)}\"]&" + query;
+        }
+
+        if (Loaders is { Count: > 0 })
+        {
+            query = $"loaders=[\"{string.Join("\",\"", Loaders)}\"]&" + query;
+        }
+
+        return new HttpRequestMessage(HttpMethod.Get,
+            $"{Options.BaseUrl}/project/{ProjectId}/version?{query}").WithAuthorization(Options);
+    }
 
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
@@ -210,13 +226,37 @@ public readonly record struct ModrinthCategoriesQuery(ModrinthClientOptions Opti
         ModrinthDecoding.ReadJsonAsync(response, ModrinthJsonContext.Default.ListModrinthCategory, ct);
 }
 
-/// <summary>GET /search — the search envelope; the query string is built by the caller
-/// (the Core adapter owns the facet building).</summary>
-public readonly record struct ModrinthSearchQuery(ModrinthClientOptions Options, string SearchUrl)
+/// <summary>GET /search — the search envelope in wire vocabulary: the fixed page size, the
+/// free text, the sort index and the facet groups (each group OR-s its values, the groups
+/// AND together — the wire encodes them as a JSON array of arrays).</summary>
+public readonly record struct ModrinthSearchQuery(ModrinthClientOptions Options, int Offset,
+    string? Query, string? Index, string ProjectType, IReadOnlyList<IReadOnlyList<string>> Facets)
     : IApiOperation<ModrinthSearchResults>
 {
-    public HttpRequestMessage CreateRequest() =>
-        new HttpRequestMessage(HttpMethod.Get, SearchUrl).WithAuthorization(Options);
+    public HttpRequestMessage CreateRequest()
+    {
+        var getArguments = new List<string>
+        {
+            $"offset={Offset}",
+            "limit=25",
+        };
+        if (Query is { Length: > 0 })
+        {
+            getArguments.Add($"query={Uri.EscapeDataString(Query)}");
+        }
+
+        if (Index is { Length: > 0 })
+        {
+            getArguments.Add($"index={Index}");
+        }
+
+        var facets = Facets.Select(group => group.ToList()).ToList();
+        getArguments.Add($"facets={Uri.EscapeDataString(
+            JsonSerializer.Serialize(facets, ModrinthJsonContext.Default.ListListString))}");
+
+        return new HttpRequestMessage(HttpMethod.Get,
+            $"{Options.BaseUrl}/search?{string.Join("&", getArguments)}").WithAuthorization(Options);
+    }
 
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
@@ -338,8 +378,11 @@ public readonly struct ModrinthVersionQueries(ModrinthClient root)
     /// <summary>GET /version/{id}.</summary>
     public ModrinthVersionQuery ById(string versionId) => new(root.Options, versionId);
 
-    /// <summary>GET a version-list URL (the Core adapter builds the query string).</summary>
-    public ModrinthVersionListQuery At(string versionsUrl) => new(root.Options, versionsUrl);
+    /// <summary>GET /project/{id}/version — the project's version list, filtered by the
+    /// wire's game-version/loader strings.</summary>
+    public ModrinthVersionListQuery Query(string projectId, IReadOnlyList<string>? gameVersions = null,
+        IReadOnlyList<string>? loaders = null, bool includeChangelog = false) =>
+        new(root.Options, projectId, gameVersions, loaders, includeChangelog);
 }
 
 /// <summary>The project endpoints: single and batch project fetches plus the description
@@ -366,8 +409,11 @@ public readonly struct ModrinthTagQueries(ModrinthClient root)
 /// <summary>The search endpoint.</summary>
 public readonly struct ModrinthSearchQueries(ModrinthClient root)
 {
-    /// <summary>GET a search URL (the Core adapter builds the query string).</summary>
-    public ModrinthSearchQuery At(string searchUrl) => new(root.Options, searchUrl);
+    /// <summary>GET /search — the wire search: page offset, free text, sort index,
+    /// project_type facet and the facet OR-groups.</summary>
+    public ModrinthSearchQuery Query(int offset, string? query, string? index, string projectType,
+        IReadOnlyList<IReadOnlyList<string>> facets) =>
+        new(root.Options, offset, query, index, projectType, facets);
 }
 
 /// <summary>The download endpoints: CDN files streamed to disk.</summary>

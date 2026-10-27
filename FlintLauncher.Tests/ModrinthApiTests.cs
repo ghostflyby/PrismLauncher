@@ -130,102 +130,6 @@ public class ModrinthApiTests : IDisposable
     }
 
     [Fact]
-    public void SearchUrl_BuildsFacetsJson()
-    {
-        var args = new SearchArgs
-        {
-            Type = ResourceType.Mod,
-            Offset = 50,
-            Search = "create mod",
-            Sorting = new SortingMethod { Index = 2, Name = "downloads" },
-            Loaders = ModLoaderType.Fabric | ModLoaderType.Quilt,
-            Versions = [new McVersion("1.20.1"), new McVersion("1.20.2 Pre-Release 1")],
-            CategoryIds = ["adventure"],
-            OpenSource = true,
-        };
-
-        var url = _modrinth.GetSearchUrl(args);
-
-        Assert.NotNull(url);
-        Assert.StartsWith(_baseUrl + "/search?", url);
-        Assert.Contains("offset=50", url);
-        Assert.Contains("limit=25", url);
-        // the query is URL-encoded
-        Assert.Contains("query=create%20mod", url);
-        Assert.Contains("index=downloads", url);
-
-        var urlText = Uri.UnescapeDataString(url);
-        var facetsText = urlText[(urlText.IndexOf("facets=", StringComparison.Ordinal) + "facets=".Length)..];
-        // the facets parameter is a JSON array of JSON arrays
-        var parsed = JsonDocument.Parse(facetsText);
-        Assert.Equal(JsonValueKind.Array, parsed.RootElement.ValueKind);
-        var groups = parsed.RootElement.EnumerateArray()
-            .Select(g => g.EnumerateArray().Select(v => v.GetString()).ToList()).ToList();
-        Assert.Contains(groups, g => g.SequenceEqual(["categories:fabric", "categories:quilt"]));
-        Assert.Contains(groups, g => g.SequenceEqual(["versions:1.20.1", "versions:1.20.2-pre1"]));
-        Assert.Contains(groups, g => g.SequenceEqual(["categories:adventure"]));
-        Assert.Contains(groups, g => g.SequenceEqual(["open_source:true"]));
-        Assert.Contains(groups, g => g.SequenceEqual(["project_type:mod"]));
-    }
-
-    [Fact]
-    public void SearchUrl_GivesEachCategoryItsOwnFacetArray()
-    {
-        // #6099: categories are OR-ed within one facet array, AND-ed across arrays — every
-        // search category gets an array of its own
-        var args = new SearchArgs
-        {
-            Type = ResourceType.Mod,
-            CategoryIds = ["adventure", "technology", "utility"],
-        };
-
-        var url = _modrinth.GetSearchUrl(args);
-        Assert.NotNull(url);
-
-        var urlText = Uri.UnescapeDataString(url);
-        var facetsText = urlText[(urlText.IndexOf("facets=", StringComparison.Ordinal) + "facets=".Length)..];
-        var groups = JsonDocument.Parse(facetsText).RootElement.EnumerateArray()
-            .Select(g => g.EnumerateArray().Select(v => v.GetString()).ToList()).ToList();
-
-        Assert.Contains(groups, g => g.SequenceEqual(["categories:adventure"]));
-        Assert.Contains(groups, g => g.SequenceEqual(["categories:technology"]));
-        Assert.Contains(groups, g => g.SequenceEqual(["categories:utility"]));
-        // no group merges two categories anymore (a null entry is malformed and fails too)
-        Assert.DoesNotContain(groups, g =>
-            g.Count > 1 && g.Any(c => c is null || c.StartsWith("categories:", StringComparison.Ordinal)));
-    }
-
-    [Fact]
-    public void SearchUrl_RejectsUnsupportedLoaders()
-    {
-        var args = new SearchArgs
-        {
-            Type = ResourceType.Mod,
-            Loaders = (ModLoaderType)0x8000 // no Modrinth support for unknown loaders
-        };
-        Assert.Null(_modrinth.GetSearchUrl(args));
-    }
-
-    [Fact]
-    public async Task Search_SendsFacetsQueryParam()
-    {
-        var args = new SearchArgs { Type = ResourceType.Mod, Offset = 0, Search = "jei" };
-        var url = _modrinth.GetSearchUrl(args);
-        Assert.NotNull(url);
-
-        var body = await FlintHttp.GetStringAsync(TestNet.Http, TestNet.Settings,
-            new HttpRequestMessage(HttpMethod.Get, url));
-
-        Assert.Contains("/search", _server.LastPath);
-        Assert.Equal("0", _server.LastQuery["offset"]);
-        Assert.Equal("25", _server.LastQuery["limit"]);
-        Assert.Equal("jei", _server.LastQuery["query"]);
-        // facets survive the round trip as JSON
-        Assert.Equal("""[["project_type:mod"]]""", _server.LastQuery["facets"]);
-        Assert.Equal("""{"hits":[]}""", body);
-    }
-
-    [Fact]
     public async Task CurrentVersion_FetchesByHashAndAlgorithm()
     {
         _server.VersionFiles["cafebabecafebabe"] = """{"version_number":"1.2.3","id":"v1","project_id":"p1","date_published":"2023-01-01T00:00:00Z","game_versions":["1.20.1"],"loaders":["fabric"],"name":"n","version_number":"1.2.3","version_type":"release","files":[]}""";
@@ -264,11 +168,12 @@ public class ModrinthApiTests : IDisposable
     [Fact]
     public async Task LatestVersions_PostsReleaseTypes()
     {
-        await _modrinth.GetLatestVersionsAsync(_http, ["hash1"], "sha512", null, null,
-        [
-            new IndexedVersionType(IndexedVersionTypeValue.Release),
-            new IndexedVersionType(IndexedVersionTypeValue.Beta),
-        ]);
+        await _modrinth.Versions.Latest(["hash1"], "sha512", null, null,
+            IndexedVersionType.ToModrinthList(
+            [
+                new IndexedVersionType(IndexedVersionTypeValue.Release),
+                new IndexedVersionType(IndexedVersionTypeValue.Beta),
+            ])).SendTo(_http);
 
         Assert.EndsWith("/version_files/update", _server.LastPath);
 
@@ -280,7 +185,7 @@ public class ModrinthApiTests : IDisposable
     [Fact]
     public async Task LatestVersions_OmitsVersionTypesByDefault()
     {
-        await _modrinth.GetLatestVersionsAsync(_http, ["hash1"], "sha512", null, null);
+        await _modrinth.Versions.Latest(["hash1"], "sha512", null, null, null).SendTo(_http);
 
         Assert.EndsWith("/version_files/update", _server.LastPath);
         var body = JsonDocument.Parse(Encoding.UTF8.GetString(_server.LastBody ?? [])).RootElement;
@@ -288,15 +193,11 @@ public class ModrinthApiTests : IDisposable
     }
 
     [Fact]
-    public void VersionFileHelpers_MapUrlsAndLoaders()
+    public void VersionHelpers_MapMcVersionsBothWays()
     {
-        Assert.Equal("https://modrinth.com/user/flowln", ModrinthExtensions.GetAuthorUrl("flowln"));
-        Assert.Equal(["fabric", "quilt"], ModrinthExtensions.GetModLoaderStrings(ModLoaderType.Fabric | ModLoaderType.Quilt));
-        Assert.Equal("\"categories:fabric\",\"categories:quilt\"",
-            ModrinthExtensions.GetModLoaderFilters(ModLoaderType.Fabric | ModLoaderType.Quilt));
         // the modrinth<->launcher version string round trip
         Assert.Equal("1.20.2-pre1", ResourceApi.MapMcVersionToModrinth(new McVersion("1.20.2 Pre-Release 1")));
-        Assert.Equal("1.20.2 Pre-Release 1", ModrinthExtensions.MapMcVersionFromModrinth("1.20.2-pre1"));
+        Assert.Equal("1.20.2 Pre-Release 1", ResourceApi.MapMcVersionFromModrinth("1.20.2-pre1"));
     }
 
     // ------------------------------------------------------- mrpack import (e2e)

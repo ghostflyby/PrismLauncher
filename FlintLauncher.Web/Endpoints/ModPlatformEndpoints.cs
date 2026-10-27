@@ -281,14 +281,10 @@ public static class ModPlatformEndpoints
             }
             else
             {
-                var versionsUrl = modrinth.GetVersionsUrl(new VersionSearchArgs
-                {
-                    Pack = new IndexedPack { AddonId = projectId, Provider = ResourceProvider.Modrinth },
-                });
                 List<ModrinthVersion> versionDtos;
                 try
                 {
-                    versionDtos = await modrinth.Versions.At(versionsUrl).SendTo(http);
+                    versionDtos = await modrinth.Versions.Query(projectId).SendTo(http);
                 }
                 catch (Exception e) when (e is ModrinthApiException)
                 {
@@ -688,38 +684,61 @@ public static class ModPlatformEndpoints
         }
     }
 
+    /// <summary>The loaders Modrinth search can facet (the C++ ModrinthAPI
+    /// getModLoaderStrings set — DataPack facets exist, Cauldron is not a search loader).</summary>
+    private static readonly ModLoaderType[] ModrinthSearchLoaders =
+    [
+        ModLoaderType.NeoForge, ModLoaderType.Forge, ModLoaderType.Fabric,
+        ModLoaderType.Quilt, ModLoaderType.LiteLoader, ModLoaderType.DataPack,
+        ModLoaderType.Babric, ModLoaderType.Bta, ModLoaderType.LegacyFabric,
+        ModLoaderType.Ornithe, ModLoaderType.Rift,
+    ];
+
     /// <summary>The Modrinth search pass-through (PAT header through the operation's request
-    /// builder; facets like the C++ search model builds them).</summary>
+    /// builder; the launcher search vocabulary translates into the wire's facet groups —
+    /// each group OR-s its values, the groups AND together).</summary>
     private static async Task<IResult> ModrinthSearchAsync(ResourceType resourceType, string? query, string? version,
         string? loader, string? index, int offset, ModrinthClient modrinth, HttpClient http,
         CancellationToken cancellationToken)
     {
-        var args = new SearchArgs
+        var projectType = ModrinthProjectType(resourceType, out var typeError);
+        if (projectType.Length == 0)
         {
-            Type = resourceType,
-            Offset = offset < 0 ? 0 : offset,
-            Search = string.IsNullOrWhiteSpace(query) ? null : query,
-            Versions = string.IsNullOrWhiteSpace(version) ? null : [new McVersion(version)],
-            Loaders = string.IsNullOrWhiteSpace(loader)
-                ? null
-                : ModIndex.GetModLoaderFromString(loader.ToLowerInvariant()),
-            Sorting = new SortingMethod
-            {
-                Index = 1,
-                Name = string.IsNullOrWhiteSpace(index) ? "relevance" : index,
-            },
-        };
+            return ApiJson.Error("invalid_type",
+                typeError ?? $"type '{resourceType}' is not supported by modrinth", 400);
+        }
 
-        var url = modrinth.GetSearchUrl(args);
-        if (url is null)
+        var loaderFlags = string.IsNullOrWhiteSpace(loader)
+            ? (ModLoaderType?)null
+            : ModIndex.GetModLoaderFromString(loader.ToLowerInvariant());
+        if (loaderFlags is { } requested && ModrinthSearchLoaders.All(known => (requested & known) == 0))
         {
             return ApiJson.Error("invalid_loader", $"loader '{loader}' is not supported by Modrinth", 400);
         }
 
+        var facets = new List<IReadOnlyList<string>>();
+        if (loaderFlags is { } supported)
+        {
+            facets.Add(ModrinthSearchLoaders.Where(known => (supported & known) != 0)
+                .Select(ModIndex.GetModLoaderAsString).Select(name => "categories:" + name).ToList());
+        }
+
+        if (!string.IsNullOrWhiteSpace(version))
+        {
+            facets.Add(["versions:" + ResourceApi.MapMcVersionToModrinth(new McVersion(version))]);
+        }
+
+        facets.Add(["project_type:" + projectType]);
+
         ModrinthSearchResults search;
         try
         {
-            search = await modrinth.Search.At(url).SendTo(http, cancellationToken);
+            search = await modrinth.Search.Query(
+                offset: offset < 0 ? 0 : offset,
+                query: string.IsNullOrWhiteSpace(query) ? null : query,
+                index: string.IsNullOrWhiteSpace(index) ? "relevance" : index,
+                projectType: projectType,
+                facets: facets).SendTo(http, cancellationToken);
         }
         catch (Exception e) when (e is ModrinthApiException)
         {

@@ -200,6 +200,7 @@ public sealed record MrPackEnv(
 [JsonSerializable(typeof(ModrinthVersion))]
 [JsonSerializable(typeof(List<ModrinthVersion>))]
 [JsonSerializable(typeof(Dictionary<string, ModrinthVersion>))]
+[JsonSerializable(typeof(List<List<string>>))]
 public sealed partial class ModrinthJsonContext : JsonSerializerContext;
 
 /// <summary>The version files array: JSON null elements are dropped at binding (the

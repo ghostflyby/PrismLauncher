@@ -243,16 +243,13 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
                 checkLoaders: loaderList.Count != 0);
         }
 
-        var versionsUrl = _modrinth.GetVersionsUrl(new VersionSearchArgs
-        {
-            Pack = pack,
-            McVersions = [mcVersion],
-            Loaders = loaders,
-        });
         List<ModrinthVersion> dtos;
         try
         {
-            dtos = await _modrinth.Versions.At(versionsUrl).SendTo(_http, cancellationToken);
+            dtos = await _modrinth.Versions.Query(pack.AddonId,
+                [ResourceApi.MapMcVersionToModrinth(mcVersion)],
+                ModIndex.ModLoaderTypesToList(loaders).Select(ModIndex.GetModLoaderAsString).ToList())
+                .SendTo(_http, cancellationToken);
         }
         catch (Exception e) when (e is ModrinthApiException)
         {

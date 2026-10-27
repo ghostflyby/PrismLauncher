@@ -85,8 +85,8 @@ public sealed class DependencySearchArgs
 
 /// <summary>
 /// Port of the ResourceAPI abstract class (URL builders + data loading hooks). Concrete
-/// platforms (FlameApi; Modrinth rides on the ExternalApi client plus ModrinthExtensions)
-/// re-implement the URL construction and the JSON loading.
+/// platforms (FlameApi; Modrinth rides on the ExternalApi client) re-implement the URL
+/// construction and the JSON loading.
 /// </summary>
 public abstract class ResourceApi
 {
@@ -122,6 +122,27 @@ public abstract class ResourceApi
 
         verStr = verStr.Replace(" ", "-");
         return verStr;
+    }
+
+    /// <summary>Port of ModrinthAPI::mapMCVersionFromModrinth (the reverse of
+    /// <see cref="MapMcVersionToModrinth"/>: the indexed wire data comes back in the
+    /// launcher's version spelling).</summary>
+    public static string MapMcVersionFromModrinth(string v)
+    {
+        const string preString = " Pre-Release ";
+        var pre = v.Contains("-pre", StringComparison.Ordinal);
+        if (pre)
+        {
+            v = v.Replace("-pre", preString);
+        }
+
+        v = v.Replace("-", " ");
+        if (pre)
+        {
+            v = v.Replace(" Pre Release ", preString);
+        }
+
+        return v;
     }
 
     /// <summary>Port of ResourceAPI::getGameVersionsString.</summary>

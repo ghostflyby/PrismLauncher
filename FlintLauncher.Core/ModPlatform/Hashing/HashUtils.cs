@@ -77,6 +77,23 @@ public static class HashUtils
     /// <summary>Port of Hashing::hash(fileName, type): hash a file's content.</summary>
     public static string HashFile(string fileName, Algorithm type) => Hash(File.ReadAllBytes(fileName), type);
 
+    /// <summary>The launcher hash spelling against the expected hash, as the
+    /// checksum-verified downloads consume it: md4 degrades to md5 (see ComputeHash's note),
+    /// sha1/sha256/sha512 pass through under their wire names, and unknown algorithms
+    /// (murmur2, "") verify to nothing — the download runs unchecked.</summary>
+    public static (string Algorithm, string Hash)? VerifiedChecksum(string? hashType, string? hash) =>
+        hash is { Length: > 0 }
+        ? AlgorithmFromString(hashType ?? "") switch
+        {
+            Algorithm.Md4 => ("md5", hash),
+            Algorithm.Md5 => ("md5", hash),
+            Algorithm.Sha1 => ("sha1", hash),
+            Algorithm.Sha256 => ("sha256", hash),
+            Algorithm.Sha512 => ("sha512", hash),
+            _ => null,
+        }
+        : null;
+
     /// <summary>Port of Hashing::hash(device, type) streamed from an open file.</summary>
     public static string HashStream(Stream stream, Algorithm type)
     {

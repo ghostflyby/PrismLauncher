@@ -33,6 +33,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
+using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi;
@@ -609,8 +610,8 @@ public sealed class ModrinthCreationTask : InstanceTask
                 EmitStatus($"Downloading {file.Path}...");
                 try
                 {
-                    await modrinth.DownloadModFileAsync(http, url, filePath, meta, hashAlgorithm, file.Hash,
-                        cancellationToken);
+                    await modrinth.Downloads.File(url, meta, HashUtils.VerifiedChecksum(hashAlgorithm, file.Hash))
+                        .SendTo(http, HttpCompletionOption.ResponseHeadersRead, filePath.Value, cancellationToken);
                     EmitSucceeded();
                     return;
                 }

@@ -873,7 +873,21 @@ public class FlintApiModrinthSearchTests : IDisposable
         var response = await host.GetAsync(
             "/api/v1/modplatform/modrinth/search?query=jei&version=1.20.1&loader=fabric&index=downloads&offset=40");
         response.EnsureSuccessStatusCode();
-        Assert.Contains("offset=40", LastSearchQuery);
+
+        // the wire query: page position, free text, sort index, and the facet groups (each
+        // group OR-s its values, the groups AND together)
+        var query = Uri.UnescapeDataString(LastSearchQuery ?? "");
+        Assert.Contains("offset=40", query);
+        Assert.Contains("limit=25", query);
+        Assert.Contains("query=jei", query);
+        Assert.Contains("index=downloads", query);
+        var facets = JsonDocument.Parse(query[(query.IndexOf("facets=", StringComparison.Ordinal) + "facets=".Length)..]).RootElement;
+        var groups = facets.EnumerateArray()
+            .Select(g => g.EnumerateArray().Select(v => v.GetString()).ToList()).ToList();
+        Assert.Contains(groups, g => g.SequenceEqual(["categories:fabric"]));
+        Assert.Contains(groups, g => g.SequenceEqual(["versions:1.20.1"]));
+        Assert.Contains(groups, g => g.SequenceEqual(["project_type:mod"]));
+
         var hits = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
         Assert.Equal(1, hits.GetArrayLength());
         Assert.Equal("proj1", hits[0].GetProperty("id").GetString());
@@ -882,6 +896,17 @@ public class FlintApiModrinthSearchTests : IDisposable
         Assert.Equal("https://cdn.test/jei.png", hits[0].GetProperty("iconUrl").GetString());
         Assert.Equal("mezz", hits[0].GetProperty("author").GetString());
         Assert.Equal(12345L, hits[0].GetProperty("downloads").GetInt64());
+    }
+
+    [Fact]
+    public async Task Modrinth_Search_Rejects_Unsupported_Loaders_With_The_Error_Envelope()
+    {
+        await using var host = await FlintApiHost.StartAsync(_modrinth);
+
+        var response = await host.GetAsync("/api/v1/modplatform/modrinth/search?loader=unknown-thing");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal("invalid_loader", body.GetProperty("error").GetProperty("code").GetString());
     }
 }
 

@@ -155,8 +155,21 @@ public sealed class ModrinthCheckUpdate : FlintTask
         Dictionary<string, ModrinthVersion> entries;
         try
         {
-            entries = await _modrinth.GetLatestVersionsAsync(_http, hashes, _hashType, _gameVersions, loader,
-                _releaseTypes, cancellationToken);
+            // #3404: "version_types" is only written when at least one valid release
+            // channel survives the translation
+            List<string>? versionTypes = null;
+            if (_releaseTypes is { Count: > 0 })
+            {
+                var types = IndexedVersionType.ToModrinthList(_releaseTypes);
+                versionTypes = types.Count != 0 ? types : null;
+            }
+
+            entries = await _modrinth.Versions.Latest(hashes, _hashType,
+                loader is { } loaderFlags
+                    ? ModIndex.ModLoaderTypesToList(loaderFlags).Select(ModIndex.GetModLoaderAsString).ToList()
+                    : null,
+                _gameVersions is null ? null : [.. _gameVersions.Select(ResourceApi.MapMcVersionToModrinth)],
+                versionTypes).SendTo(_http, cancellationToken);
         }
         catch (Exception e) when (e is ModrinthApiException)
         {

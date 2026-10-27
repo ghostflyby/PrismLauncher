@@ -336,8 +336,10 @@ public class GetModDependenciesTask : SequentialTask
                 {
                     dtos = dep.Version.Length != 0
                         ? [await _modrinth.Versions.ById(dep.Version).SendTo(_http, cancellationToken)]
-                        : await _modrinth.Versions.At(_modrinth.GetDependencyUrl(args))
-                            .SendTo(_http, cancellationToken);
+                        : await _modrinth.Versions.Query(dep.AddonId,
+                            [ResourceApi.MapMcVersionToModrinth(args.McVersion)],
+                            ModIndex.ModLoaderTypesToList(args.Loader).Select(ModIndex.GetModLoaderAsString).ToList(),
+                            args.IncludeChangelog).SendTo(_http, cancellationToken);
                 }
                 catch (Exception e) when (e is ModrinthApiException)
                 {

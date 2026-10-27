@@ -31,7 +31,7 @@ public static class ModrinthPackIndex
         pack.AddonId = dto.Id;
         pack.Provider = ResourceProvider.Modrinth;
         pack.Name = dto.Title;
-        pack.ResourceType = ModrinthExtensions.GetResourceType(dto.ProjectType);
+        pack.ResourceType = GetResourceType(dto.ProjectType);
         if (dto.Loaders?.Contains("datapack") == true)
         {
             pack.ResourceType = ResourceType.DataPack;
@@ -64,6 +64,18 @@ public static class ModrinthPackIndex
         // Modrinth can have more data than what's provided by the basic search :)
         pack.ExtraDataLoaded = false;
     }
+
+    /// <summary>The wire project_type → the launcher resource type (the C++
+    /// ModrinthAPI::getResourceType map; unknown types stay Unknown).</summary>
+    private static ResourceType GetResourceType(string param) => param switch
+    {
+        "mod" => ResourceType.Mod,
+        "resourcepack" => ResourceType.ResourcePack,
+        "shader" => ResourceType.ShaderPack,
+        "datapack" => ResourceType.DataPack,
+        "modpack" => ResourceType.Modpack,
+        _ => ResourceType.Unknown,
+    };
 
     /// <summary>Port of Modrinth::loadExtraPackData (the donation list, discord url and
     /// status members have no reader and are not ported).</summary>
@@ -99,7 +111,7 @@ public static class ModrinthPackIndex
         foreach (var raw in dto.GameVersions)
         {
             // double this so we can check both strings when filtering
-            file.McVersion.Add(ModrinthExtensions.MapMcVersionFromModrinth(raw));
+            file.McVersion.Add(ResourceApi.MapMcVersionFromModrinth(raw));
             file.McVersion.Add(raw);
         }
 
