@@ -3,12 +3,10 @@
 
 namespace FlintLauncher.ExternalApi;
 
-/// <summary>An endpoint operation value without execution-time arguments: everything needed
-/// to describe the request and its read is bound at construction, the request content is
-/// replayable (buffered or empty), and the value carries no executor — it can be sent
-/// repeatedly through whatever executor of its API a caller hands to SendTo. Parameters
-/// that cannot carry that replayability (one-shot content, per-execution targets) belong in
-/// <see cref="IApiOperation{TArgs,TResult}"/>, not here.</summary>
+/// <summary>An endpoint operation: the request is built fresh per send and the response is
+/// read into the result type. The request content must be replayable (buffered or empty),
+/// so one value can be sent repeatedly; operations with per-send arguments use
+/// <see cref="IApiOperation{TArgs,TResult}"/>.</summary>
 /// <typeparam name="TResult">The read result.</typeparam>
 public interface IApiOperation<TResult>
 {
@@ -16,26 +14,22 @@ public interface IApiOperation<TResult>
     /// body; the content must be replayable (buffered or empty).</summary>
     protected internal HttpRequestMessage CreateRequest();
 
-    /// <summary>The failure decision of this builder: wraps a transport, gate or read
-    /// failure into the exception the API wears — uniform across every operation of a root.
-    /// The pipeline throws the result; cancellation never reaches this.</summary>
+    /// <summary>Wraps a transport, gate or read failure into the operation's failure
+    /// exception; the pipeline throws the result. Cancellation never reaches this.</summary>
     protected internal Exception WrapFailure(Exception failure);
 
-    /// <summary>Reads the response into the result type, owning the endpoint's status
-    /// semantics and body shape: gate through <see cref="ApiOperation.EnsureSuccessAsync"/>
-    /// (or the endpoint's own rule), then take the body from the response message and decode
-    /// it in its natural shape (JSON through the serializer's stream API, text through a
-    /// reader, files straight to disk). The response stays owned by the pipeline and must
-    /// not be disposed here.</summary>
+    /// <summary>Reads the response into the result type: gate through
+    /// <see cref="ApiOperation.EnsureSuccessAsync"/> (or the endpoint's own rule), then take
+    /// the body from the response message and decode it (JSON through the serializer's
+    /// stream API, text through a reader, files straight to disk). The response stays owned
+    /// by the pipeline and must not be disposed here.</summary>
     protected internal Task<TResult> ReadResponseAsync(HttpResponseMessage response,
         CancellationToken ct);
 }
 
-/// <summary>An endpoint operation value with execution-time arguments: parameters that
-/// cannot be bound on a replayable value — one-shot content, the per-execution targets of
-/// the read — arrive through <typeparamref name="TArgs"/> at SendTo time and are exclusively
-/// owned by the send, released with the request message. Whatever is still replayable stays
-/// bound at construction under the <see cref="IApiOperation{TResult}"/> rules.</summary>
+/// <summary>An endpoint operation with per-send arguments: the arguments arrive at SendTo
+/// and are exclusively owned by that send, released with the request message. Everything
+/// replayable stays bound under the <see cref="IApiOperation{TResult}"/> rules.</summary>
 /// <typeparam name="TArgs">The per-send arguments.</typeparam>
 /// <typeparam name="TResult">The read result.</typeparam>
 public interface IApiOperation<in TArgs, TResult>
@@ -44,7 +38,7 @@ public interface IApiOperation<in TArgs, TResult>
     /// (buffered or empty).</summary>
     HttpRequestMessage CreateRequest(TArgs args);
 
-    /// <summary>The failure decision of this builder (see
+    /// <summary>Wraps a failure into the operation's exception (see
     /// <see cref="IApiOperation{TResult}.WrapFailure"/>).</summary>
     Exception WrapFailure(Exception failure);
 

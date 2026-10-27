@@ -7,8 +7,7 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace FlintLauncher.ExternalApi.Modrinth;
 
-/// <summary>The PAT rides on every request when a token is set (the C++ ApiHeaderProxy
-/// header logic); the transport strategies stay on the executor's handler chain.</summary>
+/// <summary>Adds the Authorization header when the options carry a PAT.</summary>
 internal static class ModrinthRequests
 {
     internal static HttpRequestMessage WithAuthorization(this HttpRequestMessage request,
@@ -132,9 +131,9 @@ public readonly record struct ModrinthVersionQuery(ModrinthClientOptions Options
         ModrinthDecoding.ReadJsonAsync<ModrinthVersion>(response, ModrinthJsonContext.Default.ModrinthVersion, ct);
 }
 
-/// <summary>GET /project/{id}/version — the version list behind a project; the filters are
-/// the wire's JSON-array query parameters (omitted when empty), and the upstream
-/// include_changelog=false default stays explicit (the port has no changelog producer).</summary>
+/// <summary>GET /project/{id}/version — the version list behind a project, filtered by
+/// the wire's game-version and loader strings (omitted when empty); requests carry the
+/// include_changelog=false default.</summary>
 public readonly record struct ModrinthVersionListQuery(
     ModrinthClientOptions Options,
     string ProjectId,
@@ -195,9 +194,8 @@ public readonly record struct ModrinthProjectsQuery(ModrinthClientOptions Option
         ModrinthDecoding.ReadJsonAsync<List<ModrinthProject>>(response, ModrinthJsonContext.Default.ListModrinthProject, ct);
 }
 
-/// <summary>GET /project/{id}/description — the project body as plain text. The endpoint
-/// owns its status rule: any failed status degrades to "" (Modrinth has no per-file
-/// changelog endpoint — changelogs ride on the version objects).</summary>
+/// <summary>GET /project/{id}/description — the project body as plain text; a failed
+/// status resolves to "".</summary>
 public readonly record struct ModrinthDescriptionQuery(ModrinthClientOptions Options, string Id)
     : IApiOperation<string>
 {
@@ -236,9 +234,8 @@ public readonly record struct ModrinthCategoriesQuery(ModrinthClientOptions Opti
         ModrinthDecoding.ReadJsonAsync<List<ModrinthCategory>>(response, ModrinthJsonContext.Default.ListModrinthCategory, ct);
 }
 
-/// <summary>GET /search — the search envelope in wire vocabulary: the fixed page size, the
-/// free text, the sort index and the facet groups (each group OR-s its values, the groups
-/// AND together — the wire encodes them as a JSON array of arrays).</summary>
+/// <summary>GET /search — the search envelope: the page offset, the free text, the sort
+/// index and the facet groups (each group OR-s its values, the groups AND together).</summary>
 public readonly record struct ModrinthSearchQuery(
     ModrinthClientOptions Options,
     int Offset,
@@ -281,13 +278,11 @@ public readonly record struct ModrinthSearchQuery(
 
 // ----------------------------------------------------------------------------- downloads
 
-/// <summary>GET a download URL: the body streams into a sibling temp file next to the
-/// destination and the file is moved into place only after the checksum matched (a null
-/// checksum or an unknown algorithm downloads unchecked), so a failed attempt never leaves
-/// a half-written artifact. The download-meta header and the PAT ride on the request when
-/// set; send it with the streaming read option (ResponseHeadersRead) so the body never
-/// buffers whole. The destination file is not part of the request — it is the execution
-/// argument of the send and resolves to the number of bytes written.</summary>
+/// <summary>GET a download URL and commit it to the destination file: the body lands in a
+/// sibling temp file that replaces the destination only after the checksum matched (a null
+/// checksum or an unknown algorithm downloads unchecked). Send with the streaming read
+/// option (ResponseHeadersRead); the destination path is the send argument and the result
+/// is the number of bytes written.</summary>
 public readonly record struct ModrinthFileDownload(
     ModrinthClientOptions Options,
     string Url,
@@ -378,7 +373,7 @@ public readonly record struct ModrinthFileDownload(
 // -------------------------------------------------------------------------------- groups
 
 /// <summary>The version endpoints: file-hash lookups, the batch update check and the
-/// version-list fetch, each returning an operation value bound to the root's Options.</summary>
+/// version-list fetch.</summary>
 public readonly struct ModrinthVersionQueries(ModrinthClient root)
 {
     /// <summary>GET /version_file/{hash}?algorithm=.</summary>
@@ -404,7 +399,7 @@ public readonly struct ModrinthVersionQueries(ModrinthClient root)
 }
 
 /// <summary>The project endpoints: single and batch project fetches plus the description
-/// body, each returning an operation value bound to the root's Options.</summary>
+/// body.</summary>
 public readonly struct ModrinthProjectQueries(ModrinthClient root)
 {
     /// <summary>GET /project/{id}.</summary>
@@ -437,8 +432,8 @@ public readonly struct ModrinthSearchQueries(ModrinthClient root)
 /// <summary>The download endpoints: CDN files streamed to disk.</summary>
 public readonly struct ModrinthDownloadQueries(ModrinthClient root)
 {
-    /// <summary>GET a download URL (checksum-gated temp-file commit); the destination file
-    /// is the send's execution argument and the result is the bytes written.</summary>
+    /// <summary>GET a download URL into a destination file (checksum-gated temp-file
+    /// commit); resolves to the bytes written.</summary>
     public ModrinthFileDownload File(string url,
         ModrinthDownloadMeta? meta = null, (string Algorithm, string Hash)? checksum = null) =>
         new(root.Options, url, meta, checksum);
