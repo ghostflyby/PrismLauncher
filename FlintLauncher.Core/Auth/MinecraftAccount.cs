@@ -77,7 +77,7 @@ public sealed class MinecraftAccount
                 {
                     Value = "0",
                     Validity = Validity.Certain,
-                    IssueInstant = DateTime.UtcNow,
+                    IssueInstant = DateTimeOffset.UtcNow,
                     Extra =
                     {
                         ["userName"] = AccountData.StringElement(username),
@@ -263,7 +263,7 @@ public sealed class MinecraftAccount
                 return true;
         }
 
-        var now = DateTime.UtcNow;
+        var now = DateTimeOffset.UtcNow;
         var issuedTimestamp = Data.YggdrasilToken.IssueInstant;
         var expiresTimestamp = Data.YggdrasilToken.NotAfter;
 

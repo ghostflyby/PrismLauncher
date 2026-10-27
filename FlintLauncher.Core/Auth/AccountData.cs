@@ -59,11 +59,14 @@ public enum Validity
 /// <summary>Port of AccountData::Token.</summary>
 public sealed class Token
 {
-    /// <summary>QDateTime issueInstant ("iat" when saved, epoch seconds).</summary>
-    public DateTime? IssueInstant;
+    /// <summary>The token's issue instant ("iat" when saved, epoch seconds). These two are
+    /// instants rather than wall-clock readings: DateTimeOffset carries the offset the
+    /// source stated, where a DateTime could only tag a Kind and leave the distance from
+    /// UTC implicit.</summary>
+    public DateTimeOffset? IssueInstant;
 
-    /// <summary>QDateTime notAfter ("exp" when saved, epoch seconds).</summary>
-    public DateTime? NotAfter;
+    /// <summary>The token's expiry ("exp" when saved, epoch seconds).</summary>
+    public DateTimeOffset? NotAfter;
 
     /// <summary>C++ member token (named Value: NO member — field or property — may carry
     /// the name of its enclosing type Token, CS0542).</summary>
@@ -362,12 +365,8 @@ public sealed class AccountData
 
         var wire = new TokenJson
         {
-            Iat = t.IssueInstant is { } issueInstant
-                ? new DateTimeOffset(issueInstant).ToUnixTimeSeconds()
-                : null,
-            Exp = t.NotAfter is { } notAfter
-                ? new DateTimeOffset(notAfter).ToUnixTimeSeconds()
-                : null,
+            Iat = t.IssueInstant?.ToUnixTimeSeconds(),
+            Exp = t.NotAfter?.ToUnixTimeSeconds(),
             Token = t.Value.Length != 0 ? t.Value : null,
             RefreshToken = t.RefreshToken.Length != 0 ? t.RefreshToken : null,
             Extra = t.Extra.Count != 0 ? new Dictionary<string, JsonElement>(t.Extra) : null,
@@ -389,12 +388,12 @@ public sealed class AccountData
 
         if (wire.Iat is { } iat)
         {
-            token.IssueInstant = DateTimeOffset.FromUnixTimeSeconds(iat).UtcDateTime;
+            token.IssueInstant = DateTimeOffset.FromUnixTimeSeconds(iat);
         }
 
         if (wire.Exp is { } exp)
         {
-            token.NotAfter = DateTimeOffset.FromUnixTimeSeconds(exp).UtcDateTime;
+            token.NotAfter = DateTimeOffset.FromUnixTimeSeconds(exp);
         }
 
         if (wire.Token is { } value)

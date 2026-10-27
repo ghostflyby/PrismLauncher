@@ -250,8 +250,9 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
     private void ApplyGrantedTokens(TokenResponse rsp)
     {
         Data.MsaClientId = _clientId;
-        Data.MsaToken.IssueInstant = DateTime.UtcNow;
-        Data.MsaToken.NotAfter = DateTime.UtcNow.AddSeconds(rsp.ExpiresIn);
+        var now = DateTimeOffset.UtcNow;
+        Data.MsaToken.IssueInstant = now;
+        Data.MsaToken.NotAfter = now.AddSeconds(rsp.ExpiresIn);
         Data.MsaToken.Extra = rsp.Extra;
         Data.MsaToken.RefreshToken = rsp.RefreshToken;
         Data.MsaToken.Value = rsp.AccessToken;

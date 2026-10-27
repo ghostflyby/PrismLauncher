@@ -101,9 +101,9 @@ public class AccountDataTests
         Assert.Equal("MSA_REFRESH", data.MsaToken.RefreshToken);
         Assert.Equal(Validity.Assumed, data.MsaToken.Validity);
         Assert.NotNull(data.MsaToken.IssueInstant);
-        Assert.Equal(1638904328, new DateTimeOffset(data.MsaToken.IssueInstant.Value).ToUnixTimeSeconds());
+        Assert.Equal(1638904328, data.MsaToken.IssueInstant.Value.ToUnixTimeSeconds());
         Assert.NotNull(data.MsaToken.NotAfter);
-        Assert.Equal(1638990728, new DateTimeOffset(data.MsaToken.NotAfter.Value).ToUnixTimeSeconds());
+        Assert.Equal(1638990728, data.MsaToken.NotAfter.Value.ToUnixTimeSeconds());
         // the numeric extra value must survive as a number
         Assert.True(data.MsaToken.Extra.TryGetValue("expires_in", out var expiresIn));
         Assert.Equal("86400", expiresIn.GetRawText());

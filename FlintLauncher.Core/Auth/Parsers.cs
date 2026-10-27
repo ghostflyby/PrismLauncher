@@ -8,7 +8,7 @@
 // Deviations: input is the raw response bytes (like upstream) parsed with System.Text.Json;
 // the "Failed to parse response from <service> as JSON" qWarnings are dropped (the bool return
 // carries the outcome, as upstream). QDateTime::fromString(Qt::ISODate) maps to an invariant
-// round-trip DateTime.Parse (the Xbox timestamps carry 7-digit fractions).
+// DateTimeOffset.Parse (the Xbox timestamps carry 7-digit fractions).
 
 using System.Globalization;
 using System.Text.Json;
@@ -18,8 +18,11 @@ namespace FlintLauncher.Core.Auth;
 
 public static class Parsers
 {
-    /// <summary>Port of Parsers::getDateTime (Qt::ISODate).</summary>
-    public static bool GetDateTime(JsonNode? value, out DateTime outDateTime)
+    /// <summary>Port of Parsers::getDateTime (Qt::ISODate). A timestamp that states no
+    /// offset is read as UTC (AssumeUniversal): the auth services always state one, and the
+    /// wall clock of the machine running the launcher has no bearing on token validity.
+    /// A stated offset is kept as stated — the instant is what comparisons read.</summary>
+    public static bool GetDateTimeOffset(JsonNode? value, out DateTimeOffset outDateTime)
     {
         outDateTime = default;
         if (value is not JsonValue v || !v.TryGetValue(out string? s))
@@ -27,7 +30,8 @@ public static class Parsers
             return false;
         }
 
-        if (!DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed))
+        if (!DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal, out var parsed))
         {
             return false;
         }
@@ -118,24 +122,20 @@ public static class Parsers
             return false;
         }
 
-        if (!GetDateTime(AccountData.Get(obj, "IssueInstant"), out var issueInstant))
+        if (!GetDateTimeOffset(AccountData.Get(obj, "IssueInstant"), out var issueInstant))
         {
             // qWarning() << "User IssueInstant is not a timestamp";
             return false;
         }
 
-        output.IssueInstant = issueInstant.Kind == DateTimeKind.Unspecified
-            ? DateTime.SpecifyKind(issueInstant, DateTimeKind.Utc)
-            : issueInstant.ToUniversalTime();
-        if (!GetDateTime(AccountData.Get(obj, "NotAfter"), out var notAfter))
+        output.IssueInstant = issueInstant;
+        if (!GetDateTimeOffset(AccountData.Get(obj, "NotAfter"), out var notAfter))
         {
             // qWarning() << "User NotAfter is not a timestamp";
             return false;
         }
 
-        output.NotAfter = notAfter.Kind == DateTimeKind.Unspecified
-            ? DateTime.SpecifyKind(notAfter, DateTimeKind.Utc)
-            : notAfter.ToUniversalTime();
+        output.NotAfter = notAfter;
         if (!GetString(AccountData.Get(obj, "Token"), out var token))
         {
             // qWarning() << "User Token is not a string";
@@ -592,7 +592,7 @@ public static class Parsers
             return false;
         }
 
-        var currentTime = DateTime.UtcNow;
+        var currentTime = DateTimeOffset.UtcNow;
         output.IssueInstant = currentTime;
         output.NotAfter = currentTime.AddSeconds(expiresIn);
 
