@@ -14,7 +14,9 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Helpers;
 using FlintLauncher.Core.ModPlatform.Modrinth;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using FlintLauncher.ExternalApi;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
 using FlintLauncher.Web.Services;
@@ -35,7 +37,7 @@ public static class ExportEndpoints
         // -------------------------------------------------------------------- export
         api.MapPost("/instances/{id}/export", async (string id, ExportRequest request,
             InstanceList instances, InstanceMutationLock instanceLock,
-            ModrinthApi modrinth, FlameApi flame, FlintTaskRegistry registry) =>
+            ModrinthClient modrinth, HttpClient http, FlameApi flame, FlintTaskRegistry registry) =>
         {
             var format = (request.Format ?? "").Trim().ToLowerInvariant();
             if (format is not ("modrinth" or "flame" or "modlist"))
@@ -94,7 +96,7 @@ public static class ExportEndpoints
                 {
                     case "modrinth":
                         task = new ModrinthPackExportTask(name, versionId, request.Summary ?? "",
-                            optionalFiles: true, instance, output, modrinth: modrinth);
+                            optionalFiles: true, instance, output, modrinth, http);
                         break;
                     case "flame":
                         task = new FlamePackExportTask(new FlamePackExportTask.Options

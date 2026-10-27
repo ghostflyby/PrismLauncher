@@ -20,6 +20,9 @@ using TruePath;
 using Xunit;
 using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
 
+using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi;
+
 namespace FlintLauncher.Tests;
 
 [Collection("ModrinthApi")]
@@ -29,12 +32,14 @@ public class GetModDependenciesTaskTests : IDisposable
     private readonly StubModrinthServer _server = new();
     private readonly ModInstallTestEnv _env;
 
-    private readonly ModrinthApi _modrinth;
+    private readonly ModrinthClient _modrinth;
+    private readonly HttpClient _http;
+    private readonly NetSettings _settings;
 
     public GetModDependenciesTaskTests()
     {
         Directory.CreateDirectory(_root);
-        _modrinth = TestModrinthApi.At(_server.Url);
+        (_modrinth, _http, _settings) = TestModrinthApi.At(_server.Url);
         _env = new ModInstallTestEnv(_root);
     }
 
@@ -163,7 +168,7 @@ public class GetModDependenciesTaskTests : IDisposable
         };
 
         var task = new GetModDependenciesTask(instance, model,
-            [new GetModDependenciesTask.PackDependency(packA, verA)], _modrinth);
+            [new GetModDependenciesTask.PackDependency(packA, verA)], _modrinth, _http, _settings);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -212,7 +217,7 @@ public class GetModDependenciesTaskTests : IDisposable
         };
 
         var task = new GetModDependenciesTask(instance, model,
-            [new GetModDependenciesTask.PackDependency(packA, verA)], _modrinth);
+            [new GetModDependenciesTask.PackDependency(packA, verA)], _modrinth, _http, _settings);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -249,7 +254,7 @@ public class GetModDependenciesTaskTests : IDisposable
         };
 
         var task = new GetModDependenciesTask(instance, model,
-            [new GetModDependenciesTask.PackDependency(packA, verA)], _modrinth);
+            [new GetModDependenciesTask.PackDependency(packA, verA)], _modrinth, _http, _settings);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -316,7 +321,7 @@ public class GetModDependenciesFlameTests : IDisposable
         };
 
         var task = new GetModDependenciesTask(instance, model,
-            [new GetModDependenciesTask.PackDependency(packA, verA)], modrinth: TestModrinthApi.Unreachable(), flame: _flameApi);
+            [new GetModDependenciesTask.PackDependency(packA, verA)], modrinth: TestModrinthApi.Unreachable().Client, http: TestModrinthApi.Unreachable().Http, settings: TestModrinthApi.Unreachable().Settings, flame: _flameApi);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);

@@ -34,7 +34,8 @@ public class ResourceDownloadTask : SequentialTask
     private readonly IndexedPack _pack;
     private readonly IndexedVersion _packVersion;
     private readonly ResourceFolderModel _packModel;
-    private readonly ModrinthApi _modrinth;
+    private readonly ModrinthClient _modrinth;
+    private readonly HttpClient _http;
     private readonly string _downloadReason;
     private readonly string _dependentOn;
     private readonly MinecraftInstance? _instance;
@@ -47,7 +48,8 @@ public class ResourceDownloadTask : SequentialTask
     public ResourceDownloadTask(IndexedPack pack,
         IndexedVersion version,
         ResourceFolderModel packs,
-        ModrinthApi modrinth,
+        ModrinthClient modrinth,
+        HttpClient http,
         bool isIndexed = true,
         string downloadReason = "standalone",
         string dependentOn = "",
@@ -57,6 +59,7 @@ public class ResourceDownloadTask : SequentialTask
         _packVersion = version;
         _packModel = packs;
         _modrinth = modrinth;
+        _http = http;
         _downloadReason = downloadReason;
         _dependentOn = dependentOn;
         _instance = instance;
@@ -72,7 +75,7 @@ public class ResourceDownloadTask : SequentialTask
         var download = new CallbackTask(async cancellationToken =>
         {
             EmitStatus($"Downloading resource:\n{_packVersion.DownloadUrl}");
-            await _modrinth.DownloadModFileAsync(_packVersion.DownloadUrl,
+            await _modrinth.DownloadModFileAsync(_http, _packVersion.DownloadUrl,
                 (AbsolutePath)_packModel.Dir / GetFilename(),
                 CreateModrinthMeta(_instance, _downloadReason, _dependentOn),
                 _packVersion.HashType.Length != 0 ? _packVersion.HashType : null,

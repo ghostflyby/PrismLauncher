@@ -19,6 +19,12 @@ public sealed class ModrinthClient
     /// with whoever constructed it (the Core adapter forwards its properties here).</summary>
     public ModrinthClientOptions Options { get; }
 
+    /// <summary>The CDN host the mrpack import validates download links against.</summary>
+    public string DownloadHost { get; set; } = "cdn.modrinth.com";
+
+    public static IReadOnlyList<string> MrpackHosts { get; } =
+        ["cdn.modrinth.com", "github.com", "raw.githubusercontent.com", "gitlab.com"];
+
     // ------------------------------------------------------------------ endpoint groups
 
     /// <summary>The version endpoints: file-hash lookups, the batch update check and the

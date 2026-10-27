@@ -18,11 +18,16 @@ using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using Xunit;
 
+using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi;
+
 namespace FlintLauncher.Tests;
 
 public class FtbTests : IDisposable
 {
-    private readonly ModrinthApi _modrinthApi = TestModrinthApi.Unreachable();
+    private readonly ModrinthClient _modrinthApi;
+    private readonly HttpClient _http;
+    private readonly NetSettings _settings;
     private readonly FlameApi _flameApi = new(TestNet.Http, TestNet.Settings);
     private readonly FtbApi _ftbApi;
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-ftb-{Guid.NewGuid():N}");
@@ -33,6 +38,7 @@ public class FtbTests : IDisposable
 
     public FtbTests()
     {
+        (_modrinthApi, _http, _settings) = TestModrinthApi.Unreachable();
         Directory.CreateDirectory(_root);
         _ftbApi = new FtbApi(TestNet.Http, TestNet.Settings) { BaseUrl = _server.Url };
         // the FTB install resolves CurseForge-only files through the Flame layer
@@ -264,7 +270,7 @@ public class FtbTests : IDisposable
         SetupFlameResolution();
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _flameApi, _ftbApi);
+        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _http, _settings, _flameApi, _ftbApi);
         task.SetName("FTB Imported");
         task.Icon = "ftb_logo";
         var wrapped = list.WrapInstanceTask(task);
@@ -306,7 +312,7 @@ public class FtbTests : IDisposable
         _server.Downloads["testmod.jar"] = "corrupted payload!!"u8.ToArray();
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _flameApi, _ftbApi);
+        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _http, _settings, _flameApi, _ftbApi);
         task.SetName("FTB Sha1");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
@@ -325,7 +331,7 @@ public class FtbTests : IDisposable
         SetupFlameResolution(downloadUrlPath: null);
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _flameApi, _ftbApi);
+        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _http, _settings, _flameApi, _ftbApi);
         task.SetName("FTB Blocked");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();
@@ -349,7 +355,7 @@ public class FtbTests : IDisposable
         await File.WriteAllBytesAsync(localPath, _cfBytes);
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _flameApi, _ftbApi)
+        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _http, _settings, _flameApi, _ftbApi)
         {
             BlockedModLocalFileResolver = _ => localPath,
         };
@@ -372,7 +378,7 @@ public class FtbTests : IDisposable
         fixture.Register(_server);
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "no-such-version", modrinth: _modrinthApi, ftb: _ftbApi);
+        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "no-such-version", modrinth: _modrinthApi, http: _http, settings: _settings, ftb: _ftbApi);
         task.SetName("FTB UnknownVersion");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped.StartAsync();

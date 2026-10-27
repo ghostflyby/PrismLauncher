@@ -45,6 +45,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi;
 using TruePath;
 using TruePath.SystemIo;
 
@@ -53,7 +54,9 @@ namespace FlintLauncher.Core.Instances;
 public sealed partial class InstanceImportTask(
     Uri sourceUrl,
     bool trustedSource,
-    ModrinthApi modrinth,
+    ModrinthClient modrinth,
+    HttpClient http,
+    NetSettings settings,
     IReadOnlyDictionary<string, string>? extraInfo = null,
     FlameApi? flame = null)
     : InstanceTask
@@ -67,8 +70,10 @@ public sealed partial class InstanceImportTask(
         Modrinth,
     }
 
-    private readonly ModrinthApi _modrinth = modrinth;
-    private readonly FlameApi _flame = flame ?? new FlameApi(modrinth.Http, modrinth.Settings);
+    private readonly ModrinthClient _modrinth = modrinth;
+    private readonly HttpClient _http = http;
+    private readonly NetSettings _settings = settings;
+    private readonly FlameApi _flame = flame ?? new FlameApi(http, settings);
     private readonly IReadOnlyDictionary<string, string> _extraInfo = extraInfo ?? new Dictionary<string, string>();
     private AbsolutePath _archivePath;
     private ModpackType _modpackType = ModpackType.Unknown;
@@ -123,7 +128,7 @@ public sealed partial class InstanceImportTask(
             string a1 = Path.GetFileName(sourceUrl.AbsolutePath);
             _archivePath = StagingPath / a1;
             FileOps.EnsureFilePathExists(_archivePath);
-            var request = HttpDownloadTask.ToFile(sourceUrl, _archivePath, _modrinth.Http, _modrinth.Settings);
+            var request = HttpDownloadTask.ToFile(sourceUrl, _archivePath, _http, _settings);
             await request.StartAsync(cancellationToken);
             if (!request.WasSuccessful)
             {
@@ -244,7 +249,7 @@ public sealed partial class InstanceImportTask(
         var instCreationTask = new FlameCreationTask(StagingPath, trustedSource,
             Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution."),
-            _modrinth, packId, packVersionId, flame: _flame)
+            _modrinth, _http, _settings, packId, packVersionId, flame: _flame)
         {
             OptionalModsSelection = OptionalModsSelection,
         };
@@ -339,7 +344,7 @@ public sealed partial class InstanceImportTask(
         var instCreationTask = new ModrinthCreationTask(StagingPath, trustedSource,
             Environment ?? throw new InvalidOperationException(
                 "InstanceTask requires SetParentEnvironment before execution."),
-            _modrinth, packId, packVersionId)
+            _modrinth, _http, _settings, packId, packVersionId)
         {
             OptionalModsSelection = OptionalModsSelection,
         };

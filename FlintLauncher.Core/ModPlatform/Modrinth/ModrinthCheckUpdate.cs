@@ -45,7 +45,8 @@ public sealed class ModrinthCheckUpdate : FlintTask
     private readonly List<ModLoaderType> _loadersList;
     private readonly Func<Resource, MetadataHandler.ModStruct?> _metadataLookup;
     private readonly IReadOnlyList<IndexedVersionType> _releaseTypes;
-    private readonly ModrinthApi _modrinth;
+    private readonly ModrinthClient _modrinth;
+    private readonly HttpClient _http;
 
     private readonly string _hashType = ProviderCapabilities.HashType(ResourceProvider.Modrinth)[0];
     private readonly Dictionary<string, Resource> _mappings = new(StringComparer.Ordinal); // hash -> resource
@@ -58,10 +59,12 @@ public sealed class ModrinthCheckUpdate : FlintTask
         IReadOnlyList<McVersion> mcVersions,
         IReadOnlyList<ModLoaderType> loadersList,
         Func<Resource, MetadataHandler.ModStruct?> metadataLookup,
-        ModrinthApi modrinth,
+        ModrinthClient modrinth,
+        HttpClient http,
         IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     {
         _modrinth = modrinth;
+        _http = http;
         _resources = resources;
         _gameVersions = mcVersions;
         _loadersList = [.. loadersList];
@@ -152,7 +155,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
         Dictionary<string, ModrinthVersion> entries;
         try
         {
-            entries = await _modrinth.GetLatestVersionsAsync(hashes, _hashType, _gameVersions, loader,
+            entries = await _modrinth.GetLatestVersionsAsync(_http, hashes, _hashType, _gameVersions, loader,
                 _releaseTypes, cancellationToken);
         }
         catch (Exception e) when (e is ModrinthApiException)

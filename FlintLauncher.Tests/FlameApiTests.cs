@@ -7,7 +7,7 @@
 // matching, and the file resolution including a blocked file (null downloadUrl) surfacing
 // as blocked.
 //
-// The Flame base URL and API key are static override hooks (like ModrinthApi), so the whole
+// The Flame base URL and API key are static override hooks (like the Modrinth client factory), so the whole
 // class is serialized through the "FlameApi" collection and restores the defaults in Dispose.
 
 using System.Text;
@@ -22,18 +22,25 @@ using FlintLauncher.Core.Versioning;
 using TruePath;
 using Xunit;
 
+using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi;
+
 namespace FlintLauncher.Tests;
 
 [Collection("FlameApi")]
 public class FlameApiTests : IDisposable
 {
     private readonly FlameApi _flameApi = new(TestNet.Http, TestNet.Settings);
+    private readonly ModrinthClient _modrinth;
+    private readonly HttpClient _http;
+    private readonly NetSettings _settings;
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-flame-{Guid.NewGuid():N}");
     private readonly StubFlameServer _server = new();
     private readonly string _baseUrl;
 
     public FlameApiTests()
     {
+        (_modrinth, _http, _settings) = TestModrinthApi.Unreachable();
         Directory.CreateDirectory(_root);
         _baseUrl = _server.Url;
         _flameApi.BaseUrl = _baseUrl;
@@ -443,7 +450,7 @@ public class FlameApiTests : IDisposable
 
         var manifest = new FlameManifest { Files = { [456] = new FlameFile { ProjectId = 123, FileId = 456 } } };
 
-        var task = new FileResolvingTask(manifest, TestModrinthApi.Unreachable(), flame: _flameApi);
+        var task = new FileResolvingTask(manifest, _modrinth, _http, _settings, flame: _flameApi);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -470,7 +477,7 @@ public class FlameApiTests : IDisposable
 
         var manifest = new FlameManifest { Files = { [456] = new FlameFile { ProjectId = 123, FileId = 456 } } };
 
-        var task = new FileResolvingTask(manifest, TestModrinthApi.Unreachable(), flame: _flameApi) { FallbackMrBlockedMods = false };
+        var task = new FileResolvingTask(manifest, _modrinth, _http, _settings, flame: _flameApi) { FallbackMrBlockedMods = false };
         await task.StartAsync();
 
         // the resolve succeeds; the blocked state is the *missing download URL*
@@ -492,7 +499,7 @@ public class FlameApiTests : IDisposable
 
         var manifest = new FlameManifest { Files = { [456] = new FlameFile { ProjectId = 123, FileId = 456 } } };
 
-        var task = new FileResolvingTask(manifest, TestModrinthApi.Unreachable(), flame: _flameApi);
+        var task = new FileResolvingTask(manifest, _modrinth, _http, _settings, flame: _flameApi);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);

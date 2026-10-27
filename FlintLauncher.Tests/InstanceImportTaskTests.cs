@@ -13,6 +13,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using FlintLauncher.ExternalApi;
 using TruePath;
 using Xunit;
 
@@ -25,12 +26,14 @@ public class InstanceImportTaskTests : IDisposable
     private readonly TestGlobalSettings _global = new();
     private readonly StubModrinthServer _server = new();
 
-    private readonly ModrinthApi _modrinth;
+    private readonly ModrinthClient _modrinth;
+    private readonly HttpClient _http;
+    private readonly NetSettings _settings;
 
     public InstanceImportTaskTests()
     {
         Directory.CreateDirectory(_root);
-        _modrinth = TestModrinthApi.At(_server.Url);
+        (_modrinth, _http, _settings) = TestModrinthApi.At(_server.Url);
         _modrinth.DownloadHost = "127.0.0.1";
     }
 
@@ -55,7 +58,7 @@ public class InstanceImportTaskTests : IDisposable
         HttpMetaCache? metaCache = null)
     {
         var list = CreateList();
-        var task = new InstanceImportTask(source, trustedSource: true, _modrinth, extraInfo)
+        var task = new InstanceImportTask(source, trustedSource: true, _modrinth, _http, _settings, extraInfo)
         {
             MetaCache = metaCache,
         };

@@ -7,13 +7,16 @@
 // name, a selected one under its real path (the OptionalModDialog answers, headless).
 //
 // [Collection("ModrinthApi")] matches InstanceImportTaskTests: each suite injects its own
-// ModrinthApi pointed at its own stub server, and the API host runs the very same
+// ModrinthClient pointed at its own stub server, and the API host runs the very same
 // InstanceImportTask the core tests drive directly.
 
 using System.Net;
 using System.Text.Json;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using Xunit;
+
+using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi;
 
 namespace FlintLauncher.Tests;
 
@@ -23,12 +26,12 @@ public class ImportOptionalModsApiTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-import-api-{Guid.NewGuid():N}");
     private readonly StubModrinthServer _server = new();
 
-    private readonly ModrinthApi _modrinth;
+    private readonly ModrinthClient _modrinth;
 
     public ImportOptionalModsApiTests()
     {
         Directory.CreateDirectory(_root);
-        _modrinth = TestModrinthApi.At(_server.Url);
+        _modrinth = TestModrinthApi.At(_server.Url).Client;
         _modrinth.DownloadHost = "127.0.0.1";
     }
 

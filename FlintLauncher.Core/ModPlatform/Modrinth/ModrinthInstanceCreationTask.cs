@@ -33,6 +33,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi;
 using TruePath;
@@ -58,12 +59,16 @@ public sealed class ModrinthCreationTask : InstanceTask
     public ModrinthCreationTask(AbsolutePath stagingPath,
         bool trustedSource,
         InstanceEnvironment environment,
-        ModrinthApi modrinth,
+        ModrinthClient modrinth,
+        HttpClient http,
+        NetSettings settings,
         string id = "",
         string versionId = "",
         string originalInstanceId = "")
     {
         _modrinth = modrinth;
+        _http = http;
+        _settings = settings;
         StagingPath = stagingPath;
         TrustedSource = trustedSource;
         SetParentEnvironment(environment);
@@ -74,7 +79,9 @@ public sealed class ModrinthCreationTask : InstanceTask
 
     public bool TrustedSource { get; }
 
-    private readonly ModrinthApi _modrinth;
+    private readonly ModrinthClient _modrinth;
+    private readonly HttpClient _http;
+    private readonly NetSettings _settings;
     private string _minecraftVersion = "";
     private string _fabricVersion = "";
     private string _quiltVersion = "";
@@ -249,7 +256,7 @@ public sealed class ModrinthCreationTask : InstanceTask
             var meta = new ModrinthDownloadMeta(Reason: "modpack", GameVersion: _minecraftVersion, Loader: loader,
                 DependentOn: _managedId.Length != 0 ? _managedVersionId : "");
 
-            var downloadTask = new ModDownloadTask(file, filePath, meta, _modrinth);
+            var downloadTask = new ModDownloadTask(file, filePath, meta, _modrinth, _http);
             downloadTasks.Add(downloadTask);
             downloadJob.AddTask(downloadTask);
         }
@@ -450,7 +457,8 @@ public sealed class ModrinthCreationTask : InstanceTask
     private async Task EnsureMetaLoop(CancellationToken cancellationToken, MinecraftInstance newInstance)
     {
         var folder = newInstance.ModsRoot / ".index";
-        var ensureMetadataTask = new EnsureMetadataTask(_resources, folder, ResourceProvider.Modrinth, _modrinth)
+        var ensureMetadataTask = new EnsureMetadataTask(_resources, folder, ResourceProvider.Modrinth,
+            _modrinth, _http, _settings)
         {
             // setUpdateLock(true): updates for mods coming from an installed modpack are locked
             LockUpdate = true
@@ -582,7 +590,8 @@ public sealed class ModrinthCreationTask : InstanceTask
     /// One indexed file: try every download URL in order, checksum-verified (the per-file
     /// slice of the C++ download NetJob with its failed -> next-URL fallback chain).
     /// </summary>
-    private sealed class ModDownloadTask(File file, AbsolutePath filePath, ModrinthDownloadMeta meta, ModrinthApi modrinth)
+    private sealed class ModDownloadTask(File file, AbsolutePath filePath, ModrinthDownloadMeta meta,
+        ModrinthClient modrinth, HttpClient http)
         : FlintTask
     {
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -600,7 +609,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                 EmitStatus($"Downloading {file.Path}...");
                 try
                 {
-                    await modrinth.DownloadModFileAsync(url, filePath, meta, hashAlgorithm, file.Hash,
+                    await modrinth.DownloadModFileAsync(http, url, filePath, meta, hashAlgorithm, file.Hash,
                         cancellationToken);
                     EmitSucceeded();
                     return;

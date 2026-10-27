@@ -89,10 +89,13 @@ public static class ModPlatformTasks
 /// (IndexedPack, IndexedVersion) pairs: project info through the provider getProject, the
 /// version either pinned by id or the latest one matching the instance's mc version/loader.
 /// </summary>
-public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType loaders, IReadOnlyList<ModLoaderType> loaderList, ModrinthApi modrinth, FlameApi? flame = null)
+public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType loaders,
+    IReadOnlyList<ModLoaderType> loaderList, ModrinthClient modrinth, HttpClient http, NetSettings settings,
+    FlameApi? flame = null)
 {
-    private readonly ModrinthApi _modrinth = modrinth;
-    private readonly FlameApi _flame = flame ?? new FlameApi(modrinth.Http, modrinth.Settings);
+    private readonly ModrinthClient _modrinth = modrinth;
+    private readonly HttpClient _http = http;
+    private readonly FlameApi _flame = flame ?? new FlameApi(http, settings);
 
     public async Task<(IndexedPack Pack, IndexedVersion Version)> ResolveAsync(
         ResourceProvider provider, string projectId, string versionId, CancellationToken cancellationToken)
@@ -132,7 +135,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             ModrinthProject dto;
             try
             {
-                dto = await _modrinth.Client.Projects.ById(projectId).SendTo(_modrinth.Http, cancellationToken);
+                dto = await _modrinth.Projects.ById(projectId).SendTo(_http, cancellationToken);
             }
             catch (Exception e) when (e is ModrinthApiException)
             {
@@ -186,7 +189,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
             ModrinthVersion dto;
             try
             {
-                dto = await _modrinth.Client.Versions.ById(versionId).SendTo(_modrinth.Http, cancellationToken);
+                dto = await _modrinth.Versions.ById(versionId).SendTo(_http, cancellationToken);
             }
             catch (Exception e) when (e is ModrinthApiException)
             {
@@ -249,7 +252,7 @@ public sealed class ModSelectionResolver(McVersion mcVersion, ModLoaderType load
         List<ModrinthVersion> dtos;
         try
         {
-            dtos = await _modrinth.Client.Versions.At(versionsUrl).SendTo(_modrinth.Http, cancellationToken);
+            dtos = await _modrinth.Versions.At(versionsUrl).SendTo(_http, cancellationToken);
         }
         catch (Exception e) when (e is ModrinthApiException)
         {
@@ -315,15 +318,19 @@ public sealed class ModInstallTask(
     IReadOnlyList<ModInstallRequest> selections,
     string mcVersion,
     ModLoaderType loaders,
-    ModrinthApi modrinth,
+    ModrinthClient modrinth,
+    HttpClient http,
+    NetSettings settings,
     FlameApi? flame = null)
     : FlintTask
 {
     private readonly McVersion _mcVersion = new(mcVersion);
     private readonly List<ModLoaderType> _loaderList = ModIndex.ModLoaderTypesToList(loaders);
     private readonly List<ModInstallEntryView> _installed = [];
-    private readonly ModrinthApi _modrinth = modrinth;
-    private readonly FlameApi _flame = flame ?? new FlameApi(modrinth.Http, modrinth.Settings);
+    private readonly ModrinthClient _modrinth = modrinth;
+    private readonly HttpClient _http = http;
+    private readonly NetSettings _settings = settings;
+    private readonly FlameApi _flame = flame ?? new FlameApi(http, settings);
 
     /// <summary>The entries for the task view's optional result payload.</summary>
     public TaskResultView BuildResult() => new(null, _installed);
@@ -336,7 +343,8 @@ public sealed class ModInstallTask(
         var selected = new List<GetModDependenciesTask.PackDependency>();
         try
         {
-            var resolver = new ModSelectionResolver(_mcVersion, loaders, _loaderList, _modrinth, _flame);
+            var resolver = new ModSelectionResolver(_mcVersion, loaders, _loaderList,
+                _modrinth, _http, _settings, _flame);
             var current = 0;
             foreach (var selection in selections)
             {
@@ -354,7 +362,8 @@ public sealed class ModInstallTask(
         }
 
         EmitStatus("Resolving dependencies...");
-        var dependencyTask = new GetModDependenciesTask(instance, folder, selected, _modrinth, _flame);
+        var dependencyTask = new GetModDependenciesTask(instance, folder, selected,
+            _modrinth, _http, _settings, _flame);
         await dependencyTask.StartAsync(cancellationToken);
         if (!dependencyTask.WasSuccessful)
         {
@@ -404,6 +413,7 @@ public sealed class ModInstallTask(
                 entry.Version,
                 folder,
                 _modrinth,
+                _http,
 
                 isIndexed: true,
 
@@ -441,7 +451,8 @@ public sealed class ModsUpdateTask(
     MinecraftInstance instance,
     ModFolderModel folder,
     IReadOnlyList<string>? filter,
-    ModrinthApi modrinth,
+    ModrinthClient modrinth,
+    HttpClient http,
     FlameApi flameApi,
     IReadOnlyList<IndexedVersionType>? releaseTypes = null)
     : FlintTask
@@ -449,7 +460,8 @@ public sealed class ModsUpdateTask(
     private sealed record PendingUpdate(ModUpdateEntryView View, IndexedVersion Version, string ProjectId, string Slug, string Name);
 
     private readonly List<PendingUpdate> _updates = [];
-    private readonly ModrinthApi _modrinth = modrinth;
+    private readonly ModrinthClient _modrinth = modrinth;
+    private readonly HttpClient _http = http;
     private readonly FlameApi _flame = flameApi;
 
     /// <summary>The update entries for the task view's optional result payload.</summary>
@@ -498,7 +510,7 @@ public sealed class ModsUpdateTask(
         {
             EmitStatus("Checking Modrinth updates...");
             var check = new ModrinthCheckUpdate(modrinth, gameVersions, loadersList,
-                resource => folder.GetMetadata(resource), _modrinth, releaseTypes);
+                resource => folder.GetMetadata(resource), _modrinth, _http, releaseTypes);
             await check.StartAsync(cancellationToken);
             if (!check.WasSuccessful)
             {
@@ -559,7 +571,8 @@ public sealed class ModsUpdateTask(
             isIndexed: true,
             downloadReason: "update",
             instance: instance,
-            modrinth: _modrinth));
+            modrinth: _modrinth,
+            http: _http));
         var apply = new ModUpdateTask(folder, downloads);
         await apply.StartAsync(cancellationToken);
         if (!apply.WasSuccessful)

@@ -21,6 +21,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Secrets;
+using FlintLauncher.ExternalApi;
 
 namespace FlintLauncher.Web.Services;
 
@@ -28,7 +29,7 @@ public sealed class NetSettingsApplier(
     FlintConfigStore configStore,
     ISecretStore secrets,
     NetSettings settings,
-    ModrinthApi modrinth,
+    ModrinthClient modrinth,
     FlameApi flame,
     AuthEndpointsOptions auth)
 {
@@ -63,9 +64,9 @@ public sealed class NetSettingsApplier(
     private void ApplyApiCredentials()
     {
         var modrinthToken = secrets.Get(ModrinthTokenSecret) ?? "";
-        if (modrinth.ApiToken != modrinthToken)
+        if (modrinth.Options.ApiToken != modrinthToken)
         {
-            modrinth.ApiToken = modrinthToken;
+            modrinth.Options.ApiToken = modrinthToken;
         }
 
         var flameKey = secrets.Get(FlameKeySecret);

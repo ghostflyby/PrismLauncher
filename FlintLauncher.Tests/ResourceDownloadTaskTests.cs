@@ -17,6 +17,9 @@ using TruePath;
 using Xunit;
 using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
 
+using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi;
+
 namespace FlintLauncher.Tests;
 
 [Collection("ModrinthApi")]
@@ -27,12 +30,13 @@ public class ResourceDownloadTaskTests : IDisposable
 
     private readonly byte[] _jarBytes = "test mod jar content 0123456789"u8.ToArray();
 
-    private readonly ModrinthApi _modrinth;
+    private readonly ModrinthClient _modrinth;
+    private readonly HttpClient _http;
 
     public ResourceDownloadTaskTests()
     {
         Directory.CreateDirectory(_root);
-        _modrinth = TestModrinthApi.At(_server.Url);
+        (_modrinth, _http, _) = TestModrinthApi.At(_server.Url);
     }
 
     public void Dispose()
@@ -90,7 +94,7 @@ public class ResourceDownloadTaskTests : IDisposable
         var (pack, version) = MakeVersion("test.jar", "mod.bin");
         var model = CreateModel();
 
-        var task = new ResourceDownloadTask(pack, version, model, modrinth: _modrinth);
+        var task = new ResourceDownloadTask(pack, version, model, modrinth: _modrinth, http: _http);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -144,7 +148,7 @@ public class ResourceDownloadTaskTests : IDisposable
             Slug = "test-mod",
             Name = "Test Mod",
             Provider = ResourceProvider.Modrinth,
-        }, version, model, modrinth: _modrinth);
+        }, version, model, modrinth: _modrinth, http: _http);
         await task.StartAsync();
 
         Assert.False(task.WasSuccessful);
@@ -178,7 +182,7 @@ public class ResourceDownloadTaskTests : IDisposable
         Assert.NotNull(FindMod(model, "old.jar"));
 
         var (pack, version) = MakeVersion("new.jar", "newmod.bin", "brand new jar bytes"u8.ToArray());
-        var task = new ResourceDownloadTask(pack, version, model, modrinth: _modrinth);
+        var task = new ResourceDownloadTask(pack, version, model, modrinth: _modrinth, http: _http);
         await task.StartAsync();
 
         Assert.True(task.WasSuccessful, task.FailReason);
@@ -201,7 +205,7 @@ public class ResourceDownloadTaskTests : IDisposable
         _server.Downloads.Clear();
         var model = CreateModel();
 
-        var task = new ResourceDownloadTask(pack, version, model, modrinth: _modrinth);
+        var task = new ResourceDownloadTask(pack, version, model, modrinth: _modrinth, http: _http);
         await task.StartAsync();
 
         Assert.False(task.WasSuccessful);

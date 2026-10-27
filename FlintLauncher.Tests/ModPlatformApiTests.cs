@@ -11,7 +11,7 @@
 // modrinth search test in ApiIntegrationTests; the runner also runs collections strictly
 // sequentially, which covers the classes below that touch both hooks):
 //  - the flame search class joins "FlameApi" (FlameConfig.BaseUrl / ApiKeyProvider);
-//  - the versions + mods classes join "ModrinthApi" (ModrinthApi.BaseUrl).
+//  - the versions + mods classes join "ModrinthApi" (ModrinthClient Options.BaseUrl).
 
 using System.Net;
 using System.Security.Cryptography;
@@ -20,6 +20,9 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using Xunit;
+
+using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi;
 
 namespace FlintLauncher.Tests;
 
@@ -132,11 +135,11 @@ public class FlintApiVersionsTests : IDisposable
     private readonly StubModrinthServer _modrinth = new();
     private readonly StubFlameServer _flame = new();
 
-    private readonly ModrinthApi _modrinthApi;
+    private readonly ModrinthClient _modrinthApi;
 
     public FlintApiVersionsTests()
     {
-        _modrinthApi = TestModrinthApi.At(_modrinth.Url);
+        _modrinthApi = TestModrinthApi.At(_modrinth.Url).Client;
         _flameApi.BaseUrl = _flame.Url;
     }
 
@@ -234,11 +237,11 @@ public class FlintApiModsTests : IDisposable
 {
     private readonly StubModrinthServer _modrinth = new();
 
-    private readonly ModrinthApi _modrinthApi;
+    private readonly ModrinthClient _modrinthApi;
 
     public FlintApiModsTests()
     {
-        _modrinthApi = TestModrinthApi.At(_modrinth.Url);
+        _modrinthApi = TestModrinthApi.At(_modrinth.Url).Client;
     }
 
     public void Dispose()

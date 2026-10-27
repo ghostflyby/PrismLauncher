@@ -85,7 +85,8 @@ public sealed class DependencySearchArgs
 
 /// <summary>
 /// Port of the ResourceAPI abstract class (URL builders + data loading hooks). Concrete
-/// platforms (ModrinthApi) re-implement the URL construction and the JSON loading.
+/// platforms (FlameApi; Modrinth rides on the ExternalApi client plus ModrinthExtensions)
+/// re-implement the URL construction and the JSON loading.
 /// </summary>
 public abstract class ResourceApi
 {

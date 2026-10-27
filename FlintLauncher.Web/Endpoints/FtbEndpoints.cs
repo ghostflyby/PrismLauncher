@@ -20,6 +20,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 using TruePath;
@@ -81,8 +82,8 @@ public static class FtbEndpoints
 
         // -------------------------------------------------- modplatform/ftb/install
         api.MapPost("/modplatform/ftb/install", async Task<IResult> (
-            FtbInstallRequest request, FtbApi ftbApi, ModrinthApi modrinth, FlameApi flame,
-            InstanceList instances, InstanceMutationLock instanceLock) =>
+            FtbInstallRequest request, FtbApi ftbApi, ModrinthClient modrinth, HttpClient http, NetSettings settings,
+            FlameApi flame, InstanceList instances, InstanceMutationLock instanceLock) =>
         {
             if (request.PackId <= 0)
             {
@@ -137,7 +138,7 @@ public static class FtbEndpoints
                         ? pack.Versions[0].Name
                         : "";
 
-                var task = new FtbPackInstallTask(pack, versionName, modrinth, flame, ftb)
+                var task = new FtbPackInstallTask(pack, versionName, modrinth, http, settings, flame, ftb)
                 {
                     Group = request.Group ?? "",
                 };

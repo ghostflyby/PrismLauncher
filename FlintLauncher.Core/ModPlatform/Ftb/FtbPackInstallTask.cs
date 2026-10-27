@@ -44,6 +44,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi;
 using TruePath;
 using TruePath.SystemIo;
 
@@ -52,14 +53,18 @@ namespace FlintLauncher.Core.ModPlatform.Ftb;
 public sealed class FtbPackInstallTask(
     FtbModpack pack,
     string versionName,
-    ModrinthApi modrinth,
+    ModrinthClient modrinth,
+    HttpClient http,
+    NetSettings settings,
     FlameApi? flame = null,
     FtbApi? ftb = null)
     : InstanceTask
 {
-    private readonly FlameApi _flame = flame ?? new FlameApi(modrinth.Http, modrinth.Settings);
-    private readonly FtbApi _ftb = ftb ?? new FtbApi(modrinth.Http, modrinth.Settings);
-    private readonly ModrinthApi _modrinth = modrinth;
+    private readonly FlameApi _flame = flame ?? new FlameApi(http, settings);
+    private readonly FtbApi _ftb = ftb ?? new FtbApi(http, settings);
+    private readonly ModrinthClient _modrinth = modrinth;
+    private readonly HttpClient _http = http;
+    private readonly NetSettings _settings = settings;
 
     // assigned by OnManifestDownloadSucceeded before any read
     private FtbVersion? _manifest;
@@ -164,7 +169,7 @@ public sealed class FtbPackInstallTask(
             }
         }
 
-        var modIdResolverTask = new FileResolvingTask(flameManifest, _modrinth, flame: _flame);
+        var modIdResolverTask = new FileResolvingTask(flameManifest, _modrinth, _http, _settings, flame: _flame);
 
         EmitStatus("Resolving mods...");
         await modIdResolverTask.StartAsync(cancellationToken);

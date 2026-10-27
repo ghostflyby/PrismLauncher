@@ -59,6 +59,7 @@ using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using FlintLauncher.ExternalApi;
 using TruePath;
 using TruePath.SystemIo;
 
@@ -71,14 +72,18 @@ public sealed partial class FlameCreationTask : InstanceTask
     public FlameCreationTask(AbsolutePath stagingPath,
         bool trustedSource,
         InstanceEnvironment environment,
-        ModrinthApi modrinth,
+        ModrinthClient modrinth,
+        HttpClient http,
+        NetSettings settings,
         string id = "",
         string versionId = "",
         string originalInstanceId = "",
         FlameApi? flame = null)
     {
         _modrinth = modrinth;
-        _flame = flame ?? new FlameApi(modrinth.Http, modrinth.Settings);
+        _http = http;
+        _settings = settings;
+        _flame = flame ?? new FlameApi(http, settings);
         StagingPath = stagingPath;
         TrustedSource = trustedSource;
         SetParentEnvironment(environment);
@@ -90,7 +95,9 @@ public sealed partial class FlameCreationTask : InstanceTask
     public bool TrustedSource { get; }
 
     private readonly FlameManifest _pack = new();
-    private readonly ModrinthApi _modrinth;
+    private readonly ModrinthClient _modrinth;
+    private readonly HttpClient _http;
+    private readonly NetSettings _settings;
     private readonly FlameApi _flame;
     private readonly string _managedId;
     private readonly string _managedVersionId;
@@ -341,7 +348,7 @@ public sealed partial class FlameCreationTask : InstanceTask
         _newInstance.SaveNow();
 
         // ---------------------------------------------------------- resolve + download
-        var modIdResolver = new FileResolvingTask(_pack, _modrinth, _flame);
+        var modIdResolver = new FileResolvingTask(_pack, _modrinth, _http, _settings, _flame);
         EmitStatus("Resolving mod IDs...");
         await modIdResolver.StartAsync(cancellationToken);
         if (!modIdResolver.WasSuccessful)

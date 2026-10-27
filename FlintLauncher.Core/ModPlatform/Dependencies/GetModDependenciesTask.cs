@@ -58,13 +58,14 @@ public class GetModDependenciesTask : SequentialTask
     public sealed record PackDependencyExtraInfo(List<string> RequiredByIds);
 
     public GetModDependenciesTask(MinecraftInstance instance, ModFolderModel folder, List<PackDependency> selected,
-        ModrinthApi modrinth, FlameApi? flame = null)
+        ModrinthClient modrinth, HttpClient http, NetSettings settings, FlameApi? flame = null)
     {
         _selected = selected;
-        _flame = flame ?? new FlameApi(modrinth.Http, modrinth.Settings);
+        _flame = flame ?? new FlameApi(http, settings);
         _version = new McVersion(instance.GetPackProfile().GetComponentVersion("net.minecraft"));
         _loaderType = instance.GetPackProfile().GetSupportedModLoaders() ?? ModLoaderType.None;
         _modrinth = modrinth;
+        _http = http;
 
         foreach (var mod in folder.AllMods())
         {
@@ -92,18 +93,9 @@ public class GetModDependenciesTask : SequentialTask
 
     private readonly McVersion _version;
     private readonly ModLoaderType _loaderType;
-    private readonly ModrinthApi _modrinth;
+    private readonly ModrinthClient _modrinth;
+    private readonly HttpClient _http;
     private readonly FlameApi _flame;
-
-    private ResourceApi GetApi(ResourceProvider provider)
-    {
-        if (provider == ResourceProvider.Flame)
-        {
-            return _flame;
-        }
-
-        return _modrinth;
-    }
 
     private void Prepare()
     {
@@ -223,7 +215,7 @@ public class GetModDependenciesTask : SequentialTask
                 }
                 else
                 {
-                    var dto = await _modrinth.Client.Projects.ById(pDep.Pack.AddonId).SendTo(_modrinth.Http, cancellationToken);
+                    var dto = await _modrinth.Projects.ById(pDep.Pack.AddonId).SendTo(_http, cancellationToken);
                     ModrinthPackIndex.LoadIndexedPack(pDep.Pack, dto);
                 }
             }
@@ -296,12 +288,11 @@ public class GetModDependenciesTask : SequentialTask
 
             if (provider == ResourceProvider.Flame)
             {
-                var api = GetApi(provider);
                 string dependencyBody;
                 try
                 {
-                    dependencyBody = await FlintHttp.GetStringAsync(api.Http, api.Settings,
-                        new HttpRequestMessage(HttpMethod.Get, api.GetDependencyUrl(args)), cancellationToken);
+                    dependencyBody = await FlintHttp.GetStringAsync(_flame.Http, _flame.Settings,
+                        new HttpRequestMessage(HttpMethod.Get, _flame.GetDependencyUrl(args)), cancellationToken);
                 }
                 catch (FlintHttpException e)
                 {
@@ -344,9 +335,9 @@ public class GetModDependenciesTask : SequentialTask
                 try
                 {
                     dtos = dep.Version.Length != 0
-                        ? [await _modrinth.Client.Versions.ById(dep.Version).SendTo(_modrinth.Http, cancellationToken)]
-                        : await _modrinth.Client.Versions.At(_modrinth.GetDependencyUrl(args))
-                            .SendTo(_modrinth.Http, cancellationToken);
+                        ? [await _modrinth.Versions.ById(dep.Version).SendTo(_http, cancellationToken)]
+                        : await _modrinth.Versions.At(_modrinth.GetDependencyUrl(args))
+                            .SendTo(_http, cancellationToken);
                 }
                 catch (Exception e) when (e is ModrinthApiException)
                 {

@@ -20,6 +20,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.ModPlatform.Technic;
+using FlintLauncher.ExternalApi;
 using FlintLauncher.Web.Endpoints;
 using FlintLauncher.Web.Logging;
 using FlintLauncher.Web.Models;
@@ -34,7 +35,7 @@ namespace FlintLauncher.Web;
 public static class WebHostBuilder
 {
     public static WebApplication BuildWebApplication(string[] args,
-        ModrinthApi? modrinth = null,
+        ModrinthClient? modrinth = null,
         FlameApi? flame = null,
         TechnicApi? technic = null,
         AtLauncherApi? atlauncher = null,

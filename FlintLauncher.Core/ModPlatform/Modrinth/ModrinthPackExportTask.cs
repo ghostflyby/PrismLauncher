@@ -37,7 +37,8 @@ public sealed class ModrinthPackExportTask(
     bool optionalFiles,
     MinecraftInstance instance,
     AbsolutePath output,
-    ModrinthApi modrinth,
+    ModrinthClient modrinth,
+    HttpClient http,
     MmcZip.FilterFunction? filter = null)
     : FlintTask
 {
@@ -49,7 +50,8 @@ public sealed class ModrinthPackExportTask(
     private readonly List<string> _files = [];
     private readonly Dictionary<string, string> _pendingHashes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ResolvedFile> _resolvedFiles = new(StringComparer.Ordinal);
-    private readonly ModrinthApi _modrinth = modrinth;
+    private readonly ModrinthClient _modrinth = modrinth;
+    private readonly HttpClient _http = http;
 
     private sealed record ResolvedFile(string Sha1, string Sha512, string Url, long Size, SideType Side);
 
@@ -127,7 +129,7 @@ public sealed class ModrinthPackExportTask(
                     var url = metadata.Url;
                     // ensure the url is permitted on modrinth.com
                     if (Uri.TryCreate(url, UriKind.Absolute, out var parsedUrl)
-                        && ModrinthApi.MrpackHosts.Contains(parsedUrl.Host))
+                        && ModrinthClient.MrpackHosts.Contains(parsedUrl.Host))
                     {
                         var sha1 = HashUtils.Hash(data, Algorithm.Sha1);
 
@@ -154,8 +156,8 @@ public sealed class ModrinthPackExportTask(
         }
 
         EmitStatus("Finding versions for hashes...");
-        var entries = await _modrinth.Client.Versions
-            .ByFileHashes(_pendingHashes.Values.ToList(), "sha512").SendTo(_modrinth.Http, cancellationToken);
+        var entries = await _modrinth.Versions
+            .ByFileHashes(_pendingHashes.Values.ToList(), "sha512").SendTo(_http, cancellationToken);
 
         ParseApiResponse(entries);
         BuildZip();

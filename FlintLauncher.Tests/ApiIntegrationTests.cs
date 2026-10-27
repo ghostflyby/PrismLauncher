@@ -9,7 +9,7 @@
 // that own the hooks):
 //  - the main class joins "LauncherJars" — the e2e launch test points the host's install
 //    root at the jars layout exactly like RealLaunchSmokeTests/LauncherPartLaunchTests;
-//  - the Modrinth search class joins "ModrinthApi" (ModrinthApi.BaseUrl is a static hook).
+//  - the Modrinth search class joins "ModrinthApi" (the client Options.BaseUrl hook).
 // The device-code class needs no collection anymore: it redirects the endpoints through a
 // stub-pointed AuthEndpointsOptions handed to its own host.
 // Environment.CurrentDirectory is process-global too: every host sets it (core paths are
@@ -35,6 +35,9 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using TruePath;
 using Xunit;
+
+using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi;
 
 namespace FlintLauncher.Tests;
 
@@ -69,7 +72,7 @@ internal sealed class FlintApiHost : IAsyncDisposable
     /// and the API token live.</summary>
     public string DataDir { get; }
 
-    public static async Task<FlintApiHost> StartAsync(ModrinthApi? modrinth = null, FlameApi? flame = null,
+    public static async Task<FlintApiHost> StartAsync(ModrinthClient? modrinth = null, FlameApi? flame = null,
         TechnicApi? technic = null, AtLauncherApi? atlauncher = null, FtbApi? ftb = null,
         AuthEndpointsOptions? auth = null)
     {
@@ -850,11 +853,11 @@ public class FlintApiModrinthSearchTests : IDisposable
         ctx.Response.Close();
     }
 
-    private readonly ModrinthApi _modrinth;
+    private readonly ModrinthClient _modrinth;
 
     public FlintApiModrinthSearchTests()
     {
-        _modrinth = TestModrinthApi.At(_server.Url);
+        _modrinth = TestModrinthApi.At(_server.Url).Client;
     }
 
     public void Dispose()

@@ -31,7 +31,7 @@ public static class ModrinthPackIndex
         pack.AddonId = dto.Id;
         pack.Provider = ResourceProvider.Modrinth;
         pack.Name = dto.Title;
-        pack.ResourceType = ModrinthApi.GetResourceType(dto.ProjectType);
+        pack.ResourceType = ModrinthExtensions.GetResourceType(dto.ProjectType);
         if (dto.Loaders?.Contains("datapack") == true)
         {
             pack.ResourceType = ResourceType.DataPack;
@@ -99,7 +99,7 @@ public static class ModrinthPackIndex
         foreach (var raw in dto.GameVersions)
         {
             // double this so we can check both strings when filtering
-            file.McVersion.Add(ModrinthApi.MapMcVersionFromModrinth(raw));
+            file.McVersion.Add(ModrinthExtensions.MapMcVersionFromModrinth(raw));
             file.McVersion.Add(raw);
         }
 

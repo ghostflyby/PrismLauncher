@@ -42,7 +42,7 @@ internal sealed class LauncherRuntime : IDisposable
 
     /// <summary>The Modrinth client (injected into platform tasks/endpoints; tests construct
     /// a runtime with a client pointed at their stub).</summary>
-    public ModrinthApi Modrinth { get; }
+    public ModrinthClient Modrinth { get; }
 
     /// <summary>The Flame (CurseForge) client — same injection story as Modrinth.</summary>
     public FlameApi Flame { get; }
@@ -105,14 +105,14 @@ internal sealed class LauncherRuntime : IDisposable
     public FlintConfigImporter.ImportResult ConfigImport { get; }
 
     public LauncherRuntime(FlintPaths paths, HttpClient? http = null, NetSettings? settings = null,
-        ModrinthApi? modrinth = null,
+        ModrinthClient? modrinth = null,
         FlameApi? flame = null, TechnicApi? technic = null, AtLauncherApi? atlauncher = null,
         FtbApi? ftb = null, ImgurApi? imgur = null, AuthEndpointsOptions? auth = null)
     {
         Paths = paths;
         Settings = settings ?? NetSettings.CreateDefault();
         Http = http ?? NetPrimaryHandler.CreateClient(Settings);
-        Modrinth = modrinth ?? new ModrinthApi(new ModrinthClient(), Http, Settings);
+        Modrinth = modrinth ?? new ModrinthClient();
         Auth = auth ?? new AuthEndpointsOptions { Http = Http, Settings = Settings };
         Flame = flame ?? new FlameApi(Http, Settings);
         Technic = technic ?? new TechnicApi(Http, Settings);

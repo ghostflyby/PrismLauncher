@@ -58,7 +58,8 @@ public static class ModPlatformEndpoints
             string? loader,
             string? index,
             string? type,
-            ModrinthApi modrinth,
+            ModrinthClient modrinth,
+            HttpClient http,
             FlameApi flame,
             CancellationToken cancellationToken,
             int offset = 0) =>
@@ -81,7 +82,7 @@ public static class ModPlatformEndpoints
 
             return parsedProvider == ResourceProvider.Flame
                 ? await FlameSearchAsync(resourceType, query, version, loader, index, offset, flame)
-                : await ModrinthSearchAsync(resourceType, query, version, loader, index, offset, modrinth,
+                : await ModrinthSearchAsync(resourceType, query, version, loader, index, offset, modrinth, http,
                     cancellationToken);
         }).Produces<FlameSearchResult[]>().Produces<ModrinthSearchResultView[]>();
 
@@ -90,7 +91,7 @@ public static class ModPlatformEndpoints
         // project_type (Modrinth), mapped to [{id, name, icon}]. An explicit numeric classId
         // wins over `type` on Flame (search hits carry the raw CurseForge class id).
         api.MapGet("/modplatform/{provider}/categories", async Task<IResult> (
-            string provider, string? type, string? classId, ModrinthApi modrinth, FlameApi flame,
+            string provider, string? type, string? classId, ModrinthClient modrinth, HttpClient http, FlameApi flame,
             CancellationToken cancellationToken) =>
         {
             if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
@@ -152,7 +153,7 @@ public static class ModPlatformEndpoints
             List<ModrinthCategory>? modrinthCategories;
             try
             {
-                modrinthCategories = await modrinth.Client.Tags.Categories().SendTo(modrinth.Http, cancellationToken);
+                modrinthCategories = await modrinth.Tags.Categories().SendTo(http, cancellationToken);
             }
             catch (Exception e) when (e is ModrinthApiException)
             {
@@ -165,7 +166,7 @@ public static class ModPlatformEndpoints
 
         // --------------------------------------------------- modplatform/{provider}/mods/{projectId}/description
         api.MapGet("/modplatform/{provider}/mods/{projectId}/description",
-            async Task<IResult> (string provider, string projectId, ModrinthApi modrinth,
+            async Task<IResult> (string provider, string projectId, ModrinthClient modrinth, HttpClient http,
                 FlameApi flame, CancellationToken cancellationToken) =>
             {
                 if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
@@ -189,7 +190,7 @@ public static class ModPlatformEndpoints
                     // degrades to an empty body (the endpoint's own status rule)
                     try
                     {
-                        body = await modrinth.Client.Projects.Description(projectId).SendTo(modrinth.Http, cancellationToken);
+                        body = await modrinth.Projects.Description(projectId).SendTo(http, cancellationToken);
                     }
                     catch (ModrinthApiException)
                     {
@@ -234,7 +235,7 @@ public static class ModPlatformEndpoints
         // ------------------------------------------------ modplatform/{provider}/versions
         api.MapGet("/modplatform/{provider}/versions", async Task<IResult> (
             string provider,
-            string? projectId, ModrinthApi modrinth, FlameApi flame) =>
+            string? projectId, ModrinthClient modrinth, HttpClient http, FlameApi flame) =>
         {
             if (string.IsNullOrWhiteSpace(projectId))
             {
@@ -287,7 +288,7 @@ public static class ModPlatformEndpoints
                 List<ModrinthVersion> versionDtos;
                 try
                 {
-                    versionDtos = await modrinth.Client.Versions.At(versionsUrl).SendTo(modrinth.Http);
+                    versionDtos = await modrinth.Versions.At(versionsUrl).SendTo(http);
                 }
                 catch (Exception e) when (e is ModrinthApiException)
                 {
@@ -356,7 +357,8 @@ public static class ModPlatformEndpoints
 
         api.MapPost("/instances/{id}/mods/install", async (string id, List<ModInstallSelection>? selections,
             InstanceList instances, InstanceMutationLock instanceLock,
-            ModrinthApi modrinth, FlameApi flame, FlintTaskRegistry registry) =>
+            ModrinthClient modrinth, HttpClient http, NetSettings settings, FlameApi flame,
+            FlintTaskRegistry registry) =>
         {
             if (selections is null || selections.Count == 0)
             {
@@ -398,7 +400,8 @@ public static class ModPlatformEndpoints
                 }
 
                 var task = new ModInstallTask(instance, instance.LoaderModList(), requests,
-                    mcVersion, profile.GetSupportedModLoaders() ?? ModLoaderType.None, modrinth, flame);
+                    mcVersion, profile.GetSupportedModLoaders() ?? ModLoaderType.None,
+                    modrinth, http, settings, flame);
                 var entry = registry.Register("mods-install", task, instanceId: instance.Id());
                 // the result payload lists the installed entries (selected + dependencies);
                 // published on terminal events so a download failure still shows what landed
@@ -415,7 +418,7 @@ public static class ModPlatformEndpoints
 
         api.MapPost("/instances/{id}/mods/update", async (string id, ModsUpdateRequest? filter,
             InstanceList instances, InstanceMutationLock instanceLock, FlintConfigStore config,
-            ModrinthApi modrinth, FlameApi flame, FlintTaskRegistry registry) =>
+            ModrinthClient modrinth, HttpClient http, FlameApi flame, FlintTaskRegistry registry) =>
         {
             await instanceLock.WaitAsync();
             try
@@ -436,7 +439,7 @@ public static class ModPlatformEndpoints
                         : IndexedVersionType.FromStringList(SettingsJson.ToStringList(
                             config.Current.ModDownload.ModUpdateReleaseTypes ?? "[]"));
 
-                var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, modrinth, flame, releaseTypes);
+                var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, modrinth, http, flame, releaseTypes);
                 var entry = registry.Register("mods-update", task, instanceId: instance.Id());
                 // the result payload carries the found/applied updates; it is published once
                 // the task reaches a terminal state (the check pass fills it before applying)
@@ -685,10 +688,11 @@ public static class ModPlatformEndpoints
         }
     }
 
-    /// <summary>The Modrinth search pass-through (PAT header through ModrinthApi.AddApiHeaders
-    /// inside the core request builder; facets like the C++ search model builds them).</summary>
+    /// <summary>The Modrinth search pass-through (PAT header through the operation's request
+    /// builder; facets like the C++ search model builds them).</summary>
     private static async Task<IResult> ModrinthSearchAsync(ResourceType resourceType, string? query, string? version,
-        string? loader, string? index, int offset, ModrinthApi modrinth, CancellationToken cancellationToken)
+        string? loader, string? index, int offset, ModrinthClient modrinth, HttpClient http,
+        CancellationToken cancellationToken)
     {
         var args = new SearchArgs
         {
@@ -715,7 +719,7 @@ public static class ModPlatformEndpoints
         ModrinthSearchResults search;
         try
         {
-            search = await modrinth.Client.Search.At(url).SendTo(modrinth.Http, cancellationToken);
+            search = await modrinth.Search.At(url).SendTo(http, cancellationToken);
         }
         catch (Exception e) when (e is ModrinthApiException)
         {

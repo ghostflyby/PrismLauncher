@@ -8,7 +8,7 @@
 // Collections: the provider base URLs / Flame key provider are process-global static hooks,
 // so these classes join the suites that own them (see ModPlatformApiTests):
 //  - the flame class joins "FlameApi" (FlameConfig.BaseUrl / ApiKeyProvider);
-//  - the modrinth class joins "ModrinthApi" (ModrinthApi.BaseUrl).
+//  - the modrinth class joins "ModrinthApi" (ModrinthClient Options.BaseUrl).
 
 using System.Net;
 using System.Text;
@@ -17,6 +17,9 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using Xunit;
+
+using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi;
 
 namespace FlintLauncher.Tests;
 
@@ -254,11 +257,11 @@ public class FlintApiModrinthResourceTests : IDisposable
     private readonly StubModrinthServer _server = new();
     private readonly StubModrinthResourceServer _resourceServer = new();
 
-    private ModrinthApi _modrinthApi;
+    private ModrinthClient _modrinthApi;
 
     public FlintApiModrinthResourceTests()
     {
-        _modrinthApi = TestModrinthApi.At(_server.Url);
+        _modrinthApi = TestModrinthApi.At(_server.Url).Client;
     }
 
     public void Dispose()
@@ -325,7 +328,7 @@ public class FlintApiModrinthResourceTests : IDisposable
                 ["header"] = "Resolution Categories",
             }).ToJsonString();
 
-        _modrinthApi = TestModrinthApi.At(_resourceServer.Url);
+        _modrinthApi = TestModrinthApi.At(_resourceServer.Url).Client;
         await using var host = await FlintApiHost.StartAsync(_modrinthApi);
         var response = await host.GetAsync("/api/v1/modplatform/modrinth/categories?type=resourcepacks");
         response.EnsureSuccessStatusCode();
@@ -347,7 +350,7 @@ public class FlintApiModrinthResourceTests : IDisposable
     {
         _resourceServer.DescriptionText = "This is a plain-text project body.";
 
-        _modrinthApi = TestModrinthApi.At(_resourceServer.Url);
+        _modrinthApi = TestModrinthApi.At(_resourceServer.Url).Client;
         await using var host = await FlintApiHost.StartAsync(_modrinthApi);
         var response = await host.GetAsync("/api/v1/modplatform/modrinth/mods/projId1/description");
         response.EnsureSuccessStatusCode();

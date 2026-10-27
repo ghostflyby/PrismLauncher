@@ -32,13 +32,16 @@ public sealed class EnsureMetadataTask(
     Dictionary<string, Resource> resources,
     AbsolutePath indexDir,
     ResourceProvider provider,
-    ModrinthApi modrinth,
+    ModrinthClient modrinth,
+    HttpClient http,
+    NetSettings settings,
     FlameApi? flame = null)
     : FlintTask
 {
     // hash -> resource
-    private readonly ModrinthApi _modrinth = modrinth;
-    private readonly FlameApi _flame = flame ?? new FlameApi(modrinth.Http, modrinth.Settings);
+    private readonly ModrinthClient _modrinth = modrinth;
+    private readonly HttpClient _http = http;
+    private readonly FlameApi _flame = flame ?? new FlameApi(http, settings);
     private readonly Dictionary<string, IndexedVersion> _tempVersions = new(StringComparer.Ordinal);
     public bool LockUpdate { get; init; }
 
@@ -76,8 +79,8 @@ public sealed class EnsureMetadataTask(
         var hashType = ProviderCapabilities.HashType(ResourceProvider.Modrinth)[0];
 
         // ---------------------------------------------------------- versions lookup
-        var versionEntries = await _modrinth.Client.Versions
-            .ByFileHashes(resources.Keys.ToList(), hashType).SendTo(_modrinth.Http, cancellationToken);
+        var versionEntries = await _modrinth.Versions
+            .ByFileHashes(resources.Keys.ToList(), hashType).SendTo(_http, cancellationToken);
 
         {
             foreach (var hash in resources.Keys)
@@ -110,11 +113,11 @@ public sealed class EnsureMetadataTask(
         List<ModrinthProject> projectEntries;
         if (addonIds.Count == 1)
         {
-            projectEntries = [await _modrinth.Client.Projects.ById(addonIds.Keys.First()).SendTo(_modrinth.Http, cancellationToken)];
+            projectEntries = [await _modrinth.Projects.ById(addonIds.Keys.First()).SendTo(_http, cancellationToken)];
         }
         else
         {
-            projectEntries = await _modrinth.Client.Projects.ByIds(addonIds.Keys.ToList()).SendTo(_modrinth.Http, cancellationToken);
+            projectEntries = await _modrinth.Projects.ByIds(addonIds.Keys.ToList()).SendTo(_http, cancellationToken);
         }
 
         foreach (var dto in projectEntries)

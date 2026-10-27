@@ -13,6 +13,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
+using FlintLauncher.ExternalApi;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 using TruePath;
@@ -157,8 +158,8 @@ public static class InstanceEndpoints
         }).Produces<InstanceCreatedResponse>(201);
 
         api.MapPost("/instances/import", async (ImportRequest request, InstanceList instances,
-            InstanceMutationLock instanceLock, ModrinthApi modrinth, FlameApi flame,
-            HttpMetaCache metaCache, FlintTaskRegistry registry) =>
+            InstanceMutationLock instanceLock, ModrinthClient modrinth, HttpClient http, NetSettings settings,
+            FlameApi flame, HttpMetaCache metaCache, FlintTaskRegistry registry) =>
         {
             if (string.IsNullOrWhiteSpace(request.Url) ||
                 !Uri.TryCreate(request.Url, UriKind.Absolute, out var uri) ||
@@ -170,7 +171,8 @@ public static class InstanceEndpoints
             await instanceLock.WaitAsync();
             try
             {
-                var importTask = new InstanceImportTask(uri, trustedSource: true, modrinth: modrinth, flame: flame)
+                var importTask = new InstanceImportTask(uri, trustedSource: true,
+                    modrinth: modrinth, http: http, settings: settings, flame: flame)
                 {
                     MetaCache = metaCache,
                     // the OptionalModDialog answers for mrpack/CurseForge packs:

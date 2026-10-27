@@ -7,22 +7,23 @@ using FlintLauncher.ExternalApi;
 
 namespace FlintLauncher.Tests;
 
-/// <summary>Test factory for hermetic ModrinthApi instances: every client gets a throwaway
+/// <summary>Test factory for hermetic Modrinth client triples: every client gets a throwaway
 /// HttpClient with a private settings pair (nothing process-global to leak in or out) pointed
 /// at the suite's stub — or at a discard address when the suite never exercises the Modrinth
 /// paths.</summary>
 internal static class TestModrinthApi
 {
-    public static ModrinthApi At(string baseUrl)
+    public static (ModrinthClient Client, HttpClient Http, NetSettings Settings) At(string baseUrl)
     {
         // UseProxy=false keeps the throwaway client hermetic: a system proxy would otherwise
         // intercept the loopback stub traffic (and answer 502)
         var http = new HttpClient(new SocketsHttpHandler { UseProxy = false });
         var options = new ModrinthClientOptions { BaseUrl = baseUrl };
-        return new ModrinthApi(new ModrinthClient(options), http, NetSettings.CreateDefault());
+        return (new ModrinthClient(options), http, NetSettings.CreateDefault());
     }
 
     /// <summary>An API wired to a closed port: any surprise request fails fast and locally
     /// instead of reaching the real service.</summary>
-    public static ModrinthApi Unreachable() => At("http://127.0.0.1:9/");
+    public static (ModrinthClient Client, HttpClient Http, NetSettings Settings) Unreachable() =>
+        At("http://127.0.0.1:9/");
 }
