@@ -26,7 +26,7 @@ public static class InstanceEndpoints
     {
         api.WithTags("Instances");
         api.MapGet("/instances", async (InstanceList instances, InstanceMutationLock instanceLock,
-            string? search, string? group) =>
+            string search = "", string group = "") =>
         {
             await instanceLock.WaitAsync();
             try

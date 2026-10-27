@@ -53,15 +53,15 @@ public static class ModPlatformEndpoints
         // query param (default mods, back-compat) selects the searched resource type.
         api.MapGet("/modplatform/{provider}/search", async Task<IResult> (
             string provider,
-            string? query,
-            string? version,
-            string? loader,
-            string? index,
-            string? type,
             ModrinthClient modrinth,
             HttpClient http,
             FlameApi flame,
             CancellationToken cancellationToken,
+            string query = "",
+            string version = "",
+            string loader = "",
+            string index = "",
+            string type = "",
             int offset = 0) =>
         {
             if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
@@ -81,9 +81,9 @@ public static class ModPlatformEndpoints
             }
 
             return parsedProvider == ResourceProvider.Flame
-                ? await FlameSearchAsync(resourceType, query, version, loader, index, offset, flame)
-                : await ModrinthSearchAsync(resourceType, query, version, loader, index, offset, modrinth, http,
-                    cancellationToken);
+                ? await FlameSearchAsync(resourceType, flame, query, version, loader, index, offset)
+                : await ModrinthSearchAsync(resourceType, modrinth, http, cancellationToken,
+                    query, version, loader, index, offset);
         }).Produces<FlameSearchResult[]>().Produces<ModrinthSearchResultView[]>();
 
         // ----------------------------------------------------- modplatform/{provider}/categories
@@ -91,8 +91,8 @@ public static class ModPlatformEndpoints
         // project_type (Modrinth), mapped to [{id, name, icon}]. An explicit numeric classId
         // wins over `type` on Flame (search hits carry the raw CurseForge class id).
         api.MapGet("/modplatform/{provider}/categories", async Task<IResult> (
-            string provider, string? type, string? classId, ModrinthClient modrinth, HttpClient http, FlameApi flame,
-            CancellationToken cancellationToken) =>
+            string provider, ModrinthClient modrinth, HttpClient http, FlameApi flame,
+            CancellationToken cancellationToken, string type = "", string classId = "") =>
         {
             if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
             {
@@ -203,9 +203,8 @@ public static class ModPlatformEndpoints
 
         // ------------------------------------------------ modplatform/{provider}/mods/{projectId}/changelog
         api.MapGet("/modplatform/{provider}/mods/{projectId}/changelog",
-            async Task<IResult> (string provider, string projectId, string? fileId,
-                FlameApi flame) =>
-            {
+            async Task<IResult> (string provider, string projectId, FlameApi flame, string fileId = "") =>
+        {
                 if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
                 {
                     return ApiJson.Error("unknown_provider", "provider must be 'modrinth' or 'flame'", 400);
@@ -234,8 +233,7 @@ public static class ModPlatformEndpoints
 
         // ------------------------------------------------ modplatform/{provider}/versions
         api.MapGet("/modplatform/{provider}/versions", async Task<IResult> (
-            string provider,
-            string? projectId, ModrinthClient modrinth, HttpClient http, FlameApi flame) =>
+            string provider, ModrinthClient modrinth, HttpClient http, FlameApi flame, string projectId = "") =>
         {
             if (string.IsNullOrWhiteSpace(projectId))
             {
@@ -458,7 +456,7 @@ public static class ModPlatformEndpoints
     /// value set mirrors the C++ resource-type search surfaces; default mods/back-compat):
     /// mods | resourcepacks | texturepacks | shaderpacks | datapacks | modpacks | worlds.
     /// </summary>
-    private static bool TryParseSearchType(string? type, out ResourceType resourceType, [NotNullWhen(false)] out string? error)
+    private static bool TryParseSearchType(string type, out ResourceType resourceType, [NotNullWhen(false)] out string? error)
     {
         resourceType = ResourceType.Mod;
         error = null;
@@ -600,8 +598,8 @@ public static class ModPlatformEndpoints
 
     /// <summary>The CurseForge search pass-through (the x-api-key header is attached through
     /// the FlameConfig provider hook; hits map through FlameMod.LoadIndexedPack).</summary>
-    private static async Task<IResult> FlameSearchAsync(ResourceType resourceType, string? query, string? version,
-        string? loader, string? index, int offset, FlameApi flame)
+    private static async Task<IResult> FlameSearchAsync(ResourceType resourceType, FlameApi flame,
+        string query = "", string version = "", string loader = "", string index = "", int offset = 0)
     {
         var loaders = string.IsNullOrWhiteSpace(loader)
             ? (ModLoaderType?)null
@@ -697,9 +695,9 @@ public static class ModPlatformEndpoints
     /// <summary>The Modrinth search pass-through (PAT header through the operation's request
     /// builder; the launcher search vocabulary translates into the wire's facet groups —
     /// each group OR-s its values, the groups AND together).</summary>
-    private static async Task<IResult> ModrinthSearchAsync(ResourceType resourceType, string? query, string? version,
-        string? loader, string? index, int offset, ModrinthClient modrinth, HttpClient http,
-        CancellationToken cancellationToken)
+    private static async Task<IResult> ModrinthSearchAsync(ResourceType resourceType, ModrinthClient modrinth,
+        HttpClient http, CancellationToken cancellationToken, string query = "", string version = "",
+        string loader = "", string index = "", int offset = 0)
     {
         var projectType = ModrinthProjectType(resourceType, out var typeError);
         if (projectType.Length == 0)
@@ -772,7 +770,7 @@ public static class ModPlatformEndpoints
 
     /// <summary>The Flame sorting method by (case-insensitive) name, defaulting to Popularity
     /// (the CurseForge API's default sortField).</summary>
-    private static SortingMethod FlameSorting(string? index, FlameApi flame)
+    private static SortingMethod FlameSorting(string index, FlameApi flame)
     {
         var methods = flame.GetSortingMethods();
         if (!string.IsNullOrWhiteSpace(index))

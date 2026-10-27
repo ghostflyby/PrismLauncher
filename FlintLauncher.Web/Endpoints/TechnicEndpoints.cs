@@ -36,22 +36,22 @@ public static class TechnicEndpoints
         // ListModel::performSearch: a query selects the search URL, an empty one trending
         // (GET /modplatform/technic/trending below). Results map through
         // TechnicApi.LoadSearchResults (the "vanilla" slug exclusion included).
-        api.MapGet("/modplatform/technic/search", async Task<IResult> (string? query, string? serverUrl,
-                    TechnicApi technic) =>
+        api.MapGet("/modplatform/technic/search", async Task<IResult> (TechnicApi technic, string query = "",
+                    string? serverUrl = null) =>
                 await SearchAsync(string.IsNullOrWhiteSpace(query) ? "" : query.Trim(), serverUrl, technic))
             .Produces<TechnicSearchResultView[]>();
 
         // ----------------------------------------------- modplatform/technic/trending
-        api.MapGet("/modplatform/technic/trending", async Task<IResult> (string? serverUrl,
-                    TechnicApi technic) =>
+        api.MapGet("/modplatform/technic/trending", async Task<IResult> (TechnicApi technic,
+                    string? serverUrl = null) =>
                 await SearchAsync("", serverUrl, technic))
             .Produces<TechnicSearchResultView[]>();
 
         // --------------------------------------------- modplatform/technic/modpack/{slug}
         // TechnicPage::suggestCurrent's metadata step (+ metadataLoaded's Solder build
         // listing for Solder packs, with the "fall back to the current version" rule).
-        api.MapGet("/modplatform/technic/modpack/{slug}", async Task<IResult> (string slug, string? serverUrl,
-            TechnicApi technic) =>
+        api.MapGet("/modplatform/technic/modpack/{slug}", async Task<IResult> (string slug, TechnicApi technic,
+            string? serverUrl = null) =>
         {
             if (string.IsNullOrWhiteSpace(slug))
             {
