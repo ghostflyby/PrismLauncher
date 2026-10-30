@@ -134,7 +134,7 @@ public sealed class MetaEntry
 
     public bool IsExpired(long offset) => !IsEternal && CurrentAge >= MaxAge - offset;
 
-    internal void SetOwner(HttpMetaCache? owner) => this._owner = owner;
+    internal void SetOwner(HttpMetaCache? owner) => _owner = owner;
 }
 
 public sealed class HttpMetaCache(AbsolutePath path) : IDisposable

@@ -6,7 +6,6 @@
 
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Migration;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web;
 using TruePath;
 using Xunit;
@@ -56,7 +55,6 @@ public class FileTransferTests : IDisposable
 
     public void Dispose()
     {
-        FileTransfer.CloneAttemptHook = null; // never leak the seam into another test
         try
         {
             Directory.Delete(_root, recursive: true);
@@ -129,17 +127,6 @@ public class FileTransferTests : IDisposable
     }
 
     [Fact]
-    public void TryClone_RealCloneOnSameVolume()
-    {
-        Directory.CreateDirectory(_root);
-        var src = WriteSrc("clone.txt", "cloned bytes");
-        var dst = DstPath("clone.txt");
-
-        Assert.True(FileTransfer.TryClone(src, dst));
-        Assert.Equal("cloned bytes", File.ReadAllText(dst));
-    }
-
-    [Fact]
     public void TryMoveDirectory_SameVolume_RenamesTree()
     {
         Directory.CreateDirectory(SrcPath("tree/inner"));
@@ -158,22 +145,18 @@ public class FileTransferTests : IDisposable
         Assert.True(FileTransfer.SameVolume(SrcPath("a"), DstPath("b")));
     }
 
-    // on volumes without reflink support (ext4, Windows, cross-volume) TryClone fails
-    // for every file — the CoW branch must degrade to a plain copy like the Move branch
-    // does, or the whole import task EmitFailed's file by file
     [Fact]
-    public void TransferFile_CopyOnWrite_FallsBackToPlainCopy_WhenReflinkUnavailable()
+    public void TransferFile_CopyOnWrite_KeepsTheSource()
     {
         Directory.CreateDirectory(_root);
-        FileTransfer.CloneAttemptHook = (_, _) => false; // simulate a non-CoW volume
         var src = WriteSrc("a.txt", "payload");
 
         Assert.True(FileTransfer.TransferFile(src, DstPath("a.txt"), ImportMode.CopyOnWrite,
             out var method));
 
         Assert.Equal("payload", File.ReadAllText(DstPath("a.txt")));
-        Assert.Equal(TransferMethod.Copy, method); // not a false, and not a fake Reflink
-        Assert.True(File.Exists(src));             // CoW keeps the source
+        Assert.Equal(TransferMethod.Copy, method);
+        Assert.True(File.Exists(src)); // CoW keeps the source
     }
 
     // the transferred file must carry the source's permission bits — accounts.json is
@@ -190,41 +173,13 @@ public class FileTransferTests : IDisposable
         var src = WriteSrc("accounts.json", "{}");
         File.SetUnixFileMode(src, UnixFileMode.UserRead | UnixFileMode.UserWrite);
 
-        // every path that lands bytes: reflink (macOS clonefile / Linux FICLONE+carry),
-        // plain copy, and the CoW fallback's copy
+        // both modes that land bytes carry the bits
         Assert.True(FileTransfer.TransferFile(src, DstPath("cow.json"), ImportMode.CopyOnWrite, out _));
         Assert.True(FileTransfer.TransferFile(src, DstPath("copy.json"), ImportMode.Copy, out _));
-        FileTransfer.CloneAttemptHook = (_, _) => false;
-        Assert.True(FileTransfer.TransferFile(src, DstPath("fallback.json"), ImportMode.CopyOnWrite, out _));
 
         var expected = UnixFileMode.UserRead | UnixFileMode.UserWrite;
         Assert.Equal(expected, File.GetUnixFileMode(DstPath("cow.json")));
         Assert.Equal(expected, File.GetUnixFileMode(DstPath("copy.json")));
-        Assert.Equal(expected, File.GetUnixFileMode(DstPath("fallback.json")));
-    }
-
-    // the mode-carry helper itself — the exact call the Linux FICLONE branch makes
-    // after a successful ioctl (not otherwise reachable on this OS)
-    [Fact]
-    public void CarryUnixFileMode_SetsTheDestinationModeFromTheSource()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
-        Directory.CreateDirectory(_root);
-        Directory.CreateDirectory(DstPath(""));
-        var src = WriteSrc("secret.txt", "s");
-        var dst = DstPath("secret.txt");
-        File.WriteAllText(dst, "stale");
-        File.SetUnixFileMode(src, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-        File.SetUnixFileMode(dst, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead
-                                  | UnixFileMode.OtherRead);
-
-        FileTransfer.CarryUnixFileMode(src, dst);
-
-        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(dst));
     }
 
     // the migration enumeration — file symlinks are yielded (the C++ ResolveSymlinks
@@ -418,7 +373,6 @@ public class PrismImportTaskTests : IDisposable
 
     public void Dispose()
     {
-        FileTransfer.CloneAttemptHook = null; // never leak the seam into another test
         TryDelete(_root);
     }
 
@@ -444,13 +398,15 @@ public class PrismImportTaskTests : IDisposable
         var task = new PrismImportTask(new AbsolutePath(Path.Combine(_root, "src")),
             new AbsolutePath(Path.Combine(_root, "dst")),
             ImportMode.CopyOnWrite, "polymc", decisions);
-        await task.StartAsync();
-
-        if (!task.WasSuccessful)
+        try
+        {
+            await task.ImportAsync(null, CancellationToken.None);
+        }
+        catch (Exception e)
         {
             // probe: write the failure details to a file (MTP truncates assertion messages)
             await File.WriteAllTextAsync(Path.Combine(Path.GetTempPath(), "flint-probe-dump.txt"),
-                "REASON=" + task.FailReason
+                "REASON=" + e.Message
                           + " | metaExists=" + File.Exists(Path.Combine(_root, "dst", "meta", "index.json"))
                           + " | metaContent=" + (File.Exists(Path.Combine(_root, "dst", "meta", "index.json"))
                               ? await File.ReadAllTextAsync(Path.Combine(_root, "dst", "meta", "index.json"))
@@ -474,27 +430,6 @@ public class PrismImportTaskTests : IDisposable
         Assert.True(record.Bytes > 0);
     }
 
-    // at the task level: on a volume without reflink support the CoW import used to
-    // fail EVERY file and EmitFailed the whole task — the copy fallback must carry it
-    [Fact]
-    public async Task ImportTask_OnReflinklessVolume_StillSucceedsThroughTheCopyFallback()
-    {
-        Directory.CreateDirectory(Path.Combine(_root, "src", "instances", "demo"));
-        await File.WriteAllTextAsync(Path.Combine(_root, "src", "instances", "demo", "instance.cfg"), "x");
-        await File.WriteAllTextAsync(Path.Combine(_root, "src", "accounts.json"), "{}");
-        FileTransfer.CloneAttemptHook = (_, _) => false; // simulate ext4/Windows/cross-volume
-
-        var task = new PrismImportTask(new AbsolutePath(Path.Combine(_root, "src")),
-            new AbsolutePath(Path.Combine(_root, "dst")),
-            ImportMode.CopyOnWrite);
-        await task.StartAsync();
-
-        Assert.True(task.WasSuccessful, task.FailReason);
-        Assert.True(File.Exists(Path.Combine(_root, "dst", "instances", "demo", "instance.cfg")));
-        Assert.True(File.Exists(Path.Combine(_root, "dst", "accounts.json")));
-        Assert.True(File.Exists(Path.Combine(_root, "src", "accounts.json"))); // CoW keeps the source
-    }
-
     [Fact]
     public async Task ImportTask_NoWhitelistedContent_Fails()
     {
@@ -502,10 +437,15 @@ public class PrismImportTaskTests : IDisposable
 
         var task = new PrismImportTask(new AbsolutePath(Path.Combine(_root, "src")),
             new AbsolutePath(Path.Combine(_root, "dst")), ImportMode.CopyOnWrite);
-        await task.StartAsync();
-
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("Nothing to import", task.FailReason);
+        try
+        {
+            await task.ImportAsync(null, CancellationToken.None);
+            Assert.Fail("the import should have failed");
+        }
+        catch (InvalidOperationException e)
+        {
+            Assert.Contains("Nothing to import", e.Message);
+        }
     }
 
     // production scenario: Flint startup ALWAYS creates <data>/instances before any
@@ -528,9 +468,7 @@ public class PrismImportTaskTests : IDisposable
         var task = new PrismImportTask(new AbsolutePath(Path.Combine(_root, "src")),
             new AbsolutePath(Path.Combine(_root, "dst")),
             ImportMode.CopyOnWrite, "prism", decisions);
-        await task.StartAsync();
-
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await task.ImportAsync(null, CancellationToken.None);
         Assert.True(File.Exists(Path.Combine(_root, "dst", "instances", "demo", "instance.cfg")));
         Assert.Equal("native", await File.ReadAllTextAsync(
             Path.Combine(_root, "dst", "instances", "native", "instance.cfg"))); // not clobbered
@@ -557,9 +495,7 @@ public class PrismImportTaskTests : IDisposable
         var task = new PrismImportTask(new AbsolutePath(Path.Combine(_root, "src")),
             new AbsolutePath(Path.Combine(_root, "dst")),
             ImportMode.Move, "prism", decisions);
-        await task.StartAsync();
-
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await task.ImportAsync(null, CancellationToken.None);
         Assert.False(Directory.Exists(Path.Combine(_root, "src", "instances"))); // the wholesale move happened
         var record = decisions.Read("prism");
         Assert.NotNull(record);

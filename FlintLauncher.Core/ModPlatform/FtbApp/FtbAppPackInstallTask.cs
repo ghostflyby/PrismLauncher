@@ -20,7 +20,7 @@ namespace FlintLauncher.Core.ModPlatform.FtbApp;
 
 public sealed class FtbAppPackInstallTask(FtbAppModpack pack) : InstanceTask
 {
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    internal override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Copying files...");
         SetProgress(1, 2);
@@ -28,8 +28,7 @@ public sealed class FtbAppPackInstallTask(FtbAppModpack pack) : InstanceTask
         var target = new AbsolutePath(StagingPath) / "minecraft";
         if (!FileOps.Copy(new AbsolutePath(pack.Path), target))
         {
-            EmitFailed("Failed to copy the FTB App instance folder");
-            return;
+            throw new InvalidOperationException("Failed to copy the FTB App instance folder");
         }
 
         await CopySettings(cancellationToken);
@@ -87,6 +86,5 @@ public sealed class FtbAppPackInstallTask(FtbAppModpack pack) : InstanceTask
         // (upstream calls downloadFiles(m_instance.get()) here — the update pipeline;
         //  like the other creation tasks, creation succeeds without fetching game files)
         await Task.CompletedTask;
-        EmitSucceeded();
     }
 }

@@ -58,7 +58,6 @@ using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
-using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
@@ -138,7 +137,7 @@ public sealed partial class FlameCreationTask : InstanceTask
 
     /// <summary>Stand-in for the "recommended" loader-version lookup over the meta index:
     /// (loader uid, loader type, mc version) -> version descriptor. Per-task hook (DI):
-    /// the caller sets it before StartAsync, so parallel creations cannot see each other's
+    /// the caller sets it before the run, so parallel creations cannot see each other's
     /// stub.</summary>
     public Func<string, string, string, string?>? RecommendedVersionLookup { get; init; }
 
@@ -148,7 +147,7 @@ public sealed partial class FlameCreationTask : InstanceTask
         EmitStatus(message);
     }
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    internal override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         // (upstream checks for an existing instance to update here — deferred, see header)
         await CreateInstanceAsync(cancellationToken);
@@ -173,8 +172,7 @@ public sealed partial class FlameCreationTask : InstanceTask
         }
         catch (JsonException e)
         {
-            EmitFailed("Could not understand pack manifest:\n" + e.Message);
-            return;
+            throw new InvalidOperationException("Could not understand pack manifest:\n" + e.Message);
         }
 
         if (_pack.Overrides.Length != 0)
@@ -184,9 +182,8 @@ public sealed partial class FlameCreationTask : InstanceTask
             // the staging root (absolute path or .. segments) is a security risk, abort
             if (!IsParentOf(StagingPath.Value, overridePath.Value))
             {
-                EmitFailed($"The overrides has a path that leads to an arbitrary location ({_pack.Overrides}). " +
-                           "This is a security risk and isn't allowed.");
-                return;
+                throw new InvalidOperationException($"The overrides has a path that leads to an arbitrary location ({_pack.Overrides}). " +
+                                                    "This is a security risk and isn't allowed.");
             }
 
             if (overridePath.Exists())
@@ -197,8 +194,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                 var mcPath = StagingPath / "minecraft";
                 if (!FileOps.Move(overridePath, mcPath))
                 {
-                    EmitFailed("Could not rename the overrides folder:\n" + _pack.Overrides);
-                    return;
+                    throw new InvalidOperationException("Could not rename the overrides folder:\n" + _pack.Overrides);
                 }
             }
             else
@@ -210,8 +206,7 @@ public sealed partial class FlameCreationTask : InstanceTask
 
         if (!PromptForUntrustedMods())
         {
-            EmitFailed("The pack contains files from untrusted sources:\n" + string.Join("\n", UntrustedMods));
-            return;
+            throw new InvalidOperationException("The pack contains files from untrusted sources:\n" + string.Join("\n", UntrustedMods));
         }
 
         string loaderType = "";
@@ -346,24 +341,20 @@ public sealed partial class FlameCreationTask : InstanceTask
         _newInstance.SaveNow();
 
         // ---------------------------------------------------------- resolve + download
-        var modIdResolver = new FileResolvingTask(_pack, _modrinth, _http, _flame);
-        EmitStatus("Resolving mod IDs...");
-        await modIdResolver.StartAsync(cancellationToken);
-        if (!modIdResolver.WasSuccessful)
+        try
         {
-            if (modIdResolver.State == TaskState.AbortedByUser)
-            {
-                EmitAborted();
-            }
-            else
-            {
-                EmitFailed("Unable to resolve mod IDs:\n" + modIdResolver.FailReason);
-            }
-
-            return;
+            await FileResolvingTask.RunAsync(_pack, _modrinth, _http, _flame, cancellationToken: cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            throw new InvalidOperationException("Unable to resolve mod IDs:\n" + e.Message, e);
         }
 
-        await IdResolverSucceeded(modIdResolver, cancellationToken);
+        await IdResolverSucceeded(cancellationToken);
     }
 
     /// <summary>Port of FlameCreationTask::getVersionForLoader.</summary>
@@ -376,8 +367,7 @@ public sealed partial class FlameCreationTask : InstanceTask
             var lookup = RecommendedVersionLookup;
             if (lookup is null)
             {
-                EmitFailed($"Failed to get local metadata index for {uid}");
-                return "";
+                throw new InvalidOperationException($"Failed to get local metadata index for {uid}");
             }
 
             // first recommended build we find, filtered by the minecraft version for
@@ -385,8 +375,7 @@ public sealed partial class FlameCreationTask : InstanceTask
             var version = lookup(uid, loaderType, mcVersion);
             if (string.IsNullOrEmpty(version))
             {
-                EmitFailed($"Failed to find version for {loaderType} loader");
-                return "";
+                throw new InvalidOperationException($"Failed to find version for {loaderType} loader");
             }
 
             return version;
@@ -394,8 +383,7 @@ public sealed partial class FlameCreationTask : InstanceTask
 
         if (loaderVersion.Length == 0)
         {
-            EmitFailed("No loader version set for modpack!");
-            return "";
+            throw new InvalidOperationException("No loader version set for modpack!");
         }
 
         return loaderVersion;
@@ -447,9 +435,9 @@ public sealed partial class FlameCreationTask : InstanceTask
     public List<LocalPath> UntrustedMods { get; private set; } = [];
 
     /// <summary>Port of FlameCreationTask::idResolverSucceeded.</summary>
-    private async Task IdResolverSucceeded(FileResolvingTask modIdResolver, CancellationToken cancellationToken)
+    private async Task IdResolverSucceeded(CancellationToken cancellationToken)
     {
-        var results = modIdResolver.GetResults().Files.Values;
+        var results = _pack.Files.Values;
 
         var optionalFiles = new List<string>();
         foreach (var result in results)
@@ -510,25 +498,23 @@ public sealed partial class FlameCreationTask : InstanceTask
 
             if (blockedMods.Any(mod => !mod.Matched))
             {
-                EmitFailed("The following files are not available for download in third party launchers.\n" +
-                           "You will need to manually download them and add them to the instance:\n" +
-                           string.Join("\n", blockedMods.Where(mod => !mod.Matched)
-                               .Select(mod => $"{mod.Name} ({mod.WebsiteUrl})")));
-                return;
+                throw new InvalidOperationException("The following files are not available for download in third party launchers.\n" +
+                                                    "You will need to manually download them and add them to the instance:\n" +
+                                                    string.Join("\n", blockedMods.Where(mod => !mod.Matched)
+                                                        .Select(mod => $"{mod.Name} ({mod.WebsiteUrl})")));
             }
 
             await CopyBlockedMods(blockedMods, cancellationToken);
         }
 
-        await SetupDownloadJob(modIdResolver, cancellationToken);
+        await SetupDownloadJob(cancellationToken);
     }
 
     /// <summary>Port of FlameCreationTask::setupDownloadJob.</summary>
-    private async Task SetupDownloadJob(FileResolvingTask modIdResolver, CancellationToken cancellationToken)
+    private async Task SetupDownloadJob(CancellationToken cancellationToken)
     {
-        var filesJob = new NetJob("Mod Download Flame");
-        var downloadTasks = new List<HttpDownloadTask>();
-        var results = modIdResolver.GetResults().Files.Values;
+        var downloads = new List<HttpDownloadTask>();
+        var results = _pack.Files.Values;
 
         foreach (var result in results)
         {
@@ -544,26 +530,16 @@ public sealed partial class FlameCreationTask : InstanceTask
 
             if (result.Version.DownloadUrl.Length != 0)
             {
-                var dl = HttpDownloadTask.ToFile(new Uri(result.Version.DownloadUrl), path, _http);
-                filesJob.AddDownload(dl);
-                downloadTasks.Add(dl);
+                downloads.Add(HttpDownloadTask.ToFile(new Uri(result.Version.DownloadUrl), path, _http));
             }
         }
 
         EmitStatus("Downloading mods...");
-        filesJob.Progress += (_, _) =>
-        {
-            EmitDetails($"{downloadTasks.Count(t => t.IsFinished)} out of {downloadTasks.Count} complete");
-            SetProgress(downloadTasks.Count(t => t.IsFinished), downloadTasks.Count);
-        };
-        await filesJob.StartAsync(cancellationToken);
-        if (!filesJob.WasSuccessful)
-        {
-            EmitFailed(filesJob.FailReason);
-            return;
-        }
+        await TaskWork.RunAllAsync(downloads,
+                (dl, token) => dl.DownloadAsync(null, token), maxConcurrent: 6, cancellationToken)
+            .ConfigureAwait(false);
 
-        await ValidateOtherResources(modIdResolver);
+        await ValidateOtherResources();
     }
 
     /// <summary>copyBlockedMods: copy the matched blocked mods to the instance staging area.</summary>
@@ -606,10 +582,10 @@ public sealed partial class FlameCreationTask : InstanceTask
 
     /// <summary>Port of FlameCreationTask::validateOtherResources (+ the metadata pass of the
     /// LocalResourceUpdateTask loop and finishInstall).</summary>
-    private async Task ValidateOtherResources(FileResolvingTask modIdResolver)
+    private async Task ValidateOtherResources()
     {
         var zipMods = new List<string>();
-        var results = modIdResolver.GetResults().Files.Values.ToList();
+        var results = _pack.Files.Values.ToList();
         foreach (var (fileName, targetFolder) in _otherResources)
         {
             var localPath = StagingPath / "minecraft" / targetFolder / fileName;
@@ -739,14 +715,12 @@ public sealed partial class FlameCreationTask : InstanceTask
 
             if (deleteFailed)
             {
-                EmitFailed("Failed to remove old conflicting files.");
-                return;
+                throw new InvalidOperationException("Failed to remove old conflicting files.");
             }
         }
 
         // (upstream calls downloadFiles(m_newInstance.get()) here — the update pipeline;
         //  like the other creation tasks, creation succeeds without fetching game files)
-        EmitSucceeded();
     }
 
     /// <summary>QUrl::fromLocalFile(root).isParentOf(QUrl::fromLocalFile(child)) for real

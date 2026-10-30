@@ -8,7 +8,7 @@
 // exactly like the C++, which only needs a BaseInstance surface for the settings writes.
 //
 // Deviations:
-//  - the copy runs synchronously inside StartAsync (no QtConcurrent::run / QFutureWatcher;
+//  - the copy runs synchronously inside ExecuteAsync (no QtConcurrent::run / QFutureWatcher;
 //    the C++ progress bookkeeping of the fileCopied() signal is dropped with it).
 //  - the symlink / hard-link / reflink transport modes are not portable here
 //    (FS::create_link and FS::clone are not ported): the task
@@ -64,30 +64,27 @@ public class InstanceCopyTask : InstanceTask
         }
     }
 
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    internal override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Copying instance " + _origInstance.Name());
 
         if (_useClone)
         {
             // FS::clone (reflink syscalls) is not ported.
-            EmitFailed("Reflink-based instance copies are not supported in this port.");
-            return Task.CompletedTask;
+            throw new InvalidOperationException("Reflink-based instance copies are not supported in this port.");
         }
 
         if (_useLinks || _useHardLinks || _linkRecursively)
         {
             // FS::create_link (symlinks/hard links, optional privilege elevation on Windows)
             // is not ported.
-            EmitFailed("Link-based instance copies are not supported in this port.");
-            return Task.CompletedTask;
+            throw new InvalidOperationException("Link-based instance copies are not supported in this port.");
         }
 
         Func<string, bool>? matcher = _matcher is null ? null : path => _matcher.IsMatch(path);
         if (!FileOps.Copy(new AbsolutePath(_origInstance.InstanceRoot), new AbsolutePath(StagingPath), matcher))
         {
-            EmitFailed("Instance folder copy failed.");
-            return Task.CompletedTask;
+            throw new InvalidOperationException("Instance folder copy failed.");
         }
 
         // copyFinished(): the copy's instance layer is rewritten through a generic (null
@@ -105,7 +102,6 @@ public class InstanceCopyTask : InstanceTask
             inst.ResetTimePlayed();
         }
 
-        EmitSucceeded();
         return Task.CompletedTask;
     }
 }

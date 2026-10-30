@@ -34,7 +34,6 @@
 //  - The APPLICATION->settings()->get("NumberOfConcurrentTasks") lookup died with the
 //    JavaCheck fan-out: the JdkFind pipeline manages its own parallelism.
 
-using FlintLauncher.Core.Tasks;
 using JdkFind;
 using TruePath;
 
@@ -52,7 +51,7 @@ public sealed class JavaInstallList
     private readonly bool _onlyManagedVersions;
     private readonly AbsolutePath? _javaRoot;
     private Status _status = Status.NotDone;
-    private JavaListLoadTask? _loadTask;
+    private Task? _loadTask;
     private List<JavaInstall> _vlist = [];
 
     /// <summary><paramref name="javaRoot"/> is the launcher-managed java dir (the JavaDir
@@ -64,22 +63,18 @@ public sealed class JavaInstallList
         _javaRoot = javaRoot;
     }
 
-    /// <summary>Port of JavaInstallList::getLoadTask().</summary>
-    public FlintTask GetLoadTask(bool forceReload = false) => Load();
-
-    private FlintTask Load()
+    /// <summary>Port of JavaInstallList::getLoadTask(): the in-flight load, or a fresh one
+    /// already started. A failure leaves the list as it was.</summary>
+    public Task LoadAsync(CancellationToken cancellationToken = default)
     {
-        if (_status == Status.InProgress && _loadTask is { } inFlight)
+        if (_loadTask is { IsCompleted: false } inFlight)
         {
             return inFlight;
         }
 
         _status = Status.InProgress;
-        var task = new JavaListLoadTask(this, _onlyManagedVersions, _javaRoot);
-        _loadTask = task;
-        // C++ starts the task immediately; the returned Task tracks the in-flight run.
-        _ = task.StartAsync();
-        return task;
+        _loadTask = JavaListLoadTask.RunAsync(this, cancellationToken, _onlyManagedVersions, _javaRoot);
+        return _loadTask;
     }
 
     public bool IsLoaded() => _status == Status.Done;
@@ -96,7 +91,6 @@ public sealed class JavaInstallList
         _vlist = [.. versions];
         SortVersions();
         _status = Status.Done;
-        _loadTask = null;
     }
 
     /// <summary>
@@ -111,19 +105,16 @@ public sealed class JavaInstallList
 
 /// <summary>Port of JavaListLoadTask. The detection itself lives in
 /// <see cref="JavaDetection"/> (JdkFind LocateAsync primary + FromExecutable fallback); this
-/// task is the list-model shell around it and maps the candidates onto
+/// is the list-model shell around it and maps the candidates onto
 /// <see cref="JavaInstall"/>.</summary>
-public sealed class JavaListLoadTask(
-    JavaInstallList vlist,
-    bool onlyManagedVersions = false,
-    AbsolutePath? javaRoot = null,
-    IReadOnlyList<IJvmProvider>? providers = null)
-    : FlintTask
+public static class JavaListLoadTask
 {
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Fills the list from the detected installations. Returning is success; any
+    /// other exception is a failure whose message is the reason.</summary>
+    public static async Task RunAsync(JavaInstallList vlist, CancellationToken cancellationToken,
+        bool onlyManagedVersions = false, AbsolutePath? javaRoot = null,
+        IReadOnlyList<IJvmProvider>? providers = null)
     {
-        EmitStatus("Detecting Java installations...");
-
         var candidates = await JavaDetection.DetectAsync(javaRoot, cancellationToken,
             providers: providers, managedOnly: onlyManagedVersions).ConfigureAwait(false);
 
@@ -137,6 +128,5 @@ public sealed class JavaListLoadTask(
             .ToList();
 
         vlist.UpdateListData(installs);
-        EmitSucceeded();
     }
 }

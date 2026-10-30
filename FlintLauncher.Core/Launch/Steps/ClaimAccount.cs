@@ -19,27 +19,17 @@
 //     See the License for the specific language governing permissions and
 //     limitations under the License.
 //
-// Port of launcher/minecraft/launch/ClaimAccount.{h,cpp}: claim the account for the duration
-// of the launch so a concurrent refresh cannot invalidate it mid-launch.
+// Claims the account for the duration of the launch so a concurrent refresh cannot invalidate
+// it mid-launch.
 //
-// Deviations from the C++ original:
-//  - The C++ reaches into APPLICATION->accounts() by the session's profile name and mounts a
-//    UseLock (launcher/Usable.h) on it. Neither half has a ported counterpart: account
-//    selection is the controller's business, and the C# MinecraftAccount explicitly did
-//    not port the Usable use-counting. With no mechanism to attach, the claim is a no-op —
-//    the step exists to keep the launch pipeline's step order and emits success. When the
-//    auth layer ports Usable, reintroduce the lock here (git history has the former
-//    Account/AccountForSession/UseLock scaffolding).
+// Nothing is claimed yet: account selection is the controller's business and MinecraftAccount
+// has no use-counting to lock. The step is a no-op that keeps the pipeline's stage order.
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class ClaimAccount(LaunchTask parent) : LaunchStep(parent)
+public sealed class ClaimAccount(LaunchTask parent) : AwaitedStep(parent)
 {
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
-    {
-        EmitSucceeded();
-        return Task.CompletedTask;
-    }
+    protected override Task RunAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     public override bool CanAbort() => false;
 }

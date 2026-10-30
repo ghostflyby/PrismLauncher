@@ -13,58 +13,44 @@ using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class EnsureAvailableMemory(LaunchTask parent, MinecraftInstance instance) : LaunchStep(parent)
+public sealed class EnsureAvailableMemory(LaunchTask parent, MinecraftInstance instance) : AwaitedStep(parent)
 {
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override Task RunAsync(CancellationToken cancellationToken)
     {
         if (OperatingSystem.IsMacOS())
         {
-            string text;
-            switch (HardwareInfo.GetMemoryPressureLevel())
+            var pressure = HardwareInfo.GetMemoryPressureLevel();
+            if (pressure == HardwareInfo.MemoryPressureLevel.Normal)
             {
-                case HardwareInfo.MemoryPressureLevel.Normal:
-                    EmitSucceeded();
-                    return Task.CompletedTask;
-                case HardwareInfo.MemoryPressureLevel.Warning:
-                    text = "The system is under increased memory pressure.\n" +
-                           "This may lead to lag or slowdowns.\n" +
-                           "If possible, close other applications before continuing.\n\n" +
-                           "Launch anyway?";
-                    break;
-                case HardwareInfo.MemoryPressureLevel.Critical:
-                default:
-                    text = "Your system is under critical memory pressure.\n" +
-                           "This may lead to severe slowdowns, crashes or system instability.\n" +
-                           "It is recommended to close other applications or restart your system.\n\n" +
-                           "Launch anyway?";
-                    break;
-            }
-
-            var shouldAbort = false;
-            if (Variant.AsBool(instance.Settings.Get("LowMemWarning")))
-            {
-                shouldAbort = Services.Ui.ConfirmLaunch?.Invoke(text) == false;
-            }
-
-            const string message = "The system is under high memory pressure";
-            if (shouldAbort)
-            {
-                EmitLogLine(message, MessageLevel.Fatal);
-                EmitFailed(message);
                 return Task.CompletedTask;
             }
 
+            var text = pressure == HardwareInfo.MemoryPressureLevel.Warning
+                ? "The system is under increased memory pressure.\n" +
+                  "This may lead to lag or slowdowns.\n" +
+                  "If possible, close other applications before continuing.\n\n" +
+                  "Launch anyway?"
+                : "Your system is under critical memory pressure.\n" +
+                  "This may lead to severe slowdowns, crashes or system instability.\n" +
+                  "It is recommended to close other applications or restart your system.\n\n" +
+                  "Launch anyway?";
+
+            const string message = "The system is under high memory pressure";
+            if (Variant.AsBool(instance.Settings.Get("LowMemWarning")) &&
+                Services.Ui.ConfirmLaunch?.Invoke(text) == false)
+            {
+                EmitLogLine(message, MessageLevel.Fatal);
+                throw new InvalidOperationException(message);
+            }
+
             EmitLogLine(message, MessageLevel.Warning);
-            EmitSucceeded();
             return Task.CompletedTask;
         }
 
         var available = HardwareInfo.AvailableRamMiB();
         if (available == 0)
         {
-            // could not read
-            EmitSucceeded();
-            return Task.CompletedTask;
+            return Task.CompletedTask; // could not read
         }
 
         var settingMin = (ulong)Variant.AsLong(instance.Settings.Get("MinMemAlloc"));
@@ -73,29 +59,23 @@ public sealed class EnsureAvailableMemory(LaunchTask parent, MinecraftInstance i
 
         if (max * 0.7 > available)
         {
-            var shouldAbort = false;
-
+            const string message = "Not enough RAM available to launch this instance";
             if (Variant.AsBool(instance.Settings.Get("LowMemWarning")))
             {
                 var dialogText =
                     "There might not be enough free RAM to launch this instance with the current memory settings.\n\n" +
                     $"Maximum allocated: {max} MiB\nFree: {available} MiB (out of {HardwareInfo.TotalRamMiB()} MiB total)\n\n" +
                     "Launch anyway? This may cause slowdowns in the game and your system.";
-                shouldAbort = Services.Ui.ConfirmLaunch?.Invoke(dialogText) == false;
-            }
-
-            const string message = "Not enough RAM available to launch this instance";
-            if (shouldAbort)
-            {
-                EmitLogLine(message, MessageLevel.Fatal);
-                EmitFailed(message);
-                return Task.CompletedTask;
+                if (Services.Ui.ConfirmLaunch?.Invoke(dialogText) == false)
+                {
+                    EmitLogLine(message, MessageLevel.Fatal);
+                    throw new InvalidOperationException(message);
+                }
             }
 
             EmitLogLine(message, MessageLevel.Warning);
         }
 
-        EmitSucceeded();
         return Task.CompletedTask;
     }
 }

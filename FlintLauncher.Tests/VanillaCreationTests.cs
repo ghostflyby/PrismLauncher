@@ -9,7 +9,6 @@ using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Instances.Creation;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Tasks;
 using TruePath;
 using Xunit;
 
@@ -66,8 +65,7 @@ public class VanillaCreationTests : IDisposable
 
         var task = CreateTask("1.20.1", "Test Instance");
 
-        await list.WrapInstanceTask(task).StartAsync();
-        Assert.True(task.WasSuccessful);
+        await list.WrapInstanceTask(task)(TestContext.Current.CancellationToken);
 
         var dir = Path.Combine(_instancesDir, "Test Instance");
         Assert.True(Directory.Exists(dir));
@@ -118,8 +116,7 @@ public class VanillaCreationTests : IDisposable
         task.Icon = "default";
         task.SetParentEnvironment(_global.Environment);
 
-        await list.WrapInstanceTask(task).StartAsync();
-        Assert.True(task.WasSuccessful);
+        await list.WrapInstanceTask(task)(TestContext.Current.CancellationToken);
 
         using var doc = JsonDocument.Parse(
             await File.ReadAllTextAsync(Path.Combine(_instancesDir, "Fab", "mmc-pack.json")));
@@ -138,12 +135,10 @@ public class VanillaCreationTests : IDisposable
     {
         var list = CreateList();
         var first = CreateTask("1.20.1", "Test Instance");
-        await list.WrapInstanceTask(first).StartAsync();
-        Assert.True(first.WasSuccessful);
+        await list.WrapInstanceTask(first)(TestContext.Current.CancellationToken);
 
         var second = CreateTask("1.20.1", "Test Instance");
-        await list.WrapInstanceTask(second).StartAsync();
-        Assert.True(second.WasSuccessful);
+        await list.WrapInstanceTask(second)(TestContext.Current.CancellationToken);
 
         Assert.True(Directory.Exists(Path.Combine(_instancesDir, "Test Instance(1)")));
 
@@ -161,8 +156,9 @@ public class VanillaCreationTests : IDisposable
         task.StagingPath = new AbsolutePath(Path.Combine(_root, "orphan"));
         Directory.CreateDirectory(task.StagingPath.Value);
 
-        await task.StartAsync();
-        Assert.Equal(TaskState.Failed, task.State);
+        // without a parent environment the task cannot build its staged instance
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() => task.ExecuteAsync(TestContext.Current.CancellationToken));
+        Assert.NotEmpty(ex.Message);
     }
 
     [Fact]
@@ -171,8 +167,7 @@ public class VanillaCreationTests : IDisposable
         var list = CreateList();
         var task = CreateTask("1.21.4", "Consumed");
 
-        await list.WrapInstanceTask(task).StartAsync();
-        Assert.True(task.WasSuccessful);
+        await list.WrapInstanceTask(task)(TestContext.Current.CancellationToken);
 
         var tempRoot = Path.Combine(_instancesDir, ".tmp");
         Assert.True(Directory.Exists(tempRoot));

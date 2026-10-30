@@ -21,26 +21,23 @@ using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class LegacyFmlLibrariesTask(MinecraftInstance inst) : FlintTask
+public static class LegacyFmlLibrariesTask
 {
-    private readonly List<FmlLib> _fmlLibsToProcess = [];
-    private NetJob? _downloadJob;
-
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Downloads the extra FML libraries and copies them into the instance's lib
+    /// folder. Returning is success; any other exception is a failure whose message is the
+    /// reason. <paramref name="progress"/> null runs without reporting.</summary>
+    public static async Task RunAsync(MinecraftInstance inst, IProgress<TaskProgress>? progress,
+        CancellationToken cancellationToken)
     {
-        // Get the mod list
-        var inst1 = inst;
-        var components = inst1.GetPackProfile();
+        var components = inst.GetPackProfile();
         var profile = components.GetProfile();
         if (profile is null)
         {
-            EmitFailed("The instance profile is missing.");
-            return;
+            throw new InvalidOperationException("The instance profile is missing.");
         }
 
         if (!profile.HasTrait("legacyFML"))
         {
-            EmitSucceeded();
             return;
         }
 
@@ -48,123 +45,88 @@ public sealed class LegacyFmlLibrariesTask(MinecraftInstance inst) : FlintTask
         var fmlLibsMapping = VersionFilterData.Instance.FmlLibsMapping;
         if (!fmlLibsMapping.TryGetValue(version, out var libList))
         {
-            EmitSucceeded();
             return;
         }
 
         // determine if we need some libs for FML or forge
-        EmitStatus("Checking for FML libraries...");
         if (components.GetComponent("net.minecraftforge") is null)
         {
-            EmitSucceeded();
             return;
         }
 
         // now check the lib folder inside the instance for files.
+        var fmlLibsToProcess = new List<FmlLib>();
         foreach (var lib in libList)
         {
-            var libInfo = new FileInfo((inst1.LibDir() / lib.Filename).Value);
+            var libInfo = new FileInfo((inst.LibDir() / lib.Filename).Value);
             if (libInfo.Exists)
             {
                 continue;
             }
 
-            _fmlLibsToProcess.Add(lib);
+            fmlLibsToProcess.Add(lib);
         }
 
         // if everything is in place, there's nothing to do here...
-        if (_fmlLibsToProcess.Count == 0)
+        if (fmlLibsToProcess.Count == 0)
         {
-            EmitSucceeded();
             return;
         }
 
         // download missing libs to our place
-        EmitStatus("Downloading FML libraries...");
         // the stamped runtime cache is the only source — the bare-fixture throwaway is
         // gone; an unstamped instance fails the step naming the missing wire
         var metacache = inst.MetaCache ?? throw new InvalidOperationException(
             $"no meta cache stamped on instance '{inst.Name()}' — the composition root must inject it");
-        var dlJob = new NetJob("FML libraries");
-        _downloadJob = dlJob;
-        foreach (var lib in _fmlLibsToProcess)
+        var downloads = new List<HttpDownloadTask>();
+        foreach (var lib in fmlLibsToProcess)
         {
             var entry = metacache.ResolveEntry("fmllibs", lib.Filename);
             entry.IsStale = true;
-            var urlString = BaseUrl() + lib.Filename;
-            dlJob.AddDownload(HttpDownloadTask.Cached(metacache, new Uri(urlString), entry, RequestOptions.MakeEternal));
+            // baseUrl(): the build default base (the override setting retired with the
+            // settings world — nothing wired it through the launch services)
+            var urlString = FlintConfig.Default.LegacyFmllibsBaseUrl + lib.Filename;
+            downloads.Add(HttpDownloadTask.Cached(metacache, new Uri(urlString), entry, RequestOptions.MakeEternal));
         }
 
-        await dlJob.StartAsync(cancellationToken).ConfigureAwait(false);
-        if (!dlJob.WasSuccessful)
+        try
         {
-            FmllibsFailed(dlJob.FailReason);
-            return;
+            await TaskWork.RunAllAsync(downloads,
+                    (download, token) => download.DownloadAsync(progress, token), maxConcurrent: 6,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            // (the C++ lists the failed files from the job; the batch carries the reason instead)
+            throw new InvalidOperationException(
+                $"Failed to download the following files:\n\nReason:{TaskWork.ReasonOf(e)}\nPlease try again.");
         }
 
-        FmllibsFinished();
-    }
-
-    /// <summary>Port of baseUrl(): the build default base (the override setting retired with
-    /// the settings world — nothing wired it through the launch services).</summary>
-    private string BaseUrl() => FlintConfig.Default.LegacyFmllibsBaseUrl;
-
-    public bool CanAbort() => true;
-
-    private void FmllibsFinished()
-    {
-        _downloadJob = null;
-        if (_fmlLibsToProcess.Count != 0)
+        // Port of fmllibsFinished(): copy the downloaded libs into the instance's lib folder.
+        var index = 0;
+        foreach (var lib in fmlLibsToProcess)
         {
-            EmitStatus("Copying FML libraries into the instance...");
-            var inst1 = inst;
-            var metacache = inst.MetaCache ?? throw new InvalidOperationException(
-                $"no meta cache stamped on instance '{inst.Name()}' — the composition root must inject it");
-            var index = 0;
-            foreach (var lib in _fmlLibsToProcess)
+            progress?.Report(new TaskProgress(index, fmlLibsToProcess.Count));
+            var entry = metacache.ResolveEntry("fmllibs", lib.Filename);
+            var path = new AbsolutePath(inst.LibDir()) / lib.Filename;
+            if (!FileOps.EnsureFilePathExists(path))
             {
-                SetProgress(index, _fmlLibsToProcess.Count);
-                var entry = metacache.ResolveEntry("fmllibs", lib.Filename);
-                var path = new AbsolutePath(inst1.LibDir()) / lib.Filename;
-                if (!FileOps.EnsureFilePathExists(path))
-                {
-                    EmitFailed("Failed creating FML library folder inside the instance.");
-                    return;
-                }
-
-                try
-                {
-                    entry.GetFullPath().Copy(inst1.LibDir() / lib.Filename, overwrite: true);
-                }
-                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-                {
-                    EmitFailed($"Failed copying Forge/FML library: {lib.Filename}.");
-                    return;
-                }
-
-                index++;
+                throw new InvalidOperationException("Failed creating FML library folder inside the instance.");
             }
 
-            SetProgress(index, _fmlLibsToProcess.Count);
+            try
+            {
+                entry.GetFullPath().Copy(inst.LibDir() / lib.Filename, overwrite: true);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                throw new InvalidOperationException($"Failed copying Forge/FML library: {lib.Filename}.");
+            }
+
+            index++;
         }
 
-        EmitSucceeded();
-    }
-
-    private void FmllibsFailed(string reason)
-    {
-        // (the C++ lists the failed files from the job; the NetJob carries the reason instead)
-        EmitFailed($"Failed to download the following files:\n\nReason:{reason}\nPlease try again.");
-    }
-
-    public override void Abort()
-    {
-        if (_downloadJob is not null && _downloadJob.IsRunning)
-        {
-            _downloadJob.Abort();
-        }
-
-        // Prematurely aborted LegacyFMLLibrariesTask
-        base.Abort();
+        progress?.Report(new TaskProgress(index, fmlLibsToProcess.Count));
     }
 }

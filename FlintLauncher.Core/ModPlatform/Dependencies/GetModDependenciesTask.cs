@@ -12,15 +12,12 @@
 //
 // Port notes:
 //  - The C++ Qt callback plumbing (ResourceAPI::getProject / getDependencyVersion with
-//    Callback<IndexedVersion>) becomes small NetJob factories here; getDependencyVersion is
-//    ported verbatim from ResourceAPI.cpp (response shape dispatch, loader heuristic,
-//    newest-date sort). The per-provider loadIndexedPack/loadIndexedPackVersion virtuals
-//    become the provider dispatch helpers below.
-//  - The C++ `m_failed.remove(...)` calls on the two NetJob::failed handlers are no-ops in
-//    this port (they erase the NetJob from the *parent* ConcurrentTask's failure map even
-//    though the direct subtask is the wrapping SequentialTask, so upstream still fails);
-//    the observable behavior (removePack + parent failure through the SequentialTask
-//    chain) is preserved.
+//    Callback<IndexedVersion>) becomes direct awaits here; getDependencyVersion is ported
+//    verbatim from ResourceAPI.cpp (response shape dispatch, loader heuristic, newest-date
+//    sort). The per-provider loadIndexedPack/loadIndexedPackVersion virtuals become the
+//    provider dispatch helpers below.
+//  - The C++ `m_failed.remove(...)` calls on the two NetJob::failed handlers have no
+//    counterpart: a failure removes the pack and propagates as the exception.
 //  - instance->resourceLists() (shader/resource-pack/texture-pack metadata sweeps) is not
 //    ported: only the mod folder model exists in this codebase so far.
 
@@ -30,7 +27,6 @@ using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Flame;
@@ -38,7 +34,7 @@ using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Core.ModPlatform.Dependencies;
 
-public class GetModDependenciesTask : SequentialTask
+public class GetModDependenciesTask
 {
     public class PackDependency
     {
@@ -79,8 +75,25 @@ public class GetModDependenciesTask : SequentialTask
 
         // (the C++ also sweeps instance->resourceLists() for metadata; those folder models
         //  are not ported yet — see the header note)
+    }
 
-        Prepare();
+    /// <summary>Resolves every selected pack's dependencies, depth-first. Returning is success;
+    /// a failure aborts the walk.</summary>
+    public async Task RunAsync(CancellationToken cancellationToken)
+    {
+        foreach (var sel in _selected)
+        {
+            if (!CheckDependencies(sel, _version, _loaderType))
+            {
+                continue;
+            }
+
+            foreach (var dep in GetDependenciesForVersion(sel.Version, sel.Pack.Provider))
+            {
+                await PrepareDependencyAsync(dep, sel.Pack.Provider, 20, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
     }
 
     /// <summary>Port of getDependecies() (sic): the resolved dependencies.</summary>
@@ -96,20 +109,6 @@ public class GetModDependenciesTask : SequentialTask
     private readonly ModrinthClient _modrinth;
     private readonly HttpClient _http;
     private readonly FlameClient _flame;
-
-    private void Prepare()
-    {
-        foreach (var sel in _selected)
-        {
-            if (CheckDependencies(sel, _version, _loaderType))
-            {
-                foreach (var dep in GetDependenciesForVersion(sel.Version, sel.Pack.Provider))
-                {
-                    AddTask(PrepareDependencyTask(dep, sel.Pack.Provider, 20));
-                }
-            }
-        }
-    }
 
     private Dependency GetOverride(Dependency dep, ResourceProvider providerName)
     {
@@ -181,50 +180,48 @@ public class GetModDependenciesTask : SequentialTask
 
     /// <summary>The project-info step for one dependency pack: fetch, parse into the pack,
     /// and drop the pack (failing the step) when the fetch or the shape fails.</summary>
-    private FlintTask GetProjectInfoTask(PackDependency pDep)
+    private async Task GetProjectInfoAsync(PackDependency pDep, CancellationToken cancellationToken)
     {
         var provider = pDep.Pack.Provider;
-        return new CallbackTask(async cancellationToken =>
+        try
         {
-            try
+            if (provider == ResourceProvider.Flame)
             {
-                if (provider == ResourceProvider.Flame)
+                try
                 {
-                    try
+                    var envelope = await _flame.Projects.ById(pDep.Pack.AddonId)
+                        .SendTo(_http, cancellationToken);
+                    if (envelope.Data is { } project)
                     {
-                        var envelope = await _flame.Projects.ById(pDep.Pack.AddonId)
-                            .SendTo(_http, cancellationToken);
-                        if (envelope.Data is { } project)
-                        {
-                            FlameMod.LoadIndexedPack(pDep.Pack, project);
-                        }
-                        else
-                        {
-                            throw new JsonException("'data' is not an object");
-                        }
+                        FlameMod.LoadIndexedPack(pDep.Pack, project);
                     }
-                    catch (FlameApiException e)
+                    else
                     {
-                        throw new HttpRequestException(e.Message, e);
+                        throw new JsonException("'data' is not an object");
                     }
                 }
-                else
+                catch (FlameApiException e)
                 {
-                    var dto = await _modrinth.Projects.ById(pDep.Pack.AddonId).SendTo(_http, cancellationToken);
-                    ModrinthPackIndex.LoadIndexedPack(pDep.Pack, dto);
+                    throw new HttpRequestException(e.Message, e);
                 }
             }
-            catch (Exception e) when (e is HttpRequestException or JsonException or ModrinthApiException
+            else
+            {
+                var dto = await _modrinth.Projects.ById(pDep.Pack.AddonId).SendTo(_http, cancellationToken);
+                ModrinthPackIndex.LoadIndexedPack(pDep.Pack, dto);
+            }
+        }
+        catch (Exception e) when (e is HttpRequestException or JsonException or ModrinthApiException
                                       or FlameApiException)
-            {
-                // (upstream logs the parse error / the error cause)
-                RemovePack(pDep.Pack.AddonId);
-                throw;
-            }
-        });
+        {
+            // (upstream logs the parse error / the error cause)
+            RemovePack(pDep.Pack.AddonId);
+            throw;
+        }
     }
 
-    private FlintTask PrepareDependencyTask(Dependency dep, ResourceProvider providerName, int level)
+    private async Task PrepareDependencyAsync(Dependency dep, ResourceProvider providerName, int level,
+        CancellationToken cancellationToken)
     {
         var pDep = new PackDependency
         {
@@ -234,129 +231,129 @@ public class GetModDependenciesTask : SequentialTask
 
         _packDependencies.Add(pDep);
 
-        var tasks = new SequentialTask(
-            $"DependencyInfo: {(dep.AddonId.Length == 0 ? dep.Version : dep.AddonId)}");
-
         if (dep.AddonId.Length != 0)
         {
-            tasks.AddTask(GetProjectInfoTask(pDep));
+            await GetProjectInfoAsync(pDep, cancellationToken).ConfigureAwait(false);
         }
 
-        tasks.AddTask(DependencyVersionTask(dep, providerName, pDep, level));
-        return tasks;
+        await ResolveDependencyVersionAsync(dep, providerName, pDep, level, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>
     /// Port of ResourceAPI::getDependencyVersion (modplatform/ResourceAPI.cpp) wired to the
     /// onSucceed continuation of GetModDependenciesTask::prepareDependencyTask.
     /// </summary>
-    private FlintTask DependencyVersionTask(Dependency dep, ResourceProvider provider, PackDependency pDep, int level)
+    private async Task ResolveDependencyVersionAsync(Dependency dep, ResourceProvider provider,
+        PackDependency pDep, int level, CancellationToken cancellationToken)
     {
-        return new CallbackTask(async cancellationToken =>
+        // the per-provider candidate lists: the Flame branch answers the pinned
+        // single-file document or the {"data": [...]} envelope, the Modrinth branch a
+        // single version document or a bare array
+        var versions = new List<IndexedVersion>();
+
+        void Consider(IndexedVersion file)
         {
-            // the per-provider candidate lists: the Flame branch answers the pinned
-            // single-file document or the {"data": [...]} envelope, the Modrinth branch a
-            // single version document or a bare array
-            var versions = new List<IndexedVersion>();
-
-            void Consider(IndexedVersion file)
+            if (file.AddonId.Length == 0)
             {
-                if (file.AddonId.Length == 0)
-                {
-                    file.AddonId = dep.AddonId;
-                }
-
-                // Heuristic to check if the returned value is valid
-                if (file.FileId.Length != 0 && (_loaderType == ModLoaderType.None || (_loaderType & file.Loaders) != 0))
-                {
-                    versions.Add(file);
-                }
+                file.AddonId = dep.AddonId;
             }
 
-            if (provider == ResourceProvider.Flame)
+            // Heuristic to check if the returned value is valid
+            if (file.FileId.Length != 0 && (_loaderType == ModLoaderType.None || (_loaderType & file.Loaders) != 0))
             {
-                List<FlameModFile>? files;
-                try
-                {
-                    // the pinned dependency names a file; the rest list the project's files
-                    // for the instance's game version and single selected loader
-                    files = dep.Version.Length != 0
-                        ? [(
+                versions.Add(file);
+            }
+        }
+
+        if (provider == ResourceProvider.Flame)
+        {
+            List<FlameModFile>? files;
+            try
+            {
+                // the pinned dependency names a file; the rest list the project's files
+                // for the instance's game version and single selected loader
+                files = dep.Version.Length != 0
+                    ?
+                    [
+                        (
                             await _flame.Files.ById(dep.AddonId, dep.Version).SendTo(_http, cancellationToken)).Data
-                            ?? throw new JsonException("'data' is not an object")]
-                        : (await _flame.Files.List(dep.AddonId,
-                                gameVersion: _version.ToString(),
-                                modLoaderType: _loaderType != 0 && ModIndex.HasSingleModLoaderSelected(_loaderType)
-                                    ? FlameMod.GetMappedModLoader(_loaderType)
-                                    : null)
-                            .SendTo(_http, cancellationToken)).Data
-                          ?? throw new JsonException("'data' is not an array");
-                }
-                catch (FlameApiException e) when (e.InnerException is HttpRequestException)
-                {
-                    RemovePack(pDep.Pack.AddonId);
-                    throw new HttpRequestException(e.Message, e);
-                }
-                catch (Exception e) when (e is FlameApiException or JsonException)
-                {
-                    // like the C++ kind-failure path: a broken body degrades to an empty
-                    // best match, which the resolution step turns into an explicit
-                    // missing-dependency (RemovePack) instead of leaving a version-less
-                    // pack dangling
-                    OnDependencyVersionResolved(dep, provider, pDep, level, new IndexedVersion());
-                    return;
-                }
-
-                foreach (var fileDto in files)
-                {
-                    try
-                    {
-                        Consider(FlameMod.LoadIndexedPackVersion(fileDto));
-                    }
-                    catch (JsonException) { }
-                }
+                        ?? throw new JsonException("'data' is not an object")
+                    ]
+                    : (await _flame.Files.List(dep.AddonId,
+                              gameVersion: _version.ToString(),
+                              modLoaderType: _loaderType != 0 && ModIndex.HasSingleModLoaderSelected(_loaderType)
+                                  ? FlameMod.GetMappedModLoader(_loaderType)
+                                  : null)
+                          .SendTo(_http, cancellationToken)).Data
+                      ?? throw new JsonException("'data' is not an array");
             }
-            else
+            catch (FlameApiException e) when (e.InnerException is HttpRequestException)
             {
-                List<ModrinthVersion> dtos;
+                RemovePack(pDep.Pack.AddonId);
+                throw new HttpRequestException(e.Message, e);
+            }
+            catch (Exception e) when (e is FlameApiException or JsonException)
+            {
+                // like the C++ kind-failure path: a broken body degrades to an empty
+                // best match, which the resolution step turns into an explicit
+                // missing-dependency (RemovePack) instead of leaving a version-less
+                // pack dangling
+                await OnDependencyVersionResolvedAsync(dep, provider, pDep, level, new IndexedVersion(),
+                    cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            foreach (var fileDto in files)
+            {
                 try
                 {
-                    dtos = dep.Version.Length != 0
-                        ? [await _modrinth.Versions.ById(dep.Version).SendTo(_http, cancellationToken)]
-                        : await _modrinth.Versions.Query(dep.AddonId,
-                            [ModrinthVersionFormat.ToWire(_version)],
-                            ModIndex.ModLoaderTypesToList(_loaderType).Select(ModIndex.GetModLoaderAsString).ToList(),
-                            includeChangelog: true).SendTo(_http, cancellationToken);
+                    Consider(FlameMod.LoadIndexedPackVersion(fileDto));
                 }
-                catch (Exception e) when (e is ModrinthApiException)
-                {
-                    RemovePack(pDep.Pack.AddonId);
-                    throw;
-                }
-
-                foreach (var dto in dtos)
-                {
-                    try
-                    {
-                        Consider(ModrinthPackIndex.LoadIndexedPackVersion(dto));
-                    }
-                    catch (JsonException)
-                    {
-                        continue;
-                    }
-                }
+                catch (JsonException) { }
+            }
+        }
+        else
+        {
+            List<ModrinthVersion> dtos;
+            try
+            {
+                dtos = dep.Version.Length != 0
+                    ? [await _modrinth.Versions.ById(dep.Version).SendTo(_http, cancellationToken)]
+                    : await _modrinth.Versions.Query(dep.AddonId,
+                        [ModrinthVersionFormat.ToWire(_version)],
+                        ModIndex.ModLoaderTypesToList(_loaderType).Select(ModIndex.GetModLoaderAsString).ToList(),
+                        includeChangelog: true).SendTo(_http, cancellationToken);
+            }
+            catch (Exception e) when (e is ModrinthApiException)
+            {
+                RemovePack(pDep.Pack.AddonId);
+                throw;
             }
 
-            // dates are in RFC 3339 format
-            versions.Sort((a, b) => string.CompareOrdinal(b.Date, a.Date));
-            var bestMatch = versions.Count != 0 ? versions[0] : new IndexedVersion();
-            OnDependencyVersionResolved(dep, provider, pDep, level, bestMatch);
-        });
+            foreach (var dto in dtos)
+            {
+                try
+                {
+                    Consider(ModrinthPackIndex.LoadIndexedPackVersion(dto));
+                }
+                catch (JsonException)
+                {
+                    // this version entry is unusable; the rest still count
+                }
+            }
+        }
+
+        // dates are in RFC 3339 format
+        versions.Sort((a, b) => string.CompareOrdinal(b.Date, a.Date));
+        var bestMatch = versions.Count != 0 ? versions[0] : new IndexedVersion();
+        await OnDependencyVersionResolvedAsync(dep, provider, pDep, level, bestMatch, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>The onSucceed continuation of the C++ prepareDependencyTask.</summary>
-    private void OnDependencyVersionResolved(Dependency dep, ResourceProvider provider, PackDependency pDep, int level,
-        IndexedVersion pack)
+    private async Task OnDependencyVersionResolvedAsync(Dependency dep, ResourceProvider provider,
+        PackDependency pDep, int level, IndexedVersion pack, CancellationToken cancellationToken)
     {
         pDep.Version = pack;
         if (pDep.Version.AddonId.Length == 0)
@@ -369,8 +366,9 @@ public class GetModDependenciesTask : SequentialTask
                     if (o.Provider == provider && dep.AddonId == o.Quilt)
                     {
                         RemovePack(dep.AddonId);
-                        AddTask(PrepareDependencyTask(new Dependency { AddonId = o.Fabric, Type = dep.Type, Version = "" },
-                            provider, level));
+                        await PrepareDependencyAsync(
+                            new Dependency { AddonId = o.Fabric, Type = dep.Type, Version = "" },
+                            provider, level, cancellationToken).ConfigureAwait(false);
                         return;
                     }
                 }
@@ -400,11 +398,12 @@ public class GetModDependenciesTask : SequentialTask
             if (overrideDep.AddonId != pDep.Version.AddonId)
             {
                 RemovePack(pDep.Version.AddonId);
-                AddTask(PrepareDependencyTask(overrideDep, provider, level));
+                await PrepareDependencyAsync(overrideDep, provider, level, cancellationToken)
+                    .ConfigureAwait(false);
             }
             else
             {
-                AddTask(GetProjectInfoTask(pDep));
+                await GetProjectInfoAsync(pDep, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -416,7 +415,8 @@ public class GetModDependenciesTask : SequentialTask
 
         foreach (var dependency in GetDependenciesForVersion(pDep.Version, provider))
         {
-            AddTask(PrepareDependencyTask(dependency, provider, level - 1));
+            await PrepareDependencyAsync(dependency, provider, level - 1, cancellationToken)
+                .ConfigureAwait(false);
         }
     }
 

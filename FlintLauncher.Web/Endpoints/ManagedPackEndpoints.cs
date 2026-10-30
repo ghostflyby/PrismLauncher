@@ -14,9 +14,7 @@
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform;
-using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Versioning;
-using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using FlintLauncher.Web.Models;

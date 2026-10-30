@@ -9,12 +9,11 @@
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class QuitAfterGameStop(LaunchTask parent) : LaunchStep(parent)
+public sealed class QuitAfterGameStop(LaunchTask parent) : AwaitedStep(parent)
 {
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override Task RunAsync(CancellationToken cancellationToken)
     {
         Services.Ui.QuitRequested?.Invoke();
-        EmitSucceeded();
         return Task.CompletedTask;
     }
 

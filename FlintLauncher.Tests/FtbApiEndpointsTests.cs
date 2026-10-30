@@ -6,7 +6,7 @@
 // (reusing the FtbTestSupport fixture builders — the endpoint runs the same
 // FtbPackInstallTask the core tests drive directly, backed by the Flame stub for the
 // CurseForge-only file) and the failure surface (unknown pack -> 500 creation_failed with
-// the fetch reason, unknown version -> the task's FailReason, validation -> 400).
+// the fetch reason, unknown version -> the failure cause, validation -> 400).
 //
 // Each suite builds its own FtbApi/FlameClient clients pointed at the stubs and hands them to
 // the host (per-instance BaseUrl, nothing process-global to restore).
@@ -14,10 +14,8 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.ExternalApi;
-using FlintLauncher.ExternalApi.Flame;
-using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
+using FlintLauncher.ExternalApi.Flame;
 using Xunit;
 
 namespace FlintLauncher.Tests;

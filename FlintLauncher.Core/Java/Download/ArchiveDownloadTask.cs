@@ -27,32 +27,29 @@ using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Java.Download;
 
-public sealed class ArchiveDownloadTask(
-    Uri url,
-    AbsolutePath finalPath,
-    HttpClient http,
-    string checksumType = "",
-    string checksumHash = "",
-    HttpMetaCache? cache = null)
-    : FlintTask
+public static class ArchiveDownloadTask
 {
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Downloads the archive and extracts it into <c>finalPath</c>. Returning is
+    /// success; any other exception is a failure whose message is the reason.
+    /// <paramref name="progress"/> null runs without reporting.</summary>
+    public static async Task DownloadAsync(Uri url, AbsolutePath finalPath, HttpClient http,
+        CancellationToken cancellationToken, IProgress<TaskProgress>? progress = null,
+        string checksumType = "", string checksumHash = "", HttpMetaCache? cache = null)
     {
         // JRE found ! download the zip
-        EmitStatus("Downloading Java");
 
         AbsolutePath fullPath;
         HttpDownloadTask action;
         var tempDownload = false;
         if (cache is not null)
         {
-            var entry = cache.ResolveEntry("java", FileName());
+            var entry = cache.ResolveEntry("java", FileName(url));
             action = HttpDownloadTask.Cached(cache, url, entry);
             fullPath = entry.GetFullPath();
         }
         else
         {
-            string a1 = $"flint-java-{Guid.NewGuid():N}-{FileName()}";
+            string a1 = $"flint-java-{Guid.NewGuid():N}-{FileName(url)}";
             fullPath = Temporary.CreateTempFolder() / a1;
             action = HttpDownloadTask.ToFile(url, fullPath, http);
             tempDownload = true;
@@ -65,14 +62,9 @@ public sealed class ArchiveDownloadTask(
 
         try
         {
-            await action.StartAsync(cancellationToken).ConfigureAwait(false);
-            if (action.State != TaskState.Succeeded)
-            {
-                EmitFailed(action.FailReason);
-                return;
-            }
+            await action.DownloadAsync(progress, cancellationToken).ConfigureAwait(false);
 
-            ExtractJava(fullPath.Value);
+            ExtractJava(fullPath.Value, finalPath, progress);
         }
         finally
         {
@@ -90,44 +82,37 @@ public sealed class ArchiveDownloadTask(
         }
     }
 
-    private void ExtractJava(string input)
+    private static void ExtractJava(string input, AbsolutePath finalPath, IProgress<TaskProgress>? progress)
     {
-        EmitStatus("Extracting Java");
-
         // determine which top-level folder to strip (C++: files[0].split('/').value(0));
         // null = unreadable archive, "" = readable but empty
         var firstFolder = FirstTopLevelFolder(input);
         if (firstFolder is null)
         {
-            EmitFailed(IsTarGz(input)
+            throw new InvalidOperationException(IsTarGz(input)
                 ? "Unable to open supplied archive file."
                 : "Unable to open supplied zip file.");
-            return;
         }
 
         if (firstFolder.Length == 0)
         {
-            EmitFailed(IsTarGz(input)
+            throw new InvalidOperationException(IsTarGz(input)
                 ? "No files were found in the supplied archive file."
                 : "No files were found in the supplied zip file.");
-            return;
         }
 
-        EmitDetails("Extracting files...");
         List<string>? extracted;
         if (IsTarGz(input))
         {
             extracted = TarArchive.ExtractTarGzFile(input, finalPath.Value, firstFolder, out var error);
             if (extracted is null)
             {
-                EmitFailed(error);
-                return;
+                throw new InvalidOperationException(error);
             }
 
             if (extracted.Count == 0)
             {
-                EmitFailed("No files were found in the supplied archive file.");
-                return;
+                throw new InvalidOperationException("No files were found in the supplied archive file.");
             }
         }
         else
@@ -145,26 +130,21 @@ public sealed class ArchiveDownloadTask(
 
             if (extracted is null)
             {
-                EmitFailed("Unable to open supplied zip file.");
-                return;
+                throw new InvalidOperationException("Unable to open supplied zip file.");
             }
 
             if (extracted.Count == 0)
             {
-                EmitFailed("No files were found in the supplied zip file.");
-                return;
+                throw new InvalidOperationException("No files were found in the supplied zip file.");
             }
         }
-
-        // This should do all of the extracting and creating folders
-        EmitSucceeded();
     }
 
     /// <summary>
     /// The first path component of the archive's first entry; null when the archive cannot be
     /// read, empty when it holds no entries.
     /// </summary>
-    private string? FirstTopLevelFolder(string input)
+    private static string? FirstTopLevelFolder(string input)
     {
         if (IsTarGz(input))
         {
@@ -211,7 +191,7 @@ public sealed class ArchiveDownloadTask(
         }
     }
 
-    private string FileName()
+    private static string FileName(Uri url)
     {
         // QUrl::fileName() keeps the file name without the query part
         var path = url.AbsolutePath;

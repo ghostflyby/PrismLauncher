@@ -56,7 +56,7 @@ public static class FlintHttp
         catch (Exception e) when (e is HttpRequestException or IOException)
         {
             // connection-level failure (DNS, refused, reset) after the retry gate — the
-            // old NetRequest surfaced it as job.FailReason, so the envelopes keep the text
+            // transport's text is the reason callers surface
             throw new FlintHttpException(e.Message);
         }
 

@@ -20,24 +20,19 @@
 //     See the License for the specific language governing permissions and
 //     limitations under the License.
 //
-// Port of modplatform/legacy_ftb/PackFetchTask.{h,cpp}: fetch the legacy FTB pack lists
-// (static/modpacks.xml + static/thirdparty.xml) and the private pack lists
-// (static/{code}.xml) from the CDN and parse their XML (see ParseAndAddPacks for the exact
-// attribute set and the oldVersions repair rules).
+// Fetches the legacy FTB pack lists (static/modpacks.xml + static/thirdparty.xml) and the
+// private pack lists (static/{code}.xml) from the CDN and parses their XML; see
+// ParseAndAddPacks for the attribute set and the oldVersions repair rules.
 //
-// Deviations (headless port): the finished/failed/privateFileDownload* signals become the
-// result properties + the PrivatePackFetched callback; a partially failed fetch keeps the
-// successfully parsed lists and fails with the C++ "Failed to download some pack lists"
-// message (the C++ emits failed while still handing out the parsed lists through the same
-// signal arguments).
+// A list that does not parse is named in the thrown exception while the other list stays
+// populated, so a partially broken CDN still yields the packs it did serve.
 
 using System.Xml;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform.LegacyFtb;
 
-public sealed class LegacyFtbPackFetchTask : FlintTask
+public sealed class LegacyFtbPackFetchTask
 {
     /// <summary>BuildConfig.LEGACY_FTB_CDN_BASE_URL (per-instance; tests construct the task
     /// pointed at their stub).</summary>
@@ -53,7 +48,9 @@ public sealed class LegacyFtbPackFetchTask : FlintTask
     /// <summary>privateFileDownloadFinished stand-in (private pack successfully parsed).</summary>
     public Action<LegacyFtbModpack>? PrivatePackFetched { get; set; }
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Fetches and parses both shared pack lists. A list that does not parse is
+    /// named in the thrown exception while the other list stays populated.</summary>
+    public async Task FetchAsync(CancellationToken cancellationToken)
     {
         PublicPacks.Clear();
         ThirdPartyPacks.Clear();
@@ -72,17 +69,15 @@ public sealed class LegacyFtbPackFetchTask : FlintTask
         }
         catch (FlintHttpException e)
         {
-            EmitFailed(e.Reason);
-            return;
+            throw new InvalidOperationException(e.Reason, e);
         }
 
-        await FileDownloadFinished(publicXml, thirdPartyXml);
+        FileDownloadFinished(publicXml, thirdPartyXml);
     }
 
-    /// <summary>Port of PackFetchTask::fetchPrivate: fetch static/{code}.xml per pack code;
-    /// each parsed pack carries its packCode. Failures are skipped per code (the C++ reported
-    /// them through the privateFileDownloadFailed signal, whose port has no subscriber). The
-    /// task result only reflects the shared network job.</summary>
+    /// <summary>Fetches static/{code}.xml per pack code; each parsed pack carries its
+    /// packCode. A code that fails to fetch or parse is skipped silently, so the caller learns
+    /// about it only by its pack's absence.</summary>
     public async Task FetchPrivateAsync(IEnumerable<string> toFetch, CancellationToken cancellationToken = default)
     {
         var privatePackBaseUrl = CdnBaseUrl + "static/%1.xml";
@@ -105,8 +100,7 @@ public sealed class LegacyFtbPackFetchTask : FlintTask
             var packs = new List<LegacyFtbModpack>();
             if (!ParseAndAddPacks(body, PackType.Private, packs))
             {
-                // (the C++ signals nothing for an unparseable private pack body — the
-                //  finished signal simply never fires for it)
+                // an unparseable private pack body contributes no packs
                 continue;
             }
 
@@ -118,10 +112,8 @@ public sealed class LegacyFtbPackFetchTask : FlintTask
         }
     }
 
-    private async Task FileDownloadFinished(string publicResponse, string thirdPartyResponse)
+    private void FileDownloadFinished(string publicResponse, string thirdPartyResponse)
     {
-        await Task.CompletedTask;
-
         var failedLists = new List<string>();
 
         if (!ParseAndAddPacks(publicResponse, PackType.Public, PublicPacks))
@@ -136,15 +128,13 @@ public sealed class LegacyFtbPackFetchTask : FlintTask
 
         if (failedLists.Count > 0)
         {
-            EmitFailed("Failed to download some pack lists: " + string.Join("\n- ", failedLists));
-            return;
+            throw new InvalidOperationException(
+                "Failed to download some pack lists: " + string.Join("\n- ", failedLists));
         }
-
-        EmitSucceeded();
     }
 
-    /// <summary>Port of PackFetchTask::parseAndAddPacks: parse every &lt;modpack&gt; element
-    /// of the XML document into the list. Returns false for unparseable XML.</summary>
+    /// <summary>Parses every &lt;modpack&gt; element of the XML document into the list.
+    /// Returns false for unparseable XML.</summary>
     public static bool ParseAndAddPacks(string data, PackType packType, List<LegacyFtbModpack> list)
     {
         var doc = new XmlDocument();

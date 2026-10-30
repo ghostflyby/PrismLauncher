@@ -28,11 +28,11 @@ using FlintLauncher.Core.Instances;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class LookupServerAddress(LaunchTask parent, MinecraftTarget output) : LaunchStep(parent)
+public sealed class LookupServerAddress(LaunchTask parent, MinecraftTarget output) : AwaitedStep(parent)
 {
     public string LookupAddress { get; init; } = "";
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         var dnsName = $"_minecraft._tcp.{LookupAddress}";
         SrvRecord? record;
@@ -43,10 +43,12 @@ public sealed class LookupServerAddress(LaunchTask parent, MinecraftTarget outpu
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
+            // a failed lookup is not fatal: the launch continues with the original address and
+            // the default port, and Minecraft itself may still connect
             EmitLogLine($"Failed to resolve server address (this is NOT an error!) {dnsName}: {e.Message}\n",
                 MessageLevel.Launcher);
-            Resolve(LookupAddress, 25565); // Technically the task failed, however, we don't abort the launch
-            return;                        // and leave it up to minecraft to fail (or maybe not) when connecting
+            Resolve(LookupAddress, 25565);
+            return;
         }
 
         if (record is null)
@@ -66,14 +68,9 @@ public sealed class LookupServerAddress(LaunchTask parent, MinecraftTarget outpu
     {
         output.Address = address;
         output.Port = port;
-        EmitSucceeded();
     }
 
     public override bool CanAbort() => true;
 
-    public override bool AbortStep()
-    {
-        EmitAborted();
-        return true;
-    }
+    public override bool AbortStep() => true;
 }

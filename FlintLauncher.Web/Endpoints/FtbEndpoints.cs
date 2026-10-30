@@ -16,10 +16,9 @@
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Core.Net;
-using FlintLauncher.ExternalApi;
+using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using FlintLauncher.Web.Models;
@@ -159,13 +158,14 @@ public static class FtbEndpoints
                 // "<name>(1)"
                 AbsolutePath inDir = new AbsolutePath(instances.PrimaryDir());
                 var expectedId = FileNaming.DirNameFromString(task.Name(), [inDir]);
-                await wrapped.StartAsync();
-                if (!wrapped.WasSuccessful)
+                try
                 {
-                    // the staging wrapper re-emits the inner task's FailReason (an
-                    // unknown version surfaces the task's "Failed to find pack version"
-                    // text)
-                    return ApiJson.Error("creation_failed", wrapped.FailReason, 500);
+                    await wrapped(CancellationToken.None);
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    // an unknown version surfaces the task's "Failed to find pack version" text
+                    return ApiJson.Error("creation_failed", TaskWork.ReasonOf(e), 500);
                 }
 
                 instances.LoadList();

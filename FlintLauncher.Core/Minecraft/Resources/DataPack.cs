@@ -47,8 +47,8 @@ public class DataPack(FileInfo fileInfo) : Resource(fileInfo)
     public void SetPackFormat(int newFormatId, (int Major, int Minor) minFormat, (int Major, int Minor) maxFormat)
     {
         _packFormat = newFormatId;
-        this._minFormat = minFormat;
-        this._maxFormat = maxFormat;
+        _minFormat = minFormat;
+        _maxFormat = maxFormat;
     }
 
     public void SetDescription(string newDescription)

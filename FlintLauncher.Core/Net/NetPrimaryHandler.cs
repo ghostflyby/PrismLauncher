@@ -22,7 +22,12 @@ public sealed class NetPrimaryHandler : HttpMessageHandler
     /// <summary>The proxy tuple plus the version counter in one immutable value: readers
     /// take one consistent snapshot, <see cref="SetProxy"/> replaces the box.</summary>
     private readonly record struct ProxyState(
-        string Type, string Host, int Port, string User, string Pass, long Version);
+        string Type,
+        string Host,
+        int Port,
+        string User,
+        string Pass,
+        long Version);
 
     /// <summary>The reference wrapper makes the volatile swap possible (a struct field
     /// cannot be volatile): readers take one snapshot, writers replace the box.</summary>
@@ -90,7 +95,7 @@ public sealed class NetPrimaryHandler : HttpMessageHandler
         {
             var previous = _proxy.State;
             var changed = previous.Type != type || previous.Host != host || previous.Port != port
-                || previous.User != user || previous.Pass != pass;
+                          || previous.User != user || previous.Pass != pass;
             if (!changed)
             {
                 return;

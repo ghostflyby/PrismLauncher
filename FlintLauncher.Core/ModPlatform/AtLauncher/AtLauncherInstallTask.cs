@@ -117,7 +117,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
     /// <summary>(uid, version) -> loaded VersionFile from the local metadata index
     /// (APPLICATION->metadataIndex()->getLoadedVersion). Best-effort — see the header note.
-    /// Per-task hook (DI): the caller sets it before StartAsync, so parallel installs and
+    /// Per-task hook (DI): the caller sets it before the run, so parallel installs and
     /// parallel tests cannot see each other's stub.</summary>
     public Func<string, string, VersionFile?>? MetaVersionDataLookup { get; set; }
 
@@ -130,8 +130,8 @@ public sealed partial class AtLauncherPackInstallTask(
     // assigned by OnDownloadSucceeded before any read
     private PackVersion? _configs;
 
-    /// <summary>The Configs payload; the state machine only reads it after the download
-    /// succeeded, so a read before that is a broken invariant rather than a null value.</summary>
+    /// <summary>The Configs payload; the body only reads it after the download succeeded, so
+    /// a read before that is a broken invariant rather than a null value.</summary>
     private PackVersion Configs => _configs
                                    ?? throw new InvalidOperationException("the pack configs have not been downloaded");
 
@@ -143,7 +143,7 @@ public sealed partial class AtLauncherPackInstallTask(
     private readonly Dictionary<AbsolutePath, VersionMod> _modsToDecomp = new();
     private readonly Dictionary<AbsolutePath, AbsolutePath> _modsToCopy = new();
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    internal override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Fetching pack version...");
 
@@ -156,8 +156,7 @@ public sealed partial class AtLauncherPackInstallTask(
         }
         catch (FlintHttpException e)
         {
-            EmitFailed(e.Reason);
-            return;
+            throw new InvalidOperationException(e.Reason);
         }
 
         await OnDownloadSucceeded(configs, cancellationToken);
@@ -173,8 +172,7 @@ public sealed partial class AtLauncherPackInstallTask(
         }
         catch (JsonException e)
         {
-            EmitFailed("Could not understand pack manifest:\n" + e.Message);
-            return;
+            throw new InvalidOperationException("Could not understand pack manifest:\n" + e.Message);
         }
 
         // Derived from the installation mode
@@ -195,8 +193,7 @@ public sealed partial class AtLauncherPackInstallTask(
                 break;
 
             default:
-                EmitFailed("Unsupported installation mode");
-                return;
+                throw new InvalidOperationException("Unsupported installation mode");
         }
 
         // Display message if one exists
@@ -380,8 +377,7 @@ public sealed partial class AtLauncherPackInstallTask(
                 EmitStatus("Unsupported mod type: " + raw);
                 return null;
             case ModType.Unknown:
-                EmitFailed($"Unknown mod type: {raw}");
-                return null;
+                throw new InvalidOperationException($"Unknown mod type: {raw}");
             default:
                 return null;
         }
@@ -397,8 +393,7 @@ public sealed partial class AtLauncherPackInstallTask(
                 var lookup = RecommendedLoaderVersionLookup;
                 if (lookup is null)
                 {
-                    EmitFailed($"Failed to get local metadata index for {uid}");
-                    return null;
+                    throw new InvalidOperationException($"Failed to get local metadata index for {uid}");
                 }
 
                 // (the version-list traversal lives in the hook; forge/neoforge are filtered
@@ -406,8 +401,7 @@ public sealed partial class AtLauncherPackInstallTask(
                 var found = lookup(uid, loader.Type, loader.Type != "fabric" ? Configs.Minecraft : "");
                 if (string.IsNullOrEmpty(found))
                 {
-                    EmitFailed($"Failed to find version for {loader.Type} loader");
-                    return null;
+                    throw new InvalidOperationException($"Failed to find version for {loader.Type} loader");
                 }
 
                 return found;
@@ -422,8 +416,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
         if (string.IsNullOrEmpty(loader.Version))
         {
-            EmitFailed("No loader version set for modpack!");
-            return null;
+            throw new InvalidOperationException("No loader version set for modpack!");
         }
 
         return loader.Version;
@@ -558,8 +551,7 @@ public sealed partial class AtLauncherPackInstallTask(
                     break;
                 case DownloadType.Browser:
                 case DownloadType.Unknown:
-                    EmitFailed($"Unknown or unsupported download type: {lib.DownloadRaw}");
-                    return false;
+                    throw new InvalidOperationException($"Unknown or unsupported download type: {lib.DownloadRaw}");
             }
 
             f.Libraries.Add(library);
@@ -715,12 +707,7 @@ public sealed partial class AtLauncherPackInstallTask(
             dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, Configs.Configs.Sha1));
         }
 
-        await dl.StartAsync(cancellationToken);
-        if (!dl.WasSuccessful)
-        {
-            EmitFailed(dl.FailReason);
-            return;
-        }
+        await dl.DownloadAsync(null, cancellationToken);
 
         await ExtractConfigs(cancellationToken);
     }
@@ -766,8 +753,7 @@ public sealed partial class AtLauncherPackInstallTask(
         EmitStatus("Downloading mods...");
 
         _jarMods.Clear();
-        var modJob = new NetJob("Mod download");
-        var downloadRequests = new List<HttpDownloadTask>();
+        var downloads = new List<HttpDownloadTask>();
         var blockedMods = new List<(VersionMod Mod, BlockedMod Blocked)>();
 
         foreach (var mod in Configs.Mods)
@@ -805,23 +791,21 @@ public sealed partial class AtLauncherPackInstallTask(
                     url = mod.Url;
                     break;
                 case DownloadType.Unknown:
-                    EmitFailed($"Unknown download type: {mod.DownloadRaw}");
-                    return;
+                    throw new InvalidOperationException($"Unknown download type: {mod.DownloadRaw}");
                 default:
-                    EmitFailed($"Unknown download type: {mod.DownloadRaw}");
-                    return;
+                    throw new InvalidOperationException($"Unknown download type: {mod.DownloadRaw}");
             }
 
             var cacheName = Path.GetFileNameWithoutExtension(mod.File) + "-" + mod.Md5 + Path.GetExtension(mod.File);
 
             if (mod.Type is ModType.Extract or ModType.TexturePackExtract or ModType.ResourcePackExtract)
             {
-                var cachePath = CachePathFor(cacheName, url, modJob, downloadRequests, mod);
+                var cachePath = CachePathFor(cacheName, url, downloads, mod);
                 _modsToExtract[cachePath] = mod;
             }
             else if (mod.Type == ModType.Decomp)
             {
-                var cachePath = CachePathFor(cacheName, url, modJob, downloadRequests, mod);
+                var cachePath = CachePathFor(cacheName, url, downloads, mod);
                 _modsToDecomp[cachePath] = mod;
             }
             else
@@ -829,15 +813,10 @@ public sealed partial class AtLauncherPackInstallTask(
                 var relpath = GetDirForModType(mod.Type, mod.TypeRaw);
                 if (relpath is null)
                 {
-                    if (State == TaskState.Failed)
-                    {
-                        return;
-                    }
-
                     continue;
                 }
 
-                var cachePath = CachePathFor(cacheName, url, modJob, downloadRequests, mod);
+                var cachePath = CachePathFor(cacheName, url, downloads, mod);
 
                 var path = StagingPath / "minecraft" / relpath / mod.File;
 
@@ -892,11 +871,6 @@ public sealed partial class AtLauncherPackInstallTask(
                         var relpath = GetDirForModType(mod.Type, mod.TypeRaw);
                         if (relpath is null)
                         {
-                            if (State == TaskState.Failed)
-                            {
-                                return;
-                            }
-
                             continue;
                         }
 
@@ -926,36 +900,22 @@ public sealed partial class AtLauncherPackInstallTask(
 
             if (!anyMatched)
             {
-                EmitFailed("The following files are not available for download in third party launchers.\n" +
-                           "You will need to manually download them and add them to the instance:\n" +
-                           string.Join("\n", BlockedMods.Select(m => $"{m.Name} ({m.WebsiteUrl})")) + "\n" +
-                           "Unknown download type: browser");
-                return;
+                throw new InvalidOperationException("The following files are not available for download in third party launchers.\n" +
+                                                    "You will need to manually download them and add them to the instance:\n" +
+                                                    string.Join("\n", BlockedMods.Select(m => $"{m.Name} ({m.WebsiteUrl})")) + "\n" +
+                                                    "Unknown download type: browser");
             }
         }
 
-        modJob.Progress += (_, _) =>
-        {
-            EmitDetails($"{downloadRequests.Count(t => t.IsFinished)} out of {downloadRequests.Count} complete");
-            SetProgress(downloadRequests.Count(t => t.IsFinished), downloadRequests.Count);
-        };
-        await modJob.StartAsync(cancellationToken);
-        if (!modJob.WasSuccessful)
-        {
-            EmitFailed(modJob.FailReason);
-            return;
-        }
+        await TaskWork.RunAllAsync(downloads,
+                (dl, token) => dl.DownloadAsync(null, token), maxConcurrent: 6, cancellationToken)
+            .ConfigureAwait(false);
 
         if (_modsToExtract.Count != 0 || _modsToDecomp.Count != 0 || _modsToCopy.Count != 0)
         {
             if (!ExtractMods())
             {
-                if (State != TaskState.Failed)
-                {
-                    EmitFailed("Failed to extract mods...");
-                }
-
-                return;
+                throw new InvalidOperationException("Failed to extract mods...");
             }
         }
 
@@ -963,7 +923,7 @@ public sealed partial class AtLauncherPackInstallTask(
     }
 
     /// <summary>Queue a mod download; returns the local path the file lands in.</summary>
-    private AbsolutePath CachePathFor(string cacheName, string url, NetJob modJob, List<HttpDownloadTask> downloadRequests,
+    private AbsolutePath CachePathFor(string cacheName, string url, List<HttpDownloadTask> downloads,
         VersionMod mod)
     {
         AbsolutePath cachePath;
@@ -986,8 +946,7 @@ public sealed partial class AtLauncherPackInstallTask(
             dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.MD5, mod.Md5));
         }
 
-        modJob.AddDownload(dl);
-        downloadRequests.Add(dl);
+        downloads.Add(dl);
         return cachePath;
     }
 
@@ -1107,8 +1066,7 @@ public sealed partial class AtLauncherPackInstallTask(
             // Use a component to add libraries BEFORE Minecraft
             if (!CreateLibrariesComponent(instance.InstanceRoot, components))
             {
-                EmitFailed("Failed to create libraries component");
-                return;
+                throw new InvalidOperationException("Failed to create libraries component");
             }
 
             // Minecraft
@@ -1117,38 +1075,28 @@ public sealed partial class AtLauncherPackInstallTask(
             // Loader
             if (Configs.Loader.Type == "forge")
             {
-                var version = GetVersionForLoader("net.minecraftforge");
-                if (version is null)
-                {
-                    return;
-                }
+                var version = GetVersionForLoader("net.minecraftforge")
+                              ?? throw new InvalidOperationException("No loader version set for modpack!");
 
                 await components.SetComponentVersion("net.minecraftforge", version, cancellationToken: cancellationToken);
             }
             else if (Configs.Loader.Type == "neoforge")
             {
-                var version = GetVersionForLoader("net.neoforged");
-                if (version is null)
-                {
-                    return;
-                }
+                var version = GetVersionForLoader("net.neoforged")
+                              ?? throw new InvalidOperationException("No loader version set for modpack!");
 
                 await components.SetComponentVersion("net.neoforged", version, cancellationToken: cancellationToken);
             }
             else if (Configs.Loader.Type == "fabric")
             {
-                var version = GetVersionForLoader("net.fabricmc.fabric-loader");
-                if (version is null)
-                {
-                    return;
-                }
+                var version = GetVersionForLoader("net.fabricmc.fabric-loader")
+                              ?? throw new InvalidOperationException("No loader version set for modpack!");
 
                 await components.SetComponentVersion("net.fabricmc.fabric-loader", version, cancellationToken: cancellationToken);
             }
             else if (Configs.Loader.Type.Length != 0)
             {
-                EmitFailed("Unknown loader type: " + Configs.Loader.Type);
-                return;
+                throw new InvalidOperationException("Unknown loader type: " + Configs.Loader.Type);
             }
 
             foreach (var (componentUid, componentVersion) in _componentsToInstall)
@@ -1162,8 +1110,7 @@ public sealed partial class AtLauncherPackInstallTask(
             // todo: use more detection
             if (!CreatePackComponent(instance.InstanceRoot, components))
             {
-                EmitFailed("Failed to create pack component");
-                return;
+                throw new InvalidOperationException("Failed to create pack component");
             }
 
             components.SaveNow();
@@ -1178,7 +1125,6 @@ public sealed partial class AtLauncherPackInstallTask(
         // (upstream calls downloadFiles(m_instance.get()) here — the update pipeline;
         //  like the other creation tasks, creation succeeds without fetching game files)
         await Task.CompletedTask;
-        EmitSucceeded();
     }
 
     /// <summary>Port of the isPathTraversal helper.</summary>

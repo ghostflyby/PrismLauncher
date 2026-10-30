@@ -65,14 +65,14 @@ public static class AccountEndpoints
 
         // ------------------------------------------------------- MSA device-code login
         api.MapPost("/accounts/msa/devicecode", async (DeviceCodeSessionStore store,
-            AuthEndpointsOptions auth) =>
+            AuthEndpointsOptions auth, ILoggerFactory loggerFactory) =>
         {
-            var session = store.Start(auth);
+            var session = store.Start(auth, loggerFactory);
             // wait (bounded) for Microsoft to hand out the device/user code pair
             var issued = await store.WaitForCodeAsync(session, TimeSpan.FromSeconds(10));
             if (!issued)
             {
-                return ApiJson.Error("msa_error", session.Flow.FailReason is { Length: > 0 } reason
+                return ApiJson.Error("msa_error", session.FailReason is { Length: > 0 } reason
                     ? $"device authorization failed: {reason}"
                     : "device authorization failed", 502);
             }

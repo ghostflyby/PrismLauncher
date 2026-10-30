@@ -40,7 +40,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
 using TruePath;
 
 namespace FlintLauncher.Core.Meta;
@@ -78,7 +77,7 @@ public abstract class MetaEntity
 {
     private LoadStatus _loadStatus = LoadStatus.NotLoaded;
 
-    private FlintTask? _task;
+    private Task? _loadTask;
 
     /// <summary>The cache this entity downloads through and resolves its local file under
     /// (base "meta"; C++: APPLICATION->metacache()). The static CWD-anchored fallback is
@@ -124,16 +123,19 @@ public abstract class MetaEntity
     /// <summary>for parsers</summary>
     public abstract void Parse(JsonObject obj);
 
-    /// <summary>Port of BaseEntity::loadTask().</summary>
-    public FlintTask LoadTask(NetMode loadType = NetMode.Online, bool forceReload = false)
+    /// <summary>Port of BaseEntity::loadTask(): a load already in flight is returned instead of
+    /// starting a second one. Returning is success; any other exception is a failure whose
+    /// message is the reason.</summary>
+    public Task LoadAsync(NetMode loadType = NetMode.Online, bool forceReload = false,
+        CancellationToken cancellationToken = default)
     {
-        if (_task is not null && _task.IsRunning)
+        if (_loadTask is { IsCompleted: false } inFlight)
         {
-            return _task;
+            return inFlight;
         }
 
-        _task = new MetaEntityLoadTask(this, loadType, forceReload);
-        return _task;
+        return _loadTask = new MetaEntityLoadTask(this, loadType, forceReload)
+            .RunAsync(cancellationToken);
     }
 
     /// <summary>
@@ -179,9 +181,9 @@ public abstract class MetaEntity
     }
 
     /// <summary>Port of Meta::BaseEntityLoadTask.</summary>
-    private sealed class MetaEntityLoadTask(MetaEntity entity, NetMode mode, bool forceReload) : FlintTask
+    private sealed class MetaEntityLoadTask(MetaEntity entity, NetMode mode, bool forceReload)
     {
-        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+        public async Task RunAsync(CancellationToken cancellationToken)
         {
             var fname = entity.MetaPath(entity.LocalFilename);
             var hashMatches = false;
@@ -194,7 +196,6 @@ public abstract class MetaEntity
                     // read local file if nothing is loaded yet
                     if (entity._loadStatus == LoadStatus.NotLoaded || entity.FileSha256.Length == 0)
                     {
-                        EmitStatus("Loading local file");
                         fileData = File.ReadAllBytes(fname);
                         entity.FileSha256 = Convert.ToHexStringLower(SHA256.HashData(fileData));
                     }
@@ -236,7 +237,6 @@ public abstract class MetaEntity
                 : hashMatches;
             if (wasLoadedOffline || (wasLoadedRemote && !forceReload))
             {
-                EmitSucceeded();
                 return;
             }
 
@@ -263,17 +263,9 @@ public abstract class MetaEntity
 
             dl.AddValidator(new ParsingValidator(entity));
 
-            await dl.StartAsync(cancellationToken).ConfigureAwait(false);
-            if (dl.State == TaskState.Succeeded)
-            {
-                entity._loadStatus = LoadStatus.Remote;
-                entity.FileSha256 = entity.Sha256;
-                EmitSucceeded();
-            }
-            else
-            {
-                EmitFailed(dl.FailReason);
-            }
+            await dl.DownloadAsync(null, cancellationToken).ConfigureAwait(false);
+            entity._loadStatus = LoadStatus.Remote;
+            entity.FileSha256 = entity.Sha256;
         }
     }
 }

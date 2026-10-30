@@ -31,6 +31,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using FlintLauncher.Core.Instances;
+using Microsoft.Extensions.Logging;
 
 namespace FlintLauncher.Core.Auth;
 
@@ -135,29 +136,31 @@ public sealed class MinecraftAccount
     /// <summary>Saves a MinecraftAccount to its wire record and returns it.</summary>
     public AccountJson SaveToJson() => Data.SaveState();
 
-    public AuthFlow Login(bool useDeviceCode = false, AuthEndpointsOptions? auth = null)
+    public AuthFlow Login(bool useDeviceCode = false, AuthEndpointsOptions? auth = null,
+        ILoggerFactory? loggerFactory = null)
     {
-        return Attach(new AuthFlow(Data, useDeviceCode ? AuthFlowAction.DeviceCode : AuthFlowAction.Login, auth));
+        return Attach(new AuthFlow(Data, useDeviceCode ? AuthFlowAction.DeviceCode : AuthFlowAction.Login,
+            auth, loggerFactory));
     }
 
-    public AuthFlow? Refresh(AuthEndpointsOptions? auth = null)
+    public AuthFlow? Refresh(AuthEndpointsOptions? auth = null, ILoggerFactory? loggerFactory = null)
     {
         if (_currentTask is not null)
         {
             return _currentTask;
         }
 
-        return Attach(new AuthFlow(Data, AuthFlowAction.Refresh, auth));
+        return Attach(new AuthFlow(Data, AuthFlowAction.Refresh, auth, loggerFactory));
     }
 
+    /// <summary>The flow currently authenticating this account, if any.</summary>
     public AuthFlow? CurrentTask => _currentTask;
 
     private AuthFlow Attach(AuthFlow flow)
     {
         _currentTask = flow;
-        flow.Succeeded += _ => AuthSucceeded();
-        flow.Failed += (_, _) => AuthFailed();
-        flow.Aborted += _ => AuthFailed();
+        flow.Succeeded += AuthSucceeded;
+        flow.Failed += AuthFailed;
         ActivityChanged?.Invoke(true);
         return flow;
     }

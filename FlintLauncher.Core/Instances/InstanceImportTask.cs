@@ -45,7 +45,6 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
-using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
@@ -87,7 +86,7 @@ public sealed partial class InstanceImportTask(
     public IReadOnlyDictionary<string, bool> OptionalModsSelection { get; set; } =
         new Dictionary<string, bool>();
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    internal override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         if (sourceUrl.IsFile)
         {
@@ -111,14 +110,8 @@ public sealed partial class InstanceImportTask(
             entry.IsStale = true;
             _archivePath = new AbsolutePath(entry.GetFullPath());
 
-            var filesNetJob = new NetJob("Modpack download");
-            filesNetJob.AddDownload(HttpDownloadTask.Cached(MetaCache, sourceUrl, entry));
-            await filesNetJob.StartAsync(cancellationToken);
-            if (!filesNetJob.WasSuccessful)
-            {
-                EmitFailed(filesNetJob.FailReason);
-                return;
-            }
+            var request = HttpDownloadTask.Cached(MetaCache, sourceUrl, entry);
+            await request.DownloadAsync(null, cancellationToken).ConfigureAwait(false);
         }
         else
         {
@@ -127,12 +120,7 @@ public sealed partial class InstanceImportTask(
             _archivePath = StagingPath / a1;
             FileOps.EnsureFilePathExists(_archivePath);
             var request = HttpDownloadTask.ToFile(sourceUrl, _archivePath, http);
-            await request.StartAsync(cancellationToken);
-            if (!request.WasSuccessful)
-            {
-                EmitFailed(request.FailReason);
-                return;
-            }
+            await request.DownloadAsync(null, cancellationToken).ConfigureAwait(false);
         }
 
         await ProcessZipPack(cancellationToken);
@@ -189,14 +177,12 @@ public sealed partial class InstanceImportTask(
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
                                       or ArgumentException or NotSupportedException)
         {
-            EmitFailed("Unable to open supplied modpack zip file.");
-            return;
+            throw new InvalidOperationException("Unable to open supplied modpack zip file.");
         }
 
         if (_modpackType == ModpackType.Unknown)
         {
-            EmitFailed("Archive does not contain a recognized modpack type.");
-            return;
+            throw new InvalidOperationException("Archive does not contain a recognized modpack type.");
         }
 
         EmitStatus("Extracting modpack");
@@ -205,8 +191,7 @@ public sealed partial class InstanceImportTask(
         var extracted = MmcZip.ExtractDir(_archivePath, root, extractDir);
         if (extracted is null)
         {
-            EmitFailed("Failed to extract the modpack zip.");
-            return;
+            throw new InvalidOperationException("Failed to extract the modpack zip.");
         }
 
         await ExtractFinished(cancellationToken);
@@ -229,8 +214,7 @@ public sealed partial class InstanceImportTask(
                 await ProcessModrinth(cancellationToken);
                 return;
             case ModpackType.Unknown:
-                EmitFailed("Archive does not contain a recognized modpack type.");
-                return;
+                throw new InvalidOperationException("Archive does not contain a recognized modpack type.");
         }
     }
 
@@ -259,17 +243,8 @@ public sealed partial class InstanceImportTask(
         instCreationTask.Group = Group;
         instCreationTask.SetConfirmUpdate(ShouldConfirmUpdate());
 
-        await instCreationTask.StartAsync(cancellationToken);
-
-        if (instCreationTask.WasSuccessful)
-        {
-            SetOverride(instCreationTask.ShouldOverride, instCreationTask.OriginalInstanceId);
-            EmitSucceeded();
-        }
-        else
-        {
-            EmitFailed(instCreationTask.FailReason);
-        }
+        await instCreationTask.ExecuteAsync(cancellationToken);
+        SetOverride(instCreationTask.ShouldOverride, instCreationTask.OriginalInstanceId);
     }
 
     private async Task ProcessTechnic(CancellationToken cancellationToken)
@@ -284,11 +259,8 @@ public sealed partial class InstanceImportTask(
             Name(), Icon, StagingPath, cancellationToken: cancellationToken);
         if (failure is not null)
         {
-            EmitFailed(failure);
-            return;
+            throw new InvalidOperationException(failure);
         }
-
-        EmitSucceeded();
     }
 
     private void ProcessMultiMc()
@@ -316,8 +288,6 @@ public sealed partial class InstanceImportTask(
         {
             instance.SetIconKey(Icon);
         }
-
-        EmitSucceeded();
     }
 
     private async Task ProcessModrinth(CancellationToken cancellationToken)
@@ -354,17 +324,8 @@ public sealed partial class InstanceImportTask(
         instCreationTask.Group = Group;
         instCreationTask.SetConfirmUpdate(ShouldConfirmUpdate());
 
-        await instCreationTask.StartAsync(cancellationToken);
-
-        if (instCreationTask.WasSuccessful)
-        {
-            SetOverride(instCreationTask.ShouldOverride, instCreationTask.OriginalInstanceId);
-            EmitSucceeded();
-        }
-        else
-        {
-            EmitFailed(instCreationTask.FailReason);
-        }
+        await instCreationTask.ExecuteAsync(cancellationToken);
+        SetOverride(instCreationTask.ShouldOverride, instCreationTask.OriginalInstanceId);
     }
 
     /// <summary>Port of the cleanPath helper ('.' and './' prefixes are removed).</summary>

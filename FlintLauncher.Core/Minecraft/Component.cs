@@ -570,7 +570,8 @@ public class Component : ProblemProvider
             if (Parent is not null && (MetaVersion is null || !MetaVersion.IsLoaded))
             {
                 // wait for the loaded version from meta
-                await Parent.MetadataIndex.LoadVersion(Uid, Version, mode).StartAsync(cancellationToken);
+                await Parent.MetadataIndex.LoadAsync(Uid, Version, mode, force: false, cancellationToken)
+                    .ConfigureAwait(false);
                 MetaVersion = Parent.MetadataIndex.Get(Uid, Version);
             }
 

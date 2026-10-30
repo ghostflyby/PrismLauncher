@@ -110,7 +110,7 @@ public class Rule
 
     public Action Apply(RuntimeContext runtimeContext)
     {
-        if (this._os is { } ruleOs && !runtimeContext.ClassifierMatches(ruleOs.Name))
+        if (_os is { } ruleOs && !runtimeContext.ClassifierMatches(ruleOs.Name))
         {
             return Action.Defer;
         }

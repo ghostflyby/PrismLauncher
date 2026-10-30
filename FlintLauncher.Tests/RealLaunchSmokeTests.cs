@@ -9,7 +9,6 @@ using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
 using TruePath;
 using Xunit;
 
@@ -68,33 +67,17 @@ public class RealLaunchSmokeTests
             Services = fixture.CreateServices(installRoot: launcherRoot),
         };
 
-        // the controller's own run completes when the launcher is started (Login tail);
-        // the game session is covered by the LaunchTask's in-flight StartAsync.
-        var controllerRun = controller.StartAsync();
-
-        var deadline = DateTime.UtcNow.AddSeconds(30);
-        while (controller.Launcher is null)
-        {
-            if (controller.IsFinished || DateTime.UtcNow > deadline)
-            {
-                throw new Exception($"controller never created a launcher: {controller.State} {controller.FailReason}");
-            }
-
-            await Task.Delay(50);
-        }
-
+        // the controller's run covers the whole session, the game included
+        var outcome = await controller.RunToCompletionAsync(TestContext.Current.CancellationToken);
         var launchTask = controller.Launcher;
-        await launchTask.StartAsync(); // joins the in-flight run
-        await controllerRun;
+        Assert.NotNull(launchTask);
 
-        if (launchTask.State != TaskState.Succeeded)
+        if (!outcome.Succeeded)
         {
             throw new Exception(
-                "launch failed: " + launchTask.FailReason + " | log: "
+                "launch failed: " + outcome.FailReason + " | log: "
                 + string.Join(" / ", launchTask.GetLogModel().Entries.Select(e => e.Line).TakeLast(12)));
         }
-
-        Assert.Equal(TaskState.Succeeded, controller.State);
 
         // the launch script reached the fake EntryPoint and came back through the log
         var lines = launchTask.GetLogModel().Entries.Select(e => e.Line).ToList();

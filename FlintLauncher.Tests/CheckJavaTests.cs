@@ -9,7 +9,6 @@
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Launch.Steps;
-using FlintLauncher.Core.Tasks;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -43,12 +42,13 @@ public class CheckJavaTests : IDisposable
         var instance = await fixture.CreateInstance();
         SeedCachedJava(fixture, instance, languageVersion: null);
 
-        var task = await RunCheckJavaAsync(fixture, instance);
+        var (task, outcome) = await RunCheckJavaAsync(fixture, instance);
 
         // the stale entry sent the step into a fresh JdkFind probe (the fake java cannot
         // answer it), instead of trusting the cache
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Equal("Could not start java!", task.FailReason);
+        Assert.False(outcome.Succeeded);
+        Assert.False(outcome.Aborted);
+        Assert.Equal("Could not start java!", outcome.FailReason);
         Assert.Contains(task.GetLogModel().Entries, e => e.Line == "Checking Java version...");
     }
 
@@ -64,9 +64,9 @@ public class CheckJavaTests : IDisposable
         var instance = await fixture.CreateInstance();
         SeedCachedJava(fixture, instance, languageVersion: 17);
 
-        var task = await RunCheckJavaAsync(fixture, instance);
+        var (task, outcome) = await RunCheckJavaAsync(fixture, instance);
 
-        Assert.Equal(TaskState.Succeeded, task.State);
+        Assert.True(outcome.Succeeded, outcome.FailReason);
         Assert.DoesNotContain(task.GetLogModel().Entries, e => e.Line == "Checking Java version...");
         Assert.Contains(task.GetLogModel().Entries,
             e => e.Line == "Java is version 17.0.2, using 64 (arm64) architecture, from fixture");
@@ -82,12 +82,13 @@ public class CheckJavaTests : IDisposable
         fixture.SeedJavaDetection(javaPath, javaUnixTime, languageVersion);
     }
 
-    private async Task<LaunchTask> RunCheckJavaAsync(LaunchFixture fixture, MinecraftInstance instance)
+    private async Task<(LaunchTask Task, LaunchTask.LaunchOutcome Outcome)> RunCheckJavaAsync(
+        LaunchFixture fixture, MinecraftInstance instance)
     {
         var task = LaunchTask.Create(instance, fixture.CreateServices(installRoot: _root));
         task.AppendStep(new CheckJava(task));
-        await task.StartAsync();
-        return task;
+        var outcome = await task.RunToCompletionAsync(TestContext.Current.CancellationToken);
+        return (task, outcome);
     }
 
     /// <summary>

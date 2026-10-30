@@ -18,76 +18,50 @@
 //     See the License for the specific language governing permissions and
 //     limitations under the License.
 //
-// Port of launcher/launch/TaskStepWrapper.{h,cpp}: wraps a plain FlintTask (the instance
-// update pipeline) as a LaunchStep.
+// Wraps a plain async body (the instance update pipeline) as a launch step.
 //
-// Deviation from the C++ original: the C++ executeTask() emits progressReportingRequest() and
-// the UI calls proceed() to start the wrapped task; proceed() maps to m_task->start(). The C#
-// port keeps the gate — the wrapped task is only started once Proceed() runs — but awaits it
-// instead of relying on the finished() signal, so the step completes when the wrapped task
-// reaches its terminal state.
-// canAbort()/abort() port note: the C++ forwards to the wrapped task's canAbort()/abort()
-// (C++ Task::canAbort defaults to a false flag). The C# FlintTask always accepts abort
-// requests, so "can abort" here means the wrapped task has not finished yet.
+// The step asks for the progress gate and starts the body once Proceed() runs, so a host that
+// drives the launch from the API can hold it there. The wrapped failure becomes this step's,
+// with the pipeline's prefix.
 
 using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Launch;
 
-public sealed class TaskStepWrapper(LaunchTask parent, FlintTask task) : LaunchStep(parent)
+public sealed class TaskStepWrapper(LaunchTask parent, Func<CancellationToken, Task> task)
+    : AwaitedStep(parent)
 {
-    private FlintTask? _task = task;
     private TaskCompletionSource? _proceedSignal;
+    private bool _bodyFinished;
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
-        if (State == TaskState.AbortedByUser)
-        {
-            EmitFailed("Task aborted.");
-            return;
-        }
-
-        // progressReportingRequest + the proceed() gate: the wrapped task starts once the
-        // controller confirms (headless: auto-proceed).
         _proceedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         EmitProgressReportingRequest();
         await _proceedSignal.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
 
-        var wrapped = this._task;
-        if (wrapped is null)
+        try
         {
-            EmitSucceeded();
-            return;
+            await task(cancellationToken).ConfigureAwait(false);
         }
-
-        await wrapped.StartAsync(cancellationToken).ConfigureAwait(false);
-
-        if (wrapped.WasSuccessful)
+        catch (OperationCanceledException)
         {
-            this._task = null;
-            EmitSucceeded();
+            throw;
         }
-        else
+        catch (Exception e)
         {
-            var reason = $"Instance update failed because: {wrapped.FailReason}\n\n";
-            this._task = null;
+            var reason = $"Instance update failed because: {TaskWork.ReasonOf(e)}\n\n";
             EmitLogLine(reason, MessageLevel.Fatal);
-            EmitFailed(reason);
+            throw new InvalidOperationException(reason, e);
+        }
+        finally
+        {
+            _bodyFinished = true;
         }
     }
 
     public override void Proceed() => _proceedSignal?.TrySetResult();
 
-    public override bool CanAbort() => _task is null || !_task.IsFinished;
-
-    public override bool AbortStep()
-    {
-        if (_task is not null && !_task.IsFinished)
-        {
-            _task.Abort();
-            return true;
-        }
-
-        return base.AbortStep();
-    }
+    /// <summary>A body that already returned has nothing left to stop.</summary>
+    public override bool CanAbort() => !_bodyFinished;
 }

@@ -10,8 +10,6 @@
 
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
-using FlintLauncher.ExternalApi;
-using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
@@ -20,6 +18,7 @@ using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Packwiz;
 using FlintLauncher.Core.Versioning;
+using FlintLauncher.ExternalApi.Flame;
 using TruePath;
 using Xunit;
 
@@ -100,9 +99,8 @@ public class ModUpdateTaskTests : IDisposable
         // 1. check: the Flame update pass finds the newer file 789
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
             _ => MetadataHandler.Get(new AbsolutePath(IndexDir), "test-mod"), flame: _flameApi, http: TestNet.Http);
-        await check.StartAsync();
-        Assert.True(check.WasSuccessful, check.FailReason);
-        var update = Assert.Single(check.GetUpdates());
+        var result = await check.CheckAsync(TestContext.Current.CancellationToken);
+        var update = Assert.Single(result.Updates);
 
         // 2. apply: the fake pack of the C++ check task + a ResourceDownloadTask per update
         var metadata = MetadataHandler.Get(new AbsolutePath(IndexDir), "test-mod");
@@ -116,10 +114,7 @@ public class ModUpdateTaskTests : IDisposable
         var download = new ResourceDownloadTask(pack, update.Version, model, TestModrinthApi.Unreachable().Client, TestModrinthApi.Unreachable().Http,
             isIndexed: true, downloadReason: "update", instance: instance);
 
-        var updateTask = new ModUpdateTask(model, [download]);
-        await updateTask.StartAsync();
-
-        Assert.True(updateTask.WasSuccessful, updateTask.FailReason);
+        await ModUpdateTask.ApplyAsync(model, [download], CancellationToken.None);
         Assert.Equal(newBytes, await File.ReadAllBytesAsync(Path.Combine(ModsDir, "test.jar")));
 
         // the metadata was refreshed to the new file id/version
@@ -173,16 +168,11 @@ public class ModUpdateTaskTests : IDisposable
         var badDownload = new ResourceDownloadTask(badPack, badVersion, model, TestModrinthApi.Unreachable().Client, TestModrinthApi.Unreachable().Http,
             instance: instance);
 
-        var updateTask = new ModUpdateTask(model, [badDownload, goodDownload]);
-        await updateTask.StartAsync();
-
         // the batch fails (like the C++ ConcurrentTask reports at the end)...
-        Assert.False(updateTask.WasSuccessful);
-        Assert.NotEqual("", updateTask.FailReason);
-        Assert.False(badDownload.WasSuccessful);
+        var failure = await Assert.ThrowsAnyAsync<Exception>(() => ModUpdateTask.ApplyAsync(model, [badDownload, goodDownload], CancellationToken.None));
+        Assert.NotEqual("", failure.Message);
 
         // ...but the sibling still installed, and the model refresh still ran
-        Assert.True(goodDownload.WasSuccessful, goodDownload.FailReason);
         Assert.Equal(goodBytes, await File.ReadAllBytesAsync(Path.Combine(ModsDir, "good.jar")));
         var installed = model.AllMods().FirstOrDefault(m => m.Fileinfo.Name == "good.jar");
         Assert.NotNull(installed);
@@ -193,10 +183,7 @@ public class ModUpdateTaskTests : IDisposable
     {
         var (_, model, _) = SetupInstalledMod("jar content"u8.ToArray());
 
-        var updateTask = new ModUpdateTask(model, []);
-        await updateTask.StartAsync();
-
-        Assert.True(updateTask.WasSuccessful, updateTask.FailReason);
+        await ModUpdateTask.ApplyAsync(model, [], CancellationToken.None);
         Assert.NotNull(model.AllMods().FirstOrDefault(m => m.Fileinfo.Name == "test.jar"));
     }
 }

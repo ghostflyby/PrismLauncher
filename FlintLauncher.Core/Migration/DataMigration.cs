@@ -69,17 +69,17 @@ public static class Filters
 /// destination files are not overwritten), after a dry run that counts the files for the
 /// progress bar.
 /// </summary>
-public sealed class DataMigrationTask(AbsolutePath sourcePath, AbsolutePath targetPath, Func<string, bool> pathMatcher) : FlintTask
+public sealed class DataMigrationTask(AbsolutePath sourcePath, AbsolutePath targetPath, Func<string, bool> pathMatcher)
 {
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Copies the whitelisted tree. Returning is success; any other exception is a
+    /// failure whose message is the reason. <paramref name="progress"/> null runs without
+    /// reporting.</summary>
+    public Task CopyAsync(IProgress<TaskProgress>? progress, CancellationToken cancellationToken)
     {
-        EmitStatus("Scanning files...");
-
         // 1. Scan — dry run to collect the amount of files.
         if (!Walk(out var files))
         {
-            EmitFailed("Failed to scan source path.");
-            return Task.CompletedTask;
+            throw new InvalidOperationException("Failed to scan source path.");
         }
 
         var toCopy = files.Count;
@@ -91,15 +91,8 @@ public sealed class DataMigrationTask(AbsolutePath sourcePath, AbsolutePath targ
         {
             cancellationToken.ThrowIfCancellationRequested();
             copied++;
-            var shortenedName = relative.Value;
-            // shorten the filename to hopefully fit into one line
-            if (shortenedName.Length > 50)
-            {
-                shortenedName = shortenedName[..20] + "…" + shortenedName[^29..];
-            }
 
-            SetProgress(copied, toCopy);
-            EmitStatus($"Copying {shortenedName}…");
+            progress?.Report(new TaskProgress(copied, toCopy));
             if (!CopyFile(relative))
             {
                 // C++ collects per-file failures (fs::copy err), keeps copying the remaining
@@ -110,11 +103,9 @@ public sealed class DataMigrationTask(AbsolutePath sourcePath, AbsolutePath targ
 
         if (failed)
         {
-            EmitFailed("Some paths could not be copied!");
-            return Task.CompletedTask;
+            throw new InvalidOperationException("Some paths could not be copied!");
         }
 
-        EmitSucceeded();
         return Task.CompletedTask;
     }
 

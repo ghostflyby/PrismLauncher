@@ -22,7 +22,6 @@ using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.ModPlatform.Technic;
-using FlintLauncher.ExternalApi;
 using TruePath;
 using Xunit;
 using MetaIndex = FlintLauncher.Core.Meta.Index;

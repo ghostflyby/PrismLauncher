@@ -236,7 +236,7 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
     /// </summary>
     public bool CompleteWithRedirectUri(string uri)
     {
-        if (this._listener is not { } httpListener)
+        if (_listener is not { } httpListener)
         {
             return false;
         }

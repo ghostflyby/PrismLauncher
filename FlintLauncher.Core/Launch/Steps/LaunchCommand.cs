@@ -19,18 +19,21 @@
 //     See the License for the specific language governing permissions and
 //     limitations under the License.
 //
-// Port of launcher/launch/steps/LaunchCommand.{h,cpp}: run the pre-load/pre-launch/post-exit
-// command through a LoggedProcess with the instance environment.
+// Runs the pre-load/pre-launch/post-exit command through a LoggedProcess with the instance
+// environment. The step ends when the command's process exits, so its body parks on the exit
+// signal instead of returning when the process starts.
 
 using TruePath;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class LaunchCommand : LaunchStep
+public sealed class LaunchCommand : AwaitedStep
 {
     private readonly LoggedProcess _process = new();
     private readonly string _command;
     private readonly string _phaseName;
+    private TaskCompletionSource? _exitSignal;
+    private string? _failureReason;
 
     public LaunchCommand(LaunchTask parent, string command, string phaseName = "") : base(parent)
     {
@@ -42,54 +45,62 @@ public sealed class LaunchCommand : LaunchStep
         _process.StateChanged += OnState;
     }
 
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         var args = Parent.SubstituteVariables(_command);
-        EmitLogLine($"Running {_phaseName} command: {string.Join(' ', args)}", MessageLevel.Launcher);
+        var commandLine = string.Join(' ', args);
+        EmitLogLine($"Running {_phaseName} command: {commandLine}", MessageLevel.Launcher);
         if (args.Count == 0)
         {
             var emptyError = $"{_phaseName} command is empty, skipping.";
             EmitLogLine(emptyError, MessageLevel.Fatal);
-            EmitFailed(emptyError);
-            return Task.CompletedTask;
+            throw new InvalidOperationException(emptyError);
         }
 
+        _exitSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var program = args[0];
         args.RemoveAt(0);
         _process.Start(program, args);
-        return Task.CompletedTask;
+        await _exitSignal.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        // the exit callback records the reason instead of faulting the signal, so a body that
+        // already unwound through cancellation leaves no unobserved exception behind
+        if (_failureReason is { } failure)
+        {
+            throw new InvalidOperationException(failure);
+        }
     }
 
     private void OnState(LoggedProcessState state)
     {
-        string GetError() => $"{_phaseName} command failed with code {_process.ExitCode}.\n\n";
+        string Error() => $"{_phaseName} command failed with code {_process.ExitCode}.\n\n";
+
+        void Fail(string reason)
+        {
+            _failureReason = reason;
+            EmitLogLine(reason, MessageLevel.Fatal);
+            _exitSignal?.TrySetResult();
+        }
+
         switch (state)
         {
             case LoggedProcessState.Aborted:
             case LoggedProcessState.Crashed:
             case LoggedProcessState.FailedToStart:
-            {
-                var error = GetError();
-                EmitLogLine(error, MessageLevel.Fatal);
-                EmitFailed(error);
+                Fail(Error());
                 return;
-            }
             case LoggedProcessState.Finished:
-            {
                 if (_process.ExitCode != 0)
                 {
-                    var error = GetError();
-                    EmitLogLine(error, MessageLevel.Fatal);
-                    EmitFailed(error);
+                    Fail(Error());
                 }
                 else
                 {
                     EmitLogLine($"{_phaseName} command ran successfully.\n\n", MessageLevel.Launcher);
-                    EmitSucceeded();
+                    _exitSignal?.TrySetResult();
                 }
 
                 break;
-            }
         }
     }
 

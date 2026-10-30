@@ -28,15 +28,13 @@ using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class VerifyJavaInstall(LaunchTask parent) : LaunchStep(parent)
+public sealed class VerifyJavaInstall(LaunchTask parent) : AwaitedStep(parent)
 {
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override Task RunAsync(CancellationToken cancellationToken)
     {
         var instance = Parent.Instance;
-        var packProfile = instance.GetPackProfile();
         var settings = instance.Settings;
         var detection = instance.JavaDetection();
-        var ignoreCompatibility = Variant.AsBool(settings.Get("IgnoreJavaCompatibility"));
         var javaArchitecture = detection?.Architecture ?? "";
         var maxMemAlloc = Variant.AsInt(settings.Get("MaxMemAlloc"));
 
@@ -47,29 +45,23 @@ public sealed class VerifyJavaInstall(LaunchTask parent) : LaunchStep(parent)
                         "The instance may not start due to this.", MessageLevel.Error);
         }
 
-        var profile = packProfile.GetProfile();
-        if (profile is null)
-        {
-            EmitFailed("The instance profile is missing.");
-            return Task.CompletedTask;
-        }
+        var profile = instance.GetPackProfile().GetProfile()
+                      ?? throw new InvalidOperationException("The instance profile is missing.");
 
         var compatibleMajors = profile.GetCompatibleJavaMajors();
 
-        // the feature version JdkFind read at probe time; null means CheckJava has not
-        // probed this java yet or found no release file — never a compatible match
+        // the feature version JdkFind read at probe time; null means CheckJava has not probed
+        // this java yet or found no release file — never a compatible match
         var languageVersion = detection?.LanguageVersion;
 
         if (compatibleMajors.Count == 0 || (languageVersion is { } known && compatibleMajors.Contains(known)))
         {
-            EmitSucceeded();
             return Task.CompletedTask;
         }
 
-        if (ignoreCompatibility)
+        if (Variant.AsBool(settings.Get("IgnoreJavaCompatibility")))
         {
             EmitLogLine("Java major version is incompatible. Things might break.\n", MessageLevel.Warning);
-            EmitSucceeded();
             return Task.CompletedTask;
         }
 
@@ -84,8 +76,7 @@ public sealed class VerifyJavaInstall(LaunchTask parent) : LaunchStep(parent)
         EmitLogLine("Go to instance Java settings to change your Java version or disable the Java compatibility check if you know what " +
                     "you're doing.", MessageLevel.Error);
 
-        EmitFailed("Incompatible Java major version");
-        return Task.CompletedTask;
+        throw new InvalidOperationException("Incompatible Java major version");
     }
 
     public override bool CanAbort() => false;

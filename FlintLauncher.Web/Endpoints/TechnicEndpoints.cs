@@ -8,7 +8,7 @@
 // pack install — SingleZipPackInstallTask / SolderPackInstallTask run through the same
 // staged-commit flow as POST /modplatform/ftb/install (the metadata/zip/Solder downloads are
 // small, so the flow is synchronous: 201 with the committed instance, 500 creation_failed
-// with the task's FailReason otherwise).
+// with the failure reason otherwise).
 //
 // The Technic client is per-host state (TechnicApi — the headless equivalent of the C++
 // BuildConfig.TECHNIC_API_BASE_URL constant). The optional `serverUrl` (query param on the
@@ -21,6 +21,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
+using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 using TruePath;
@@ -224,11 +225,13 @@ public static class TechnicEndpoints
                 // directory already exists and DirNameFromString would return "<name>(1)"
                 AbsolutePath inDir = new AbsolutePath(instances.PrimaryDir());
                 var expectedId = FileNaming.DirNameFromString(task.Name(), [inDir]);
-                await wrapped.StartAsync();
-                if (!wrapped.WasSuccessful)
+                try
                 {
-                    // the staging wrapper re-emits the inner task's FailReason
-                    return ApiJson.Error("creation_failed", wrapped.FailReason, 500);
+                    await wrapped(CancellationToken.None);
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    return ApiJson.Error("creation_failed", TaskWork.ReasonOf(e), 500);
                 }
 
                 instances.LoadList();

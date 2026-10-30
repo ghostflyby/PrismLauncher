@@ -4,16 +4,13 @@
 // SPDX-FileCopyrightText: 2022 flowln <flowlnlnln@gmail.com>
 // SPDX-FileCopyrightText: 2022 Sefa Eyeoglu <contact@scrumplex.net>
 //
-// Port of modplatform/EnsureMetadataTask.{h,cpp} (Modrinth + Flame branches) plus the
-// callers' view of minecraft/mod/tasks/LocalResourceUpdateTask.{h,cpp}: make sure every
-// downloaded resource has its .pw.toml metadata written.
+// Writes the .pw.toml metadata for a batch of freshly downloaded resources: look the
+// resources up by hash on the provider's API, match them to projects, and create or refresh
+// the index entries. A resource that ends up without metadata is returned as a failure entry
+// and does not fail the pass.
 //
-// Deviations:
-//  - The ConcurrentTask hash-priming pass lives in the callers (HashUtils.HashFile is
-//    synchronous here), so the task takes the hash → resource map directly.
-//  - Resource::setMetadata does not exist yet (the ported Mod has no metadata field),
-//    so the freshly created ModStruct is handed to callers through the MetadataReady
-//    event (ModFolderModel re-reads it from disk through its hook).
+// The hash → resource map is the input rather than something the pass computes: hashing is a
+// synchronous call here, so priming the map belongs to whoever produced the hashes.
 
 using System.Globalization;
 using System.Text.Json;
@@ -21,7 +18,6 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
@@ -36,22 +32,28 @@ public sealed class EnsureMetadataTask(
     ModrinthClient modrinth,
     HttpClient http,
     FlameClient? flame = null)
-    : FlintTask
 {
     // hash -> resource
     private readonly FlameClient _flame = flame ?? new FlameClient();
     private readonly Dictionary<string, IndexedVersion> _tempVersions = new(StringComparer.Ordinal);
     public bool LockUpdate { get; init; }
 
-    /// <summary>Port of the metadataReady(resource) signal, carrying the fresh metadata.</summary>
-    public event Action<Resource, MetadataHandler.ModStruct>? MetadataReady;
+    // hashes this pass has not settled yet; the C++ m_resources shrinks as entries are
+    // reported, and whatever is left at the end is the leftover set. Rebuilt per run so a
+    // second RunAsync starts from the caller's full set again.
+    private Dictionary<string, Resource> _remaining = [];
 
-    /// <summary>Port of the metadataFailed(resource) signal.</summary>
-    public event Action<Resource, string>? MetadataFailed;
+    private readonly List<(Resource Resource, string Reason)> _failures = [];
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Resolves the metadata for every entry in <c>resources</c>, writing the index
+    /// files. Returns the resources that ended up without metadata; the pass itself throws only
+    /// on an unexpected fault.</summary>
+    public async Task<IReadOnlyList<(Resource Resource, string Reason)>> RunAsync(
+        CancellationToken cancellationToken)
     {
-        EmitStatus("Checking if resources have metadata...");
+        _remaining = new Dictionary<string, Resource>(resources, StringComparer.Ordinal);
+        _tempVersions.Clear();
+        _failures.Clear();
 
         switch (provider)
         {
@@ -63,13 +65,14 @@ public sealed class EnsureMetadataTask(
                 break;
         }
 
-        // invalidadeLeftover(): everything that made it this far without metadata failed
-        foreach (var (hash, resource) in resources)
+        // invalidadeLeftover(): everything that made it this far without metadata failed.
+        // The snapshot is required: EmitMetadataFailed removes from _remaining.
+        foreach (var (hash, resource) in _remaining.ToList())
         {
-            EmitMetadataFailed(resource, $"No metadata was generated for hash {hash}");
+            EmitMetadataFailed(hash, resource, $"No metadata was generated for hash {hash}");
         }
 
-        EmitSucceeded();
+        return _failures;
     }
 
     private async Task ModrinthFlow(CancellationToken cancellationToken)
@@ -78,19 +81,18 @@ public sealed class EnsureMetadataTask(
 
         // ---------------------------------------------------------- versions lookup
         var versionEntries = await modrinth.Versions
-            .ByFileHashes(resources.Keys.ToList(), hashType).SendTo(http, cancellationToken);
+            .ByFileHashes(_remaining.Keys.ToList(), hashType).SendTo(http, cancellationToken);
 
         {
-            foreach (var hash in resources.Keys)
+            foreach (var hash in _remaining.Keys.ToList())
             {
-                var resource = resources[hash];
+                var resource = _remaining[hash];
                 if (!versionEntries.TryGetValue(hash, out var entry))
                 {
-                    EmitMetadataFailed(resource, hash + " is not an object");
+                    EmitMetadataFailed(hash, resource, hash + " is not an object");
                     continue;
                 }
 
-                EmitStatus($"Parsing API response from Modrinth for '{resource.Name}'...");
                 _tempVersions[hash] = ModrinthPackIndex.LoadIndexedPackVersion(entry);
             }
         }
@@ -138,30 +140,27 @@ public sealed class EnsureMetadataTask(
                 continue;
             }
 
-            if (!resources.TryGetValue(hash, out var resource))
+            if (!_remaining.TryGetValue(hash, out var resource))
             {
                 continue;
             }
 
-            EmitStatus($"Parsing API response from Modrinth for '{resource.Name}'...");
-
             if (_tempVersions.TryGetValue(hash, out var version))
             {
-                await UpdateMetadata(pack, version, resource);
+                UpdateMetadata(hash, pack, version, resource);
             }
         }
     }
 
     /// <summary>
-    /// Port of EnsureMetadataTask::flameVersionsTask + flameProjectsTask: match the mods by
-    /// murmur2 fingerprint (the hash keys), then load the project metadata and write the
-    /// .pw.toml files through the shared updateMetadata.
+    /// Matches the mods by murmur2 fingerprint (the hash keys), then loads the project
+    /// metadata and writes the .pw.toml files through <see cref="UpdateMetadata"/>.
     /// </summary>
     private async Task FlameFlow(CancellationToken cancellationToken)
     {
         // ---------------------------------------------------------- versions task
         var fingerprints = new List<uint>();
-        foreach (var murmur in resources.Keys)
+        foreach (var murmur in _remaining.Keys.ToList())
         {
             if (uint.TryParse(murmur, NumberStyles.None, CultureInfo.InvariantCulture, out var fp))
             {
@@ -176,8 +175,7 @@ public sealed class EnsureMetadataTask(
         }
         catch (FlameApiException e)
         {
-            EmitFailed(e.Message);
-            return;
+            throw new InvalidOperationException(e.Message, e);
         }
 
         {
@@ -198,20 +196,19 @@ public sealed class EnsureMetadataTask(
                 }
 
                 var fingerprint = (fileObj.FileFingerprint ?? 0).ToString(CultureInfo.InvariantCulture);
-                if (!resources.TryGetValue(fingerprint, out var resource))
+                if (!_remaining.TryGetValue(fingerprint, out var resource))
                 {
                     // "Invalid fingerprint from the API response."
                     continue;
                 }
 
-                EmitStatus($"Parsing API response from CurseForge for '{resource.Name}'...");
                 try
                 {
                     _tempVersions[fingerprint] = FlameMod.LoadIndexedPackVersion(fileObj);
                 }
                 catch (JsonException)
                 {
-                    EmitMetadataFailed(resource, "Invalid data returned from the API.");
+                    EmitMetadataFailed(fingerprint, resource, "Invalid data returned from the API.");
                 }
             }
         }
@@ -239,14 +236,16 @@ public sealed class EnsureMetadataTask(
             entries = multiple
                 ? (await _flame.Projects.ByIds(addonIds.Keys.ToList()).SendTo(http, cancellationToken)).Data
                   ?? throw new JsonException("'data' is not an array")
-                : [(
-                    await _flame.Projects.ById(addonIds.Keys.First()).SendTo(http, cancellationToken)).Data
-                    ?? throw new JsonException("'data' is not an object")];
+                :
+                [
+                    (
+                        await _flame.Projects.ById(addonIds.Keys.First()).SendTo(http, cancellationToken)).Data
+                    ?? throw new JsonException("'data' is not an object")
+                ];
         }
         catch (FlameApiException e)
         {
-            EmitFailed(e.Message);
-            return;
+            throw new InvalidOperationException(e.Message, e);
         }
         catch (JsonException)
         {
@@ -261,7 +260,7 @@ public sealed class EnsureMetadataTask(
             }
 
             var id = (entry.Id ?? 0).ToString(CultureInfo.InvariantCulture);
-            if (!addonIds.TryGetValue(id, out var hash) || !resources.TryGetValue(hash, out var resource)
+            if (!addonIds.TryGetValue(id, out var hash) || !_remaining.TryGetValue(hash, out var resource)
                                                         || !_tempVersions.TryGetValue(hash, out var version))
             {
                 continue;
@@ -270,28 +269,25 @@ public sealed class EnsureMetadataTask(
             var pack = new IndexedPack();
             try
             {
-                EmitStatus($"Parsing API response from CurseForge for '{resource.Name}'...");
                 FlameMod.LoadIndexedPack(pack, entry);
             }
             catch (JsonException)
             {
-                EmitMetadataFailed(resource, "Invalid data returned from the API.");
+                EmitMetadataFailed(hash, resource, "Invalid data returned from the API.");
                 continue;
             }
 
-            await UpdateMetadata(pack, version, resource);
+            UpdateMetadata(hash, pack, version, resource);
         }
     }
 
     /// <summary>
-    /// Port of EnsureMetadataTask::updateMetadata + updateMetadataCallback, with the
-    /// LocalResourceUpdateTask::executeTask semantics inlined (old-metadata slug rescue,
-    /// create + write the .pw.toml index).
+    /// Writes one resource's index entry: rescue a missing slug from the existing metadata,
+    /// then create and store the .pw.toml. The version's file name is forced to the downloaded
+    /// file's name so the index points at what is on disk.
     /// </summary>
-    private async Task UpdateMetadata(IndexedPack pack, IndexedVersion ver, Resource resource)
+    private void UpdateMetadata(string hash, IndexedPack pack, IndexedVersion ver, Resource resource)
     {
-        await Task.CompletedTask; // async signature for future network work; AOT-friendly no-op
-
         // Prevent file name mismatch
         ver.FileName = resource.Fileinfo.Name;
         if (ver.FileName.EndsWith(".disabled", StringComparison.Ordinal))
@@ -302,7 +298,7 @@ public sealed class EnsureMetadataTask(
         // LocalResourceUpdateTask: ensure a '.index' folder exists in the mods folder
         if (!FileOps.EnsureFolderPathExists(indexDir))
         {
-            EmitMetadataFailed(resource, $"Unable to create index directory at {indexDir}!");
+            EmitMetadataFailed(hash, resource, $"Unable to create index directory at {indexDir}!");
             return;
         }
 
@@ -320,13 +316,20 @@ public sealed class EnsureMetadataTask(
         {
             pwMod.LockUpdate = LockUpdate;
             MetadataHandler.Update(indexDir, pwMod);
-            MetadataReady?.Invoke(resource, pwMod);
+            // settled: it must not be reported as a leftover at the end of the pass
+            _remaining.Remove(hash);
         }
         else
         {
-            EmitMetadataFailed(resource, "Invalid metadata");
+            EmitMetadataFailed(hash, resource, "Invalid metadata");
         }
     }
 
-    private void EmitMetadataFailed(Resource resource, string reason) => MetadataFailed?.Invoke(resource, reason);
+    /// <summary>Records why one resource could not be given metadata and drops it from the
+    /// leftover set, so the end-of-pass sweep does not report it twice.</summary>
+    private void EmitMetadataFailed(string hash, Resource resource, string reason)
+    {
+        _failures.Add((resource, reason));
+        _remaining.Remove(hash);
+    }
 }

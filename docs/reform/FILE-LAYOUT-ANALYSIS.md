@@ -118,7 +118,7 @@
 | 版本元数据 | `MetaEntity` 族（`Index/VersionList/MetaVersion`）+ `HttpMetaCache` | ✅（双格式账本遗留待清） |
 | 资源/库 | `AssetObject/AssetsIndex`、`Library` | ✅ |
 | 皮肤 | `SkinModel` | ✅ |
-| 任务/日志 | `FlintTask` 家族 + `LogModel` + `RollingFileLoggerProvider` | ✅ |
+| 任务/日志 | `TaskWork`/`TaskProgress` + `LogModel` + `RollingFileLoggerProvider` | ✅ |
 | Java 运行时 | `JavaInstallList` | ✅ |
 | **实例分组** | ❌ instgroups.json 解析散在 `InstanceList` 内部字典（`_groupNameCache/_instanceGroupIndex/_collapsedGroups`），无 `InstanceGroup` 模型 | **缺**，建议随 #1 稳定 ID 改造一并补 |
 | **图标池** | ❌ 仅 `Icons/IconFiles.cs` 无状态助手；C++ 有 `IconList`（按 key 索引 + 文件监视） | **缺** |

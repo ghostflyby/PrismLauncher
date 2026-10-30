@@ -2,25 +2,22 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 // SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
 //
-// Port of modplatform/flame/FlameCheckUpdate.{h,cpp}: CurseForge update detection.
-// For every resource (its installed state taken from the packwiz Flame metadata), fetch the
-// project's file list, pick the latest file matching the instance loaders
-// (FlameMod.GetLatestVersion) and compare hashes; files without a download URL are reported
-// through the checkFailed(recoverUrl) path after the project info was fetched
-// (collectBlockedMods).
+// CurseForge update detection. For every resource (its installed state taken from the packwiz
+// Flame metadata), fetch the project's file list, pick the latest file matching the instance
+// loaders and compare hashes. A file that CurseForge does not serve to third-party launchers
+// is reported with a manual-download URL once the project info is known.
 //
-// Deviations (headless port):
-//  - Resource::metadata() becomes the injectable metadataLookup delegate (the ported Mod has
-//    no metadata field; ModFolderModel.GetMetadata is the intended provider).
-//  - The ResourceDownloadTask / GetModDependenciesTask wiring of the C++ Update struct is
-//    not ported yet; the update record carries the resolved IndexedVersion instead.
-//  - checkFailed carries the recoverUrl as a third event argument ("" when none).
+// The metadata lookup is injected rather than read off the resource: Resource carries no
+// metadata field. An Update carries the resolved IndexedVersion, not a download task — the
+// caller builds the downloads.
+//
+// CheckAsync returns both the updates and one failure entry per resource whose update could
+// not be delivered, carrying the recover URL where there is one.
 
 using System.Globalization;
 using System.Text.Json;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Flame;
@@ -35,10 +32,10 @@ public sealed class FlameCheckUpdate(
     FlameClient flame,
     HttpClient http,
     IReadOnlyList<IndexedVersionType>? releaseTypes = null)
-    : FlintTask
 {
-    /// <summary>Port of CheckUpdateTask::Update (minus the download task, see header note);
-    /// the UI-only old-hash/enabled members are not ported.</summary>
+    /// <summary>One available update: the installed and available version numbers, the
+    /// available version's release channel and changelog, and the resolved version the caller
+    /// downloads.</summary>
     public sealed class Update
     {
         public required string Name { get; init; }
@@ -50,8 +47,12 @@ public sealed class FlameCheckUpdate(
         public required IndexedVersion Version { get; init; }
     }
 
-    /// <summary>Port of the checkFailed(resource, reason, recoverUrl = "") signal.</summary>
-    public event Action<Resource, string, string>? CheckFailed;
+    /// <summary>The check's outcome: the updates found, plus one entry per resource whose
+    /// update could not be delivered. A failure carries a recover URL when CurseForge offers a
+    /// manual download for the file.</summary>
+    public sealed record CheckResult(
+        IReadOnlyList<Update> Updates,
+        IReadOnlyList<(Resource Resource, string Reason, string RecoverUrl)> Failures);
 
     private readonly List<ModLoaderType> _loadersList = [.. loadersList];
     private readonly IReadOnlyList<IndexedVersionType> _releaseTypes = releaseTypes ?? [];
@@ -59,13 +60,12 @@ public sealed class FlameCheckUpdate(
     private readonly Dictionary<Resource, string> _blocked = new();
 
     private readonly List<Update> _updates = [];
+    private readonly List<(Resource Resource, string Reason, string RecoverUrl)> _failures = [];
 
-    public IReadOnlyList<Update> GetUpdates() => _updates;
-
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Runs the check. A resource without metadata to compare against fails the whole
+    /// run; per-resource API failures are returned as <see cref="CheckResult.Failures"/>.</summary>
+    public async Task<CheckResult> CheckAsync(CancellationToken cancellationToken)
     {
-        EmitStatus("Preparing resources for CurseForge...");
-
         /* Check for update:
          * - Get latest version available
          * - Compare hash of the latest version with the current hash
@@ -76,8 +76,8 @@ public sealed class FlameCheckUpdate(
             var metadata = metadataLookup(resource);
             if (metadata is null)
             {
-                EmitFailed($"Resource {resource.Name} has no metadata to check against.");
-                return;
+                throw new InvalidOperationException(
+                    $"Resource {resource.Name} has no metadata to check against.");
             }
 
             // Fake pack with the necessary info to pass to the download task :)
@@ -95,13 +95,14 @@ public sealed class FlameCheckUpdate(
             }
             catch (FlameApiException)
             {
-                continue; // (the C++ reports per-request failures through the NetJob callbacks)
+                continue; // a failed file-list request skips this resource
             }
 
             await GetLatestVersionCallback(resource, metadata, versionsDoc, cancellationToken);
         }
 
         await CollectBlockedMods(cancellationToken);
+        return new CheckResult(_updates, _failures);
     }
 
     private async Task GetLatestVersionCallback(Resource resource, MetadataHandler.ModStruct metadata,
@@ -122,20 +123,18 @@ public sealed class FlameCheckUpdate(
         catch (JsonException e)
         {
             // "Failed to parse response from a version request."
-            EmitStatus(e.Message);
+            _failures.Add((resource, e.Message, ""));
         }
 
         var latestVer = FlameMod.GetLatestVersion(pack.Versions, _loadersList, metadata.Loaders,
             checkLoaders: _loadersList.Count != 0, _releaseTypes);
-
-        EmitStatus($"Parsing the API response from CurseForge for '{resource.Name}'...");
 
         if (latestVer is null || latestVer.AddonId.Length == 0)
         {
             var reason = resource is Mod
                 ? "No valid version found for this resource. It's probably unavailable for the current game version / mod loader."
                 : "No valid version found for this resource. It's probably unavailable for the current game version.";
-            CheckFailed?.Invoke(resource, reason, "");
+            _failures.Add((resource, reason, ""));
             return;
         }
 
@@ -158,8 +157,8 @@ public sealed class FlameCheckUpdate(
             try
             {
                 changelog = await flame.Files.Changelog(
-                    int.Parse(latestVer.AddonId, CultureInfo.InvariantCulture),
-                    int.Parse(latestVer.FileId, CultureInfo.InvariantCulture))
+                        int.Parse(latestVer.AddonId, CultureInfo.InvariantCulture),
+                        int.Parse(latestVer.FileId, CultureInfo.InvariantCulture))
                     .SendTo(http, cancellationToken);
             }
             catch (FlameApiException)
@@ -180,8 +179,8 @@ public sealed class FlameCheckUpdate(
         }
     }
 
-    /// <summary>Port of FlameCheckUpdate::collectBlockedMods: report the blocked updates
-    /// with a manual-download URL once the project info (websiteUrl) is known.</summary>
+    /// <summary>Reports the blocked updates with a manual-download URL once the project info
+    /// (websiteUrl) is known.</summary>
     private async Task CollectBlockedMods(CancellationToken cancellationToken)
     {
         var addonIds = new List<string>();
@@ -201,7 +200,6 @@ public sealed class FlameCheckUpdate(
 
         if (addonIds.Count == 0)
         {
-            EmitSucceeded();
             return;
         }
 
@@ -210,16 +208,19 @@ public sealed class FlameCheckUpdate(
         try
         {
             entries = single
-                ? [(
-                    await flame.Projects.ById(addonIds[0]).SendTo(http, cancellationToken)).Data
-                    ?? throw new JsonException("'data' is not an object")]
+                ?
+                [
+                    (
+                        await flame.Projects.ById(addonIds[0]).SendTo(http, cancellationToken)).Data
+                    ?? throw new JsonException("'data' is not an object")
+                ]
                 : (await flame.Projects.ByIds(addonIds).SendTo(http, cancellationToken)).Data
                   ?? throw new JsonException("'data' is not an array");
         }
         catch (Exception e) when (e is FlameApiException or JsonException)
         {
             // a failed fetch or a broken response body only skips the blocked-download
-            // recovery lookup (the task finishes regardless, like the C++)
+            // recovery lookup; the check itself still reports what it found
         }
 
         if (entries is not null)
@@ -239,20 +240,17 @@ public sealed class FlameCheckUpdate(
 
                 try
                 {
-                    EmitStatus($"Parsing API response from CurseForge for '{resource.Name}'...");
-
                     var pack = new IndexedPack();
                     FlameMod.LoadIndexedPack(pack, entryObj);
                     var recoverUrl = $"{pack.WebsiteUrl}/download/{_blocked[resource]}";
-                    CheckFailed?.Invoke(resource,
+                    _failures.Add((resource,
                         "Resource has a new update available, but is not downloadable using CurseForge.",
-                        recoverUrl);
+                        recoverUrl));
                 }
                 catch (JsonException) { }
             }
         }
 
-        // do not care much about errors (the C++ finishes the task regardless)
-        EmitSucceeded();
+        // a failed lookup only skips the blocked-download recovery
     }
 }

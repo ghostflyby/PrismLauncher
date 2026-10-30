@@ -22,7 +22,6 @@ using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Modrinth;
@@ -217,9 +216,8 @@ public class ModrinthApiTests : IDisposable
 
         var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http);
         task.SetName("Imported Pack");
-        await task.StartAsync();
+        await task.ExecuteAsync(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
 
         // files placed
         Assert.Equal(pack.ModBytes,
@@ -255,7 +253,7 @@ public class ModrinthApiTests : IDisposable
             new AbsolutePath(Path.Combine(staging, "minecraft", "mods")))!);
         modList.Update();
         var mod = Assert.Single(modList.AllMods(),
-            m => m.Type == FlintLauncher.Core.Minecraft.Resources.ResourceType.ZipFile);
+            m => m.Type == Core.Minecraft.Resources.ResourceType.ZipFile);
         Assert.Equal(ResourceStatus.Installed, mod.Status);
         var metadata = modList.GetMetadata(mod);
         Assert.NotNull(metadata);
@@ -282,9 +280,8 @@ public class ModrinthApiTests : IDisposable
 
         var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http);
         task.SetName("Meta Pack");
-        await task.StartAsync();
+        await task.ExecuteAsync(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         // the modrinth-download-meta header carries the download context
         var meta = _server.LastDownloadHeaders["modrinth-download-meta"];
         Assert.Contains("\"reason\":\"modpack\"", meta);
@@ -313,9 +310,8 @@ public class ModrinthApiTests : IDisposable
 
         var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http);
         task.SetName("Optional Pack");
-        await task.StartAsync();
+        await task.ExecuteAsync(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         Assert.True(File.Exists(Path.Combine(staging, "minecraft", "mods", "test.jar")));
         // env.client = "optional" -> installed disabled (headless equivalent of the dialog)
         Assert.True(File.Exists(Path.Combine(staging, "minecraft", "mods", "optional.jar.disabled")));
@@ -337,9 +333,8 @@ public class ModrinthApiTests : IDisposable
 
         var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http);
         task.SetName("Bad Pack");
-        await task.StartAsync();
-
-        Assert.Equal(TaskState.Failed, task.State);
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() => task.ExecuteAsync(TestContext.Current.CancellationToken));
+        Assert.NotEmpty(ex.Message);
         Assert.False(File.Exists(Path.Combine(staging, "minecraft", "mods", "test.jar")));
     }
 
@@ -358,10 +353,16 @@ public class ModrinthApiTests : IDisposable
 
         var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http);
         task.SetName("Escape Pack");
-        await task.StartAsync();
-
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("security risk", task.FailReason);
+        string taskFailure = "";
+        try
+        {
+            await task.ExecuteAsync(TestContext.Current.CancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            taskFailure = e.Message;
+        }
+        Assert.Contains("security risk", taskFailure);
         Assert.False(File.Exists(TempPath("evil.jar")));
     }
 
@@ -378,10 +379,16 @@ public class ModrinthApiTests : IDisposable
 
         var task = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http);
         task.SetName("Dep Pack");
-        await task.StartAsync();
-
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("Unknown dependency type", task.FailReason);
+        string taskFailure = "";
+        try
+        {
+            await task.ExecuteAsync(TestContext.Current.CancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            taskFailure = e.Message;
+        }
+        Assert.Contains("Unknown dependency type", taskFailure);
     }
 
     // ------------------------------------------------------- export round-trip
@@ -402,18 +409,15 @@ public class ModrinthApiTests : IDisposable
 
         var import = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global, modrinth: _modrinth, http: _http);
         import.SetName("Round Trip Pack");
-        await import.StartAsync();
-        Assert.True(import.WasSuccessful, import.FailReason);
+        await import.ExecuteAsync(TestContext.Current.CancellationToken);
 
         // ... then export the instance again (the staged instance is Flint format)
         var instance = new MinecraftInstance(
             new InstanceJsonSettingsObject(new AbsolutePath(staging), _global.Environment), new AbsolutePath(staging));
         var output = TempPath("exported.mrpack");
-        var export = new ModrinthPackExportTask("Round Trip Pack", "1.0.0", "round trip", optionalFiles: true,
-            instance, new AbsolutePath(output), modrinth: _modrinth, http: _http);
-        await export.StartAsync();
+        await ModrinthPackExportTask.ExportAsync("Round Trip Pack", "1.0.0", "round trip", optionalFiles: true,
+            instance, new AbsolutePath(output), _modrinth, _http, TestContext.Current.CancellationToken);
 
-        Assert.True(export.WasSuccessful, export.FailReason);
         Assert.True(File.Exists(output));
 
         using var zip = await ZipFile.OpenReadAsync(output);
@@ -512,10 +516,9 @@ public class ModrinthApiTests : IDisposable
         var mod = new Mod(new AbsolutePath(jarPath));
         var check = new ModrinthCheckUpdate([mod], [new McVersion("1.20.1")], [ModLoaderType.Fabric],
             _ => MetadataHandler.Get(new AbsolutePath(Path.Combine(modsDir, ".index")), "test-mod"), modrinth: _modrinth, http: _http);
-        await check.StartAsync();
+        var result = await check.CheckAsync(TestContext.Current.CancellationToken);
 
-        Assert.True(check.WasSuccessful, check.FailReason);
-        var update = Assert.Single(check.GetUpdates());
+        var update = Assert.Single(result.Updates);
         Assert.Equal("Test Mod", update.Name);
         Assert.Equal("1.0.0", update.OldVersion);
         Assert.Equal("2.0.0", update.NewVersion);
@@ -552,10 +555,9 @@ public class ModrinthApiTests : IDisposable
         var mod = new Mod(new AbsolutePath(jarPath));
         var check = new ModrinthCheckUpdate([mod], [new McVersion("1.20.1")], [ModLoaderType.Fabric],
             _ => MetadataHandler.Get(new AbsolutePath(Path.Combine(modsDir, ".index")), "test-mod"), modrinth: _modrinth, http: _http);
-        await check.StartAsync();
+        var result = await check.CheckAsync(TestContext.Current.CancellationToken);
 
-        Assert.True(check.WasSuccessful, check.FailReason);
-        Assert.Empty(check.GetUpdates());
+        Assert.Empty(result.Updates);
     }
 
     [Fact]
@@ -597,17 +599,23 @@ public class ModrinthCreationTaskManifestTests : IDisposable
         task.SetName("M");
         await File.WriteAllTextAsync(Path.Combine(staging, "modrinth.index.json"),
             """{"formatVersion":1,"game":"terraria","files":[],"dependencies":{}}""");
-        await task.StartAsync();
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("Unknown game", task.FailReason);
+        string taskFailure = "";
+        try
+        {
+            await task.ExecuteAsync(TestContext.Current.CancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            taskFailure = e.Message;
+        }
+        Assert.Contains("Unknown game", taskFailure);
 
         var (modrinth2, http2) = TestModrinthApi.Unreachable();
         var task2 = new ModrinthCreationTask(new AbsolutePath(staging), trustedSource: true, _global,
             modrinth2, http2);
         await File.WriteAllTextAsync(Path.Combine(staging, "modrinth.index.json"),
             """{"formatVersion":42,"game":"minecraft","files":[],"dependencies":{}}""");
-        await task2.StartAsync();
-        Assert.Equal(TaskState.Failed, task2.State);
-        Assert.Contains("Unknown format version", task2.FailReason);
+        var ex2 = await Assert.ThrowsAnyAsync<Exception>(() => task2.ExecuteAsync(TestContext.Current.CancellationToken));
+        Assert.Contains("Unknown format version", ex2.Message);
     }
 }

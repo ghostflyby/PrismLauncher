@@ -98,13 +98,14 @@ public static class MiscEndpoints
                 : PasteUpload.PasteType.Mclogs;
             var upload = new PasteUpload(content, config.Current.Api.PastebinCustomApiBase ?? "",
                 pasteType, http);
-            await upload.StartAsync();
-            return upload is { WasSuccessful: true, PasteLink.Length: > 0 }
-                ? Results.Created("/api/v1/paste", new PasteCreatedResponse(upload.PasteLink))
-                : ApiJson.Error("paste_failed",
-                    upload.WasSuccessful
-                        ? "the paste server returned no link"
-                        : upload.FailReason, 502);
+            try
+            {
+                return Results.Created("/api/v1/paste", new PasteCreatedResponse(await upload.UploadAsync()));
+            }
+            catch (Exception e)
+            {
+                return ApiJson.Error("paste_failed", e.Message, 502);
+            }
         }).Produces<PasteCreatedResponse>(201);
 
         // --------------------------------------------------------------- meta cache

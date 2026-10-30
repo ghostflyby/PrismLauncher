@@ -11,8 +11,6 @@ using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
-using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
 using Xunit;
@@ -53,8 +51,9 @@ public class InstanceImportTaskTests : IDisposable
         return _global.BareInstanceList(instancesDir);
     }
 
-    private async Task<FlintTask> RunImport(Uri source, IReadOnlyDictionary<string, string>? extraInfo = null,
-        HttpMetaCache? metaCache = null)
+    /// <summary>Runs the import and returns the reason it failed, or null when it succeeded.</summary>
+    private async Task<(InstanceImportTask Task, string? Failure)> RunImport(Uri source,
+        IReadOnlyDictionary<string, string>? extraInfo = null, HttpMetaCache? metaCache = null)
     {
         var list = CreateList();
         var task = new InstanceImportTask(source, trustedSource: true, _modrinth, _http, extraInfo)
@@ -63,8 +62,15 @@ public class InstanceImportTaskTests : IDisposable
         };
         task.SetName("Imported");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
-        return task;
+        try
+        {
+            await wrapped(TestContext.Current.CancellationToken);
+            return (task, null);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            return (task, e.Message);
+        }
     }
 
     private string WriteMrpack()
@@ -84,9 +90,8 @@ public class InstanceImportTaskTests : IDisposable
     {
         var mrpackPath = WriteMrpack();
 
-        var task = await RunImport(new Uri(mrpackPath));
+        await RunImport(new Uri(mrpackPath));
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         // the instance was created from the Modrinth pack
         var instanceDir = Path.Combine(_root, "instances", "Imported");
         Assert.True(Directory.Exists(instanceDir));
@@ -112,9 +117,8 @@ public class InstanceImportTaskTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(packDir, ".minecraft", "options.txt"), "keepMe=1\n");
         Assert.True(MmcZip.CompressDir(new AbsolutePath(zipPath), new AbsolutePath(packDir)));
 
-        var task = await RunImport(new Uri(zipPath));
+        await RunImport(new Uri(zipPath));
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         // the extracted pack folder landed in the staging instance dir and was renamed; the
         // import fixups run through the typed adapter — instance.json
         var instanceDir = Path.Combine(_root, "instances", "Imported");
@@ -136,9 +140,8 @@ public class InstanceImportTaskTests : IDisposable
             """{"manifestType":"minecraftModpack","manifestVersion":1,"minecraft":{"version":"1.20.1"},"files":[],"overrides":"overrides"}""");
         Assert.True(MmcZip.CompressDir(new AbsolutePath(zipPath), new AbsolutePath(dir)));
 
-        var task = await RunImport(new Uri(zipPath));
+        await RunImport(new Uri(zipPath));
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         var instanceDir = Path.Combine(_root, "instances", "Imported");
         Assert.True(Directory.Exists(instanceDir));
         Assert.True(File.Exists(Path.Combine(instanceDir, "flame", "manifest.json")));
@@ -163,9 +166,8 @@ public class InstanceImportTaskTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(dir, "modpack", "options.txt"), "keepMe=1\n");
         Assert.True(MmcZip.CompressDir(new AbsolutePath(zipPath), new AbsolutePath(dir)));
 
-        var task = await RunImport(new Uri(zipPath));
+        await RunImport(new Uri(zipPath));
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         var instanceDir = Path.Combine(_root, "instances", "Imported");
         Assert.True(Directory.Exists(instanceDir));
         // the pack contents landed in minecraft/, the version.json flavor set the component,
@@ -191,10 +193,9 @@ public class InstanceImportTaskTests : IDisposable
             writer.Write(bytes);
         }
 
-        var task = await RunImport(new Uri(zipPath));
+        var (_, failure) = await RunImport(new Uri(zipPath));
 
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("bin/modpack.jar", task.FailReason);
+        Assert.Contains("bin/modpack.jar", failure);
     }
 
     [Fact]
@@ -206,10 +207,9 @@ public class InstanceImportTaskTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(dir, "readme.txt"), "nothing in here");
         Assert.True(MmcZip.CompressDir(new AbsolutePath(zipPath), new AbsolutePath(dir)));
 
-        var task = await RunImport(new Uri(zipPath));
+        var (_, failure) = await RunImport(new Uri(zipPath));
 
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("does not contain a recognized modpack type", task.FailReason);
+        Assert.Contains("does not contain a recognized modpack type", failure);
     }
 
     [Fact]
@@ -227,9 +227,8 @@ public class InstanceImportTaskTests : IDisposable
         var source = new Uri($"{_server.Url}/data/{packId}/versions/1.0.0/pack.mrpack");
         _server.Downloads["pack.mrpack"] = await File.ReadAllBytesAsync(mrpackPath);
 
-        var task = await RunImport(source, metaCache: cache);
+        await RunImport(source, metaCache: cache);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         var instanceDir = Path.Combine(_root, "instances", "Imported");
         Assert.True(File.Exists(Path.Combine(instanceDir, "minecraft", "mods", "test.jar")));
         // the download went through the cache ("general" base)
@@ -243,9 +242,8 @@ public class InstanceImportTaskTests : IDisposable
         var badPath = Path.Combine(_root, "bad.zip");
         await File.WriteAllBytesAsync(badPath, "this is not a zip file"u8.ToArray());
 
-        var task = await RunImport(new Uri(badPath));
+        var (_, failure) = await RunImport(new Uri(badPath));
 
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("Unable to open supplied modpack zip file", task.FailReason);
+        Assert.Contains("Unable to open supplied modpack zip file", failure);
     }
 }

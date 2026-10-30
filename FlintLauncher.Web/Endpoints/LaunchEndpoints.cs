@@ -121,8 +121,14 @@ public static class LaunchEndpoints
                     Services = services,
                 };
 
-                var entry = registry.Register("launch", controller, instanceId: inst.Id(), controller: controller);
-                _ = controller.StartAsync();
+                // claim the instance before the work can start and finish: the launch runs off
+                // the request thread, and a second request in between would otherwise pass
+                // CanLaunch. A launch that fails immediately resets the flag itself.
+                instance.SetRunning(true);
+                var entry = registry.Start("launch",
+                    handle => handle.RunAsync(token => controller.RunAsync(token)),
+                    instanceId: inst.Id(),
+                    controller: controller);
                 return Results.Accepted($"/api/v1/tasks/{entry.Id}", new TaskAcceptedResponse(entry.Id));
             }
             finally

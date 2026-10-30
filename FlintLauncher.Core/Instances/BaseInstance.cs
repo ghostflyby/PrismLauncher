@@ -64,7 +64,6 @@ using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.State;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Text;
 using TruePath;
 
@@ -592,11 +591,10 @@ public abstract class BaseInstance : INotifyPropertyChanged
     public abstract void LoadSpecificSettings();
 
     /// <summary>returns a valid update task</summary>
-    public abstract List<FlintTask> CreateUpdateTask();
+    public abstract List<Func<CancellationToken, Task>> CreateUpdateTask();
 
     /// <summary>
-    /// returns a valid launcher (task container). Returns the LaunchTask (LaunchTask
-    /// derives from FlintTask, like the C++ LaunchTask derives from Task).
+    /// returns a valid launcher (the step chain for one launch).
     /// </summary>
     public abstract LaunchTask? CreateLaunchTask(AuthSession? account, MinecraftTarget? targetToJoin);
 
@@ -724,7 +722,7 @@ public abstract class BaseInstance : INotifyPropertyChanged
         var previous = CurrentStatus();
         if (previous != newStatus)
         {
-            this._status = newStatus;
+            _status = newStatus;
             StatusChanged?.Invoke(previous, newStatus);
         }
     }

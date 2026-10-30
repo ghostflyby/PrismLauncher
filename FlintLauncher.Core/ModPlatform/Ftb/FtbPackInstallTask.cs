@@ -43,7 +43,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Net;
-using FlintLauncher.ExternalApi;
+using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
@@ -66,8 +66,8 @@ public sealed class FtbPackInstallTask(
     // assigned by OnManifestDownloadSucceeded before any read
     private FtbVersion? _manifest;
 
-    /// <summary>The manifest payload; the state machine only reads it after the download
-    /// succeeded, so a read before that is a broken invariant rather than a null value.</summary>
+    /// <summary>The manifest payload; the body only reads it after the download succeeded, so
+    /// a read before that is a broken invariant rather than a null value.</summary>
     private FtbVersion Manifest => _manifest
                                    ?? throw new InvalidOperationException("the pack manifest has not been downloaded");
 
@@ -81,7 +81,7 @@ public sealed class FtbPackInstallTask(
     /// path (null when the user has none).</summary>
     public Func<BlockedMod, string?>? BlockedModLocalFileResolver { get; init; }
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    internal override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Getting the manifest...");
 
@@ -98,8 +98,7 @@ public sealed class FtbPackInstallTask(
 
         if (versionInfo is null)
         {
-            EmitFailed($"Failed to find pack version {versionName}");
-            return;
+            throw new InvalidOperationException($"Failed to find pack version {versionName}");
         }
 
         string manifest;
@@ -109,8 +108,7 @@ public sealed class FtbPackInstallTask(
         }
         catch (FlintHttpException e)
         {
-            EmitFailed(e.Reason);
-            return;
+            throw new InvalidOperationException(e.Reason);
         }
 
         await OnManifestDownloadSucceeded(manifest, cancellationToken);
@@ -126,8 +124,7 @@ public sealed class FtbPackInstallTask(
         }
         catch (JsonException e)
         {
-            EmitFailed("Could not understand pack manifest:\n" + e.Message);
-            return;
+            throw new InvalidOperationException("Could not understand pack manifest:\n" + e.Message);
         }
 
         await ResolveMods(cancellationToken);
@@ -147,8 +144,7 @@ public sealed class FtbPackInstallTask(
             {
                 if (file.Curseforge.FileId <= 0)
                 {
-                    EmitFailed($"Invalid manifest: There's no information available to download the file '{file.Name}'!");
-                    return;
+                    throw new InvalidOperationException($"Invalid manifest: There's no information available to download the file '{file.Name}'!");
                 }
 
                 var flameFile = new FlameFile
@@ -166,23 +162,15 @@ public sealed class FtbPackInstallTask(
             }
         }
 
-        var modIdResolverTask = new FileResolvingTask(flameManifest, modrinth, http, flame: _flame);
+        await FileResolvingTask.RunAsync(flameManifest, modrinth, http, _flame,
+            cancellationToken: cancellationToken);
 
-        EmitStatus("Resolving mods...");
-        await modIdResolverTask.StartAsync(cancellationToken);
-        if (!modIdResolverTask.WasSuccessful)
-        {
-            EmitFailed(modIdResolverTask.FailReason);
-            return;
-        }
-
-        await OnResolveModsSucceeded(modIdResolverTask, cancellationToken);
+        await OnResolveModsSucceeded(flameManifest, cancellationToken);
     }
 
-    private async Task OnResolveModsSucceeded(FileResolvingTask modIdResolverTask,
+    private async Task OnResolveModsSucceeded(FlameManifest results,
         CancellationToken cancellationToken)
     {
-        var results = modIdResolverTask.GetResults();
         for (var index = 0; index < _fileIds.Count; index++)
         {
             var fileId = _fileIds[index];
@@ -229,11 +217,10 @@ public sealed class FtbPackInstallTask(
 
             if (_blockedMods.Any(mod => !mod.Matched))
             {
-                EmitFailed("The following files are not available for download in third party launchers.\n" +
-                           "You will need to manually download them and add them to the instance:\n" +
-                           string.Join("\n", _blockedMods.Where(mod => !mod.Matched)
-                               .Select(mod => $"{mod.Name} ({mod.WebsiteUrl})")));
-                return;
+                throw new InvalidOperationException("The following files are not available for download in third party launchers.\n" +
+                                                    "You will need to manually download them and add them to the instance:\n" +
+                                                    string.Join("\n", _blockedMods.Where(mod => !mod.Matched)
+                                                        .Select(mod => $"{mod.Name} ({mod.WebsiteUrl})")));
             }
         }
 
@@ -309,9 +296,8 @@ public sealed class FtbPackInstallTask(
     {
         EmitStatus("Downloading mods...");
 
-        // FTB blocks multiple requests at a time
-        var jobPtr = new NetJob("Mod download", maxConcurrent: 1);
-        var downloadRequests = new List<HttpDownloadTask>();
+        // FTB blocks multiple requests at a time, so the batch runs one unit at a time
+        var downloads = new List<HttpDownloadTask>();
         foreach (var file in Manifest.Files)
         {
             if (file.ServerOnly || file.Url.Length == 0)
@@ -327,21 +313,12 @@ public sealed class FtbPackInstallTask(
                 dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, file.Sha1));
             }
 
-            jobPtr.AddDownload(dl);
-            downloadRequests.Add(dl);
+            downloads.Add(dl);
         }
 
-        jobPtr.Progress += (_, _) =>
-        {
-            EmitDetails($"{downloadRequests.Count(t => t.IsFinished)} out of {downloadRequests.Count} complete");
-            SetProgress(downloadRequests.Count(t => t.IsFinished), downloadRequests.Count);
-        };
-        await jobPtr.StartAsync(cancellationToken);
-        if (!jobPtr.WasSuccessful)
-        {
-            EmitFailed(jobPtr.FailReason);
-            return;
-        }
+        await TaskWork.RunAllAsync(downloads,
+                (dl, token) => dl.DownloadAsync(null, token), maxConcurrent: 1, cancellationToken)
+            .ConfigureAwait(false);
 
         if (_blockedMods.Count != 0)
         {
@@ -350,7 +327,6 @@ public sealed class FtbPackInstallTask(
 
         // (upstream calls downloadFiles(m_instance.get()) here — the update pipeline;
         //  like the other creation tasks, creation succeeds without fetching game files)
-        EmitSucceeded();
     }
 
     /// <summary>copyBlockedMods: copy the matched blocked mods to the instance staging area.</summary>

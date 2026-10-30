@@ -82,9 +82,9 @@ internal static class PortAllocator
         /// </summary>
         public TcpListener TakeListener()
         {
-            ObjectDisposedException.ThrowIf(this._listener is null, this);
-            var leased = this._listener;
-            this._listener = null;
+            ObjectDisposedException.ThrowIf(_listener is null, this);
+            var leased = _listener;
+            _listener = null;
             return leased;
         }
 

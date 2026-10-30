@@ -362,7 +362,7 @@ public sealed class LoggedProcess : IDisposable
 
             lock (_lock)
             {
-                var existing = isStdErr ? _errLeftoverLine : this._leftoverLine;
+                var existing = isStdErr ? _errLeftoverLine : _leftoverLine;
                 if (existing.Length != 0)
                 {
                     str = existing + str;
@@ -372,7 +372,7 @@ public sealed class LoggedProcess : IDisposable
                     }
                     else
                     {
-                        this._leftoverLine = "";
+                        _leftoverLine = "";
                     }
                 }
 
@@ -386,7 +386,7 @@ public sealed class LoggedProcess : IDisposable
                 }
                 else
                 {
-                    this._leftoverLine = remaining;
+                    _leftoverLine = remaining;
                 }
 
                 var complete = lines[..^1];
@@ -438,9 +438,9 @@ public sealed class LoggedProcess : IDisposable
 
         lock (_lock)
         {
-            if (this._exitCode == 0)
+            if (_exitCode == 0)
             {
-                this._exitCode = processExitCode;
+                _exitCode = processExitCode;
             }
         }
 
@@ -463,12 +463,12 @@ public sealed class LoggedProcess : IDisposable
 
     private void ChangeState(LoggedProcessState state)
     {
-        if (state == this._state)
+        if (state == _state)
         {
             return;
         }
 
-        this._state = state;
+        _state = state;
         DiagLog.StateChanged(state.ToString());
         StateChanged?.Invoke(state);
     }

@@ -5,9 +5,8 @@
 //
 // Port of launcher/ResourceDownloadTask.{h,cpp}: download an IndexedVersion's primary file
 // into the target folder model's directory and keep the per-mod metadata (.pw.toml) in
-// sync. A SequentialTask with (optionally, when isIndexed) the LocalResourceUpdateTask
-// first and the file download second; the old file is only uninstalled after the new
-// download succeeded (the hasOldResource indirection).
+// sync. The metadata update runs first (when indexed) and the file download second; the old
+// file is only uninstalled after the new download succeeded.
 //
 // Deviations:
 //  - The C++ reads the Modrinth download-meta (reason/game_version/loader/dependent_on)
@@ -23,14 +22,13 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Dependencies;
 using FlintLauncher.Core.ModPlatform.Hashing;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform;
 
-public class ResourceDownloadTask : SequentialTask
+public class ResourceDownloadTask
 {
     private readonly IndexedPack _pack;
     private readonly IndexedVersion _packVersion;
@@ -41,10 +39,7 @@ public class ResourceDownloadTask : SequentialTask
     private readonly string _dependentOn;
     private readonly MinecraftInstance? _instance;
 
-    private readonly LocalResourceUpdateTask? _updateTask;
-
-    // Port of the to_delete tuple: (old metadata name, old file name)
-    private (string Name, string Filename) _toDelete = ("", "");
+    private readonly bool _isIndexed;
 
     public ResourceDownloadTask(IndexedPack pack,
         IndexedVersion version,
@@ -64,28 +59,7 @@ public class ResourceDownloadTask : SequentialTask
         _downloadReason = downloadReason;
         _dependentOn = dependentOn;
         _instance = instance;
-
-        if (isIndexed)
-        {
-            _updateTask = new LocalResourceUpdateTask(_packModel.IndexDir, _pack, _packVersion);
-            _updateTask.HasOldResource += HasOldResource;
-
-            AddTask(_updateTask);
-        }
-
-        var download = new CallbackTask(async cancellationToken =>
-        {
-            EmitStatus($"Downloading resource:\n{_packVersion.DownloadUrl}");
-            await _modrinth.Downloads.File(_packVersion.DownloadUrl,
-                    CreateModrinthMeta(_instance, _downloadReason, _dependentOn),
-                    HashUtils.VerifiedChecksum(
-                        _packVersion.HashType.Length != 0 ? _packVersion.HashType : null,
-                        _packVersion.Hash.Length != 0 ? _packVersion.Hash : null))
-                .SendTo(_http, HttpCompletionOption.ResponseHeadersRead,
-                    ((AbsolutePath)_packModel.Dir / GetFilename()).Value, cancellationToken);
-        });
-        download.Succeeded += DownloadSucceeded;
-        AddTask(download);
+        _isIndexed = isIndexed;
     }
 
     public string GetFilename() => _packVersion.FileName;
@@ -99,6 +73,37 @@ public class ResourceDownloadTask : SequentialTask
     public string GetName() => _pack.Name;
 
     public IndexedPack GetPack() => _pack;
+
+    /// <summary>Downloads the primary file and keeps the index entry in sync. Returning is
+    /// success; any other exception is a failure whose message is the reason.</summary>
+    public async Task RunAsync(CancellationToken cancellationToken)
+    {
+        var previous = _isIndexed
+            ? await LocalResourceUpdateTask.RunAsync(_packModel.IndexDir, _pack, _packVersion,
+                cancellationToken).ConfigureAwait(false)
+            : null;
+
+        await _modrinth.Downloads.File(_packVersion.DownloadUrl,
+                CreateModrinthMeta(_instance, _downloadReason, _dependentOn),
+                HashUtils.VerifiedChecksum(
+                    _packVersion.HashType.Length != 0 ? _packVersion.HashType : null,
+                    _packVersion.Hash.Length != 0 ? _packVersion.Hash : null))
+            .SendTo(_http, HttpCompletionOption.ResponseHeadersRead,
+                (_packModel.Dir / GetFilename()).Value, cancellationToken)
+            .ConfigureAwait(false);
+
+        // the new file is in place: the previous one can go. The metadata pass ran before the
+        // download, so a failed download leaves the old file untouched.
+        if (previous is not { Name.Length: > 0 } old || old.Filename == _packVersion.FileName)
+        {
+            return;
+        }
+
+        _packModel.UninstallResource(old.Filename, preserveMetadata: true);
+
+        // (the C++ also renames the shader config .txt for ShaderPackFolderModel here; that
+        //  model is not ported, see the header note)
+    }
 
     // ------------------------------------------------------------------ internals
 
@@ -118,28 +123,5 @@ public class ResourceDownloadTask : SequentialTask
             profile.GetComponentVersion("net.minecraft"),
             loaders.Count != 0 ? ModIndex.GetModLoaderAsString(loaders[0]) : "",
             dependentOn);
-    }
-
-    // This indirection is done so that we don't delete a mod before being sure it was
-    // downloaded successfully!
-    private void HasOldResource(string name, string filename)
-    {
-        _toDelete = (name, filename);
-    }
-
-    private void DownloadSucceeded(FlintTask task)
-    {
-        var oldName = _toDelete.Name;
-        var oldFilename = _toDelete.Filename;
-
-        if (oldName.Length == 0 || oldFilename == _packVersion.FileName)
-        {
-            return;
-        }
-
-        _packModel.UninstallResource(oldFilename, preserveMetadata: true);
-
-        // (the C++ also renames the shader config .txt for ShaderPackFolderModel here; that
-        //  model is not ported, see the header note)
     }
 }

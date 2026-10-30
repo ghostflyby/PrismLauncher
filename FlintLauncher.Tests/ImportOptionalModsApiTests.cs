@@ -12,9 +12,8 @@
 
 using System.Net;
 using System.Text.Json;
-using Xunit;
-using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Modrinth;
+using Xunit;
 
 namespace FlintLauncher.Tests;
 

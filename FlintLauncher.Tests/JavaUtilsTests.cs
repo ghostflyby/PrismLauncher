@@ -224,8 +224,7 @@ public class JavaUtilsTests : IDisposable
                 : new UnixJvmProvider(root);
 
         var list = new JavaInstallList();
-        var task = new JavaListLoadTask(list, providers: [provider]);
-        await task.StartAsync();
+        await JavaListLoadTask.RunAsync(list, TestContext.Current.CancellationToken, providers: [provider]);
 
         var install = Assert.Single(list.Versions(), j => j.Path == Path.Combine(home, "bin", JavaUtils.JavaExecutable));
         Assert.Equal("21.0.5", install.Id.ToString());

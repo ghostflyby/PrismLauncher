@@ -24,22 +24,21 @@
 //
 // Deviations from the C++ original:
 //  - PackProfile::reload() starts the ComponentUpdateTask and returns; the C++ task then
-//    connects to the running task's signals. The C# PackProfile ReloadAsync() already awaits
-//    the resolve, so GetCurrentTask() is null again by the time executeTask would check it —
-//    the wrapped subtask propagation collapses into the awaited reload (the terminal states
-//    map 1:1).
+//    connects to the running task's signals. ReloadAsync() here awaits the resolve, so the
+//    resolution's failure is this step's failure instead of a propagated signal.
 //  - updateLatestMinecraft() (the "UseLatestMinecraftVersion" branch) was deferred and
 //    is not ported, so the whole branch is skipped (documented follow-up).
 
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class MinecraftLoadAndCheck(MinecraftInstance inst, NetMode netmode) : FlintTask
+public static class MinecraftLoadAndCheck
 {
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Resolves the instance's component metadata. Returning is success; any other
+    /// exception is a failure whose message is the reason.</summary>
+    public static async Task RunAsync(MinecraftInstance inst, NetMode netmode, CancellationToken cancellationToken)
     {
         // add offline metadata load task
         // (the UseLatestMinecraftVersion/updateLatestMinecraft branch is not ported — see header)
@@ -47,12 +46,7 @@ public sealed class MinecraftLoadAndCheck(MinecraftInstance inst, NetMode netmod
         var result = await components.ReloadAsync(netmode, cancellationToken).ConfigureAwait(false);
         if (!result)
         {
-            EmitFailed(result.ErrorMessage);
-            return;
+            throw new InvalidOperationException(result.ErrorMessage);
         }
-
-        EmitSucceeded();
     }
-
-    public bool CanAbort() => true;
 }

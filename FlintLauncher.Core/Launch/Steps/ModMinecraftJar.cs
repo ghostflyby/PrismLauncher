@@ -31,68 +31,48 @@ using TruePath;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
+public sealed class ModMinecraftJar(LaunchTask parent) : AwaitedStep(parent)
 {
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override Task RunAsync(CancellationToken cancellationToken)
     {
         var inst = Parent.Instance;
 
         // checked before GetJarMods: that accessor treats a missing profile as a broken
         // launch invariant, while this step reports it with the launch-specific message
-        var components = inst.GetPackProfile();
-        var profile = components.GetProfile();
-        if (profile is null)
-        {
-            EmitFailed("The instance profile is missing.");
-            return Task.CompletedTask;
-        }
+        var profile = inst.GetPackProfile().GetProfile()
+                      ?? throw new InvalidOperationException("The instance profile is missing.");
 
         if (inst.GetJarMods().Count == 0)
         {
-            EmitSucceeded();
             return Task.CompletedTask;
         }
 
-        // nuke obsolete stripped jar(s) if needed
         if (!FileOps.EnsureFolderPathExists(new AbsolutePath(inst.BinRoot())))
         {
-            EmitFailed("Couldn't create the bin folder for Minecraft.jar");
-            return Task.CompletedTask;
+            throw new InvalidOperationException("Couldn't create the bin folder for Minecraft.jar");
         }
 
         var finalJarPath = inst.BinRoot() / "minecraft.jar";
         if (!RemoveJar())
         {
-            EmitFailed($"Couldn't remove stale jar file: {finalJarPath}");
-            return Task.CompletedTask;
+            throw new InvalidOperationException($"Couldn't remove stale jar file: {finalJarPath}");
         }
 
-        // create temporary modded jar, if needed
-        var jarMods = inst.GetJarMods();
-        if (jarMods.Count != 0)
+        var mainJar = profile.GetMainJar()
+                      ?? throw new InvalidOperationException("Failed to create the custom Minecraft jar file.");
+
+        var jars = new List<AbsolutePath>();
+        var temp1 = new List<AbsolutePath>();
+        var temp2 = new List<AbsolutePath>();
+        var temp3 = new List<AbsolutePath>();
+        mainJar.GetApplicableFiles(inst.RuntimeContext, jars, temp1, temp2, temp3, inst.GetLocalLibraryPath(),
+            inst.LibraryStorageBase());
+
+        if (!CreateModdedJar(jars[0].Value, finalJarPath.Value, inst.GetJarMods()))
         {
-            var mainJar = profile.GetMainJar();
-            if (mainJar is null)
-            {
-                EmitFailed("Failed to create the custom Minecraft jar file.");
-                return Task.CompletedTask;
-            }
-
-            var jars = new List<AbsolutePath>();
-            var temp1 = new List<AbsolutePath>();
-            var temp2 = new List<AbsolutePath>();
-            var temp3 = new List<AbsolutePath>();
-            mainJar.GetApplicableFiles(inst.RuntimeContext, jars, temp1, temp2, temp3, inst.GetLocalLibraryPath(),
-                inst.LibraryStorageBase());
-            var sourceJarPath = jars[0];
-            if (!CreateModdedJar(sourceJarPath.Value, finalJarPath.Value, jarMods))
-            {
-                EmitFailed("Failed to create the custom Minecraft jar file.");
-                return Task.CompletedTask;
-            }
+            throw new InvalidOperationException("Failed to create the custom Minecraft jar file.");
         }
 
-        EmitSucceeded();
         return Task.CompletedTask;
     }
 

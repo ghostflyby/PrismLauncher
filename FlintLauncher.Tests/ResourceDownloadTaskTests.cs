@@ -11,12 +11,10 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform;
-using FlintLauncher.Core.Tasks;
+using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
 using Xunit;
 using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
-using FlintLauncher.ExternalApi;
-using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Tests;
 
@@ -93,9 +91,7 @@ public class ResourceDownloadTaskTests : IDisposable
         var model = CreateModel();
 
         var task = new ResourceDownloadTask(pack, version, model, modrinth: _modrinth, http: _http);
-        await task.StartAsync();
-
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await task.RunAsync(CancellationToken.None);
         Assert.Equal(Path.Combine(ModsDir, "test.jar"), Path.Combine(ModsDir, task.GetFilename()));
         Assert.Equal("verId1", task.GetVersionId());
         Assert.Equal(ResourceProvider.Modrinth, task.GetProvider());
@@ -147,10 +143,8 @@ public class ResourceDownloadTaskTests : IDisposable
             Name = "Test Mod",
             Provider = ResourceProvider.Modrinth,
         }, version, model, modrinth: _modrinth, http: _http);
-        await task.StartAsync();
-
-        Assert.False(task.WasSuccessful);
-        Assert.NotEqual("", task.FailReason);
+        var failure = await Assert.ThrowsAnyAsync<Exception>(() => task.RunAsync(CancellationToken.None));
+        Assert.NotEqual("", failure.Message);
 
         // the atomic sink leaves no payload behind (the .flint-tmp leftover of a failed
         // finalize is the shared Net sink's behavior, not this task's)
@@ -181,9 +175,7 @@ public class ResourceDownloadTaskTests : IDisposable
 
         var (pack, version) = MakeVersion("new.jar", "newmod.bin", "brand new jar bytes"u8.ToArray());
         var task = new ResourceDownloadTask(pack, version, model, modrinth: _modrinth, http: _http);
-        await task.StartAsync();
-
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await task.RunAsync(CancellationToken.None);
         Assert.False(File.Exists(Path.Combine(ModsDir, "old.jar")), "the old file should be gone");
         Assert.Null(FindMod(model, "old.jar"));
         Assert.NotNull(FindMod(model, "new.jar"));
@@ -204,9 +196,6 @@ public class ResourceDownloadTaskTests : IDisposable
         var model = CreateModel();
 
         var task = new ResourceDownloadTask(pack, version, model, modrinth: _modrinth, http: _http);
-        await task.StartAsync();
-
-        Assert.False(task.WasSuccessful);
-        Assert.Equal(TaskState.Failed, task.State);
+        await Assert.ThrowsAnyAsync<Exception>(() => task.RunAsync(CancellationToken.None));
     }
 }

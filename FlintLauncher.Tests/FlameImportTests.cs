@@ -14,12 +14,10 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
-using FlintLauncher.Core.Tasks;
-using TruePath;
-using Xunit;
-using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
+using TruePath;
+using Xunit;
 
 namespace FlintLauncher.Tests;
 
@@ -96,9 +94,8 @@ public class FlameImportTests : IDisposable
         var task = new InstanceImportTask(new Uri(zipPath), trustedSource: true, _modrinth, _http, flame: _flameApi);
         task.SetName("Flame Imported");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await wrapped(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
 
         var staging = TempPath("instances", "Flame Imported");
         // the overrides landed in the game root
@@ -151,9 +148,8 @@ public class FlameImportTests : IDisposable
 
         var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, _modrinth, _http, flame: _flameApi);
         task.SetName("Fabric Flame");
-        await task.StartAsync();
+        await task.ExecuteAsync(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         var components = doc.RootElement.GetProperty("components").EnumerateArray()
             .Select(c => (Uid: c.GetProperty("uid").GetString(), Version: c.GetProperty("version").GetString()))
@@ -177,10 +173,17 @@ public class FlameImportTests : IDisposable
 
         var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, _modrinth, _http, flame: _flameApi);
         task.SetName("Blocked Pack");
-        await task.StartAsync();
+        string taskFailure = "";
+        try
+        {
+            await task.ExecuteAsync(TestContext.Current.CancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            taskFailure = e.Message;
+        }
 
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("not available for download", task.FailReason);
+        Assert.Contains("not available for download", taskFailure);
         // the blocked mod data is exposed for the BlockedModsDialog flow
         var blocked = Assert.Single(task.BlockedMods);
         Assert.Equal("test.jar", blocked.Name);
@@ -210,9 +213,8 @@ public class FlameImportTests : IDisposable
             BlockedModLocalFileResolver = _ => localCopy,
         };
         task.SetName("Matched Pack");
-        await task.StartAsync();
+        await task.ExecuteAsync(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         // the matched local file was copied into the instance's mods folder
         Assert.Equal(_downloadBytes,
             await File.ReadAllBytesAsync(Path.Combine(staging, "minecraft", "mods", "test.jar")));
@@ -235,11 +237,18 @@ public class FlameImportTests : IDisposable
 
         var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: false, _global, _modrinth, _http, flame: _flameApi);
         task.SetName("Untrusted Pack");
-        await task.StartAsync();
+        string taskFailure = "";
+        try
+        {
+            await task.ExecuteAsync(TestContext.Current.CancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            taskFailure = e.Message;
+        }
 
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("untrusted", task.FailReason);
-        Assert.Contains("mods/override.jar", task.FailReason);
+        Assert.Contains("untrusted", taskFailure);
+        Assert.Contains("mods/override.jar", taskFailure);
     }
 
     [Fact]
@@ -255,9 +264,8 @@ public class FlameImportTests : IDisposable
 
         var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, _modrinth, _http, flame: _flameApi);
         task.SetName("Trusted Pack");
-        await task.StartAsync();
+        await task.ExecuteAsync(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         Assert.True(File.Exists(Path.Combine(staging, "minecraft", "mods", "override.jar")));
     }
 
@@ -274,9 +282,8 @@ public class FlameImportTests : IDisposable
 
         var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, _modrinth, _http, flame: _flameApi);
         task.SetName("Unknown Loader");
-        await task.StartAsync();
+        await task.ExecuteAsync(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         Assert.Contains(task.Warnings, w => w.Contains("Unknown mod loader in manifest"));
         using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         var components = doc.RootElement.GetProperty("components").EnumerateArray()
@@ -305,10 +312,17 @@ public class FlameImportTests : IDisposable
 
         var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, _modrinth, _http, flame: _flameApi);
         task.SetName("Traversal");
-        await task.StartAsync();
+        string taskFailure = "";
+        try
+        {
+            await task.ExecuteAsync(TestContext.Current.CancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            taskFailure = e.Message;
+        }
 
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("security risk", task.FailReason);
+        Assert.Contains("security risk", taskFailure);
         // the targeted directory was not touched
         Assert.True(Directory.Exists(outsideMarker));
         Assert.True(File.Exists(Path.Combine(outsideMarker, "sentinel.txt")));
@@ -337,10 +351,17 @@ public class FlameImportTests : IDisposable
 
         var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, _modrinth, _http, flame: _flameApi);
         task.SetName("Recommended");
-        await task.StartAsync();
+        string taskFailure = "";
+        try
+        {
+            await task.ExecuteAsync(TestContext.Current.CancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            taskFailure = e.Message;
+        }
 
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("Failed to get local metadata index", task.FailReason);
+        Assert.Contains("Failed to get local metadata index", taskFailure);
 
         // with a lookup hook the recommended version resolves (per-task hook, no global reset)
         var staging2 = TempPath("staging-recommended2");
@@ -356,8 +377,7 @@ public class FlameImportTests : IDisposable
                 return "40.2.0";
             },
         };
-        await task2.StartAsync();
-        Assert.True(task2.WasSuccessful, task2.FailReason);
+        await task2.ExecuteAsync(TestContext.Current.CancellationToken);
         using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging2, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
             c => c.GetProperty("uid").GetString() == "net.minecraftforge"
@@ -376,9 +396,8 @@ public class FlameImportTests : IDisposable
 
         var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, _modrinth, _http, flame: _flameApi);
         task.SetName("Missing Overrides");
-        await task.StartAsync();
+        await task.ExecuteAsync(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         Assert.Contains(task.Warnings, w => w.Contains("overrides folder (overrides) is missing"));
     }
 
@@ -392,11 +411,18 @@ public class FlameImportTests : IDisposable
 
         var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, _modrinth, _http, flame: _flameApi);
         task.SetName("Bad Manifest");
-        await task.StartAsync();
+        string taskFailure = "";
+        try
+        {
+            await task.ExecuteAsync(TestContext.Current.CancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            taskFailure = e.Message;
+        }
 
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("Could not understand pack manifest", task.FailReason);
-        Assert.Contains("Unknown manifest version", task.FailReason);
+        Assert.Contains("Could not understand pack manifest", taskFailure);
+        Assert.Contains("Unknown manifest version", taskFailure);
     }
 
     [Fact]
@@ -421,9 +447,8 @@ public class FlameImportTests : IDisposable
         RegisterResolvedMod();
         var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, _modrinth, _http, flame: _flameApi);
         task.SetName("Optional Pack");
-        await task.StartAsync();
+        await task.ExecuteAsync(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         Assert.True(File.Exists(Path.Combine(staging, "minecraft", "mods", "test.jar.disabled")));
         Assert.False(File.Exists(Path.Combine(staging, "minecraft", "mods", "test.jar")));
         // optional blocked mods are flagged disabled in the blocked-mods data

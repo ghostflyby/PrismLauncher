@@ -19,34 +19,33 @@
 //     See the License for the specific language governing permissions and
 //     limitations under the License.
 //
-// Port of launcher/minecraft/launch/CreateGameFolders.{h,cpp}: create the main .minecraft
-// folder for the instance and any other necessary folders.
+// Creates the instance's game folder and the server-resource-packs folder (a workaround for
+// Minecraft bug MCL-3732).
 
 using FlintLauncher.Core.IO;
 using TruePath;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class CreateGameFolders(LaunchTask parent) : LaunchStep(parent)
+public sealed class CreateGameFolders(LaunchTask parent) : AwaitedStep(parent)
 {
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override Task RunAsync(CancellationToken cancellationToken)
     {
         var instance = Parent.Instance;
 
         if (!FileOps.EnsureFolderPathExists(new AbsolutePath(instance.GameRoot)))
         {
-            EmitLogLine("Couldn't create the main game folder", MessageLevel.Error);
-            EmitFailed("Couldn't create the main game folder");
-            return Task.CompletedTask;
+            var reason = "Couldn't create the main game folder";
+            EmitLogLine(reason, MessageLevel.Error);
+            throw new InvalidOperationException(reason);
         }
 
-        // HACK: this is a workaround for MCL-3732 - 'server-resource-packs' folder is created.
-        if (!FileOps.EnsureFolderPathExists((new AbsolutePath(instance.GameRoot) / "server-resource-packs")))
+        // a failure here is a warning only: the game runs without the folder
+        if (!FileOps.EnsureFolderPathExists(new AbsolutePath(instance.GameRoot) / "server-resource-packs"))
         {
             EmitLogLine("Couldn't create the 'server-resource-packs' folder", MessageLevel.Error);
         }
 
-        EmitSucceeded();
         return Task.CompletedTask;
     }
 

@@ -8,13 +8,12 @@
 
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
-using FlintLauncher.ExternalApi;
-using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Versioning;
+using FlintLauncher.ExternalApi.Flame;
 using TruePath;
 using Xunit;
 using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
@@ -93,14 +92,10 @@ public class FlameCheckUpdateTests : IDisposable
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
             _ => MetadataHandler.Get(new AbsolutePath(Path.Combine(TempPath("mods"), ".index")), "test-mod"), flame: _flameApi, http: TestNet.Http);
 
-        var failures = new List<(Resource Resource, string Reason, string RecoverUrl)>();
-        check.CheckFailed += (resource, reason, recoverUrl) => failures.Add((resource, reason, recoverUrl));
+        var result = await check.CheckAsync(TestContext.Current.CancellationToken);
 
-        await check.StartAsync();
-
-        Assert.True(check.WasSuccessful, check.FailReason);
-        Assert.Empty(failures);
-        var update = Assert.Single(check.GetUpdates());
+        Assert.Empty(result.Failures);
+        var update = Assert.Single(result.Updates);
         // the update record carries the resource's display name, like the C++ fake pack
         Assert.Equal("test", update.Name);
         Assert.Equal("1.0.0", update.OldVersion);
@@ -127,10 +122,9 @@ public class FlameCheckUpdateTests : IDisposable
 
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
             _ => MetadataHandler.Get(new AbsolutePath(Path.Combine(TempPath("mods"), ".index")), "test-mod"), flame: _flameApi, http: TestNet.Http);
-        await check.StartAsync();
+        var result = await check.CheckAsync(TestContext.Current.CancellationToken);
 
-        Assert.True(check.WasSuccessful, check.FailReason);
-        Assert.Empty(check.GetUpdates());
+        Assert.Empty(result.Updates);
     }
 
     [Fact]
@@ -154,14 +148,10 @@ public class FlameCheckUpdateTests : IDisposable
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
             _ => MetadataHandler.Get(new AbsolutePath(Path.Combine(TempPath("mods"), ".index")), "test-mod"), flame: _flameApi, http: TestNet.Http);
 
-        var failures = new List<(Resource Resource, string Reason, string RecoverUrl)>();
-        check.CheckFailed += (resource, reason, recoverUrl) => failures.Add((resource, reason, recoverUrl));
+        var result = await check.CheckAsync(TestContext.Current.CancellationToken);
 
-        await check.StartAsync();
-
-        Assert.True(check.WasSuccessful, check.FailReason);
-        Assert.Empty(check.GetUpdates());
-        var failure = Assert.Single(failures);
+        Assert.Empty(result.Updates);
+        var failure = Assert.Single(result.Failures);
         Assert.Equal("Resource has a new update available, but is not downloadable using CurseForge.",
             failure.Reason);
         Assert.Equal("https://www.curseforge.com/projects/test-mod/download/789", failure.RecoverUrl);
@@ -184,14 +174,10 @@ public class FlameCheckUpdateTests : IDisposable
         var check = new FlameCheckUpdate([mod], [new McVersion("1.18.2")], [ModLoaderType.Forge],
             _ => MetadataHandler.Get(new AbsolutePath(Path.Combine(TempPath("mods"), ".index")), "test-mod"), flame: _flameApi, http: TestNet.Http);
 
-        var failures = new List<(Resource Resource, string Reason, string RecoverUrl)>();
-        check.CheckFailed += (resource, reason, recoverUrl) => failures.Add((resource, reason, recoverUrl));
+        var result = await check.CheckAsync(TestContext.Current.CancellationToken);
 
-        await check.StartAsync();
-
-        Assert.True(check.WasSuccessful, check.FailReason);
-        Assert.Empty(check.GetUpdates());
-        var failure = Assert.Single(failures);
+        Assert.Empty(result.Updates);
+        var failure = Assert.Single(result.Failures);
         Assert.Contains("No valid version found", failure.Reason);
         Assert.Equal("", failure.RecoverUrl);
     }

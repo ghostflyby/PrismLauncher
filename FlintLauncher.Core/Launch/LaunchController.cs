@@ -26,8 +26,8 @@
 //
 // The controller decides the account and the launch mode (Normal/Offline/Demo), fills the
 // AuthSession, builds the LaunchTask (prepending the mode/version TextPrint steps and the
-// PrintServers step) and runs it to completion — the C++ controller task only finishes when
-// the game exits, and so does the ported one (the terminal emissions come from the launcher).
+// PrintServers step) and awaits it — the run finishes when the game exits, and its outcome is
+// the launch's.
 //
 // Deviations from the C++ original (dialogs are UI):
 //  - decideAccount(): the "no accounts" info box and the ProfileSelectDialog are not ported;
@@ -75,7 +75,7 @@ public enum LaunchDecision
     Abort,
 }
 
-public class LaunchController : FlintTask
+public sealed class LaunchController
 {
     private AuthSession? _session;
     private LaunchTask? _launcher;
@@ -130,23 +130,68 @@ public class LaunchController : FlintTask
     /// </summary>
     public bool AutoProceed { get; init; } = true;
 
-    // ------------------------------------------------------------------ Task (executeTask)
+    // ------------------------------------------------------------------ the launch
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Runs the launch: decide the account and mode, build the task, and await it.
+    /// The await covers the whole session, including the time the game runs.</summary>
+    public async Task RunAsync(CancellationToken cancellationToken)
     {
         if (Instance is not { } instance)
         {
-            EmitFailed("No instance specified!");
-            return;
+            throw new InvalidOperationException("No instance specified!");
         }
 
-        if (!JavaCommon.CheckJvmArgs(Variant.AsString(instance.Settings.Get("JvmArgs"))))
+        // the controller takes the instance over for the whole run: CanLaunch refuses a second
+        // launch from here on, even before the task itself exists
+        instance.SetRunning(true);
+
+        try
         {
-            EmitFailed("Invalid Java arguments specified. Please fix this first.");
-            return;
-        }
+            if (!JavaCommon.CheckJvmArgs(Variant.AsString(instance.Settings.Get("JvmArgs"))))
+            {
+                throw new InvalidOperationException("Invalid Java arguments specified. Please fix this first.");
+            }
 
-        await Login(instance, cancellationToken).ConfigureAwait(false);
+            var launcher = await Login(instance, cancellationToken).ConfigureAwait(false);
+            if (launcher is null)
+            {
+                throw new InvalidOperationException("Couldn't instantiate a launcher.");
+            }
+
+            await launcher.RunAsync(cancellationToken).ConfigureAwait(false);
+            Log.LaunchFinished("succeeded");
+        }
+        catch (OperationCanceledException)
+        {
+            instance.SetRunning(false);
+            Log.LaunchFinished("aborted");
+            throw;
+        }
+        catch (Exception e)
+        {
+            instance.SetRunning(false);
+            Log.LaunchFinished("failed: " + e.Message);
+            throw;
+        }
+    }
+
+    /// <summary>Runs the launch and reports its outcome as data, for a caller that inspects
+    /// the result rather than propagating the failure.</summary>
+    public async Task<LaunchTask.LaunchOutcome> RunToCompletionAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await RunAsync(cancellationToken).ConfigureAwait(false);
+            return new LaunchTask.LaunchOutcome(true, "", false);
+        }
+        catch (OperationCanceledException)
+        {
+            return new LaunchTask.LaunchOutcome(false, "Aborted", true);
+        }
+        catch (Exception e)
+        {
+            return new LaunchTask.LaunchOutcome(false, TaskWork.ReasonOf(e), false);
+        }
     }
 
     // ----------------------------------------------------------------------- account/login
@@ -234,10 +279,10 @@ public class LaunchController : FlintTask
         if (state is AccountState.Unchecked or AccountState.Errored || needsRefresh)
         {
             // MinecraftAccount::refresh(): start the auth flow and wait for the state to settle
-            var refresh = accountToCheck.Refresh(Services?.Auth);
+            var refresh = accountToCheck.Refresh(Services?.Auth, Services?.LoggerFactory);
             if (refresh is not null && !refresh.IsFinished)
             {
-                await refresh.StartAsync(cancellationToken).ConfigureAwait(false);
+                await RunAuthFlowAsync(refresh, cancellationToken).ConfigureAwait(false);
             }
 
             state = accountToCheck.AccountState;
@@ -249,8 +294,7 @@ public class LaunchController : FlintTask
             var task = accountToCheck.CurrentTask;
             if (task is not null)
             {
-                await task.StartAsync(cancellationToken).ConfigureAwait(false);
-                if (task.State == TaskState.AbortedByUser)
+                if (!await RunAuthFlowAsync(task, cancellationToken).ConfigureAwait(false))
                 {
                     return LaunchDecision.Abort;
                 }
@@ -270,6 +314,27 @@ public class LaunchController : FlintTask
             ? LaunchMode.Normal
             : LaunchMode.Offline;
         return LaunchDecision.Continue; // All good to go
+    }
+
+    /// <summary>Runs an auth flow and reports whether it authenticated the account. A
+    /// cancellation is the caller's own abort; any other failure is logged and settles the
+    /// account state, which the caller reads from the account.</summary>
+    private async Task<bool> RunAuthFlowAsync(AuthFlow flow, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await flow.RunAsync(cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+        catch (Exception e)
+        {
+            Log.LogWarning(e, "authentication failed");
+            return false;
+        }
     }
 
     /// <summary>Port of askPlayDemo() (the C++ default button is Cancel — see the header note).</summary>
@@ -337,7 +402,7 @@ public class LaunchController : FlintTask
     }
 
     /// <summary>Port of login(): decide the account/mode, fill the session, launch.</summary>
-    private async Task Login(MinecraftInstance instance, CancellationToken cancellationToken)
+    private async Task<LaunchTask?> Login(MinecraftInstance instance, CancellationToken cancellationToken)
     {
         DecideAccount(instance);
 
@@ -350,14 +415,12 @@ public class LaunchController : FlintTask
         if (cancellationToken.IsCancellationRequested && decision == LaunchDecision.Undecided)
         {
             // the controller was aborted while looping on the (hook driven) reauth path
-            EmitAborted();
-            return;
+            throw new OperationCanceledException(cancellationToken);
         }
 
         if (decision == LaunchDecision.Abort)
         {
-            EmitAborted();
-            return;
+            throw new OperationCanceledException("Aborted");
         }
 
         if (_actualLaunchMode == LaunchMode.Demo)
@@ -369,13 +432,11 @@ public class LaunchController : FlintTask
                 {
                     _session = new AuthSession();
                     _session.MakeDemo(name, MinecraftAccount.UuidFromUsername(name).ToString("D"));
-                    LaunchInstance(instance);
-                    return;
+                    return BuildInstance(instance);
                 }
             }
 
-            EmitFailed("No account selected for launch");
-            return;
+            throw new InvalidOperationException("No account selected for launch");
         }
 
         _session = new AuthSession
@@ -391,13 +452,11 @@ public class LaunchController : FlintTask
                 : AskOfflineName("Player", LaunchMode.Offline) ?? "";
             if (name.Length == 0)
             {
-                EmitAborted();
-                return;
+                throw new OperationCanceledException("Aborted");
             }
 
             _session.MakeOffline(name);
-            LaunchInstance(instance);
-            return;
+            return BuildInstance(instance);
         }
 
         AccountToUse.FillSession(_session);
@@ -408,8 +467,7 @@ public class LaunchController : FlintTask
             {
                 // Now handle setting up a profile name here... (the ProfileSetupDialog is UI;
                 // the headless core cannot invent a profile name — abort like a rejected dialog)
-                EmitAborted();
-                return;
+                throw new OperationCanceledException("Aborted");
             }
 
             if (_actualLaunchMode == LaunchMode.Offline)
@@ -420,8 +478,7 @@ public class LaunchController : FlintTask
                     name = AskOfflineName(_session.PlayerName, LaunchMode.Offline) ?? "";
                     if (name.Length == 0)
                     {
-                        EmitAborted();
-                        return;
+                        throw new OperationCanceledException("Aborted");
                     }
                 }
 
@@ -429,20 +486,18 @@ public class LaunchController : FlintTask
             }
         }
 
-        LaunchInstance(instance);
+        return BuildInstance(instance);
     }
 
     // ---------------------------------------------------------------------- launchInstance
 
-    /// <summary>Port of launchInstance(): build the LaunchTask, prepend the banner steps, run.</summary>
-    private void LaunchInstance(MinecraftInstance instance)
+    /// <summary>Builds the launch task, prepends the banner steps and returns it without
+    /// starting it: the caller awaits <see cref="LaunchTask.RunAsync"/>.</summary>
+    private LaunchTask? BuildInstance(MinecraftInstance instance)
     {
-        _launcher = instance.CreateLaunchTask(_session, TargetToJoin, Services);
-        if (_launcher is null)
-        {
-            EmitFailed("Couldn't instantiate a launcher.");
-            return;
-        }
+        var launcher = instance.CreateLaunchTask(_session, TargetToJoin, Services);
+
+        _launcher = launcher;
 
         Log.LaunchStarted(
             instance.Id(),
@@ -450,10 +505,8 @@ public class LaunchController : FlintTask
             _session?.PlayerName ?? "(none)",
             TargetToJoin?.ToString() ?? "(instance default)");
 
-        _launcher.ReadyForLaunch += ReadyForLaunch;
-        _launcher.Succeeded += OnLauncherSucceeded;
-        _launcher.Failed += OnLauncherFailed;
-        _launcher.RequestProgress += OnProgressRequested;
+        launcher.ReadyForLaunch += ReadyForLaunch;
+        launcher.RequestProgress += OnProgressRequested;
 
         // Prepend Online and Auth Status
         string onlineMode;
@@ -464,7 +517,7 @@ public class LaunchController : FlintTask
             // Prepend Server Status
             string[] servers = ["login.microsoftonline.com", "session.minecraft.net", "textures.minecraft.net", "api.mojang.com"];
 
-            _launcher.PrependStep(new PrintServers(_launcher, servers));
+            launcher.PrependStep(new PrintServers(launcher, servers));
         }
         else
         {
@@ -480,7 +533,8 @@ public class LaunchController : FlintTask
                 $"{FlintConfig.Default.LauncherDisplayName} version: {FlintConfig.DefaultVersionString} ({FlintConfig.Default.BuildPlatform})";
             _launcher.PrependStep(new TextPrint(_launcher, versionString + "\n", MessageLevel.Launcher));
         }
-        _ = _launcher.StartAsync();
+
+        return _launcher;
     }
 
     /// <summary>Port of readyForLaunch(): the profiler plumbing is UI, so the default is an
@@ -493,38 +547,14 @@ public class LaunchController : FlintTask
         }
     }
 
-    private void OnLauncherSucceeded(FlintTask task)
-    {
-        Log.LaunchFinished("succeeded");
-        EmitSucceeded();
-    }
-
-    private void OnLauncherFailed(FlintTask task, string reason)
-    {
-        Log.LaunchFinished("failed: " + reason);
-        EmitFailed(reason);
-    }
-
     /// <summary>Port of onProgressRequested(): the progress dialog collapses into a proceed().</summary>
-    private void OnProgressRequested(FlintTask task) => _launcher?.Proceed();
+    private void OnProgressRequested(LaunchStep step) => _launcher?.Proceed();
 
     // -------------------------------------------------------------------------------- abort
 
-    public override void Abort()
+    public void Abort()
     {
-        if (_launcher is null)
-        {
-            // C++ abort(): nothing to kill before the launcher exists
-            base.Abort();
-            return;
-        }
-
-        if (!_launcher.CanAbort())
-        {
-            return;
-        }
-
         // the C++ "Kill Minecraft?" confirm defaults to Yes; the headless port kills directly
-        _launcher.Abort();
+        _launcher?.Abort();
     }
 }

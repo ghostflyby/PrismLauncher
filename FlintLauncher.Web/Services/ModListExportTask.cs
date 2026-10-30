@@ -14,17 +14,11 @@
 using System.Security;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.Helpers;
-using FlintLauncher.Core.Tasks;
 using TruePath;
 
 namespace FlintLauncher.Web.Services;
 
-public sealed class ModListExportTask(
-    MinecraftInstance instance,
-    AbsolutePath? outputPath,
-    ModListFormat format,
-    OptionalData extraData)
-    : FlintTask
+public static class ModListExportTask
 {
     private static readonly Dictionary<string, (ModListFormat Format, string Extension)> Formats =
         new(StringComparer.Ordinal)
@@ -36,11 +30,8 @@ public sealed class ModListExportTask(
             ["csv"] = (ModListFormat.Csv, "csv"),
         };
 
-    /// <summary>The written file (exposed through the task view's result payload).</summary>
-    public AbsolutePath? OutputPath => outputPath;
-
     /// <summary>Maps the API format2 key ("html"|"markdown"|"plain"|"json"|"csv") to the
-    /// core format + file extension; null when the key is unknown.</summary>
+    /// core format + file extension; false when the key is unknown.</summary>
     public static bool TryParseFormat(string? format2, out ModListFormat format, out string extension)
     {
         if (format2 is not null && Formats.TryGetValue(format2.Trim().ToLowerInvariant(), out var entry))
@@ -56,9 +47,13 @@ public sealed class ModListExportTask(
         return false;
     }
 
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Writes the mod list to <paramref name="outputPath"/>. Returning is success; any
+    /// other exception is a failure whose message is the reason. The list is written in one
+    /// pass, so the token has nothing to observe.</summary>
+    public static Task ExportAsync(MinecraftInstance instance, AbsolutePath? outputPath,
+        ModListFormat format, OptionalData extraData, CancellationToken cancellationToken)
     {
-        EmitStatus("Collecting mods...");
+        _ = cancellationToken;
 
         // the same mod list the /instances/{id}/mods endpoint serves (metadata-aware)
         var folder = instance.LoaderModList();
@@ -84,11 +79,9 @@ public sealed class ModListExportTask(
             });
         }
 
-        EmitStatus("Writing the mod list...");
         if (outputPath is not { } target)
         {
-            EmitFailed("No output path was provided for the mod list export");
-            return Task.CompletedTask;
+            throw new InvalidOperationException("No output path was provided for the mod list export");
         }
 
         try
@@ -98,11 +91,9 @@ public sealed class ModListExportTask(
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException
                                       or SecurityException)
         {
-            EmitFailed("Could not write the mod list: " + e.Message);
-            return Task.CompletedTask;
+            throw new InvalidOperationException("Could not write the mod list: " + e.Message, e);
         }
 
-        EmitSucceeded();
         return Task.CompletedTask;
     }
 }

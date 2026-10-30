@@ -113,8 +113,10 @@ public class ModelNotificationTests : IDisposable
     {
         var mods = MaterializedDirectory.Ensure(_root / "mods")!;
         var model = new ModFolderModel(mods, isIndexed: false);
-        (mods.Path / "a.jar").WriteAllBytes([0x50, 0x4B, 0x05, 0x06, 0, 0, 0, 0, 0, 0,
-                                             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        (mods.Path / "a.jar").WriteAllBytes([
+            0x50, 0x4B, 0x05, 0x06, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        ]);
         model.Update(); // baseline snapshot: one resource
         Assert.Equal(1, model.Size);
 

@@ -2,22 +2,17 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
 // The modplatform install/update orchestration behind POST /instances/{id}/mods/install and
-// POST /instances/{id}/mods/update — the headless port of the C++ ModrinthPage/FlamePage
-// download-dialog flow (resolve selections -> GetModDependenciesTask -> a ResourceDownloadTask
-// per resolved entry) and of ModFolderPage::updateMods (provider CheckUpdate pass ->
-// ModUpdateTask over the per-mod downloads).
+// POST /instances/{id}/mods/update: resolve the selections, resolve their dependencies, then
+// run one ResourceDownloadTask per resolved entry. The update path runs the provider's check
+// pass and applies what it found through ModUpdateTask.
 //
-// Deviations:
-//  - The C++ drives the phases through chained UI dialogs; here ModInstallTask is a custom
-//    FlintTask that awaits the phases in order (SequentialTask semantics: the first failure
-//    fails the whole task). The phases cannot be one statically-built SequentialTask because
-//    GetModDependenciesTask must be constructed with the already-resolved selected versions.
-//  - "Latest version" for a selection without a pinned version reuses each provider's
-//    latest-version logic: the Modrinth shape dispatch/date-sort of
-//    GetModDependenciesTask::getDependencyVersion (modplatform/ResourceAPI.cpp) and
-//    FlameAPI::getLatestVersion over the project's file list.
-//  - ModsUpdateTask skips mods without packwiz metadata (the C++ update dialog reports them
-//    as an error row; the API surface has no per-resource error channel yet).
+// The install phases are sequential because GetModDependenciesTask must be constructed with
+// the already-resolved selected versions, so the phase chain cannot be built up front.
+//
+// "Latest version" for a selection without a pinned version reuses each provider's
+// latest-version logic: Modrinth's shape dispatch and date sort, CurseForge's file-list pick.
+//
+// Mods without packwiz metadata are skipped: nothing records their update state.
 
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
@@ -39,7 +34,8 @@ namespace FlintLauncher.Web.Services;
 /// <summary>A validated install selection (the API-level provider string already parsed).</summary>
 public sealed record ModInstallRequest(ResourceProvider Provider, string ProjectId, string VersionId);
 
-/// <summary>Raised when a selection/project cannot be resolved; the message becomes the task's FailReason.</summary>
+/// <summary>Raised when a selection/project cannot be resolved; the message is the reason
+/// reported to the caller.</summary>
 public sealed class ModResolveException(string message) : Exception(message);
 
 /// <summary>Provider-string plumbing shared by the modplatform endpoints and tasks.</summary>
@@ -275,7 +271,7 @@ public sealed class ModSelectionResolver(
 /// Install one or more mods into an instance's mods folder: resolve every selection
 /// (project + version), run the recursive dependency resolution against the instance's
 /// installed mods, then download a ResourceDownloadTask per resolved entry (each writing its
-/// own packwiz metadata). Fails with the resolution/download reason, like a SequentialTask.
+/// own packwiz metadata). The first failure ends the install with that reason.
 /// </summary>
 public sealed class ModInstallTask(
     MinecraftInstance instance,
@@ -286,18 +282,17 @@ public sealed class ModInstallTask(
     ModrinthClient modrinth,
     HttpClient http,
     FlameClient? flame = null)
-    : FlintTask
 {
     private readonly McVersion _mcVersion = new(mcVersion);
     private readonly List<ModLoaderType> _loaderList = ModIndex.ModLoaderTypesToList(loaders);
-    private readonly List<ModInstallEntryView> _installed = [];
     private readonly FlameClient _flame = flame ?? new FlameClient();
 
-    /// <summary>The entries for the task view's optional result payload.</summary>
-    public TaskResultView BuildResult() => new(null, _installed);
-
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Resolves, then downloads, every selection and returns the installed entries.
+    /// Any exception is a failure whose message is the reason.</summary>
+    public async Task<TaskResultView> RunAsync(CancellationToken cancellationToken)
     {
+        var installed = new List<ModInstallEntryView>();
+
         // pick up already-installed mods for the dependency resolution
         folder.Update();
 
@@ -306,40 +301,27 @@ public sealed class ModInstallTask(
         {
             var resolver = new ModSelectionResolver(_mcVersion, loaders, _loaderList,
                 modrinth, http, _flame);
-            var current = 0;
             foreach (var selection in selections)
             {
-                EmitStatus($"Resolving {ModPlatformTasks.ProviderKey(selection.Provider)} project {selection.ProjectId}...");
                 var (pack, version) = await resolver.ResolveAsync(
                     selection.Provider, selection.ProjectId, selection.VersionId, cancellationToken);
                 selected.Add(new GetModDependenciesTask.PackDependency(pack, version));
-                SetProgress(++current, selections.Count + 2);
             }
         }
         catch (ModResolveException e)
         {
-            EmitFailed(e.Message);
-            return;
+            throw new InvalidOperationException(e.Message, e);
         }
-
-        EmitStatus("Resolving dependencies...");
         var dependencyTask = new GetModDependenciesTask(instance, folder, selected,
             modrinth, http, _flame);
-        await dependencyTask.StartAsync(cancellationToken);
-        if (!dependencyTask.WasSuccessful)
-        {
-            EmitFailed(dependencyTask.FailReason.Length != 0 ? dependencyTask.FailReason : "dependency resolution failed");
-            return;
-        }
-
-        SetProgress(selections.Count + 1, selections.Count + 2);
+        await dependencyTask.RunAsync(cancellationToken).ConfigureAwait(false);
 
         var dependencies = dependencyTask.GetDependencies();
         var extraInfo = dependencyTask.GetExtraInfo();
 
         void RecordInstalled(GetModDependenciesTask.PackDependency entry, bool isDependency, string? requiredBy)
         {
-            _installed.Add(new ModInstallEntryView(
+            installed.Add(new ModInstallEntryView(
                 entry.Version.FileName,
                 ModPlatformTasks.ProviderKey(entry.Pack.Provider),
                 entry.Pack.AddonId,
@@ -347,10 +329,8 @@ public sealed class ModInstallTask(
                 isDependency,
                 requiredBy));
         }
-
-        EmitStatus("Downloading mods...");
         var planned = new List<(GetModDependenciesTask.PackDependency Entry, bool IsDependency, string? RequiredBy)>();
-        var downloads = new SequentialTask("Download mods");
+        List<ResourceDownloadTask> downloads = [];
         foreach (var entry in selected.Concat(dependencies))
         {
             var isDependency = !selected.Contains(entry);
@@ -365,11 +345,11 @@ public sealed class ModInstallTask(
 
             if (entry.Version.DownloadUrl.Length == 0)
             {
-                EmitFailed($"no downloadable version of {entry.Pack.AddonId} was resolved");
-                return;
+                throw new InvalidOperationException(
+                    $"no downloadable version of {entry.Pack.AddonId} was resolved");
             }
 
-            downloads.AddTask(new ResourceDownloadTask(
+            downloads.Add(new ResourceDownloadTask(
                 entry.Pack,
                 entry.Version,
                 folder,
@@ -381,12 +361,8 @@ public sealed class ModInstallTask(
                 instance));
         }
 
-        await downloads.StartAsync(cancellationToken);
-        if (!downloads.WasSuccessful)
-        {
-            EmitFailed(downloads.FailReason.Length != 0 ? downloads.FailReason : "the mod download failed");
-            return;
-        }
+        await TaskWork.SequenceAsync(downloads, (download, token) => download.RunAsync(token),
+            cancellationToken).ConfigureAwait(false);
 
         // only entries whose download actually succeeded reach the result payload
         foreach (var (entry, isDependency, requiredBy) in planned)
@@ -394,15 +370,14 @@ public sealed class ModInstallTask(
             RecordInstalled(entry, isDependency, requiredBy);
         }
 
-        SetProgress(selections.Count + 2, selections.Count + 2);
-        EmitSucceeded();
+        return new TaskResultView(null, installed);
     }
 }
 
 /// <summary>
 /// Check an instance's installed (metadata-tracked) mods for updates through the provider
-/// check passes, then apply everything found with a ModUpdateTask. The found/applied updates
-/// are exposed for the task view's result payload ({@link BuildResult}).
+/// check passes, then apply everything found with a ModUpdateTask. RunAsync returns the
+/// found/applied updates as the task view's result payload.
 /// </summary>
 public sealed class ModsUpdateTask(
     MinecraftInstance instance,
@@ -412,17 +387,14 @@ public sealed class ModsUpdateTask(
     HttpClient http,
     FlameClient flameApi,
     IReadOnlyList<IndexedVersionType>? releaseTypes = null)
-    : FlintTask
 {
     private sealed record PendingUpdate(ModUpdateEntryView View, IndexedVersion Version, string ProjectId, string Slug, string Name);
 
-    private readonly List<PendingUpdate> _updates = [];
-
-    /// <summary>The update entries for the task view's optional result payload.</summary>
-    public TaskResultView BuildResult() => new(_updates.Select(u => u.View).ToArray(), null);
-
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Checks every installed mod, applies what was found, and returns the
+    /// found/applied updates. Any exception is a failure whose message is the reason.</summary>
+    public async Task<TaskResultView> RunAsync(CancellationToken cancellationToken)
     {
+        var updates = new List<PendingUpdate>();
         folder.Update();
 
         var profile = instance.GetPackProfile();
@@ -462,57 +434,42 @@ public sealed class ModsUpdateTask(
 
         if (modrinthResources.Count != 0)
         {
-            EmitStatus("Checking Modrinth updates...");
             var check = new ModrinthCheckUpdate(modrinthResources, gameVersions, loadersList,
                 resource => folder.GetMetadata(resource), modrinth, http, releaseTypes);
-            await check.StartAsync(cancellationToken);
-            if (!check.WasSuccessful)
-            {
-                EmitFailed(check.FailReason.Length != 0 ? check.FailReason : "the Modrinth update check failed");
-                return;
-            }
+            var result = await check.CheckAsync(cancellationToken).ConfigureAwait(false);
 
             var byProject = MetadataByProject(modrinthResources);
-            foreach (var update in check.GetUpdates())
+            foreach (var update in result.Updates)
             {
                 if (byProject.TryGetValue(update.Version.AddonId, out var metadata))
                 {
-                    Collect(update.Provider, update, metadata);
+                    Collect(updates, update.Provider, update, metadata);
                 }
             }
         }
 
         if (flameResources.Count != 0)
         {
-            EmitStatus("Checking CurseForge updates...");
             var check = new FlameCheckUpdate(flameResources, gameVersions, loadersList,
                 resource => folder.GetMetadata(resource), flameApi, http, releaseTypes);
-            await check.StartAsync(cancellationToken);
-            if (!check.WasSuccessful)
-            {
-                EmitFailed(check.FailReason.Length != 0 ? check.FailReason : "the CurseForge update check failed");
-                return;
-            }
+            var result = await check.CheckAsync(cancellationToken).ConfigureAwait(false);
 
             var byProject = MetadataByProject(flameResources);
-            foreach (var update in check.GetUpdates())
+            foreach (var update in result.Updates)
             {
                 if (byProject.TryGetValue(update.Version.AddonId, out var metadata))
                 {
-                    Collect(update.Provider, update, metadata);
+                    Collect(updates, update.Provider, update, metadata);
                 }
             }
         }
 
-        if (_updates.Count == 0)
+        if (updates.Count == 0)
         {
-            EmitSucceeded();
-            return;
+            return new TaskResultView([], null);
         }
-
-        EmitStatus($"Downloading {_updates.Count} update(s)...");
-        // the fake pack of the C++ check tasks (only the fields the download task reads)
-        var downloads = _updates.Select(update => new ResourceDownloadTask(
+        // a pack carrying only the fields the download task reads
+        var downloads = updates.Select(update => new ResourceDownloadTask(
             new IndexedPack
             {
                 AddonId = update.ProjectId,
@@ -527,22 +484,16 @@ public sealed class ModsUpdateTask(
             instance: instance,
             modrinth: modrinth,
             http: http));
-        var apply = new ModUpdateTask(folder, downloads);
-        await apply.StartAsync(cancellationToken);
-        if (!apply.WasSuccessful)
-        {
-            EmitFailed(apply.FailReason.Length != 0 ? apply.FailReason : "applying the updates failed");
-            return;
-        }
-
-        EmitSucceeded();
+        await ModUpdateTask.ApplyAsync(folder, downloads, cancellationToken).ConfigureAwait(false);
+        return new TaskResultView(updates.Select(update => update.View).ToArray(), null);
     }
 
     // the two check passes expose structurally identical Update records (both are the port
     // of CheckUpdateTask::Update); one builder per shape keeps the mapping explicit
-    private void Collect(ResourceProvider provider, ModrinthCheckUpdate.Update update, MetadataHandler.ModStruct metadata)
+    private static void Collect(List<PendingUpdate> updates, ResourceProvider provider,
+        ModrinthCheckUpdate.Update update, MetadataHandler.ModStruct metadata)
     {
-        _updates.Add(new PendingUpdate(
+        updates.Add(new PendingUpdate(
             new ModUpdateEntryView(metadata.Filename, update.OldVersion, update.NewVersion,
                 ModPlatformTasks.ProviderKey(provider)),
             update.Version,
@@ -551,9 +502,10 @@ public sealed class ModsUpdateTask(
             update.Name));
     }
 
-    private void Collect(ResourceProvider provider, FlameCheckUpdate.Update update, MetadataHandler.ModStruct metadata)
+    private static void Collect(List<PendingUpdate> updates, ResourceProvider provider,
+        FlameCheckUpdate.Update update, MetadataHandler.ModStruct metadata)
     {
-        _updates.Add(new PendingUpdate(
+        updates.Add(new PendingUpdate(
             new ModUpdateEntryView(metadata.Filename, update.OldVersion, update.NewVersion,
                 ModPlatformTasks.ProviderKey(provider)),
             update.Version,

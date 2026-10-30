@@ -134,7 +134,7 @@ dotnet_naming_rule.parameters_rule.severity = warning
 dotnet_naming_rule.parameters_rule.symbols = parameters_symbols
 dotnet_naming_rule.parameters_rule.style = camel_case_style
 
-dotnet_naming_symbols.types_and_namespaces_symbols.applicable_kinds = class,delegate,enum,namespace,struct
+dotnet_naming_symbols.types_and_namespaces_symbols.applicable_kinds = class, delegate, enum, namespace, struct
 dotnet_naming_symbols.types_and_namespaces_symbols.applicable_accessibilities = *
 
 dotnet_naming_symbols.interfaces_symbols.applicable_kinds = interface
@@ -149,13 +149,13 @@ dotnet_naming_symbols.constants_symbols.required_modifiers = const
 
 dotnet_naming_symbols.private_static_readonly_symbols.applicable_kinds = field
 dotnet_naming_symbols.private_static_readonly_symbols.applicable_accessibilities = private
-dotnet_naming_symbols.private_static_readonly_symbols.required_modifiers = readonly,static
+dotnet_naming_symbols.private_static_readonly_symbols.required_modifiers = readonly, static
 
 dotnet_naming_symbols.private_fields_symbols.applicable_kinds = field
 dotnet_naming_symbols.private_fields_symbols.applicable_accessibilities = private
 
 dotnet_naming_symbols.non_private_fields_symbols.applicable_kinds = field
-dotnet_naming_symbols.non_private_fields_symbols.applicable_accessibilities = public,internal,protected,protected_internal,private_protected
+dotnet_naming_symbols.non_private_fields_symbols.applicable_accessibilities = public, internal, protected, protected_internal, private_protected
 
 dotnet_naming_symbols.methods_symbols.applicable_kinds = method
 dotnet_naming_symbols.methods_symbols.applicable_accessibilities = *

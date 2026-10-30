@@ -53,7 +53,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
     /// pointed at their stub).</summary>
     public string CdnBaseUrl { get; init; } = FlintConfig.Default.LegacyFtbCdnBaseUrl;
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    internal override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         await DownloadPack(cancellationToken);
     }
@@ -80,15 +80,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
         _archivePath = TempCachePath(path);
         var request = HttpDownloadTask.ToFile(new Uri(url), _archivePath, http);
 
-        var job = new NetJob("Download FTB Pack");
-        job.AddDownload(request);
-
-        await job.StartAsync(cancellationToken);
-        if (!job.WasSuccessful)
-        {
-            EmitFailed(job.FailReason);
-            return;
-        }
+        await request.DownloadAsync(null, cancellationToken).ConfigureAwait(false);
 
         await Unzip(cancellationToken);
     }
@@ -109,8 +101,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
         var extractDir = StagingPath / "unzip";
         if (MmcZip.ExtractDir(_archivePath, "", extractDir) is null)
         {
-            EmitFailed("Failed to extract modpack");
-            return;
+            throw new InvalidOperationException("Failed to extract modpack");
         }
 
         await Install(cancellationToken);
@@ -127,8 +118,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
             // ok, found minecraft dir, move contents to instance dir
             if (!FileOps.Move(unzipMcDir, StagingPath / "minecraft"))
             {
-                EmitFailed("Failed to move unpacked Minecraft!");
-                return;
+                throw new InvalidOperationException("Failed to move unpacked Minecraft!");
             }
         }
 
@@ -195,8 +185,7 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
             if (fallback)
             {
                 // TODO: Some fallback mechanism... or just keep failing!
-                EmitFailed("No installation method found!");
-                return;
+                throw new InvalidOperationException("No installation method found!");
             }
 
             components.SaveNow();
@@ -210,7 +199,6 @@ public sealed class LegacyFtbPackInstallTask(LegacyFtbModpack pack, string versi
         // (upstream calls downloadFiles(m_instance.get()) here — the update pipeline;
         //  like the other creation tasks, creation succeeds without fetching game files)
         await Task.CompletedTask;
-        EmitSucceeded();
     }
 }
 

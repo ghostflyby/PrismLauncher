@@ -16,7 +16,6 @@
 // deviceId is an internal correlation id (never sent to Microsoft).
 
 using FlintLauncher.Core.Auth;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
 
 namespace FlintLauncher.Web.Services;
@@ -32,6 +31,9 @@ public sealed class DeviceCodeSessionStore
         public string VerificationUri { get; set; } = "";
         public int ExpiresInSeconds { get; set; }
         public bool CodeIssued { get; set; }
+
+        /// <summary>The flow's failure reason once it settled without authenticating.</summary>
+        public string FailReason { get; set; } = "";
     }
 
     private readonly object _lock = new();
@@ -43,10 +45,10 @@ public sealed class DeviceCodeSessionStore
     /// (the HTTP call to Microsoft is in flight); the start endpoint waits briefly for the
     /// code through <see cref="WaitForCodeAsync"/>.
     /// </summary>
-    public Session Start(AuthEndpointsOptions? auth = null)
+    public Session Start(AuthEndpointsOptions? auth = null, ILoggerFactory? loggerFactory = null)
     {
         var account = MinecraftAccount.CreateBlankMsa();
-        var flow = account.Login(useDeviceCode: true, auth)
+        var flow = account.Login(useDeviceCode: true, auth, loggerFactory)
                    ?? throw new InvalidOperationException("could not create the device-code auth flow");
 
         var session = new Session
@@ -68,7 +70,19 @@ public sealed class DeviceCodeSessionStore
             _sessions[session.DeviceId] = session;
         }
 
-        _ = flow.StartAsync(); // background: polls Microsoft, then runs the remaining steps
+        // background: polls Microsoft, then runs the remaining steps. The poll endpoints read
+        // the flow's state, so the run's own outcome is recorded on the session instead.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await flow.RunAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                session.FailReason = e.Message;
+            }
+        });
         return session;
     }
 
@@ -104,7 +118,7 @@ public sealed class DeviceCodeSessionStore
         var flow = session.Flow;
         if (flow.IsFinished)
         {
-            if (flow.State == TaskState.Succeeded)
+            if (flow.TaskState == AccountTaskState.Succeeded)
             {
                 if (accounts.FindAccountByProfileId(session.Account.ProfileId()) == -1)
                 {

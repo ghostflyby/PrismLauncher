@@ -13,12 +13,10 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
-using Xunit;
-using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
+using Xunit;
 
 namespace FlintLauncher.Tests;
 
@@ -272,9 +270,8 @@ public class FtbTests : IDisposable
         task.SetName("FTB Imported");
         task.Icon = "ftb_logo";
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await wrapped(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
 
         var staging = Path.Combine(_root, "instances", "FTB Imported");
         // instance layout: the files went below .minecraft/<path>/<name> per their type
@@ -313,9 +310,8 @@ public class FtbTests : IDisposable
         var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _http, _flameApi, _ftbApi);
         task.SetName("FTB Sha1");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await Assert.ThrowsAnyAsync<Exception>(() => wrapped(TestContext.Current.CancellationToken));
 
-        Assert.False(task.WasSuccessful);
         Assert.False(File.Exists(Path.Combine(_root, "instances", "FTB Sha1",
             ".minecraft", "mods", "testmod.jar")));
     }
@@ -332,11 +328,9 @@ public class FtbTests : IDisposable
         var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _http, _flameApi, _ftbApi);
         task.SetName("FTB Blocked");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
-
-        Assert.False(task.WasSuccessful);
-        Assert.Contains("not available for download", task.FailReason);
-        Assert.Contains("cfmod.jar", task.FailReason);
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() => wrapped(TestContext.Current.CancellationToken));
+        Assert.Contains("not available for download", ex.Message);
+        Assert.Contains("cfmod.jar", ex.Message);
         var blocked = Assert.Single(task.BlockedMods);
         Assert.Equal("cfmod.jar", blocked.Name);
         Assert.Equal("mods", blocked.TargetFolder);
@@ -359,9 +353,8 @@ public class FtbTests : IDisposable
         };
         task.SetName("FTB Matched");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await wrapped(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
 
         var staging = Path.Combine(_root, "instances", "FTB Matched");
         Assert.True(task.BlockedMods[0].Matched);
@@ -379,9 +372,7 @@ public class FtbTests : IDisposable
         var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "no-such-version", modrinth: _modrinthApi, http: _http, ftb: _ftbApi);
         task.SetName("FTB UnknownVersion");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
-
-        Assert.False(task.WasSuccessful);
-        Assert.Contains("Failed to find pack version no-such-version", task.FailReason);
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() => wrapped(TestContext.Current.CancellationToken));
+        Assert.Contains("Failed to find pack version no-such-version", ex.Message);
     }
 }

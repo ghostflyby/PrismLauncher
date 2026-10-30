@@ -2,22 +2,20 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 // SPDX-FileCopyrightText: 2023-2024 Trial97 <alexandru.tripon97@gmail.com>
 //
-// Port of launcher/java/download/SymlinkTask.{h,cpp}: on macOS an extracted JDK layout is
-// <target>/Contents/Home/bin/java, but the launcher expects <target>/bin/java. The task finds
-// the Contents/Home folder and symlinks everything inside it into the target folder.
-// FS::create_link becomes System.IO.File.CreateSymbolicLink (available since .NET 6, AOT-safe);
-// existing destinations are skipped (the C++ std::filesystem call would throw on them, but the
-// task re-runs only when the wanted bin path is missing anyway).
+// A JDK extracted on macOS keeps its binary at <target>/Contents/Home/bin/java, while the
+// launcher expects <target>/bin/java. Run() finds the Contents/Home folder and symlinks its
+// entries into the target. A destination that already exists is skipped, so a partially
+// linked tree can be completed.
 
-using FlintLauncher.Core.Tasks;
 using TruePath;
 using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Java.Download;
 
-public sealed class SymlinkTask(AbsolutePath finalPath) : FlintTask
+public static class SymlinkTask
 {
-    /// <summary>Port of the free function findBinPath: first &lt;root&gt;/&lt;pattern&gt;, then one level down.</summary>
+    /// <summary>The folder holding the wanted relative path: either directly under
+    /// <paramref name="root"/> or one level down (the JDK archive's top-level folder).</summary>
     public static AbsolutePath? FindBinPath(AbsolutePath root, LocalPath pattern)
     {
         var path = root / pattern;
@@ -41,59 +39,31 @@ public sealed class SymlinkTask(AbsolutePath finalPath) : FlintTask
         return null;
     }
 
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Links the Contents/Home layout into <paramref name="finalPath"/>. Throws when
+    /// no binary path can be found; a target that already carries bin/java is left untouched.</summary>
+    public static void Run(AbsolutePath finalPath)
     {
-        EmitStatus("Checking for Java binary path");
         var binPath = new LocalPath("bin/java");
         var wantedPath = finalPath / binPath;
         if (wantedPath.Exists())
         {
-            EmitSucceeded();
-            return Task.CompletedTask;
+            return;
         }
 
-        EmitStatus("Searching for Java binary path");
         var contentsPartialPath = new LocalPath("Contents") / "Home" / binPath;
-        var relativePathToBin = FindBinPath(finalPath, contentsPartialPath);
-        if (relativePathToBin is null)
-        {
-            EmitFailed("Failed to find Java binary path");
-            return Task.CompletedTask;
-        }
+        var relativePathToBin = FindBinPath(finalPath, contentsPartialPath)
+                                ?? throw new InvalidOperationException("Failed to find Java binary path");
 
         // relativePathToBin ends with ".../bin/java": chop the "bin/java" tail off
-        var folderToLink = relativePathToBin.Value.Value[..^binPath.Value.Length];
-
-        EmitStatus("Collecting folders to symlink");
-        var entries = Directory.GetFileSystemEntries(folderToLink);
-        SetProgress(0, entries.Length);
-
-        EmitStatus("Symlinking Java binary path");
-        var linked = 0;
-        foreach (var entry in entries)
+        var folderToLink = relativePathToBin.Value[..^binPath.Value.Length];
+        foreach (var entry in Directory.GetFileSystemEntries(folderToLink))
         {
             var source = Path.GetFullPath(entry);
-            string a1 = Path.GetFileName(entry);
-            var destination = finalPath / a1;
-            var destinationExists = destination.Exists();
-            if (!destinationExists)
+            var destination = finalPath / Path.GetFileName(entry);
+            if (!destination.Exists())
             {
-                try
-                {
-                    File.CreateSymbolicLink(destination.Value, source);
-                }
-                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-                {
-                    EmitFailed(e.Message);
-                    return Task.CompletedTask;
-                }
+                File.CreateSymbolicLink(destination.Value, source);
             }
-
-            linked++;
-            SetProgress(linked, entries.Length);
         }
-
-        EmitSucceeded();
-        return Task.CompletedTask;
     }
 }

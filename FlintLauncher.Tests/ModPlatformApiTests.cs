@@ -17,11 +17,9 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.ModPlatform.Flame;
-using Xunit;
-using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
+using Xunit;
 
 namespace FlintLauncher.Tests;
 

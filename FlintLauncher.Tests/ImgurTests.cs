@@ -11,7 +11,6 @@ using System.Text;
 using System.Text.Json;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Screenshots;
-using FlintLauncher.Core.Tasks;
 using TruePath;
 using Xunit;
 
@@ -79,9 +78,8 @@ public class ImgurTests : IDisposable
 
         var shot = new ScreenShot(path);
         var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "client-id-42");
-        await upload.StartAsync();
+        await upload.UploadAsync();
 
-        Assert.Equal(TaskState.Succeeded, upload.State);
         var request = _server.Request("/image");
         Assert.NotNull(request);
         Assert.Equal("POST", request.Method);
@@ -124,9 +122,8 @@ public class ImgurTests : IDisposable
 
         var shot = new ScreenShot(path);
         var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
-        await upload.StartAsync();
+        await upload.UploadAsync();
 
-        Assert.Equal(TaskState.Succeeded, upload.State);
         Assert.Equal("abc123", shot.ImgurId);
         Assert.Equal("https://i.imgur.com/abc123.png", shot.Url);
         Assert.Equal("del789", shot.ImgurDeleteHash);
@@ -140,10 +137,15 @@ public class ImgurTests : IDisposable
 
         var shot = new ScreenShot(path);
         var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
-        await upload.StartAsync();
-
-        Assert.Equal(TaskState.Failed, upload.State);
-        Assert.Equal("Screenshot was not uploaded successfully", upload.FailReason);
+        try
+        {
+            await upload.UploadAsync();
+            Assert.Fail("the upload should have failed");
+        }
+        catch (InvalidOperationException e)
+        {
+            Assert.Equal("Screenshot was not uploaded successfully", e.Message);
+        }
     }
 
     [Fact]
@@ -154,10 +156,15 @@ public class ImgurTests : IDisposable
 
         var shot = new ScreenShot(path);
         var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
-        await upload.StartAsync();
-
-        Assert.Equal(TaskState.Failed, upload.State);
-        Assert.Equal("Invalid json reply", upload.FailReason);
+        try
+        {
+            await upload.UploadAsync();
+            Assert.Fail("the upload should have failed");
+        }
+        catch (InvalidOperationException e)
+        {
+            Assert.Equal("Invalid json reply", e.Message);
+        }
     }
 
     [Fact]
@@ -168,10 +175,15 @@ public class ImgurTests : IDisposable
 
         var shot = new ScreenShot(path);
         var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
-        await upload.StartAsync();
-
-        Assert.Equal(TaskState.Failed, upload.State);
-        Assert.Contains("429", upload.FailReason);
+        try
+        {
+            await upload.UploadAsync();
+            Assert.Fail("the upload should have failed");
+        }
+        catch (InvalidOperationException e)
+        {
+            Assert.Contains("429", e.Message);
+        }
     }
 
     [Fact]
@@ -179,10 +191,15 @@ public class ImgurTests : IDisposable
     {
         var shot = new ScreenShot(new AbsolutePath(Path.Combine(_dir, "does-not-exist.png")));
         var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
-        await upload.StartAsync();
-
-        Assert.Equal(TaskState.Failed, upload.State);
-        Assert.StartsWith("Could not open file ", upload.FailReason);
+        try
+        {
+            await upload.UploadAsync();
+            Assert.Fail("the upload should have failed");
+        }
+        catch (InvalidOperationException e)
+        {
+            Assert.StartsWith("Could not open file ", e.Message);
+        }
         Assert.Empty(_server.Requests);
     }
 
@@ -214,9 +231,8 @@ public class ImgurTests : IDisposable
         [
             ShotWithHash("hash-one"), ShotWithHash("hash-two"), ShotWithHash("hash-three"),
         ], _server.BaseUrl + "/", "cid");
-        await album.StartAsync();
+        await album.CreateAsync();
 
-        Assert.Equal(TaskState.Succeeded, album.State);
         Assert.Equal("dhXyZ", result.DeleteHash);
         Assert.Equal("aB1cD2e", result.Id);
 
@@ -239,10 +255,15 @@ public class ImgurTests : IDisposable
 
         var result = new ImgurApi.AlbumResult();
         var album = _imgur.MakeAlbum(result, [ShotWithHash("h")], _server.BaseUrl + "/", "cid");
-        await album.StartAsync();
-
-        Assert.Equal(TaskState.Failed, album.State);
-        Assert.Equal("Failed to create album", album.FailReason);
+        try
+        {
+            await album.CreateAsync();
+            Assert.Fail("the album should have failed");
+        }
+        catch (InvalidOperationException e)
+        {
+            Assert.Equal("Failed to create album", e.Message);
+        }
         Assert.Equal("", result.DeleteHash);
         Assert.Equal("", result.Id);
     }
@@ -254,10 +275,15 @@ public class ImgurTests : IDisposable
 
         var result = new ImgurApi.AlbumResult();
         var album = _imgur.MakeAlbum(result, [ShotWithHash("h")], _server.BaseUrl + "/", "cid");
-        await album.StartAsync();
-
-        Assert.Equal(TaskState.Failed, album.State);
-        Assert.Equal("Invalid json reply", album.FailReason);
+        try
+        {
+            await album.CreateAsync();
+            Assert.Fail("the album should have failed");
+        }
+        catch (InvalidOperationException e)
+        {
+            Assert.Equal("Invalid json reply", e.Message);
+        }
     }
 
     [Fact]
@@ -267,10 +293,15 @@ public class ImgurTests : IDisposable
 
         var result = new ImgurApi.AlbumResult();
         var album = _imgur.MakeAlbum(result, [ShotWithHash("h")], _server.BaseUrl + "/", "cid");
-        await album.StartAsync();
-
-        Assert.Equal(TaskState.Failed, album.State);
-        Assert.Contains("500", album.FailReason);
+        try
+        {
+            await album.CreateAsync();
+            Assert.Fail("the album should have failed");
+        }
+        catch (InvalidOperationException e)
+        {
+            Assert.Contains("500", e.Message);
+        }
     }
 
     // The C++ reads data.id/data.link/data.deletehash via QJsonObject::value().toString(); a
@@ -283,9 +314,8 @@ public class ImgurTests : IDisposable
 
         var shot = new ScreenShot(path);
         var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
-        await upload.StartAsync();
+        await upload.UploadAsync();
 
-        Assert.Equal(TaskState.Succeeded, upload.State);
         Assert.Equal("", shot.ImgurId);
         Assert.Equal("", shot.Url);
         Assert.Equal("", shot.ImgurDeleteHash);

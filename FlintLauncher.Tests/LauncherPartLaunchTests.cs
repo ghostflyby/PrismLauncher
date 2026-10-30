@@ -11,7 +11,6 @@
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Launch.Steps;
-using FlintLauncher.Core.Tasks;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -109,10 +108,10 @@ public class LauncherPartLaunchTests : IDisposable
             Assert.True(instance.IsRunning); // the launch counts as running until the game exits
             task.Proceed();                  // write "launch\n"
         };
-        await task.StartAsync();
+        var outcome = await task.RunToCompletionAsync(TestContext.Current.CancellationToken);
 
         // the step only succeeds at game exit
-        Assert.Equal(TaskState.Succeeded, task.State);
+        Assert.True(outcome.Succeeded, outcome.FailReason);
         Assert.Equal(-1, task.Pid); // reset after the game stopped
         Assert.True(pidAtLaunch > 0);
         Assert.False(instance.IsRunning);
@@ -147,15 +146,39 @@ public class LauncherPartLaunchTests : IDisposable
 
         task.ReadyForLaunch += () => task.Abort(); // abort instead of proceeding
 
-        await task.StartAsync();
+        var outcome = await task.RunToCompletionAsync(TestContext.Current.CancellationToken);
 
         // the fake EntryPoint exits with code 42 on "abort": "if the exit code wasn't 0,
         // report this as a crash" (LauncherPartLaunch::on_state)
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Equal("Game crashed.", task.FailReason);
+        Assert.False(outcome.Succeeded);
+        Assert.False(outcome.Aborted);
+        Assert.Equal("Game crashed.", outcome.FailReason);
         Assert.True(instance.HasCrashed);
         var lines = task.GetLogModel().Entries;
         Assert.Contains(lines, e => e.Line == "abort"); // the command echoed back
+    }
+
+    /// <summary>A java binary that cannot be executed at all: the process reports
+    /// FailedToStart synchronously from Start(), before the step could reach its own await.</summary>
+    [Fact]
+    public async Task UnstartableJava_FailsInsteadOfHanging()
+    {
+        using var fixture = new LaunchFixture();
+        fixture.SeedJavaDetection("java", 0, languageVersion: 17, version: "17.0.2");
+        var instance = await fixture.CreateInstance();
+
+        var task = BuildLaunchTask(fixture, instance, Path.Combine(_root, "no-such-java"), out var step);
+        step.Session = fixture.OfflineSession();
+
+        LaunchTask.LaunchOutcome outcome;
+        var run = task.RunToCompletionAsync(TestContext.Current.CancellationToken);
+        var completed = await Task.WhenAny(run, Task.Delay(TimeSpan.FromSeconds(30)));
+
+        Assert.Same(run, completed);
+        outcome = await run;
+        Assert.False(outcome.Succeeded);
+        Assert.False(outcome.Aborted);
+        Assert.Contains("Could not launch Minecraft", outcome.FailReason);
     }
 
     [Fact]
@@ -179,9 +202,9 @@ public class LauncherPartLaunchTests : IDisposable
         step.Session = fixture.OfflineSession();
         task.ReadyForLaunch += () => task.Proceed();
 
-        await task.StartAsync();
+        var outcome = await task.RunToCompletionAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(TaskState.Succeeded, task.State);
+        Assert.True(outcome.Succeeded, outcome.FailReason);
         var lines = task.GetLogModel().Entries;
         Assert.Contains(lines, e => e.Line == "launcher standard");
     }

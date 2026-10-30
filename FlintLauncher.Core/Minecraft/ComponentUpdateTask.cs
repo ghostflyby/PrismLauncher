@@ -6,10 +6,10 @@
 // loads the components of a component list AND resolves dependency issues between them.
 //
 // The C++ signal-driven "one shot async task" (see the FIXMEs at the top of the original)
-// becomes a hand-rolled async state machine: the remote metadata loads run concurrently and
-// their completion is awaited where the C++ waited for signals. Everything that manipulates
-// the PackProfile (trivial removals, dependency insertion, update actions) follows the C++
-// algorithm step by step; the resolution outcomes match the original semantics:
+// becomes an async body: the remote metadata loads run concurrently and their completion is
+// awaited where the C++ waited for signals. Everything that manipulates the PackProfile
+// (trivial removals, dependency insertion, update actions) follows the C++ algorithm step by
+// step; the resolution outcomes match the original semantics:
 //   - Launch mode or offline mode => checkOnly pass (no components may be added/changed).
 //   - Resolution mode (online)    => missing dependencies are inserted before their first
 //     dependee, outdated dependency-only components are version-bumped, then re-resolved.
@@ -19,18 +19,17 @@
 //    per-task finished/succeeded flags (and the upstream oddity that remoteLoadSucceeded also
 //    records succeeded == false, keyed off the overall flag instead) are kept.
 //  - The blocking Index::getLoadedVersion()/VersionList::waitToLoad() event-loop waits inside
-//    performUpdateActions become awaits of the same load tasks.
+//    performUpdateActions become awaits of the same metadata loads.
 //  - The `#if 0` Launch-vs-Resolution load branching of loadComponents() is compiled out
 //    upstream as well; both modes load component versions.
 
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Minecraft;
 
-public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode netmode, PackProfile list) : FlintTask
+public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode netmode, PackProfile list)
 {
     public enum Mode
     {
@@ -56,7 +55,7 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
 
         public bool Succeeded;
 
-        public required FlintTask Task { get; init; }
+        public required Func<CancellationToken, Task> Unit { get; init; }
     }
 
     /// <summary>Port of the RequireEx helper from ComponentUpdateTask.cpp.</summary>
@@ -82,18 +81,10 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
 
     public NetMode GetNetMode() => netmode;
 
-    public override void Abort()
-    {
-        // the C++ canAbort()/abort() forward to the in-flight remote load tasks
-        foreach (var status in _remoteLoadStatusList)
-        {
-            status.Task.Abort();
-        }
-
-        base.Abort();
-    }
-
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Loads the components, applies their update actions and resolves the
+    /// dependencies. Returning is success; any other exception is a failure whose message is
+    /// the reason.</summary>
+    public async Task RunAsync(CancellationToken cancellationToken)
     {
         // "Loading components"
         await LoadComponentsAsync(cancellationToken);
@@ -101,8 +92,8 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
 
     // ---------------------------------------------------------------- loading
 
-    private LoadResult LoadComponent(Component component, out FlintTask? loadTask,
-        NetMode netmode, CancellationToken cancellationToken)
+    private LoadResult LoadComponent(Component component, out Func<CancellationToken, Task>? loadTask,
+        NetMode netmode)
     {
         loadTask = null;
         if (component.Loaded)
@@ -146,9 +137,11 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
             }
             else
             {
-                loadTask = list.MetadataIndex.LoadVersion(component.Uid, component.Version, netmode);
-                // the C++ start()s the task here and waits for its signals below
-                _ = loadTask.StartAsync(cancellationToken);
+                loadTask = token => list.MetadataIndex.LoadAsync(component.Uid, component.Version, netmode,
+                    force: false, token);
+                // the C++ start()s the task here and waits for its signals below; the unit is
+                // started by AwaitRemoteLoadAsync, which is where the outcome is recorded
+
                 if (netmode == NetMode.Online)
                 {
                     result = LoadResult.RequiresRemote;
@@ -188,7 +181,7 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
             // FIXME upstream: to do this right, the version lists would be loaded first and the
             // versions decided during dependency resolution; the Launch/Resolution split below
             // is disabled upstream (#if 0) as well.
-            var singleResult = LoadComponent(component, out var loadTask, netmode, cancellationToken);
+            var singleResult = LoadComponent(component, out var loadTask, netmode);
             if (singleResult == LoadResult.LoadedLocal)
             {
                 component.UpdateCachedData();
@@ -200,10 +193,10 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
                 var status = new RemoteLoadStatus
                 {
                     PackProfileIndex = componentIndex,
-                    Task = loadTask,
+                    Unit = loadTask,
                 };
                 _remoteLoadStatusList.Add(status);
-                waitTasks.Add(AwaitRemoteLoadAsync(status));
+                waitTasks.Add(AwaitRemoteLoadAsync(status, cancellationToken));
                 taskIndex++;
             }
 
@@ -211,7 +204,6 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
         }
 
         _remoteTasksInProgress = taskIndex;
-        SetProgress(0, taskIndex);
         switch (result)
         {
             case LoadResult.LoadedLocal:
@@ -224,15 +216,13 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
             case LoadResult.RequiresRemote:
             {
                 // we wait for the remote load completions (C++: signals)
-                EmitDetails($"Downloading metadata for {taskIndex} components");
                 await Task.WhenAll(waitTasks);
                 await CheckIfAllFinishedAsync(cancellationToken);
                 return;
             }
             case LoadResult.Failed:
             {
-                EmitFailed("Some component metadata load tasks failed.");
-                return;
+                throw new InvalidOperationException("Some component metadata load tasks failed.");
             }
         }
     }
@@ -241,29 +231,31 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
     /// Waits for one remote load started by LoadComponent and records the outcome (C++: the
     /// remoteLoadSucceeded/remoteLoadFailed signal handlers).
     /// </summary>
-    private async Task AwaitRemoteLoadAsync(RemoteLoadStatus status)
+    private async Task AwaitRemoteLoadAsync(RemoteLoadStatus status, CancellationToken cancellationToken)
     {
-        var loadTask = status.Task;
-        // the task is already running; StartAsync returns the in-flight run
-        await loadTask.StartAsync();
+        var succeeded = true;
+        try
+        {
+            await status.Unit(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // the launch is being aborted: a cancellation is not a metadata failure, so it
+            // must leave as a cancellation rather than as "failed while downloading"
+            throw;
+        }
+        catch (Exception)
+        {
+            succeeded = false;
+        }
+
         if (status.Finished)
         {
             // "Got multiple results from remote load task" guard; nothing to record
             return;
         }
 
-        if (loadTask.State == TaskState.Succeeded)
-        {
-            RemoteLoadFinished(status, loadSucceeded: true);
-        }
-        else if (loadTask.State == TaskState.AbortedByUser)
-        {
-            RemoteLoadFinished(status, loadSucceeded: false);
-        }
-        else
-        {
-            RemoteLoadFinished(status, loadSucceeded: false);
-        }
+        RemoteLoadFinished(status, succeeded);
     }
 
     private void RemoteLoadFinished(RemoteLoadStatus status, bool loadSucceeded)
@@ -297,7 +289,6 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
 
     private async Task CheckIfAllFinishedAsync(CancellationToken cancellationToken)
     {
-        SetProgress(CurrentProgress + 1, TotalProgress);
         if (_remoteTasksInProgress != 0)
         {
             // not yet...
@@ -327,8 +318,9 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
 
             _remoteLoadStatusList.Clear();
 
-            EmitFailed("Component metadata update task failed while downloading from remote server:\n"
-                       + string.Join("\n", allErrorsList));
+            throw new InvalidOperationException(
+                "Component metadata update task failed while downloading from remote server:\n"
+                + string.Join("\n", allErrorsList));
         }
     }
 
@@ -558,8 +550,7 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
             if (!GatherRequirementsFromComponents(components, allRequires))
             {
                 FinalizeComponents();
-                EmitFailed("Conflicting requirements detected during dependency checking!");
-                return;
+                throw new InvalidOperationException("Conflicting requirements detected during dependency checking!");
             }
 
             GetTrivialRemovals(components, allRequires, toRemove);
@@ -578,8 +569,7 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
         if (!succeeded)
         {
             FinalizeComponents();
-            EmitFailed("Instance has conflicting dependencies.");
-            return;
+            throw new InvalidOperationException("Instance has conflicting dependencies.");
         }
 
         if (checkOnly)
@@ -587,13 +577,8 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
             FinalizeComponents();
             if (toAdd.Count != 0 || toChange.Count != 0)
             {
-                EmitFailed("Instance has unresolved dependencies while loading/checking for launch.");
+                throw new InvalidOperationException("Instance has unresolved dependencies while loading/checking for launch.");
             }
-            else
-            {
-                EmitSucceeded();
-            }
-
             return;
         }
 
@@ -673,7 +658,6 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
         else
         {
             FinalizeComponents();
-            EmitSucceeded();
         }
     }
 
@@ -708,10 +692,24 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
                         // (the C++ "no version list in metadata index" branch is unreachable:
                         // Index::get() creates the list entry)
                         var versionList = list.MetadataIndex.Get(component.GetId());
-                        // port of the blocking VersionList::waitToLoad()
+                        // port of the blocking VersionList::waitToLoad(): the C++ waits on the
+                        // load task's signals and only logs a failure, so the arm falls through
+                        // to the per-component problem below instead of failing the resolution
                         if (!versionList.IsLoaded)
                         {
-                            await versionList.LoadTask(netmode).StartAsync(cancellationToken);
+                            try
+                            {
+                                await versionList.LoadAsync(netmode, cancellationToken: cancellationToken);
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
+                            catch (Exception)
+                            {
+                                // the version list is unavailable: the component reports the
+                                // missing version as its own problem
+                            }
                         }
 
                         var recommended = versionList.GetRecommendedForParent(lrc.ParentUid, lrc.Version)
@@ -735,8 +733,8 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
                     case UpdateAction.ImportantChanged ic:
                     {
                         // port of the blocking Index::getLoadedVersion()
-                        await list.MetadataIndex.LoadVersion(component.GetId(), ic.OldVersion, netmode)
-                            .StartAsync(cancellationToken);
+                        await list.MetadataIndex.LoadAsync(component.GetId(), ic.OldVersion, netmode,
+                            force: false, cancellationToken).ConfigureAwait(false);
                         var oldVersion = list.MetadataIndex.Get(component.GetId(), ic.OldVersion);
                         foreach (var oldReq in oldVersion.RequiredSet)
                         {

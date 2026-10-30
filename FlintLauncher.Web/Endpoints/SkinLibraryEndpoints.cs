@@ -140,10 +140,16 @@ public static class SkinLibraryEndpoints
             var account = accounts.At(index);
             var variant = ParseVariant(request.Model) ?? (skin.Model == SkinModelKind.Slim ? "slim" : "classic");
             var upload = SkinUpload.Make(account.AccessToken(), texture, variant, auth, http);
-            await upload.StartAsync();
-            return upload.WasSuccessful
-                ? Results.NoContent()
-                : ApiJson.Error("skin_upload_failed", upload.FailReason, 400);
+            try
+            {
+                await upload.SendAsync();
+            }
+            catch (Exception e)
+            {
+                return ApiJson.Error("skin_upload_failed", e.Message, 400);
+            }
+
+            return Results.NoContent();
         }).Produces(204);
     }
 

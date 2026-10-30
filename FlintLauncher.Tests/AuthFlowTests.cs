@@ -12,7 +12,6 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -55,10 +54,8 @@ public class AuthFlowTests : IDisposable
         var browserEvents = new List<(string url, string code, int expiresIn)>();
         flow.AuthorizeWithBrowserWithExtra += (url, code, expiresIn) => browserEvents.Add((url, code, expiresIn));
 
-        await flow.StartAsync();
+        await flow.RunAsync(TestContext.Current.CancellationToken);
 
-        Assert.True(flow.State == TaskState.Succeeded,
-            "state=" + flow.State + " taskState=" + flow.TaskState + " reason=" + flow.FailReason + " status=" + flow.Status);
         Assert.Equal(AccountTaskState.Succeeded, flow.TaskState);
 
         var data = account.AccountData;
@@ -164,14 +161,14 @@ public class AuthFlowTests : IDisposable
 
         var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
-        await flow.StartAsync();
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            flow.RunAsync(TestContext.Current.CancellationToken));
 
-        Assert.Equal(TaskState.Failed, flow.State);
         Assert.Equal(AccountTaskState.FailedSoft, flow.TaskState);
         // 2148916238: underaged account not linked to a family (upstream message, verbatim)
         Assert.Equal("This Microsoft account is underaged and is not linked to a family.\n\n" +
                      "Please set up your account according to <a href=\"https://help.minecraft.net/hc/en-us/articles/4408968616077\">help.minecraft.net</a>.",
-            flow.FailReason);
+            failure.Message);
         Assert.Equal(AccountState.Errored, account.AccountData.AccountState);
         Assert.Contains("underaged", account.AccountData.LastError());
     }
@@ -183,12 +180,12 @@ public class AuthFlowTests : IDisposable
 
         var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
-        await flow.StartAsync();
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            flow.RunAsync(TestContext.Current.CancellationToken));
 
-        Assert.Equal(TaskState.Failed, flow.State);
         Assert.Contains("This Microsoft account does not have an Xbox Live profile. Buy the game on " +
                         "<a href=\"https://www.minecraft.net/en-us/store/minecraft-java-edition\">minecraft.net</a> first.",
-            flow.FailReason);
+            failure.Message);
     }
 
     [Fact]
@@ -198,10 +195,11 @@ public class AuthFlowTests : IDisposable
 
         var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
-        await flow.StartAsync();
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            flow.RunAsync(TestContext.Current.CancellationToken));
 
-        Assert.Equal(TaskState.Failed, flow.State);
-        Assert.Equal("XSTS authentication ended with unrecognized error(s):\n\n2148916999", flow.FailReason);
+        Assert.Equal("XSTS authentication ended with unrecognized error(s):\n\n2148916999",
+            failure.Message);
     }
 
     [Fact]
@@ -211,10 +209,10 @@ public class AuthFlowTests : IDisposable
 
         var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
-        await flow.StartAsync();
+        await flow.RunAsync(TestContext.Current.CancellationToken);
 
         // NOTE (upstream): Succeed even if we do not have a profile. This is a valid account state.
-        Assert.Equal(TaskState.Succeeded, flow.State);
+        Assert.Equal(AccountTaskState.Succeeded, flow.TaskState);
         Assert.Equal("", account.AccountData.ProfileId());
         Assert.Equal("No Minecraft profile", account.AccountData.ProfileName());
         Assert.Equal(AccountState.Online, account.AccountData.AccountState);
@@ -229,11 +227,11 @@ public class AuthFlowTests : IDisposable
 
         var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
-        await flow.StartAsync();
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            flow.RunAsync(TestContext.Current.CancellationToken));
 
-        Assert.Equal(TaskState.Failed, flow.State);
         Assert.Equal(AccountTaskState.Offline, flow.TaskState);
-        Assert.Contains("Minecraft Java profile acquisition failed", flow.FailReason);
+        Assert.Contains("Minecraft Java profile acquisition failed", failure.Message);
         Assert.Equal(AccountState.Offline, account.AccountData.AccountState);
     }
 
@@ -244,11 +242,11 @@ public class AuthFlowTests : IDisposable
 
         var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
-        await flow.StartAsync();
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            flow.RunAsync(TestContext.Current.CancellationToken));
 
-        Assert.Equal(TaskState.Failed, flow.State);
         Assert.Equal(AccountTaskState.FailedHard, flow.TaskState);
-        Assert.Equal("Device Access failed: Device token has expired.", flow.FailReason);
+        Assert.Equal("Device Access failed: Device token has expired.", failure.Message);
         // the token stored on the account stays untouched (empty on a fresh MSA account)
         Assert.Equal("", account.AccountData.MsaToken.Value);
         // hard failure clears the MSA token via MinecraftAccount::authFailed semantics — but the
@@ -262,7 +260,7 @@ public class AuthFlowTests : IDisposable
 
         var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
-        var runTask = flow.StartAsync();
+        var runTask = flow.RunAsync(CancellationToken.None);
 
         // wait until the device code was fetched and the flow started polling
         while (_server.Request("POST", "/devicecode") is null)
@@ -273,10 +271,9 @@ public class AuthFlowTests : IDisposable
         await Task.Delay(200);
 
         flow.Abort();
-        await runTask;
+        var aborted = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => runTask);
 
-        Assert.Equal(TaskState.AbortedByUser, flow.State);
-        Assert.Equal("Aborted", flow.FailReason);
+        Assert.Equal("Aborted", aborted.Message);
     }
 
     [Fact]
@@ -284,9 +281,9 @@ public class AuthFlowTests : IDisposable
     {
         var account = MinecraftAccount.CreateOffline("Notch");
         var flow = new AuthFlow(account.AccountData);
-        await flow.StartAsync();
+        await flow.RunAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(TaskState.Succeeded, flow.State);
+        Assert.Equal(AccountTaskState.Succeeded, flow.TaskState);
         Assert.Equal(Validity.Certain, account.AccountData.Validity);
         Assert.Equal(AccountState.Online, account.AccountData.AccountState);
         Assert.Empty(_server.Requests);
@@ -302,7 +299,7 @@ public class AuthFlowTests : IDisposable
         var authorizeUrl = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         flow.AuthorizeWithBrowser += url => authorizeUrl.TrySetResult(url);
 
-        var runTask = flow.StartAsync();
+        var runTask = flow.RunAsync(CancellationToken.None);
         var url = await authorizeUrl.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
         // QOAuth2AuthorizationCodeFlow-style authorize URL with the upstream prompt parameter
@@ -325,7 +322,7 @@ public class AuthFlowTests : IDisposable
 
         await runTask;
 
-        Assert.Equal(TaskState.Succeeded, flow.State);
+        Assert.Equal(AccountTaskState.Succeeded, flow.TaskState);
         Assert.Equal("MSA_ACCESS", account.AccountData.MsaToken.Value);
         Assert.Equal("c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb", account.AccountData.MsaClientId);
 
@@ -347,7 +344,7 @@ public class AuthFlowTests : IDisposable
         var authorizeUrl = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         flow.AuthorizeWithBrowser += url => authorizeUrl.TrySetResult(url);
 
-        var runTask = flow.StartAsync();
+        var runTask = flow.RunAsync(CancellationToken.None);
         var url = await authorizeUrl.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
         var redirectUri = Uri.UnescapeDataString(url.Split("redirect_uri=")[1].Split('&')[0]);
@@ -356,10 +353,9 @@ public class AuthFlowTests : IDisposable
             .GetAsync($"http://127.0.0.1:{port}/?error=access_denied&error_description=User+cancelled")
             .WaitAsync(TimeSpan.FromSeconds(10));
 
-        await runTask;
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => runTask);
 
-        Assert.Equal(TaskState.Failed, flow.State);
-        Assert.Equal("User cancelled", flow.FailReason);
+        Assert.Equal("User cancelled", failure.Message);
     }
 
     [Fact]
@@ -373,9 +369,9 @@ public class AuthFlowTests : IDisposable
         account.AccountData.YggdrasilToken.Value = "STALE_YGG";
 
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.Refresh, _auth);
-        await flow.StartAsync();
+        await flow.RunAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(TaskState.Succeeded, flow.State);
+        Assert.Equal(AccountTaskState.Succeeded, flow.TaskState);
         var tokenReq = _server.Request("POST", "/token");
         Assert.NotNull(tokenReq);
         Assert.Contains("grant_type=refresh_token", tokenReq.Body);
@@ -395,11 +391,12 @@ public class AuthFlowTests : IDisposable
         account.AccountData.MsaToken.RefreshToken = "EXISTING_REFRESH";
 
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.Refresh, _auth);
-        await flow.StartAsync();
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            flow.RunAsync(TestContext.Current.CancellationToken));
 
-        Assert.Equal(TaskState.Failed, flow.State);
         Assert.Equal(AccountTaskState.Disabled, flow.TaskState);
-        Assert.Equal("Microsoft user authentication failed - client identification has changed.", flow.FailReason);
+        Assert.Equal("Microsoft user authentication failed - client identification has changed.",
+            failure.Message);
         Assert.Equal(AccountState.Disabled, account.AccountData.AccountState);
         Assert.Empty(_server.Requests);
     }
@@ -411,10 +408,10 @@ public class AuthFlowTests : IDisposable
         account.AccountData.MsaClientId = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
 
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.Refresh, _auth);
-        await flow.StartAsync();
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            flow.RunAsync(TestContext.Current.CancellationToken));
 
-        Assert.Equal(TaskState.Failed, flow.State);
-        Assert.Equal("Microsoft user authentication failed - refresh token is empty.", flow.FailReason);
+        Assert.Equal("Microsoft user authentication failed - refresh token is empty.", failure.Message);
         Assert.Empty(_server.Requests);
     }
 
@@ -429,9 +426,9 @@ public class AuthFlowTests : IDisposable
         account.AccountData.Validity = Validity.Assumed;
 
         var flow = account.Login(useDeviceCode: true, _auth);
-        await flow.StartAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            flow.RunAsync(TestContext.Current.CancellationToken));
 
-        Assert.Equal(TaskState.Failed, flow.State);
         Assert.Equal(AccountTaskState.FailedHard, flow.TaskState);
         // MinecraftAccount::authFailed(STATE_FAILED_HARD): MSA tokens cleared
         Assert.Equal("", account.AccountData.MsaToken.Value);
@@ -446,8 +443,8 @@ public class AuthFlowTests : IDisposable
         // offline accounts have no steps: the flow completes immediately
         var flow = account.Refresh(_auth);
         Assert.NotNull(flow);
-        await flow.StartAsync();
-        Assert.Equal(TaskState.Succeeded, flow.State);
+        await flow.RunAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(AccountTaskState.Succeeded, flow.TaskState);
         Assert.Null(account.CurrentTask);
         Assert.False(account.IsActive);
 
@@ -477,9 +474,9 @@ public class AuthFlowTests : IDisposable
         var account = MinecraftAccount.CreateBlankMsa();
         var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, auth);
 
-        await flow.StartAsync();
+        await flow.RunAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(TaskState.Succeeded, flow.State);
+        Assert.Equal(AccountTaskState.Succeeded, flow.TaskState);
         Assert.NotEmpty(_server.Requests);
         Assert.All(_server.Requests,
             request => Assert.Equal("Flint-AuthStackProbe/1.0", request.Headers["User-Agent"]));

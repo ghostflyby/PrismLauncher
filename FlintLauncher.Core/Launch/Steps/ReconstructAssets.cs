@@ -23,28 +23,21 @@
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class ReconstructAssets(LaunchTask parent) : LaunchStep(parent)
+public sealed class ReconstructAssets(LaunchTask parent) : AwaitedStep(parent)
 {
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override Task RunAsync(CancellationToken cancellationToken)
     {
         var instance = Parent.Instance;
-        var components = instance.GetPackProfile();
-        var profile = components.GetProfile();
-        if (profile is null)
-        {
-            EmitFailed("The instance profile is missing.");
-            return Task.CompletedTask;
-        }
+        var profile = instance.GetPackProfile().GetProfile()
+                      ?? throw new InvalidOperationException("The instance profile is missing.");
 
         var assets = profile.GetMinecraftAssets();
-
-        var assetsRoot = instance.AssetsRoot;
-        if (!AssetsUtils.ReconstructAssets(assets.Id, instance.ResourcesDir(), assetsRoot))
+        if (!AssetsUtils.ReconstructAssets(assets.Id, instance.ResourcesDir(), instance.AssetsRoot))
         {
+            // the virtual folder is a convenience for resource packs; the launch continues
             EmitLogLine("Failed to reconstruct Minecraft assets.", MessageLevel.Error);
         }
 
-        EmitSucceeded();
         return Task.CompletedTask;
     }
 }

@@ -9,7 +9,6 @@
 // DELETE /api/v1/meta-cache endpoint delegates to.
 
 using System.Security.Cryptography;
-using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Launch;

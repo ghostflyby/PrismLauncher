@@ -21,7 +21,6 @@
 using System.Globalization;
 using System.Text.Json;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
@@ -41,65 +40,52 @@ public sealed class BlockedMod
     public bool Disabled { get; set; }
 }
 
-public sealed class FileResolvingTask(
-    FlameManifest toProcess,
-    ModrinthClient modrinth,
-    HttpClient http,
-    FlameClient? flame = null) : FlintTask
+public static class FileResolvingTask
 {
-    private readonly FlameClient _flame = flame ?? new FlameClient();
-
-    public FlameManifest GetResults() => toProcess;
-
-    /// <summary>
-    /// APPLICATION->settings()->get("FallbackMRBlockedMods") (upstream default: true): when
-    /// set, files without a download URL are looked up on Modrinth by their sha1.
-    /// </summary>
-    public bool FallbackMrBlockedMods { get; init; } = true;
-
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Resolves the manifest's file/project ids and loads the per-file pack metadata
+    /// into <paramref name="toProcess"/> in place. Returning is success; any other exception is
+    /// a failure whose message is the reason.
+    /// <para><paramref name="fallbackMrBlockedMods"/> is the "FallbackMRBlockedMods" setting
+    /// (upstream default: true): when set, files without a download URL are looked up on
+    /// Modrinth by their sha1.</para></summary>
+    public static async Task RunAsync(FlameManifest toProcess, ModrinthClient modrinth, HttpClient http,
+        FlameClient? flame = null, bool fallbackMrBlockedMods = true,
+        CancellationToken cancellationToken = default)
     {
+        var flameClient = flame ?? new FlameClient();
+
         if (toProcess.Files.Count == 0)
         {
-            // no file to resolve so leave it empty and emit success immediately
-            EmitSucceeded();
+            // no file to resolve, so leave it empty
             return;
         }
-
-        EmitStatus("Resolving mod IDs...");
-        SetProgress(0, 3);
 
         var fileIds = toProcess.Files.Values
             .Select(f => f.FileId.ToString(CultureInfo.InvariantCulture)).ToList();
         FlameFileList doc;
         try
         {
-            doc = await _flame.Files.ByIds(fileIds).SendTo(http, cancellationToken);
+            doc = await flameClient.Files.ByIds(fileIds).SendTo(http, cancellationToken);
         }
         catch (FlameApiException e)
         {
-            EmitFailed(e.Message);
-            return;
+            throw new InvalidOperationException(e.Message, e);
         }
 
-        await NetJobFinished(doc, cancellationToken);
-    }
+        await NetJobFinished(doc);
 
-    private async Task NetJobFinished(FlameFileList doc, CancellationToken cancellationToken)
-    {
-        SetProgress(1, 3);
-        // job to check modrinth for blocked projects
-        if (doc.Data is null)
+        async Task NetJobFinished(FlameFileList fileList)
         {
-            // the former RequireArray throw: an absent/null data member is a broken reply,
-            // not an empty resolution
-            EmitFailed("Invalid data returned from the API.");
-            return;
-        }
+            // job to check modrinth for blocked projects
+            if (fileList.Data is null)
+            {
+                // the former RequireArray throw: an absent/null data member is a broken reply,
+                // not an empty resolution
+                throw new InvalidOperationException("Invalid data returned from the API.");
+            }
 
-        {
             var hashes = new List<string>();
-            foreach (var fileDto in doc.Data)
+            foreach (var fileDto in fileList.Data)
             {
                 try
                 {
@@ -118,110 +104,99 @@ public sealed class FileResolvingTask(
                         hashes.Add(version.Hash);
                     }
                 }
-                catch (JsonException)
+                catch (Exception e) when (e is JsonException or FormatException)
                 {
                     // "Non-JSON data returned from the CF API"
-                    EmitFailed("Invalid data returned from the API.");
-                    return;
-                }
-                catch (FormatException)
-                {
-                    EmitFailed("Invalid data returned from the API.");
-                    return;
+                    throw new InvalidOperationException("Invalid data returned from the API.", e);
                 }
             }
 
             if (hashes.Count == 0)
             {
-                await GetFlameProjects(cancellationToken);
+                await GetFlameProjects();
                 return;
             }
 
-            await ModrinthFallback(hashes, cancellationToken);
+            await ModrinthFallback(hashes);
         }
-    }
 
-    /// <summary>The Modrinth fallback for blocked files (currentVersions by sha1).</summary>
-    private async Task ModrinthFallback(List<string> hashes, CancellationToken cancellationToken)
-    {
-        try
+        // the Modrinth fallback for blocked files (currentVersions by sha1)
+        async Task ModrinthFallback(List<string> hashes)
         {
-            // a non-object (or invalid) body fails the decode: every lookup just misses,
-            // treated the same as the C++ parse-error path
-            if (FallbackMrBlockedMods)
+            try
             {
-                var entries = await modrinth.Versions.ByFileHashes(hashes, "sha1")
-                    .SendTo(http, cancellationToken);
-                foreach (var outFile in toProcess.Files.Values)
+                // a non-object (or invalid) body fails the decode: every lookup just misses,
+                // treated the same as the C++ parse-error path
+                if (fallbackMrBlockedMods)
                 {
-                    var urlValid = Uri.TryCreate(outFile.Version.DownloadUrl, UriKind.Absolute, out _);
-                    if (!urlValid && "sha1" == outFile.Version.HashType
-                                  && outFile.Version.Hash.Length != 0
-                                  && entries.TryGetValue(outFile.Version.Hash, out var entry))
+                    var entries = await modrinth.Versions.ByFileHashes(hashes, "sha1")
+                        .SendTo(http, cancellationToken);
+                    foreach (var outFile in toProcess.Files.Values)
                     {
-                        try
+                        var urlValid = Uri.TryCreate(outFile.Version.DownloadUrl, UriKind.Absolute, out _);
+                        if (!urlValid && "sha1" == outFile.Version.HashType
+                                      && outFile.Version.Hash.Length != 0
+                                      && entries.TryGetValue(outFile.Version.Hash, out var entry))
                         {
-                            var file = ModrinthPackIndex.LoadIndexedPackVersion(entry);
-                            outFile.Version.DownloadUrl = file.DownloadUrl;
+                            try
+                            {
+                                var file = ModrinthPackIndex.LoadIndexedPackVersion(entry);
+                                outFile.Version.DownloadUrl = file.DownloadUrl;
+                            }
+                            catch (JsonException) { }
                         }
-                        catch (JsonException) { }
                     }
                 }
             }
-        }
-        catch (Exception e) when (e is ModrinthApiException)
-        {
-            // the fallback is best-effort: the sha1-lookup failing must not fail the resolution
-        }
-
-        // the C++ moves on to the projects step even when the Modrinth task failed
-        await GetFlameProjects(cancellationToken);
-    }
-
-    private async Task GetFlameProjects(CancellationToken cancellationToken)
-    {
-        SetProgress(2, 3);
-        var addonIds = toProcess.Files.Values
-            .Select(f => f.ProjectId.ToString(CultureInfo.InvariantCulture)).ToList();
-
-        FlameProjectList doc;
-        try
-        {
-            doc = await _flame.Projects.ByIds(addonIds).SendTo(http, cancellationToken);
-        }
-        catch (FlameApiException e)
-        {
-            EmitFailed(e.Message);
-            return;
-        }
-
-        // (the C++ only logs parse problems in this step and still succeeds)
-        try
-        {
-            foreach (var entry in doc.Data ?? [])
+            catch (Exception e) when (e is ModrinthApiException)
             {
-                if (entry is not { } projectDto)
-                {
-                    continue;
-                }
+                // the fallback is best-effort: the sha1-lookup failing must not fail the resolution
+            }
 
-                var id = projectDto.Id ?? 0;
-                var file = toProcess.Files.Values.FirstOrDefault(f => f.ProjectId == id);
-                if (file is null)
-                {
-                    continue;
-                }
+            // the C++ moves on to the projects step even when the Modrinth task failed
+            await GetFlameProjects();
+        }
 
-                EmitStatus($"Parsing API response from CurseForge for '{file.Version.FileName}'...");
-                FlameMod.LoadIndexedPack(file.Pack, projectDto);
-                if (file.Pack.ResourceType == ResourceType.World)
+        async Task GetFlameProjects()
+        {
+            var addonIds = toProcess.Files.Values
+                .Select(f => f.ProjectId.ToString(CultureInfo.InvariantCulture)).ToList();
+
+            FlameProjectList projectList;
+            try
+            {
+                projectList = await flameClient.Projects.ByIds(addonIds).SendTo(http, cancellationToken);
+            }
+            catch (FlameApiException e)
+            {
+                throw new InvalidOperationException(e.Message, e);
+            }
+
+            // (the C++ only logs parse problems in this step and still succeeds)
+            try
+            {
+                foreach (var entry in projectList.Data ?? [])
                 {
-                    file.TargetFolder = "saves";
+                    if (entry is not { } projectDto)
+                    {
+                        continue;
+                    }
+
+                    var id = projectDto.Id ?? 0;
+                    var file = toProcess.Files.Values.FirstOrDefault(f => f.ProjectId == id);
+                    if (file is null)
+                    {
+                        continue;
+                    }
+
+                    FlameMod.LoadIndexedPack(file.Pack, projectDto);
+                    if (file.Pack.ResourceType == ResourceType.World)
+                    {
+                        file.TargetFolder = "saves";
+                    }
                 }
             }
+            catch (JsonException) { }
         }
-        catch (JsonException) { }
-
-        EmitSucceeded();
     }
 }

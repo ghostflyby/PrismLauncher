@@ -82,7 +82,6 @@ using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.State;
-using FlintLauncher.Core.Tasks;
 using TruePath;
 using TruePath.SystemIo;
 
@@ -651,9 +650,30 @@ public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged
     /// temporary folder that is committed into the instance dir on success (with the C++
     /// exponential backoff around the commit, defending against antivirus file locks).
     /// </summary>
-    public FlintTask WrapInstanceTask(InstanceTask task)
+    public Func<CancellationToken, Task> WrapInstanceTask(InstanceTask task) =>
+        new InstanceStaging(this, task).RunAsync;
+
+    /// <summary>As <see cref="WrapInstanceTask(InstanceTask)"/>, forwarding the creation's own
+    /// status and progress to the caller's window. The staging area is claimed here, so the
+    /// caller must build this inside the same lock that guards instance creation.</summary>
+    public Func<CancellationToken, Task> WrapInstanceTask(InstanceTask task, Action<string> onStatus,
+        Action<long, long> onProgress)
     {
-        return new InstanceStaging(this, task);
+        var staging = new InstanceStaging(this, task);
+        return async cancellationToken =>
+        {
+            task.StatusChanged += onStatus;
+            task.ProgressChanged += onProgress;
+            try
+            {
+                await staging.RunAsync(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                task.StatusChanged -= onStatus;
+                task.ProgressChanged -= onProgress;
+            }
+        };
     }
 
     /// <summary>
@@ -1130,16 +1150,17 @@ public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged
     /// commits it with the C++ exponential backoff (1..16, in 500ms steps) around the commit
     /// — the defense against Windows antivirus locking freshly written files.
     /// </summary>
-    private sealed class InstanceStaging(InstanceList parent, InstanceTask child) : FlintTask
+    private sealed class InstanceStaging(InstanceList parent, InstanceTask child)
     {
         private readonly AbsolutePath? _stagingPath = parent.GetStagedInstancePath(child.TargetDir);
 
-        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+        /// <summary>Runs the child inside the staging folder and commits it. A child that
+        /// fails leaves its staging folder removed and its reason rethrown.</summary>
+        public async Task RunAsync(CancellationToken cancellationToken)
         {
             if (_stagingPath is not { } stagingPath)
             {
-                EmitFailed("Could not create staging folder");
-                return;
+                throw new InvalidOperationException("Could not create staging folder");
             }
 
             child.StagingPath = stagingPath;
@@ -1147,44 +1168,39 @@ public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged
             // type infos) replaces the former parent SettingsObject handle
             child.SetParentEnvironment(parent.Environment);
 
-            await child.StartAsync(cancellationToken);
-
-            if (child.State == TaskState.Succeeded)
+            var committed = false;
+            try
             {
+                await child.ExecuteAsync(cancellationToken).ConfigureAwait(false);
+
                 var backoff = MinBackoff;
                 while (true)
                 {
                     if (parent.CommitStagedInstance(stagingPath.Value, child, child.Group))
                     {
-                        EmitSucceeded();
+                        committed = true;
                         return;
                     }
 
                     if (backoff == MaxBackoff)
                     {
-                        EmitFailed("Failed to commit instance, even after multiple retries. It is being blocked by something.");
-                        return;
+                        throw new InvalidOperationException(
+                            "Failed to commit instance, even after multiple retries. It is being blocked by something.");
                     }
 
-                    await Task.Delay(backoff * 500, cancellationToken);
+                    await Task.Delay(backoff * 500, cancellationToken).ConfigureAwait(false);
                     backoff = Math.Min(backoff * 2, MaxBackoff);
                 }
             }
-
-            if (child.State == TaskState.AbortedByUser)
+            finally
             {
-                FileOps.DeletePath(stagingPath);
-                EmitAborted();
-                return;
+                // whatever the exit — a failing child, an abort during the commit backoff, a
+                // failed commit — an uncommitted staging folder is the wrapper's to remove
+                if (!committed)
+                {
+                    FileOps.DeletePath(stagingPath);
+                }
             }
-
-            FileOps.DeletePath(stagingPath);
-            EmitFailed(child.FailReason);
-        }
-
-        public override void Abort()
-        {
-            child.Abort();
         }
     }
 }

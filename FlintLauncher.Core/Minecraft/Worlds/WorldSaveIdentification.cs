@@ -9,8 +9,9 @@
 //  - The WorldSave model drops the Resource base class and the QMutex: this port is a
 //    plain mutable value holder, the parse functions are synchronous and side-effect
 //    free with respect to shared state.
-//  - LocalWorldSaveParseTask (the Task/abort plumbing) is not ported; modpack imports
-//    can wrap the synchronous Process* calls in a FlintTask themselves.
+//  - LocalWorldSaveParseTask (the Task/abort plumbing) is not ported; the Process* functions
+//    below are synchronous and side-effect free with respect to shared state. No production
+//    flow consumes them yet.
 //  - Zip inspection uses System.IO.Compression (like MMCZip.cs) instead of libarchive;
 //    directory entries are represented by the "name/" entry convention.
 //  - The C++ `zip.exists("/saves")` check (ArchiveReader::exists: exact entry match or

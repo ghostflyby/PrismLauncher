@@ -122,17 +122,24 @@ public static class MigrationEndpoints
             // (prism/polymc/multimc) — the old code hardcoded "prism"
             var task = new PrismImportTask(sourceDir, paths.DataDir, importMode,
                 sourceName, migrationDecisions);
-            // every terminal state completes the single pass: the C++ task emitted
-            // finished() after emitAborted() too (Task.cpp:133-146), so a cancelled import ran
-            // the same completion as a successful one. The port dropped finished() — the
-            // subscribers must hang the hook off all three terminal states, or an aborted
-            // import strands what already landed at the data root (assets/libraries/meta
-            // re-downloaded GB-level by the store side until the next process start).
-            task.Succeeded += _ => completion.Run();
-            task.Failed += (_, _) => completion.Run();
-            task.Aborted += _ => completion.Run();
-            var entry = registry.Register("prism-import", task, onFinished: null);
-            _ = task.StartAsync();
+
+            // every terminal state completes the single pass: the C++ task emitted finished()
+            // after emitAborted() too (Task.cpp:133-146), so a cancelled import ran the same
+            // completion as a successful one — an aborted import otherwise strands what
+            // already landed at the data root (assets/libraries/meta re-downloaded GB-level by
+            // the store side until the next process start)
+            var entry = registry.Start("prism-import", async handle =>
+            {
+                try
+                {
+                    await handle.RunAsync(ct => task.ImportAsync(handle, ct)).ConfigureAwait(false);
+                }
+                finally
+                {
+                    completion.Run();
+                }
+            }, instanceId: null);
+
             return Results.Accepted($"/api/v1/tasks/{entry.Id}", new TaskAcceptedResponse(entry.Id));
         }).Produces<PrismImportDryRunResponse>().Produces<TaskAcceptedResponse>(202);
 

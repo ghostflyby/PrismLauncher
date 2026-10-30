@@ -28,32 +28,30 @@ using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class ExtractNatives(LaunchTask parent) : LaunchStep(parent)
+public sealed class ExtractNatives(LaunchTask parent) : AwaitedStep(parent)
 {
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override Task RunAsync(CancellationToken cancellationToken)
     {
         var instance = Parent.Instance;
         var toExtract = instance.GetNativeJars();
         if (toExtract.Count == 0)
         {
-            EmitSucceeded();
             return Task.CompletedTask;
         }
 
         var outputPath = instance.GetNativePath();
         FileOps.EnsureFolderPathExists(outputPath);
-        var jniHackEnabled = instance.GetJavaLanguageVersion() >= 8;
         foreach (var source in toExtract)
         {
-            if (!UnzipNatives(source, outputPath.Value, jniHackEnabled))
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!UnzipNatives(source, outputPath.Value, instance.GetJavaLanguageVersion() >= 8))
             {
-                EmitLogLine($"Couldn't extract native jar '{source}' to destination '{outputPath}'", MessageLevel.Fatal);
-                EmitFailed($"Couldn't extract native jar '{source}' to destination '{outputPath}'");
-                return Task.CompletedTask;
+                var reason = $"Couldn't extract native jar '{source}' to destination '{outputPath}'";
+                EmitLogLine(reason, MessageLevel.Fatal);
+                throw new InvalidOperationException(reason);
             }
         }
 
-        EmitSucceeded();
         return Task.CompletedTask;
     }
 

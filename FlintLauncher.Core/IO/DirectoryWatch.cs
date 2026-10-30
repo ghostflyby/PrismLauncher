@@ -124,7 +124,7 @@ public sealed class DirectoryWatch : IDisposable
             IncludeSubdirectories = true,
             InternalBufferSize = 64 * 1024,
             NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName
-                           | NotifyFilters.LastWrite | NotifyFilters.Size,
+                                                  | NotifyFilters.LastWrite | NotifyFilters.Size,
         };
         fsw.Created += (_, e) => MarkDirtyOrRootLoss(e.FullPath);
         fsw.Changed += (_, _) => MarkDirty();

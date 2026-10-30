@@ -26,9 +26,9 @@ using FlintLauncher.Core.Instances;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class PrintInstanceInfo(LaunchTask parent, AuthSession? session, MinecraftTarget? targetToJoin) : LaunchStep(parent)
+public sealed class PrintInstanceInfo(LaunchTask parent, AuthSession? session, MinecraftTarget? targetToJoin) : AwaitedStep(parent)
 {
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override Task RunAsync(CancellationToken cancellationToken)
     {
         var instance = Parent.Instance;
         var log = new List<string>
@@ -52,7 +52,6 @@ public sealed class PrintInstanceInfo(LaunchTask parent, AuthSession? session, M
 
         EmitLogLines(log, MessageLevel.Launcher);
         EmitLogLines(instance.VerboseDescription(session, targetToJoin), MessageLevel.Launcher);
-        EmitSucceeded();
         return Task.CompletedTask;
     }
 

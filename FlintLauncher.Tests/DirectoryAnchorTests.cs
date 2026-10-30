@@ -47,7 +47,7 @@ public class DirectoryAnchorTests : IDisposable
         var moved = _root / "b";
         Directory.Move(dir.Path.Value, moved.Value);
 
-        Assert.True(anchor.MatchesIdentity(moved));  // the same inode lives at the new path
+        Assert.True(anchor.MatchesIdentity(moved)); // the same inode lives at the new path
         Assert.False(anchor.MatchesIdentity(dir.Path));
 
         // the re-derived path is the same directory (F_GETPATH reports the physical

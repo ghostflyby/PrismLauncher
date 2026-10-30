@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
-// The Prism→Flint import layer on top of the DataMigration port: a FlintTask that moves or
-// reflink/CoW-copies a typical Prism data directory into the Flint data directory (one
+// The Prism→Flint import layer on top of the DataMigration port: a work unit that moves or
+// copies a typical Prism data directory into the Flint data directory (one
 // whitelist per top-level item, idempotent "destination exists → skip"), a dry-run planner
 // and a source detector for the migration endpoints (M* endpoints, active operation only —
 // there is no automatic startup migration).
@@ -88,7 +88,7 @@ public static class PrismImportPlanner
             {
                 // Flint ALWAYS creates <data>/instances (InstanceList's constructor
                 // ensures the folder), so a flat "destination exists → skip" silently
-                // strands the whole imported tree behind an EmitSucceeded + imported record.
+                // strands the whole imported tree behind a success report + imported record.
                 // The C++ migration runs before InstanceList and merges FILE BY FILE
                 // (FileSystem.cpp:403-471): drill down and plan the per-file merge whenever
                 // any source file is missing at the destination — files already there keep
@@ -184,7 +184,7 @@ public static class PrismImportPlanner
 /// {source, decision: imported, at, mode, instances, bytes} under the state root's
 /// migration/ directory) so a detector does not propose the same source twice.
 /// </summary>
-public sealed class PrismImportTask : FlintTask
+public sealed class PrismImportTask
 {
     private readonly AbsolutePath _sourceDir;
     private readonly AbsolutePath _targetDataDir;
@@ -205,24 +205,17 @@ public sealed class PrismImportTask : FlintTask
         _decisions = decisions;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Transfers the whitelisted items. Returning is success; any other exception is a
+    /// failure whose message is the reason. <paramref name="progress"/> null runs without
+    /// reporting.</summary>
+    public async Task ImportAsync(IProgress<TaskProgress>? progress, CancellationToken cancellationToken)
     {
-        // C++ Task::start() ran the body on its own QThread; without a yield this body (no
-        // awaits below) would complete INLINE on the caller's thread — the migration
-        // endpoint's fire-and-forget StartAsync would block the POST until the whole
-        // transfer finished and an abort() could never arrive mid-import (the client only
-        // learns the task id from the 202, by which time the task is terminal). The yield
-        // makes the 202 truthful and the cooperative cancellation points below reachable.
-        await Task.Yield();
-
-        EmitStatus("Scanning the source directory...");
-
         var plan = PrismImportPlanner.Plan(_sourceDir, _targetDataDir, _mode);
         var totalFiles = plan.Sum(item => item.Files);
         if (totalFiles == 0)
         {
-            EmitFailed("Nothing to import: the source directory has no whitelisted content.");
-            return;
+            throw new InvalidOperationException(
+                "Nothing to import: the source directory has no whitelisted content.");
         }
 
         // the source inventory is read BEFORE any transfer: a same-volume move empties the
@@ -245,7 +238,6 @@ public sealed class PrismImportTask : FlintTask
 
             if (item is { IsDirectory: true, Method: PlannedMethod.RenameDirectory })
             {
-                EmitStatus($"Moving {item.Name}…");
                 if (FileTransfer.TryMoveDirectory(srcItem.Value, dstItem.Value))
                 {
                     done += item.Files;
@@ -254,14 +246,15 @@ public sealed class PrismImportTask : FlintTask
                 // volume differs or destination appeared — fall through per file
             }
 
+            // report per file rather than per item: a per-file line flashes past faster than a
+            // poller can read it, while the item name says which part of the tree is moving
             foreach (var file in EnumerateFiles(srcItem))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 done++;
-                SetProgress(done, totalFiles);
+                progress?.Report(new TaskProgress(done, totalFiles));
                 var relative = Path.GetRelativePath(_sourceDir.Value, file).Replace('\\', '/');
                 var dst = _targetDataDir / relative;
-                EmitStatus($"Importing {Truncate(relative)}…");
                 if (!FileTransfer.TransferFile(file, dst.Value, _mode, out _))
                 {
                     failed = true;
@@ -269,11 +262,10 @@ public sealed class PrismImportTask : FlintTask
             }
         }
 
-        SetProgress(totalFiles, totalFiles);
+        progress?.Report(new TaskProgress(totalFiles, totalFiles));
         if (failed)
         {
-            EmitFailed("Some paths could not be imported!");
-            return;
+            throw new InvalidOperationException("Some paths could not be imported!");
         }
 
         // the target may still carry the Prism bare `metacache` ledger from
@@ -294,7 +286,6 @@ public sealed class PrismImportTask : FlintTask
         }
 
         RecordImportDecision(plan, sourceInstances);
-        EmitSucceeded();
     }
 
     /// <summary>The completed import lands as an `imported` decision record under the

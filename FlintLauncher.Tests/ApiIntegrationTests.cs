@@ -24,18 +24,16 @@ using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
-using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.State;
+using FlintLauncher.ExternalApi.Flame;
+using FlintLauncher.ExternalApi.Modrinth;
 using FlintLauncher.Web;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using TruePath;
 using Xunit;
-using FlintLauncher.ExternalApi;
-using FlintLauncher.ExternalApi.Flame;
-using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Tests;
 
@@ -469,6 +467,9 @@ public class FlintApiIntegrationTests
 
         var task = await host.WaitForTaskStateAsync(taskId, "succeeded", TimeSpan.FromSeconds(20));
         Assert.Equal("import", task.GetProperty("kind").GetString());
+        // the creation's own narration reaches the task view (the wrap forwards its events)
+        Assert.False(string.IsNullOrEmpty(task.GetProperty("status").GetString()),
+            "the import task should carry the creation's last status line");
 
         // the committed instance is discoverable and carries the pack name
         var list = JsonDocument.Parse(

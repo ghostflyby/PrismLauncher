@@ -15,7 +15,6 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -50,8 +49,9 @@ public class TechnicTests : IDisposable
         return _global.BareInstanceList(instancesDir);
     }
 
-    private async Task<SingleZipPackInstallTask> RunZipInstall(TechnicZipPackBuilder pack, string minecraftVersion = "",
-        string name = "Technic Imported")
+    /// <summary>Runs the install and returns the reason it failed, or null when it succeeded.</summary>
+    private async Task<(SingleZipPackInstallTask Task, string? Failure)> RunZipInstall(
+        TechnicZipPackBuilder pack, string minecraftVersion = "", string name = "Technic Imported")
     {
         var zipName = $"pack-{Guid.NewGuid():N}.zip";
         var zipPath = Path.Combine(_root, zipName);
@@ -64,8 +64,15 @@ public class TechnicTests : IDisposable
             TestNet.Http);
         task.SetName(name);
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
-        return task;
+        try
+        {
+            await wrapped(TestContext.Current.CancellationToken);
+            return (task, null);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            return (task, e.Message);
+        }
     }
 
     // ---------------------------------------------------------------- API surface
@@ -217,8 +224,7 @@ public class TechnicTests : IDisposable
     [Fact]
     public async Task SingleZip_VersionJsonFlavor_SetsComponentsAndLayout()
     {
-        var task = await RunZipInstall(new TechnicZipPackBuilder());
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await RunZipInstall(new TechnicZipPackBuilder());
 
         var staging = Path.Combine(_root, "instances", "Technic Imported");
         // the extracted pack landed in minecraft/
@@ -244,8 +250,7 @@ public class TechnicTests : IDisposable
         {
             VersionJson = """{"inheritsFrom":"1.7.10","id":"legacy","libraries":[{"name":"net.minecraftforge:forge:1.7.10-10.13.4.1614-1.7.10"}]}""",
         };
-        var task = await RunZipInstall(pack, name: "Technic 1710");
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await RunZipInstall(pack, name: "Technic 1710");
 
         var staging = Path.Combine(_root, "instances", "Technic 1710");
         using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
@@ -261,8 +266,7 @@ public class TechnicTests : IDisposable
         {
             VersionJson = """{"inheritsFrom":"1.20.1","id":"fabricpack","libraries":[{"name":"net.fabricmc:fabric-loader:0.14.21"}]}""",
         };
-        var task = await RunZipInstall(fabricPack, name: "Technic Fabric");
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await RunZipInstall(fabricPack, name: "Technic Fabric");
         var staging = Path.Combine(_root, "instances", "Technic Fabric");
         using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
@@ -273,8 +277,7 @@ public class TechnicTests : IDisposable
         {
             VersionJson = """{"inheritsFrom":"1.20.1","id":"quiltpack","libraries":[{"name":"org.quiltmc:quilt-loader:0.19.0"}]}""",
         };
-        var task2 = await RunZipInstall(quiltPack, name: "Technic Quilt");
-        Assert.True(task2.WasSuccessful, task2.FailReason);
+        await RunZipInstall(quiltPack, name: "Technic Quilt");
         var staging2 = Path.Combine(_root, "instances", "Technic Quilt");
         using var doc2 = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging2, "mmc-pack.json")));
         Assert.Contains(doc2.RootElement.GetProperty("components").EnumerateArray(),
@@ -291,8 +294,7 @@ public class TechnicTests : IDisposable
             ForgeVersionProperties = "forge.major.number=1\nforge.minor.number=4\nforge.revision.number=7\nforge.build.number=5\n",
         };
         // the minecraft version must be known (as from the Platform metadata)
-        var task = await RunZipInstall(pack, minecraftVersion: "1.4.7", name: "Technic JarForge");
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await RunZipInstall(pack, minecraftVersion: "1.4.7", name: "Technic JarForge");
 
         var staging = Path.Combine(_root, "instances", "Technic JarForge");
         Assert.True(File.Exists(Path.Combine(staging, "minecraft", "bin", "modpack.jar")));
@@ -311,9 +313,8 @@ public class TechnicTests : IDisposable
     [Fact]
     public async Task SingleZip_ModpackJarWithoutVersionJsonAndUnknownMc_Fails()
     {
-        var task = await RunZipInstall(new TechnicZipPackBuilder { WithModpackJar = true }, name: "Technic UnknownMc");
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("Minecraft version is unknown", task.FailReason);
+        var (_, failure) = await RunZipInstall(new TechnicZipPackBuilder { WithModpackJar = true }, name: "Technic UnknownMc");
+        Assert.Contains("Minecraft version is unknown", failure);
     }
 
     [Fact]
@@ -325,8 +326,7 @@ public class TechnicTests : IDisposable
             JarEmbedsVersionJson = true,
             VersionJson = """{"inheritsFrom":"1.6.4","id":"embedded","libraries":[{"name":"net.minecraftforge:minecraftforge:9.11.1.964"}]}""",
         };
-        var task = await RunZipInstall(pack, name: "Technic Embedded");
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await RunZipInstall(pack, name: "Technic Embedded");
 
         var staging = Path.Combine(_root, "instances", "Technic Embedded");
         using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
@@ -348,8 +348,7 @@ public class TechnicTests : IDisposable
             VersionJson = """{"id":"fml-only","libraries":[]}""",
             FmlVersionProperties = "fmlbuild.mcversion=1.6.4\nfmlbuild.deobfuscated_artifact=yes\n",
         };
-        var task = await RunZipInstall(pack, name: "Technic Fml");
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await RunZipInstall(pack, name: "Technic Fml");
 
         var staging = Path.Combine(_root, "instances", "Technic Fml");
         using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
@@ -367,18 +366,16 @@ public class TechnicTests : IDisposable
             JarEmbedsVersionJson = true,
             VersionJson = """{"id":"no-inherits","libraries":[]}""",
         };
-        var task = await RunZipInstall(pack, name: "Technic NoInherits");
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("inheritsFrom is missing", task.FailReason);
+        var (_, failure) = await RunZipInstall(pack, name: "Technic NoInherits");
+        Assert.Contains("inheritsFrom is missing", failure);
     }
 
     [Fact]
     public async Task SingleZip_VanillaFlavor_UsesPassedMinecraftVersion()
     {
         // no bin/modpack.jar and no bin/version.json: the "vanilla" flavor
-        var task = await RunZipInstall(new TechnicZipPackBuilder { WithVersionJson = false },
+        await RunZipInstall(new TechnicZipPackBuilder { WithVersionJson = false },
             minecraftVersion: "1.19.2", name: "Technic Vanilla");
-        Assert.True(task.WasSuccessful, task.FailReason);
 
         var staging = Path.Combine(_root, "instances", "Technic Vanilla");
         using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
@@ -393,10 +390,9 @@ public class TechnicTests : IDisposable
     {
         // the surfaced parse error keeps the wrapper prefix; the STJ detail text follows it
         // (the former requireDocument "Error parsing JSON" wording is not the contract)
-        var task = await RunZipInstall(new TechnicZipPackBuilder { VersionJson = """{"inheritsFrom":}""" },
+        var (_, failure) = await RunZipInstall(new TechnicZipPackBuilder { VersionJson = """{"inheritsFrom":}""" },
             name: "Technic BadVersionJson");
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("Could not understand \"version.json\":", task.FailReason);
+        Assert.Contains("Could not understand \"version.json\":", failure);
     }
 
     // --------------------------------------------------------------- Solder install
@@ -423,9 +419,8 @@ public class TechnicTests : IDisposable
         var task = new SolderPackInstallTask(new Uri(_server.Url), "testpack", "1.0.0", minecraftVersion: "", TestNet.Http);
         task.SetName("Solder Imported");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await wrapped(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
 
         var staging = Path.Combine(_root, "instances", "Solder Imported");
         // the mod zip was downloaded (md5-verified) and extracted into minecraft/
@@ -460,9 +455,7 @@ public class TechnicTests : IDisposable
         var task = new SolderPackInstallTask(new Uri(_server.Url), "testpack", "1.0.0", minecraftVersion: "", TestNet.Http);
         task.SetName("Solder BadMd5");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
-
-        Assert.Equal(TaskState.Failed, task.State);
+        await Assert.ThrowsAnyAsync<Exception>(() => wrapped(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -474,11 +467,10 @@ public class TechnicTests : IDisposable
         var task = new SolderPackInstallTask(new Uri(_server.Url), "testpack", "1.0.0", minecraftVersion: "", TestNet.Http);
         task.SetName("Solder BadManifest");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
-
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("Could not understand pack manifest:", task.FailReason);
-        Assert.Contains("Error parsing JSON", task.FailReason);
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() => wrapped(TestContext.Current.CancellationToken));
+        var failure = ex.Message;
+        Assert.Contains("Could not understand pack manifest:", failure);
+        Assert.Contains("Error parsing JSON", failure);
     }
 
     [Fact]
@@ -495,9 +487,8 @@ public class TechnicTests : IDisposable
         var task = new SolderPackInstallTask(new Uri(_server.Url), "vanillapack", "2.0", minecraftVersion: "1.12.2", TestNet.Http);
         task.SetName("Solder Vanilla");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await wrapped(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         var staging = Path.Combine(_root, "instances", "Solder Vanilla");
         using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),

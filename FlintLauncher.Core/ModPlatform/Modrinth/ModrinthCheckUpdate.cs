@@ -2,32 +2,31 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 // SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
 //
-// Port of modplatform/modrinth/ModrinthCheckUpdate.{h,cpp}: hash-based update detection.
-// For every mod (its installed hash taken from the packwiz metadata), ask Modrinth for the
-// latest version matching the game versions (+ loader, in loader passes); a mod has an
-// update when the latest preferred file's hash differs from the installed one.
+// Hash-based update detection against Modrinth. For every mod (its installed hash taken from
+// the packwiz metadata), ask Modrinth for the latest version matching the game versions and,
+// in loader passes, the instance loaders; a mod has an update when the latest preferred
+// file's hash differs from the installed one.
 //
-// Deviations (headless port):
-//  - Resource::metadata() becomes the injectable metadataLookup delegate (the ported Mod has
-//    no metadata field; ModFolderModel.GetMetadata is the intended provider).
-//  - The ResourceDownloadTask / GetModDependenciesTask wiring of the C++ Update struct is
-//    not ported yet; the update record carries the resolved IndexedVersion instead.
-//  - The dependency list (m_deps) is not ported.
+// The metadata lookup is injected rather than read off the resource: Resource carries no
+// metadata field. An Update carries the resolved IndexedVersion, not a download task — the
+// caller builds the downloads. Dependencies are not resolved by the check.
+//
+// CheckAsync returns both the updates and one failure entry per resource the API could not
+// resolve, so a caller that wants the per-resource outcome does not subscribe to an event.
 
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Hashing;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
-public sealed class ModrinthCheckUpdate : FlintTask
+public sealed class ModrinthCheckUpdate
 {
-    /// <summary>Port of CheckUpdateTask::Update (minus the download task, see header note);
-    /// the UI-only members (old hash, changelog, enabled flag) are not ported.</summary>
+    /// <summary>One available update: the installed and available version numbers, and the
+    /// resolved version the caller downloads.</summary>
     public sealed class Update
     {
         public required string Name { get; init; }
@@ -37,8 +36,11 @@ public sealed class ModrinthCheckUpdate : FlintTask
         public required IndexedVersion Version { get; init; }
     }
 
-    /// <summary>Port of the checkFailed(resource, reason) signal.</summary>
-    public event Action<Resource, string>? CheckFailed;
+    /// <summary>The check's outcome: the updates found, plus one entry per resource the API
+    /// could not resolve.</summary>
+    public sealed record CheckResult(
+        IReadOnlyList<Update> Updates,
+        IReadOnlyList<(Resource Resource, string Reason)> Failures);
 
     private readonly IReadOnlyList<Resource> _resources;
     private readonly IReadOnlyList<McVersion> _gameVersions;
@@ -52,6 +54,7 @@ public sealed class ModrinthCheckUpdate : FlintTask
     private readonly Dictionary<string, Resource> _mappings = new(StringComparer.Ordinal); // hash -> resource
 
     private readonly List<Update> _updates = [];
+    private readonly List<(Resource Resource, string Reason)> _failures = [];
     private int _loaderIdx;
     private readonly int _initialSize;
 
@@ -90,12 +93,10 @@ public sealed class ModrinthCheckUpdate : FlintTask
         }
     }
 
-    public IReadOnlyList<Update> GetUpdates() => _updates;
-
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Runs the check. A resource without metadata to compare against fails the whole
+    /// run; resources the API could not resolve are returned as <see cref="CheckResult.Failures"/>.</summary>
+    public async Task<CheckResult> CheckAsync(CancellationToken cancellationToken)
     {
-        EmitStatus("Preparing resources for Modrinth...");
-
         // Sadly the API can only handle one hash type per call, so we need to generate a new
         // hash when the stored one is inadequate (hashing is synchronous in this port).
         foreach (var resource in _resources)
@@ -103,37 +104,32 @@ public sealed class ModrinthCheckUpdate : FlintTask
             var metadata = _metadataLookup(resource);
             if (metadata is null)
             {
-                EmitFailed($"Resource {resource.Name} has no metadata to check against.");
-                return;
+                throw new InvalidOperationException(
+                    $"Resource {resource.Name} has no metadata to check against.");
             }
 
             var hash = metadata.Hash;
 
             if (metadata.HashFormat != _hashType)
             {
-                var hashTask = HashUtils.CreateHasher(resource.Fileinfo.FullName, ResourceProvider.Modrinth);
-                await hashTask.StartAsync(cancellationToken);
-                if (!hashTask.WasSuccessful)
+                hash = HashUtils.HashFile(resource.Fileinfo.FullName, HashUtils.HasherAlgorithm(ResourceProvider.Modrinth));
+                if (hash.Length == 0)
                 {
-                    EmitFailed("Failed to generate hash");
-                    return;
+                    throw new InvalidOperationException($"Empty hash for {resource.Name}!");
                 }
-
-                hash = hashTask.GetResult();
             }
 
             _mappings[hash] = resource;
         }
 
         await CheckNextLoader(cancellationToken);
+        return new CheckResult(_updates, _failures);
     }
 
     private async Task GetUpdateModsForLoader(ModLoaderType? loader, bool forceModLoaderCheck,
         CancellationToken cancellationToken)
     {
         _loaderIdx++;
-
-        EmitStatus("Waiting for the API response from Modrinth...");
 
         List<string> hashes;
         if (forceModLoaderCheck && loader is { } filter)
@@ -183,8 +179,6 @@ public sealed class ModrinthCheckUpdate : FlintTask
     private async Task CheckVersionsResponse(Dictionary<string, ModrinthVersion> entries, ModLoaderType? loader,
         CancellationToken cancellationToken)
     {
-        EmitStatus("Parsing the API response from Modrinth...");
-
         {
             var processed = new List<string>();
             foreach (var (hash, resource) in _mappings)
@@ -260,7 +254,6 @@ public sealed class ModrinthCheckUpdate : FlintTask
     {
         if (_mappings.Count == 0)
         {
-            EmitSucceeded();
             return;
         }
 
@@ -280,10 +273,8 @@ public sealed class ModrinthCheckUpdate : FlintTask
 
         foreach (var resource in _mappings.Values)
         {
-            CheckFailed?.Invoke(resource,
-                "No valid version found for this resource. It's probably unavailable for the current game version / mod loader.");
+            _failures.Add((resource,
+                "No valid version found for this resource. It's probably unavailable for the current game version / mod loader."));
         }
-
-        EmitSucceeded();
     }
 }

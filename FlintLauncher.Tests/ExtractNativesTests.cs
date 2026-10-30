@@ -20,7 +20,6 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using TruePath;
 using TruePath.SystemIo;
@@ -56,17 +55,16 @@ public class ExtractNativesTests
 
     /// <summary>Keeps the launch "running" so the steps' FinalizeStep can be observed while
     /// the extracted/merged artifacts still exist.</summary>
-    private sealed class GateStep(LaunchTask parent) : LaunchStep(parent)
+    private sealed class GateStep(LaunchTask parent) : AwaitedStep(parent)
     {
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public bool Started { get; private set; }
 
-        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+        protected override async Task RunAsync(CancellationToken cancellationToken)
         {
             Started = true;
             await Release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
-            EmitSucceeded();
         }
 
         public override bool CanAbort() => true;
@@ -100,7 +98,8 @@ public class ExtractNativesTests
         task.AppendStep(new ExtractNatives(task));
         task.AppendStep(gate);
 
-        var run = task.StartAsync();
+        LaunchTask.LaunchOutcome outcome;
+        var run = task.RunToCompletionAsync(TestContext.Current.CancellationToken);
         while (!gate.Started)
         {
             await Task.Delay(10);
@@ -116,9 +115,9 @@ public class ExtractNativesTests
         Assert.Equal("meta", await (natives / "META-INF/MANIFEST.MF").ReadAllTextAsync());
 
         gate.Release.TrySetResult();
-        await run;
+        outcome = await run;
 
-        Assert.Equal(TaskState.Succeeded, task.State);
+        Assert.True(outcome.Succeeded, outcome.FailReason);
         // ExtractNatives::finalize removes the whole natives folder again
         Assert.False(natives.ExistsDirectory());
     }
@@ -131,9 +130,9 @@ public class ExtractNativesTests
         var task = LaunchTask.Create(instance, fixture.CreateServices());
         task.AppendStep(new ExtractNatives(task));
 
-        await task.StartAsync();
+        var outcome = await task.RunToCompletionAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(TaskState.Succeeded, task.State);
+        Assert.True(outcome.Succeeded, outcome.FailReason);
         Assert.False(instance.GetNativePath().ExistsDirectory());
     }
 
@@ -191,7 +190,8 @@ public class ExtractNativesTests
         task.AppendStep(new ModMinecraftJar(task));
         task.AppendStep(gate);
 
-        var run = task.StartAsync();
+        LaunchTask.LaunchOutcome outcome;
+        var run = task.RunToCompletionAsync(TestContext.Current.CancellationToken);
         while (!gate.Started)
         {
             await Task.Delay(10);
@@ -211,9 +211,9 @@ public class ExtractNativesTests
         }
 
         gate.Release.TrySetResult();
-        await run;
+        outcome = await run;
 
-        Assert.Equal(TaskState.Succeeded, task.State);
+        Assert.True(outcome.Succeeded, outcome.FailReason);
         // ModMinecraftJar::finalize removes the temporary stripped jar
         Assert.False(finalJar.ExistsFile());
     }
@@ -226,9 +226,9 @@ public class ExtractNativesTests
         var task = LaunchTask.Create(instance, fixture.CreateServices());
         task.AppendStep(new ModMinecraftJar(task));
 
-        await task.StartAsync();
+        var outcome = await task.RunToCompletionAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(TaskState.Succeeded, task.State);
+        Assert.True(outcome.Succeeded, outcome.FailReason);
         Assert.False(instance.BinRoot().ExistsDirectory());
     }
 
@@ -267,9 +267,9 @@ public class ExtractNativesTests
         var task = LaunchTask.Create(instance, services);
         task.AppendStep(new ReconstructAssets(task));
 
-        await task.StartAsync();
+        var outcome = await task.RunToCompletionAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(TaskState.Succeeded, task.State);
+        Assert.True(outcome.Succeeded, outcome.FailReason);
         var rebuilt = assetsRoot / "virtual" / assetsId / "icon.png";
         Assert.True(rebuilt.ExistsFile());
         Assert.Equal("virtual asset payload", await rebuilt.ReadAllTextAsync());
@@ -360,16 +360,17 @@ public class ExtractNativesTests
         try
         {
             var task = LaunchTask.Create(instance, instance.LaunchServices);
-            // the update tasks run as plain FlintTasks inside the TaskStepWrapper (which
-            // gates on the progressReportingRequest/proceed handshake)
+            // the update units run inside the TaskStepWrapper (which gates on the
+            // progressReportingRequest/proceed handshake)
             task.RequestProgress += _ => task.Proceed();
-            task.AppendStep(new TaskStepWrapper(task, new AssetUpdateTask(instance)));
+            task.AppendStep(new TaskStepWrapper(task,
+                cancellationToken => AssetUpdateTask.RunAsync(instance, cancellationToken)));
 
-            await task.StartAsync();
+            var outcome = await task.RunToCompletionAsync(TestContext.Current.CancellationToken);
 
-            Assert.True(task.WasSuccessful, task.FailReason + " | indexFile=" +
-                                            File.Exists(Path.Combine(assetsRoot.Root, "indexes", assetsId + ".json")) +
-                                            " objectFile=" + File.Exists(Path.Combine(assetsRoot.Root, "objects", objectHash[..2], objectHash)));
+            Assert.True(outcome.Succeeded, outcome.FailReason + " | indexFile=" +
+                                           File.Exists(Path.Combine(assetsRoot.Root, "indexes", assetsId + ".json")) +
+                                           " objectFile=" + File.Exists(Path.Combine(assetsRoot.Root, "objects", objectHash[..2], objectHash)));
         }
         finally
         {

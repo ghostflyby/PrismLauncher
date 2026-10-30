@@ -128,11 +128,11 @@ public class LaunchProfile : ProblemProvider
 
     public void ApplyMinecraftVersion(string id) => ApplyString(id, ref _minecraftVersion);
 
-    public void ApplyAppletClass(string appletClass) => ApplyString(appletClass, ref this._appletClass);
+    public void ApplyAppletClass(string appletClass) => ApplyString(appletClass, ref _appletClass);
 
-    public void ApplyMainClass(string mainClass) => ApplyString(mainClass, ref this._mainClass);
+    public void ApplyMainClass(string mainClass) => ApplyString(mainClass, ref _mainClass);
 
-    public void ApplyMinecraftArguments(string minecraftArguments) => ApplyString(minecraftArguments, ref this._minecraftArguments);
+    public void ApplyMinecraftArguments(string minecraftArguments) => ApplyString(minecraftArguments, ref _minecraftArguments);
 
     public void ApplyAddnJvmArguments(IReadOnlyList<string> addnJvmArguments) => _addnJvmArguments.AddRange(addnJvmArguments);
 
@@ -155,7 +155,7 @@ public class LaunchProfile : ProblemProvider
     {
         // if the applied tweakers override an existing one, skip it. this effectively moves it later in the sequence
         var newTweakers = new List<string>();
-        foreach (var tweaker in this._tweakers)
+        foreach (var tweaker in _tweakers)
         {
             if (tweakers.Contains(tweaker))
             {
@@ -167,7 +167,7 @@ public class LaunchProfile : ProblemProvider
 
         // then just append the new tweakers (or moved original ones)
         newTweakers.AddRange(tweakers);
-        this._tweakers = newTweakers;
+        _tweakers = newTweakers;
     }
 
     public void ApplyJarMods(IReadOnlyList<Library> jarMods) => _jarMods.AddRange(jarMods);

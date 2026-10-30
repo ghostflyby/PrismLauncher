@@ -14,8 +14,6 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Helpers;
 using FlintLauncher.Core.ModPlatform.Modrinth;
-using FlintLauncher.Core.Tasks;
-using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using FlintLauncher.Web.Models;
@@ -86,21 +84,24 @@ public static class ExportEndpoints
                     ? default
                     : instanceRoot / $"{baseName}.{extension}";
 
-                FlintTask task;
                 var kind = format switch
                 {
                     "modrinth" => "export-modrinth",
                     "flame" => "export-flame",
                     _ => "export-modlist",
                 };
+                Func<CancellationToken, Task> export;
                 switch (format)
                 {
                     case "modrinth":
-                        task = new ModrinthPackExportTask(name, versionId, request.Summary ?? "",
-                            optionalFiles: true, instance, output, modrinth, http);
+                    {
+                        export = token => ModrinthPackExportTask.ExportAsync(name, versionId,
+                            request.Summary ?? "", optionalFiles: true, instance, output, modrinth, http, token);
                         break;
+                    }
                     case "flame":
-                        task = new FlamePackExportTask(new FlamePackExportTask.Options
+                    {
+                        var options = new FlamePackExportTask.Options
                         {
                             Name = name,
                             Version = versionId,
@@ -110,8 +111,10 @@ public static class ExportEndpoints
                             Output = output,
                             Http = http,
                             Flame = flame,
-                        });
+                        };
+                        export = token => FlamePackExportTask.ExportAsync(options, null, token);
                         break;
+                    }
                     default:
                     {
                         if (!ModListExportTask.TryParseFormat(request.Format2, out var modlistFormat,
@@ -120,18 +123,22 @@ public static class ExportEndpoints
                             return ApiJson.Error("invalid_body",
                                 "'format2' must be one of: html, markdown, plain, json, csv", 400);
                         }
+
                         output = instanceRoot / $"{baseName}-mods.{modlistExtension}";
-                        task = new ModListExportTask(instance, output, modlistFormat,
-                            OptionalData.Version | OptionalData.FileName);
+                        var modlistOutput = output;
+                        export = token => ModListExportTask.ExportAsync(instance, modlistOutput,
+                            modlistFormat, OptionalData.Version | OptionalData.FileName, token);
                         break;
                     }
                 }
 
-                var entry = registry.Register(kind, task, instanceId: instance.Id());
                 // publish the written file path through the task view's optional result once
-                // the task actually succeeded (a failed export has no artifact)
-                task.Succeeded += _ => entry.Result = new TaskResultView(null, null, output);
-                _ = task.StartAsync(); // 202: the export runs in the background
+                // the export actually succeeded (a failed export has no artifact)
+                var entry = registry.Start(kind,
+                    handle => handle.RunAsync(token => export(token),
+                        () => handle.Result = new TaskResultView(null, null, output)),
+                    instance.Id());
+
                 return Results.Accepted($"/api/v1/tasks/{entry.Id}", new TaskAcceptedResponse(entry.Id));
             }
             finally

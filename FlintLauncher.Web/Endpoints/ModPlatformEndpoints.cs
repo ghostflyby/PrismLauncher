@@ -214,7 +214,7 @@ public static class ModPlatformEndpoints
         api.MapGet("/modplatform/{provider}/mods/{projectId}/changelog",
             async Task<IResult> (string provider, string projectId, FlameClient flame, HttpClient http,
                 CancellationToken cancellationToken, string fileId = "") =>
-        {
+            {
                 if (!ModPlatformTasks.TryParseProvider(provider, out var parsedProvider))
                 {
                     return ApiJson.Error("unknown_provider", "provider must be 'modrinth' or 'flame'", 400);
@@ -410,12 +410,12 @@ public static class ModPlatformEndpoints
                 var task = new ModInstallTask(instance, instance.LoaderModList(), requests,
                     mcVersion, profile.GetSupportedModLoaders() ?? ModLoaderType.None,
                     modrinth, http, flame);
-                var entry = registry.Register("mods-install", task, instanceId: instance.Id());
-                // the result payload lists the installed entries (selected + dependencies);
-                // published on terminal events so a download failure still shows what landed
-                task.Succeeded += _ => entry.Result = task.BuildResult();
-                task.Failed += (_, _) => entry.Result = task.BuildResult();
-                _ = task.StartAsync();
+
+                // the payload is the install's own result; a failed install has none, which is
+                // what the failure branch means
+                var entry = registry.Start("mods-install", handle => handle.RunAsync(async token => handle.Result = await task.RunAsync(token).ConfigureAwait(false)),
+                    instance.Id());
+
                 return Results.Accepted($"/api/v1/tasks/{entry.Id}", new TaskAcceptedResponse(entry.Id));
             }
             finally
@@ -448,12 +448,11 @@ public static class ModPlatformEndpoints
                             config.Current.ModDownload.ModUpdateReleaseTypes ?? "[]"));
 
                 var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, modrinth, http, flame, releaseTypes);
-                var entry = registry.Register("mods-update", task, instanceId: instance.Id());
-                // the result payload carries the found/applied updates; it is published once
-                // the task reaches a terminal state (the check pass fills it before applying)
-                task.Succeeded += _ => entry.Result = task.BuildResult();
-                task.Failed += (_, _) => entry.Result = task.BuildResult();
-                _ = task.StartAsync();
+
+                // the payload is the check's own result; a failed check has none
+                var entry = registry.Start("mods-update", handle => handle.RunAsync(async token => handle.Result = await task.RunAsync(token).ConfigureAwait(false)),
+                    instance.Id());
+
                 return Results.Accepted($"/api/v1/tasks/{entry.Id}", new TaskAcceptedResponse(entry.Id));
             }
             finally
@@ -626,12 +625,12 @@ public static class ModPlatformEndpoints
         try
         {
             doc = await flame.Search.Query(
-                classId: FlameMod.GetClassId(resourceType),
-                offset: offset < 0 ? 0 : offset,
-                searchFilter: string.IsNullOrWhiteSpace(query) ? null : query,
-                sortField: (int)sorting.Index,
-                modLoaderTypes: loaderIds,
-                gameVersion: string.IsNullOrWhiteSpace(version) ? null : version)
+                    classId: FlameMod.GetClassId(resourceType),
+                    offset: offset < 0 ? 0 : offset,
+                    searchFilter: string.IsNullOrWhiteSpace(query) ? null : query,
+                    sortField: (int)sorting.Index,
+                    modLoaderTypes: loaderIds,
+                    gameVersion: string.IsNullOrWhiteSpace(version) ? null : version)
                 .SendTo(http, cancellationToken);
         }
         catch (Exception e) when (e is FlameApiException)

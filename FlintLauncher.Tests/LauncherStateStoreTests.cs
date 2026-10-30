@@ -192,9 +192,12 @@ public class LaunchControllerOfflineNameStateTests
             WantedLaunchMode = LaunchMode.Offline,
             Services = fixture.CreateServices(),
         };
-        await first.StartAsync();
+        using var firstRun = new CancellationTokenSource();
+        var firstTask = first.RunAsync(firstRun.Token);
         Assert.Equal("Player", await WaitForOfflineName(fixture, expected: "Player"));
         first.Abort();
+        await firstRun.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => firstTask);
 
         // the handler (dialog) path: the suggestion prefills from the stored name (C++
         // LastOfflinePlayerName parity) and the picked name is written back
@@ -210,10 +213,13 @@ public class LaunchControllerOfflineNameStateTests
                 return "HandlerPicked";
             },
         };
-        await second.StartAsync();
+        using var secondRun = new CancellationTokenSource();
+        var secondTask = second.RunAsync(secondRun.Token);
         Assert.Equal("Player", capturedSuggestion);
         Assert.Equal("HandlerPicked", await WaitForOfflineName(fixture, expected: "HandlerPicked"));
         second.Abort();
+        await secondRun.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => secondTask);
     }
 
     private static async Task<string> WaitForOfflineName(LaunchFixture fixture, string expected)

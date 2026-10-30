@@ -36,13 +36,13 @@ using JdkFind;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
+public sealed class CheckJava(LaunchTask parent) : AwaitedStep(parent)
 {
     private string _javaPath = "";
     private string _javaSignature = "";
     private string _detectKey = "";
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         var instance = Parent.Instance;
         var settings = instance.Settings;
@@ -69,8 +69,7 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
                             "the settings.", MessageLevel.Warning);
             }
 
-            EmitFailed("Java path is not valid.");
-            return;
+            throw new InvalidOperationException("Java path is not valid.");
         }
 
         EmitLogLine("Java path is:\n  " + _javaPath, MessageLevel.Launcher);
@@ -99,7 +98,6 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
 
         PrintJavaInfo(stored.Version, stored.Architecture, stored.RealArchitecture, stored.Vendor);
         Parent.Instance.UpdateRuntimeContext();
-        EmitSucceeded();
     }
 
     /// <summary>Probes the selected binary through JdkFind.FromExecutable: path-keyed, the
@@ -123,8 +121,7 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
             }
 
             EmitLogLine("\nCheck your Java settings.", MessageLevel.Launcher);
-            EmitFailed("Could not start java!");
-            return;
+            throw new InvalidOperationException("Could not start java!");
         }
 
         var osArch = executable.Architecture;
@@ -136,7 +133,6 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
             EmitLogLine($"java.version=\"{version}\" java.vendor=\"{vendor}\" os.arch=\"{osArch}\"", MessageLevel.Warning);
             EmitLogLine("\nMinecraft might not start properly.", MessageLevel.Launcher);
             Parent.Instance.UpdateRuntimeContext();
-            EmitSucceeded();
             return;
         }
 
@@ -162,7 +158,6 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
             return state with { Java = state.Java with { Detections = detections } };
         });
         Parent.Instance.UpdateRuntimeContext();
-        EmitSucceeded();
     }
 
     private void PrintJavaInfo(string version, string architecture, string realArchitecture, string vendor)

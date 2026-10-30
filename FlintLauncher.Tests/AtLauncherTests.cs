@@ -14,7 +14,6 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
 using TruePath;
 using Xunit;
 
@@ -81,7 +80,8 @@ public class AtLauncherTests : IDisposable
             .ToList();
     }
 
-    private async Task<AtLauncherPackInstallTask> RunInstall(AtlPackFixture fixture,
+    /// <summary>Runs the install and returns the reason it failed, or null when it succeeded.</summary>
+    private async Task<(AtLauncherPackInstallTask Task, string? Failure)> RunInstall(AtlPackFixture fixture,
         IReadOnlyDictionary<string, bool>? optionalSelection = null, string name = "ATL Imported",
         Func<string, string, string, string?>? recommendedLookup = null)
     {
@@ -98,8 +98,15 @@ public class AtLauncherTests : IDisposable
         };
         task.SetName(name);
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
-        return task;
+        try
+        {
+            await wrapped(TestContext.Current.CancellationToken);
+            return (task, null);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            return (task, e.Message);
+        }
     }
 
     // -------------------------------------------------------------------- index
@@ -214,9 +221,9 @@ public class AtLauncherTests : IDisposable
     public async Task Install_EndToEnd_CreatesInstanceWithModLayout()
     {
         var fixture = AtlPackFixture.Create();
-        var task = await RunInstall(fixture);
+        var (_, failure) = await RunInstall(fixture);
+        Assert.Null(failure);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
 
         var staging = Path.Combine(_root, "instances", "ATL Imported");
         // the configs zip landed in minecraft/ (sha1-verified download)
@@ -261,9 +268,9 @@ public class AtLauncherTests : IDisposable
     public async Task Install_FabricLoader_SetsFabricComponent()
     {
         var fixture = AtlPackFixture.Create("""{"type":"fabric","metadata":{"loader":"0.14.21","latest":false,"recommended":false}}""");
-        var task = await RunInstall(fixture, name: "ATL Fabric");
+        var (_, failure) = await RunInstall(fixture, name: "ATL Fabric");
+        Assert.Null(failure);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         var staging = Path.Combine(_root, "instances", "ATL Fabric");
         var components = Components(staging);
         Assert.Contains(components, c => c is { Uid: "net.minecraft", Version: "1.20.1" });
@@ -274,9 +281,9 @@ public class AtLauncherTests : IDisposable
     public async Task Install_ForgeLoader_SetsForgeComponent()
     {
         var fixture = AtlPackFixture.Create("""{"type":"forge","metadata":{"version":"40.1.0","latest":false,"recommended":false}}""");
-        var task = await RunInstall(fixture, name: "ATL Forge");
+        var (_, failure) = await RunInstall(fixture, name: "ATL Forge");
+        Assert.Null(failure);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         var staging = Path.Combine(_root, "instances", "ATL Forge");
         using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
@@ -299,9 +306,8 @@ public class AtLauncherTests : IDisposable
         var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api);
         task.SetName("ATL NoConfigs");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await wrapped(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         var staging = Path.Combine(_root, "instances", "ATL NoConfigs");
         Assert.True(File.Exists(Path.Combine(staging, "minecraft", "mods", "required.jar")));
         Assert.False(File.Exists(Path.Combine(staging, "minecraft", "config", "test.cfg")));
@@ -320,9 +326,8 @@ public class AtLauncherTests : IDisposable
         var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api);
         task.SetName("ATL BadSha");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await Assert.ThrowsAnyAsync<Exception>(() => wrapped(TestContext.Current.CancellationToken));
 
-        Assert.Equal(TaskState.Failed, task.State);
         // nothing was installed
         Assert.False(File.Exists(Path.Combine(_root, "instances", "ATL BadSha", "minecraft", "mods", "required.jar")));
     }
@@ -344,9 +349,7 @@ public class AtLauncherTests : IDisposable
         var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api);
         task.SetName("ATL BadMd5");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
-
-        Assert.Equal(TaskState.Failed, task.State);
+        await Assert.ThrowsAnyAsync<Exception>(() => wrapped(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -367,9 +370,8 @@ public class AtLauncherTests : IDisposable
         };
         task.SetName("ATL Cached");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await wrapped(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         Assert.True(Directory.GetFiles(cacheDir, "*", SearchOption.AllDirectories).Any(),
             "the configs zip should have been cached");
         var staging = Path.Combine(_root, "instances", "ATL Cached");
@@ -380,10 +382,9 @@ public class AtLauncherTests : IDisposable
     public async Task Install_UnknownLoaderType_Fails()
     {
         var fixture = AtlPackFixture.Create("""{"type":"unknownloader","metadata":{"version":"1"}}""");
-        var task = await RunInstall(fixture, name: "ATL UnknownLoader");
+        var (_, failure) = await RunInstall(fixture, name: "ATL UnknownLoader");
 
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("Unknown loader type", task.FailReason);
+        Assert.Contains("Unknown loader type", failure);
     }
 
     [Fact]
@@ -397,10 +398,8 @@ public class AtLauncherTests : IDisposable
         var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api);
         task.SetName("ATL BadJson");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
-
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("Could not understand pack manifest", task.FailReason);
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() => wrapped(TestContext.Current.CancellationToken));
+        Assert.Contains("Could not understand pack manifest", ex.Message);
     }
 
     // ------------------------------------------------------- loader version hooks
@@ -409,10 +408,9 @@ public class AtLauncherTests : IDisposable
     public async Task Install_RecommendedLoader_WithoutLookupHook_Fails()
     {
         var fixture = AtlPackFixture.Create("""{"type":"forge","metadata":{"version":"","recommended":true,"latest":false}}""");
-        var task = await RunInstall(fixture, name: "ATL Recommended");
+        var (_, failure) = await RunInstall(fixture, name: "ATL Recommended");
 
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Contains("Failed to get local metadata index for net.minecraftforge", task.FailReason);
+        Assert.Contains("Failed to get local metadata index for net.minecraftforge", failure);
     }
 
     [Fact]
@@ -420,7 +418,7 @@ public class AtLauncherTests : IDisposable
     {
         var fixture = AtlPackFixture.Create("""{"type":"forge","metadata":{"version":"","recommended":true,"latest":false}}""");
         // the lookup hook is per-task (DI): set through RunInstall's initializer below
-        var task = await RunInstall(fixture, name: "ATL Recommended2", recommendedLookup: (uid, loaderType, mcVersion) =>
+        var (_, _) = await RunInstall(fixture, name: "ATL Recommended2", recommendedLookup: (uid, loaderType, mcVersion) =>
         {
             Assert.Equal("net.minecraftforge", uid);
             Assert.Equal("forge", loaderType);
@@ -428,7 +426,6 @@ public class AtLauncherTests : IDisposable
             return "40.2.0";
         });
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         var staging = Path.Combine(_root, "instances", "ATL Recommended2");
         using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
@@ -454,9 +451,8 @@ public class AtLauncherTests : IDisposable
         task.SetName("ATL Choose");
         fixture.Register(_server);
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await wrapped(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         var staging = Path.Combine(_root, "instances", "ATL Choose");
         using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(staging, "mmc-pack.json")));
         Assert.Contains(doc.RootElement.GetProperty("components").EnumerateArray(),
@@ -481,9 +477,8 @@ public class AtLauncherTests : IDisposable
         var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api);
         task.SetName("ATL MainClass");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await wrapped(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         var staging = Path.Combine(_root, "instances", "ATL MainClass");
         var patch = Directory.GetFiles(Path.Combine(staging, "patches"))
             .First(f => Path.GetFileName(f).StartsWith("org.multimc.atlauncher."));
@@ -506,9 +501,8 @@ public class AtLauncherTests : IDisposable
         var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api);
         task.SetName("ATL DepMissing");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await wrapped(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         var staging = Path.Combine(_root, "instances", "ATL DepMissing");
         Assert.DoesNotContain(Directory.GetFiles(Path.Combine(staging, "patches")),
             f => Path.GetFileName(f).StartsWith("org.multimc.atlauncher."));
@@ -533,9 +527,8 @@ public class AtLauncherTests : IDisposable
         };
         task.SetName("ATL Message");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await wrapped(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         Assert.Equal("Welcome!", displayed);
     }
 }

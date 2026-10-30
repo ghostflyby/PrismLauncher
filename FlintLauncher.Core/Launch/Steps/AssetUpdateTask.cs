@@ -16,19 +16,17 @@ using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
+public static class AssetUpdateTask
 {
-    private NetJob? _downloadJob;
-
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Downloads the assets index and the objects it lists. Returning is success;
+    /// any other exception is a failure whose message is the reason.</summary>
+    public static async Task RunAsync(MinecraftInstance inst, CancellationToken cancellationToken)
     {
-        EmitStatus("Updating assets index...");
         var components = inst.GetPackProfile();
         var profile = components.GetProfile();
         if (profile is null)
         {
-            EmitFailed("The instance profile is missing.");
-            return;
+            throw new InvalidOperationException("The instance profile is missing.");
         }
 
         var assets = profile.GetMinecraftAssets();
@@ -41,7 +39,6 @@ public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
             $"no meta cache stamped on instance '{inst.Name()}' — the composition root must inject it");
         var entry = metacache.ResolveEntry("asset_indexes", localPath);
         entry.IsStale = true;
-        var job = new NetJob($"Asset index for {inst.Name()}");
 
         // Net::ApiRequest::makeCached(indexUrl, entry) — no extra options upstream
         var dl = HttpDownloadTask.Cached(metacache, new Uri(indexUrl), entry);
@@ -50,27 +47,18 @@ public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
             dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, assets.Sha1));
         }
 
-        job.AddDownload(dl);
+        await dl.DownloadAsync(null, cancellationToken).ConfigureAwait(false);
 
-        _downloadJob = job;
-        await job.StartAsync(cancellationToken).ConfigureAwait(false);
-        if (!job.WasSuccessful)
-        {
-            EmitFailed($"Failed to download the assets index:\n{job.FailReason}");
-            return;
-        }
-
-        await AssetIndexFinished(cancellationToken).ConfigureAwait(false);
+        await AssetIndexFinished(inst, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task AssetIndexFinished(CancellationToken cancellationToken)
+    private static async Task AssetIndexFinished(MinecraftInstance inst, CancellationToken cancellationToken)
     {
         var components = inst.GetPackProfile();
         var profile = components.GetProfile();
         if (profile is null)
         {
-            EmitFailed("The instance profile is missing.");
-            return;
+            throw new InvalidOperationException("The instance profile is missing.");
         }
 
         var assets = profile.GetMinecraftAssets();
@@ -85,39 +73,25 @@ public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
                 $"no meta cache stamped on instance '{inst.Name()}' — the composition root must inject it");
             var entry = metacache.ResolveEntry("asset_indexes", assets.Id + ".json");
             metacache.EvictEntry(entry);
-            EmitFailed("Failed to read the assets index!");
-            return;
+            throw new InvalidOperationException("Failed to read the assets index!");
         }
 
         // the object downloads ride the instance's cache plane — the client the index itself
         // came through
         var cache = inst.MetaCache ?? throw new InvalidOperationException(
             $"no meta cache stamped on instance '{inst.Name()}' — the composition root must inject it");
-        var job = index.GetDownloadJob(ResourceUrl(), inst.AssetsRoot, cache.Http);
-        if (job is not null)
+        var downloads = index.GetDownloadJob(ResourceUrl(inst), inst.AssetsRoot, cache.Http);
+        if (downloads is not null)
         {
-            var resourceUrl = ResourceUrl();
-            var source = "Mojang";
-            if (resourceUrl != FlintConfig.Default.DefaultResourceBase)
-            {
-                source = new Uri(resourceUrl).Host;
-            }
-
-            EmitStatus($"Getting the asset files from {source}...");
-            _downloadJob = job;
-            await job.StartAsync(cancellationToken).ConfigureAwait(false);
-            if (!job.WasSuccessful)
-            {
-                EmitFailed($"Failed to download assets:\n{job.FailReason}");
-                return;
-            }
+            await TaskWork.RunAllAsync(downloads,
+                    (download, token) => download.DownloadAsync(null, token), maxConcurrent: 6,
+                    cancellationToken)
+                .ConfigureAwait(false);
         }
-
-        EmitSucceeded();
     }
 
     /// <summary>Port of resourceUrl().</summary>
-    private string ResourceUrl()
+    private static string ResourceUrl(MinecraftInstance inst)
     {
         var urlOverride = inst.LaunchServices?.ResourceUrlOverride;
         if (!string.IsNullOrEmpty(urlOverride))
@@ -126,18 +100,5 @@ public sealed class AssetUpdateTask(MinecraftInstance inst) : FlintTask
         }
 
         return FlintConfig.Default.DefaultResourceBase;
-    }
-
-    public bool CanAbort() => true;
-
-    public override void Abort()
-    {
-        if (_downloadJob is not null && _downloadJob.IsRunning)
-        {
-            _downloadJob.Abort();
-        }
-
-        // Prematurely aborted AssetUpdateTask
-        base.Abort();
     }
 }

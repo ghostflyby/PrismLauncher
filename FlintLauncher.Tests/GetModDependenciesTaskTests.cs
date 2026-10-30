@@ -14,13 +14,11 @@ using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Dependencies;
-using FlintLauncher.Core.ModPlatform.Flame;
+using FlintLauncher.ExternalApi.Flame;
+using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
 using Xunit;
 using PackwizModel = FlintLauncher.Core.ModPlatform.Packwiz.Packwiz;
-using FlintLauncher.ExternalApi;
-using FlintLauncher.ExternalApi.Flame;
-using FlintLauncher.ExternalApi.Modrinth;
 
 namespace FlintLauncher.Tests;
 
@@ -167,9 +165,7 @@ public class GetModDependenciesTaskTests : IDisposable
 
         var task = new GetModDependenciesTask(instance, model,
             [new GetModDependenciesTask.PackDependency(packA, verA)], _modrinth, _http);
-        await task.StartAsync();
-
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await task.RunAsync(CancellationToken.None);
 
         // only B was resolved: A was selected (not a dependency), C is installed locally,
         // D is optional
@@ -216,9 +212,7 @@ public class GetModDependenciesTaskTests : IDisposable
 
         var task = new GetModDependenciesTask(instance, model,
             [new GetModDependenciesTask.PackDependency(packA, verA)], _modrinth, _http);
-        await task.StartAsync();
-
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await task.RunAsync(CancellationToken.None);
 
         var dep = Assert.Single(task.GetDependencies());
         // the pack adopted the resolved version's project id and fetched its info
@@ -253,9 +247,7 @@ public class GetModDependenciesTaskTests : IDisposable
 
         var task = new GetModDependenciesTask(instance, model,
             [new GetModDependenciesTask.PackDependency(packA, verA)], _modrinth, _http);
-        await task.StartAsync();
-
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await task.RunAsync(CancellationToken.None);
         Assert.Single(task.GetDependencies());
 
         // the dependency search carried the instance's game version + loader
@@ -320,9 +312,7 @@ public class GetModDependenciesFlameTests : IDisposable
 
         var task = new GetModDependenciesTask(instance, model,
             [new GetModDependenciesTask.PackDependency(packA, verA)], modrinth: TestModrinthApi.Unreachable().Client, http: TestModrinthApi.Unreachable().Http, flame: _flameApi);
-        await task.StartAsync();
-
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await task.RunAsync(CancellationToken.None);
 
         var dep = Assert.Single(task.GetDependencies());
         Assert.Equal("789", dep.Pack.AddonId);

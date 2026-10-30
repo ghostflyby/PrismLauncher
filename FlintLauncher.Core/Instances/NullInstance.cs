@@ -25,7 +25,6 @@
 
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Settings;
-using FlintLauncher.Core.Tasks;
 using TruePath;
 
 namespace FlintLauncher.Core.Instances;
@@ -50,7 +49,7 @@ public class NullInstance : BaseInstance
 
     public override LaunchTask? CreateLaunchTask(AuthSession? account, MinecraftTarget? targetToJoin) => null;
 
-    public override List<FlintTask> CreateUpdateTask() => [];
+    public override List<Func<CancellationToken, Task>> CreateUpdateTask() => [];
 
     public override ProcessEnvironment CreateEnvironment() => new();
 

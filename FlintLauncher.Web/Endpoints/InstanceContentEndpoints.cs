@@ -13,7 +13,6 @@ using FlintLauncher.Core.Minecraft.GameOptions;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Core.Screenshots;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
 using FlintLauncher.Web.Services;
@@ -684,20 +683,28 @@ public static class InstanceContentEndpoints
                 var baseUrl = Environment.GetEnvironmentVariable("FLINT_IMGUR_BASE_URL");
                 var clientId = Environment.GetEnvironmentVariable("FLINT_IMGUR_CLIENT_ID");
 
-                // ImgurAPI::makeUpload per file; more than one also runs ImgurAPI::makeAlbum
-                var task = new SequentialTask("Uploading screenshots");
-                foreach (var shot in shots)
-                {
-                    task.AddTask(imgur.MakeUpload(shot, baseUrl, clientId));
-                }
+                // ImgurAPI::makeUpload per file; more than one also runs ImgurAPI::makeAlbum.
+                // Sequential by design: the album needs the delete hashes the uploads leave.
+                var uploads = shots.Select(shot => imgur.MakeUpload(shot, baseUrl, clientId)).ToArray();
+                var album = shots.Count > 1
+                    ? imgur.MakeAlbum(new ImgurApi.AlbumResult(), shots, baseUrl, clientId)
+                    : null;
 
-                if (shots.Count > 1)
+                var entry = registry.Start("screenshots-upload", handle => handle.RunAsync(async ct =>
                 {
-                    task.AddTask(imgur.MakeAlbum(new ImgurApi.AlbumResult(), shots, baseUrl, clientId));
-                }
+                    for (var i = 0; i < uploads.Length; i++)
+                    {
+                        handle.SetProgress(i, uploads.Length + (album is null ? 0 : 1));
+                        await uploads[i].UploadAsync(ct).ConfigureAwait(false);
+                    }
 
-                var entry = registry.Register("screenshots-upload", task, instanceId: instance.Id());
-                _ = task.StartAsync(); // 202: network uploads run in the background
+                    if (album is not null)
+                    {
+                        handle.SetProgress(uploads.Length, uploads.Length + 1);
+                        await album.CreateAsync(ct).ConfigureAwait(false);
+                    }
+                }), instance.Id());
+
                 return Results.Accepted($"/api/v1/tasks/{entry.Id}", new TaskAcceptedResponse(entry.Id));
             }
             finally

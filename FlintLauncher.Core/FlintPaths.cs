@@ -169,7 +169,6 @@ public sealed record FlintPaths
     private static AbsolutePath XdgBase(string envVar)
     {
         var env = Environment.GetEnvironmentVariable(envVar);
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         return string.IsNullOrWhiteSpace(env)
             ? new AbsolutePath()
             : new AbsolutePath(env);

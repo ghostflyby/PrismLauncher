@@ -83,9 +83,7 @@ public class LegacyFtbTests : IDisposable
                                 """;
 
         var task = CreateFetchTask();
-        await task.StartAsync();
-
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await task.FetchAsync(CancellationToken.None);
 
         var publicPack = Assert.Single(task.PublicPacks);
         Assert.Equal(PackType.Public, publicPack.Type);
@@ -123,9 +121,8 @@ public class LegacyFtbTests : IDisposable
         _server.ThirdPartyXml = """<modpacks></modpacks>""";
 
         var task = CreateFetchTask();
-        await task.StartAsync();
+        await task.FetchAsync(CancellationToken.None);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         var pack = Assert.Single(task.PublicPacks);
         Assert.True(pack.Bugged);
         Assert.True(pack.Broken);
@@ -139,12 +136,11 @@ public class LegacyFtbTests : IDisposable
         _server.ThirdPartyXml = """<modpacks></modpacks>""";
 
         var task = CreateFetchTask();
-        await task.StartAsync();
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => task.FetchAsync(CancellationToken.None));
 
-        Assert.False(task.WasSuccessful);
-        Assert.Contains("Failed to download some pack lists:", task.FailReason);
-        Assert.Contains("Public Packs", task.FailReason);
-        Assert.DoesNotContain("Third Party Packs", task.FailReason);
+        Assert.Contains("Failed to download some pack lists:", ex.Message);
+        Assert.Contains("Public Packs", ex.Message);
+        Assert.DoesNotContain("Third Party Packs", ex.Message);
     }
 
     [Fact]
@@ -252,9 +248,8 @@ public class LegacyFtbTests : IDisposable
         var task = new LegacyFtbPackInstallTask(pack, "1.2.3", TestNet.Http) { CdnBaseUrl = _server.Url + "/" };
         task.SetName("Legacy FTB Forge");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await wrapped(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
 
         var staging = Path.Combine(_root, "instances", "Legacy FTB Forge");
         // the minecraft folder of the archive became the instance's minecraft dir
@@ -290,9 +285,8 @@ public class LegacyFtbTests : IDisposable
         var task = new LegacyFtbPackInstallTask(pack, "2.0.0", TestNet.Http) { CdnBaseUrl = _server.Url + "/" };
         task.SetName("Legacy FTB JarMods");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await wrapped(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
 
         var staging = Path.Combine(_root, "instances", "Legacy FTB JarMods");
         Assert.Equal("old mod payload",
@@ -318,9 +312,8 @@ public class LegacyFtbTests : IDisposable
         var task = new LegacyFtbPackInstallTask(pack, "1.0", TestNet.Http) { CdnBaseUrl = _server.Url + "/" };
         task.SetName("Legacy FTB Private");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await wrapped(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         Assert.Equal("privatepacks/SecretPack/1_0/SecretPack-1_0.zip", _server.LastArchivePath);
     }
 
@@ -339,10 +332,8 @@ public class LegacyFtbTests : IDisposable
         var task = new LegacyFtbPackInstallTask(pack, "0.1", TestNet.Http) { CdnBaseUrl = _server.Url + "/" };
         task.SetName("Legacy FTB Bare");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
-
-        Assert.False(task.WasSuccessful);
-        Assert.Equal("No installation method found!", task.FailReason);
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() => wrapped(TestContext.Current.CancellationToken));
+        Assert.Equal("No installation method found!", ex.Message);
     }
 }
 

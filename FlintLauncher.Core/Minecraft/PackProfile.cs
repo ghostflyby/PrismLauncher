@@ -127,6 +127,10 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
     private ComponentUpdateTask? _updateTask;
 
+    // the in-flight resolve's own cancellation, so ReloadAsync can stop it when the network
+    // mode changes (the C++ aborts the running task here)
+    private CancellationTokenSource? _updateTaskAbort;
+
     private bool _loaded;
 
     public PackProfile(AbsolutePath instanceRoot, Index? metadataIndex = null)
@@ -265,7 +269,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     /// <summary>
     /// reload the list, reload all components, resolve dependencies. Unlike the C++ original
     /// (which returns once the resolve task is started), the returned Task completes when the
-    /// resolution finished.
+    /// resolution finished, so a resolution failure is the caller's to handle.
     /// </summary>
     public async Task<Result> ReloadAsync(NetMode netmode, CancellationToken cancellationToken = default)
     {
@@ -279,7 +283,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
             // https://github.com/PrismLauncher/PrismLauncher/issues/5209
             // FIXME upstream: HACK HACK HACK
-            _updateTask.Abort();
+            _updateTaskAbort?.Cancel();
             _updateTask = null;
         }
 
@@ -299,9 +303,6 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         return Result.Success();
     }
 
-    /// <summary>get current running task...</summary>
-    public ComponentUpdateTask? GetCurrentTask() => _updateTask;
-
     /// <summary>
     /// resolve all components (starts a ComponentUpdateTask). The returned Task completes when
     /// the task reaches a terminal state (C++ notifies through signals instead).
@@ -309,23 +310,32 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     public Task Resolve(NetMode netmode, CancellationToken cancellationToken = default)
     {
         var task = new ComponentUpdateTask(ComponentUpdateTask.Mode.Resolution, netmode, this);
-        this._updateTask = task;
-        task.Succeeded += _ => UpdateSucceeded();
-        task.Failed += (_, _) => UpdateFailed();
-        task.Aborted += _ => UpdateFailed();
-        return task.StartAsync(cancellationToken);
+        _updateTask = task;
+        return RunUpdateAsync(task, cancellationToken);
     }
 
-    private void UpdateSucceeded()
+    /// <summary>Clears the in-flight task and invalidates the launch profile whichever way the
+    /// resolution ended.</summary>
+    private async Task RunUpdateAsync(ComponentUpdateTask task, CancellationToken cancellationToken)
     {
-        _updateTask = null;
-        InvalidateLaunchProfile();
-    }
+        using var abortSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _updateTaskAbort = abortSource;
+        try
+        {
+            await task.RunAsync(abortSource.Token).ConfigureAwait(false);
+        }
+        finally
+        {
+            // a newer resolve may have replaced this one (ReloadAsync cancels and replaces);
+            // only clear the fields that still name this run
+            if (ReferenceEquals(_updateTask, task))
+            {
+                _updateTask = null;
+                _updateTaskAbort = null;
+            }
 
-    private void UpdateFailed()
-    {
-        _updateTask = null;
-        InvalidateLaunchProfile();
+            InvalidateLaunchProfile();
+        }
     }
 
     // END: save/load
@@ -1061,7 +1071,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
                     file.ApplyTo(applied);
                 }
 
-                this._profile = applied;
+                _profile = applied;
             }
             catch (Exception e) when (e is JsonException or MetaParseException or IOException)
             {

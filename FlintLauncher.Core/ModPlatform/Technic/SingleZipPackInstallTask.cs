@@ -43,7 +43,7 @@ public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVers
     /// <summary>APPLICATION->metacache() hook ("general" base); null = plain download.</summary>
     public HttpMetaCache? MetaCache { get; init; }
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    internal override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Downloading modpack:\n" + sourceUrl);
 
@@ -53,16 +53,9 @@ public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVers
             var entry = MetaCache.ResolveEntry("general", path);
             entry.IsStale = true;
 
-            var filesNetJob = new NetJob("Modpack download");
             var request = HttpDownloadTask.Cached(MetaCache, sourceUrl, entry);
-            filesNetJob.AddDownload(request);
             _archivePath = entry.GetFullPath();
-            await filesNetJob.StartAsync(cancellationToken);
-            if (!filesNetJob.WasSuccessful)
-            {
-                EmitFailed(filesNetJob.FailReason);
-                return;
-            }
+            await request.DownloadAsync(null, cancellationToken).ConfigureAwait(false);
         }
         else
         {
@@ -73,12 +66,7 @@ public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVers
             _archivePath = Temporary.CreateTempFolder() / a1;
             FileOps.EnsureFilePathExists(_archivePath);
             var request = HttpDownloadTask.ToFile(sourceUrl, _archivePath, http);
-            await request.StartAsync(cancellationToken);
-            if (!request.WasSuccessful)
-            {
-                EmitFailed(request.FailReason);
-                return;
-            }
+            await request.DownloadAsync(null, cancellationToken).ConfigureAwait(false);
         }
 
         await DownloadSucceeded(cancellationToken);
@@ -93,8 +81,7 @@ public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVers
         var extracted = MmcZip.ExtractDir(_archivePath, "", extractDir);
         if (extracted is null)
         {
-            EmitFailed("Failed to extract modpack");
-            return;
+            throw new InvalidOperationException("Failed to extract modpack");
         }
 
         // (the "fixing permissions" walk is not ported — see the header note)
@@ -105,10 +92,7 @@ public sealed class SingleZipPackInstallTask(Uri sourceUrl, string minecraftVers
             Name(), Icon, StagingPath, minecraftVersion, cancellationToken: cancellationToken);
         if (failure is not null)
         {
-            EmitFailed(failure);
-            return;
+            throw new InvalidOperationException(failure);
         }
-
-        EmitSucceeded();
     }
 }

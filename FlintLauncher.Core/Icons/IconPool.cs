@@ -193,13 +193,4 @@ public sealed class IconPool
         Rescan();
         return true;
     }
-
-    // ------------------------------------------------------------------------ helpers
-
-    /// <summary>QFileInfo::suffix(): the part after the last dot ("" when there is none).</summary>
-    private static string Suffix(string fileName)
-    {
-        var dot = fileName.LastIndexOf('.');
-        return dot > 0 ? fileName[(dot + 1)..] : "";
-    }
 }

@@ -23,6 +23,13 @@ public class DataMigrationTests : IDisposable
         new(new AbsolutePath(Path.Combine(_dir, Guid.NewGuid().ToString("N"), "migration")),
             FlintJsonContext.Default.MigrationDecisionRecord);
 
+    private sealed class RecordingProgress : IProgress<TaskProgress>
+    {
+        public List<(long current, long total)> ProgressUpdates { get; } = [];
+
+        public void Report(TaskProgress value) => ProgressUpdates.Add((value.Current, value.Total));
+    }
+
     public void Dispose()
     {
         try
@@ -267,8 +274,7 @@ public class DataMigrationTests : IDisposable
             DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(old), "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
 
         var task = new DataMigrationTask(new AbsolutePath(old), new AbsolutePath(current), DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
-        await task.StartAsync();
-        Assert.Equal(TaskState.Succeeded, task.State);
+        await task.CopyAsync(null, CancellationToken.None);
         Assert.True(File.Exists(Path.Combine(current, "polymc.cfg")));
         Assert.True(File.Exists(Path.Combine(current, "instances", "1.21", "world", "level.dat")));
 
@@ -348,15 +354,10 @@ public class DataMigrationTests : IDisposable
 
         var target = Path.Combine(_dir, "target-" + Guid.NewGuid().ToString("N"));
 
-        var progress = new List<(long current, long total)>();
-        var statuses = new List<string>();
+        var reporter = new RecordingProgress();
         var task = new DataMigrationTask(new AbsolutePath(source), new AbsolutePath(target), DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
-        task.Progress += (_, p) => progress.Add((p.Current, p.Total));
-        task.StatusChanged += (_, s) => statuses.Add(s);
 
-        await task.StartAsync();
-
-        Assert.Equal(TaskState.Succeeded, task.State);
+        await task.CopyAsync(reporter, CancellationToken.None);
 
         // copied
         Assert.Equal("content of polymc.cfg", await File.ReadAllTextAsync(Path.Combine(target, "polymc.cfg")));
@@ -379,10 +380,8 @@ public class DataMigrationTests : IDisposable
         Assert.False(File.Exists(Path.Combine(target, "assetsother", "not-included.json")));
 
         // progress: dry-run count first, then one step per copied file (13 whitelisted files)
-        Assert.Equal(13, progress.Last().total);
-        Assert.Equal((13, 13), progress.Last());
-        Assert.Equal("Scanning files...", statuses[0]);
-        Assert.StartsWith("Copying ", statuses[1]);
+        Assert.Equal(13, reporter.ProgressUpdates.Last().total);
+        Assert.Equal((13, 13), reporter.ProgressUpdates.Last());
     }
 
     [Fact]
@@ -393,12 +392,18 @@ public class DataMigrationTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(target, "polymc.cfg"), "target version");
 
         var task = new DataMigrationTask(new AbsolutePath(source), new AbsolutePath(target), DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
-        await task.StartAsync();
 
         // C++ semantics: copy_options::none reports an error for existing destination files, so
         // the task FAILS with this message while the existing target file stays untouched.
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Equal("Some paths could not be copied!", task.FailReason);
+        try
+        {
+            await task.CopyAsync(null, CancellationToken.None);
+            Assert.Fail("the migration should have failed");
+        }
+        catch (InvalidOperationException e)
+        {
+            Assert.Equal("Some paths could not be copied!", e.Message);
+        }
         Assert.Equal("target version", await File.ReadAllTextAsync(Path.Combine(target, "polymc.cfg")));
     }
 
@@ -408,10 +413,16 @@ public class DataMigrationTests : IDisposable
         var target = Path.Combine(_dir, "target-" + Guid.NewGuid().ToString("N"));
         var task = new DataMigrationTask(new AbsolutePath(Path.Combine(_dir, "does-not-exist")), new AbsolutePath(target),
             DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
-        await task.StartAsync();
 
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Equal("Failed to scan source path.", task.FailReason);
+        try
+        {
+            await task.CopyAsync(null, CancellationToken.None);
+            Assert.Fail("the migration should have failed");
+        }
+        catch (InvalidOperationException e)
+        {
+            Assert.Equal("Failed to scan source path.", e.Message);
+        }
     }
 
     // a file symlink inside the migrated tree is copied by its TARGET'S CONTENT (the
@@ -434,36 +445,14 @@ public class DataMigrationTests : IDisposable
             Path.Combine(source, "marker.txt"));
         var target = Path.Combine(_dir, "target-" + Guid.NewGuid().ToString("N"));
 
-        var progress = new List<(long current, long total)>();
+        var reporter = new RecordingProgress();
         var task = new DataMigrationTask(new AbsolutePath(source), new AbsolutePath(target),
             DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
-        task.Progress += (_, p) => progress.Add((p.Current, p.Total));
-        await task.StartAsync();
+        await task.CopyAsync(reporter, CancellationToken.None);
 
-        Assert.Equal(TaskState.Succeeded, task.State);
         var landed = Path.Combine(target, "instances", "demo", "link.cfg");
         Assert.Equal("marker-content", await File.ReadAllTextAsync(landed));
         Assert.Null(File.ResolveLinkTarget(landed, returnFinalTarget: false)); // content, not a re-link
-        Assert.Equal(1, progress.Last().total);                                // the plan count includes the link too
-    }
-
-    // the C++ shortens long status names: left(20) + "…" + right(29)
-    [Fact]
-    public async Task Long_Paths_Are_Shortened_In_The_Status()
-    {
-        var deep = string.Join('/', Enumerable.Repeat("directory-name", 10));
-        var source = MakeDir($"instances/{deep}/options.txt");
-        var target = Path.Combine(_dir, "target-" + Guid.NewGuid().ToString("N"));
-
-        var statuses = new List<string>();
-        var task = new DataMigrationTask(new AbsolutePath(source), new AbsolutePath(target),
-            DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
-        task.StatusChanged += (_, s) => statuses.Add(s);
-        await task.StartAsync();
-
-        Assert.Equal(TaskState.Succeeded, task.State);
-        var copying = statuses.Last(s => s.StartsWith("Copying "));
-        var relative = $"instances/{deep}/options.txt";
-        Assert.Equal($"Copying {relative[..20]}…{relative[^29..]}…", copying);
+        Assert.Equal(1, reporter.ProgressUpdates.Last().total);                // the plan count includes the link too
     }
 }

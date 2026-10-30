@@ -23,7 +23,6 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Hashing;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
@@ -32,298 +31,279 @@ using MrPackJsonContext = FlintLauncher.ExternalApi.Modrinth.MrPackJsonContext;
 
 namespace FlintLauncher.Core.ModPlatform.Modrinth;
 
-public sealed class ModrinthPackExportTask(
-    string name,
-    string version,
-    string summary,
-    bool optionalFiles,
-    MinecraftInstance instance,
-    AbsolutePath output,
-    ModrinthClient modrinth,
-    HttpClient http,
-    MmcZip.FilterFunction? filter = null)
-    : FlintTask
+public static class ModrinthPackExportTask
 {
     private static readonly string[] Prefixes = ["mods/", "coremods/", "resourcepacks/", "texturepacks/", "shaderpacks/"];
     private static readonly string[] FileExtensions = ["jar", "litemod", "zip"];
 
-    private readonly AbsolutePath _gameRoot = instance.GameRoot;
-
-    private readonly List<string> _files = [];
-    private readonly Dictionary<string, string> _pendingHashes = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, ResolvedFile> _resolvedFiles = new(StringComparer.Ordinal);
-
     private sealed record ResolvedFile(string Sha1, string Sha512, string Url, long Size, SideType Side);
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Writes the mrpack. Returning is success; any other exception is a failure
+    /// whose message is the reason.</summary>
+    public static async Task ExportAsync(
+        string name,
+        string version,
+        string summary,
+        bool optionalFiles,
+        MinecraftInstance instance,
+        AbsolutePath output,
+        ModrinthClient modrinth,
+        HttpClient http,
+        CancellationToken cancellationToken,
+        MmcZip.FilterFunction? filter = null)
     {
-        EmitStatus("Searching for files...");
+        var gameRoot = instance.GameRoot;
 
-        if (!CollectFiles())
+        var files = new List<string>();
+        var pendingHashes = new Dictionary<string, string>(StringComparer.Ordinal);
+        var resolvedFiles = new Dictionary<string, ResolvedFile>(StringComparer.Ordinal);
+
+        CollectFiles();
+        await CollectHashes();
+        await MakeApiRequest();
+
+        void CollectFiles()
         {
-            return;
-        }
-
-        await CollectHashes(cancellationToken);
-        await MakeApiRequest(cancellationToken);
-    }
-
-    private bool CollectFiles()
-    {
-        _files.Clear();
-        if (!MmcZip.CollectFileListRecursively(instance.GameRoot, null, _files,
-                filter != null ? (Func<FileSystemInfo, bool>)(f => filter(GetRelativePath(f.FullName))) : null))
-        {
-            EmitFailed("Could not search for files");
-            return false;
-        }
-
-        return true;
-    }
-
-    private async Task CollectHashes(CancellationToken cancellationToken)
-    {
-        await Task.CompletedTask; // keep the async shape of the C++ callback chain
-
-        EmitStatus("Finding file hashes...");
-
-        // instance->loaderModList()->update()
-        var modList = new ModFolderModel(MaterializedDirectory.Wrap(instance.ModsRoot)!);
-        modList.Update();
-
-        foreach (var file in _files)
-        {
-            var relative = GetRelativePath(file);
-            // require sensible file types
-            if (!Prefixes.Any(prefix => relative.StartsWith(prefix, StringComparison.Ordinal)))
+            files.Clear();
+            if (!MmcZip.CollectFileListRecursively(instance.GameRoot, null, files,
+                    filter != null ? (Func<FileSystemInfo, bool>)(f => filter(GetRelativePath(f.FullName))) : null))
             {
-                continue;
-            }
-
-            if (!FileExtensions.Any(extension =>
-                    relative.EndsWith('.' + extension, StringComparison.Ordinal)
-                    || relative.EndsWith('.' + extension + ".disabled", StringComparison.Ordinal)))
-            {
-                continue;
-            }
-
-            byte[] data;
-            try
-            {
-                data = await File.ReadAllBytesAsync(file, cancellationToken);
-            }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-            {
-                // "Could not open {file} for hashing"
-                continue;
-            }
-
-            var sha512 = HashUtils.Hash(data, Algorithm.Sha512);
-
-            var mod = modList.AllMods().Find(m => string.Equals(m.Fileinfo.FullName, file, StringComparison.Ordinal));
-            if (mod is not null)
-            {
-                var metadata = modList.GetMetadata(mod);
-                if (metadata is not null)
-                {
-                    var url = metadata.Url;
-                    // ensure the url is permitted on modrinth.com
-                    if (Uri.TryCreate(url, UriKind.Absolute, out var parsedUrl)
-                        && ModrinthClient.MrpackHosts.Contains(parsedUrl.Host))
-                    {
-                        var sha1 = HashUtils.Hash(data, Algorithm.Sha1);
-
-                        _resolvedFiles[relative] = new ResolvedFile(sha1, sha512, url,
-                            new FileInfo(file).Length, metadata.Side);
-
-                        // nice! we've managed to resolve based on local metadata!
-                        // no need to enqueue it
-                        continue;
-                    }
-                }
-            }
-
-            _pendingHashes[relative] = sha512;
-        }
-    }
-
-    private async Task MakeApiRequest(CancellationToken cancellationToken)
-    {
-        if (_pendingHashes.Count == 0)
-        {
-            BuildZip();
-            return;
-        }
-
-        EmitStatus("Finding versions for hashes...");
-        var entries = await modrinth.Versions
-            .ByFileHashes(_pendingHashes.Values.ToList(), "sha512").SendTo(http, cancellationToken);
-
-        ParseApiResponse(entries);
-        BuildZip();
-    }
-
-    private void ParseApiResponse(Dictionary<string, ModrinthVersion> entries)
-    {
-        foreach (var (relative, sha512) in _pendingHashes)
-        {
-            if (!entries.TryGetValue(sha512, out var v))
-            {
-                continue;
-            }
-
-            foreach (var file in v.Files)
-            {
-                if (file.Hashes?.TryGetValue("sha512", out var hash) != true || hash != sha512)
-                {
-                    continue;
-                }
-
-                // map the file to the url
-                _resolvedFiles[relative] = new ResolvedFile(
-                    Sha1: file.Hashes.GetValueOrDefault("sha1", ""),
-                    Sha512: sha512,
-                    Url: file.Url,
-                    Size: file.Size,
-                    Side: SideType.Invalid);
-                break;
+                throw new InvalidOperationException("Could not search for files");
             }
         }
 
-        _pendingHashes.Clear();
-    }
-
-    private void BuildZip()
-    {
-        EmitStatus("Adding files...");
-
-        try
+        async Task CollectHashes()
         {
-            using var stream = PathIo.Create(output);
-            using var zip = new ZipArchive(stream, ZipArchiveMode.Create);
+            // instance->loaderModList()->update()
+            var modList = new ModFolderModel(MaterializedDirectory.Wrap(instance.ModsRoot)!);
+            modList.Update();
 
-            // the ExportToZipTask layout: everything under the game root, prefixed with
-            // "overrides/", minus the files that the index references by URL
-            foreach (var file in _files)
+            foreach (var file in files)
             {
                 var relative = GetRelativePath(file);
-                if (relative.Length == 0 || _resolvedFiles.ContainsKey(relative))
+                // require sensible file types
+                if (!Prefixes.Any(prefix => relative.StartsWith(prefix, StringComparison.Ordinal)))
                 {
                     continue;
                 }
 
-                if (File.Exists(file))
+                if (!FileExtensions.Any(extension =>
+                        relative.EndsWith('.' + extension, StringComparison.Ordinal)
+                        || relative.EndsWith('.' + extension + ".disabled", StringComparison.Ordinal)))
                 {
-                    zip.CreateEntryFromFile(file, "overrides/" + relative, CompressionLevel.Optimal);
+                    continue;
+                }
+
+                byte[] data;
+                try
+                {
+                    data = await File.ReadAllBytesAsync(file, cancellationToken);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    // "Could not open {file} for hashing"
+                    continue;
+                }
+
+                var sha512 = HashUtils.Hash(data, Algorithm.Sha512);
+
+                var mod = modList.AllMods().Find(m => string.Equals(m.Fileinfo.FullName, file, StringComparison.Ordinal));
+                if (mod is not null)
+                {
+                    var metadata = modList.GetMetadata(mod);
+                    if (metadata is not null)
+                    {
+                        var url = metadata.Url;
+                        // ensure the url is permitted on modrinth.com
+                        if (Uri.TryCreate(url, UriKind.Absolute, out var parsedUrl)
+                            && ModrinthClient.MrpackHosts.Contains(parsedUrl.Host))
+                        {
+                            var sha1 = HashUtils.Hash(data, Algorithm.Sha1);
+
+                            resolvedFiles[relative] = new ResolvedFile(sha1, sha512, url,
+                                new FileInfo(file).Length, metadata.Side);
+
+                            // nice! we've managed to resolve based on local metadata!
+                            // no need to enqueue it
+                            continue;
+                        }
+                    }
+                }
+
+                pendingHashes[relative] = sha512;
+            }
+        }
+
+        async Task MakeApiRequest()
+        {
+            if (pendingHashes.Count == 0)
+            {
+                BuildZip();
+                return;
+            }
+
+            var entries = await modrinth.Versions
+                .ByFileHashes(pendingHashes.Values.ToList(), "sha512").SendTo(http, cancellationToken);
+
+            ParseApiResponse(entries);
+            BuildZip();
+        }
+
+        void ParseApiResponse(Dictionary<string, ModrinthVersion> entries)
+        {
+            foreach (var (relative, sha512) in pendingHashes)
+            {
+                if (!entries.TryGetValue(sha512, out var v))
+                {
+                    continue;
+                }
+
+                foreach (var file in v.Files)
+                {
+                    if (file.Hashes?.TryGetValue("sha512", out var hash) != true || hash != sha512)
+                    {
+                        continue;
+                    }
+
+                    // map the file to the url
+                    resolvedFiles[relative] = new ResolvedFile(
+                        Sha1: file.Hashes.GetValueOrDefault("sha1", ""),
+                        Sha512: sha512,
+                        Url: file.Url,
+                        Size: file.Size,
+                        Side: SideType.Invalid);
+                    break;
                 }
             }
 
-            var indexEntry = zip.CreateEntry("modrinth.index.json", CompressionLevel.Optimal);
-            using var writer = new StreamWriter(indexEntry.Open(), Encoding.UTF8);
-            writer.Write(GenerateIndex());
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                      or NotSupportedException)
-        {
-            EmitFailed("Could not write the export zip: " + e.Message);
-            return;
+            pendingHashes.Clear();
         }
 
-        EmitSucceeded();
-    }
-
-    private string GenerateIndex()
-    {
-        // collect all supported components
-        var profile = instance.GetPackProfile();
-        profile.Load(); // (MinecraftInstance loads its profile lazily in the C++; make it explicit here)
-        Component? minecraft = profile.GetComponent("net.minecraft");
-        Component? quilt = profile.GetComponent("org.quiltmc.quilt-loader");
-        Component? fabric = profile.GetComponent("net.fabricmc.fabric-loader");
-        Component? forge = profile.GetComponent("net.minecraftforge");
-        Component? neoForge = profile.GetComponent("net.neoforged");
-
-        // convert all available components to mrpack dependencies (the C++ reads the raw
-        // m_version of each component)
-        var dependencies = new Dictionary<string, string?>(StringComparer.Ordinal);
-        if (minecraft is not null)
+        void BuildZip()
         {
-            dependencies["minecraft"] = minecraft.Version;
-        }
-
-        if (quilt is not null)
-        {
-            dependencies["quilt-loader"] = quilt.Version;
-        }
-
-        if (fabric is not null)
-        {
-            dependencies["fabric-loader"] = fabric.Version;
-        }
-
-        if (forge is not null)
-        {
-            dependencies["forge"] = forge.Version;
-        }
-
-        if (neoForge is not null)
-        {
-            dependencies["neoforge"] = neoForge.Version;
-        }
-
-        var filesOut = new List<MrPackFile>();
-        foreach (var (pathIn, value) in _resolvedFiles)
-        {
-            var path = pathIn;
-            var client = "required";
-            var server = "required";
-
-            // detect disabled mod
-            var suffix = Path.GetExtension(path).TrimStart('.');
-            if (optionalFiles && suffix == "disabled")
+            try
             {
-                // rename it
-                path = Path.Combine(Path.GetDirectoryName(path) ?? "", Path.GetFileNameWithoutExtension(path))
-                    .Replace('\\', '/');
-                client = "optional";
-                server = "optional";
-            }
+                using var stream = PathIo.Create(output);
+                using var zip = new ZipArchive(stream, ZipArchiveMode.Create);
 
-            // a server side mod does not imply that the mod does not work on the client
-            // however, if a mrpack mod is marked as server-only it will not install on the client
-            if (value.Side.Value == SideTypeValue.ClientSide)
-            {
-                server = "unsupported";
-            }
-
-            filesOut.Add(new MrPackFile(
-                Env: new MrPackEnv(Client: client, Server: server),
-                Path: path,
-                Downloads: [value.Url],
-                Hashes: new Dictionary<string, string>(StringComparer.Ordinal)
+                // the ExportToZipTask layout: everything under the game root, prefixed with
+                // "overrides/", minus the files that the index references by URL
+                foreach (var file in files)
                 {
-                    ["sha1"] = value.Sha1,
-                    ["sha512"] = value.Sha512,
-                },
-                FileSize: value.Size));
+                    var relative = GetRelativePath(file);
+                    if (relative.Length == 0 || resolvedFiles.ContainsKey(relative))
+                    {
+                        continue;
+                    }
+
+                    if (File.Exists(file))
+                    {
+                        zip.CreateEntryFromFile(file, "overrides/" + relative, CompressionLevel.Optimal);
+                    }
+                }
+
+                var indexEntry = zip.CreateEntry("modrinth.index.json", CompressionLevel.Optimal);
+                using var writer = new StreamWriter(indexEntry.Open(), Encoding.UTF8);
+                writer.Write(GenerateIndex());
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
+                                          or NotSupportedException)
+            {
+                throw new InvalidOperationException("Could not write the export zip: " + e.Message);
+            }
         }
 
-        var index = new MrPackIndex
+        string GenerateIndex()
         {
-            FormatVersion = 1,
-            Game = "minecraft",
-            Name = name,
-            VersionId = version,
-            Summary = string.IsNullOrEmpty(summary) ? null : summary,
-            Dependencies = dependencies,
-            Files = filesOut,
-        };
+            // collect all supported components
+            var profile = instance.GetPackProfile();
+            profile.Load(); // (MinecraftInstance loads its profile lazily in the C++; make it explicit here)
+            Component? minecraft = profile.GetComponent("net.minecraft");
+            Component? quilt = profile.GetComponent("org.quiltmc.quilt-loader");
+            Component? fabric = profile.GetComponent("net.fabricmc.fabric-loader");
+            Component? forge = profile.GetComponent("net.minecraftforge");
+            Component? neoForge = profile.GetComponent("net.neoforged");
 
-        return JsonSerializer.Serialize(index, MrPackJsonContext.Default.MrPackIndex);
-    }
+            // convert all available components to mrpack dependencies (the C++ reads the raw
+            // m_version of each component)
+            var dependencies = new Dictionary<string, string?>(StringComparer.Ordinal);
+            if (minecraft is not null)
+            {
+                dependencies["minecraft"] = minecraft.Version;
+            }
 
-    private string GetRelativePath(string file)
-    {
-        return Path.GetRelativePath(_gameRoot.Value, file).Replace('\\', '/');
+            if (quilt is not null)
+            {
+                dependencies["quilt-loader"] = quilt.Version;
+            }
+
+            if (fabric is not null)
+            {
+                dependencies["fabric-loader"] = fabric.Version;
+            }
+
+            if (forge is not null)
+            {
+                dependencies["forge"] = forge.Version;
+            }
+
+            if (neoForge is not null)
+            {
+                dependencies["neoforge"] = neoForge.Version;
+            }
+
+            var filesOut = new List<MrPackFile>();
+            foreach (var (pathIn, value) in resolvedFiles)
+            {
+                var path = pathIn;
+                var client = "required";
+                var server = "required";
+
+                // detect disabled mod
+                var suffix = Path.GetExtension(path).TrimStart('.');
+                if (optionalFiles && suffix == "disabled")
+                {
+                    // rename it
+                    path = Path.Combine(Path.GetDirectoryName(path) ?? "", Path.GetFileNameWithoutExtension(path))
+                        .Replace('\\', '/');
+                    client = "optional";
+                    server = "optional";
+                }
+
+                // a server side mod does not imply that the mod does not work on the client
+                // however, if a mrpack mod is marked as server-only it will not install on the client
+                if (value.Side.Value == SideTypeValue.ClientSide)
+                {
+                    server = "unsupported";
+                }
+
+                filesOut.Add(new MrPackFile(
+                    Env: new MrPackEnv(Client: client, Server: server),
+                    Path: path,
+                    Downloads: [value.Url],
+                    Hashes: new Dictionary<string, string>(StringComparer.Ordinal)
+                    {
+                        ["sha1"] = value.Sha1,
+                        ["sha512"] = value.Sha512,
+                    },
+                    FileSize: value.Size));
+            }
+
+            var index = new MrPackIndex
+            {
+                FormatVersion = 1,
+                Game = "minecraft",
+                Name = name,
+                VersionId = version,
+                Summary = string.IsNullOrEmpty(summary) ? null : summary,
+                Dependencies = dependencies,
+                Files = filesOut,
+            };
+
+            return JsonSerializer.Serialize(index, MrPackJsonContext.Default.MrPackIndex);
+        }
+
+        string GetRelativePath(string file) =>
+            Path.GetRelativePath(gameRoot.Value, file).Replace('\\', '/');
     }
 }

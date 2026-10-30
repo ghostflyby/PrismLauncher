@@ -45,6 +45,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Java.Download;
 using FlintLauncher.Core.Meta;
+using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tasks;
 using TruePath;
@@ -53,10 +54,9 @@ using Index = FlintLauncher.Core.Meta.Index;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class AutoInstallJava : LaunchStep
+public sealed class AutoInstallJava : AwaitedStep
 {
     private readonly MinecraftInstance _instance;
-    private FlintTask? _currentTask;
     private int _majorJavaVersionIndex;
     private readonly string _supportedArch;
 
@@ -66,7 +66,7 @@ public sealed class AutoInstallJava : LaunchStep
         _supportedArch = SysInfo.GetSupportedJavaArchitecture();
     }
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         var settings = _instance.Settings;
         // the typed user layer: the C++ default of this switch derives from the
@@ -80,7 +80,6 @@ public sealed class AutoInstallJava : LaunchStep
             (Variant.AsBool(settings.Get("OverrideJavaLocation")) &&
              (File.Exists(Variant.AsString(settings.Get("JavaPath"))) || Directory.Exists(Variant.AsString(settings.Get("JavaPath"))))))
         {
-            EmitSucceeded();
             return;
         }
 
@@ -90,10 +89,21 @@ public sealed class AutoInstallJava : LaunchStep
             var javas = Services.JavaInstallListProvider?.Invoke();
             if (javas is not null)
             {
-                // (upstream connects finished + emits progressReportingRequest without starting
-                //  the task; the port awaits the load instead — see header note)
-                _currentTask = javas.GetLoadTask();
-                await _currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await javas.LoadAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                    // a detection failure leaves the list as-is: the walk below finds nothing
+                    // compatible and the step falls back to the default Java, like the C++
+                    // (which only logged the load task's failure)
+                }
+
                 var compatibleMajors = packProfile.GetProfile()?.GetCompatibleJavaMajors() ?? [];
                 for (var i = 0; i < javas.Count; i++)
                 {
@@ -112,7 +122,6 @@ public sealed class AutoInstallJava : LaunchStep
             }
 
             EmitLogLine("No compatible Java version was found. Using the default one.", MessageLevel.Warning);
-            EmitSucceeded();
             return;
         }
 
@@ -120,7 +129,6 @@ public sealed class AutoInstallJava : LaunchStep
         {
             EmitLogLine($"Your system ({SysInfo.CurrentSystem()}-{SysInfo.UseQtForArch()}) is not compatible with automatic Java installation. Using the default Java path.",
                 MessageLevel.Warning);
-            EmitSucceeded();
             return;
         }
 
@@ -129,7 +137,6 @@ public sealed class AutoInstallJava : LaunchStep
         {
             EmitLogLine("Your meta information is out of date or doesn't have the information necessary to determine what installation of " +
                         "Java should be used. Using the default Java path.", MessageLevel.Warning);
-            EmitSucceeded();
             return;
         }
 
@@ -144,13 +151,7 @@ public sealed class AutoInstallJava : LaunchStep
 
         // load the "net.minecraft.java" version list, then walk the compatible majors
         var versionList = MetadataIndex().Get("net.minecraft.java");
-        _currentTask = versionList.LoadTask();
-        await _currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
-        if (!_currentTask.WasSuccessful && State == TaskState.Running)
-        {
-            EmitFailed(_currentTask.FailReason);
-            return;
-        }
+        await versionList.LoadAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
 
         await TryNextMajorJava(cancellationToken).ConfigureAwait(false);
     }
@@ -168,7 +169,6 @@ public sealed class AutoInstallJava : LaunchStep
         settings.Set("JavaPath", path);
         settings.Set("AutomaticJava", true);
         EmitLogLine($"Compatible Java found at: {path}.", MessageLevel.Launcher);
-        EmitSucceeded();
     }
 
     private void SetJavaPathFromPartial()
@@ -189,7 +189,6 @@ public sealed class AutoInstallJava : LaunchStep
         {
             EmitLogLine("No compatible Java version was found (the binary file does not exist). Using the default one.",
                 MessageLevel.Warning);
-            EmitSucceeded();
         }
     }
 
@@ -201,46 +200,49 @@ public sealed class AutoInstallJava : LaunchStep
             if (java.RuntimeOs == _supportedArch && java.Name == javaName)
             {
                 var javaDir = Services.JavaRoot;
-                var finalPath = (AbsolutePath)javaDir / java.Name;
-                switch (java.DownloadType)
+                var finalPath = javaDir / java.Name;
+                Func<IProgress<TaskProgress>?, CancellationToken, Task>? download = java.DownloadType switch
                 {
-                    case JavaDownloadType.Manifest:
-                        _currentTask = new ManifestDownloadTask(new Uri(java.Url), finalPath, Services.Http,
-                            java.ChecksumType, java.ChecksumHash);
-                        break;
-                    case JavaDownloadType.Archive:
-                        _currentTask = new ArchiveDownloadTask(new Uri(java.Url), finalPath, Services.Http,
-                            java.ChecksumType, java.ChecksumHash);
-                        break;
-                    case JavaDownloadType.Unknown:
-                    default:
-                        try
+                    JavaDownloadType.Manifest => (progress, token) => ManifestDownloadTask.DownloadAsync(
+                        new Uri(java.Url), finalPath, Services.Http, token, progress,
+                        java.ChecksumType, java.ChecksumHash),
+                    JavaDownloadType.Archive => (progress, token) => ArchiveDownloadTask.DownloadAsync(
+                        new Uri(java.Url), finalPath, Services.Http, token, progress,
+                        java.ChecksumType, java.ChecksumHash),
+                    _ => null,
+                };
+
+                if (download is null)
+                {
+                    try
+                    {
+                        if (finalPath.Exists())
                         {
-                            if (finalPath.Exists())
-                            {
-                                FileOps.DeletePath(new AbsolutePath(finalPath));
-                            }
+                            FileOps.DeletePath(new AbsolutePath(finalPath));
                         }
-                        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+                    }
+                    catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
 
-                        EmitFailed("Could not determine Java download type!");
-                        return;
+                    EmitLogLine("Could not determine Java download type!", MessageLevel.Fatal);
+                    throw new InvalidOperationException("Could not determine Java download type!");
                 }
 
-                if (OperatingSystem.IsMacOS())
+                try
                 {
-                    var seq = new SequentialTask("Install Java");
-                    seq.AddTask(_currentTask);
-                    seq.AddTask(new SymlinkTask(finalPath));
-                    _currentTask = seq;
-                }
+                    // the JDK lands first, then the macOS layout symlink runs on it
+                    await download(null, cancellationToken).ConfigureAwait(false);
+                    if (OperatingSystem.IsMacOS())
+                    {
+                        SymlinkTask.Run(finalPath);
+                    }
 
-                await _currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
-                if (_currentTask.WasSuccessful)
-                {
                     SetJavaPathFromPartial();
                 }
-                else if (IsRunning)
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception)
                 {
                     // the C++ retries with the next major version on failure
                     await TryNextMajorJava(cancellationToken).ConfigureAwait(false);
@@ -255,11 +257,6 @@ public sealed class AutoInstallJava : LaunchStep
 
     private async Task TryNextMajorJava(CancellationToken cancellationToken)
     {
-        if (!IsRunning)
-        {
-            return;
-        }
-
         var packProfile = _instance.GetPackProfile();
         var wantedJavaName = packProfile.GetProfile()?.GetCompatibleJavaName() ?? "";
         var majorJavaVersions = MajorJavaVersions();
@@ -268,7 +265,6 @@ public sealed class AutoInstallJava : LaunchStep
             EmitLogLine($"No versions of Java were found for your operating system: {SysInfo.CurrentSystem()}-{SysInfo.UseQtForArch()}",
                 MessageLevel.Warning);
             EmitLogLine("No compatible version of Java was found. Using the default one.", MessageLevel.Warning);
-            EmitSucceeded();
             return;
         }
 
@@ -284,30 +280,22 @@ public sealed class AutoInstallJava : LaunchStep
         }
         else
         {
-            _currentTask = MetadataIndex().LoadVersion("net.minecraft.java", javaMajor.Version);
-            await _currentTask.StartAsync(cancellationToken).ConfigureAwait(false);
-            if (_currentTask.WasSuccessful)
+            try
             {
+                await MetadataIndex().LoadAsync("net.minecraft.java", javaMajor.Version,
+                    NetMode.Online, force: false, cancellationToken).ConfigureAwait(false);
                 await DownloadJava(javaMajor, wantedJavaName, cancellationToken).ConfigureAwait(false);
             }
-            else
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception)
             {
                 await TryNextMajorJava(cancellationToken).ConfigureAwait(false);
             }
         }
     }
 
-    public override bool CanAbort() => _currentTask is not null && _currentTask.IsRunning;
-
-    public override bool AbortStep()
-    {
-        if (_currentTask is not null && _currentTask.IsRunning)
-        {
-            _currentTask.Abort();
-            EmitAborted();
-            return true;
-        }
-
-        return base.AbortStep();
-    }
+    public override bool CanAbort() => true;
 }

@@ -25,8 +25,8 @@
 // as multipart/form-data, and group uploaded screenshots into an album through the
 // application/x-www-form-urlencoded delete hashes. Upstream exposes ImgurAPI::makeUpload /
 // ImgurAPI::makeAlbum returning (request, result) pairs; the request half of each pair is a
-// Net::Request the caller starts, so here the factories return the started-by-caller task
-// that performs the identical HTTP exchange.
+// Net::Request the caller starts, so here the factories return an object whose async method
+// performs the identical HTTP exchange.
 //
 // Deviations:
 //  - Upstream builds the requests through QHttpMultiPart on QNetworkAccessManager; the port
@@ -41,7 +41,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
 using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Screenshots;
@@ -65,7 +64,7 @@ internal sealed partial class ImgurJsonContext : JsonSerializerContext;
 
 /// <summary>Port of the ImgurAPI namespace: the two imgur request factories. An instance
 /// rides the injected client (the composition root's ImgurApi — same de-singletoning story
-/// as the platform clients); the tasks it builds send through that stack's client.</summary>
+/// as the platform clients); the requests it builds send through that stack's client.</summary>
 public sealed class ImgurApi(HttpClient http)
 {
     /// <summary>The network stack this client's uploads flow through.</summary>
@@ -102,7 +101,6 @@ public sealed class ImgurUpload(
     HttpClient http,
     string? baseUrl = null,
     string? clientId = null)
-    : FlintTask
 {
     private readonly string _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
 
@@ -112,7 +110,9 @@ public sealed class ImgurUpload(
         get => field + "image";
     } = baseUrl ?? FlintConfig.Default.ImgurBaseUrl;
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Uploads the screenshot; on success it carries the imgur id, url and delete
+    /// hash.</summary>
+    public async Task UploadAsync(CancellationToken cancellationToken = default)
     {
         byte[] fileData;
         try
@@ -122,8 +122,7 @@ public sealed class ImgurUpload(
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException
                                       or ArgumentException or SecurityException)
         {
-            EmitFailed($"Could not open file {shot.FilePath} for reading: {e.Message}");
-            return;
+            throw new InvalidOperationException($"Could not open file {shot.FilePath} for reading: {e.Message}");
         }
 
         var boundary = "flint-" + Guid.NewGuid().ToString("N");
@@ -153,8 +152,7 @@ public sealed class ImgurUpload(
 
         if (statusCode is not 200 and not 201 and not 202 and not 203 and not 206)
         {
-            EmitFailed($"HTTP status {statusCode} for {EndpointUrl}\n{Truncate(responseBody)}");
-            return;
+            throw new InvalidOperationException($"HTTP status {statusCode} for {EndpointUrl}\n{Truncate(responseBody)}");
         }
 
         // Port of the RPC::Sink<QString> parse function.
@@ -166,14 +164,12 @@ public sealed class ImgurUpload(
         catch (JsonException)
         {
             // "imgur server did not reply with JSON"
-            EmitFailed("Invalid json reply");
-            return;
+            throw new InvalidOperationException("Invalid json reply");
         }
 
         if (reply?.Success != true)
         {
-            EmitFailed("Screenshot was not uploaded successfully");
-            return;
+            throw new InvalidOperationException("Screenshot was not uploaded successfully");
         }
 
         if (reply.Data is { } data)
@@ -182,8 +178,6 @@ public sealed class ImgurUpload(
             shot.Url = data.Link ?? "";
             shot.ImgurDeleteHash = data.DeleteHash ?? "";
         }
-
-        EmitSucceeded();
     }
 
     /// <summary>
@@ -226,7 +220,6 @@ public sealed class ImgurAlbumCreation(
     HttpClient http,
     string? baseUrl = null,
     string? clientId = null)
-    : FlintTask
 {
     private readonly string _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
 
@@ -236,7 +229,8 @@ public sealed class ImgurAlbumCreation(
         get => field + "album";
     } = baseUrl ?? FlintConfig.Default.ImgurBaseUrl;
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Creates the album; on success <c>result</c> carries its delete hash and id.</summary>
+    public async Task CreateAsync(CancellationToken cancellationToken = default)
     {
         // Port of getPayload(): "deletehashes=" + hashes.join("&deletehashes=")
         //                     + "&title=Minecraft%20Screenshots&privacy=hidden"
@@ -269,8 +263,7 @@ public sealed class ImgurAlbumCreation(
 
         if (statusCode is not 200 and not 201 and not 202 and not 203 and not 206)
         {
-            EmitFailed($"HTTP status {statusCode} for {EndpointUrl}");
-            return;
+            throw new InvalidOperationException($"HTTP status {statusCode} for {EndpointUrl}");
         }
 
         // Port of the RPC::Sink<AlbumResult> parse function.
@@ -281,14 +274,12 @@ public sealed class ImgurAlbumCreation(
         }
         catch (JsonException)
         {
-            EmitFailed("Invalid json reply");
-            return;
+            throw new InvalidOperationException("Invalid json reply");
         }
 
         if (reply?.Success != true)
         {
-            EmitFailed("Failed to create album");
-            return;
+            throw new InvalidOperationException("Failed to create album");
         }
 
         if (reply.Data is { } albumData)
@@ -296,7 +287,5 @@ public sealed class ImgurAlbumCreation(
             result.DeleteHash = albumData.DeleteHash ?? "";
             result.Id = albumData.Id ?? "";
         }
-
-        EmitSucceeded();
     }
 }

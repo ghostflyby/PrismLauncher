@@ -8,7 +8,6 @@ using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Skins;
-using FlintLauncher.Core.Tasks;
 using TruePath;
 using Xunit;
 
@@ -46,9 +45,7 @@ public class SkinApiTests : IDisposable
         await File.WriteAllBytesAsync(skinPath, pngBytes);
 
         var request = SkinUpload.Make("SKIN_TOKEN", new AbsolutePath(skinPath), "classic", _auth);
-        await request.StartAsync();
-
-        Assert.Equal(TaskState.Succeeded, request.State);
+        await request.SendAsync();
 
         var recorded = _server.Request("POST", "/minecraft/profile/skins");
         Assert.NotNull(recorded);
@@ -125,10 +122,9 @@ public class SkinApiTests : IDisposable
         var dead = new AuthEndpointsOptions { MinecraftServices = _server.BaseUrl + "/nowhere" };
 
         var request = SkinUpload.Make("SKIN_TOKEN", [1, 2, 3], "slim", dead);
-        await request.StartAsync();
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => request.SendAsync());
 
-        Assert.Equal(TaskState.Failed, request.State);
-        Assert.Contains("404", request.FailReason);
+        Assert.Contains("404", failure.Message);
     }
 
     // ---------------------------------------------------------- index.json persistence

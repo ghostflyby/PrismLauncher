@@ -2,14 +2,12 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 // SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
 //
-// Port of modplatform/helpers/HashUtils.{h,cpp}: hashing helpers for the mod platforms
-// (sha1/sha256/sha512/md5/md5 via the crypto stack, and the CurseForge murmur2 variant
-// with its tab/LF/CR/space filter). The QtConcurrent Hasher task becomes the awaitable
-// Hasher FlintTask.
+// Hashing for the mod platforms: sha1/sha256/sha512/md5 through the crypto stack, plus the
+// CurseForge murmur2 variant with its tab/LF/CR/space filter. Hashing a file is a synchronous
+// call here — HashFile returns the digest and the caller decides where to run it.
 
 using System.Globalization;
 using System.Security.Cryptography;
-using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.ModPlatform.Hashing;
 
@@ -52,18 +50,16 @@ public static class HashUtils
     };
 
     /// <summary>
-    /// Port of Hashing::createHasher(file_path, provider): Modrinth uses its first declared
-    /// hash type (sha512), Flame uses the CF murmur2 variant.
+    /// The hash type a provider's platform API expects: Modrinth's first declared hash type
+    /// (sha512), CurseForge's murmur2 variant.
     /// </summary>
-    public static Hasher CreateHasher(string filePath, ResourceProvider provider) => provider switch
+    public static Algorithm HasherAlgorithm(ResourceProvider provider) => provider switch
     {
-        ResourceProvider.Modrinth => new Hasher(filePath, ProviderCapabilities.HashType(ResourceProvider.Modrinth)[0]),
-        ResourceProvider.Flame => new Hasher(filePath, Algorithm.Murmur2),
+        ResourceProvider.Modrinth =>
+            AlgorithmFromString(ProviderCapabilities.HashType(ResourceProvider.Modrinth)[0]),
+        ResourceProvider.Flame => Algorithm.Murmur2,
         _ => throw new ArgumentException("[Hashing] Unrecognized mod platform!", nameof(provider)),
     };
-
-    /// <summary>Port of Hashing::createHasher(file_path, type).</summary>
-    public static Hasher CreateHasher(string filePath, string type) => new(filePath, type);
 
     /// <summary>Port of Hashing::hash(device, type) over raw data.</summary>
     public static string Hash(byte[] data, Algorithm type) => type switch
@@ -83,16 +79,16 @@ public static class HashUtils
     /// (murmur2, "") verify to nothing — the download runs unchecked.</summary>
     public static (string Algorithm, string Hash)? VerifiedChecksum(string? hashType, string? hash) =>
         hash is { Length: > 0 }
-        ? AlgorithmFromString(hashType ?? "") switch
-        {
-            Algorithm.Md4 => ("md5", hash),
-            Algorithm.Md5 => ("md5", hash),
-            Algorithm.Sha1 => ("sha1", hash),
-            Algorithm.Sha256 => ("sha256", hash),
-            Algorithm.Sha512 => ("sha512", hash),
-            _ => null,
-        }
-        : null;
+            ? AlgorithmFromString(hashType ?? "") switch
+            {
+                Algorithm.Md4 => ("md5", hash),
+                Algorithm.Md5 => ("md5", hash),
+                Algorithm.Sha1 => ("sha1", hash),
+                Algorithm.Sha256 => ("sha256", hash),
+                Algorithm.Sha512 => ("sha512", hash),
+                _ => null,
+            }
+            : null;
 
     /// <summary>Port of Hashing::hash(device, type) streamed from an open file.</summary>
     public static string HashStream(Stream stream, Algorithm type)
@@ -118,40 +114,4 @@ public static class HashUtils
     };
 
     public static string Hash(byte[] data, string type) => Hash(data, AlgorithmFromString(type));
-}
-
-/// <summary>Port of Hashing::Hasher: a Task that computes a file hash off the caller's flow.</summary>
-public sealed class Hasher(string filePath, Algorithm alg) : FlintTask
-{
-    private string _result = "";
-
-    public Hasher(string filePath, string alg)
-        : this(filePath, HashUtils.AlgorithmFromString(alg))
-    {
-    }
-
-    public string Path { get; } = filePath;
-
-    public Algorithm Alg { get; } = alg;
-
-    public string GetResult() => _result;
-
-    public string GetPath() => Path;
-
-    /// <summary>Port of the resultsReady(QString) signal.</summary>
-    public event Action<string>? ResultsReady;
-
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
-    {
-        _result = HashUtils.HashFile(Path, Alg);
-        if (_result.Length == 0)
-        {
-            EmitFailed("Empty hash!");
-            return Task.CompletedTask;
-        }
-
-        ResultsReady?.Invoke(_result);
-        EmitSucceeded();
-        return Task.CompletedTask;
-    }
 }

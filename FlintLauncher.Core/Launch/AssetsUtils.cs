@@ -103,20 +103,20 @@ public sealed class AssetsIndex
 
     /// <summary>Port of AssetsIndex::getDownloadJob; null when everything is already present.
     /// <paramref name="assetsRoot"/> anchors the local object store (injected); the object
-    /// downloads ride <paramref name="net"/>.</summary>
-    public NetJob? GetDownloadJob(string resourceUrl, AbsolutePath assetsRoot, HttpClient http)
+    /// downloads ride <paramref name="http"/>.</summary>
+    public List<HttpDownloadTask>? GetDownloadJob(string resourceUrl, AbsolutePath assetsRoot, HttpClient http)
     {
-        var job = new NetJob($"Assets for {Id}");
+        List<HttpDownloadTask> downloads = [];
         foreach (var @object in Objects.Values)
         {
             var dl = @object.GetDownloadAction(assetsRoot, resourceUrl, http);
             if (dl is not null)
             {
-                job.AddDownload(dl);
+                downloads.Add(dl);
             }
         }
 
-        return job.Downloads.Count != 0 ? job : null;
+        return downloads.Count != 0 ? downloads : null;
     }
 }
 

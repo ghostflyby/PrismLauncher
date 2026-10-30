@@ -19,11 +19,11 @@
 //     See the License for the specific language governing permissions and
 //     limitations under the License.
 //
-// Port of launcher/launch/steps/TextPrint.{h,cpp}: print static text into the launch log.
+// Prints static text into the launch log.
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class TextPrint : LaunchStep
+public sealed class TextPrint : AwaitedStep
 {
     private readonly List<string> _lines;
     private readonly MessageLevel _level;
@@ -40,18 +40,13 @@ public sealed class TextPrint : LaunchStep
         _level = level;
     }
 
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override Task RunAsync(CancellationToken cancellationToken)
     {
         EmitLogLines(_lines, _level);
-        EmitSucceeded();
         return Task.CompletedTask;
     }
 
     public override bool CanAbort() => true;
 
-    public override bool AbortStep()
-    {
-        EmitAborted();
-        return true;
-    }
+    public override bool AbortStep() => true;
 }

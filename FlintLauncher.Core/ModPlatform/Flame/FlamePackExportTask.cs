@@ -42,7 +42,7 @@ namespace FlintLauncher.Core.ModPlatform.Flame;
 
 using ResourceFolderType = Minecraft.Resources.ResourceType;
 
-public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : FlintTask
+public static class FlamePackExportTask
 {
     private const string Template = "<li><a href=\"{url}\">{name}{authors}</a></li>\n";
     private static readonly string[] FileExtensions = ["jar", "zip"];
@@ -80,151 +80,141 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
         public bool IsMod { get; init; }
     }
 
-    private readonly AbsolutePath _gameRoot = options.Instance.GameRoot;
-    private readonly FlameClient _flame = options.Flame;
-    private readonly HttpClient _http = options.Http;
-
-    private readonly List<string> _files = [];
-    private readonly Dictionary<string, HashInfo> _pendingHashes = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, ResolvedFile> _resolvedFiles = new(StringComparer.Ordinal);
-
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Writes the export zip. Returning is success; any other exception is a failure
+    /// whose message is the reason. <paramref name="progress"/> null runs without reporting.</summary>
+    public static async Task ExportAsync(Options options, IProgress<TaskProgress>? progress,
+        CancellationToken cancellationToken)
     {
-        EmitStatus("Searching for files...");
-        SetProgress(0, 5);
+        var gameRoot = options.Instance.GameRoot;
+        var flame = options.Flame;
+        var http = options.Http;
 
-        if (!CollectFiles())
-        {
-            return;
-        }
+        var files = new List<string>();
+        var pendingHashes = new Dictionary<string, HashInfo>(StringComparer.Ordinal);
+        var resolvedFiles = new Dictionary<string, ResolvedFile>(StringComparer.Ordinal);
+
+        progress?.Report(new TaskProgress(0, 5));
+
+        CollectFiles();
 
         await CollectHashes();
-        await MakeApiRequest(cancellationToken);
-    }
+        await MakeApiRequest();
 
-    private bool CollectFiles()
-    {
-        _files.Clear();
-        if (!MmcZip.CollectFileListRecursively(options.Instance.GameRoot, null, _files))
+        void CollectFiles()
         {
-            EmitFailed("Could not search for files");
-            return false;
+            files.Clear();
+            if (!MmcZip.CollectFileListRecursively(options.Instance.GameRoot, null, files))
+            {
+                throw new InvalidOperationException("Could not search for files");
+            }
         }
 
-        return true;
-    }
-
-    private async Task CollectHashes()
-    {
-        await Task.CompletedTask; // keep the async shape of the C++ callback chain
-
-        EmitStatus("Finding file hashes...");
-        SetProgress(1, 5);
-
-        // instance->loaderModList()->update()
-        var modList = new ModFolderModel(MaterializedDirectory.Ensure(options.Instance.ModsRoot)!);
-        modList.Update();
-        var allMods = modList.AllMods();
-
-        foreach (var file in _files)
+        async Task CollectHashes()
         {
-            var relative = GetRelativePath(file);
-            // require sensible file types
-            var sensibleType = FileExtensions.Any(extension =>
-                relative.EndsWith('.' + extension, StringComparison.Ordinal)
-                || relative.EndsWith('.' + extension + ".disabled", StringComparison.Ordinal));
-            if (!sensibleType)
-            {
-                continue;
-            }
+            progress?.Report(new TaskProgress(1, 5));
 
-            if (relative.StartsWith("resourcepacks/", StringComparison.Ordinal)
-                && (relative.EndsWith(".zip", StringComparison.Ordinal)
-                    || relative.EndsWith(".zip.disabled", StringComparison.Ordinal)))
-            {
-                // is resourcepack
-                var hash = HashUtils.HashFile(file, Algorithm.Murmur2);
-                _pendingHashes[hash] = new HashInfo
-                {
-                    Name = relative,
-                    Path = file,
-                    Enabled = relative.EndsWith(".zip", StringComparison.Ordinal),
-                    IsMod = false,
-                };
-                continue;
-            }
+            // instance->loaderModList()->update()
+            var modList = new ModFolderModel(MaterializedDirectory.Ensure(options.Instance.ModsRoot)!);
+            modList.Update();
+            var allMods = modList.AllMods();
 
-            var mod = allMods.Find(m => string.Equals(m.Fileinfo.FullName, file, StringComparison.Ordinal));
-            if (mod is not null)
+            foreach (var file in files)
             {
-                if (mod.Type == ResourceFolderType.Folder)
+                var relative = GetRelativePath(file);
+                // require sensible file types
+                var sensibleType = FileExtensions.Any(extension =>
+                    relative.EndsWith('.' + extension, StringComparison.Ordinal)
+                    || relative.EndsWith('.' + extension + ".disabled", StringComparison.Ordinal));
+                if (!sensibleType)
                 {
                     continue;
                 }
 
-                var metadata = modList.GetMetadata(mod);
-                if (metadata is not null && metadata.Provider == ResourceProvider.Flame)
+                if (relative.StartsWith("resourcepacks/", StringComparison.Ordinal)
+                    && (relative.EndsWith(".zip", StringComparison.Ordinal)
+                        || relative.EndsWith(".zip.disabled", StringComparison.Ordinal)))
                 {
-                    _resolvedFiles[file] = new ResolvedFile
+                    // is resourcepack
+                    var hash = HashUtils.HashFile(file, Algorithm.Murmur2);
+                    pendingHashes[hash] = new HashInfo
                     {
-                        AddonId = ParseLong(metadata.ProjectId),
-                        Version = ParseLong(metadata.FileId),
-                        Enabled = mod.Enabled,
-                        IsMod = true,
-                        Name = metadata.Name,
-                        Slug = metadata.Slug,
-                        Authors = string.Join(", ", mod.Authors()),
+                        Name = relative,
+                        Path = file,
+                        Enabled = relative.EndsWith(".zip", StringComparison.Ordinal),
+                        IsMod = false,
                     };
                     continue;
                 }
 
-                var modHash = HashUtils.HashFile(file, Algorithm.Murmur2);
-                _pendingHashes[modHash] = new HashInfo
+                var mod = allMods.Find(m => string.Equals(m.Fileinfo.FullName, file, StringComparison.Ordinal));
+                if (mod is not null)
                 {
-                    Name = mod.Name,
-                    Path = file,
-                    Enabled = mod.Enabled,
-                    IsMod = true,
-                };
+                    if (mod.Type == ResourceFolderType.Folder)
+                    {
+                        continue;
+                    }
+
+                    var metadata = modList.GetMetadata(mod);
+                    if (metadata is not null && metadata.Provider == ResourceProvider.Flame)
+                    {
+                        resolvedFiles[file] = new ResolvedFile
+                        {
+                            AddonId = ParseLong(metadata.ProjectId),
+                            Version = ParseLong(metadata.FileId),
+                            Enabled = mod.Enabled,
+                            IsMod = true,
+                            Name = metadata.Name,
+                            Slug = metadata.Slug,
+                            Authors = string.Join(", ", mod.Authors()),
+                        };
+                        continue;
+                    }
+
+                    var modHash = HashUtils.HashFile(file, Algorithm.Murmur2);
+                    pendingHashes[modHash] = new HashInfo
+                    {
+                        Name = mod.Name,
+                        Path = file,
+                        Enabled = mod.Enabled,
+                        IsMod = true,
+                    };
+                }
             }
         }
-    }
 
-    private async Task MakeApiRequest(CancellationToken cancellationToken)
-    {
-        if (_pendingHashes.Count == 0)
+        async Task MakeApiRequest()
         {
-            await BuildZipAsync(cancellationToken);
-            return;
-        }
-
-        EmitStatus("Finding versions for hashes...");
-        SetProgress(2, 5);
-
-        var fingerprints = new List<uint>();
-        foreach (var murmur in _pendingHashes.Keys)
-        {
-            if (uint.TryParse(murmur, NumberStyles.None, CultureInfo.InvariantCulture, out var fp))
+            if (pendingHashes.Count == 0)
             {
-                fingerprints.Add(fp);
+                await BuildZipAsync();
+                return;
             }
+
+            progress?.Report(new TaskProgress(2, 5));
+
+            var fingerprints = new List<uint>();
+            foreach (var murmur in pendingHashes.Keys)
+            {
+                if (uint.TryParse(murmur, NumberStyles.None, CultureInfo.InvariantCulture, out var fp))
+                {
+                    fingerprints.Add(fp);
+                }
+            }
+
+            try
+            {
+                ParseApiResponse(await flame.Fingerprints.Match(fingerprints).SendTo(http, cancellationToken));
+            }
+            catch (FlameApiException)
+            {
+                // (the C++ only logged the fingerprint failure and continued to the info pass)
+            }
+
+            pendingHashes.Clear();
+            await GetProjectsInfo();
         }
 
-        try
-        {
-            ParseApiResponse(await _flame.Fingerprints.Match(fingerprints).SendTo(_http, cancellationToken));
-        }
-        catch (FlameApiException)
-        {
-            // (the C++ only logged the fingerprint failure and continued to the info pass)
-        }
-
-        _pendingHashes.Clear();
-        await GetProjectsInfo(cancellationToken);
-    }
-
-    private void ParseApiResponse(FlameFingerprintResponse response)
-    {
+        void ParseApiResponse(FlameFingerprintResponse response)
         {
             var exactMatches = response.Data?.ExactMatches;
             if (exactMatches is null or { Count: 0 })
@@ -242,16 +232,15 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
                 }
 
                 var fingerprint = (fileObj.FileFingerprint ?? 0).ToString(CultureInfo.InvariantCulture);
-                if (!_pendingHashes.TryGetValue(fingerprint, out var mod))
+                if (!pendingHashes.TryGetValue(fingerprint, out var mod))
                 {
                     // "Invalid fingerprint from the API response."
                     continue;
                 }
 
-                EmitStatus($"Parsing API response from CurseForge for '{mod.Name}'...");
                 if (fileObj.IsAvailable == true)
                 {
-                    _resolvedFiles[mod.Path] = new ResolvedFile
+                    resolvedFiles[mod.Path] = new ResolvedFile
                     {
                         AddonId = fileObj.ModId ?? 0,
                         Version = fileObj.Id ?? 0,
@@ -261,261 +250,250 @@ public sealed class FlamePackExportTask(FlamePackExportTask.Options options) : F
                 }
             }
         }
-    }
 
-    private async Task GetProjectsInfo(CancellationToken cancellationToken)
-    {
-        EmitStatus("Finding project info from CurseForge...");
-        SetProgress(3, 5);
-        var addonIds = _resolvedFiles.Values
-            .Where(resolved => resolved.Slug.Length == 0)
-            .Select(resolved => resolved.AddonId.ToString(CultureInfo.InvariantCulture))
-            .ToList();
+        async Task GetProjectsInfo()
+        {
+            progress?.Report(new TaskProgress(3, 5));
+            var addonIds = resolvedFiles.Values
+                .Where(resolved => resolved.Slug.Length == 0)
+                .Select(resolved => resolved.AddonId.ToString(CultureInfo.InvariantCulture))
+                .ToList();
 
-        if (addonIds.Count == 0)
-        {
-            await BuildZipAsync(cancellationToken);
-            return;
-        }
-
-        var single = addonIds.Count == 1;
-        List<FlameProject?>? entries = null;
-        try
-        {
-            entries = single
-                ? [(
-                    await _flame.Projects.ById(addonIds[0]).SendTo(_http, cancellationToken)).Data
-                    ?? throw new JsonException("'data' is not an object")]
-                : (await _flame.Projects.ByIds(addonIds).SendTo(_http, cancellationToken)).Data
-                  ?? throw new JsonException("'data' is not an array");
-        }
-        catch (FlameApiException e) when (e.InnerException is HttpRequestException)
-        {
-            EmitFailed(e.Message);
-            return;
-        }
-        catch (Exception e) when (e is FlameApiException or JsonException)
-        {
-            // a broken response body (the wrapped decode) only skips the project-info
-            // enrichment: the export still builds its zip, like the former kind-failure flow
-        }
-
-        if (entries is not null)
-        {
-            foreach (var entryObj in entries)
+            if (addonIds.Count == 0)
             {
-                try
+                await BuildZipAsync();
+                return;
+            }
+
+            var single = addonIds.Count == 1;
+            List<FlameProject?>? entries = null;
+            try
+            {
+                entries = single
+                    ?
+                    [
+                        (
+                            await flame.Projects.ById(addonIds[0]).SendTo(http, cancellationToken)).Data
+                        ?? throw new JsonException("'data' is not an object")
+                    ]
+                    : (await flame.Projects.ByIds(addonIds).SendTo(http, cancellationToken)).Data
+                      ?? throw new JsonException("'data' is not an array");
+            }
+            catch (FlameApiException e) when (e.InnerException is HttpRequestException)
+            {
+                throw new InvalidOperationException(e.Message);
+            }
+            catch (Exception e) when (e is FlameApiException or JsonException)
+            {
+                // a broken response body (the wrapped decode) only skips the project-info
+                // enrichment: the export still builds its zip, like the former kind-failure flow
+            }
+
+            if (entries is not null)
+            {
+                foreach (var entryObj in entries)
                 {
-                    if (entryObj is null)
+                    try
+                    {
+                        if (entryObj is null)
+                        {
+                            continue;
+                        }
+
+                        var pack = new IndexedPack();
+                        FlameMod.LoadIndexedPack(pack, entryObj);
+                        foreach (var (key, val) in resolvedFiles)
+                        {
+                            if (val.AddonId.ToString(CultureInfo.InvariantCulture) == pack.AddonId)
+                            {
+                                var authors = string.Join(", ", pack.Authors.Select(a => a.Name));
+                                resolvedFiles[key] = new ResolvedFile
+                                {
+                                    AddonId = val.AddonId,
+                                    Version = val.Version,
+                                    Enabled = val.Enabled,
+                                    IsMod = val.IsMod,
+                                    Name = pack.Name,
+                                    Slug = pack.Slug,
+                                    Authors = authors,
+                                };
+                            }
+                        }
+                    }
+                    catch (JsonException) { }
+                }
+            }
+            await BuildZipAsync();
+        }
+
+        async Task BuildZipAsync()
+        {
+            progress?.Report(new TaskProgress(4, 5));
+
+            var outputPath = options.Output?.Value;
+            if (string.IsNullOrEmpty(outputPath))
+            {
+                throw new InvalidOperationException("No output path given for the export zip.");
+            }
+
+            try
+            {
+                using var stream = File.Create(outputPath);
+                using var zip = new ZipArchive(stream, ZipArchiveMode.Create);
+
+                // the ExportToZipTask layout: everything under the game root, prefixed with
+                // "overrides/", minus the files that the manifest references by id
+                var exclude = resolvedFiles.Keys
+                    .Select(path => Path.GetRelativePath(gameRoot.Value, path).Replace('\\', '/'))
+                    .ToHashSet();
+
+                foreach (var file in files)
+                {
+                    var relative = GetRelativePath(file);
+                    if (relative.Length == 0 || exclude.Contains(relative))
                     {
                         continue;
                     }
 
-                    EmitStatus($"Parsing API response from CurseForge for '{entryObj.Name ?? ""}'...");
-
-                    var pack = new IndexedPack();
-                    FlameMod.LoadIndexedPack(pack, entryObj);
-                    foreach (var (key, val) in _resolvedFiles)
+                    if (File.Exists(file))
                     {
-                        if (val.AddonId.ToString(CultureInfo.InvariantCulture) == pack.AddonId)
-                        {
-                            var authors = string.Join(", ", pack.Authors.Select(a => a.Name));
-                            _resolvedFiles[key] = new ResolvedFile
-                            {
-                                AddonId = val.AddonId,
-                                Version = val.Version,
-                                Enabled = val.Enabled,
-                                IsMod = val.IsMod,
-                                Name = pack.Name,
-                                Slug = pack.Slug,
-                                Authors = authors,
-                            };
-                        }
+                        zip.CreateEntryFromFile(file, "overrides/" + relative, CompressionLevel.Optimal);
                     }
                 }
-                catch (JsonException) { }
-            }
-        }
-        await BuildZipAsync(cancellationToken);
-    }
 
-    private async Task BuildZipAsync(CancellationToken cancellationToken)
-    {
-        _ = cancellationToken;
-        EmitStatus("Adding files...");
-        SetProgress(4, 5);
-
-        var outputPath = options.Output?.Value;
-        if (string.IsNullOrEmpty(outputPath))
-        {
-            EmitFailed("No output path given for the export zip.");
-            return;
-        }
-
-        try
-        {
-            using var stream = File.Create(outputPath);
-            using var zip = new ZipArchive(stream, ZipArchiveMode.Create);
-
-            // the ExportToZipTask layout: everything under the game root, prefixed with
-            // "overrides/", minus the files that the manifest references by id
-            var exclude = _resolvedFiles.Keys
-                .Select(path => Path.GetRelativePath(_gameRoot.Value, path).Replace('\\', '/'))
-                .ToHashSet();
-
-            foreach (var file in _files)
-            {
-                var relative = GetRelativePath(file);
-                if (relative.Length == 0 || exclude.Contains(relative))
+                var manifestEntry = zip.CreateEntry("manifest.json", CompressionLevel.Optimal);
+                using (var writer = new StreamWriter(manifestEntry.Open(), Encoding.UTF8))
                 {
-                    continue;
+                    await writer.WriteAsync(GenerateIndex());
                 }
 
-                if (File.Exists(file))
+                var modlistEntry = zip.CreateEntry("modlist.html", CompressionLevel.Optimal);
+                using (var writer = new StreamWriter(modlistEntry.Open(), Encoding.UTF8))
                 {
-                    zip.CreateEntryFromFile(file, "overrides/" + relative, CompressionLevel.Optimal);
+                    await writer.WriteAsync(GenerateHtml());
+                }
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
+                                          or NotSupportedException)
+            {
+                throw new InvalidOperationException("Could not write the export zip: " + e.Message);
+            }
+        }
+
+        string GenerateIndex()
+        {
+            var obj = new JsonObject
+            {
+                ["manifestType"] = "minecraftModpack",
+                ["manifestVersion"] = 1,
+                ["name"] = options.Name,
+                ["version"] = options.Version,
+                ["author"] = options.Author,
+                ["overrides"] = "overrides",
+            };
+
+            var version = new JsonObject();
+
+            var profile = options.Instance.GetPackProfile();
+            profile.Load(); // (MinecraftInstance loads its profile lazily in the C++; make it explicit here)
+
+            // collect all supported components
+            var minecraft = profile.GetComponent("net.minecraft");
+            var quilt = profile.GetComponent("org.quiltmc.quilt-loader");
+            var fabric = profile.GetComponent("net.fabricmc.fabric-loader");
+            var forge = profile.GetComponent("net.minecraftforge");
+            var neoforge = profile.GetComponent("net.neoforged");
+
+            // convert all available components to manifest mod loaders
+            var id = "";
+            if (quilt is not null)
+            {
+                id = "quilt-" + quilt.Version;
+            }
+            else if (fabric is not null)
+            {
+                id = "fabric-" + fabric.Version;
+            }
+            else if (forge is not null)
+            {
+                id = "forge-" + forge.Version;
+            }
+            else if (neoforge is not null)
+            {
+                id = "neoforge-";
+                if (minecraft?.Version == "1.20.1")
+                {
+                    id += "1.20.1-";
+                }
+
+                id += neoforge.Version;
+            }
+
+            if (minecraft is not null)
+            {
+                version["version"] = minecraft.Version;
+            }
+
+            var modLoaders = new JsonArray();
+            if (id.Length != 0)
+            {
+                var loader = new JsonObject
+                {
+                    ["id"] = id,
+                    ["primary"] = true,
+                };
+                modLoaders.Add((JsonNode?)loader);
+            }
+
+            version["modLoaders"] = modLoaders;
+
+            obj["minecraft"] = version;
+
+            var manifestFiles = new JsonArray();
+            foreach (var mod in resolvedFiles.Values)
+            {
+                var file = new JsonObject
+                {
+                    ["projectID"] = mod.AddonId,
+                    ["fileID"] = mod.Version,
+                    ["required"] = mod.Enabled || !options.OptionalFiles,
+                };
+                manifestFiles.Add((JsonNode?)file);
+            }
+
+            obj["files"] = manifestFiles;
+
+            return obj.ToJsonString();
+        }
+
+        string GenerateHtml()
+        {
+            var content = "";
+            foreach (var mod in resolvedFiles.Values)
+            {
+                if (mod.IsMod)
+                {
+                    var authors = mod.Authors.Length != 0
+                        ? WebUtility.HtmlEncode($" (by {mod.Authors})")
+                        : "";
+                    content += Template
+                        .Replace("{name}", WebUtility.HtmlEncode(mod.Name))
+                        .Replace("{url}", WebUtility.HtmlEncode(ModIndex.GetMetaUrl(ResourceProvider.Flame,
+                            mod.AddonId.ToString(CultureInfo.InvariantCulture))))
+                        .Replace("{authors}", authors);
                 }
             }
 
-            var manifestEntry = zip.CreateEntry("manifest.json", CompressionLevel.Optimal);
-            using (var writer = new StreamWriter(manifestEntry.Open(), Encoding.UTF8))
-            {
-                await writer.WriteAsync(GenerateIndex());
-            }
-
-            var modlistEntry = zip.CreateEntry("modlist.html", CompressionLevel.Optimal);
-            using (var writer = new StreamWriter(modlistEntry.Open(), Encoding.UTF8))
-            {
-                await writer.WriteAsync(GenerateHtml());
-            }
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                      or NotSupportedException)
-        {
-            EmitFailed("Could not write the export zip: " + e.Message);
-            return;
+            content = "<ul>" + content + "</ul>";
+            return content;
         }
 
-        EmitSucceeded();
-    }
+        string GetRelativePath(string file) =>
+            Path.GetRelativePath(gameRoot.Value, file).Replace('\\', '/');
 
-    private string GenerateIndex()
-    {
-        var obj = new JsonObject
-        {
-            ["manifestType"] = "minecraftModpack",
-            ["manifestVersion"] = 1,
-            ["name"] = options.Name,
-            ["version"] = options.Version,
-            ["author"] = options.Author,
-            ["overrides"] = "overrides",
-        };
-
-        var version = new JsonObject();
-
-        var profile = options.Instance.GetPackProfile();
-        profile.Load(); // (MinecraftInstance loads its profile lazily in the C++; make it explicit here)
-
-        // collect all supported components
-        var minecraft = profile.GetComponent("net.minecraft");
-        var quilt = profile.GetComponent("org.quiltmc.quilt-loader");
-        var fabric = profile.GetComponent("net.fabricmc.fabric-loader");
-        var forge = profile.GetComponent("net.minecraftforge");
-        var neoforge = profile.GetComponent("net.neoforged");
-
-        // convert all available components to manifest mod loaders
-        var id = "";
-        if (quilt is not null)
-        {
-            id = "quilt-" + quilt.Version;
-        }
-        else if (fabric is not null)
-        {
-            id = "fabric-" + fabric.Version;
-        }
-        else if (forge is not null)
-        {
-            id = "forge-" + forge.Version;
-        }
-        else if (neoforge is not null)
-        {
-            id = "neoforge-";
-            if (minecraft?.Version == "1.20.1")
-            {
-                id += "1.20.1-";
-            }
-
-            id += neoforge.Version;
-        }
-
-        if (minecraft is not null)
-        {
-            version["version"] = minecraft.Version;
-        }
-
-        var modLoaders = new JsonArray();
-        if (id.Length != 0)
-        {
-            var loader = new JsonObject
-            {
-                ["id"] = id,
-                ["primary"] = true,
-            };
-            modLoaders.Add((JsonNode?)loader);
-        }
-
-        version["modLoaders"] = modLoaders;
-
-        obj["minecraft"] = version;
-
-        var files = new JsonArray();
-        foreach (var mod in _resolvedFiles.Values)
-        {
-            var file = new JsonObject
-            {
-                ["projectID"] = mod.AddonId,
-                ["fileID"] = mod.Version,
-                ["required"] = mod.Enabled || !options.OptionalFiles,
-            };
-            files.Add((JsonNode?)file);
-        }
-
-        obj["files"] = files;
-
-        return obj.ToJsonString();
-    }
-
-    private string GenerateHtml()
-    {
-        var content = "";
-        foreach (var mod in _resolvedFiles.Values)
-        {
-            if (mod.IsMod)
-            {
-                var authors = mod.Authors.Length != 0
-                    ? WebUtility.HtmlEncode($" (by {mod.Authors})")
-                    : "";
-                content += Template
-                    .Replace("{name}", WebUtility.HtmlEncode(mod.Name))
-                    .Replace("{url}", WebUtility.HtmlEncode(ModIndex.GetMetaUrl(ResourceProvider.Flame,
-                        mod.AddonId.ToString(CultureInfo.InvariantCulture))))
-                    .Replace("{authors}", authors);
-            }
-        }
-
-        content = "<ul>" + content + "</ul>";
-        return content;
-    }
-
-    private string GetRelativePath(string file)
-    {
-        return Path.GetRelativePath(_gameRoot.Value, file).Replace('\\', '/');
-    }
-
-    private static long ParseLong(string value)
-    {
-        return long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
-            ? parsed
-            : 0;
+        static long ParseLong(string value) =>
+            long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+                ? parsed
+                : 0;
     }
 }

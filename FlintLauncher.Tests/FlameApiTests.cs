@@ -17,12 +17,11 @@ using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Hashing;
-using FlintLauncher.Core.Versioning;
-using TruePath;
-using Xunit;
 using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
+using TruePath;
+using Xunit;
 
 namespace FlintLauncher.Tests;
 
@@ -433,10 +432,8 @@ public class FlameApiTests : IDisposable
 
         var manifest = new FlameManifest { Files = { [456] = new FlameFile { ProjectId = 123, FileId = 456 } } };
 
-        var task = new FileResolvingTask(manifest, _modrinth, _http, flame: _flameApi);
-        await task.StartAsync();
-
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await FileResolvingTask.RunAsync(manifest, _modrinth, _http, _flameApi,
+            cancellationToken: TestContext.Current.CancellationToken);
         var file = manifest.Files[456];
         Assert.Equal("456", file.Version.FileId);
         Assert.Equal("test.jar", file.Version.FileName);
@@ -460,11 +457,10 @@ public class FlameApiTests : IDisposable
 
         var manifest = new FlameManifest { Files = { [456] = new FlameFile { ProjectId = 123, FileId = 456 } } };
 
-        var task = new FileResolvingTask(manifest, _modrinth, _http, flame: _flameApi) { FallbackMrBlockedMods = false };
-        await task.StartAsync();
+        await FileResolvingTask.RunAsync(manifest, _modrinth, _http, _flameApi,
+            fallbackMrBlockedMods: false, cancellationToken: TestContext.Current.CancellationToken);
 
         // the resolve succeeds; the blocked state is the *missing download URL*
-        Assert.True(task.WasSuccessful, task.FailReason);
         var version = manifest.Files[456].Version;
         Assert.Equal("", version.DownloadUrl);
         Assert.Equal("456", version.FileId);
@@ -482,10 +478,8 @@ public class FlameApiTests : IDisposable
 
         var manifest = new FlameManifest { Files = { [456] = new FlameFile { ProjectId = 123, FileId = 456 } } };
 
-        var task = new FileResolvingTask(manifest, _modrinth, _http, flame: _flameApi);
-        await task.StartAsync();
-
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await FileResolvingTask.RunAsync(manifest, _modrinth, _http, _flameApi,
+            cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(ResourceType.World, manifest.Files[456].Pack.ResourceType);
         Assert.Equal("saves", manifest.Files[456].TargetFolder);
     }

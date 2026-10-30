@@ -11,7 +11,6 @@
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Tasks;
 using TruePath;
 using Xunit;
 
@@ -137,8 +136,7 @@ public class InstanceCopyTests : IDisposable
         task.Icon = "flint-icon";
         task.SetParentEnvironment(_global.Environment);
 
-        await list.WrapInstanceTask(task).StartAsync();
-        Assert.True(task.WasSuccessful);
+        await list.WrapInstanceTask(task)(TestContext.Current.CancellationToken);
 
         var copiedDir = Path.Combine(_instancesDir, "Source Copy");
         Assert.True(Directory.Exists(copiedDir));
@@ -174,8 +172,7 @@ public class InstanceCopyTests : IDisposable
         task.SetParentEnvironment(_global.Environment);
 
         var list = CreateList();
-        await list.WrapInstanceTask(task).StartAsync();
-        Assert.True(task.WasSuccessful);
+        await list.WrapInstanceTask(task)(TestContext.Current.CancellationToken);
 
         var copyDir = Path.Combine(_instancesDir, "Fresh Copy");
         // the copied cfg still carries the source's number (read-compat, never rewritten)…
@@ -198,8 +195,7 @@ public class InstanceCopyTests : IDisposable
         task.SetParentEnvironment(_global.Environment);
 
         var list = CreateList();
-        await list.WrapInstanceTask(task).StartAsync();
-        Assert.True(task.WasSuccessful);
+        await list.WrapInstanceTask(task)(TestContext.Current.CancellationToken);
 
         var copiedDir = Path.Combine(_instancesDir, "No Saves");
         Assert.True(File.Exists(Path.Combine(copiedDir, "minecraft", "options.txt")));
@@ -218,14 +214,12 @@ public class InstanceCopyTests : IDisposable
         var first = new InstanceCopyTask(source, new InstanceCopyPrefs());
         first.SetName("Source");
         first.SetParentEnvironment(_global.Environment);
-        await list.WrapInstanceTask(first).StartAsync();
-        Assert.True(first.WasSuccessful);
+        await list.WrapInstanceTask(first)(TestContext.Current.CancellationToken);
 
         var second = new InstanceCopyTask(source, new InstanceCopyPrefs());
         second.SetName("Source");
         second.SetParentEnvironment(_global.Environment);
-        await list.WrapInstanceTask(second).StartAsync();
-        Assert.True(second.WasSuccessful);
+        await list.WrapInstanceTask(second)(TestContext.Current.CancellationToken);
 
         Assert.True(Directory.Exists(Path.Combine(_instancesDir, "Source(1)")));
 
@@ -243,13 +237,15 @@ public class InstanceCopyTests : IDisposable
 
         var symlinks = new InstanceCopyTask(source, new InstanceCopyPrefs { UseSymLinks = true });
         symlinks.SetParentEnvironment(_global.Environment);
-        await symlinks.StartAsync();
-        Assert.Equal(TaskState.Failed, symlinks.State);
+        var symlinksEx = await Assert.ThrowsAnyAsync<Exception>(() => symlinks.ExecuteAsync(TestContext.Current.CancellationToken));
+        Assert.Contains("not supported", symlinksEx.Message);
+
 
         var clone = new InstanceCopyTask(source, new InstanceCopyPrefs { UseClone = true });
         clone.SetParentEnvironment(_global.Environment);
-        await clone.StartAsync();
-        Assert.Equal(TaskState.Failed, clone.State);
+        var cloneEx = await Assert.ThrowsAnyAsync<Exception>(() => clone.ExecuteAsync(TestContext.Current.CancellationToken));
+        Assert.Contains("not supported", cloneEx.Message);
+
 
         // nothing was copied (only the source instance itself is there)
         Assert.Equal(["Source"], Directory.GetFileSystemEntries(_instancesDir)

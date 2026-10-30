@@ -28,34 +28,17 @@
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class ScanModFolders(LaunchTask parent) : LaunchStep(parent)
+public sealed class ScanModFolders(LaunchTask parent) : AwaitedStep(parent)
 {
-    private bool _modsDone;
-    private bool _coreModsDone;
-    private bool _nilModsDone;
-
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override Task RunAsync(CancellationToken cancellationToken)
     {
         var inst = Parent.Instance;
 
-        var loaders = inst.LoaderModList();
-        _modsDone = loaders.Update();
-
-        var cores = inst.CoreModList();
-        _coreModsDone = cores.Update();
-
-        var nils = inst.NilModList();
-        _nilModsDone = nils.Update();
-
-        CheckDone();
+        // a folder that cannot be enumerated contributes an empty list; the launch runs on
+        // whatever was read, so the outcome does not change this step's result
+        _ = inst.LoaderModList().Update();
+        _ = inst.CoreModList().Update();
+        _ = inst.NilModList().Update();
         return Task.CompletedTask;
-    }
-
-    private void CheckDone()
-    {
-        if (_modsDone && _coreModsDone && _nilModsDone)
-        {
-            EmitSucceeded();
-        }
     }
 }

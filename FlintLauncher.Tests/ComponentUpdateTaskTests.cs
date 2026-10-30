@@ -20,7 +20,6 @@ using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
 using TruePath;
 using Xunit;
 using Index = FlintLauncher.Core.Meta.Index;
@@ -144,7 +143,7 @@ public class ComponentUpdateTaskTests : IDisposable
         await File.WriteAllTextAsync(metaFile, json);
         var metaVersion = index.Get(uid, version);
         metaVersion.Sha256 = Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(metaFile))).ToLowerInvariant();
-        await metaVersion.LoadTask(NetMode.Offline).StartAsync();
+        await metaVersion.LoadAsync(NetMode.Offline);
         Assert.True(metaVersion.IsLoaded, "seeded meta version should be loaded");
     }
 
@@ -184,7 +183,6 @@ public class ComponentUpdateTaskTests : IDisposable
         using var profile = NewProfile();
         var result = await profile.ReloadAsync(NetMode.Offline);
         Assert.True(result.Ok, result.ErrorMessage);
-        Assert.Null(profile.GetCurrentTask()); // updateSucceeded() released it
 
         var launchProfile = profile.GetProfile();
         Assert.NotNull(launchProfile);
@@ -216,10 +214,10 @@ public class ComponentUpdateTaskTests : IDisposable
         Assert.True(profile.Load().Ok);
 
         var task = new ComponentUpdateTask(ComponentUpdateTask.Mode.Resolution, NetMode.Offline, profile);
-        await task.StartAsync();
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            task.RunAsync(TestContext.Current.CancellationToken));
 
-        Assert.Equal(TaskState.Failed, task.State);
-        Assert.Equal("Some component metadata load tasks failed.", task.FailReason);
+        Assert.Equal("Some component metadata load tasks failed.", failure.Message);
 
         // cleanup the shared meta cache folder (the profile does not own it)
         Directory.Delete(MetaDirFor("net.minecraft"), true);
@@ -234,11 +232,11 @@ public class ComponentUpdateTaskTests : IDisposable
             requires: ("net.minecraft", "1.12.2")));
 
         using var profile = NewProfile();
-        var result = await profile.ReloadAsync(NetMode.Offline);
-        // the reload itself succeeded (the component file was read); the checkOnly dependency
-        // pass failed afterwards (like upstream, reload() does not report the task failure)
-        Assert.True(result.Ok, result.ErrorMessage);
-        Assert.Null(profile.GetCurrentTask()); // updateFailed() released it
+        // the component file itself loads; the checkOnly dependency pass fails afterwards, and
+        // the failure surfaces because ReloadAsync completes when the resolution does
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            profile.ReloadAsync(NetMode.Offline));
+        Assert.Contains("unresolved dependencies", failure.Message);
 
         var component = profile.GetComponent("test.modloader");
         Assert.NotNull(component);

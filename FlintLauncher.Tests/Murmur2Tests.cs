@@ -134,15 +134,11 @@ public class Murmur2Tests
         Murmur2.FilterFunc cf = c => c is 9 or 10 or 13 or 32;
         Assert.Equal(Murmur2.Hash(data, cf).ToString(), HashUtils.HashFile(path, Algorithm.Murmur2));
 
-        var hasher = HashUtils.CreateHasher(path, "sha512");
-        await hasher.StartAsync();
-        Assert.True(hasher.WasSuccessful);
-        Assert.Equal(HashUtils.Hash(data, Algorithm.Sha512), hasher.GetResult());
-
-        // the provider-based factory maps FLAME to the CF murmur2 variant
-        var cfHasher = HashUtils.CreateHasher(path, ResourceProvider.Flame);
-        await cfHasher.StartAsync();
-        Assert.Equal(HashUtils.Hash(data, Algorithm.Murmur2), cfHasher.GetResult());
+        // the provider-based mapping picks sha512 for Modrinth and the CF murmur2 variant for Flame
+        Assert.Equal(HashUtils.Hash(data, Algorithm.Sha512),
+            HashUtils.HashFile(path, HashUtils.HasherAlgorithm(ResourceProvider.Modrinth)));
+        Assert.Equal(HashUtils.Hash(data, Algorithm.Murmur2),
+            HashUtils.HashFile(path, HashUtils.HasherAlgorithm(ResourceProvider.Flame)));
 
         Directory.Delete(dir, recursive: true);
     }

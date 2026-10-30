@@ -18,64 +18,53 @@
 //     See the License for the specific language governing permissions and
 //     limitations under the License.
 //
-// Port of launcher/launch/LaunchStep.{h,cpp}.
+// One stage of the LaunchTask pipeline. A step is a body that the engine awaits: returning
+// succeeds it and throwing fails it, with the exception's message as the reason. A step whose
+// end is an external event (the game exiting) parks its body on that event.
 //
-// A LaunchStep is one stage of the LaunchTask pipeline. Like every FlintTask it becomes
-// finished by calling EmitSucceeded/EmitFailed/EmitAborted from ExecuteAsync; the LaunchTask
-// listens for the terminal states (the C++ `finished` signal) and advances the chain.
+// The base constructor wires the step's log and gate requests to the engine, so a step reports
+// its log lines and asks for the launch gate without holding the engine reference itself.
 //
-// Deviations from the C++ original:
-//  - The Qt connect() wiring of the constructor becomes C# event subscriptions in the base
-//    constructor (readyForLaunch -> LaunchTask.OnReadyForLaunch, logLine/logLines ->
-//    OnLogLine/OnLogLines, progressReportingRequest -> OnProgressReportingRequested and the
-//    finished() -> onStepFinished() wiring, here expressed as subscriptions to the
-//    Succeeded/Failed/Aborted events).
-//  - Task::abort() (bool) is ported as AbortStep() (bool); the inherited
-//    FlintTask.Abort() (void, cooperative cancellation) is what the default implementation
-//    drives, mirroring the C++ Task subclasses that emit aborted() themselves.
-//  - `finalize()` is named FinalizeStep() (System.Object::Finalize clash).
-//  - C++ Task::canAbort() defaults to a false m_can_abort flag; steps that can be aborted
-//    override it. The port keeps that default.
-
-using FlintLauncher.Core.Tasks;
+// abort() is a request: CanAbort() says whether the step can honour one right now, and
+// AbortStep() does it (writing an abort command, killing the process). A step that cannot be
+// interrupted mid-work reports false rather than pretending.
 
 namespace FlintLauncher.Core.Launch;
 
-public abstract class LaunchStep : FlintTask
+public abstract class LaunchStep
 {
     protected LaunchStep(LaunchTask parent)
     {
         Parent = parent;
 
-        // LaunchStep::LaunchStep() connect() block
-        ReadyForLaunch += parent.OnReadyForLaunch;
         LogLine += parent.OnLogLine;
         LogLines += parent.OnLogLines;
-        ProgressReportingRequest += parent.OnProgressReportingRequested;
-        Succeeded += parent.OnStepFinished;
-        Failed += parent.OnStepFailed;
-        Aborted += parent.OnStepFinished;
+        ReadyForLaunch += () => parent.OnReadyForLaunch(this);
+        ProgressReportingRequest += () => parent.OnProgressReportingRequested(this);
     }
 
-    /// <summary>The LaunchTask this step belongs to (C++ m_parent).</summary>
+    /// <summary>The LaunchTask this step belongs to.</summary>
     public LaunchTask Parent { get; }
 
     /// <summary>The injected launch dependencies (the parent's LaunchServices): paths, logger
-    /// factory, global settings, UI hooks. Replaces the former APPLICATION-singleton static
-    /// hooks of the C++ steps.</summary>
+    /// factory, global settings, UI hooks.</summary>
     public LaunchServices Services => Parent.Services;
 
-    /// <summary>Port of the logLines(QStringList, MessageLevel) signal.</summary>
+    /// <summary>The log lines this step emits, as a list.</summary>
     public event Action<List<string>, MessageLevel>? LogLines;
 
-    /// <summary>Port of the logLine(QString, MessageLevel) signal.</summary>
+    /// <summary>One log line from this step.</summary>
     public event Action<string, MessageLevel>? LogLine;
 
-    /// <summary>Port of the readyForLaunch() signal.</summary>
+    /// <summary>The step is ready for the launch gate: the host answers with Proceed().</summary>
     public event Action? ReadyForLaunch;
 
-    /// <summary>Port of the progressReportingRequest() signal.</summary>
+    /// <summary>The step asked the host to make a progress decision (the launch gate).</summary>
     public event Action? ProgressReportingRequest;
+
+    /// <summary>The step's work. Returning succeeds the step; throwing fails it. The token is
+    /// cancelled when the launch is aborted, so a body that awaits it stops.</summary>
+    internal abstract Task ExecuteAsync(CancellationToken cancellationToken);
 
     protected void EmitLogLines(IReadOnlyList<string> lines, MessageLevel level) =>
         LogLines?.Invoke([.. lines], level);
@@ -86,26 +75,20 @@ public abstract class LaunchStep : FlintTask
 
     protected void EmitProgressReportingRequest() => ProgressReportingRequest?.Invoke();
 
-    /// <summary>
-    /// Port of the proceed() slot: called when the UI (or the headless controller) confirms the
-    /// launch. Steps that gate on user confirmation override this.
-    /// </summary>
+    /// <summary>Opens the gate this step asked for. Steps that gate override this.</summary>
     public virtual void Proceed() { }
 
-    /// <summary>
-    /// Port of the finalize() slot: called in the opposite order than the start, used to clean
-    /// up or otherwise undo things after the launch ends.
-    /// </summary>
+    /// <summary>Runs after the launch chain ends, deepest step first, to undo what the step
+    /// set up (an extracted folder, a synthesized jar).</summary>
     public virtual void FinalizeStep() { }
 
-    /// <summary>Port of Task::canAbort() (default: not abortable, like the C++ m_can_abort).</summary>
+    /// <summary>Whether the step can honour an abort right now. A step that cannot be
+    /// interrupted mid-work reports false, the default.</summary>
     public virtual bool CanAbort() => false;
 
-    /// <summary>Port of Task::abort() (bool): request the step to stop. Returns whether the
-    /// request was honoured.</summary>
-    public virtual bool AbortStep()
-    {
-        Abort();
-        return true;
-    }
+    /// <summary>Requests the step to stop, returning whether the request was honoured. The
+    /// engine cancels the launch token when any step honours one, which ends a body parked on
+    /// it; a step driving something the token does not reach (a child process) also stops that
+    /// here.</summary>
+    public virtual bool AbortStep() => CanAbort();
 }

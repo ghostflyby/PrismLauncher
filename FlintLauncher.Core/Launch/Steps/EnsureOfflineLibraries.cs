@@ -11,33 +11,20 @@ using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class EnsureOfflineLibraries(LaunchTask parent, MinecraftInstance instance) : LaunchStep(parent)
+public sealed class EnsureOfflineLibraries(LaunchTask parent, MinecraftInstance instance) : AwaitedStep(parent)
 {
-    protected override Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override Task RunAsync(CancellationToken cancellationToken)
     {
-        var profile = instance.GetPackProfile().GetProfile();
-        if (profile is null)
-        {
-            EmitFailed("The instance profile is missing.");
-            return Task.CompletedTask;
-        }
+        var profile = instance.GetPackProfile().GetProfile()
+                      ?? throw new InvalidOperationException("The instance profile is missing.");
 
         var allJars = new List<AbsolutePath>();
         profile.GetLibraryFiles(instance.RuntimeContext, allJars, allJars, instance.GetLocalLibraryPath(),
             instance.BinRoot(), false, storageBase: instance.LibraryStorageBase());
 
-        var missing = new List<AbsolutePath>();
-        foreach (var jar in allJars)
-        {
-            if (!jar.ExistsFile())
-            {
-                missing.Add(jar);
-            }
-        }
-
+        var missing = allJars.Where(jar => !jar.ExistsFile()).ToList();
         if (missing.Count == 0)
         {
-            EmitSucceeded();
             return Task.CompletedTask;
         }
 
@@ -49,7 +36,6 @@ public sealed class EnsureOfflineLibraries(LaunchTask parent, MinecraftInstance 
 
         EmitLogLine("\nThis instance cannot be launched because some libraries are missing or have not been downloaded yet. Please " +
                     "try again in online mode with a working Internet connection", MessageLevel.Fatal);
-        EmitFailed("Required libraries are missing");
-        return Task.CompletedTask;
+        throw new InvalidOperationException("Required libraries are missing");
     }
 }

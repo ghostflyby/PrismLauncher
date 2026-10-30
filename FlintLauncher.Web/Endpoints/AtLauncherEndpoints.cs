@@ -6,7 +6,7 @@
 // C++ AtlListModel) and the pack install — AtLauncherPackInstallTask run through the same
 // staged-commit flow as POST /instances/vanilla (the ATL configs/mods downloads are small,
 // so the flow is synchronous: 201 with the committed instance, 500 creation_failed with the
-// task's FailReason otherwise, e.g. a Configs.json 404 for an unknown pack/version).
+// failure reason otherwise, e.g. a Configs.json 404 for an unknown pack/version).
 //
 // The ATL download-server/API URL hooks (AtLauncherApi.DownloadServerUrl / ApiBaseUrl) are
 // per-host state (AtLauncherApi — the headless equivalent of the C++ BuildConfig
@@ -19,6 +19,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.Net;
+using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 using TruePath;
@@ -101,12 +102,15 @@ public static class AtLauncherEndpoints
                 // directory already exists and DirNameFromString would return "<name>(1)"
                 AbsolutePath inDir = instances.PrimaryDir();
                 var expectedId = FileNaming.DirNameFromString(request.Name, [inDir]);
-                await wrapped.StartAsync();
-                if (!wrapped.WasSuccessful)
+                try
                 {
-                    // the staging wrapper re-emits the inner task's FailReason (unknown
-                    // pack/version surface its text)
-                    return ApiJson.Error("creation_failed", wrapped.FailReason, 500);
+                    await wrapped(CancellationToken.None);
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    // the inner task's reason surfaces as the exception (unknown pack/version
+                    // keep their text)
+                    return ApiJson.Error("creation_failed", TaskWork.ReasonOf(e), 500);
                 }
 
                 instances.LoadList();

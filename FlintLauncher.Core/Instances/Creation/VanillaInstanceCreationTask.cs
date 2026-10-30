@@ -39,7 +39,7 @@ public sealed class VanillaCreationTask : InstanceTask
         _loaderVersion = loaderVersion;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    internal override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Creating instance from version " + _version);
 
@@ -68,6 +68,5 @@ public sealed class VanillaCreationTask : InstanceTask
         }
 
         // (upstream calls downloadFiles(m_instance.get()) here — see the header note)
-        EmitSucceeded();
     }
 }

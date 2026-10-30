@@ -36,6 +36,9 @@ public static class LogCategories
     /// <summary>API auth: the process-lifetime token announcement.</summary>
     public const string ApiAuth = "flint.apiauth";
 
+    /// <summary>AuthFlow: the step sequence and its outcome.</summary>
+    public const string Auth = "flint.auth";
+
     /// <summary>Migration: the flint-legacy startup remount outcome.</summary>
     public const string Migration = "flint.migration";
 

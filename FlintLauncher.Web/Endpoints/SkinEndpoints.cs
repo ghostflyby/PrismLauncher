@@ -10,7 +10,7 @@
 //                                          CapeChange::getReply turns an empty cape id into
 //                                          a bare DELETE of capes/active (cape removal)
 // The upload/delete/change requests are single-round-trip Minecraft services calls, so they
-// run synchronously: 204 on success, 400 with the task/request FailReason otherwise. They go
+// run synchronously: 204 on success, 400 with the request failure reason otherwise. They go
 // through the injected AuthEndpointsOptions (defaults byte-identical to the hardcoded
 // upstream URL; tests construct options pointed at their stub).
 //
@@ -77,10 +77,16 @@ public static class SkinEndpoints
             using var body = new MemoryStream();
             await file.CopyToAsync(body);
             var upload = SkinUpload.Make(account.AccessToken(), body.ToArray(), model, auth, http);
-            await upload.StartAsync();
-            return upload.WasSuccessful
-                ? Results.NoContent()
-                : ApiJson.Error("skin_upload_failed", upload.FailReason, 400);
+            try
+            {
+                await upload.SendAsync();
+            }
+            catch (Exception e)
+            {
+                return ApiJson.Error("skin_upload_failed", e.Message, 400);
+            }
+
+            return Results.NoContent();
         }).WithMetadata(new FormUploadMarker("multipart form: skin image file (png) + optional model field (slim/classic)")).Produces(204);
 
         // ------------------------------------------------- accounts/{id}/skin (delete)

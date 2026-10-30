@@ -33,6 +33,7 @@ using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
+using FlintLauncher.Core.Tasks;
 using TruePath;
 using TruePath.SystemIo;
 
@@ -43,7 +44,7 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
 {
     private string _minecraftVersion = minecraftVersion;
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    internal override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         EmitStatus("Resolving modpack files");
 
@@ -56,8 +57,7 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
         }
         catch (FlintHttpException e)
         {
-            EmitFailed(e.Reason);
-            return;
+            throw new InvalidOperationException(e.Reason);
         }
 
         await FileListSucceeded(listing, cancellationToken);
@@ -74,8 +74,7 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
         }
         catch (JsonException e)
         {
-            EmitFailed("Could not understand pack manifest:\n" + e.Message);
-            return;
+            throw new InvalidOperationException("Could not understand pack manifest:\n" + e.Message);
         }
 
         if (build.Minecraft.Length != 0)
@@ -89,7 +88,7 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
         {
             outputDir.CreateDirectory();
 
-            var filesJob = new NetJob("Downloading modpack");
+            var downloads = new List<HttpDownloadTask>();
             var modCount = build.Mods.Count;
             var i = 0;
             foreach (var mod in build.Mods)
@@ -104,17 +103,14 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
                     dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.MD5, mod.Md5));
                 }
 
-                filesJob.AddDownload(dl);
+                downloads.Add(dl);
 
                 i++;
             }
 
-            await filesJob.StartAsync(cancellationToken);
-            if (!filesJob.WasSuccessful)
-            {
-                EmitFailed(filesJob.FailReason);
-                return;
-            }
+            await TaskWork.RunAllAsync(downloads,
+                    (dl, token) => dl.DownloadAsync(null, token), maxConcurrent: 6, cancellationToken)
+                .ConfigureAwait(false);
 
             await DownloadSucceeded(outputDir, modCount, cancellationToken);
         }
@@ -140,8 +136,7 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
             var path = outputDir / i.ToString();
             if (MmcZip.ExtractDir(path, "", extractDir) is null)
             {
-                EmitFailed("Failed to extract modpack");
-                return;
+                throw new InvalidOperationException("Failed to extract modpack");
             }
 
             i++;
@@ -156,10 +151,7 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
             cancellationToken: cancellationToken);
         if (failure is not null)
         {
-            EmitFailed(failure);
-            return;
+            throw new InvalidOperationException(failure);
         }
-
-        EmitSucceeded();
     }
 }

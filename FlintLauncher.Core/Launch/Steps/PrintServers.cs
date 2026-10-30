@@ -10,12 +10,12 @@ using System.Net;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class PrintServers(LaunchTask parent, IReadOnlyList<string> servers) : LaunchStep(parent)
+public sealed class PrintServers(LaunchTask parent, IReadOnlyList<string> servers) : AwaitedStep(parent)
 {
     private readonly List<string> _servers = [.. servers];
     private readonly Dictionary<string, string> _serverToAddress = new(StringComparer.Ordinal);
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         foreach (var server in _servers)
         {
@@ -55,8 +55,6 @@ public sealed class PrintServers(LaunchTask parent, IReadOnlyList<string> server
         {
             EmitLogLine(_serverToAddress.GetValueOrDefault(server, ""), MessageLevel.Launcher);
         }
-
-        EmitSucceeded();
     }
 
     public override bool CanAbort() => true;

@@ -23,7 +23,7 @@
 | `launch/` + `minecraft/launch/` | 启动步骤引擎与 Minecraft 专用步骤 |
 | `java/` | JVM 扫描（平台分支）、`JavaChecker`（外部 jar 探测）、Java 运行时下载（meta `java` 列表） |
 | `net/` | `NetJob`/`Request`/`Sink`/`Validator`、`HttpMetaCache`、PasteUpload(0x0.st 风格) |
-| `tasks/` | Task 状态机 + Sequential/Concurrent/MultipleOptions 组合器 |
+| `tasks/` | Task 状态机、`SequentialTask`/`ConcurrentTask` 组合器 |
 | `settings/` | INI 设置框架（QSettings 兼容格式）、`OverrideSetting`+gate |
 | `modplatform/` | Modrinth/Flame/ATL/FTB/legacyFTB/Technic/Packwiz/FTBApp导入 |
 | `minecraft/auth/` | MSA→Xbox→XSTS→MinecraftServices 全链路，`accounts.json` 持久化 |
@@ -44,7 +44,7 @@
 7. `CheckJava` / `VerifyJavaInstall` — 版本/位数/主版本兼容校验
 8. `LaunchCommand("Pre-Launch")`
 9. `ClaimAccount` — 在线模式记账账号使用
-10. 更新任务组：`FoldersTask` → `LibrariesTask` → `LegacyFMLLibrariesTask`(≤1.5.2 FML) → `AssetUpdateTask`
+10. 更新任务组：创建游戏目录 → `LibrariesTask` → `LegacyFMLLibrariesTask`(≤1.5.2 FML) → `AssetUpdateTask`
 11. `EnsureOfflineLibraries` — 离线模式校验本地库齐全
 12. `ModMinecraftJar` — jarmod/自定义 jar 合成 `minecraft.jar`
 13. `ScanModFolders` — 扫 mods/资源包目录
@@ -135,7 +135,7 @@ CurseForge key 为构建期注入的 bcrypt 形字符串（仓库 CMakeLists 公
 | TOML(packwiz) | 评估 Tomlyn AOT 兼容性；不行则手写子集解析器 | 风险项，Phase 6 前验证 |
 | murmur2 | 移植 `libraries/murmur2` | CurseForge 指纹必需 |
 | HTTP | `HttpClient` + 自实现 HttpMetaCache（ETag/If-None-Match/sha 校验） | 替代 NetJob 栈 |
-| 任务 | async/await；Sequential=顺序 await、Concurrent=SemaphoreSlim 节流、MultipleOptions=回退链 | 保留 Task 语义（进度/取消/失败聚合） |
+| 任务 | async/await；顺序=逐个 await、并发=`Parallel.ForEachAsync` 节流（失败收成 `AggregateException`） | 保留 Task 语义（进度/取消/失败聚合） |
 | 进程 | `System.Diagnostics.Process` + stdout/stderr 行事件 | 替代 LoggedProcess；需进程树终止（Windows Job Object / POSIX process group） |
 | Java 助手 | `libraries/launcher` 源码原样复用，开发期 javac 编译为资源内嵌 jar | GPL 同源无许可问题；构建机需 JDK |
 | 设置 | 自研 QSettings 兼容 INI 读写器 | 兼容目标见 §4 |

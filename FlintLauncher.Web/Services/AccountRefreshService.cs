@@ -18,6 +18,7 @@ namespace FlintLauncher.Web.Services;
 public sealed class AccountRefreshService(
     AccountList accounts,
     AuthEndpointsOptions auth,
+    ILoggerFactory loggerFactory,
     ILogger<AccountRefreshService> logger) : BackgroundService
 {
     private static readonly TimeSpan StartupDelay = TimeSpan.FromSeconds(10);
@@ -71,10 +72,10 @@ public sealed class AccountRefreshService(
             logger.LogInformation("Refreshing account '{Profile}'", account.ProfileName());
             try
             {
-                var refresh = account.Refresh(auth);
+                var refresh = account.Refresh(auth, loggerFactory);
                 if (refresh is not null && !refresh.IsFinished)
                 {
-                    await refresh.StartAsync(cancellationToken).ConfigureAwait(false);
+                    await refresh.RunAsync(cancellationToken).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException)

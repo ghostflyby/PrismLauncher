@@ -10,7 +10,6 @@ using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.State;
-using FlintLauncher.Core.Tasks;
 using TruePath;
 using Xunit;
 
@@ -719,11 +718,7 @@ public class InstanceListTests : IDisposable
 
     private sealed class StubInstanceTask : InstanceTask
     {
-        protected override Task ExecuteAsync(CancellationToken cancellationToken)
-        {
-            EmitSucceeded();
-            return Task.CompletedTask;
-        }
+        internal override Task ExecuteAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     [Fact]
@@ -770,9 +765,8 @@ public class InstanceListTests : IDisposable
         var task = new StubInstanceTask();
         task.SetName("Wrapped");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await wrapped(CancellationToken.None);
 
-        Assert.True(wrapped.WasSuccessful);
         // the wrapper's own staging folder was committed into place
         Assert.True(Directory.Exists(Path.Combine(_instancesDir, "Wrapped")));
         Assert.Empty(Directory.EnumerateFileSystemEntries(Path.Combine(_instancesDir, ".tmp")));
@@ -784,9 +778,8 @@ public class InstanceListTests : IDisposable
         var list = CreateList();
 
         var wrapped = list.WrapInstanceTask(new FailingInstanceTask());
-        await wrapped.StartAsync();
-        Assert.Equal(TaskState.Failed, wrapped.State);
-        Assert.Equal("boom", wrapped.FailReason);
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => wrapped(CancellationToken.None));
+        Assert.Equal("boom", ex.Message);
 
         // the staging folder was cleaned up: .tmp is empty again
         var tempRoot = Path.Combine(_instancesDir, ".tmp");
@@ -796,11 +789,8 @@ public class InstanceListTests : IDisposable
 
     private sealed class FailingInstanceTask : InstanceTask
     {
-        protected override Task ExecuteAsync(CancellationToken cancellationToken)
-        {
-            EmitFailed("boom");
-            return Task.CompletedTask;
-        }
+        internal override Task ExecuteAsync(CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("boom");
     }
 
     [Fact]

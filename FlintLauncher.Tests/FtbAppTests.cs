@@ -249,9 +249,8 @@ public class FtbAppTests : IDisposable
         var task = new FtbAppPackInstallTask(modpack);
         task.SetName("FTB App Imported");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await wrapped(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
 
         var staging = Path.Combine(_root, "instances", "FTB App Imported");
         // the whole modpack folder was copied below minecraft/
@@ -286,9 +285,8 @@ public class FtbAppTests : IDisposable
         var task = new FtbAppPackInstallTask(modpack);
         task.SetName("FTB App NeoForge");
         var wrapped = list.WrapInstanceTask(task);
-        await wrapped.StartAsync();
+        await wrapped(TestContext.Current.CancellationToken);
 
-        Assert.True(task.WasSuccessful, task.FailReason);
         var components = Components(Path.Combine(_root, "instances", "FTB App NeoForge"));
         Assert.Contains(components, c => c is { Uid: "net.neoforged", Version: "20.4.237" });
     }

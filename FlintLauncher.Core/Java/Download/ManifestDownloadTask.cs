@@ -7,11 +7,10 @@
 // downloads.raw url + sha1 and an executable flag).
 //
 // Deviations from the C++ original:
-//  - The QJsonDocument/QJsonObject dance becomes System.Text.Json via the Qt shims.
 //  - QFile::link becomes File.CreateSymbolicLink (Unix symlinks; on Windows the link entry is
-//    silently skipped like upstream's QFile::link returning false without surfacing an error).
-//  - Relative manifest file URLs are rejected (upstream hands them to QUrl/QNetworkAccessManager
-//    which would fail the request later); the meta server only issues absolute URLs.
+//    silently skipped, like upstream's QFile::link returning false without a surfaced error).
+//  - Relative manifest file URLs are rejected: the meta server only issues absolute ones, and
+//    a relative one would fail the request later anyway.
 
 using System.Security.Cryptography;
 using System.Text;
@@ -47,12 +46,15 @@ public sealed record JavaRuntimeRawJson(
 [JsonSerializable(typeof(JavaRuntimeManifestJson))]
 internal sealed partial class JavaManifestJsonContext : JsonSerializerContext;
 
-public sealed class ManifestDownloadTask(Uri url, AbsolutePath finalPath, HttpClient http, string checksumType = "", string checksumHash = "")
-    : FlintTask
+public static class ManifestDownloadTask
 {
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Installs the runtime manifest into <c>finalPath</c>. Returning is success; any
+    /// other exception is a failure whose message is the reason. <paramref name="progress"/>
+    /// null runs without reporting.</summary>
+    public static async Task DownloadAsync(Uri url, AbsolutePath finalPath, HttpClient http,
+        CancellationToken cancellationToken, IProgress<TaskProgress>? progress = null,
+        string checksumType = "", string checksumHash = "")
     {
-        EmitStatus("Downloading Java");
         byte[] manifestBytes;
         try
         {
@@ -61,8 +63,7 @@ public sealed class ManifestDownloadTask(Uri url, AbsolutePath finalPath, HttpCl
         }
         catch (FlintHttpException e)
         {
-            EmitFailed(e.Reason);
-            return;
+            throw new InvalidOperationException(e.Reason);
         }
 
         if (checksumHash.Length != 0 && checksumType.Length != 0)
@@ -72,8 +73,7 @@ public sealed class ManifestDownloadTask(Uri url, AbsolutePath finalPath, HttpCl
             if (!validator.Init(spec) || !validator.Write(manifestBytes) ||
                 !validator.Validate(new NetResponseInfo { StatusCode = 200 }))
             {
-                EmitFailed($"checksum verification failed for {url}");
-                return;
+                throw new InvalidOperationException($"checksum verification failed for {url}");
             }
         }
 
@@ -86,20 +86,19 @@ public sealed class ManifestDownloadTask(Uri url, AbsolutePath finalPath, HttpCl
         catch (Exception e) when (e is JsonException)
         {
             // qWarning() << "Error while parsing JSON response ..."
-            EmitFailed(e.Message);
-            return;
+            throw new InvalidOperationException(e.Message);
         }
 
         if (manifest is null)
         {
-            EmitFailed("Manifest root is not a JSON object");
-            return;
+            throw new InvalidOperationException("Manifest root is not a JSON object");
         }
 
-        await DownloadJava(manifest, cancellationToken).ConfigureAwait(false);
+        await DownloadJava(manifest, finalPath, http, progress, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task DownloadJava(JavaRuntimeManifestJson manifest, CancellationToken cancellationToken)
+    private static async Task DownloadJava(JavaRuntimeManifestJson manifest, AbsolutePath finalPath,
+        HttpClient http, IProgress<TaskProgress>? progress, CancellationToken cancellationToken)
     {
         // valid json doc, begin making jre spot
         FileOps.EnsureFolderPathExists(new AbsolutePath(finalPath));
@@ -113,7 +112,7 @@ public sealed class ManifestDownloadTask(Uri url, AbsolutePath finalPath, HttpCl
                     continue; // toObject() on a non-object yields an empty object with no type
                 }
 
-                var file = (AbsolutePath)finalPath / paths;
+                var file = finalPath / paths;
 
                 var type = meta.Type ?? "";
                 if (type == "directory")
@@ -149,7 +148,7 @@ public sealed class ManifestDownloadTask(Uri url, AbsolutePath finalPath, HttpCl
             }
         }
 
-        var elementDownload = new NetJob("JRE::FileDownload");
+        var downloads = new List<(HttpDownloadTask Download, bool IsExec)>();
         foreach (var file in toDownload)
         {
             var dl = HttpDownloadTask.ToFile(file.Url, file.Path, http);
@@ -158,23 +157,17 @@ public sealed class ManifestDownloadTask(Uri url, AbsolutePath finalPath, HttpCl
                 dl.AddValidator(new ChecksumValidator(HashAlgorithmName.SHA1, file.Hash));
             }
 
-            var target = file.Path;
-            if (file.IsExec)
-            {
-                dl.Succeeded += _ => SetExecutable(target.Value);
-            }
-
-            elementDownload.AddDownload(dl);
+            downloads.Add((dl, file.IsExec));
         }
 
-        await elementDownload.StartAsync(cancellationToken).ConfigureAwait(false);
-        if (elementDownload.State != TaskState.Succeeded)
+        await TaskWork.RunAllAsync(downloads, async (item, token) =>
         {
-            EmitFailed(elementDownload.FailReason);
-            return;
-        }
-
-        EmitSucceeded();
+            await item.Download.DownloadAsync(progress, token).ConfigureAwait(false);
+            if (item.IsExec)
+            {
+                SetExecutable(item.Download.Target.Value);
+            }
+        }, maxConcurrent: 6, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Port of the QFile(file.path).setPermissions(... | 0x1111) success handler.</summary>
@@ -197,7 +190,7 @@ public sealed class ManifestDownloadTask(Uri url, AbsolutePath finalPath, HttpCl
         }
     }
 
-    private void CreateLink(string target, string linkPath)
+    private static void CreateLink(string target, string linkPath)
     {
         try
         {

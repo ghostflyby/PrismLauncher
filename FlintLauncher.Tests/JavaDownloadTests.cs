@@ -12,7 +12,6 @@ using System.Text;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Java.Download;
-using FlintLauncher.Core.Tasks;
 using TruePath;
 using Xunit;
 
@@ -38,6 +37,21 @@ public class JavaDownloadTests : IDisposable
 
     private static string Sha1(byte[] data) => Convert.ToHexString(SHA1.HashData(data)).ToLowerInvariant();
 
+    /// <summary>Runs a download and returns the failure message, asserting it succeeded when
+    /// <paramref name="expectSuccess"/> is set (the reason is then empty).</summary>
+    private static async Task<string> RunDownloadAsync(Task download, bool expectSuccess)
+    {
+        if (expectSuccess)
+        {
+            await download;
+            return "";
+        }
+
+        var failure = await Record.ExceptionAsync(() => download);
+        Assert.NotNull(failure);
+        return failure.Message;
+    }
+
     // ------------------------------------------------------------------ archive (zip)
 
     [Fact]
@@ -62,12 +76,9 @@ public class JavaDownloadTests : IDisposable
         });
 
         var finalPath = TempPath("install-zip");
-        var task = new ArchiveDownloadTask(new Uri($"{server.Url}/jdk-17.0.9.zip"), new AbsolutePath(finalPath),
-            TestNet.Http);
-
-        await task.StartAsync();
-
-        Assert.Equal(TaskState.Succeeded, task.State);
+        var task = ArchiveDownloadTask.DownloadAsync(new Uri($"{server.Url}/jdk-17.0.9.zip"), new AbsolutePath(finalPath),
+            TestNet.Http, CancellationToken.None);
+        await task;
         Assert.Equal("java-binary", await File.ReadAllTextAsync(Path.Combine(finalPath, "Contents/Home/bin/java")));
         Assert.Equal("JAVA_VERSION=\"17.0.9\"", await File.ReadAllTextAsync(Path.Combine(finalPath, "release")));
     }
@@ -85,12 +96,9 @@ public class JavaDownloadTests : IDisposable
         });
 
         var finalPath = TempPath("install-bad-sha");
-        var task = new ArchiveDownloadTask(new Uri($"{server.Url}/jdk.zip"), new AbsolutePath(finalPath),
-            TestNet.Http, "sha1", new string('0', 40));
-
-        await task.StartAsync();
-
-        Assert.Equal(TaskState.Failed, task.State);
+        var task = ArchiveDownloadTask.DownloadAsync(new Uri($"{server.Url}/jdk.zip"), new AbsolutePath(finalPath),
+            TestNet.Http, CancellationToken.None, checksumType: "sha1", checksumHash: new string('0', 40));
+        await Assert.ThrowsAnyAsync<Exception>(() => task);
         Assert.Empty(Directory.Exists(finalPath) ? Directory.GetFileSystemEntries(finalPath) : []);
     }
 
@@ -122,12 +130,9 @@ public class JavaDownloadTests : IDisposable
         var names = TarArchive.ListTarGzFile(tarPath, out var listError);
         Assert.True(names is not null, $"ListTarGzFile failed: {listError}");
         Assert.Equal("jdk-17.0.9/", names[0]);
-        var task = new ArchiveDownloadTask(new Uri($"{server.Url}/jdk-17.0.9.tar.gz"), new AbsolutePath(finalPath),
-            TestNet.Http);
-
-        await task.StartAsync();
-
-        Assert.True(task.State == TaskState.Succeeded, $"task failed: {task.FailReason}");
+        var task = ArchiveDownloadTask.DownloadAsync(new Uri($"{server.Url}/jdk-17.0.9.tar.gz"), new AbsolutePath(finalPath),
+            TestNet.Http, CancellationToken.None);
+        await task;
         Assert.Equal("java-binary-bytes", await File.ReadAllTextAsync(Path.Combine(finalPath, "Contents/Home/bin/java")));
         Assert.Equal("JAVA_VERSION=\"17.0.9\"", await File.ReadAllTextAsync(Path.Combine(finalPath, "Contents/Home/release")));
         Assert.True(Directory.Exists(Path.Combine(finalPath, "Contents/Home/lib")));
@@ -215,12 +220,9 @@ public class JavaDownloadTests : IDisposable
                                                 """;
 
         var finalPath = TempPath("install-manifest");
-        var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), new AbsolutePath(finalPath),
-            TestNet.Http);
-
-        await task.StartAsync();
-
-        Assert.Equal(TaskState.Succeeded, task.State);
+        var task = ManifestDownloadTask.DownloadAsync(new Uri($"{server.Url}/manifest"), new AbsolutePath(finalPath),
+            TestNet.Http, CancellationToken.None);
+        await task;
         Assert.Equal(Encoding.UTF8.GetString(javaBytes), await File.ReadAllTextAsync(Path.Combine(finalPath, "bin/java")));
         Assert.Equal("release-info", await File.ReadAllTextAsync(Path.Combine(finalPath, "release")));
         Assert.True(Directory.Exists(Path.Combine(finalPath, "bin")));
@@ -248,12 +250,9 @@ public class JavaDownloadTests : IDisposable
         });
 
         var finalPath = TempPath("install-manifest-bad");
-        var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), new AbsolutePath(finalPath),
-            TestNet.Http, "sha1", new string('1', 40));
-
-        await task.StartAsync();
-
-        Assert.Equal(TaskState.Failed, task.State);
+        var task = ManifestDownloadTask.DownloadAsync(new Uri($"{server.Url}/manifest"), new AbsolutePath(finalPath),
+            TestNet.Http, CancellationToken.None, checksumType: "sha1", checksumHash: new string('1', 40));
+        await Assert.ThrowsAnyAsync<Exception>(() => task);
     }
 
     [Fact]
@@ -290,12 +289,9 @@ public class JavaDownloadTests : IDisposable
                          """;
 
         var finalPath = TempPath("install-manifest-badfile");
-        var task = new ManifestDownloadTask(new Uri($"{server.Url}/manifest"), new AbsolutePath(finalPath),
-            TestNet.Http);
-
-        await task.StartAsync();
-
-        Assert.Equal(TaskState.Failed, task.State);
+        var task = ManifestDownloadTask.DownloadAsync(new Uri($"{server.Url}/manifest"), new AbsolutePath(finalPath),
+            TestNet.Http, CancellationToken.None);
+        await Assert.ThrowsAnyAsync<Exception>(() => task);
     }
 
     // ---------------------------------------------------------------- symlink task
@@ -311,10 +307,7 @@ public class JavaDownloadTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(home, "lib/native.dylib"), "dylib");
         await File.WriteAllTextAsync(Path.Combine(home, "release"), "JAVA_VERSION=17");
 
-        var task = new SymlinkTask(new AbsolutePath(target));
-        await task.StartAsync();
-
-        Assert.Equal(TaskState.Succeeded, task.State);
+        SymlinkTask.Run(new AbsolutePath(target));
         if (OperatingSystem.IsWindows())
         {
             return; // symlink creation needs privileges on Windows; the C++ path is macOS-gated too
@@ -333,16 +326,12 @@ public class JavaDownloadTests : IDisposable
         Directory.CreateDirectory(Path.Combine(target, "bin"));
         await File.WriteAllTextAsync(Path.Combine(target, "bin/java"), "java-binary");
 
-        var alreadyThere = new SymlinkTask(new AbsolutePath(target));
-        await alreadyThere.StartAsync();
-        Assert.Equal(TaskState.Succeeded, alreadyThere.State);
+        SymlinkTask.Run(new AbsolutePath(target));
 
         var emptyDir = TempPath("symlink-empty");
         Directory.CreateDirectory(emptyDir);
-        var empty = new SymlinkTask(new AbsolutePath(emptyDir));
-        await empty.StartAsync();
-        Assert.Equal(TaskState.Failed, empty.State);
-        Assert.Contains("Failed to find Java binary path", empty.FailReason);
+        var failure = Assert.ThrowsAny<Exception>(() => SymlinkTask.Run(new AbsolutePath(emptyDir)));
+        Assert.Contains("Failed to find Java binary path", failure.Message);
     }
 
     // ------------------------------------------------------------------- tar edges

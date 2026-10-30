@@ -26,8 +26,8 @@
 // Deviations:
 //  - Upstream builds the request through QHttpMultiPart on QNetworkAccessManager; the port
 //    pre-builds an identical multipart body (same part headers, CRLF framing) and sends it
-//    with an injected client (defaulting to the auth options' client). This stays a
-//    FlintTask like the C++ Net::Request subclass. The multipart Content-Type must be set on
+//    with an injected client (defaulting to the auth options' client), like the C++ Net::Request
+//    subclass. The multipart Content-Type must be set on
 //    the content headers, which the plain fetch helper cannot do.
 //  - QHttpMultiPart generates a random boundary of a different shape — any legal boundary is
 //    equivalent, so the port uses a "flint-<32 hex>" one.
@@ -37,12 +37,11 @@
 using System.Text;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
 using TruePath;
 
 namespace FlintLauncher.Core.Skins;
 
-public sealed class SkinUpload : FlintTask
+public sealed class SkinUpload
 {
     private readonly string _token;
     private readonly byte[] _skinData;
@@ -74,12 +73,13 @@ public sealed class SkinUpload : FlintTask
         return new SkinUpload(token, skinData, variant, auth, http);
     }
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Posts the skin; a non-2xx answer surfaces as an
+    /// <see cref="InvalidOperationException"/> carrying the status and the request URL.</summary>
+    public async Task SendAsync(CancellationToken cancellationToken = default)
     {
         var boundary = "flint-" + Guid.NewGuid().ToString("N");
         var body = BuildMultipartBody(boundary, _skinData, _variant);
 
-        EmitStatus("Uploading skin");
         // the inactivity window (RequestTimeout): the transport's retry gate arms it with
         // its configured length and covers the send with it
         using var message = new HttpRequestMessage(HttpMethod.Post,
@@ -94,11 +94,8 @@ public sealed class SkinUpload : FlintTask
         var statusCode = (int)response.StatusCode;
         if (statusCode is not 200 and not 201 and not 202 and not 203 and not 204 and not 206)
         {
-            EmitFailed($"HTTP status {statusCode} for {message.RequestUri}");
-            return;
+            throw new InvalidOperationException($"HTTP status {statusCode} for {message.RequestUri}");
         }
-
-        EmitSucceeded();
     }
 
     /// <summary>

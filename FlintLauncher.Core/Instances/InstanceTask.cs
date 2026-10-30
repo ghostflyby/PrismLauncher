@@ -2,16 +2,16 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 // SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
 //
-// Port of launcher/InstanceTask.{h,cpp}: the base class of instance *creation* tasks
-// (copy / import / vanilla creation). A task runs inside a staging folder that the
-// InstanceList hands out and commits once the task succeeds (InstanceList.WrapInstanceTask).
+// The base class of instance *creation* tasks (copy / import / vanilla creation). A task runs
+// inside a staging folder that the InstanceList hands out and commits once the task returns
+// (InstanceList.WrapInstanceTask); a task that throws leaves its staging folder removed.
 //
 // Dropped (Qt GUI):
 //  - the ask* free functions (askForChangingInstanceName/askIfShouldUpdate/
 //    askIfShouldDeleteSaves) are message-box dialogs; only their enums
 //    (InstanceNameChange/ShouldUpdate/ShouldDeleteSaves) are ported. Callers run the
 //    dialog themselves and hand the outcome to <see cref="ShouldDeleteSaves"/>.
-//  - downloadFiles(): drives createUpdateTask() (the launch pipeline) through a
+//  - downloadFiles(): drives createUpdateTask() (the launch pipeline) through the C++
 //    SequentialTask with a CustomMessageBox error dialog on failure — TODO.
 //  - the m_gameFilesTask abort plumbing belongs to downloadFiles.
 //
@@ -19,10 +19,9 @@
 //  - scheduleToDelete() consults the settable <see cref="ShouldDeleteSaves"/> property
 //    instead of opening a dialog when it is NotAsked (NotAsked and No both skip scheduling
 //    "saves/" paths, Yes schedules them like the dialog's answer).
-//  - the copy executes synchronously inside StartAsync (no QtConcurrent thread hop).
+//  - the copy runs inline in the task body (no QtConcurrent thread hop).
 
 using FlintLauncher.Core.Config;
-using FlintLauncher.Core.Tasks;
 using TruePath;
 
 namespace FlintLauncher.Core.Instances;
@@ -50,7 +49,7 @@ public enum ShouldDeleteSaves : byte
     No,
 }
 
-public abstract class InstanceTask : FlintTask
+public abstract class InstanceTask
 {
     private readonly List<AbsolutePath> _filesToRemove = [];
 
@@ -130,12 +129,28 @@ public abstract class InstanceTask : FlintTask
 
     public void SetOverride(bool overrideExisting, string instanceIdToOverride = "")
     {
-        this._overrideExisting = overrideExisting;
+        _overrideExisting = overrideExisting;
         if (instanceIdToOverride.Length != 0)
         {
             _originalInstanceId = instanceIdToOverride;
         }
     }
+
+    /// <summary>Runs the creation. Returning succeeds it; throwing fails it with the
+    /// exception's message as the reason. The work happens inside <see cref="StagingPath"/>,
+    /// which the staging wrapper commits once this returns.</summary>
+    internal abstract Task ExecuteAsync(CancellationToken cancellationToken);
+
+    /// <summary>Narration for the task log: what the creation is doing right now. It is not
+    /// task state — the outcome is the run's.</summary>
+    public event Action<string>? StatusChanged;
+
+    /// <summary>How far the creation has got. The window it feeds is the host's.</summary>
+    public event Action<long, long>? ProgressChanged;
+
+    protected void EmitStatus(string status) => StatusChanged?.Invoke(status);
+
+    protected void SetProgress(long current, long total) => ProgressChanged?.Invoke(current, total);
 
     /// <summary>
     /// Port of scheduleToDelete(): schedules a relative path (inside <paramref name="dir"/>)

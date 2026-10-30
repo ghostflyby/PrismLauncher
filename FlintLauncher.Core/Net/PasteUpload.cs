@@ -26,9 +26,9 @@
 // mclo.gs), each with its own request shape and response parsing.
 //
 // Deviations:
-//  - Upstream is a Net::Request subclass posting through QNetworkAccessManager; the port is a
-//    FlintTask sending the identical request through an injected client (like
-//    Skins/SkinUpload.cs), because the plain fetch helper cannot express multipart/JSON Content-Type headers.
+//  - Upstream is a Net::Request subclass posting through QNetworkAccessManager; the port sends
+//    the identical request through an injected client, because the plain fetch helper cannot
+//    express multipart/JSON Content-Type headers.
 //  - The C++ constructor anonymizes the log in place (logs/AnonymizeLog.cpp); the port applies
 //    the same seven rules in AnonymizeLog() before the request is built.
 //  - mclo.gs bodies: QUrlQuery percent-encoding is reproduced with Uri.EscapeDataString. Qt
@@ -44,7 +44,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Net;
 
@@ -59,7 +58,7 @@ internal sealed record PasteGgContent(string Format, string Value);
 [JsonSerializable(typeof(PasteGgBody))]
 internal sealed partial class PasteGgJsonContext : JsonSerializerContext;
 
-public sealed class PasteUpload : FlintTask
+public sealed class PasteUpload
 {
     public enum PasteType
     {
@@ -130,7 +129,11 @@ public sealed class PasteUpload : FlintTask
     /// <summary>The anonymized log body this upload sends (exposed for tests).</summary>
     public string Log => _log;
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Uploads the log and returns the link the provider handed back. A provider error, a
+    /// malformed reply or a reply without a link throws.
+    /// </summary>
+    public async Task<string> UploadAsync(CancellationToken cancellationToken = default)
     {
         var request = BuildRequest();
         HttpResponseMessage response;
@@ -145,8 +148,7 @@ public sealed class PasteUpload : FlintTask
         catch (HttpRequestException e)
         {
             // Port of the Sink::finalize network-error gate (QNetworkReply::error() != NoError).
-            EmitFailed($"Network error: {e.Message}");
-            return;
+            throw new InvalidOperationException($"Network error: {e.Message}", e);
         }
 
         using (response)
@@ -166,8 +168,8 @@ public sealed class PasteUpload : FlintTask
             var reasonPhrase = response.ReasonPhrase ?? "";
             if (statusCode != 200 && statusCode != 201)
             {
-                EmitFailed($"Error: {EndpointUrl} returned unexpected status code {statusCode} {reasonPhrase}");
-                return;
+                throw new InvalidOperationException(
+                    $"Error: {EndpointUrl} returned unexpected status code {statusCode} {reasonPhrase}");
             }
 
             switch (_pasteType)
@@ -179,10 +181,7 @@ public sealed class PasteUpload : FlintTask
                 }
                 case PasteType.Hastebin:
                 {
-                    if (!TryParseJson(body, out var obj, "hastebin"))
-                    {
-                        return;
-                    }
+                    TryParseJson(body, out var obj, "hastebin");
 
                     if (obj.TryGetProperty("key", out var key) && key.ValueKind == JsonValueKind.String)
                     {
@@ -190,18 +189,15 @@ public sealed class PasteUpload : FlintTask
                     }
                     else
                     {
-                        EmitFailed($"Error: {EndpointUrl} returned a malformed response body");
-                        return;
+                        throw new InvalidOperationException(
+                            $"Error: {EndpointUrl} returned a malformed response body");
                     }
 
                     break;
                 }
                 case PasteType.Mclogs:
                 {
-                    if (!TryParseJson(body, out var obj, "mclogs"))
-                    {
-                        return;
-                    }
+                    TryParseJson(body, out var obj, "mclogs");
 
                     if (obj.TryGetProperty("success", out var success) &&
                         success.ValueKind is JsonValueKind.True or JsonValueKind.False)
@@ -217,24 +213,21 @@ public sealed class PasteUpload : FlintTask
                             var error = obj.TryGetProperty("error", out var err) && err.ValueKind == JsonValueKind.String
                                 ? err.GetString() ?? ""
                                 : "";
-                            EmitFailed($"Error: {EndpointUrl} returned an error: {error}");
-                            return;
+                            throw new InvalidOperationException(
+                                $"Error: {EndpointUrl} returned an error: {error}");
                         }
                     }
                     else
                     {
-                        EmitFailed($"Error: {EndpointUrl} returned a malformed response body");
-                        return;
+                        throw new InvalidOperationException(
+                            $"Error: {EndpointUrl} returned a malformed response body");
                     }
 
                     break;
                 }
                 case PasteType.PasteGg:
                 {
-                    if (!TryParseJson(body, out var obj, "pasteGG"))
-                    {
-                        return;
-                    }
+                    TryParseJson(body, out var obj, "pasteGG");
 
                     if (obj.TryGetProperty("status", out var status) && status.ValueKind == JsonValueKind.String)
                     {
@@ -257,25 +250,30 @@ public sealed class PasteUpload : FlintTask
                             var message = obj.TryGetProperty("message", out var msg) && msg.ValueKind == JsonValueKind.String
                                 ? msg.GetString() ?? ""
                                 : "none";
-                            EmitFailed($"Error: {EndpointUrl} returned an error code: {error}\nError message: {message}");
-                            return;
+                            throw new InvalidOperationException(
+                                $"Error: {EndpointUrl} returned an error code: {error}\nError message: {message}");
                         }
                     }
                     else
                     {
-                        EmitFailed($"Error: {EndpointUrl} returned a malformed response body");
-                        return;
+                        throw new InvalidOperationException(
+                            $"Error: {EndpointUrl} returned a malformed response body");
                     }
 
                     break;
                 }
             }
 
-            EmitSucceeded();
+            if (PasteLink.Length == 0)
+            {
+                throw new InvalidOperationException("the paste server returned no link");
+            }
+
+            return PasteLink;
         }
     }
 
-    private bool TryParseJson(string body, out JsonElement obj, string provider)
+    private void TryParseJson(string body, out JsonElement obj, string provider)
     {
         obj = default;
         JsonDocument doc;
@@ -285,19 +283,18 @@ public sealed class PasteUpload : FlintTask
         }
         catch (JsonException e)
         {
-            EmitFailed(
-                $"Failed to parse response from {provider} server: expected JSON but got an invalid response. Error: {e.Message}");
-            return false;
+            throw new InvalidOperationException(
+                $"Failed to parse response from {provider} server: expected JSON but got an invalid response. Error: {e.Message}",
+                e);
         }
 
         obj = doc.RootElement.Clone();
         if (obj.ValueKind == JsonValueKind.Object)
         {
-            return true;
+            return;
         }
 
-        EmitFailed($"Error: {EndpointUrl} returned a malformed response body");
-        return false;
+        throw new InvalidOperationException($"Error: {EndpointUrl} returned a malformed response body");
     }
 
     /// <summary>Builds the exact request the C++ getReply() produces for the configured type.</summary>

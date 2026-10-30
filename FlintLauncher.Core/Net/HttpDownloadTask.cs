@@ -10,8 +10,9 @@
 // (the C++ MetaCacheSink::finalizeCache table, 7-day default expiry included).
 
 using System.Diagnostics;
-using System.Security.Cryptography;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Tasks;
@@ -41,14 +42,14 @@ public sealed class HttpDownloadTask(
     Uri url,
     HttpClient http,
     AbsolutePath target,
-    RequestOptions options = RequestOptions.NoOptions,
-    byte[]? postData = null,
-    string? name = null)
-    : FlintTask
+    RequestOptions options = RequestOptions.NoOptions)
 {
     private readonly List<Validator> _validators = [];
     private AbsolutePath? _tempFile;
     private bool _wroteAnyData;
+
+    /// <summary>Why the last helper returned false; <see cref="Fail"/> throws it.</summary>
+    private string _failReason = "";
 
     internal HttpMetaCache? MetaCache { get; init; }
 
@@ -56,8 +57,6 @@ public sealed class HttpDownloadTask(
 
     /// <summary>The MakeEternal flag forwarded to the cache bookkeeping.</summary>
     private bool IsEternal => options.HasFlag(RequestOptions.MakeEternal);
-
-    public string TaskName { get; } = name ?? url.ToString();
 
     public Uri Url { get; } = url;
 
@@ -96,7 +95,10 @@ public sealed class HttpDownloadTask(
 
     // ---------------------------------------------------------------- execution
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Runs the download. Returning is success; a thrown fault carries the reason.
+    /// <paramref name="progress"/> null runs without reporting. The instance is single-use:
+    /// it owns the temp file and validator state of one transfer.</summary>
+    public async Task DownloadAsync(IProgress<TaskProgress>? progress, CancellationToken cancellationToken)
     {
         // RequestTimeout port (QNetworkReply::setTransferTimeout): an inactivity window, not
         // a total duration. The transport's retry gate arms the window for the send; every
@@ -109,8 +111,7 @@ public sealed class HttpDownloadTask(
         {
             if (!InitTarget())
             {
-                Fail(FailReason);
-                return;
+                Fail(_failReason);
             }
 
             if (CachedEntry is { } entry && !entry.IsStale && (HasTargetData() || entry.Md5Sum.Length > 0))
@@ -119,11 +120,6 @@ public sealed class HttpDownloadTask(
                 {
                     message.Headers.TryAddWithoutValidation("If-None-Match", entry.Etag);
                 }
-            }
-
-            if (postData is not null)
-            {
-                message.Content = new ByteArrayContent(postData);
             }
 
             message.Options.Set(RetryHandler.ManualRetryOption, true);
@@ -138,11 +134,9 @@ public sealed class HttpDownloadTask(
                 // not modified: local data is still valid — finalize without writing
                 if (!FinalizeTarget(statusCode, response.Headers))
                 {
-                    Fail(FailReason);
-                    return;
+                    Fail(_failReason);
                 }
 
-                EmitSucceeded();
                 return;
             }
 
@@ -161,7 +155,6 @@ public sealed class HttpDownloadTask(
                 }
 
                 Fail($"HTTP status {statusCode} for {Url}\n{body}");
-                return;
             }
 
             // stream the body into the temp file with throttled progress
@@ -182,8 +175,7 @@ public sealed class HttpDownloadTask(
 
                     if (!WriteChunk(buffer[..read]))
                     {
-                        Fail(FailReason);
-                        return;
+                        Fail(_failReason);
                     }
 
                     receivedBytes += read;
@@ -191,42 +183,36 @@ public sealed class HttpDownloadTask(
                     if (lastProgressTime.ElapsedMilliseconds > 100 || receivedBytes == totalBytes)
                     {
                         lastProgressTime.Restart();
-                        EmitProgress(new TaskStepProgress(Uid)
-                        {
-                            Current = receivedBytes,
-                            Total = totalBytes,
-                            State = TaskStepState.Running,
-                        });
+                        progress?.Report(new TaskProgress(receivedBytes, totalBytes));
                     }
                 }
             }
 
             if (!FinalizeTarget(statusCode, response.Headers))
             {
-                Fail(FailReason);
-                return;
+                Fail(_failReason);
             }
-
-            EmitSucceeded();
         }
         catch (OperationCanceledException) when (window.TimedOut)
         {
             // our inactivity timer fired mid-transfer (the header phase is covered by the
             // transport's manual-retry gate via the option above; this late conversion is
-            // the task-level failure surface — a stalled body fails after one window)
+            // the failure surface — a stalled body fails after one window)
             CancelWriting();
             Fail(window.TimeoutMessage);
         }
         catch (Exception)
         {
             // a network error or user abort must not leave the temp file behind (the C++
-            // sink's abort deleted it too); the failure state itself is handled by the
-            // task machinery / rethrow below
+            // sink's abort deleted it too)
             CancelWriting();
             throw;
         }
     }
 
+    /// <summary>Abandons the transfer and throws <paramref name="reason"/>; never returns, so
+    /// the callers rely on it instead of a following early exit.</summary>
+    [DoesNotReturn]
     private void Fail(string reason)
     {
         CancelWriting();
@@ -235,7 +221,7 @@ public sealed class HttpDownloadTask(
             validator.Abort();
         }
 
-        EmitFailed(reason);
+        throw new InvalidOperationException(reason);
     }
 
     // ------------------------------------------------------- target plumbing (the sinks)
@@ -250,7 +236,7 @@ public sealed class HttpDownloadTask(
     {
         if (!FileOps.EnsureFilePathExists(target))
         {
-            FailReason = "Could not create folder for " + target;
+            _failReason = "Could not create folder for " + target;
             return false;
         }
 
@@ -264,7 +250,7 @@ public sealed class HttpDownloadTask(
         }
         catch (IOException e)
         {
-            FailReason = $"Could not open {target} for writing: {e.Message}";
+            _failReason = $"Could not open {target} for writing: {e.Message}";
             _tempFile = null;
             return false;
         }
@@ -277,7 +263,7 @@ public sealed class HttpDownloadTask(
                 continue;
             }
 
-            FailReason = "Failed to initialize validators";
+            _failReason = "Failed to initialize validators";
             return false;
         }
 
@@ -288,7 +274,7 @@ public sealed class HttpDownloadTask(
     {
         if (_tempFile is not { } tempFile)
         {
-            FailReason = "Writing into a closed file sink";
+            _failReason = "Writing into a closed file sink";
             return false;
         }
 
@@ -299,7 +285,7 @@ public sealed class HttpDownloadTask(
         }
         catch (IOException e)
         {
-            FailReason = $"Failed writing into {target}: {e.Message}";
+            _failReason = $"Failed writing into {target}: {e.Message}";
             CancelWriting();
             _wroteAnyData = false;
             return false;
@@ -312,7 +298,7 @@ public sealed class HttpDownloadTask(
                 continue;
             }
 
-            FailReason = $"Failed writing into {target}: validators failed";
+            _failReason = $"Failed writing into {target}: validators failed";
             CancelWriting();
             _wroteAnyData = false;
             return false;
@@ -344,7 +330,7 @@ public sealed class HttpDownloadTask(
                     continue;
                 }
 
-                FailReason = "Failed to finalize validators";
+                _failReason = "Failed to finalize validators";
                 return false;
             }
 
@@ -356,7 +342,7 @@ public sealed class HttpDownloadTask(
                 }
                 catch (IOException e)
                 {
-                    FailReason = $"Failed to commit changes to {target}: {e.Message}";
+                    _failReason = $"Failed to commit changes to {target}: {e.Message}";
                     CancelWriting();
                     return false;
                 }

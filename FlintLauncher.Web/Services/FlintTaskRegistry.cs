@@ -16,7 +16,6 @@
 
 using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Launch;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web.Models;
 
 namespace FlintLauncher.Web.Services;
@@ -32,14 +31,18 @@ public sealed class FlintTaskRegistry(ILoggerFactory loggerFactory)
     {
         public required string Id { get; init; }
         public required string Kind { get; init; }
-        public required FlintTask Task { get; init; }
-        public string? InstanceId { get; init; }
-        public LaunchController? Controller { get; init; }
+        public required TaskHandle Handle { get; init; }
+        public string? InstanceId => Handle.InstanceId;
+        public LaunchController? Controller => Handle.Controller;
 
         /// <summary>Optional terminal payload exposed through the task view (flag: currently
         /// only the mods-update task publishes its found/applied updates here; null = absent,
         /// and the field is omitted from the JSON entirely).</summary>
-        public TaskResultView? Result { get; set; }
+        public TaskResultView? Result
+        {
+            get => Handle.Result;
+            set => Handle.Result = value;
+        }
 
         // log buffering (see the file header)
         public readonly object LogLock = new();
@@ -55,47 +58,68 @@ public sealed class FlintTaskRegistry(ILoggerFactory loggerFactory)
     /// <summary>Log lines kept per task (absolute indexes preserved beyond the cap).</summary>
     public const int MaxBufferedLines = 5000;
 
-    public Entry Register(string kind, FlintTask task, string? instanceId = null,
-        LaunchController? controller = null, Action? onFinished = null)
+    /// <summary>Registers a plain-Task operation: the caller supplies the work, the registry
+    /// supplies the id and the entry. The work is started with the handle's token, so Abort
+    /// reaches it without the caller threading anything. A launch passes its controller so the
+    /// API can read the proceed gate and the game log.</summary>
+    public Entry Start(string kind, Func<TaskHandle, Task> work, string? instanceId = null,
+        Action? onFinished = null, LaunchController? controller = null)
     {
-        var entry = new Entry
+        var handle = new TaskHandle
         {
             Id = NewId(),
             Kind = kind,
-            Task = task,
             InstanceId = instanceId,
             Controller = controller,
+            Stop = controller is null ? null : controller.Abort,
         };
 
-        void RunHook()
+        var entry = Register(handle);
+        // the work runs off the request thread: a body with no await before its first heavy
+        // stretch (the import's directory scan and copy loop) would otherwise complete inside
+        // the POST, making the 202 late and the abort unreachable
+        handle.Run = Task.Run(async () =>
         {
             try
             {
-                onFinished?.Invoke();
+                await work(handle).ConfigureAwait(false);
             }
-            catch
+            finally
             {
-                // host bookkeeping must never break the task machinery
+                RunHook(onFinished);
             }
-        }
+        });
+        return entry;
+    }
 
-        void OnTerminal(FlintTask finishedTask)
+    /// <summary>Host bookkeeping that must never break the task machinery.</summary>
+    private static void RunHook(Action? hook)
+    {
+        try
         {
-            _log.Finished(entry.Id, finishedTask.State.ToString());
-            RunHook();
+            hook?.Invoke();
         }
+        catch
+        {
+            // the operation's outcome is already recorded; a failing hook is the host's problem
+        }
+    }
 
-        void OnTerminalFailed(FlintTask finishedTask, string _) => OnTerminal(finishedTask);
-        task.Succeeded += OnTerminal;
-        task.Failed += OnTerminalFailed;
-        task.Aborted += OnTerminal;
+    public Entry Register(TaskHandle handle)
+    {
+        var entry = new Entry
+        {
+            Id = handle.Id,
+            Kind = handle.Kind,
+            Handle = handle,
+        };
 
         lock (_lock)
         {
             _entries[entry.Id] = entry;
         }
 
-        _log.Registered(entry.Id, kind);
+        _log.Registered(entry.Id, entry.Kind);
         return entry;
     }
 
@@ -128,14 +152,14 @@ public sealed class FlintTaskRegistry(ILoggerFactory loggerFactory)
     public TaskView View(Entry entry)
     {
         var state = StateOf(entry);
-        var controller = entry.Controller;
-        var status = controller?.Launcher?.Status ?? entry.Task.Status;
+        var status = entry.Handle.Status;
+        var (current, total) = entry.Handle.Progress;
         return new TaskView(
             entry.Id,
             entry.Kind,
             state,
             status,
-            new TaskProgressDto(entry.Task.CurrentProgress, entry.Task.TotalProgress),
+            new TaskProgressDto(current, total),
             FailReasonOf(entry),
             entry.InstanceId,
             entry.Result);
@@ -143,11 +167,11 @@ public sealed class FlintTaskRegistry(ILoggerFactory loggerFactory)
 
     public string StateOf(Entry entry)
     {
-        // terminal first: a LaunchTask keeps its internal LaunchState at Waiting even after
-        // the chain finalized (the FlintTask state carries the terminal outcome)
+        // the terminal outcome lives on the window; the launch state is only read while the
+        // chain is still running
         if (IsTerminal(entry))
         {
-            return MapState(entry.Task.State);
+            return MapState(entry.Handle.Phase);
         }
 
         var launcher = entry.Controller?.Launcher;
@@ -156,22 +180,22 @@ public sealed class FlintTaskRegistry(ILoggerFactory loggerFactory)
             return "waiting";
         }
 
-        return "running";
+        return entry.Handle.Phase == TaskPhase.Pending ? "pending" : "running";
     }
 
-    public bool IsTerminal(Entry entry) =>
-        entry.Controller is not null ? entry.Controller.IsFinished : entry.Task.IsFinished;
+    public bool IsTerminal(Entry entry) => entry.Handle.IsTerminal;
 
     // View() FailReason must follow the same rule (only meaningful when terminal)
-    public string? FailReasonOf(Entry entry) => IsTerminal(entry) ? entry.Task.FailReason : null;
+    public string? FailReasonOf(Entry entry) => IsTerminal(entry) ? entry.Handle.FailReason : null;
 
-    private static string MapState(TaskState state) => state switch
+    private static string MapState(TaskPhase phase) => phase switch
     {
-        TaskState.Inactive => "pending",
-        TaskState.Running => "running",
-        TaskState.Succeeded => "succeeded",
-        TaskState.Failed => "failed",
-        TaskState.AbortedByUser => "aborted",
+        TaskPhase.Pending => "pending",
+        TaskPhase.Running => "running",
+        TaskPhase.Waiting => "waiting",
+        TaskPhase.Succeeded => "succeeded",
+        TaskPhase.Failed => "failed",
+        TaskPhase.Aborted => "aborted",
         _ => "unknown",
     };
 
@@ -184,9 +208,9 @@ public sealed class FlintTaskRegistry(ILoggerFactory loggerFactory)
             return false;
         }
 
-        // LaunchController.Abort() kills the game (its own ConfirmKill default); plain
-        // tasks are cancelled cooperatively.
-        (entry.Controller as FlintTask ?? entry.Task).Abort();
+        // the launch controller kills the game (its own ConfirmKill default); plain work is
+        // cancelled cooperatively through the handle's token
+        entry.Handle.Abort();
         return true;
     }
 

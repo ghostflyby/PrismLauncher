@@ -14,11 +14,10 @@ using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Flame;
-using TruePath;
-using Xunit;
-using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
+using TruePath;
+using Xunit;
 
 namespace FlintLauncher.Tests;
 
@@ -75,8 +74,7 @@ public class FlameExportTests : IDisposable
 
         var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, _modrinth, _http, flame: _flameApi);
         task.SetName(name);
-        await task.StartAsync();
-        Assert.True(task.WasSuccessful, task.FailReason);
+        await task.ExecuteAsync(TestContext.Current.CancellationToken);
         return staging;
     }
 
@@ -110,7 +108,7 @@ public class FlameExportTests : IDisposable
         var instance = new MinecraftInstance(
             new InstanceJsonSettingsObject(new AbsolutePath(staging), _global.Environment), new AbsolutePath(staging));
         var output = TempPath("exported.zip");
-        var export = new FlamePackExportTask(new FlamePackExportTask.Options
+        var exportOptions = new FlamePackExportTask.Options
         {
             Flame = _flameApi,
             Http = TestNet.Http,
@@ -120,10 +118,9 @@ public class FlameExportTests : IDisposable
             OptionalFiles = true,
             Instance = instance,
             Output = new AbsolutePath(output),
-        });
-        await export.StartAsync();
+        };
+        await FlamePackExportTask.ExportAsync(exportOptions, null, CancellationToken.None);
 
-        Assert.True(export.WasSuccessful, export.FailReason);
         Assert.True(File.Exists(output));
 
         using var zip = await ZipFile.OpenReadAsync(output);
@@ -203,7 +200,7 @@ public class FlameExportTests : IDisposable
         var instance = new MinecraftInstance(
             new InstanceJsonSettingsObject(new AbsolutePath(staging), _global.Environment), new AbsolutePath(staging));
         var output = TempPath("exported-unresolved.zip");
-        var export = new FlamePackExportTask(new FlamePackExportTask.Options
+        var exportOptions = new FlamePackExportTask.Options
         {
             Flame = _flameApi,
             Http = TestNet.Http,
@@ -213,10 +210,9 @@ public class FlameExportTests : IDisposable
             OptionalFiles = false,
             Instance = instance,
             Output = new AbsolutePath(output),
-        });
-        await export.StartAsync();
+        };
+        await FlamePackExportTask.ExportAsync(exportOptions, null, CancellationToken.None);
 
-        Assert.True(export.WasSuccessful, export.FailReason);
         using var zip = await ZipFile.OpenReadAsync(output);
         Assert.Contains("overrides/mods/unmeta.jar", zip.Entries.Select(e => e.FullName));
 

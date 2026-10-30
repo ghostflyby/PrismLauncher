@@ -19,39 +19,32 @@
 //     See the License for the specific language governing permissions and
 //     limitations under the License.
 //
-// Port of launcher/launch/LaunchTask.{h,cpp}: the sequential step engine that drives one
-// instance launch.
+// The step engine of one instance launch. Steps are declared in stages: a stage's steps start
+// together and the next stage waits for all of them, so independent work (the library, asset
+// and java downloads) shares a stage while anything reading its output gets a later one.
 //
-// The C++ engine is purely signal driven: executeTask() starts the first step and each step's
-// finished() signal triggers onStepFinished(), which advances (or finalizes) the chain. The
-// Qt "run the game now" gate works through the readyForLaunch() signal reaching the UI, which
-// calls back proceed(). The C# port keeps the exact state machine and event flow, with these
-// documented deviations:
-//  - StartAsync() is awaitable: ExecuteAsync() parks on a TaskCompletionSource that the
-//    terminal emissions (succeeded/failed/aborted) complete, so `await launchTask.StartAsync()`
-//    covers the whole launch including the "game is running" phase (the C++ LaunchTask also
-//    only emits finished() once the LauncherPartLaunch step sees the game exit).
-//  - proceed() gating: the ReadyForLaunch event plus the Proceed() method map 1:1 to the C++
-//    readyForLaunch()/proceed() pair. AbortProceed() is the C#-side shorthand for aborting
-//    while the engine is Waiting (the C++ UI calls abort() for this). One deliberate
-//    deviation: Proceed() restores LaunchState.Running after the step consumes the gate —
-//    the C++ stays Waiting forever (its GUI never re-reads the state), while this API
-//    reports the state to clients, who would otherwise see "waiting" during the whole game
-//    session with no signal that the gate was already opened.
-//  - abort() before start(): the C++ emits aborted() immediately from abort(); the port
-//    records the Aborted state and emits it when StartAsync() runs (deferred by one call —
-//    the observable outcome is the same terminal AbortedByUser state).
-//  - parseXmlLogs(): the log4j XML event parser IS ported (LogParser) and wired like the C++
-//    LaunchTask::onLogLine — but behind the <see cref="LaunchServices.XmlLogParsing"/> opt-in
-//    gate, since the C++ had no off switch and pure-core consumers should keep the simple
-//    path. When enabled, StdOut/StdErr lines feed the per-level LogParser instances first:
-//    complete log4j events become structured "[HH:mm:ss] [thread/LEVEL] [logger]: message"
-//    entries, everything else falls through the same level-detection heuristics as before.
-//    The Web host enables it in the LaunchServices it builds (WebHostBuilder).
-//  - censorPrivateInfo() applies the session censor filter; the QMap iteration order (sorted
-//    by key) is preserved via the SortedDictionary the instance filter is built into.
+// The engine awaits each step's body. The launch's outcome is the run's: a return succeeds, a
+// thrown exception fails, and a cancellation aborts. `await RunAsync()` therefore covers the
+// whole session, including the time the game runs — a step whose end is the game exiting parks
+// its body on that event.
+//
+// The "run the game now" gate: a step emits ReadyForLaunch and waits; the host answers with
+// Proceed(), which routes to that step. Proceed() restores Running so a host reading the state
+// does not see "waiting" through the whole game session.
+//
+// abort() before the run aborts it without starting anything. An abort while a step runs asks
+// that step (AbortStep) and cancels the chain's token; the stages after it never start.
+//
+// parseXmlLogs(): the log4j XML event parser (LogParser) runs behind the
+// <see cref="LaunchServices.XmlLogParsing"/> opt-in gate, since pure-core consumers should keep
+// the simple path. When enabled, StdOut/StdErr lines feed the per-level LogParser instances
+// first: complete log4j events become structured "[HH:mm:ss] [thread/LEVEL] [logger]: message"
+// entries, and everything else falls through the plain-text level heuristics.
+//
+// censorPrivateInfo() applies the session censor filter, iterated in key order.
 
 using System.Globalization;
+using System.Runtime.ExceptionServices;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Instances;
@@ -61,7 +54,7 @@ using Microsoft.Extensions.Logging;
 
 namespace FlintLauncher.Core.Launch;
 
-public class LaunchTask : FlintTask
+public sealed class LaunchTask
 {
     /// <summary>Port of the LaunchTask::State enum.</summary>
     public enum LaunchState
@@ -74,19 +67,28 @@ public class LaunchTask : FlintTask
         Finished,
     }
 
+    /// <summary>How a launch ended, as the engine settled it: a returned run succeeds, a
+    /// failure carries its reason, and an abort is its own outcome.</summary>
+    public readonly record struct LaunchOutcome(bool Succeeded, string FailReason, bool Aborted);
+
     private static readonly Regex SettingUserRegex = new(".*Setting user.+",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private readonly MinecraftInstance _instance;
     private readonly LaunchServices _services;
-    private readonly List<LaunchStep> _steps = [];
+    private readonly List<List<LaunchStep>> _stages = [];
     private readonly LogParser _stdoutParser = new();
     private readonly LogParser _stderrParser = new();
     private SortedDictionary<string, string> _censorFilter = new(StringComparer.Ordinal);
-    private int _currentStep = -1;
+    private int _stageIndex = -1;
+    private readonly List<LaunchStep> _gatedSteps = [];
+    private readonly List<LaunchStep> _runningSteps = [];
+    private readonly Lock _gateLock = new();
+    private LaunchStep? _gatedStep;
+    private volatile bool _abortRequested;
+    private CancellationTokenSource? _abortSource;
     private LaunchState _state = LaunchState.NotStarted;
     private LogModel? _logModel;
-    private TaskCompletionSource? _terminalSignal;
 
     internal LaunchTask(MinecraftInstance instance, LaunchServices services)
     {
@@ -101,11 +103,30 @@ public class LaunchTask : FlintTask
     /// <summary>Port of the readyForLaunch() signal: the launch preparations are done.</summary>
     public event Action? ReadyForLaunch;
 
-    /// <summary>Port of the requestProgress(Task*) signal.</summary>
-    public event Action<FlintTask>? RequestProgress;
+    /// <summary>Raised when a step asks the host to open the progress gate for it.</summary>
+    public event Action<LaunchStep>? RequestProgress;
 
     /// <summary>Diagnostics/test hook for the internal LaunchState state machine.</summary>
     internal LaunchState CurrentState => _state;
+
+    /// <summary>Runs the chain and reports its outcome as the state the engine settled on,
+    /// for callers that inspect the launch rather than propagate its failure.</summary>
+    public async Task<LaunchOutcome> RunToCompletionAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await RunAsync(cancellationToken).ConfigureAwait(false);
+            return new LaunchOutcome(true, "", false);
+        }
+        catch (OperationCanceledException)
+        {
+            return new LaunchOutcome(false, "Aborted", true);
+        }
+        catch (Exception e)
+        {
+            return new LaunchOutcome(false, TaskWork.ReasonOf(e), false);
+        }
+    }
 
     /// <summary>
     /// Port of the C++ LaunchTask "Waiting" state observable: the launch preparations are
@@ -126,8 +147,44 @@ public class LaunchTask : FlintTask
 
     public long Pid { get; set; } = -1;
 
-    /// <summary>Port of LaunchTask::isMultiStep(): a launch chain is multi-step by definition.</summary>
-    public override bool IsMultiStep => _steps.Count > 1;
+    /// <summary>Whether the launch runs more than a single step.</summary>
+    public bool IsMultiStep => _stages.Count > 1 || (_stages.Count == 1 && _stages[0].Count > 1);
+
+    /// <summary>Port of onReadyForLaunch(): the step that asked waits for user confirmation.
+    /// Several gated steps may be open at once; <see cref="Proceed"/> consumes them in the
+    /// order they asked.</summary>
+    internal void OnReadyForLaunch(LaunchStep step)
+    {
+        lock (_gateLock)
+        {
+            _gatedSteps.Add(step);
+            _gatedStep ??= step;
+        }
+
+        _state = LaunchState.Waiting;
+        Log.ReadyForLaunch(StepName(step));
+        ReadyForLaunch?.Invoke();
+    }
+
+    /// <summary>Port of onProgressReportingRequested(): the step that asked waits for the
+    /// host to open the gate.</summary>
+    internal void OnProgressReportingRequested(LaunchStep step)
+    {
+        lock (_gateLock)
+        {
+            _gatedSteps.Add(step);
+            _gatedStep ??= step;
+        }
+
+        _state = LaunchState.Waiting;
+        Log.ProgressGate(StepName(step));
+        RequestProgress?.Invoke(step);
+    }
+
+    /// <summary>Stable engine-side identity of a step (class name — LaunchStep has no
+    /// user-facing name of its own; the user-facing description goes to the launch console
+    /// via TextPrint / PrintInstanceInfo).</summary>
+    private static string StepName(LaunchStep step) => step.GetType().Name;
 
     public LogModel GetLogModel()
     {
@@ -147,9 +204,16 @@ public class LaunchTask : FlintTask
         return _logModel;
     }
 
-    public void AppendStep(LaunchStep step) => _steps.Add(step);
+    /// <summary>Appends one step as its own stage: it runs after everything appended so far.</summary>
+    public void AppendStep(LaunchStep step) => _stages.Add([step]);
 
-    public void PrependStep(LaunchStep step) => _steps.Insert(0, step);
+    /// <summary>Appends a stage whose steps run concurrently and whose aggregate gates the
+    /// stages after it. The steps must not depend on each other's output.</summary>
+    public void AppendStage(params LaunchStep[] steps) => _stages.Add([.. steps]);
+
+    /// <summary>Inserts one step as a stage before everything else (the controller's banner
+    /// steps); prepending several keeps the order of the prepend calls.</summary>
+    public void PrependStep(LaunchStep step) => _stages.Insert(0, [step]);
 
     public void SetCensorFilter(SortedDictionary<string, string> filter) => _censorFilter = filter;
 
@@ -158,150 +222,210 @@ public class LaunchTask : FlintTask
 
     // ------------------------------------------------------------------- step engine
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    /// <summary>Runs the stages. The chain's outcome is the terminal state of this task: a
+    /// return succeeds it, a thrown exception fails it, and an abort requested through
+    /// <see cref="Abort"/> aborts it.</summary>
+    internal async Task RunAsync(CancellationToken cancellationToken)
     {
-        _terminalSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-
         if (_state == LaunchState.Aborted)
         {
-            // C++ abort() before start(): emitAborted() straight away. Deferred to the start
-            // call here — see the header note.
-            EmitAborted();
-            _terminalSignal.TrySetResult();
-            return;
+            // abort() before start(): nothing runs, and the run reports the abort
+            _instance.SetRunning(false);
+            throw new OperationCanceledException("Aborted");
         }
 
         _instance.SetCrashed(false);
-        if (_steps.Count == 0)
+        if (_stages.Count == 0)
         {
             _state = LaunchState.Finished;
-            EmitSucceeded();
-            _terminalSignal.TrySetResult();
+            _instance.SetRunning(false);
             return;
         }
 
         _state = LaunchState.Running;
-        OnStepFinishedCore();
-        await _terminalSignal.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
-    }
+        using var abortSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _abortSource = abortSource;
+        var token = abortSource.Token;
 
-    /// <summary>Port of onReadyForLaunch(): the current step waits for user confirmation.</summary>
-    internal void OnReadyForLaunch()
-    {
-        _state = LaunchState.Waiting;
-        Log.ReadyForLaunch(StepName(_currentStep));
-        ReadyForLaunch?.Invoke();
-    }
-
-    /// <summary>Port of onProgressReportingRequested().</summary>
-    internal void OnProgressReportingRequested()
-    {
-        _state = LaunchState.Waiting;
-        Log.ProgressGate(StepName(_currentStep));
-        RequestProgress?.Invoke(_steps[_currentStep]);
-    }
-
-    /// <summary>Port of onStepFinished(): the initial call starts the first step, later calls
-    /// advance (or finalize) the chain.</summary>
-    internal void OnStepFinished(FlintTask step) => OnStepFinishedCore();
-
-    /// <summary>Adapter for the failed(QString) signal.</summary>
-    internal void OnStepFailed(FlintTask step, string reason) => OnStepFinishedCore();
-
-    private void OnStepFinishedCore()
-    {
-        if (IsFinished)
+        Exception? failure = null;
+        try
         {
-            // Late terminal events from a step that was already finalized; the C++ flow never
-            // produces them because Qt disconnects finished steps.
+            for (_stageIndex = 0; _stageIndex < _stages.Count; _stageIndex++)
+            {
+                if (_abortRequested)
+                {
+                    // an abort was honoured while a later stage had not started: do not start it
+                    break;
+                }
+
+                await RunStageAsync(_stages[_stageIndex], token).ConfigureAwait(false);
+            }
+        }
+        catch (Exception e) when (e is not OperationCanceledException || !token.IsCancellationRequested)
+        {
+            failure = e;
+        }
+        finally
+        {
+            _abortSource = null;
+            // the C++ finalizes every started step backwards once the chain ends, whether it
+            // succeeded or not
+            FinalizeStartedSteps();
+            // the instance stops counting as running with the chain, on every exit path
+            // (including a token-cancelled abort, which leaves through the exception)
+            _instance.SetRunning(false);
+        }
+
+        // A step's own failure wins over the abort flag: an aborted step usually reports how it
+        // ended (the game crashed on the abort command), and that reason is what the caller
+        // asked for. The flag only stops the stages after the abort.
+        _state = failure switch
+        {
+            null when _abortRequested => LaunchState.Aborted,
+            null => LaunchState.Finished,
+            _ => LaunchState.Failed,
+        };
+
+        if (failure is not null)
+        {
+            _instance.SetCrashed(true);
+            ExceptionDispatchInfo.Capture(failure).Throw();
             return;
         }
 
-        // initial -> just start the first step
-        if (_currentStep == -1)
+        if (_abortRequested || cancellationToken.IsCancellationRequested)
         {
-            _currentStep++;
-            StartStep(_steps[_currentStep]);
-            return;
-        }
-
-        var step = _steps[_currentStep];
-        Log.StepFinished(StepName(_currentStep), step.WasSuccessful, step.FailReason);
-        if (step.WasSuccessful)
-        {
-            // end?
-            if (_currentStep == _steps.Count - 1)
-            {
-                FinalizeSteps(true, "");
-            }
-            else
-            {
-                _currentStep++;
-                StartStep(_steps[_currentStep]);
-            }
-        }
-        else
-        {
-            FinalizeSteps(false, step.FailReason);
+            throw new OperationCanceledException("Aborted", cancellationToken);
         }
     }
 
-    private void StartStep(LaunchStep step)
+    /// <summary>Finalizes the steps that ran, from the deepest started stage back to the first.
+    /// A finalizer that throws must not stop the ones before it from running.</summary>
+    private void FinalizeStartedSteps()
     {
-        Log.StepStarted(_currentStep + 1, _steps.Count, StepName(_currentStep));
-        _ = step.StartAsync(); // the step reports its terminal state through the events
+        // _stageIndex is past the last stage when the chain completed, and names the failed
+        // one when it did not
+        var lastStarted = Math.Min(_stageIndex, _stages.Count - 1);
+        for (var stage = lastStarted; stage >= 0; stage--)
+        {
+            var steps = _stages[stage];
+            for (var i = steps.Count - 1; i >= 0; i--)
+            {
+                try
+                {
+                    steps[i].FinalizeStep();
+                }
+                catch (Exception)
+                {
+                    // a cleanup failure must not mask the launch outcome or skip the remaining
+                    // cleanups
+                }
+            }
+        }
     }
 
-    /// <summary>Stable engine-side identity of a step (class name — LaunchStep has no
-    /// user-facing name of its own; the user-facing description goes to the launch console
-    /// via TextPrint / PrintInstanceInfo).</summary>
-    private string StepName(int index) => _steps[index].GetType().Name;
-
-    /// <summary>Port of finalizeSteps(): finalize from the current step backwards, then emit.</summary>
-    private void FinalizeSteps(bool successful, string error)
+    /// <summary>Runs one stage: its steps start together, and the stage waits for all of them
+    /// before the next one begins. A failure is collected rather than thrown so its siblings
+    /// still run to their own end.</summary>
+    private async Task RunStageAsync(IReadOnlyList<LaunchStep> stage, CancellationToken cancellationToken)
     {
-        for (var step = _currentStep; step >= 0; step--)
+        var failures = new List<Exception>();
+        if (stage.Count == 1)
         {
-            _steps[step].FinalizeStep();
-        }
-
-        if (successful)
-        {
-            EmitSucceeded();
+            await RunStepAsync(stage[0], cancellationToken, failures).ConfigureAwait(false);
         }
         else
         {
-            EmitFailed(error);
+            await Task.WhenAll(stage.Select(step =>
+                RunStepAsync(step, cancellationToken, failures))).ConfigureAwait(false);
         }
 
-        _terminalSignal?.TrySetResult();
+        if (failures.Count > 0)
+        {
+            // one failure keeps its own shape (the caller sees its message); several are
+            // aggregated, since a stage reports them together
+            throw failures.Count == 1 ? failures[0] : new AggregateException(failures);
+        }
+    }
+
+    /// <summary>Runs one step to its end. A step that fails contributes its exception to the
+    /// stage's failure list instead of throwing into the caller, so its siblings still run.</summary>
+    private async Task RunStepAsync(LaunchStep step, CancellationToken cancellationToken,
+        List<Exception> failures)
+    {
+        lock (_gateLock)
+        {
+            _runningSteps.Add(step);
+        }
+
+        Log.StepStarted(_stageIndex + 1, _stages.Count, StepName(step));
+        try
+        {
+            await step.ExecuteAsync(cancellationToken).ConfigureAwait(false);
+            Log.StepFinished(StepName(step), !_abortRequested, _abortRequested ? "Aborted" : "");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // the launch is being aborted: the caller surfaces the cancellation
+            throw;
+        }
+        catch (Exception e)
+        {
+            Log.StepFinished(StepName(step), false, e.Message);
+            lock (failures)
+            {
+                failures.Add(e);
+            }
+        }
+        finally
+        {
+            lock (_gateLock)
+            {
+                _runningSteps.Remove(step);
+                _gatedSteps.Remove(step);
+                if (ReferenceEquals(_gatedStep, step))
+                {
+                    _gatedStep = _gatedSteps.Count > 0 ? _gatedSteps[0] : null;
+                }
+            }
+        }
     }
 
     // ------------------------------------------------------------- launch confirmation
 
-    /// <summary>Port of proceed(): launch the armed instance (the current step gates on this).
-    /// Restores the Running state afterwards so IsWaitingForProceed only reports a genuinely
-    /// open gate — see the header deviation note (a no-op Proceed outside Waiting is the
-    /// caller's signal to check the state instead of silently retrying).</summary>
+    /// <summary>Port of proceed(): open the gate the waiting step asked for. A no-op outside
+    /// the Waiting state is the caller's signal to check the state instead of retrying.</summary>
     public void Proceed()
     {
-        if (_state != LaunchState.Waiting)
+        LaunchStep? step;
+        lock (_gateLock)
+        {
+            step = _gatedStep;
+            if (step is not null)
+            {
+                _gatedSteps.Remove(step);
+                _gatedStep = _gatedSteps.Count > 0 ? _gatedSteps[0] : null;
+            }
+        }
+
+        if (_state != LaunchState.Waiting || step is null)
         {
             Log.ProceedIgnored(_state.ToString());
             return;
         }
 
-        Log.ProceedRouted(StepName(_currentStep));
-        _steps[_currentStep].Proceed();
-        _state = LaunchState.Running;
+        Log.ProceedRouted(StepName(step));
+        step.Proceed();
+        if (_gatedStep is null)
+        {
+            _state = LaunchState.Running;
+        }
     }
-
-    /// <summary>C#-side shorthand for aborting while Waiting (documented addition).</summary>
-    public void AbortProceed() => Abort();
 
     // ------------------------------------------------------------------------- aborting
 
-    /// <summary>Port of canAbort().</summary>
+    /// <summary>Port of canAbort(). Between stages no step is running, but the chain still can
+    /// be stopped, so the answer is true while it has not finished.</summary>
     public bool CanAbort()
     {
         switch (_state)
@@ -314,14 +438,25 @@ public class LaunchTask : FlintTask
                 return true;
             case LaunchState.Running:
             case LaunchState.Waiting:
-                return _steps[_currentStep].CanAbort();
+            {
+                LaunchStep[] candidates;
+                lock (_gateLock)
+                {
+                    candidates = _gatedSteps.Count > 0 ? [.. _gatedSteps] : [.. _runningSteps];
+                }
+
+                // no step in flight: the stage loop is between stages and can still stop
+                return candidates.Length == 0 || candidates.Any(step => step.CanAbort());
+            }
             default:
                 return false;
         }
     }
 
-    /// <summary>Port of abort().</summary>
-    public override void Abort()
+    /// <summary>Stops the launch. A running step decides how: AbortStep() stops whatever it
+    /// drives (the game process, the pre-launch command), and the chain's token stops the
+    /// stages that have not started.</summary>
+    public void Abort()
     {
         switch (_state)
         {
@@ -330,28 +465,37 @@ public class LaunchTask : FlintTask
             case LaunchState.Finished:
                 return;
             case LaunchState.NotStarted:
-            {
                 _state = LaunchState.Aborted;
-                if (IsRunning)
-                {
-                    EmitAborted();
-                    _terminalSignal?.TrySetResult();
-                }
-
+                _abortRequested = true;
                 return;
-            }
             case LaunchState.Running:
             case LaunchState.Waiting:
             {
-                var step = _steps[_currentStep];
-                if (!step.CanAbort())
+                LaunchStep[] candidates;
+                lock (_gateLock)
                 {
-                    return;
+                    candidates = _gatedSteps.Count > 0 ? [.. _gatedSteps] : [.. _runningSteps];
                 }
 
-                if (step.AbortStep())
+                var honoured = false;
+                foreach (var step in candidates)
                 {
+                    if (step.CanAbort() && step.AbortStep())
+                    {
+                        honoured = true;
+                    }
+                }
+
+                // between stages nothing is left to abort, but the chain still stops rather
+                // than starting the next stage
+                if (honoured || candidates.Length == 0)
+                {
+                    _abortRequested = true;
                     _state = LaunchState.Aborted;
+                    // a body parked on the token ends here. A step that drives something the
+                    // token cannot reach (the game process) stopped it in AbortStep() and
+                    // reports how it ended.
+                    _abortSource?.Cancel();
                 }
 
                 return;
@@ -473,24 +617,9 @@ public class LaunchTask : FlintTask
         return true;
     }
 
-    /// <summary>Port of emitSucceeded(): the instance is no longer running.</summary>
-    protected new void EmitSucceeded()
-    {
-        _instance.SetRunning(false);
-        base.EmitSucceeded();
-    }
-
-    /// <summary>Port of emitFailed(QString): the instance counts as crashed.</summary>
-    protected new void EmitFailed(string reason)
-    {
-        _instance.SetRunning(false);
-        _instance.SetCrashed(true);
-        base.EmitFailed(reason);
-    }
-
     // -------------------------------------------------------------- helpers for steps
 
-    /// <summary>Port of the "Setting user" CloseAfterLaunch stdout filter.</summary>
+    /// <summary>The "Setting user" CloseAfterLaunch stdout filter.</summary>
     public static bool MatchesCloseAfterLaunch(IEnumerable<string> lines) =>
         lines.Any(line => SettingUserRegex.IsMatch(line));
 

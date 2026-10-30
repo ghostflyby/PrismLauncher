@@ -5,7 +5,7 @@
 // pass-through (list + per-pack versions), the staged pack install against the stub ATL CDN
 // (reusing the AtlTestSupport fixture builders — the endpoint runs the same
 // AtLauncherPackInstallTask the core tests drive directly) and the failure surface
-// (unknown pack -> 500 creation_failed with the task's FailReason, validation -> 400).
+// (unknown pack -> 500 creation_failed with the failure cause, validation -> 400).
 //
 // Every host gets its own AtLauncherApi client pointed at the stub (DownloadServerUrl/
 // ApiBaseUrl are per-instance state now, so no [Collection] serialization is needed).

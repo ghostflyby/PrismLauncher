@@ -73,7 +73,6 @@ using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.State;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
 using Microsoft.Extensions.Logging.Abstractions;
 using TruePath;
@@ -123,15 +122,15 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// anchor on the process CWD (the legacy default layout's shape). The instance carries
     /// no layout type — the composition root owns it.</summary>
     public AbsolutePath AssetsRoot => LaunchServices?.AssetsRoot
-        ?? AbsolutePath.CurrentWorkingDirectory / "assets";
+                                      ?? AbsolutePath.CurrentWorkingDirectory / "assets";
 
     public AbsolutePath AssetIndexesDir => AssetsRoot / "indexes";
 
     public AbsolutePath LibrariesRoot => LaunchServices?.LibrariesRoot
-        ?? AbsolutePath.CurrentWorkingDirectory / "libraries";
+                                         ?? AbsolutePath.CurrentWorkingDirectory / "libraries";
 
     public AbsolutePath StoreRoot => LaunchServices?.StoreRoot
-        ?? AbsolutePath.CurrentWorkingDirectory / "store";
+                                     ?? AbsolutePath.CurrentWorkingDirectory / "store";
 
     /// <summary>Injected launch-pipeline dependencies (paths, logger factory, global settings,
     /// install root, UI hooks — the former static hooks). Stamped by the composition root
@@ -343,19 +342,35 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     //////  Launch stuff //////
 
-    // TODO: the C++ assembles FoldersTask, LibrariesTask, LegacyFMLLibrariesTask and
+    // TODO: the C++ assembles the folder creation, LibrariesTask, LegacyFMLLibrariesTask and
     // AssetUpdateTask here (the update pipeline). Ported in Launch/LaunchController and the
     // Launch/Steps/* tasks below.
-    public override List<FlintTask> CreateUpdateTask() =>
+    public override List<Func<CancellationToken, Task>> CreateUpdateTask() =>
     [
         // create folders
-        new FoldersTask(this),
+        cancellationToken =>
+        {
+            var mcDir = GameRoot;
+            if (!mcDir.ExistsDirectory())
+            {
+                try
+                {
+                    Directory.CreateDirectory(mcDir.Value);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    throw new InvalidOperationException("Failed to create folder for Minecraft binaries.", e);
+                }
+            }
+
+            return Task.CompletedTask;
+        },
         // libraries download
-        new LibrariesTask(this),
+        cancellationToken => LibrariesTask.RunAsync(this, cancellationToken),
         // FML libraries download and copy into the instance
-        new LegacyFmlLibrariesTask(this),
+        cancellationToken => LegacyFmlLibrariesTask.RunAsync(this, null, cancellationToken),
         // assets update
-        new AssetUpdateTask(this),
+        cancellationToken => AssetUpdateTask.RunAsync(this, cancellationToken),
     ];
 
     /// <summary>Port of createLaunchTask() (2-arg form): builds the per-launch services from
@@ -422,7 +437,8 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // load meta
         {
             var mode = session?.LaunchMode != LaunchMode.Offline ? NetMode.Online : NetMode.Offline;
-            process.AppendStep(new TaskStepWrapper(process, new MinecraftLoadAndCheck(this, mode)));
+            process.AppendStep(new TaskStepWrapper(process,
+                cancellationToken => MinecraftLoadAndCheck.RunAsync(this, mode, cancellationToken)));
         }
 
         // check java

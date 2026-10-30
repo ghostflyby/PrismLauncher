@@ -22,9 +22,9 @@
 //    like the C++ non-dialog path.
 //  - promptForUntrustedMods: without the UntrustedModsDialog the install fails listing the
 //    untrusted files when TrustedSource is false (the C++ dialog defaults to rejecting).
-//  - Downloads run through a ConcurrentTask of per-file tasks so the fallback-URL retry can
-//    mark the file failed only after every URL was tried (the C++ chains new net actions
-//    from the failed signal).
+//  - Downloads run as one unit per file through TaskWork.RunAllAsync, so the fallback-URL
+//    retry can mark the file failed only after every URL was tried (the C++ chains new net
+//    actions from the failed signal).
 
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -34,7 +34,6 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.ModPlatform.Hashing;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Modrinth;
@@ -109,7 +108,7 @@ public sealed class ModrinthCreationTask : InstanceTask
     public IReadOnlyDictionary<string, bool> OptionalModsSelection { get; set; } =
         new Dictionary<string, bool>();
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    internal override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         // (upstream checks for an existing instance to update here — deferred, see header)
         await CreateInstanceAsync(cancellationToken);
@@ -142,8 +141,7 @@ public sealed class ModrinthCreationTask : InstanceTask
             // Apply the overrides
             if (!FileOps.Move(overridePath, mcPath))
             {
-                EmitFailed("Could not rename the overrides folder:\n" + "overrides");
-                return;
+                throw new InvalidOperationException("Could not rename the overrides folder:\n" + "overrides");
             }
         }
 
@@ -157,15 +155,13 @@ public sealed class ModrinthCreationTask : InstanceTask
             // Apply the overrides
             if (!OverrideUtils.OverrideFolder(mcPath, clientOverridePath))
             {
-                EmitFailed("Could not rename the client overrides folder:\n" + "client overrides");
-                return;
+                throw new InvalidOperationException("Could not rename the client overrides folder:\n" + "client overrides");
             }
         }
 
         if (!PromptForUntrustedMods())
         {
-            EmitFailed("The pack contains files from untrusted sources:\n" + string.Join("\n", UntrustedMods));
-            return;
+            throw new InvalidOperationException("The pack contains files from untrusted sources:\n" + string.Join("\n", UntrustedMods));
         }
 
         // the staged instance is Flint format from birth (typed instance.json adapter)
@@ -221,8 +217,7 @@ public sealed class ModrinthCreationTask : InstanceTask
         // ---------------------------------------------------------- download mods
         var rootModpackPath = StagingPath / _rootPath;
 
-        var downloadJob = new ConcurrentTask("Mod Download Modrinth");
-        var downloadTasks = new List<ModDownloadTask>();
+        var downloads = new List<ModDownloadTask>();
 
         foreach (var file in _files)
         {
@@ -231,9 +226,8 @@ public sealed class ModrinthCreationTask : InstanceTask
             if (!IsParentOf(rootModpackPath, filePath))
             {
                 // This means we somehow got out of the root folder, so abort here to prevent exploits
-                EmitFailed(
+                throw new InvalidOperationException(
                     $"One of the files has a path that leads to an arbitrary location ({fileName}). This is a security risk and isn't allowed.");
-                return;
             }
 
             if (fileName.StartsWith("mods/", StringComparison.Ordinal))
@@ -249,30 +243,19 @@ public sealed class ModrinthCreationTask : InstanceTask
 
             if (file.Downloads.Count == 0)
             {
-                EmitFailed($"The file '{fileName}' is missing a download link. This is invalid in the pack format.");
-                return;
+                throw new InvalidOperationException($"The file '{fileName}' is missing a download link. This is invalid in the pack format.");
             }
 
             var meta = new ModrinthDownloadMeta(Reason: "modpack", GameVersion: _minecraftVersion, Loader: loader,
                 DependentOn: _managedId.Length != 0 ? _managedVersionId : "");
 
-            var downloadTask = new ModDownloadTask(file, filePath, meta, _modrinth, _http);
-            downloadTasks.Add(downloadTask);
-            downloadJob.AddTask(downloadTask);
+            downloads.Add(new ModDownloadTask(file, filePath, meta, _modrinth, _http));
         }
 
         EmitStatus("Downloading mods...");
-        downloadJob.Progress += (_, _) =>
-        {
-            EmitDetails($"{downloadTasks.Count(t => t.IsFinished)} out of {downloadTasks.Count} complete");
-            SetProgress(downloadTasks.Count(t => t.IsFinished), downloadTasks.Count);
-        };
-        await downloadJob.StartAsync(cancellationToken);
-        if (!downloadJob.WasSuccessful)
-        {
-            EmitFailed(downloadJob.FailReason);
-            return;
-        }
+        await TaskWork.RunAllAsync(downloads,
+                (download, token) => download.RunAsync(token), maxConcurrent: 6, cancellationToken)
+            .ConfigureAwait(false);
 
         await EnsureMetaLoop(cancellationToken, newInstance);
     }
@@ -381,8 +364,7 @@ public sealed class ModrinthCreationTask : InstanceTask
                     {
                         // (the C++ opens the OptionalModDialog here — headless port installs
                         //  optional files disabled instead, see the header note)
-                        EmitAborted();
-                        return false;
+                        throw new OperationCanceledException("Aborted");
                     }
 
                     foreach (var file in optionalFiles)
@@ -447,8 +429,7 @@ public sealed class ModrinthCreationTask : InstanceTask
         }
         catch (JsonException e)
         {
-            EmitFailed("Could not understand pack index:\n" + e.Message);
-            return false;
+            throw new InvalidOperationException("Could not understand pack index:\n" + e.Message);
         }
 
         return true;
@@ -463,13 +444,13 @@ public sealed class ModrinthCreationTask : InstanceTask
             // setUpdateLock(true): updates for mods coming from an installed modpack are locked
             LockUpdate = true
         };
-        ensureMetadataTask.MetadataFailed += (_, reason) => EmitStatus(reason);
         EmitStatus("Generating metadata for mods...");
-        await ensureMetadataTask.StartAsync(cancellationToken);
-        if (!ensureMetadataTask.WasSuccessful)
+        var failures = await ensureMetadataTask.RunAsync(cancellationToken).ConfigureAwait(false);
+
+        // the per-resource failures do not fail the install, but they are worth reporting
+        foreach (var (_, reason) in failures)
         {
-            EmitFailed(ensureMetadataTask.FailReason);
-            return;
+            EmitStatus(reason);
         }
 
         await FinishInstallAsync(newInstance);
@@ -560,15 +541,13 @@ public sealed class ModrinthCreationTask : InstanceTask
 
             if (deleteFailed)
             {
-                EmitFailed("Failed to remove old conflicting files.");
-                return;
+                throw new InvalidOperationException("Failed to remove old conflicting files.");
             }
         }
 
         _ = newInstance;
         // (upstream calls downloadFiles(m_newInstance.get()) here — the update pipeline;
         //  like VanillaCreationTask, creation succeeds without fetching game files)
-        EmitSucceeded();
     }
 
     /// <summary>QUrl::fromLocalFile(...).isParentOf(...) equivalent for local paths.</summary>
@@ -596,9 +575,10 @@ public sealed class ModrinthCreationTask : InstanceTask
         ModrinthDownloadMeta meta,
         ModrinthClient modrinth,
         HttpClient http)
-        : FlintTask
     {
-        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+        /// <summary>Downloads the file, trying every URL in order. Returning is success; any
+        /// other exception is a failure whose message is the reason.</summary>
+        public async Task RunAsync(CancellationToken cancellationToken)
         {
             FileOps.EnsureFilePathExists(filePath);
             // md4 degrades to md5 (no managed MD4 in .NET); the adapter maps it back.
@@ -610,25 +590,21 @@ public sealed class ModrinthCreationTask : InstanceTask
             while (file.Downloads.Count > 0)
             {
                 var url = file.Downloads.Dequeue();
-                EmitStatus($"Downloading {file.Path}...");
                 try
                 {
                     await modrinth.Downloads.File(url, meta, HashUtils.VerifiedChecksum(hashAlgorithm, file.Hash))
-                        .SendTo(http, HttpCompletionOption.ResponseHeadersRead, filePath.Value, cancellationToken);
-                    EmitSucceeded();
+                        .SendTo(http, HttpCompletionOption.ResponseHeadersRead, filePath.Value, cancellationToken)
+                        .ConfigureAwait(false);
                     return;
                 }
                 catch (Exception e) when (e is ModrinthApiException)
                 {
-                    if (!IsRunning)
-                    {
-                        return; // aborted
-                    }
+                    cancellationToken.ThrowIfCancellationRequested();
                     // else: try the next URL
                 }
             }
 
-            EmitFailed($"Failed to download {file.Path}: {file.Hash}");
+            throw new InvalidOperationException($"Failed to download {file.Path}: {file.Hash}");
         }
     }
 }

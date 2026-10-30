@@ -9,10 +9,9 @@ using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Instances.Creation;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
-using FlintLauncher.ExternalApi;
+using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using FlintLauncher.Web.Models;
@@ -139,10 +138,13 @@ public static class InstanceEndpoints
                 // and DirNameFromString would return "<name>(1)")
                 AbsolutePath inDir = new AbsolutePath(instances.PrimaryDir());
                 var expectedId = FileNaming.DirNameFromString(request.Name, [inDir]);
-                await wrapped.StartAsync();
-                if (!wrapped.WasSuccessful)
+                try
                 {
-                    return ApiJson.Error("creation_failed", wrapped.FailReason, 500);
+                    await wrapped(CancellationToken.None);
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    return ApiJson.Error("creation_failed", TaskWork.ReasonOf(e), 500);
                 }
 
                 instances.LoadList();
@@ -186,23 +188,27 @@ public static class InstanceEndpoints
                     importTask.SetName(request.Name);
                 }
 
-                var wrapped = instances.WrapInstanceTask(importTask);
-                // NOTE: the hook runs via Task.Run — the fire-and-forget StartAsync below can
-                // complete synchronously on this thread (small/file packs), and an inline
-                // InstanceLock.Wait() here would deadlock against this very handler
-                var entry = registry.Register("import", wrapped, onFinished: () => _ = Task.Run(() =>
-                {
-                    instanceLock.Wait();
-                    try
+                // the creation narrates through its own events; forwarding them is what fills
+                // the task view's status and progress. Built here, inside the lock, so the
+                // staging area is claimed under the same discipline as every other creation.
+                var entry = registry.Start("import", handle =>
                     {
-                        instances.LoadList();
-                    }
-                    finally
+                        var wrapped = instances.WrapInstanceTask(importTask, handle.SetStatus,
+                            handle.SetProgress);
+                        return handle.RunAsync(wrapped);
+                    },
+                    onFinished: () => _ = Task.Run(() =>
                     {
-                        instanceLock.Release();
-                    }
-                }));
-                _ = wrapped.StartAsync(); // 202: downloads/modpack processing run in background
+                        instanceLock.Wait();
+                        try
+                        {
+                            instances.LoadList();
+                        }
+                        finally
+                        {
+                            instanceLock.Release();
+                        }
+                    }));
                 return Results.Accepted($"/api/v1/tasks/{entry.Id}", new TaskAcceptedResponse(entry.Id));
             }
             finally
@@ -260,7 +266,9 @@ public static class InstanceEndpoints
                 task.Icon = request.IconKey ?? original.IconKey();
 
                 var wrapped = instances.WrapInstanceTask(task);
-                var entry = registry.Register("copy", wrapped, instanceId: @ref,
+                var entry = registry.Start("copy",
+                    handle => handle.RunAsync(token => wrapped(token)),
+                    instanceId: @ref,
                     onFinished: () => _ = Task.Run(() =>
                     {
                         instanceLock.Wait();
@@ -273,7 +281,6 @@ public static class InstanceEndpoints
                             instanceLock.Release();
                         }
                     }));
-                _ = wrapped.StartAsync(); // 202: the folder copy + commit run in the background
                 return Results.Accepted($"/api/v1/tasks/{entry.Id}", new TaskAcceptedResponse(entry.Id));
             }
             finally

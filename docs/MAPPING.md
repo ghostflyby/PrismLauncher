@@ -24,12 +24,12 @@
 | `MMCZip.{h,cpp}` | `FlintLauncher.Core/IO/MMCZip.cs` | partial | extract/compress/merge；createModdedJar 待 Mod 模型；符号链接/权限位未实现 |
 | `settings/INIFile.{h,cpp}` | `FlintLauncher.Core/Settings/IniFile.cs` + `QSettingsIniCodec.cs` | ported | 黄金对拍：真 QSettings 6.11 生成 golden 文件，读写字节级一致（docs/tools/qt-ini-golden） |
 | `settings/SettingsObject*` `Setting*` `INISettingsObject` `OverrideSetting` `PassthroughSetting` | `FlintLauncher.Core/Settings/*.cs` | ported | QVariant→object?+`Variant` 转换层 |
-| `tasks/Task*` | `FlintLauncher.Core/Tasks/*`（Task→FlintTask 改名） | ported | ConcurrentTask 语义：子任务失败不中断兄弟、排空后聚合失败 |
+| `tasks/Task*` | `FlintLauncher.Core/Tasks/*` | partial | C# 有协程，任务基类不移植：每个操作直接是 `async Task`（返回即成功、抛出即失败、取消走 token）；`ConcurrentTask` 语义保留在 `TaskWork.RunAllAsync`（子项失败不中断兄弟、排空后聚合） |
 | `net/Request*` | `FlintLauncher.Core/Net/NetRequest.cs` | partial | HttpClient 底座；429/503 自动重试；HeaderProxy 简化为 AddHeader |
 | `net/Sink*` `FileSink` `ByteArraySink` `MetaCacheSink` | `FlintLauncher.Core/Net/Sink.cs` `FileSink.cs` | ported | PSaveFile→临时文件+原子替换 |
 | `net/Validator*` `ChecksumValidator` | `FlintLauncher.Core/Net/Validator.cs` | ported | IncrementalHash |
 | `net/HttpMetaCache*` | `FlintLauncher.Core/Net/HttpMetaCache.cs` | ported | metacache JSON 格式（version "1"）与原版互通；挂载表（baseId→根）+ 账本分离（E4），账本落 cache 根（E3），启动 Load()（E6） |
-| `net/NetJob*` | `FlintLauncher.Core/Net/NetJob.cs` | ported | 共享静态 HttpClient |
+| `net/NetJob*` | —（不移植） | dropped | C# 有协程：一批下载就是 `TaskWork.RunAllAsync` 或 `SequenceAsync` 的项列表 |
 | `net/Mode.h` `ApiRequest.h` `HeaderProxy*` | `FlintLauncher.Core/Net/Mode.cs`；头机制简化 | partial | 头注入按需在 P2/P6 恢复 |
 | `net/PasteUpload*` | `FlintLauncher.Core/Net/PasteUpload.cs` | ported | P7 完成（见下）；注入 NetStack 直发 |
 | `RWStorage.h` | — | n/a | 由 C# 并发设施取代 |
@@ -123,7 +123,7 @@
 | `libraries/murmur2` | `ModPlatform/Hashing/Murmur2.cs` | ported | 独立参考向量验证 |
 | `libraries/qdcss` | — | n/a | 未发现调用点（此前登记待查） |
 | `InstanceImportTask*`（modpack 分发） | `Instances/InstanceImportTask.cs` | ported | mrpack/Flame/Technic/plain/URL 五路分发 |
-| `ResourceDownloadTask*` | `ModPlatform/ResourceDownloadTask.cs` | ported | 下载+元数据；NetJob 空任务静默成功的 ctor 缺陷已修 |
+| `ResourceDownloadTask*` | `ModPlatform/ResourceDownloadTask.cs` | ported | 下载+元数据；旧文件的删除发生在下载成功之后，由元数据步骤的返回值带回 |
 | `minecraft/mod/tasks/GetModDependenciesTask*` | `ModPlatform/Dependencies/GetModDependenciesTask.cs` | ported | 递归依赖解析（required-only/quilt-fabric override/环防护） |
 | `minecraft/mod/tasks/LocalResourceUpdateTask*` | `ModPlatform/Dependencies/LocalResourceUpdateTask.cs` | ported | |
 | 更新应用编排（C++ 在 UI 层） | `ModPlatform/ModUpdateTask.cs` | ported | 失败不中止兄弟、末尾统一失败（C++ 语义） |

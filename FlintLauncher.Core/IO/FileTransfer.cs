@@ -1,21 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
-// File transfer primitives for the Prism→Flint data import: CoW reflink (APFS clonefile /
-// Linux FICLONE), move and copy, with a "destination exists → skip" idempotency rule that
-// matches FS::copy (the migration can be re-run and simply resumes).
+// File transfer primitives for the Prism→Flint data import, with a "destination exists →
+// skip" idempotency rule that matches FS::copy (the migration can be re-run and simply
+// resumes).
 //
-// Platform notes:
-//  - macOS: clonefile(2) (APFS, same volume) clones a whole file via P/Invoke.
-//  - Linux: FICLONE ioctl (Btrfs/XFS/ZFS 2.2+/NFS 4.2, same volume).
-//  - Windows: no reflink attempt (ReFS block cloning needs an ioctl of its own) — CoW
-//    degrades to copy.
-//  - Move: same-volume rename is O(1); cross-volume degrades to clone/copy + source delete
-//    after success.
-//
+// CoW is the runtime's: File.Copy clones extents where the platform supports it (APFS on
+// macOS, ReFS on Windows) and copies bytes elsewhere, so there is no reflink call to make and
+// no "did the volume support it" question to answer. Same-volume moves stay renames.
 
 using System.Runtime.InteropServices;
-using System.Security;
 using TruePath;
 
 namespace FlintLauncher.Core.IO;
@@ -23,11 +17,11 @@ namespace FlintLauncher.Core.IO;
 /// <summary>How the import moves bytes for one item.</summary>
 public enum ImportMode
 {
-    /// <summary>Reflink/CoW where the filesystem supports it, plain copy otherwise. Source
-    /// is kept intact. The default.</summary>
+    /// <summary>Copy (CoW where the runtime's copy can clone extents), source kept. The
+    /// default.</summary>
     CopyOnWrite,
 
-    /// <summary>Same-volume rename when possible, otherwise clone/copy + source delete after
+    /// <summary>Same-volume rename when possible, otherwise copy + source delete after
     /// success.</summary>
     Move,
 
@@ -41,7 +35,6 @@ public enum TransferMethod
     /// <summary>Destination already had the content — nothing done (idempotent resume).</summary>
     SkippedDestinationExists,
     SameVolumeRename,
-    Reflink,
     Copy,
 }
 
@@ -49,9 +42,8 @@ public static partial class FileTransfer
 {
     /// <summary>Transfers one file per mode. The destination is never overwritten; an
     /// existing destination returns SkippedDestinationExists (idempotent). Move degrades
-    /// rename → reflink → plain copy (+ source delete on success), CoW degrades
-    /// reflink → plain copy — both return false only when every mechanism failed (the
-    /// source is left intact).</summary>
+    /// rename → copy (+ source delete on success); both modes return false only when every
+    /// mechanism failed (the source is left intact).</summary>
     public static bool TransferFile(string src, string dst, ImportMode mode, out TransferMethod method)
     {
         method = TransferMethod.SkippedDestinationExists;
@@ -62,62 +54,22 @@ public static partial class FileTransfer
 
         try
         {
-            switch (mode)
+            if (mode == ImportMode.Move && TryRename(src, dst))
             {
-                case ImportMode.Move:
-                    if (TryRename(src, dst))
-                    {
-                        method = TransferMethod.SameVolumeRename;
-                        return true;
-                    }
-
-                    if (TryClone(src, dst))
-                    {
-                        method = TransferMethod.Reflink;
-                    }
-                    else if (!CopyInto(src, dst))
-                    {
-                        // cross-volume with neither rename nor reflink: the plain-copy
-                        // degradation the type documents ("clone/copy + source delete")
-                        // — without it a cross-volume Move is an unconditional false and
-                        // every per-file walk fails forever
-                        return false;
-                    }
-                    else
-                    {
-                        method = TransferMethod.Copy;
-                    }
-
-                    // the content is in place; failing to delete the source is not a failure
-                    TryDeleteFile(src);
-                    return true;
-                case ImportMode.CopyOnWrite:
-                    if (TryClone(src, dst))
-                    {
-                        method = TransferMethod.Reflink;
-                        return true;
-                    }
-
-                    // reflink unavailable (ext4/Windows/cross-volume): degrade to a plain
-                    // copy like the Move branch above — a hard false makes every per-file
-                    // import fail wholesale on non-CoW volumes, with the whole task
-                    // EmitFailed'ing file by file
-                    if (!CopyInto(src, dst))
-                    {
-                        return false;
-                    }
-
-                    method = TransferMethod.Copy;
-                    return true;
-                default:
-                    if (!CopyInto(src, dst))
-                    {
-                        return false;
-                    }
-
-                    method = TransferMethod.Copy;
-                    return true;
+                method = TransferMethod.SameVolumeRename;
+                return true;
             }
+
+            CopyInto(src, dst);
+            method = TransferMethod.Copy;
+
+            if (mode == ImportMode.Move)
+            {
+                // the content is in place; failing to delete the source is not a failure
+                TryDeleteFile(src);
+            }
+
+            return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
                                       or NotSupportedException)
@@ -214,40 +166,11 @@ public static partial class FileTransfer
         }
     }
 
-    /// <summary>Test seam: replaces the platform reflink attempt so the copy fallbacks run
-    /// on every OS (null = the real platform attempt — clonefile / FICLONE).</summary>
-    internal static Func<string, string, bool>? CloneAttemptHook { get; set; }
-
-    /// <summary>CoW clone into a not-yet-existing destination; false when the platform or
-    /// volume does not support reflinks (the transfer modes fall back to a plain copy). An
-    /// existing destination counts as success (idempotent, like FS::copy).</summary>
-    public static bool TryClone(string src, string dst)
-    {
-        var hook = CloneAttemptHook;
-        if (hook is not null)
-        {
-            return hook(src, dst);
-        }
-
-        EnsureDirectoryFor(dst);
-        if (OperatingSystem.IsMacOS())
-        {
-            return CloneFileMacOs(src, dst);
-        }
-
-        if (OperatingSystem.IsLinux())
-        {
-            return CloneLinux(src, dst);
-        }
-
-        return false;
-    }
-
     // ------------------------------------------------------------------------ unix stat
     //
     // The instance addressing chain needs the instance directory's inode: stable
     // across renames, zero-write, resolvable even when the instance cfg is broken. Same
-    // LibraryImport convention as clonefile below (UTF-8 string marshalling, the stat
+    // LibraryImport convention as the stat below (UTF-8 string marshalling, the stat
     // buffer pinned in place). Windows has no libc binding and returns 0 — the
     // addressing chain skips the inode link there (NTFS FileId can come later).
     //
@@ -283,54 +206,6 @@ public static partial class FileTransfer
     [LibraryImport("libc", EntryPoint = "stat", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
     private static partial int Stat(string path, Span<byte> buf);
 
-    // ------------------------------------------------------------------ macOS clonefile
-
-    [LibraryImport("libc", EntryPoint = "clonefile", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
-    private static partial int CloneFile(string src, string dst, int flags);
-
-    private static bool CloneFileMacOs(string src, string dst)
-    {
-        // EEXIST (17): destination already there — idempotent success, like FS::copy
-        return CloneFile(src, dst, 0) == 0
-               || Marshal.GetLastWin32Error() == 17;
-    }
-
-    // ------------------------------------------------------------------ Linux FICLONE
-
-    private const ulong FicloneIoctl = 0x40049409;
-
-    [LibraryImport("libc", EntryPoint = "ioctl", SetLastError = true)]
-    private static partial int Ioctl(int fd, ulong request, int srcFd);
-
-    private static bool CloneLinux(string src, string dst)
-    {
-        using var srcHandle = File.Open(src, FileMode.Open, FileAccess.Read, FileShare.Read);
-        bool cloned;
-        // the destination handle must close before the half-written clone is unlinked
-        using (var dstHandle = File.Open(dst, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-        {
-            var srcFd = (int)srcHandle.SafeFileHandle.DangerousGetHandle();
-            var dstFd = (int)dstHandle.SafeFileHandle.DangerousGetHandle();
-            cloned = Ioctl(dstFd, FicloneIoctl, srcFd) == 0;
-        }
-
-        if (cloned)
-        {
-            // FICLONE clones extents only — the CreateNew destination keeps its
-            // 0666&~umask mode, so a 0600 accounts.json would land world-readable
-            CarryUnixFileMode(src, dst);
-            return true;
-        }
-
-        try
-        {
-            File.Delete(dst);
-        }
-        catch (IOException) { }
-
-        return false;
-    }
-
     // ------------------------------------------------------------------ shared helpers
 
     private static bool TryRename(string src, string dst)
@@ -348,36 +223,10 @@ public static partial class FileTransfer
         }
     }
 
-    private static bool CopyInto(string src, string dst)
+    private static void CopyInto(string src, string dst)
     {
         EnsureDirectoryFor(dst);
         File.Copy(src, dst, overwrite: false);
-        // File.Copy's mode preservation is not contractual across runtimes/platforms — the
-        // migration copies credential-bearing files (accounts.json is 0600), so the source
-        // bits are carried explicitly
-        CarryUnixFileMode(src, dst);
-        return true;
-    }
-
-    /// <summary>Carries the source's Unix permission bits onto a freshly created destination.
-    /// Best effort: a filesystem without permission storage (FAT/exFAT) rejects the chmod —
-    /// the C++ copy proceeds without modes there too, so the transfer still counts as done.
-    /// Windows has no such bits.</summary>
-    internal static void CarryUnixFileMode(string src, string dst)
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
-        try
-        {
-            File.SetUnixFileMode(dst, File.GetUnixFileMode(src));
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException
-                                      or SecurityException or NotSupportedException)
-        {
-        }
     }
 
     private static void EnsureDirectoryFor(string dst)

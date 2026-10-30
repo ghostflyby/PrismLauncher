@@ -24,7 +24,6 @@
 
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Tasks;
 
 namespace FlintLauncher.Core.Meta;
 
@@ -120,28 +119,34 @@ public sealed class Index : MetaEntity
     // ------------------------------------------------------------------ loading
 
     /// <summary>
-    /// Port of Index::loadVersion(): chains the index, version-list and version load tasks
-    /// (offline mode or plain lookups short-circuit to just the version load task). The
+    /// Port of Index::loadVersion(): loads the index, version list and version in that order
+    /// (offline mode or plain lookups short-circuit to just the version load). The
     /// "MetaRefreshOnLaunch" setting gate is not ported because the settings key does not
-    /// exist yet; online loads always attempt a refresh like force=true, minus the tasks that
-    /// are already loaded (loadTask() emits immediately for fresh local files).
+    /// exist yet; online loads always attempt a refresh like force=true, minus the entities
+    /// that are already fresh on disk.
     /// </summary>
-    public FlintTask LoadVersion(string uid, string version, NetMode mode = NetMode.Online, bool force = false)
+    public async Task LoadAsync(string uid, string version, NetMode mode, bool force,
+        CancellationToken cancellationToken)
     {
         if (mode == NetMode.Offline)
         {
-            return Get(uid, version).LoadTask(mode);
+            await Get(uid, version).LoadAsync(mode, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            return;
         }
 
         var versionList = Get(uid);
-        var loadTask = new SequentialTask($"Load meta for {uid}:{version}");
         if (Status() != LoadStatus.Remote || force)
         {
-            loadTask.AddTask(LoadTask(mode));
+            await base.LoadAsync(mode, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
-        loadTask.AddTask(versionList.LoadTask(mode));
-        loadTask.AddTask(versionList.GetVersion(version).LoadTask(mode));
-        return loadTask;
+        // a cache-satisfied load does not observe the token, so an abort between two of them
+        // must be checked here
+        cancellationToken.ThrowIfCancellationRequested();
+        await versionList.LoadAsync(mode, cancellationToken: cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        await versionList.GetVersion(version).LoadAsync(mode, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
     }
 }
