@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
-// Tests for the data-migration port (launcher/DataMigrationTask.{h,cpp} plus the data-level
-// half of Application::handleDataMigration): the whitelist inventory, the dry-run/copy task
-// flow, the migration decision records (with the legacy "_nomigrate.txt" marker upgrade)
-// and the idempotency decision tree.
+// Tests for the data-level half of Application::handleDataMigration: the whitelist
+// inventory, the migration decision records (with the legacy "_nomigrate.txt" marker
+// upgrade) and the idempotency decision tree.
 
 using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.Tasks;
@@ -22,13 +21,6 @@ public class DataMigrationTests : IDisposable
     private MigrationDecisionStore Decisions() =>
         new(new AbsolutePath(Path.Combine(_dir, Guid.NewGuid().ToString("N"), "migration")),
             FlintJsonContext.Default.MigrationDecisionRecord);
-
-    private sealed class RecordingProgress : IProgress<TaskProgress>
-    {
-        public List<(long current, long total)> ProgressUpdates { get; } = [];
-
-        public void Report(TaskProgress value) => ProgressUpdates.Add((value.Current, value.Total));
-    }
 
     public void Dispose()
     {
@@ -264,7 +256,7 @@ public class DataMigrationTests : IDisposable
     // idempotency: after a successful migration the decision record exists, so re-running is
     // a no-op
     [Fact]
-    public async Task Migration_Is_Idempotent_Through_The_Decision_Record()
+    public void Migration_Is_Idempotent_Through_The_Decision_Record()
     {
         var decisions = Decisions();
         var current = MakeDir();
@@ -272,11 +264,6 @@ public class DataMigrationTests : IDisposable
 
         Assert.Equal(DataMigration.MigrationDecision.ReadyToMigrate,
             DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(old), "PolyMC", PolyMcConfigFile, LauncherConfigFile, decisions));
-
-        var task = new DataMigrationTask(new AbsolutePath(old), new AbsolutePath(current), DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
-        await task.CopyAsync(null, CancellationToken.None);
-        Assert.True(File.Exists(Path.Combine(current, "polymc.cfg")));
-        Assert.True(File.Exists(Path.Combine(current, "instances", "1.21", "world", "level.dat")));
 
         // the host records the completed migration (the decision record replaces setDoNotMigrate)
         decisions.Write(new MigrationDecisionRecord
@@ -325,134 +312,5 @@ public class DataMigrationTests : IDisposable
         Assert.Equal(DataMigration.MigrationDecision.CurrentDataExists,
             DataMigration.Decide(new AbsolutePath(current), new AbsolutePath(old), "PolyMC", PolyMcConfigFile, LauncherConfigFile,
                 currentConfigFile: new AbsolutePath(flintJson)));
-    }
-
-    // ---------------------------------------------------------------- task flow
-
-    [Fact]
-    public async Task Task_Copies_The_Whitelisted_Tree()
-    {
-        var source = MakeDir(
-            "polymc.cfg",
-            "flint.cfg",
-            "accounts.json",
-            "accounts/steve@gmail.com.json",
-            "assets/indexes/6.json",
-            "assets/objects/ab/abcdef",
-            "icons/default.png",
-            "instances/1.21.4/instance.cfg",
-            "instances/1.21.4/minecraft/options.txt",
-            "libraries/org/ow2/asm/asm.jar",
-            "mods/create.jar",
-            "themes/peppermint/theme.json",
-            "logs/flint-0.log",
-            // not whitelisted:
-            "unrelated.cfg",
-            "metacache",
-            "PolyMC_nomigrate.txt",
-            "assetsother/not-included.json");
-
-        var target = Path.Combine(_dir, "target-" + Guid.NewGuid().ToString("N"));
-
-        var reporter = new RecordingProgress();
-        var task = new DataMigrationTask(new AbsolutePath(source), new AbsolutePath(target), DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
-
-        await task.CopyAsync(reporter, CancellationToken.None);
-
-        // copied
-        Assert.Equal("content of polymc.cfg", await File.ReadAllTextAsync(Path.Combine(target, "polymc.cfg")));
-        Assert.Equal("content of flint.cfg", await File.ReadAllTextAsync(Path.Combine(target, "flint.cfg")));
-        Assert.Equal("content of accounts.json", await File.ReadAllTextAsync(Path.Combine(target, "accounts.json")));
-        Assert.True(File.Exists(Path.Combine(target, "accounts", "steve@gmail.com.json")));
-        Assert.True(File.Exists(Path.Combine(target, "assets", "indexes", "6.json")));
-        Assert.True(File.Exists(Path.Combine(target, "assets", "objects", "ab", "abcdef")));
-        Assert.True(File.Exists(Path.Combine(target, "icons", "default.png")));
-        Assert.True(File.Exists(Path.Combine(target, "instances", "1.21.4", "instance.cfg")));
-        Assert.True(File.Exists(Path.Combine(target, "instances", "1.21.4", "minecraft", "options.txt")));
-        Assert.True(File.Exists(Path.Combine(target, "libraries", "org", "ow2", "asm", "asm.jar")));
-        Assert.True(File.Exists(Path.Combine(target, "mods", "create.jar")));
-        Assert.True(File.Exists(Path.Combine(target, "themes", "peppermint", "theme.json")));
-        Assert.True(File.Exists(Path.Combine(target, "logs", "flint-0.log")));
-
-        // left behind
-        Assert.False(File.Exists(Path.Combine(target, "unrelated.cfg")));
-        Assert.False(File.Exists(Path.Combine(target, "metacache")));
-        Assert.False(File.Exists(Path.Combine(target, "assetsother", "not-included.json")));
-
-        // progress: dry-run count first, then one step per copied file (13 whitelisted files)
-        Assert.Equal(13, reporter.ProgressUpdates.Last().total);
-        Assert.Equal((13, 13), reporter.ProgressUpdates.Last());
-    }
-
-    [Fact]
-    public async Task Task_Does_Not_Overwrite_Existing_Target_Files()
-    {
-        var source = MakeDir("polymc.cfg");
-        var target = MakeDir("polymc.cfg");
-        await File.WriteAllTextAsync(Path.Combine(target, "polymc.cfg"), "target version");
-
-        var task = new DataMigrationTask(new AbsolutePath(source), new AbsolutePath(target), DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
-
-        // C++ semantics: copy_options::none reports an error for existing destination files, so
-        // the task FAILS with this message while the existing target file stays untouched.
-        try
-        {
-            await task.CopyAsync(null, CancellationToken.None);
-            Assert.Fail("the migration should have failed");
-        }
-        catch (InvalidOperationException e)
-        {
-            Assert.Equal("Some paths could not be copied!", e.Message);
-        }
-        Assert.Equal("target version", await File.ReadAllTextAsync(Path.Combine(target, "polymc.cfg")));
-    }
-
-    [Fact]
-    public async Task Missing_Source_Fails_With_The_Cpp_Message()
-    {
-        var target = Path.Combine(_dir, "target-" + Guid.NewGuid().ToString("N"));
-        var task = new DataMigrationTask(new AbsolutePath(Path.Combine(_dir, "does-not-exist")), new AbsolutePath(target),
-            DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
-
-        try
-        {
-            await task.CopyAsync(null, CancellationToken.None);
-            Assert.Fail("the migration should have failed");
-        }
-        catch (InvalidOperationException e)
-        {
-            Assert.Equal("Failed to scan source path.", e.Message);
-        }
-    }
-
-    // a file symlink inside the migrated tree is copied by its TARGET'S CONTENT (the
-    // C++ FS::copy default follows file symlinks — m_followSymlinks=true, FileSystem.h:159,
-    // ResolveSymlinks enumeration, FileSystem.cpp:461) — the old ReparsePoint skip silently
-    // pruned it from both the dry-run count and the copy
-    [Fact]
-    public async Task Task_Copies_File_Symlinks_By_Content()
-    {
-        if (!SymlinkSupport.CanCreateLinks())
-        {
-            return; // Windows without symlink privilege
-        }
-
-        var source = Path.Combine(_dir, "src-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(Path.Combine(source, "instances", "demo"));
-        // the link's target sits OUTSIDE the whitelisted tree — only link.cfg itself matches
-        await File.WriteAllTextAsync(Path.Combine(source, "marker.txt"), "marker-content");
-        File.CreateSymbolicLink(Path.Combine(source, "instances", "demo", "link.cfg"),
-            Path.Combine(source, "marker.txt"));
-        var target = Path.Combine(_dir, "target-" + Guid.NewGuid().ToString("N"));
-
-        var reporter = new RecordingProgress();
-        var task = new DataMigrationTask(new AbsolutePath(source), new AbsolutePath(target),
-            DataMigration.BuildFilter(PolyMcConfigFile, LauncherConfigFile));
-        await task.CopyAsync(reporter, CancellationToken.None);
-
-        var landed = Path.Combine(target, "instances", "demo", "link.cfg");
-        Assert.Equal("marker-content", await File.ReadAllTextAsync(landed));
-        Assert.Null(File.ResolveLinkTarget(landed, returnFinalTarget: false)); // content, not a re-link
-        Assert.Equal(1, reporter.ProgressUpdates.Last().total);                // the plan count includes the link too
     }
 }

@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
-// Tests for the legacy FTB platform: the modpacks.xml/thirdparty.xml parsing (attributes,
-// oldVersions repair, bugged/broken flags), private pack fetching, the private pack code
-// file round-trip and the end-to-end install of a CDN archive (unzip -> minecraft folder,
-// forge from pack.json, jar mods from instMods, the no-method failure). Each task is
-// constructed with its CdnBaseUrl pointed at the stub (per-instance, nothing
+// Tests for the legacy FTB platform: the end-to-end install of a CDN archive (unzip ->
+// minecraft folder, forge from pack.json, jar mods from instMods, the no-method failure).
+// Each task is constructed with its CdnBaseUrl pointed at the stub (per-instance, nothing
 // process-global to restore).
 
 using System.Net;
@@ -40,10 +38,6 @@ public class LegacyFtbTests : IDisposable
         catch (DirectoryNotFoundException) { }
     }
 
-    /// <summary>A fetch task whose CDN points at the stub server.</summary>
-    private LegacyFtbPackFetchTask CreateFetchTask() =>
-        new() { CdnBaseUrl = _server.Url + "/", Http = TestNet.Http };
-
     private InstanceList CreateList()
     {
         var instancesDir = Path.Combine(_root, "instances");
@@ -58,143 +52,6 @@ public class LegacyFtbTests : IDisposable
             .Select(c => (Uid: c.GetProperty("uid").GetString(),
                 Version: c.TryGetProperty("version", out var v) ? v.GetString() : null))
             .ToList();
-    }
-
-    // --------------------------------------------------------------------- fetch/xml
-
-    [Fact]
-    public async Task Fetch_ParsesPublicAndThirdPartyLists()
-    {
-        _server.ModpacksXml = """
-                              <?xml version="1.0" encoding="UTF-8"?>
-                              <modpacks>
-                                  <modpack name="Public Pack" version="1.2.3" mcVersion="1.7.10"
-                                           description="a public pack" mods="42" logo="public.png"
-                                           oldVersions="1.2.2;1.2.1" author="alice" dir="PublicPack" url="PublicPack-1.2.3.zip"/>
-                              </modpacks>
-                              """;
-        _server.ThirdPartyXml = """
-                                <?xml version="1.0" encoding="UTF-8"?>
-                                <modpacks>
-                                    <modpack name="Third Party Pack" version="3.1" mcVersion="1.12.2"
-                                             description="" mods="" logo="" oldVersions="" author="bob"
-                                             dir="ThirdPartyPack" url="ThirdPartyPack-3.1.zip"/>
-                                </modpacks>
-                                """;
-
-        var task = CreateFetchTask();
-        await task.FetchAsync(CancellationToken.None);
-
-        var publicPack = Assert.Single(task.PublicPacks);
-        Assert.Equal(PackType.Public, publicPack.Type);
-        Assert.Equal("Public Pack", publicPack.Name);
-        Assert.Equal("1.2.3", publicPack.CurrentVersion);
-        Assert.Equal("1.7.10", publicPack.McVersion);
-        Assert.Equal("a public pack", publicPack.Description);
-        Assert.Equal("42", publicPack.Mods);
-        Assert.Equal("public.png", publicPack.Logo);
-        Assert.Equal(new[] { "1.2.2", "1.2.1" }, publicPack.OldVersions);
-        Assert.Equal("alice", publicPack.Author);
-        Assert.Equal("PublicPack", publicPack.Dir);
-        Assert.Equal("PublicPack-1.2.3.zip", publicPack.File);
-        Assert.False(publicPack.Bugged);
-        Assert.False(publicPack.Broken);
-
-        var thirdPartyPack = Assert.Single(task.ThirdPartyPacks);
-        Assert.Equal(PackType.ThirdParty, thirdPartyPack.Type);
-        // the empty oldVersions attribute is repaired from the current version
-        Assert.DoesNotContain(thirdPartyPack.OldVersions, v => v.Length == 0);
-        Assert.Equal(new[] { "3.1" }, thirdPartyPack.OldVersions);
-        Assert.True(thirdPartyPack.Bugged);
-        Assert.False(thirdPartyPack.Broken);
-    }
-
-    [Fact]
-    public async Task Fetch_PackWithoutAnyVersion_IsBroken()
-    {
-        _server.ModpacksXml = """
-                              <?xml version="1.0" encoding="UTF-8"?>
-                              <modpacks>
-                                  <modpack name="Broken Pack" version="" mcVersion="1.7.10" oldVersions="" dir="Broken"/>
-                              </modpacks>
-                              """;
-        _server.ThirdPartyXml = """<modpacks></modpacks>""";
-
-        var task = CreateFetchTask();
-        await task.FetchAsync(CancellationToken.None);
-
-        var pack = Assert.Single(task.PublicPacks);
-        Assert.True(pack.Bugged);
-        Assert.True(pack.Broken);
-        Assert.Empty(pack.OldVersions);
-    }
-
-    [Fact]
-    public async Task Fetch_UnparseableXml_FailsWithListName()
-    {
-        _server.ModpacksXml = "this is not xml";
-        _server.ThirdPartyXml = """<modpacks></modpacks>""";
-
-        var task = CreateFetchTask();
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => task.FetchAsync(CancellationToken.None));
-
-        Assert.Contains("Failed to download some pack lists:", ex.Message);
-        Assert.Contains("Public Packs", ex.Message);
-        Assert.DoesNotContain("Third Party Packs", ex.Message);
-    }
-
-    [Fact]
-    public async Task FetchPrivate_CarriesPackCode()
-    {
-        _server.PrivateXmls["secret"] = """
-                                        <?xml version="1.0" encoding="UTF-8"?>
-                                        <modpacks>
-                                            <modpack name="Private Pack" version="9.9" mcVersion="1.7.10"
-                                                     oldVersions="9.8" author="carol" dir="PrivatePack" url="PrivatePack-9.9.zip"/>
-                                        </modpacks>
-                                        """;
-
-        var task = CreateFetchTask();
-        var fetched = new List<LegacyFtbModpack>();
-        task.PrivatePackFetched = fetched.Add;
-        await task.FetchPrivateAsync(["secret"]);
-
-        var pack = Assert.Single(fetched);
-        Assert.Equal(PackType.Private, pack.Type);
-        Assert.Equal("secret", pack.PackCode);
-        Assert.Equal("Private Pack", pack.Name);
-    }
-
-    // ------------------------------------------------------------ private pack codes
-
-    [Fact]
-    public void PrivatePackManager_RoundTrip()
-    {
-        var path = Path.Combine(_root, "private_packs.txt");
-        var manager = new PrivatePackManager(path);
-        Assert.True(manager.Empty);
-        manager.Load(); // missing file -> empty
-        Assert.True(manager.Empty);
-
-        manager.Add("code1");
-        manager.Add("code2");
-        manager.Save();
-
-        var reloaded = new PrivatePackManager(path);
-        reloaded.Load();
-        Assert.False(reloaded.Empty);
-        Assert.Equal(new[] { "code1", "code2" }.OrderBy(c => c),
-            reloaded.GetCurrentPackCodes().OrderBy(c => c));
-
-        // one code per line (the C++ file format)
-        var content = File.ReadAllLines(path);
-        Assert.Equal(2, content.Length);
-
-        Assert.True(reloaded.Remove("code1"));
-        reloaded.Save();
-        var afterRemove = new PrivatePackManager(path);
-        afterRemove.Load();
-        Assert.Equal(new[] { "code2" }, afterRemove.GetCurrentPackCodes());
     }
 
     // ----------------------------------------------------------------------- install

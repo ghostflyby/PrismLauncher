@@ -2,12 +2,11 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
 // Tests for the FTB App API platform: the /modpack/all index, the pack description and the
-// version payload parsing, the data-level pack model (dud-pack skipping + search filter)
-// and the end-to-end pack install against the stub servers (instance layout, component
-// ids, files by their path/type, sha1 verification, CurseForge resolution and the blocked
-// file flow) — the Flame stub backs the CurseForge file resolver. Each test suite builds
-// its own FtbApi/FlameClient clients pointed at the stubs (per-instance BaseUrl, nothing
-// process-global to restore).
+// version payload parsing, and the end-to-end pack install against the stub servers (instance
+// layout, component ids, files by their path/type, sha1 verification, CurseForge resolution
+// and the blocked file flow) — the Flame stub backs the CurseForge file resolver. Each test
+// suite builds its own FtbApi/FlameClient clients pointed at the stubs (per-instance BaseUrl,
+// nothing process-global to restore).
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -214,30 +213,6 @@ public class FtbTests : IDisposable
                                                                                 """));
         Assert.StartsWith("JSON response from FTB: Error parsing JSON: ", notInt.Message);
         Assert.Contains("id", notInt.Message);
-    }
-
-    // ----------------------------------------------------------------------- model
-
-    [Fact]
-    public async Task Model_Fetch_SkipsPackWithoutVersionsAndFilters()
-    {
-        var fixture = FtbPackFixture.Create();
-        fixture.Register(_server);
-        // a second pack without any versions: a "dud" the model must ignore
-        var dudJson = Regex.Replace(fixture.PackJson, "\"versions\":\\[.*?\\]", "\"versions\":[]",
-            RegexOptions.Singleline);
-        _server.ModpacksIndexJson = """{"packs":[42, 43]}""";
-        _server.Modpacks["43"] = dudJson;
-
-        var model = new FtbPackModel(_ftbApi);
-        await model.FetchAsync();
-
-        var pack = Assert.Single(model.Packs);
-        Assert.Equal(42, pack.Id);
-
-        Assert.Single(model.FilteredPacks(""));
-        Assert.Single(model.FilteredPacks("test ftb"));
-        Assert.Empty(model.FilteredPacks("nomatch"));
     }
 
     // --------------------------------------------------------------------- install

@@ -2,15 +2,11 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 // SPDX-FileCopyrightText: 2022-2026 Prism Launcher Contributors
 //
-// Port of launcher/DataMigrationTask.{h,cpp} plus the data-level half of
-// Application::handleDataMigration (the file/dir inventory, the "_nomigrate.txt" marker and the
-// idempotency rules): migrate existing data from other MMC-like launchers into the Flint data
-// directory.
+// The data-level half of Application::handleDataMigration (the file/dir inventory, the
+// "_nomigrate.txt" marker and the idempotency rules): what can be migrated from other
+// MMC-like launchers into the Flint data directory, and when.
 //
 // Deviations:
-//  - The C++ task drives FS::copy on a thread pool with a dry run first; the port performs the
-//    same dry-run-then-copy walk inline (counting matched files, then copying with per-file
-//    status/progress), preserving FS::copy's matcher/whitelist semantics.
 //  - Application::handleDataMigration's QMessageBox question is not ported; DataMigration
 //    exposes the decision inputs (old config present? marker present? current config present?)
 //    so a host can ask the user itself, and the C++ decision order is encoded in
@@ -18,6 +14,8 @@
 //  - The migration inventory is the exact filter list from Application::handleDataMigration;
 //    the launcher's own config file name comes from FlintConfig ("flint.cfg", Prism's
 //    "prismlauncher.cfg").
+//  - The C++ DataMigrationTask (the dry-run-then-copy walk) is not ported: PrismImportTask
+//    performs the transfer from the same inventory, with a plan and dry run of its own.
 
 using System.Security;
 using System.Text.RegularExpressions;
@@ -61,105 +59,6 @@ public static class Filters
 
     public static Func<string, bool> Regexp(Regex pattern) =>
         src => pattern.IsMatch(src);
-}
-
-/// <summary>
-/// Port of DataMigrationTask: copies everything the whitelist matcher accepts from
-/// <c>sourcePath</c> into <c>targetPath</c> (relative paths preserved,
-/// destination files are not overwritten), after a dry run that counts the files for the
-/// progress bar.
-/// </summary>
-public sealed class DataMigrationTask(AbsolutePath sourcePath, AbsolutePath targetPath, Func<string, bool> pathMatcher)
-{
-    /// <summary>Copies the whitelisted tree. Returning is success; any other exception is a
-    /// failure whose message is the reason. <paramref name="progress"/> null runs without
-    /// reporting.</summary>
-    public Task CopyAsync(IProgress<TaskProgress>? progress, CancellationToken cancellationToken)
-    {
-        // 1. Scan — dry run to collect the amount of files.
-        if (!Walk(out var files))
-        {
-            throw new InvalidOperationException("Failed to scan source path.");
-        }
-
-        var toCopy = files.Count;
-
-        // 2. Copy — actually copy all files now.
-        var copied = 0;
-        var failed = false;
-        foreach (var relative in files)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            copied++;
-
-            progress?.Report(new TaskProgress(copied, toCopy));
-            if (!CopyFile(relative))
-            {
-                // C++ collects per-file failures (fs::copy err), keeps copying the remaining
-                // files, and fails the whole task at the end with this message.
-                failed = true;
-            }
-        }
-
-        if (failed)
-        {
-            throw new InvalidOperationException("Some paths could not be copied!");
-        }
-
-        return Task.CompletedTask;
-    }
-
-    /// <summary>The FS::copy dry run: files (including hidden ones) below the source
-    /// directory, matched against the whitelist on the '/'-separated relative path. A missing
-    /// source directory fails the walk — a deliberate divergence: C++ FS::copy actually
-    /// returns true for a missing root (empty QDirListing, FileSystem.cpp:467; the
-    /// non-directory root is then filtered out by the whitelist matcher on the empty relative
-    /// path, FileSystem.cpp:404/474-475; <c>return err.value() == 0</c>, FileSystem.cpp:514),
-    /// so the C++ task "succeeds" with 0 files and its scan-failure message is unreachable.
-    /// This port prefers a loud failure for direct callers (tests/embedded hosts); the real
-    /// pipeline never reaches this — Decide requires an existing old config first. File
-    /// symlinks are matched (and copied by content below — the C++ ResolveSymlinks walk);
-    /// directory links are not descended into.</summary>
-    private bool Walk(out List<LocalPath> matched)
-    {
-        matched = [];
-        if (!sourcePath.ExistsDirectory())
-        {
-            return false;
-        }
-
-        foreach (var file in FileTransfer.EnumerateFilesDeep(sourcePath))
-        {
-            var relative = Path.GetRelativePath(sourcePath.Value, file).Replace('\\', '/');
-            if (pathMatcher(relative))
-            {
-                matched.Add(new LocalPath(relative));
-            }
-        }
-
-        return true;
-    }
-
-    private bool CopyFile(LocalPath relative)
-    {
-        var dstPath = targetPath / relative;
-        if (!FileOps.EnsureFilePathExists(new AbsolutePath(dstPath)))
-        {
-            return false;
-        }
-
-        var srcPath = sourcePath / relative;
-        try
-        {
-            srcPath.Copy(dstPath, overwrite: false);
-            return true;
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
-                                      or NotSupportedException)
-        {
-            return false;
-        }
-    }
 }
 
 /// <summary>

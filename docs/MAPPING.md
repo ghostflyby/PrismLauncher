@@ -7,7 +7,7 @@
 
 | 原文件 | C# 目标 | 状态 | 备注 |
 |---|---|---|---|
-| `buildconfig/BuildConfig.{h,cpp.in}` + CMake 默认值 | `FlintLauncher.Core/FlintConfig.cs` | ported | 常量按仓库 CMake 默认值固化；版本号改为 Flint 自己的 0.1.0；`LAUNCHER_CONFIGFILE`→`flint.cfg`（导入 prismlauncher.cfg 属 P7 DataMigrationTask） |
+| `buildconfig/BuildConfig.{h,cpp.in}` + CMake 默认值 | `FlintLauncher.Core/FlintConfig.cs` | ported | 常量按仓库 CMake 默认值固化；版本号改为 Flint 自己的 0.1.0；`LAUNCHER_CONFIGFILE`→`flint.cfg`（导入 prismlauncher.cfg 属 P7 迁移流程） |
 
 ## P1 基础设施
 
@@ -138,7 +138,7 @@
 | `net/PasteUpload*` + `logs/AnonymizeLog*` | `Net/PasteUpload.cs` | ported | 四 provider + 日志匿名化 |
 | `logs/LogParser*` | `Launch/LogParser.cs` | ported | Log4j XML/纯文本拆分；前导文本被吞语义保留 |
 | `minecraft/GameOptions*`(Op*) | `Minecraft/GameOptions/GameOptions.cs` | ported | options.txt 读写与转义 |
-| `DataMigrationTask*` | `Migration/DataMigration.cs` | ported | 文件清单/marker 幂等/聚合失败语义 |
+| `DataMigrationTask*` | `Migration/DataMigration.cs` | partial | 决策树/文件清单/marker 幂等已移植；拷贝任务本身不移植——`PrismImportTask` 用同一清单执行传输，并自带计划与 dry run |
 | `tools/*` | `Tools/Profilers.cs` | ported | 注册表 + argv 构建（无进程派生） |
 | `translations/*` 下载逻辑 | — | deferred | 无头核心价值低，需要时再补 |
 | `updater/*` | GUI-bound / 进程外 | n/a | |
