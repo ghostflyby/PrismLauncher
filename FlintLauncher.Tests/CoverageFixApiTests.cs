@@ -197,6 +197,32 @@ public class CoverageFixSettingsApiTests
     }
 
     [Fact]
+    public async Task Profilers_Endpoint_Lists_The_Registry_And_Checks_Each()
+    {
+        await using var host = await FlintApiHost.StartAsync();
+        var response = await host.GetAsync("/api/v1/tools/profilers");
+        response.EnsureSuccessStatusCode();
+        var view = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+
+        var profilers = view.GetProperty("profilers").EnumerateArray().ToList();
+        Assert.Equal(["generic", "jprofiler", "jvisualvm"],
+            profilers.Select(p => p.GetProperty("key").GetString()).OrderBy(k => k));
+
+        // the generic profiler takes no path, so it always passes its check; the two real ones
+        // have no configured path in a fresh host and report why
+        var generic = profilers.Single(p => p.GetProperty("key").GetString() == "generic");
+        Assert.True(generic.GetProperty("available").GetBoolean());
+
+        var jprofiler = profilers.Single(p => p.GetProperty("key").GetString() == "jprofiler");
+        Assert.False(jprofiler.GetProperty("available").GetBoolean());
+        Assert.Equal("Empty path", jprofiler.GetProperty("error").GetString());
+
+        // no instance asked, so nothing is selected and no command is built
+        Assert.Equal("", view.GetProperty("selected").GetString());
+        Assert.Equal(JsonValueKind.Null, view.GetProperty("command").ValueKind);
+    }
+
+    [Fact]
     public async Task About_Endpoint_Exposes_The_Static_Identity()
     {
         await using var host = await FlintApiHost.StartAsync();

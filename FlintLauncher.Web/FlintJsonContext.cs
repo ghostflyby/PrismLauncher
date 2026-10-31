@@ -113,6 +113,9 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(PasteRequest))]
 [JsonSerializable(typeof(PasteCreatedResponse))]
 [JsonSerializable(typeof(AboutResponse))]
+[JsonSerializable(typeof(ProfilerListView))]
+[JsonSerializable(typeof(ProfilerView))]
+[JsonSerializable(typeof(ProfilerCommandView))]
 // collection roots (standalone arrays returned from list endpoints are NOT auto-generated)
 [JsonSerializable(typeof(InstanceSummary[]))]
 [JsonSerializable(typeof(InstanceGroupView[]))]

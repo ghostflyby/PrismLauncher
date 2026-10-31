@@ -399,6 +399,24 @@ public sealed record AboutResponse(
     string SubredditUrl,
     string BugTrackerUrl);
 
+/// <summary>One registered external profiler: its registry key, display name, whether the
+/// configured path passes the factory's check, and the reason when it does not.</summary>
+public sealed record ProfilerView(
+    string Key,
+    string Name,
+    bool Available,
+    string Error);
+
+/// <summary>GET /api/v1/tools/profilers: the registered profilers and, for the one an instance
+/// selects, the command the host would run. Nothing is started — the argv is the deliverable.</summary>
+public sealed record ProfilerListView(
+    ProfilerView[] Profilers,
+    string Selected,
+    ProfilerCommandView? Command);
+
+/// <summary>The program and arguments a profiler would be started with for one pid.</summary>
+public sealed record ProfilerCommandView(string Program, string[] Arguments);
+
 // ----------------------------------------------------------------- ATLauncher
 
 /// <summary>One packsnew.json index version (GET /modplatform/atlauncher/packs[/versions]).</summary>

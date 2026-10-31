@@ -10,8 +10,8 @@
 //    plain mutable value holder, the parse functions are synchronous and side-effect
 //    free with respect to shared state.
 //  - LocalWorldSaveParseTask (the Task/abort plumbing) is not ported; the Process* functions
-//    below are synchronous and side-effect free with respect to shared state. No production
-//    flow consumes them yet.
+//    below are synchronous and side-effect free with respect to shared state. The Flame
+//    import calls Validate() to classify a downloaded file the manifest left untyped.
 //  - Zip inspection uses System.IO.Compression (like MMCZip.cs) instead of libarchive;
 //    directory entries are represented by the "name/" entry convention.
 //  - The C++ `zip.exists("/saves")` check (ArchiveReader::exists: exact entry match or

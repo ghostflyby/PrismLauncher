@@ -74,7 +74,7 @@
 | `VanillaInstanceCreationTask`(minecraft/) | `FlintLauncher.Core/Instances/Creation/VanillaInstanceCreationTask.cs` | ported | mmc-pack/instance.cfg 字节兼容 |
 | `ProfileUtils*`(minecraft/) | `FlintLauncher.Core/Minecraft/ProfileUtils.cs` | ported | P2b 已完成；此检出版本无 legacy 导入半 |
 | `minecraft/World*` `WorldList*` `WorldTasks*` | `FlintLauncher.Core/Minecraft/Worlds/` | ported | Qt model 不移植；World::install 上游反向检查 bug 已修 |
-| `LocalWorldSaveParseTask` | `Worlds/WorldSaveIdentification.cs` | ported | |
+| `LocalWorldSaveParseTask` | `Worlds/WorldSaveIdentification.cs` | partial | 内容级判定（folder/zip 的 level.dat 探测）+ 导入时的类型回退；解析任务/abort 那层不移植 |
 | `minecraft/mod/*`（资源模型与解析） | `FlintLauncher.Core/Minecraft/Resources/` | ported | pack_format 表全量；QImage→PNG IHDR 读取（已记录偏差） |
 | `minecraft/Op*`（gameoptions） | — | todo | P7 |
 | `icons/IconList` `IconUtils`（文件部分） | `FlintLauncher.Core/Icons/IconFiles.cs` + `Icons/IconPool.cs` | ported | D5：IconPool 模型（key→path 索引/扫描/安装/删除，DI 注入，IconsDir 设置生效）；Qt 模型/主题不移植 |
@@ -139,7 +139,7 @@
 | `logs/LogParser*` | `Launch/LogParser.cs` | ported | Log4j XML/纯文本拆分；前导文本被吞语义保留 |
 | `minecraft/GameOptions*`(Op*) | `Minecraft/GameOptions/GameOptions.cs` | ported | options.txt 读写与转义 |
 | `DataMigrationTask*` | `Migration/DataMigration.cs` | partial | 决策树/文件清单/marker 幂等已移植；拷贝任务本身不移植——`PrismImportTask` 用同一清单执行传输，并自带计划与 dry run |
-| `tools/*` | `Tools/Profilers.cs` | ported | 注册表 + argv 构建（无进程派生） |
+| `tools/*` | `Tools/Profilers.cs` | partial | 注册表 + argv 构建（无进程派生）；`GET /tools/profilers` 暴露注册表、check 结果与命令行 |
 | `translations/*` 下载逻辑 | — | deferred | 无头核心价值低，需要时再补 |
 | `updater/*` | GUI-bound / 进程外 | n/a | |
 | `Application*` `main.cpp` `ApplicationMessage*` `LocalPeer` | `FlintLauncher.Web/WebHostBuilder.cs` + Services/* | ported | v1 API：instances CRUD/settings/launch/tasks+日志+SSE/accounts(含 MSA 设备码)/java/modplatform 搜索+分页+install/update 结果负载+本地 token 鉴权(--api-token/--no-auth)；五根注入（news 已随 CACHE E7 删除）；账号后台刷新(FLINT_ACCOUNT_REFRESH_MINUTES, 默认关) |

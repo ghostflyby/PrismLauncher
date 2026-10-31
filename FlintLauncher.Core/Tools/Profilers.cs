@@ -33,7 +33,8 @@
 // Deviations:
 //  - The QProcess orchestration (BaseProfiler::beginProfiling/abortProfiling,
 //    BaseDetachedTool::run) is not ported — the port stays data-level: it exposes the argv the
-//    C++ would spawn (program + arguments) so a host can run it.
+//    C++ would spawn (program + arguments) so a host can run it. GET /tools/profilers surfaces
+//    the registry, each factory's check() result and that argv.
 //  - JVisualVMFactory's default path uses QStandardPaths::findExecutable; the port searches the
 //    PATH environment variable (with .exe appended on Windows) for "jvisualvm", falling back to
 //    "visualvm", empty when not found (the C++ default is null in that case).

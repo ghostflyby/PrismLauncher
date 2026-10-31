@@ -604,7 +604,7 @@ public sealed partial class FlameCreationTask : InstanceTask
                 return localPath.Value;
             }
 
-            var resource = OtherResourcesType(fileName, results);
+            var resource = OtherResourcesType(fileName, results, localPath.Value);
             string worldPath;
             switch (resource)
             {
@@ -664,17 +664,26 @@ public sealed partial class FlameCreationTask : InstanceTask
 
     /// <summary>The API-declared resource type of the recorded other-resource (see the
     /// header note about the identify() substitution).</summary>
-    private static ResourceType OtherResourcesType(string fileName, IEnumerable<FlameFile> results)
+    /// <summary>The pack-declared type for a file, or — when the manifest does not carry one —
+    /// the type its contents point at. A bare ".zip" whose archive holds a level.dat is a
+    /// world save (LocalResourceParse's WorldSaveUtils::validate branch).</summary>
+    internal static ResourceType OtherResourcesType(string fileName, IEnumerable<FlameFile> results,
+        string localPath)
     {
         foreach (var file in results)
         {
             if (file.Version.FileName == fileName)
             {
-                return file.Pack.ResourceType;
+                if (file.Pack.ResourceType != ResourceType.Unknown)
+                {
+                    return file.Pack.ResourceType;
+                }
+
+                break;
             }
         }
 
-        return ResourceType.Unknown;
+        return WorldSaveIdentification.Validate(localPath) ? ResourceType.World : ResourceType.Unknown;
     }
 
     private void InstallWorld(string worldPath)

@@ -7,9 +7,12 @@
 
 using FlintLauncher.Core;
 using FlintLauncher.Core.Config;
+using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Net;
+using FlintLauncher.Core.Settings;
+using FlintLauncher.Core.Tools;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 
@@ -42,6 +45,39 @@ public static class MiscEndpoints
             config.DiscordUrl,
             config.SubredditUrl,
             config.BugTrackerUrl));
+
+        // --------------------------------------------------------------- profilers
+        // The external-profiler registry (Application's m_profilers). The host starts nothing:
+        // a profiler is a launch-time wrapper the C++ drives from readyForLaunch, which this
+        // launcher does not port. What is useful here is which tools are configured, whether
+        // each passes its factory's check, and the command line the host would run.
+        api.MapGet("/tools/profilers", (FlintConfigStore config, string? instance, InstanceList instances) =>
+        {
+            var settings = new ToolSettings(config);
+            Profilers.RegisterSettings(settings);
+
+            var views = Profilers.All.Values
+                .Select(factory => new ProfilerView(factory.Key, factory.Name,
+                    factory.Check(settings, out var error), error))
+                .ToArray();
+
+            // an instance's "Profiler" setting selects one; without an instance nothing is
+            // selected and there is no pid to build a command for
+            var selected = "";
+            ProfilerCommandView? command = null;
+            if (!string.IsNullOrWhiteSpace(instance) && instances.ResolveInstance(instance) is { } target)
+            {
+                selected = Variant.AsString(target.Settings.Get("Profiler"));
+                if (Profilers.Value(selected) is { } factory)
+                {
+                    // pid 0: the command shape is the deliverable, not a runnable line
+                    var (program, arguments) = factory.BuildCommand(settings, 0);
+                    command = new ProfilerCommandView(program.Value ?? "", [.. arguments]);
+                }
+            }
+
+            return Results.Ok(new ProfilerListView(views, selected, command));
+        }).Produces<ProfilerListView>();
 
         // --------------------------------------------------------------- paste
         // GuiUtil::uploadPaste: either the raw content or a finished task's buffered log goes
