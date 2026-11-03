@@ -194,7 +194,7 @@ public sealed class LaunchTask
             _logModel = new LogModel
             {
                 MaxLines = BaseInstance.GetConsoleMaxLines(_instance.Settings),
-                StopOnOverflow = BaseInstance.ShouldStopOnConsoleOverflow(_instance.Settings)
+                StopOnOverflow = BaseInstance.ShouldStopOnConsoleOverflow(_instance.Settings),
             };
             // FIXME: should this really be here?
             _logModel.OverflowMessage = $"Stopped watching the game log because the log length surpassed {_logModel.MaxLines} lines.\n" +

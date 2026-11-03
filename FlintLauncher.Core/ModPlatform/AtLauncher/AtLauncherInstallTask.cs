@@ -538,7 +538,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
             var library = new Library
             {
-                Name = new GradleSpecifier(libName)
+                Name = new GradleSpecifier(libName),
             };
 
             switch (lib.Download)

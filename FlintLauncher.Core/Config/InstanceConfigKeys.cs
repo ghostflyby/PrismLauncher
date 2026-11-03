@@ -71,7 +71,7 @@ public static class InstanceConfigKeys
             ["OverrideNativeWorkarounds"] = "OverrideNativeWorkarounds",
             ["OverrideMiscellaneous"] = "OverrideMiscellaneous",
             ["OverrideLegacySettings"] = "OverrideLegacySettings",
-            ["OverrideModDownloadLoaders"] = "OverrideModDownloadLoaders"
+            ["OverrideModDownloadLoaders"] = "OverrideModDownloadLoaders",
         };
 
     /// <summary>
@@ -178,46 +178,46 @@ public static class InstanceConfigKeys
     {
         Launch = i.Launch with
         {
-            Java = i.Launch.Java with { JavaPath = null, IgnoreJavaCompatibility = null }
-        }
+            Java = i.Launch.Java with { JavaPath = null, IgnoreJavaCompatibility = null },
+        },
     };
 
     private static InstanceConfigFile ClearJavaArgs(InstanceConfigFile i) => i with
     {
         Launch = i.Launch with
         {
-            Java = i.Launch.Java with { JvmArgs = null }
-        }
+            Java = i.Launch.Java with { JvmArgs = null },
+        },
     };
 
     private static InstanceConfigFile ClearMemory(InstanceConfigFile i) => i with
     {
-        Launch = i.Launch with { Memory = new InstanceMemoryConfig() }
+        Launch = i.Launch with { Memory = new InstanceMemoryConfig() },
     };
 
     private static InstanceConfigFile ClearWindow(InstanceConfigFile i) => i with
     {
-        Launch = i.Launch with { Window = new InstanceWindowConfig() }
+        Launch = i.Launch with { Window = new InstanceWindowConfig() },
     };
 
     private static InstanceConfigFile ClearCommands(InstanceConfigFile i) => i with
     {
-        Launch = i.Launch with { Commands = new InstanceCommandsConfig() }
+        Launch = i.Launch with { Commands = new InstanceCommandsConfig() },
     };
 
     private static InstanceConfigFile ClearEnv(InstanceConfigFile i) => i with
     {
-        Launch = i.Launch with { Env = null }
+        Launch = i.Launch with { Env = null },
     };
 
     private static InstanceConfigFile ClearPerformance(InstanceConfigFile i) => i with
     {
-        Launch = i.Launch with { Performance = new InstancePerformanceConfig() }
+        Launch = i.Launch with { Performance = new InstancePerformanceConfig() },
     };
 
     private static InstanceConfigFile ClearNativeLib(InstanceConfigFile i) => i with
     {
-        Launch = i.Launch with { NativeLib = new InstanceNativeLibConfig() }
+        Launch = i.Launch with { NativeLib = new InstanceNativeLibConfig() },
     };
 
     private static InstanceConfigFile ClearConsole(InstanceConfigFile i) => i with
@@ -225,31 +225,31 @@ public static class InstanceConfigKeys
         // the domain is materialized — "clear" resets its scalars to null (inherit)
         Misc = i.Misc with
         {
-            Console = new InstanceConsoleConfig { ShowConsole = null, AutoCloseConsole = null, ShowConsoleOnError = null, LogPrePostOutput = null }
-        }
+            Console = new InstanceConsoleConfig { ShowConsole = null, AutoCloseConsole = null, ShowConsoleOnError = null, LogPrePostOutput = null },
+        },
     };
 
     private static InstanceConfigFile ClearGameTime(InstanceConfigFile i) => i with
     {
         Misc = i.Misc with
         {
-            GameTime = new InstanceGameTimeConfig { ShowGameTime = null, RecordGameTime = null }
-        }
+            GameTime = new InstanceGameTimeConfig { ShowGameTime = null, RecordGameTime = null },
+        },
     };
 
     private static InstanceConfigFile ClearMiscellaneous(InstanceConfigFile i) => i with
     {
-        Misc = i.Misc with { CloseAfterLaunch = null, QuitAfterGameStop = null }
+        Misc = i.Misc with { CloseAfterLaunch = null, QuitAfterGameStop = null },
     };
 
     private static InstanceConfigFile ClearLegacySettings(InstanceConfigFile i) => i with
     {
-        Misc = i.Misc with { OnlineFixes = null }
+        Misc = i.Misc with { OnlineFixes = null },
     };
 
     private static InstanceConfigFile ClearModDownloadLoaders(InstanceConfigFile i) => i with
     {
-        Misc = i.Misc with { ModDownloadLoaders = null }
+        Misc = i.Misc with { ModDownloadLoaders = null },
     };
 
     // ------------------------------------------------------------------------ the registry
@@ -288,8 +288,8 @@ public static class InstanceConfigKeys
                 {
                     Launch = i.Launch with
                     {
-                        Java = i.Launch.Java with { JavaPath = StringOf(v) }
-                    }
+                        Java = i.Launch.Java with { JavaPath = StringOf(v) },
+                    },
                 }),
             E("IgnoreJavaCompatibility", "OverrideJavaLocation",
                 (u, i) => i.Launch.Java.IgnoreJavaCompatibility ?? u.Java.IgnoreJavaCompatibility,
@@ -298,8 +298,8 @@ public static class InstanceConfigKeys
                 {
                     Launch = i.Launch with
                     {
-                        Java = i.Launch.Java with { IgnoreJavaCompatibility = BoolOf(v) }
-                    }
+                        Java = i.Launch.Java with { IgnoreJavaCompatibility = BoolOf(v) },
+                    },
                 }),
             E("JvmArgs", "OverrideJavaArgs",
                 (u, i) => i.Launch.Java.JvmArgs ?? u.Java.JvmArgs,
@@ -308,8 +308,8 @@ public static class InstanceConfigKeys
                 {
                     Launch = i.Launch with
                     {
-                        Java = i.Launch.Java with { JvmArgs = StringOf(v) }
-                    }
+                        Java = i.Launch.Java with { JvmArgs = StringOf(v) },
+                    },
                 }),
             E("AutomaticJava", null,
                 (_, i) => i.Launch.Java.AutomaticJava,
@@ -318,8 +318,8 @@ public static class InstanceConfigKeys
                 {
                     Launch = i.Launch with
                     {
-                        Java = i.Launch.Java with { AutomaticJava = BoolOf(v) }
-                    }
+                        Java = i.Launch.Java with { AutomaticJava = BoolOf(v) },
+                    },
                 }),
 
             // ---- memory (OverrideMemory)
@@ -330,8 +330,8 @@ public static class InstanceConfigKeys
                 {
                     Launch = i.Launch with
                     {
-                        Memory = i.Launch.Memory with { MinMemAlloc = IntOf(v) }
-                    }
+                        Memory = i.Launch.Memory with { MinMemAlloc = IntOf(v) },
+                    },
                 }),
             E("MaxMemAlloc", "OverrideMemory",
                 (u, i) => i.Launch.Memory.MaxMemAlloc ?? u.Memory.MaxMemAlloc,
@@ -340,8 +340,8 @@ public static class InstanceConfigKeys
                 {
                     Launch = i.Launch with
                     {
-                        Memory = i.Launch.Memory with { MaxMemAlloc = IntOf(v) }
-                    }
+                        Memory = i.Launch.Memory with { MaxMemAlloc = IntOf(v) },
+                    },
                 }),
             // PermGen died with the Java <8 support floor (2026-10-05): an imported
             // instance.cfg PermGen key is now an unknown key and drops silently.
@@ -352,8 +352,8 @@ public static class InstanceConfigKeys
                 {
                     Launch = i.Launch with
                     {
-                        Memory = i.Launch.Memory with { LowMemWarning = BoolOf(v) }
-                    }
+                        Memory = i.Launch.Memory with { LowMemWarning = BoolOf(v) },
+                    },
                 }),
 
             // ---- window (OverrideWindow)
@@ -364,8 +364,8 @@ public static class InstanceConfigKeys
                 {
                     Launch = i.Launch with
                     {
-                        Window = i.Launch.Window with { LaunchMaximized = BoolOf(v) }
-                    }
+                        Window = i.Launch.Window with { LaunchMaximized = BoolOf(v) },
+                    },
                 }),
             E("MinecraftWinWidth", "OverrideWindow",
                 (u, i) => i.Launch.Window.MinecraftWinWidth ?? u.Window.MinecraftWinWidth,
@@ -374,8 +374,8 @@ public static class InstanceConfigKeys
                 {
                     Launch = i.Launch with
                     {
-                        Window = i.Launch.Window with { MinecraftWinWidth = IntOf(v) }
-                    }
+                        Window = i.Launch.Window with { MinecraftWinWidth = IntOf(v) },
+                    },
                 }),
             E("MinecraftWinHeight", "OverrideWindow",
                 (u, i) => i.Launch.Window.MinecraftWinHeight ?? u.Window.MinecraftWinHeight,
@@ -384,8 +384,8 @@ public static class InstanceConfigKeys
                 {
                     Launch = i.Launch with
                     {
-                        Window = i.Launch.Window with { MinecraftWinHeight = IntOf(v) }
-                    }
+                        Window = i.Launch.Window with { MinecraftWinHeight = IntOf(v) },
+                    },
                 }),
 
             // ---- commands (OverrideCommands, synonym OverrideLaunchCmd)
@@ -396,8 +396,8 @@ public static class InstanceConfigKeys
                 {
                     Launch = i.Launch with
                     {
-                        Commands = i.Launch.Commands with { PreLoadCommand = StringOf(v) }
-                    }
+                        Commands = i.Launch.Commands with { PreLoadCommand = StringOf(v) },
+                    },
                 }),
             E("PreLaunchCommand", "OverrideCommands",
                 (u, i) => i.Launch.Commands.PreLaunchCommand ?? u.Commands.PreLaunchCommand,
@@ -406,8 +406,8 @@ public static class InstanceConfigKeys
                 {
                     Launch = i.Launch with
                     {
-                        Commands = i.Launch.Commands with { PreLaunchCommand = StringOf(v) }
-                    }
+                        Commands = i.Launch.Commands with { PreLaunchCommand = StringOf(v) },
+                    },
                 }),
             E("WrapperCommand", "OverrideCommands",
                 (u, i) => i.Launch.Commands.WrapperCommand ?? u.Commands.WrapperCommand,
@@ -416,8 +416,8 @@ public static class InstanceConfigKeys
                 {
                     Launch = i.Launch with
                     {
-                        Commands = i.Launch.Commands with { WrapperCommand = StringOf(v) }
-                    }
+                        Commands = i.Launch.Commands with { WrapperCommand = StringOf(v) },
+                    },
                 }),
             E("PostExitCommand", "OverrideCommands",
                 (u, i) => i.Launch.Commands.PostExitCommand ?? u.Commands.PostExitCommand,
@@ -426,8 +426,8 @@ public static class InstanceConfigKeys
                 {
                     Launch = i.Launch with
                     {
-                        Commands = i.Launch.Commands with { PostExitCommand = StringOf(v) }
-                    }
+                        Commands = i.Launch.Commands with { PostExitCommand = StringOf(v) },
+                    },
                 }),
 
             // ---- env (OverrideEnv): the custom environment map's JSON text
@@ -446,9 +446,9 @@ public static class InstanceConfigKeys
                     {
                         Performance = i.Launch.Performance with
                         {
-                            EnableFeralGamemode = BoolOf(v)
-                        }
-                    }
+                            EnableFeralGamemode = BoolOf(v),
+                        },
+                    },
                 }),
             E("EnableMangoHud", "OverridePerformance",
                 (u, i) => i.Launch.Performance.EnableMangoHud ?? u.Performance.EnableMangoHud,
@@ -459,9 +459,9 @@ public static class InstanceConfigKeys
                     {
                         Performance = i.Launch.Performance with
                         {
-                            EnableMangoHud = BoolOf(v)
-                        }
-                    }
+                            EnableMangoHud = BoolOf(v),
+                        },
+                    },
                 }),
             E("UseDiscreteGpu", "OverridePerformance",
                 (u, i) => i.Launch.Performance.UseDiscreteGpu ?? u.Performance.UseDiscreteGpu,
@@ -472,9 +472,9 @@ public static class InstanceConfigKeys
                     {
                         Performance = i.Launch.Performance with
                         {
-                            UseDiscreteGpu = BoolOf(v)
-                        }
-                    }
+                            UseDiscreteGpu = BoolOf(v),
+                        },
+                    },
                 }),
             E("UseZink", "OverridePerformance",
                 (u, i) => i.Launch.Performance.UseZink ?? u.Performance.UseZink,
@@ -483,8 +483,8 @@ public static class InstanceConfigKeys
                 {
                     Launch = i.Launch with
                     {
-                        Performance = i.Launch.Performance with { UseZink = BoolOf(v) }
-                    }
+                        Performance = i.Launch.Performance with { UseZink = BoolOf(v) },
+                    },
                 }),
 
             // ---- native library workarounds (OverrideNativeWorkarounds)
@@ -497,9 +497,9 @@ public static class InstanceConfigKeys
                     {
                         NativeLib = i.Launch.NativeLib with
                         {
-                            UseNativeOpenAl = BoolOf(v)
-                        }
-                    }
+                            UseNativeOpenAl = BoolOf(v),
+                        },
+                    },
                 }),
             E("CustomOpenALPath", "OverrideNativeWorkarounds",
                 (u, i) => i.Launch.NativeLib.CustomOpenAlPath ?? u.NativeLib.CustomOpenAlPath,
@@ -510,9 +510,9 @@ public static class InstanceConfigKeys
                     {
                         NativeLib = i.Launch.NativeLib with
                         {
-                            CustomOpenAlPath = StringOf(v)
-                        }
-                    }
+                            CustomOpenAlPath = StringOf(v),
+                        },
+                    },
                 }),
             E("UseNativeGLFW", "OverrideNativeWorkarounds",
                 (u, i) => i.Launch.NativeLib.UseNativeGlfw ?? u.NativeLib.UseNativeGlfw,
@@ -523,9 +523,9 @@ public static class InstanceConfigKeys
                     {
                         NativeLib = i.Launch.NativeLib with
                         {
-                            UseNativeGlfw = BoolOf(v)
-                        }
-                    }
+                            UseNativeGlfw = BoolOf(v),
+                        },
+                    },
                 }),
             E("CustomGLFWPath", "OverrideNativeWorkarounds",
                 (u, i) => i.Launch.NativeLib.CustomGlfwPath ?? u.NativeLib.CustomGlfwPath,
@@ -536,9 +536,9 @@ public static class InstanceConfigKeys
                     {
                         NativeLib = i.Launch.NativeLib with
                         {
-                            CustomGlfwPath = StringOf(v)
-                        }
-                    }
+                            CustomGlfwPath = StringOf(v),
+                        },
+                    },
                 }),
             E("UseNativeSDL", "OverrideNativeWorkarounds",
                 (u, i) => i.Launch.NativeLib.UseNativeSdl ?? u.NativeLib.UseNativeSdl,
@@ -549,9 +549,9 @@ public static class InstanceConfigKeys
                     {
                         NativeLib = i.Launch.NativeLib with
                         {
-                            UseNativeSdl = BoolOf(v)
-                        }
-                    }
+                            UseNativeSdl = BoolOf(v),
+                        },
+                    },
                 }),
             E("CustomSDLPath", "OverrideNativeWorkarounds",
                 (u, i) => i.Launch.NativeLib.CustomSdlPath ?? u.NativeLib.CustomSdlPath,
@@ -562,9 +562,9 @@ public static class InstanceConfigKeys
                     {
                         NativeLib = i.Launch.NativeLib with
                         {
-                            CustomSdlPath = StringOf(v)
-                        }
-                    }
+                            CustomSdlPath = StringOf(v),
+                        },
+                    },
                 }),
 
             // ---- console (OverrideConsole) — the passthrough pair is NOT here
@@ -575,8 +575,8 @@ public static class InstanceConfigKeys
                 {
                     Misc = i.Misc with
                     {
-                        Console = i.Misc.Console with { ShowConsole = BoolOf(v) }
-                    }
+                        Console = i.Misc.Console with { ShowConsole = BoolOf(v) },
+                    },
                 }),
             E("AutoCloseConsole", "OverrideConsole",
                 (u, i) => i.Misc.Console.AutoCloseConsole ?? u.Console.AutoCloseConsole,
@@ -585,8 +585,8 @@ public static class InstanceConfigKeys
                 {
                     Misc = i.Misc with
                     {
-                        Console = i.Misc.Console with { AutoCloseConsole = BoolOf(v) }
-                    }
+                        Console = i.Misc.Console with { AutoCloseConsole = BoolOf(v) },
+                    },
                 }),
             E("ShowConsoleOnError", "OverrideConsole",
                 (u, i) => i.Misc.Console.ShowConsoleOnError ?? u.Console.ShowConsoleOnError,
@@ -595,8 +595,8 @@ public static class InstanceConfigKeys
                 {
                     Misc = i.Misc with
                     {
-                        Console = i.Misc.Console with { ShowConsoleOnError = BoolOf(v) }
-                    }
+                        Console = i.Misc.Console with { ShowConsoleOnError = BoolOf(v) },
+                    },
                 }),
             E("LogPrePostOutput", "OverrideConsole",
                 (u, i) => i.Misc.Console.LogPrePostOutput ?? u.Console.LogPrePostOutput,
@@ -605,8 +605,8 @@ public static class InstanceConfigKeys
                 {
                     Misc = i.Misc with
                     {
-                        Console = i.Misc.Console with { LogPrePostOutput = BoolOf(v) }
-                    }
+                        Console = i.Misc.Console with { LogPrePostOutput = BoolOf(v) },
+                    },
                 }),
 
             // ---- game time (OverrideGameTime)
@@ -617,8 +617,8 @@ public static class InstanceConfigKeys
                 {
                     Misc = i.Misc with
                     {
-                        GameTime = i.Misc.GameTime with { ShowGameTime = BoolOf(v) }
-                    }
+                        GameTime = i.Misc.GameTime with { ShowGameTime = BoolOf(v) },
+                    },
                 }),
             E("RecordGameTime", "OverrideGameTime",
                 (u, i) => i.Misc.GameTime.RecordGameTime ?? u.GameTime.RecordGameTime,
@@ -627,8 +627,8 @@ public static class InstanceConfigKeys
                 {
                     Misc = i.Misc with
                     {
-                        GameTime = i.Misc.GameTime with { RecordGameTime = BoolOf(v) }
-                    }
+                        GameTime = i.Misc.GameTime with { RecordGameTime = BoolOf(v) },
+                    },
                 }),
 
             // ---- miscellaneous gates (OverrideMiscellaneous / OverrideLegacySettings /
@@ -638,14 +638,14 @@ public static class InstanceConfigKeys
                 i => i.Misc.CloseAfterLaunch is not null,
                 (i, v) => i with
                 {
-                    Misc = i.Misc with { CloseAfterLaunch = BoolOf(v) }
+                    Misc = i.Misc with { CloseAfterLaunch = BoolOf(v) },
                 }),
             E("QuitAfterGameStop", "OverrideMiscellaneous",
                 (u, i) => i.Misc.QuitAfterGameStop ?? u.Launcher.QuitAfterGameStop,
                 i => i.Misc.QuitAfterGameStop is not null,
                 (i, v) => i with
                 {
-                    Misc = i.Misc with { QuitAfterGameStop = BoolOf(v) }
+                    Misc = i.Misc with { QuitAfterGameStop = BoolOf(v) },
                 }),
             E("OnlineFixes", "OverrideLegacySettings",
                 (u, i) => i.Misc.OnlineFixes ?? u.MinecraftMisc.OnlineFixes,
@@ -656,7 +656,7 @@ public static class InstanceConfigKeys
                 i => i.Misc.ModDownloadLoaders is not null,
                 (i, v) => i with
                 {
-                    Misc = i.Misc with { ModDownloadLoaders = StringListOf(v) }
+                    Misc = i.Misc with { ModDownloadLoaders = StringListOf(v) },
                 }),
 
             // ---- instance-only misc keys
@@ -665,84 +665,84 @@ public static class InstanceConfigKeys
                 i => i.Misc.JoinServerOnLaunch is not null,
                 (i, v) => i with
                 {
-                    Misc = i.Misc with { JoinServerOnLaunch = BoolOf(v) }
+                    Misc = i.Misc with { JoinServerOnLaunch = BoolOf(v) },
                 }),
             E("JoinServerOnLaunchAddress", null,
                 (_, i) => i.Misc.JoinServerOnLaunchAddress,
                 i => i.Misc.JoinServerOnLaunchAddress is not null,
                 (i, v) => i with
                 {
-                    Misc = i.Misc with { JoinServerOnLaunchAddress = StringOf(v) }
+                    Misc = i.Misc with { JoinServerOnLaunchAddress = StringOf(v) },
                 }),
             E("JoinWorldOnLaunch", null,
                 (_, i) => i.Misc.JoinWorldOnLaunch,
                 i => i.Misc.JoinWorldOnLaunch is not null,
                 (i, v) => i with
                 {
-                    Misc = i.Misc with { JoinWorldOnLaunch = StringOf(v) }
+                    Misc = i.Misc with { JoinWorldOnLaunch = StringOf(v) },
                 }),
             E("UseAccountForInstance", null,
                 (_, i) => i.Misc.UseAccountForInstance,
                 i => i.Misc.UseAccountForInstance is not null,
                 (i, v) => i with
                 {
-                    Misc = i.Misc with { UseAccountForInstance = BoolOf(v) }
+                    Misc = i.Misc with { UseAccountForInstance = BoolOf(v) },
                 }),
             E("InstanceAccountId", null,
                 (_, i) => i.Misc.InstanceAccountId,
                 i => i.Misc.InstanceAccountId is not null,
                 (i, v) => i with
                 {
-                    Misc = i.Misc with { InstanceAccountId = StringOf(v) }
+                    Misc = i.Misc with { InstanceAccountId = StringOf(v) },
                 }),
             E("CountGameTime", null,
                 (_, i) => i.Misc.CountGameTime,
                 i => i.Misc.CountGameTime is not null,
                 (i, v) => i with
                 {
-                    Misc = i.Misc with { CountGameTime = BoolOf(v) }
+                    Misc = i.Misc with { CountGameTime = BoolOf(v) },
                 }),
             E("linkedInstances", null,
                 (_, i) => i.Misc.LinkedInstances,
                 i => i.Misc.LinkedInstances is not null,
                 (i, v) => i with
                 {
-                    Misc = i.Misc with { LinkedInstances = ToStringList(v) }
+                    Misc = i.Misc with { LinkedInstances = ToStringList(v) },
                 }),
             E("GlobalDataPacksEnabled", null,
                 (_, i) => i.Misc.GlobalDataPacksEnabled,
                 i => i.Misc.GlobalDataPacksEnabled is not null,
                 (i, v) => i with
                 {
-                    Misc = i.Misc with { GlobalDataPacksEnabled = BoolOf(v) }
+                    Misc = i.Misc with { GlobalDataPacksEnabled = BoolOf(v) },
                 }),
             E("GlobalDataPacksPath", null,
                 (_, i) => i.Misc.GlobalDataPacksPath,
                 i => i.Misc.GlobalDataPacksPath is not null,
                 (i, v) => i with
                 {
-                    Misc = i.Misc with { GlobalDataPacksPath = StringOf(v) }
+                    Misc = i.Misc with { GlobalDataPacksPath = StringOf(v) },
                 }),
             E("UseLatestMinecraftVersion", null,
                 (_, i) => i.Misc.UseLatestMinecraftVersion,
                 i => i.Misc.UseLatestMinecraftVersion is not null,
                 (i, v) => i with
                 {
-                    Misc = i.Misc with { UseLatestMinecraftVersion = BoolOf(v) }
+                    Misc = i.Misc with { UseLatestMinecraftVersion = BoolOf(v) },
                 }),
             E("UseLatestMinecraftVersionType", null,
                 (_, i) => i.Misc.UseLatestMinecraftVersionType,
                 i => i.Misc.UseLatestMinecraftVersionType is not null,
                 (i, v) => i with
                 {
-                    Misc = i.Misc with { UseLatestMinecraftVersionType = StringOf(v) }
+                    Misc = i.Misc with { UseLatestMinecraftVersionType = StringOf(v) },
                 }),
             E("InstanceType", null,
                 (_, i) => i.Misc.InstanceType,
                 i => i.Misc.InstanceType is not null,
                 (i, v) => i with
                 {
-                    Misc = i.Misc with { InstanceType = StringOf(v) }
+                    Misc = i.Misc with { InstanceType = StringOf(v) },
                 }),
 
             // ---- managed pack (the ManagedPack family)
@@ -751,7 +751,7 @@ public static class InstanceConfigKeys
                 i => i.Managed.IsManagedPack is not null,
                 (i, v) => i with
                 {
-                    Managed = i.Managed with { IsManagedPack = BoolOf(v) }
+                    Managed = i.Managed with { IsManagedPack = BoolOf(v) },
                 }),
             E("ManagedPackType", null,
                 (_, i) => i.Managed.Type,
@@ -770,14 +770,14 @@ public static class InstanceConfigKeys
                 i => i.Managed.VersionId is not null,
                 (i, v) => i with
                 {
-                    Managed = i.Managed with { VersionId = StringOf(v) }
+                    Managed = i.Managed with { VersionId = StringOf(v) },
                 }),
             E("ManagedPackVersionName", null,
                 (_, i) => i.Managed.VersionName,
                 i => i.Managed.VersionName is not null,
                 (i, v) => i with
                 {
-                    Managed = i.Managed with { VersionName = StringOf(v) }
+                    Managed = i.Managed with { VersionName = StringOf(v) },
                 }),
             E("ManagedPackURL", null,
                 (_, i) => i.Managed.Url,
@@ -806,7 +806,7 @@ public static class InstanceConfigKeys
                 i => i.Export.OptionalFiles is not null,
                 (i, v) => i with
                 {
-                    Export = i.Export with { OptionalFiles = BoolOf(v) }
+                    Export = i.Export with { OptionalFiles = BoolOf(v) },
                 }),
             E("ExportRecommendedRAM", null,
                 (_, i) => i.Export.RecommendedRam,
@@ -816,8 +816,8 @@ public static class InstanceConfigKeys
                     Export = i.Export with
                     {
                         // IntOf already preserves null ("not configured", the C++ default)
-                        RecommendedRam = IntOf(v)
-                    }
+                        RecommendedRam = IntOf(v),
+                    },
                 }),
             E("Profiler", null,
                 (_, i) => i.Export.Profiler,
@@ -890,7 +890,7 @@ public static class InstanceConfigKeys
             E("OverrideModDownloadLoaders", "OverrideModDownloadLoaders", // the family this derived gate belongs to (its INI spelling lives in GateIniSpellings)
                 (_, i) => GateModDownloadLoaders(i),
                 _ => false,
-                (i, v) => GateWrite(i, v, ClearModDownloadLoaders))
+                (i, v) => GateWrite(i, v, ClearModDownloadLoaders)),
         ];
 
         var map = new Dictionary<string, InstanceKeyEntry>(StringComparer.Ordinal);
@@ -910,6 +910,6 @@ public static class InstanceConfigKeys
         IReadOnlyList<string> list => list,
         IEnumerable<string> en => en.ToList(),
         string text => SettingsJson.ToStringList(text),
-        _ => null
+        _ => null,
     };
 }

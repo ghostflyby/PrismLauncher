@@ -72,7 +72,7 @@ public sealed class LaunchFactory(FlintPaths paths, ILoggerFactory loggerFactory
             // Resolve server address to join on launch
             var step = new LookupServerAddress(process, targetToJoin)
             {
-                LookupAddress = targetToJoin.Address
+                LookupAddress = targetToJoin.Address,
             };
             process.AppendStep(step);
         }

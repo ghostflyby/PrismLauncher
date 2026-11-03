@@ -82,16 +82,16 @@ public sealed class MinecraftAccount
                     Extra =
                     {
                         ["userName"] = AccountData.StringElement(username),
-                        ["clientToken"] = AccountData.StringElement(Guid.NewGuid().ToString("N"))
-                    }
+                        ["clientToken"] = AccountData.StringElement(Guid.NewGuid().ToString("N")),
+                    },
                 },
                 MinecraftProfile =
                 {
                     Id = UuidFromUsername(username).ToString("N"),
                     Name = username,
-                    Validity = Validity.Certain
-                }
-            }
+                    Validity = Validity.Certain,
+                },
+            },
         };
         return account;
     }

@@ -274,7 +274,7 @@ public static class FlamePackExportTask
                     [
                         (
                             await flame.Projects.ById(addonIds[0]).SendTo(http, cancellationToken)).Data
-                        ?? throw new JsonException("'data' is not an object")
+                        ?? throw new JsonException("'data' is not an object"),
                     ]
                     : (await flame.Projects.ByIds(addonIds).SendTo(http, cancellationToken)).Data
                       ?? throw new JsonException("'data' is not an array");

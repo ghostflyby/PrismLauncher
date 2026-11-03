@@ -442,7 +442,7 @@ public sealed class ModrinthCreationTask : InstanceTask
             _modrinth, _http)
         {
             // setUpdateLock(true): updates for mods coming from an installed modpack are locked
-            LockUpdate = true
+            LockUpdate = true,
         };
         EmitStatus("Generating metadata for mods...");
         var failures = await ensureMetadataTask.RunAsync(cancellationToken).ConfigureAwait(false);

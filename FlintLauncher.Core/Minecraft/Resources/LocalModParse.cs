@@ -323,7 +323,7 @@ public static class ModUtils
     {
         var details = new ModDetails
         {
-            ModId = firstObj.ModId
+            ModId = firstObj.ModId,
         };
         var name = firstObj.Name;
         // NOTE: ignore stupid example mods copies where the author didn't even bother to change the name
@@ -565,7 +565,7 @@ public static class ModUtils
         var details = new ModDetails
         {
             ModId = fabric.Id,
-            Version = fabric.Version
+            Version = fabric.Version,
         };
 
         details.Name = fabric.Name ?? details.ModId;
@@ -687,7 +687,7 @@ public static class ModUtils
         var details = new ModDetails
         {
             ModId = loader.Id,
-            Version = loader.Version
+            Version = loader.Version,
         };
 
         var modMetadata = loader.Metadata;
@@ -763,7 +763,7 @@ public static class ModUtils
             // Read the data
             Name = "Minecraft Forge",
             ModId = "Forge",
-            Homeurl = "http://www.minecraftforge.net/forum/"
+            Homeurl = "http://www.minecraftforge.net/forum/",
         };
 
         // INIFile (QSettings IniFormat) approximation: flat "key=value" properties lines

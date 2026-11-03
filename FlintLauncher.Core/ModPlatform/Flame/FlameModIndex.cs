@@ -248,7 +248,7 @@ public static class FlameMod
                     5 => new DependencyType(DependencyTypeValue.Incompatible), // Incompatible
                     6 => new DependencyType(DependencyTypeValue.Include),      // Include
                     _ => DependencyType.Invalid,
-                }
+                },
             };
             file.Dependencies.Add(dependency);
         }

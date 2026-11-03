@@ -443,7 +443,7 @@ public sealed class LaunchController(ILoggerFactory loggerFactory, AuthEndpoints
 
         _session = new AuthSession
         {
-            LaunchMode = _actualLaunchMode
+            LaunchMode = _actualLaunchMode,
         };
         if (AccountToUse is null)
         {

@@ -240,7 +240,7 @@ public sealed class EnsureMetadataTask(
                 [
                     (
                         await _flame.Projects.ById(addonIds.Keys.First()).SendTo(http, cancellationToken)).Data
-                    ?? throw new JsonException("'data' is not an object")
+                    ?? throw new JsonException("'data' is not an object"),
                 ];
         }
         catch (FlameApiException e)

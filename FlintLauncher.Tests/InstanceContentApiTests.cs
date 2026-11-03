@@ -331,7 +331,7 @@ public class InstanceCopyApiTests : IAsyncDisposable
                 group = "Copies",
                 copySaves = false,
                 copyMods = false,
-                keepPlaytime = false
+                keepPlaytime = false,
             });
         Assert.Equal(HttpStatusCode.Accepted, copy.StatusCode);
         var taskId = JsonDocument.Parse(await copy.Content.ReadAsStringAsync())
@@ -965,8 +965,8 @@ public class GameOptionsApiTests : IAsyncDisposable
                 options = new[]
                 {
                     new { key = "difficulty", value = "hard" },
-                    new { key = "renderDistance", value = "12" }
-                }
+                    new { key = "renderDistance", value = "12" },
+                },
             });
         Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
 

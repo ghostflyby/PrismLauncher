@@ -666,7 +666,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
             ["INST_JAVA"] = (AbsolutePath.CurrentWorkingDirectory
                              / Variant.AsString(Settings.Get("JavaPath"))).Value,
             ["INST_JAVA_ARGS"] = string.Join(" ", JavaArguments()),
-            ["NO_COLOR"] = "1"
+            ["NO_COLOR"] = "1",
         };
         if (OperatingSystem.IsMacOS())
         {
@@ -1040,7 +1040,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         {
             ["profile_name"] = Name(),
             ["version_name"] = profile.GetMinecraftVersion(),
-            ["version_type"] = profile.GetMinecraftVersionType()
+            ["version_type"] = profile.GetMinecraftVersionType(),
         };
 
         var absRootDir = GameRoot;

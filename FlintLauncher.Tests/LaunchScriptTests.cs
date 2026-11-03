@@ -197,7 +197,7 @@ public class LaunchScriptTests
             [session.Session] = "<SESSION ID>", // "-" is filtered upstream; offline session is "-"
             ["0"] = "<ACCESS TOKEN>",           // "0" would be filtered upstream
             [session.Uuid] = "<PROFILE ID>",
-            ["super-secret-token"] = "<ACCESS TOKEN>"
+            ["super-secret-token"] = "<ACCESS TOKEN>",
         };
         task.SetCensorFilter(filter);
 

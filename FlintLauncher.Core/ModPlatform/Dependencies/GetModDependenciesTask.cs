@@ -278,7 +278,7 @@ public class GetModDependenciesTask
                     [
                         (
                             await _flame.Files.ById(dep.AddonId, dep.Version).SendTo(_http, cancellationToken)).Data
-                        ?? throw new JsonException("'data' is not an object")
+                        ?? throw new JsonException("'data' is not an object"),
                     ]
                     : (await _flame.Files.List(dep.AddonId,
                               gameVersion: _version.ToString(),

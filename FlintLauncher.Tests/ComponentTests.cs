@@ -145,7 +145,7 @@ public class ComponentTests : IDisposable
         var file = MakeVersionFile("net.minecraft", "1.12.2", "Minecraft");
         var metaVersion = new MetaVersion("net.minecraft", "1.12.2")
         {
-            Data = file
+            Data = file,
         };
         component.MetaVersion = metaVersion;
         component.Loaded = true;

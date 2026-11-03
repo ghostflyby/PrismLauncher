@@ -480,7 +480,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
             // cached
             // TODO upstream @RESILIENCE: ignore invalid values/structure here?
             CachedVersion = wire.CachedVersion,
-            CachedName = wire.CachedName
+            CachedName = wire.CachedName,
         };
 
         MetaJsonFormat.ParseRequires(wire.CachedRequires, component.CachedRequires, "cachedRequires");
@@ -811,7 +811,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         {
             Name = name,
             Uid = uid,
-            Version = "1"
+            Version = "1",
         };
         var patchFileName = patchDir / (uid + ".json");
         try
@@ -903,7 +903,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
                 Name = new GradleSpecifier("custom.jarmods:" + id + ":1"),
                 FilenameOverride = targetFilename,
                 DisplayNameValue = CompleteBaseName(filepath.Value),
-                Hint = "local"
+                Hint = "local",
             };
             f.JarMods.Add(jarMod);
             f.Name = targetName;
@@ -963,7 +963,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         {
             Name = specifier,
             DisplayNameValue = CompleteBaseName(filepath.Value),
-            Hint = "local"
+            Hint = "local",
         };
         f.MainJar = jarMod;
         f.Name = targetName;
@@ -1021,7 +1021,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
                 Name = new GradleSpecifier("custom.agents:" + id + ":1"),
                 FilenameOverride = targetBaseName,
                 DisplayNameValue = CompleteBaseName(source.Value),
-                Hint = "local"
+                Hint = "local",
             };
 
             versionFile.Agents.Add(new Agent(agent, ""));

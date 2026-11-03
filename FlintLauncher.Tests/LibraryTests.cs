@@ -58,7 +58,7 @@ public class LibraryTests
         [
             libraries is { } baseDir
                 ? baseDir / relative
-                : throw new InvalidOperationException("the 'libraries' base is not registered on the cache")
+                : throw new InvalidOperationException("the 'libraries' base is not registered on the cache"),
         ];
     }
 
@@ -112,7 +112,7 @@ public class LibraryTests
         var failedFiles = new List<string>();
         var test = new Library("test.package:testname:testversion")
         {
-            RepositoryUrl = "file://foo/bar"
+            RepositoryUrl = "file://foo/bar",
         };
         var downloads = test.GetDownloads(r, _cache, failedFiles, "");
         Assert.Single(downloads);
@@ -163,8 +163,8 @@ public class LibraryTests
         {
             NativeClassifiers =
             {
-                ["linux"] = "linux"
-            }
+                ["linux"] = "linux",
+            },
         };
         Assert.True(test.IsNative());
         test.RepositoryUrl = "file://foo/bar";
@@ -193,8 +193,8 @@ public class LibraryTests
             {
                 ["linux"] = "linux-${arch}",
                 ["osx"] = "osx-${arch}",
-                ["windows"] = "windows-${arch}"
-            }
+                ["windows"] = "windows-${arch}",
+            },
         };
         Assert.True(test.IsNative());
         test.RepositoryUrl = "file://foo/bar";
@@ -249,9 +249,9 @@ public class LibraryTests
         {
             NativeClassifiers =
             {
-                ["linux"] = "linux-${arch}"
+                ["linux"] = "linux-${arch}",
             },
-            Hint = "local"
+            Hint = "local",
         };
         Assert.True(test.IsNative());
         test.RepositoryUrl = "file://foo/bar";

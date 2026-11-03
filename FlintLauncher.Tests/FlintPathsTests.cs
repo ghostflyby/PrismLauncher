@@ -34,7 +34,7 @@ public class FlintPathsTests : IDisposable
         foreach (var name in (string[])
                  [
                      "FLINT_HOME", "FLINT_CONFIG_DIR", "FLINT_DATA_DIR",
-                     "FLINT_STORE_DIR", "FLINT_CACHE_DIR", "FLINT_STATE_DIR"
+                     "FLINT_STORE_DIR", "FLINT_CACHE_DIR", "FLINT_STATE_DIR",
                  ])
         {
             if (!_savedEnv.ContainsKey(name))

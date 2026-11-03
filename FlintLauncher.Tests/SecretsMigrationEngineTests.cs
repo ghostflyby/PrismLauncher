@@ -428,7 +428,7 @@ public class MigrationEngineTests : IDisposable
         foreach (var root in new[]
                  {
                      paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
-                     paths.CacheRoot, paths.StateRoot
+                     paths.CacheRoot, paths.StateRoot,
                  })
         {
             root.CreateDirectory();
@@ -486,7 +486,7 @@ public class MigrationEngineTests : IDisposable
         foreach (var root in new[]
                  {
                      paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
-                     paths.CacheRoot, paths.StateRoot
+                     paths.CacheRoot, paths.StateRoot,
                  })
         {
             root.CreateDirectory();
@@ -618,7 +618,7 @@ public class MigrationEngineTests : IDisposable
         foreach (var root in new[]
                  {
                      paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
-                     paths.CacheRoot, paths.StateRoot
+                     paths.CacheRoot, paths.StateRoot,
                  })
         {
             root.CreateDirectory();
@@ -656,7 +656,7 @@ public class MigrationEngineTests : IDisposable
         foreach (var root in new[]
                  {
                      paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
-                     paths.CacheRoot, paths.StateRoot
+                     paths.CacheRoot, paths.StateRoot,
                  })
         {
             root.CreateDirectory();
@@ -695,7 +695,7 @@ public class MigrationEngineTests : IDisposable
         foreach (var root in new[]
                  {
                      paths.ConfigRoot, paths.DataRoot, paths.StoreRoot,
-                     paths.CacheRoot, paths.StateRoot
+                     paths.CacheRoot, paths.StateRoot,
                  })
         {
             root.CreateDirectory();

@@ -238,7 +238,7 @@ public static partial class OneSixVersionFormat
         {
             var lib = new Library
             {
-                Name = new GradleSpecifier($"com.mojang:minecraft:{outInfo.MinecraftVersion}:client")
+                Name = new GradleSpecifier($"com.mojang:minecraft:{outInfo.MinecraftVersion}:client"),
             };
             // we have a reliable client download, use it.
             if (outInfo.MojangDownloads.TryGetValue("client", out var clientDownload))

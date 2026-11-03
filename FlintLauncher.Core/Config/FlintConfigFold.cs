@@ -82,7 +82,7 @@ public static class FlintConfigFold
         CloseAfterLaunch = upper.CloseAfterLaunch ?? lower.CloseAfterLaunch,
         QuitAfterGameStop = upper.QuitAfterGameStop ?? lower.QuitAfterGameStop,
         InstSortMode = upper.InstSortMode ?? lower.InstSortMode,
-        InstRenamingMode = upper.InstRenamingMode ?? lower.InstRenamingMode
+        InstRenamingMode = upper.InstRenamingMode ?? lower.InstRenamingMode,
     };
 
     private static ConsoleConfig Merge(ConsoleConfig lower, ConsoleConfig upper) => new()
@@ -92,7 +92,7 @@ public static class FlintConfigFold
         ShowConsoleOnError = upper.ShowConsoleOnError ?? lower.ShowConsoleOnError,
         LogPrePostOutput = upper.LogPrePostOutput ?? lower.LogPrePostOutput,
         ConsoleMaxLines = upper.ConsoleMaxLines ?? lower.ConsoleMaxLines,
-        ConsoleOverflowStop = upper.ConsoleOverflowStop ?? lower.ConsoleOverflowStop
+        ConsoleOverflowStop = upper.ConsoleOverflowStop ?? lower.ConsoleOverflowStop,
     };
 
     private static GameTimeConfig Merge(GameTimeConfig lower, GameTimeConfig upper) => new() { ShowGameTime = upper.ShowGameTime ?? lower.ShowGameTime, ShowGlobalGameTime = upper.ShowGlobalGameTime ?? lower.ShowGlobalGameTime, ShowGameTimeWithoutDays = upper.ShowGameTimeWithoutDays ?? lower.ShowGameTimeWithoutDays, RecordGameTime = upper.RecordGameTime ?? lower.RecordGameTime };
@@ -110,7 +110,7 @@ public static class FlintConfigFold
         UseNativeGlfw = upper.UseNativeGlfw ?? lower.UseNativeGlfw,
         CustomGlfwPath = upper.CustomGlfwPath ?? lower.CustomGlfwPath,
         UseNativeSdl = upper.UseNativeSdl ?? lower.UseNativeSdl,
-        CustomSdlPath = upper.CustomSdlPath ?? lower.CustomSdlPath
+        CustomSdlPath = upper.CustomSdlPath ?? lower.CustomSdlPath,
     };
 
     private static CommandsConfig Merge(CommandsConfig lower, CommandsConfig upper) => new() { PreLoadCommand = upper.PreLoadCommand ?? lower.PreLoadCommand, PreLaunchCommand = upper.PreLaunchCommand ?? lower.PreLaunchCommand, WrapperCommand = upper.WrapperCommand ?? lower.WrapperCommand, PostExitCommand = upper.PostExitCommand ?? lower.PostExitCommand };
@@ -124,7 +124,7 @@ public static class FlintConfigFold
         SkipModpackUpdatePrompt = upper.SkipModpackUpdatePrompt ?? lower.SkipModpackUpdatePrompt,
         ShowModIncompat = upper.ShowModIncompat ?? lower.ShowModIncompat,
         DownloadGameFilesDuringInstanceCreation = upper.DownloadGameFilesDuringInstanceCreation ?? lower.DownloadGameFilesDuringInstanceCreation,
-        ModUpdateReleaseTypes = upper.ModUpdateReleaseTypes ?? lower.ModUpdateReleaseTypes
+        ModUpdateReleaseTypes = upper.ModUpdateReleaseTypes ?? lower.ModUpdateReleaseTypes,
     };
 
     private static JavaConfig Merge(JavaConfig lower, JavaConfig upper) => new()
@@ -135,7 +135,7 @@ public static class FlintConfigFold
         IgnoreJavaWizard = upper.IgnoreJavaWizard ?? lower.IgnoreJavaWizard,
         AutomaticJavaSwitch = upper.AutomaticJavaSwitch ?? lower.AutomaticJavaSwitch,
         AutomaticJavaDownload = upper.AutomaticJavaDownload ?? lower.AutomaticJavaDownload,
-        AutomaticJava = upper.AutomaticJava ?? lower.AutomaticJava
+        AutomaticJava = upper.AutomaticJava ?? lower.AutomaticJava,
     };
 
     private static DirsConfig Merge(DirsConfig lower, DirsConfig upper) => new()
@@ -145,7 +145,7 @@ public static class FlintConfigFold
         JavaDir = upper.JavaDir ?? lower.JavaDir,
         DownloadsDir = upper.DownloadsDir ?? lower.DownloadsDir,
         DownloadsDirWatchRecursive = upper.DownloadsDirWatchRecursive ?? lower.DownloadsDirWatchRecursive,
-        MoveModsFromDownloadsDir = upper.MoveModsFromDownloadsDir ?? lower.MoveModsFromDownloadsDir
+        MoveModsFromDownloadsDir = upper.MoveModsFromDownloadsDir ?? lower.MoveModsFromDownloadsDir,
     };
 
     private static LanguageConfig Merge(LanguageConfig lower, LanguageConfig upper) => new() { Language = upper.Language ?? lower.Language, UseSystemLocale = upper.UseSystemLocale ?? lower.UseSystemLocale };
