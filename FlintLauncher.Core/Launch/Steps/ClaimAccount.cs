@@ -27,9 +27,9 @@
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class ClaimAccount(LaunchTask parent) : AwaitedStep(parent)
+public sealed class ClaimAccount(LaunchTask parent) : LaunchStep(parent)
 {
-    protected override Task RunAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    internal override Task RunAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     public override bool CanAbort() => false;
 }

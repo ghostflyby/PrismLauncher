@@ -54,7 +54,7 @@ using Index = FlintLauncher.Core.Meta.Index;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class AutoInstallJava : AwaitedStep
+public sealed class AutoInstallJava : LaunchStep
 {
     private readonly MinecraftInstance _instance;
     private int _majorJavaVersionIndex;
@@ -66,7 +66,7 @@ public sealed class AutoInstallJava : AwaitedStep
         _supportedArch = SysInfo.GetSupportedJavaArchitecture();
     }
 
-    protected override async Task RunAsync(CancellationToken cancellationToken)
+    internal override async Task RunAsync(CancellationToken cancellationToken)
     {
         var settings = _instance.Settings;
         // the typed user layer: the C++ default of this switch derives from the

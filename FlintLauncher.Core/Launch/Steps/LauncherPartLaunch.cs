@@ -36,7 +36,7 @@ using TruePath;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class LauncherPartLaunch : AwaitedStep
+public sealed class LauncherPartLaunch : LaunchStep
 {
     /// <summary>Diagnostics logger (flint.launch category). Resolved per call from the
     /// injected factory — a disposed host's factory degrades to silence, never throws.</summary>
@@ -77,7 +77,7 @@ public sealed class LauncherPartLaunch : AwaitedStep
 
     public void SetWorkingDirectory(AbsolutePath workingDirectory) => _process.SetWorkingDirectory(workingDirectory);
 
-    protected override async Task RunAsync(CancellationToken cancellationToken)
+    internal override async Task RunAsync(CancellationToken cancellationToken)
     {
         var jarPath = LauncherJars.GetJarPath(LauncherJars.NewLaunchJarName, Services.Paths.InstallRoot);
         if (jarPath.Length == 0)

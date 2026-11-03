@@ -22,11 +22,11 @@ public class StepEngineTests
         List<string>? order = null,
         bool fail = false,
         Action? onFinalize = null)
-        : AwaitedStep(parent)
+        : LaunchStep(parent)
     {
         public string Name { get; } = name;
 
-        protected override Task RunAsync(CancellationToken cancellationToken)
+        internal override Task RunAsync(CancellationToken cancellationToken)
         {
             order?.Add(Name);
             return fail
@@ -38,13 +38,13 @@ public class StepEngineTests
     }
 
     /// <summary>A step that only finishes when released (or aborted).</summary>
-    private sealed class WaitingStep(LaunchTask parent) : AwaitedStep(parent)
+    private sealed class WaitingStep(LaunchTask parent) : LaunchStep(parent)
     {
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public bool Started { get; private set; }
 
-        protected override async Task RunAsync(CancellationToken cancellationToken)
+        internal override async Task RunAsync(CancellationToken cancellationToken)
         {
             Started = true;
             await Release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -202,12 +202,12 @@ public class StepEngineTests
         }
     }
 
-    private sealed class GatedStep(LaunchTask parent) : AwaitedStep(parent)
+    private sealed class GatedStep(LaunchTask parent) : LaunchStep(parent)
     {
         public TaskCompletionSource ProceedTask { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool Proceeded;
 
-        protected override async Task RunAsync(CancellationToken cancellationToken)
+        internal override async Task RunAsync(CancellationToken cancellationToken)
         {
             EmitReadyForLaunch();
             await ProceedTask.Task.ConfigureAwait(false);
@@ -491,9 +491,9 @@ public class StepEngineTests
         LaunchTask parent,
         Action onStart,
         Task release,
-        Action onFinish) : AwaitedStep(parent)
+        Action onFinish) : LaunchStep(parent)
     {
-        protected override async Task RunAsync(CancellationToken cancellationToken)
+        internal override async Task RunAsync(CancellationToken cancellationToken)
         {
             onStart();
             await release.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -503,9 +503,9 @@ public class StepEngineTests
         public override bool CanAbort() => true;
     }
 
-    private sealed class FailingAfterSignalStep(LaunchTask parent, TaskCompletionSource signal) : AwaitedStep(parent)
+    private sealed class FailingAfterSignalStep(LaunchTask parent, TaskCompletionSource signal) : LaunchStep(parent)
     {
-        protected override async Task RunAsync(CancellationToken cancellationToken)
+        internal override async Task RunAsync(CancellationToken cancellationToken)
         {
             signal.TrySetResult();
             await Task.Yield();
@@ -519,12 +519,12 @@ public class StepEngineTests
         LaunchTask parent,
         TaskCompletionSource started,
         Task release,
-        Action onFinish) : AwaitedStep(parent)
+        Action onFinish) : LaunchStep(parent)
     {
         private readonly TaskCompletionSource _aborted =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        protected override async Task RunAsync(CancellationToken cancellationToken)
+        internal override async Task RunAsync(CancellationToken cancellationToken)
         {
             onFinish();
             started.TrySetResult();
@@ -542,9 +542,9 @@ public class StepEngineTests
         }
     }
 
-    private sealed class ThrowingFinalizeStep(LaunchTask parent) : AwaitedStep(parent)
+    private sealed class ThrowingFinalizeStep(LaunchTask parent) : LaunchStep(parent)
     {
-        protected override Task RunAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        internal override Task RunAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         public override void FinalizeStep() => throw new InvalidOperationException("cleanup failed");
     }

@@ -23,7 +23,7 @@
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class TextPrint : AwaitedStep
+public sealed class TextPrint : LaunchStep
 {
     private readonly List<string> _lines;
     private readonly MessageLevel _level;
@@ -40,7 +40,7 @@ public sealed class TextPrint : AwaitedStep
         _level = level;
     }
 
-    protected override Task RunAsync(CancellationToken cancellationToken)
+    internal override Task RunAsync(CancellationToken cancellationToken)
     {
         EmitLogLines(_lines, _level);
         return Task.CompletedTask;

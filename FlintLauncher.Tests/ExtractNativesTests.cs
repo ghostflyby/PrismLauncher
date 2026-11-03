@@ -55,13 +55,13 @@ public class ExtractNativesTests
 
     /// <summary>Keeps the launch "running" so the steps' FinalizeStep can be observed while
     /// the extracted/merged artifacts still exist.</summary>
-    private sealed class GateStep(LaunchTask parent) : AwaitedStep(parent)
+    private sealed class GateStep(LaunchTask parent) : LaunchStep(parent)
     {
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public bool Started { get; private set; }
 
-        protected override async Task RunAsync(CancellationToken cancellationToken)
+        internal override async Task RunAsync(CancellationToken cancellationToken)
         {
             Started = true;
             await Release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);

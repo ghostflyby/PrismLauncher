@@ -27,7 +27,7 @@ using TruePath;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class LaunchCommand : AwaitedStep
+public sealed class LaunchCommand : LaunchStep
 {
     private readonly LoggedProcess _process = new();
     private readonly string _command;
@@ -45,7 +45,7 @@ public sealed class LaunchCommand : AwaitedStep
         _process.StateChanged += OnState;
     }
 
-    protected override async Task RunAsync(CancellationToken cancellationToken)
+    internal override async Task RunAsync(CancellationToken cancellationToken)
     {
         var args = Parent.SubstituteVariables(_command);
         var commandLine = string.Join(' ', args);

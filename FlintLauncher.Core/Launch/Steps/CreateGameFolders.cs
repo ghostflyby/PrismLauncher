@@ -27,9 +27,9 @@ using TruePath;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class CreateGameFolders(LaunchTask parent) : AwaitedStep(parent)
+public sealed class CreateGameFolders(LaunchTask parent) : LaunchStep(parent)
 {
-    protected override Task RunAsync(CancellationToken cancellationToken)
+    internal override Task RunAsync(CancellationToken cancellationToken)
     {
         var instance = Parent.Instance;
 

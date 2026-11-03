@@ -29,12 +29,12 @@ using FlintLauncher.Core.Tasks;
 namespace FlintLauncher.Core.Launch;
 
 public sealed class TaskStepWrapper(LaunchTask parent, Func<CancellationToken, Task> task)
-    : AwaitedStep(parent)
+    : LaunchStep(parent)
 {
     private TaskCompletionSource? _proceedSignal;
     private bool _bodyFinished;
 
-    protected override async Task RunAsync(CancellationToken cancellationToken)
+    internal override async Task RunAsync(CancellationToken cancellationToken)
     {
         _proceedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         EmitProgressReportingRequest();

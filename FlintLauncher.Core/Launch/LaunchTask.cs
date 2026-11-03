@@ -361,7 +361,7 @@ public sealed class LaunchTask
         Log.StepStarted(_stageIndex + 1, _stages.Count, StepName(step));
         try
         {
-            await step.ExecuteAsync(cancellationToken).ConfigureAwait(false);
+            await step.RunAsync(cancellationToken).ConfigureAwait(false);
             Log.StepFinished(StepName(step), !_abortRequested, _abortRequested ? "Aborted" : "");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

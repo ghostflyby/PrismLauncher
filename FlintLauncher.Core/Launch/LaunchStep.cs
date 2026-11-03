@@ -64,7 +64,7 @@ public abstract class LaunchStep
 
     /// <summary>The step's work. Returning succeeds the step; throwing fails it. The token is
     /// cancelled when the launch is aborted, so a body that awaits it stops.</summary>
-    internal abstract Task ExecuteAsync(CancellationToken cancellationToken);
+    internal abstract Task RunAsync(CancellationToken cancellationToken);
 
     protected void EmitLogLines(IReadOnlyList<string> lines, MessageLevel level) =>
         LogLines?.Invoke([.. lines], level);

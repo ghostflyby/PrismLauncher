@@ -23,9 +23,9 @@
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class ReconstructAssets(LaunchTask parent) : AwaitedStep(parent)
+public sealed class ReconstructAssets(LaunchTask parent) : LaunchStep(parent)
 {
-    protected override Task RunAsync(CancellationToken cancellationToken)
+    internal override Task RunAsync(CancellationToken cancellationToken)
     {
         var instance = Parent.Instance;
         var profile = instance.GetPackProfile().GetProfile()

@@ -13,9 +13,9 @@ using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class EnsureAvailableMemory(LaunchTask parent, MinecraftInstance instance) : AwaitedStep(parent)
+public sealed class EnsureAvailableMemory(LaunchTask parent, MinecraftInstance instance) : LaunchStep(parent)
 {
-    protected override Task RunAsync(CancellationToken cancellationToken)
+    internal override Task RunAsync(CancellationToken cancellationToken)
     {
         if (OperatingSystem.IsMacOS())
         {

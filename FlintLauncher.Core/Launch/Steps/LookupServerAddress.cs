@@ -28,11 +28,11 @@ using FlintLauncher.Core.Instances;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class LookupServerAddress(LaunchTask parent, MinecraftTarget output) : AwaitedStep(parent)
+public sealed class LookupServerAddress(LaunchTask parent, MinecraftTarget output) : LaunchStep(parent)
 {
     public string LookupAddress { get; init; } = "";
 
-    protected override async Task RunAsync(CancellationToken cancellationToken)
+    internal override async Task RunAsync(CancellationToken cancellationToken)
     {
         var dnsName = $"_minecraft._tcp.{LookupAddress}";
         SrvRecord? record;

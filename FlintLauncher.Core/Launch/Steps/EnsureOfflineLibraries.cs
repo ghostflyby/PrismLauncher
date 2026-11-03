@@ -11,9 +11,9 @@ using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class EnsureOfflineLibraries(LaunchTask parent, MinecraftInstance instance) : AwaitedStep(parent)
+public sealed class EnsureOfflineLibraries(LaunchTask parent, MinecraftInstance instance) : LaunchStep(parent)
 {
-    protected override Task RunAsync(CancellationToken cancellationToken)
+    internal override Task RunAsync(CancellationToken cancellationToken)
     {
         var profile = instance.GetPackProfile().GetProfile()
                       ?? throw new InvalidOperationException("The instance profile is missing.");

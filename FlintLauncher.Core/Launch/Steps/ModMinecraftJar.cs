@@ -31,9 +31,9 @@ using TruePath;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class ModMinecraftJar(LaunchTask parent) : AwaitedStep(parent)
+public sealed class ModMinecraftJar(LaunchTask parent) : LaunchStep(parent)
 {
-    protected override Task RunAsync(CancellationToken cancellationToken)
+    internal override Task RunAsync(CancellationToken cancellationToken)
     {
         var inst = Parent.Instance;
 

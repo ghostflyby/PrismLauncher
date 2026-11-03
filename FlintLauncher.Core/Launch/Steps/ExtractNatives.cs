@@ -28,9 +28,9 @@ using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Launch.Steps;
 
-public sealed class ExtractNatives(LaunchTask parent) : AwaitedStep(parent)
+public sealed class ExtractNatives(LaunchTask parent) : LaunchStep(parent)
 {
-    protected override Task RunAsync(CancellationToken cancellationToken)
+    internal override Task RunAsync(CancellationToken cancellationToken)
     {
         var instance = Parent.Instance;
         var toExtract = instance.GetNativeJars();
