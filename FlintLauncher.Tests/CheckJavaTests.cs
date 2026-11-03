@@ -85,7 +85,7 @@ public class CheckJavaTests : IDisposable
     private async Task<(LaunchTask Task, LaunchTask.LaunchOutcome Outcome)> RunCheckJavaAsync(
         LaunchFixture fixture, MinecraftInstance instance)
     {
-        var task = LaunchTask.Create(instance, fixture.CreateServices(installRoot: _root));
+        var task = fixture.CreateTask(instance);
         task.AppendStep(new CheckJava(task));
         var outcome = await task.RunToCompletionAsync(TestContext.Current.CancellationToken);
         return (task, outcome);

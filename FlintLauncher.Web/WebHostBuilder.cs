@@ -71,7 +71,7 @@ public static class WebHostBuilder
         // diagnostics channel (Application.cpp:513-528 parity): level from --log-level /
         // FLINT_LOG_LEVEL (default Information), default console provider plus the rolling
         // state-root file; the core services log through this factory by injection
-        // (LaunchServices.LoggerFactory / DI)
+        // (the LaunchFactory / DI)
         builder.Logging.SetMinimumLevel(ResolveLogLevel(args));
         // the rolling file sink opens its writer IN ITS CONSTRUCTOR, so the provider instance
         // exists before the core assembly below — a mid-assembly crash gets its
@@ -211,6 +211,7 @@ public static class WebHostBuilder
                     FlintJsonContext.Default.InstanceStateFile),
                 paths.GroupsFile,
                 [paths.InstgroupsFile, instanceDirs.Path / "instgroups.json"],
+                storeRoot: paths.StoreRoot,
                 metaCache: metaCache,
                 launcherState: state);
             instances.LoadList();
@@ -296,28 +297,18 @@ public static class WebHostBuilder
         builder.Services.AddSingleton(apiAuth);
         builder.Services.AddHostedService<AccountRefreshService>();
 
-        // the launch pipeline's dependencies (the C++ APPLICATION singleton's launch half):
-        // the global settings and runtime state assembled above, the logger factory from the
-        // app services (it only exists after Build — hence the factory). The launch
-        // endpoints inject it; the instance list is stamped with it after Build.
-        builder.Services.AddSingleton(sp => new LaunchServices
-        {
-            Paths = paths,
-            LoggerFactory = sp.GetRequiredService<ILoggerFactory>(),
-            Http = http,
-            Config = config,
-            LauncherState = state,
-            Auth = authOptions,
-            // the java root follows the JavaDir setting under store
-            // semantics, and the managed-versions javalist scans it (the C++
-            // APPLICATION->javalist() the AutoInstallJava "no download" branch reads)
-            JavaRootProvider = () => dirs.JavaRoot,
-            JavaInstallListProvider = () => new JavaInstallList(javaRoot: dirs.JavaRoot),
+        // the launch pipeline's composition point (the C++ APPLICATION singleton's launch
+        // half): the globals assembled above, the logger factory from the app services (it
+        // only exists after Build — hence the factory). The launch endpoints inject it.
+        builder.Services.AddSingleton(sp => new LaunchFactory(
+            paths, sp.GetRequiredService<ILoggerFactory>(), http,
             // the C++ LaunchTask always parses log4j XML events out of the game output
             // (LaunchTask::parseXmlLogs); the port keeps it behind an opt-in gate for
             // pure-core consumers and this host turns it on
-            XmlLogParsing = true,
-        });
+            new LaunchOptions(XmlLogParsing: true),
+            config: config,
+            dirs: dirs,
+            auth: authOptions));
 
         var app = builder.Build();
         var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
@@ -340,10 +331,9 @@ public static class WebHostBuilder
                 "Flint API token (temporary, process-lifetime): {Token}", apiAuth.Token);
         }
 
-        // stamp the launch-pipeline dependencies onto the instance list (re-stamps the
-        // already-discovered residents); resolving here is also the factory's eager,
-        // fail-fast construction
-        instances.LaunchServices = app.Services.GetRequiredService<LaunchServices>();
+        // resolve the launch factory eagerly — its construction is the last piece of the
+        // composition, and failing here beats failing at the first launch request
+        _ = app.Services.GetRequiredService<LaunchFactory>();
 
         // the flint-legacy startup remount ran during assembly — surface what it did
         // (informational; a failed pass retries next start)

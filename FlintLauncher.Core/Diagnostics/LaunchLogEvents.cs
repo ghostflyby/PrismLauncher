@@ -50,7 +50,7 @@ public static class LogCategories
 
 /// <summary>Per-instance resolution of a diagnostics logger from the injected
 /// ILoggerFactory. Replaces the deleted FlintLog static facade: the factory travels through
-/// constructor injection (LaunchServices/LaunchController/LoggedProcess/DI), so nothing here
+/// constructor injection (LaunchFactory/LaunchController/LoggedProcess), so nothing here
 /// is process-global — only the dispose semantics are kept 1:1: an unknown factory degrades
 /// to silence and a disposed host's factory must degrade to silence, not throw.</summary>
 public static class Log

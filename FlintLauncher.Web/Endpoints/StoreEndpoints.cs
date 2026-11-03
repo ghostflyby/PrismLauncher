@@ -31,8 +31,8 @@ public static class StoreEndpoints
             StoreStatusReport? report;
             try
             {
-                report = StoreCompleteness.LibrariesStatus(paths, metaCache, versionRef,
-                    new RuntimeContext());
+                report = StoreCompleteness.LibrariesStatus(paths.MetaDir, paths.LibrariesRoot,
+                    metaCache, versionRef, new RuntimeContext());
             }
             catch (Exception e) when (e is MetaParseException or JsonException)
             {
@@ -48,7 +48,7 @@ public static class StoreEndpoints
 
         group.MapGet("/status/assets/{assetsId}", (FlintPaths paths, string assetsId) =>
         {
-            var report = StoreCompleteness.AssetsStatus(paths, assetsId);
+            var report = StoreCompleteness.AssetsStatus(paths.AssetsRoot, assetsId);
             return report is null
                 ? ApiJson.NotFound("index_not_found",
                     $"no asset index '{assetsId}' under the store's indexes — the assets must be installed first")

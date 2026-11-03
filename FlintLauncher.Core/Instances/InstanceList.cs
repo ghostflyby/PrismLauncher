@@ -123,7 +123,8 @@ public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged
     private DirectorySpace? _watchSpace;
     private int _reconcileRunning;
 
-    private LaunchServices? _launchServices;
+    private readonly AbsolutePath? _storeRoot;
+    private readonly LaunchUiHooks? _ui;
 
     /// <summary>Constructs the list over its materialized instance roots. The list owns
     /// discovery, lifecycle and watching — it deliberately knows nothing about the wider
@@ -137,9 +138,10 @@ public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged
     /// <param name="groupsFile">The canonical groups file (the write target).</param>
     /// <param name="legacyGroupsFiles">The read-compat instgroups probes, in order (the
     /// data-root copy, then the primary-dir copy upstream used).</param>
-    /// <param name="launchServices">Optional at construction (the host logger factory
-    /// lives in DI); the composition root completes it through the
-    /// <see cref="LaunchServices"/> property, which re-stamps discovered instances.</param>
+    /// <param name="storeRoot">Optional: injected into discovered MinecraftInstance ctors
+    /// (the store root their launch-time flows read); null keeps the CWD shape.</param>
+    /// <param name="ui">Optional: injected into discovered MinecraftInstance ctors (the
+    /// maximized-launch screen-size hook); null keeps the headless default.</param>
     /// <param name="metaCache">Optional: stamped onto discovered instances (library and
     /// asset-index download caches, metadata entities).</param>
     /// <param name="launcherState">Optional: launcher-state.json — the TotalPlayTime
@@ -147,11 +149,12 @@ public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged
     public InstanceList(IEnumerable<MaterializedDirectory> instanceDirs,
         InstanceEnvironment environment, AbsolutePath groupsFile,
         IReadOnlyList<AbsolutePath> legacyGroupsFiles,
-        LaunchServices? launchServices = null, HttpMetaCache? metaCache = null,
+        AbsolutePath? storeRoot = null, LaunchUiHooks? ui = null, HttpMetaCache? metaCache = null,
         LauncherStateStore? launcherState = null)
     {
         Environment = environment;
-        _launchServices = launchServices;
+        _storeRoot = storeRoot;
+        _ui = ui;
         MetaCache = metaCache;
         LauncherState = launcherState;
 
@@ -176,23 +179,6 @@ public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged
     /// <summary>Injected metadata cache — stamped onto discovered instances (library and
     /// asset-index download caches, metadata entities).</summary>
     public HttpMetaCache? MetaCache { get; }
-
-    /// <summary>Injected launch-pipeline dependencies — stamped onto discovered instances
-    /// (the base LaunchServices their CreateLaunchTask builds from). The composition root
-    /// completes it after the host build (its logger factory lives in DI); setting it
-    /// re-stamps the already-discovered residents.</summary>
-    public LaunchServices? LaunchServices
-    {
-        get => _launchServices;
-        set
-        {
-            _launchServices = value;
-            foreach (var resident in _instances.OfType<MinecraftInstance>())
-            {
-                resident.LaunchServices = value;
-            }
-        }
-    }
 
     /// <summary>The launcher runtime state (launcher-state.json) — the one-shot
     /// TotalPlayTime migration and the group collapse ("hidden") persistence land here;
@@ -1017,10 +1003,9 @@ public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged
         }
         else
         {
-            inst = new MinecraftInstance(instanceSettings, instanceRoot)
+            inst = new MinecraftInstance(instanceSettings, instanceRoot, _storeRoot, _ui)
             {
                 MetaCache = MetaCache,
-                LaunchServices = LaunchServices,
                 LauncherState = LauncherState,
                 WatchSpace = _watchSpace,
             };

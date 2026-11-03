@@ -83,7 +83,7 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
         // MinecraftInstance.JavaDetectKey — the same resolution the signature covers),
         // replacing the five global settings keys that overwrote each other across JVMs
         _detectKey = MinecraftInstance.JavaDetectKey(javaPathSetting);
-        var stored = Services.LauncherState?.Current.Java.Detections.GetValueOrDefault(_detectKey);
+        var stored = instance.LauncherState?.Current.Java.Detections.GetValueOrDefault(_detectKey);
 
         // if timestamps are not the same, or something is missing, check! A null
         // LanguageVersion is either a probe from before the member existed or one JdkFind
@@ -142,7 +142,7 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
         var languageVersion = executable.Installation?.LanguageVersion;
         // write the probe result into the path-keyed state cache, then
         // refresh the runtime context from it — settings are out of the loop
-        Services.LauncherState?.Update(state =>
+        Parent.Instance.LauncherState?.Update(state =>
         {
             var detections = new Dictionary<string, JavaDetectEntry>(
                 state.Java.Detections, StringComparer.Ordinal)

@@ -47,9 +47,7 @@ public class NullInstance : BaseInstance
 
     public override AbsolutePath InstanceConfigFolder() => InstanceRoot;
 
-    public override LaunchTask? CreateLaunchTask(AuthSession? account, MinecraftTarget? targetToJoin) => null;
-
-    public override List<Func<CancellationToken, Task>> CreateUpdateTask() => [];
+    public override List<Func<CancellationToken, Task>> CreateUpdateTask(string? resourceUrlOverride = null) => [];
 
     public override SortedDictionary<string, string> CreateEnvironment() =>
         new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);

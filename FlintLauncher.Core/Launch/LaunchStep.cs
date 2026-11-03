@@ -46,10 +46,6 @@ public abstract class LaunchStep
     /// <summary>The LaunchTask this step belongs to.</summary>
     public LaunchTask Parent { get; }
 
-    /// <summary>The injected launch dependencies (the parent's LaunchServices): paths, logger
-    /// factory, global settings, UI hooks.</summary>
-    public LaunchServices Services => Parent.Services;
-
     /// <summary>The log lines this step emits, as a list.</summary>
     public event Action<List<string>, MessageLevel>? LogLines;
 

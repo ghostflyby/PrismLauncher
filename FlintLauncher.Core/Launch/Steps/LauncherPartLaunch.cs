@@ -40,9 +40,12 @@ public sealed class LauncherPartLaunch : LaunchStep
 {
     /// <summary>Diagnostics logger (flint.launch category). Resolved per call from the
     /// injected factory — a disposed host's factory degrades to silence, never throws.</summary>
-    private ILogger Log => Diagnostics.Log.For(Services.LoggerFactory, LogCategories.Launch);
+    private ILogger Log => Diagnostics.Log.For(_loggerFactory, LogCategories.Launch);
 
     private readonly LoggedProcess _process;
+    private readonly string _installRoot;
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly LaunchUiHooks? _ui;
     private readonly bool _closeAfterLaunch;
     private bool _closeAfterLaunchTriggered;
     public AuthSession? Session { get; set; }
@@ -52,13 +55,19 @@ public sealed class LauncherPartLaunch : LaunchStep
     private TaskCompletionSource? _exitSignal;
     private string? _failureReason;
 
-    public LauncherPartLaunch(LaunchTask parent) : base(parent)
+    /// <summary>The injected install root is the only layout this step reads: the
+    /// jars/NewLaunch.jar lookup anchor.</summary>
+    public LauncherPartLaunch(LaunchTask parent, string installRoot, ILoggerFactory loggerFactory,
+        LaunchUiHooks? ui = null) : base(parent)
     {
+        _installRoot = installRoot;
+        _loggerFactory = loggerFactory;
+        _ui = ui;
         _closeAfterLaunch = Variant.AsBool(parent.Instance.Settings.Get("CloseAfterLaunch"));
         _process = new LoggedProcess(
             // UTF-8 is the default charset from Java 18 on (JEP 400)
             parent.Instance.GetJavaLanguageVersion() >= 18 ? Encoding.UTF8 : null,
-            parent.Services.LoggerFactory);
+            loggerFactory);
 
         _process.Log += OnProcessLog;
         _process.StateChanged += OnState;
@@ -69,7 +78,7 @@ public sealed class LauncherPartLaunch : LaunchStep
         if (_closeAfterLaunch && !_closeAfterLaunchTriggered && LaunchTask.MatchesCloseAfterLaunch(lines))
         {
             _closeAfterLaunchTriggered = true;
-            Services.Ui.CloseAfterLaunch?.Invoke();
+            _ui?.CloseAfterLaunch?.Invoke();
         }
 
         EmitLogLines(lines, level);
@@ -79,7 +88,7 @@ public sealed class LauncherPartLaunch : LaunchStep
 
     internal override async Task RunAsync(CancellationToken cancellationToken)
     {
-        var jarPath = LauncherJars.GetJarPath(LauncherJars.NewLaunchJarName, Services.Paths.InstallRoot);
+        var jarPath = LauncherJars.GetJarPath(LauncherJars.NewLaunchJarName, _installRoot);
         if (jarPath.Length == 0)
         {
             const string reason = "Launcher library could not be found. Please check your installation.";
@@ -92,7 +101,7 @@ public sealed class LauncherPartLaunch : LaunchStep
         var legacyJarPath = "";
         if (instance.GetLauncher() == "legacy" || instance.ShouldApplyOnlineFixes())
         {
-            legacyJarPath = LauncherJars.GetJarPath(LauncherJars.NewLaunchLegacyJarName, Services.Paths.InstallRoot);
+            legacyJarPath = LauncherJars.GetJarPath(LauncherJars.NewLaunchLegacyJarName, _installRoot);
             if (legacyJarPath.Length == 0)
             {
                 const string legacyReason = "Legacy launcher library could not be found. Please check your installation.";
@@ -101,7 +110,7 @@ public sealed class LauncherPartLaunch : LaunchStep
             }
         }
 
-        _launchScript = instance.CreateLaunchScript(Session, TargetToJoin, Services);
+        _launchScript = instance.CreateLaunchScript(Session, TargetToJoin);
         var args = instance.JavaArguments();
         EmitLogLine("Java arguments:\n  " + Parent.CensorPrivateInfo(string.Join(" ", args)) + "\n",
             MessageLevel.Launcher);
@@ -198,7 +207,7 @@ public sealed class LauncherPartLaunch : LaunchStep
 
                 if (_closeAfterLaunch)
                 {
-                    Services.Ui.ShowMainWindow?.Invoke();
+                    _ui?.ShowMainWindow?.Invoke();
                 }
 
                 Parent.Pid = -1;

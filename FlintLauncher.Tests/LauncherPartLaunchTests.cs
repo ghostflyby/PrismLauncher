@@ -24,7 +24,7 @@ public class LauncherPartLaunchTests : IDisposable
     {
         Directory.CreateDirectory(_root);
         // the jar lookup (Application::getJarPath) searches <install root>/jars/NewLaunch.jar;
-        // the launch tasks below point LaunchServices.Paths.InstallRoot at this fixture root
+        // the factories below point the injected FlintPaths.InstallRoot at this fixture root
         // (the former JavaUtils.LauncherRootPath static test hook)
         Directory.CreateDirectory(Path.Combine(_root, "jars"));
         File.WriteAllText(Path.Combine(_root, "jars", LauncherJars.NewLaunchJarName), "dummy jar bytes");
@@ -76,8 +76,9 @@ public class LauncherPartLaunchTests : IDisposable
         // JavaPath is the (gate-controlled) global override; the stub applies in both cases
         fixture.Global.StubSet("JavaPath", javaPath);
         Directory.CreateDirectory(instance.GameRoot.Value); // the step's working directory
-        var task = LaunchTask.Create(instance, fixture.CreateServices(installRoot: installRoot ?? _root));
-        step = new LauncherPartLaunch(task);
+        var factory = fixture.CreateFactory(installRoot: installRoot ?? _root);
+        var task = fixture.CreateTask(instance);
+        step = factory.CreateLauncherPartLaunch(task);
         step.SetWorkingDirectory(instance.GameRoot);
         task.AppendStep(step);
         return task;

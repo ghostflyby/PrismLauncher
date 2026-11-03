@@ -16,6 +16,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using FlintLauncher.Core;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Launch.Steps;
@@ -93,7 +94,7 @@ public class ExtractNativesTests
         var instance = await fixture.CreateInstance(NativeLibrariesPatch);
         WriteNativeJars(instance.GetLocalLibraryPath(), "dylib-bytes", "jnilib-bytes");
 
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
         var gate = new GateStep(task);
         task.AppendStep(new ExtractNatives(task));
         task.AppendStep(gate);
@@ -127,7 +128,7 @@ public class ExtractNativesTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance(); // default patch has no libraries
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
         task.AppendStep(new ExtractNatives(task));
 
         var outcome = await task.RunToCompletionAsync(TestContext.Current.CancellationToken);
@@ -185,7 +186,7 @@ public class ExtractNativesTests
         WriteJarModInputs(instance);
         Assert.NotEmpty(instance.GetJarMods()); // the patch yields one jar mod
 
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
         var gate = new GateStep(task);
         task.AppendStep(new ModMinecraftJar(task));
         task.AppendStep(gate);
@@ -223,7 +224,7 @@ public class ExtractNativesTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance(); // no jar mods in the default patch
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
         task.AppendStep(new ModMinecraftJar(task));
 
         var outcome = await task.RunToCompletionAsync(TestContext.Current.CancellationToken);
@@ -249,22 +250,20 @@ public class ExtractNativesTests
         var body = Encoding.UTF8.GetBytes("virtual asset payload");
         var hash = Convert.ToHexString(SHA1.HashData(body)).ToLowerInvariant();
         using var fixture = new LaunchFixture();
-        var services = fixture.CreateServices();
-        // the step anchors the asset store at the injected Paths root: seed the index (which
+        var patch = LaunchFixture.DefaultPatchJson.Replace("\"assets\": \"5\"", $"\"assets\": \"{assetsId}\"");
+        var instance = await fixture.CreateInstance(patch);
+        // the step anchors the asset store at the injected paths root: seed the index (which
         // marks the assets virtual) and the object file there
-        var assetsRoot = services.Paths.AssetsRoot;
+        var assetsRoot = instance.AssetsRoot;
         var indexJson = """{"virtual":true,"objects":{"icon.png":{"hash":"HASH","size":LEN}}}"""
             .Replace("HASH", hash).Replace("LEN", body.Length.ToString());
-        services.Paths.AssetIndexesDir.CreateDirectory();
-        await (services.Paths.AssetIndexesDir / (assetsId + ".json")).WriteAllTextAsync(indexJson);
+        instance.AssetIndexesDir.CreateDirectory();
+        await (instance.AssetIndexesDir / (assetsId + ".json")).WriteAllTextAsync(indexJson);
         var objectDir = assetsRoot / "objects" / hash[..2];
         objectDir.CreateDirectory();
         await (objectDir / hash).WriteAllBytesAsync(body);
 
-        var patch = LaunchFixture.DefaultPatchJson.Replace("\"assets\": \"5\"", $"\"assets\": \"{assetsId}\"");
-        var instance = await fixture.CreateInstance(patch);
-
-        var task = LaunchTask.Create(instance, services);
+        var task = fixture.CreateTask(instance);
         task.AppendStep(new ReconstructAssets(task));
 
         var outcome = await task.RunToCompletionAsync(TestContext.Current.CancellationToken);
@@ -322,7 +321,12 @@ public class ExtractNativesTests
             $"\"assets\": \"{assetsId}\", \"assetIndex\": " +
             "{ \"id\": \"ID\", \"url\": \"URL/indexes/ID.json\", \"sha1\": \"SHA\", \"size\": 0, \"totalSize\": 0 }"
                 .Replace("ID", assetsId).Replace("URL", server.Url).Replace("SHA", indexSha));
-        var instance = await fixture.CreateInstance(patch);
+        // the layout arrives through the ctor-injected store root (the instance derives its
+        // assets anchors from it): the anchors read through the <BaseDirectory>/assets
+        // symlink (the CWD-lexical fallback of FILE-LAYOUT §1.5), so the STORE root is
+        // BaseDirectory (assets hang off the store root)
+        var instance = await fixture.CreateInstance(patch,
+            new AbsolutePath(AppContext.BaseDirectory));
 
         // the index is downloaded into the same place the task reads it from — the injected
         // instance cache ("asset_indexes" base) instead of the former static hook; the
@@ -336,35 +340,17 @@ public class ExtractNativesTests
         };
         instanceCache.AddBase("asset_indexes", new AbsolutePath(Path.Combine(assetsRoot.Root, "indexes")));
         instance.MetaCache = instanceCache;
-        // the layout arrives through the injected LaunchServices (the instance derives its
-        // Paths from it): the instance stamp reads its assets anchors through the
-        // <BaseDirectory>/assets symlink (the CWD-lexical fallback of FILE-LAYOUT §1.5), so
-        // the store root is BaseDirectory (assets hang off the store root)
-        var baseDir = new AbsolutePath(AppContext.BaseDirectory);
-        // the resource URL override rides the instance-stamped LaunchServices (the former
-        // AssetUpdateTask.ResourceUrlOverride static hook)
-        instance.LaunchServices = new LaunchServices
-        {
-            Paths = new()
-            {
-                ConfigRoot = baseDir,
-                DataRoot = baseDir,
-                StoreRoot = baseDir,
-                CacheRoot = baseDir,
-                StateRoot = baseDir,
-            },
-            LoggerFactory = NullLoggerFactory.Instance,
-            Http = TestNet.Http,
-            ResourceUrlOverride = server.Url + "/objects/",
-        };
         try
         {
-            var task = LaunchTask.Create(instance, instance.LaunchServices);
+            var task = fixture.CreateTask(instance);
             // the update units run inside the TaskStepWrapper (which gates on the
-            // progressReportingRequest/proceed handshake)
+            // progressReportingRequest/proceed handshake); the resource URL override rides
+            // the explicit parameter (the former AssetUpdateTask.ResourceUrlOverride static
+            // hook, today LaunchFactory.Options.ResourceUrlOverride)
             task.RequestProgress += _ => task.Proceed();
             task.AppendStep(new TaskStepWrapper(task,
-                cancellationToken => AssetUpdateTask.RunAsync(instance, cancellationToken)));
+                cancellationToken => AssetUpdateTask.RunAsync(instance, server.Url + "/objects/",
+                    cancellationToken)));
 
             var outcome = await task.RunToCompletionAsync(TestContext.Current.CancellationToken);
 

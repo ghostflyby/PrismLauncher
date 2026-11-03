@@ -4,7 +4,7 @@
 // Core-level coverage tests: the C++-aligned config defaults (the record
 // property defaults are the single source, read through the typed flint.json store; the
 // batch retired the SettingsObject adapter view), the
-// LaunchTask.parseXmlLogs wiring (LogParser behind the LaunchServices.XmlLogParsing gate),
+// LaunchTask.parseXmlLogs wiring (LogParser behind the LaunchOptions.XmlLogParsing gate),
 // the Http proxy/timeout hook application (NetConfigApplier) and the meta-cache eviction the
 // DELETE /api/v1/meta-cache endpoint delegates to.
 
@@ -131,11 +131,11 @@ public class CoverageFixCoreTests
     [Fact]
     public async Task XmlParsing_Disabled_Appends_Game_Lines_Raw()
     {
-        // the gate is per-pipeline now (LaunchServices.XmlLogParsing — the Web host turns it
-        // on in the services it builds), so the "off" behavior is the default fixture task
+        // the gate is per-pipeline now (LaunchOptions.XmlLogParsing — the Web host turns it
+        // on in the factory it builds), so the "off" behavior is the default fixture task
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
 
         var xmlEvent = """
                        <log4j:event logger="net.minecraft" timestamp="1700000000" level="INFO" thread="Server thread"><log4j:Message>raw path</log4j:Message></log4j:event>
@@ -150,7 +150,7 @@ public class CoverageFixCoreTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance, fixture.CreateServices(xmlLogParsing: true));
+        var task = fixture.CreateTask(instance, xmlLogParsing: true);
 
         task.OnLogLine("""
                        <log4j:event logger="net.minecraft.server" timestamp="1700000000" level="INFO" thread="Server thread"><log4j:Message>hello xml world</log4j:Message></log4j:event>
@@ -174,7 +174,7 @@ public class CoverageFixCoreTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance, fixture.CreateServices(xmlLogParsing: true));
+        var task = fixture.CreateTask(instance, xmlLogParsing: true);
 
         // missing the required logger attribute -> parse error entry, line re-parsed plain
         task.OnLogLine("""

@@ -6,6 +6,7 @@
 // factory that seeds a complete net.minecraft patch so PackProfile::getProfile() builds a
 // LaunchProfile offline (no network, no real Mojang metadata).
 
+using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
@@ -170,26 +171,29 @@ public sealed class LaunchFixture : IDisposable
                                            """;
 
     /// <summary>
-    /// LaunchServices for this fixture's data dir (headless: null logger unless the test
-    /// attaches one, no global settings double — the IniSettingsObject cast in the core
-    /// degrades to null, matching the former unset static providers). The optional
-    /// installRoot stands in for the former JavaUtils.LauncherRootPath test hook (the
-    /// jars/NewLaunch.jar lookup), xmlLogParsing for the former XmlParsingEnabled gate.
+    /// The fixture's launch factory (headless: null logger unless the test attaches one,
+    /// no config store — the java/download switches stay off, matching the former unset
+    /// static providers). The optional installRoot stands in for the former
+    /// JavaUtils.LauncherRootPath test hook (the jars/NewLaunch.jar lookup), xmlLogParsing
+    /// for the former XmlParsingEnabled gate.
     /// </summary>
-    public LaunchServices CreateServices(ILoggerFactory? loggerFactory = null, string? installRoot = null,
+    public LaunchFactory CreateFactory(ILoggerFactory? loggerFactory = null, string? installRoot = null,
         bool xmlLogParsing = false)
     {
-        return new LaunchServices
-        {
-            Paths = _paths.Paths with { InstallRoot = installRoot ?? AppContext.BaseDirectory },
-            LoggerFactory = loggerFactory ?? NullLoggerFactory.Instance,
-            Http = Http,
-            LauncherState = State,
-            XmlLogParsing = xmlLogParsing,
-        };
+        return new LaunchFactory(
+            _paths.Paths with { InstallRoot = installRoot ?? AppContext.BaseDirectory },
+            loggerFactory ?? NullLoggerFactory.Instance, Http,
+            new LaunchOptions(XmlLogParsing: xmlLogParsing));
     }
 
-    public async Task<MinecraftInstance> CreateInstance(string? patchJson = DefaultPatchJson)
+    /// <summary>A bare launch task over this fixture's instance (for the tests that assemble
+    /// their own step chains).</summary>
+    public LaunchTask CreateTask(MinecraftInstance instance, ILoggerFactory? loggerFactory = null,
+        bool xmlLogParsing = false) =>
+        new(instance, loggerFactory ?? NullLoggerFactory.Instance, xmlLogParsing);
+
+    public async Task<MinecraftInstance> CreateInstance(string? patchJson = DefaultPatchJson,
+        AbsolutePath? storeRoot = null)
     {
         var instanceRoot = Path.Combine(Root, "inst");
         Directory.CreateDirectory(instanceRoot);
@@ -209,20 +213,18 @@ public sealed class LaunchFixture : IDisposable
 
         // the typed instance layer: the adapter over the fixture root folds the
         // fixture's user-layer store (Global) with the instance's own instance.json
-        var services = CreateServices();
         var instance = new MinecraftInstance(
             new InstanceJsonSettingsObject(
                 new AbsolutePath(instanceRoot), new InstanceEnvironment(
                     Global.Store, FlintJsonContext.Default.InstanceConfigFile,
                     FlintJsonContext.Default.InstanceStateFile)),
-            new AbsolutePath(instanceRoot))
+            new AbsolutePath(instanceRoot),
+            // the ctor-injected store root (InstanceList does the same in the host): the
+            // assets/library anchors hang off it
+            storeRoot ?? _paths.Paths.StoreRoot)
         {
-            // the composition-root stamp (InstanceList does the same in the host): the
-            // CreateLaunchTask path builds its per-launch services from these, the launcher
-            // runtime state carries the java probe cache, and the fixture meta cache
-            // (fixture injection) feeds the metadata/library/asset-index downloads.
-            // Paths rides LaunchServices (the instance derives its layout from it).
-            LaunchServices = services,
+            // the launcher runtime state carries the java probe cache, and the fixture meta
+            // cache (fixture injection) feeds the metadata/library/asset-index downloads
             LauncherState = State,
             MetaCache = MetaCache,
         };

@@ -75,22 +75,23 @@ public enum LaunchDecision
     Abort,
 }
 
-public sealed class LaunchController
+/// <summary>Built per launch through <see cref="LaunchFactory.CreateController"/>: the
+/// diagnostics logger and the auth environment are the factory's constructor-injected
+/// globals, and the task built at launch time comes from the same factory.</summary>
+/// <param name="loggerFactory">The host diagnostics factory.</param>
+/// <param name="auth">The auth environment for the pre-launch account refresh; null keeps
+/// the built-in endpoints over a private stack.</param>
+/// <param name="factory">The pipeline composition point the launch task is built through.</param>
+public sealed class LaunchController(ILoggerFactory loggerFactory, AuthEndpointsOptions? auth,
+    LaunchFactory factory)
 {
     private AuthSession? _session;
     private LaunchTask? _launcher;
     private LaunchMode _actualLaunchMode = LaunchMode.Normal;
 
-    /// <summary>The injected launch dependencies: the controller reads/writes the offline
-    /// name through <see cref="LaunchServices.LauncherState"/> (launcher-state.json),
-    /// its diagnostics logger from <see cref="LaunchServices.LoggerFactory"/> and hands the
-    /// services down to the LaunchTask it builds. Null keeps the headless defaults (null
-    /// decides like the former unset hooks).</summary>
-    public LaunchServices? Services { get; init; }
-
     /// <summary>Diagnostics logger (flint.controller category). Resolved per call from the
-    /// injected factory; null/unset or disposed factories degrade to silence.</summary>
-    private ILogger Log => Diagnostics.Log.For(Services?.LoggerFactory, LogCategories.Controller);
+    /// injected factory; a disposed host's factory degrades to silence.</summary>
+    private ILogger Log => Diagnostics.Log.For(loggerFactory, LogCategories.Controller);
 
     public MinecraftInstance? Instance { get; init; }
 
@@ -279,7 +280,7 @@ public sealed class LaunchController
         if (state is AccountState.Unchecked or AccountState.Errored || needsRefresh)
         {
             // MinecraftAccount::refresh(): start the auth flow and wait for the state to settle
-            var refresh = accountToCheck.Refresh(Services?.Auth, Services?.LoggerFactory);
+            var refresh = accountToCheck.Refresh(auth, loggerFactory);
             if (refresh is not null && !refresh.IsFinished)
             {
                 await RunAuthFlowAsync(refresh, cancellationToken).ConfigureAwait(false);
@@ -340,8 +341,9 @@ public sealed class LaunchController
     /// <summary>Port of askPlayDemo() (the C++ default button is Cancel — see the header note).</summary>
     private bool AskPlayDemo() => false;
 
-    /// <summary>Port of askOfflineName(); returns null when the (hook) dialog was cancelled.</summary>
-    private string? AskOfflineName(string playerName, LaunchMode mode)
+    /// <summary>Port of askOfflineName(); returns null when the (hook) dialog was cancelled.
+    /// The launcher runtime state (the stored last offline name) rides the instance.</summary>
+    private string? AskOfflineName(MinecraftInstance instance, string playerName, LaunchMode mode)
     {
         var title = "Player name";
         var message = "";
@@ -375,7 +377,7 @@ public sealed class LaunchController
 
         // the dialog suggestion prefers the stored last offline name, like the C++
         // (LastOfflinePlayerName — now in launcher-state.json)
-        var lastName = Services?.LauncherState?.Current.LastOfflinePlayerName ?? "";
+        var lastName = instance.LauncherState?.Current.LastOfflinePlayerName ?? "";
         var suggestion = lastName.Length != 0 ? lastName : playerName;
 
         string usedName;
@@ -397,7 +399,7 @@ public sealed class LaunchController
             }
         }
 
-        Services?.LauncherState?.Update(state => state with { LastOfflinePlayerName = usedName });
+        instance.LauncherState?.Update(state => state with { LastOfflinePlayerName = usedName });
         return usedName;
     }
 
@@ -427,7 +429,7 @@ public sealed class LaunchController
         {
             if (WantedLaunchMode == LaunchMode.Demo || AskPlayDemo())
             {
-                var name = AskOfflineName("Player", LaunchMode.Demo);
+                var name = AskOfflineName(instance, "Player", LaunchMode.Demo);
                 if (name is not null)
                 {
                     _session = new AuthSession();
@@ -449,7 +451,7 @@ public sealed class LaunchController
             // session straight from the offline name (AskOfflineName's headless default)
             var name = OfflineName.Length != 0
                 ? OfflineName
-                : AskOfflineName("Player", LaunchMode.Offline) ?? "";
+                : AskOfflineName(instance, "Player", LaunchMode.Offline) ?? "";
             if (name.Length == 0)
             {
                 throw new OperationCanceledException("Aborted");
@@ -475,7 +477,7 @@ public sealed class LaunchController
                 var name = OfflineName;
                 if (name.Length == 0)
                 {
-                    name = AskOfflineName(_session.PlayerName, LaunchMode.Offline) ?? "";
+                    name = AskOfflineName(instance, _session.PlayerName, LaunchMode.Offline) ?? "";
                     if (name.Length == 0)
                     {
                         throw new OperationCanceledException("Aborted");
@@ -495,7 +497,7 @@ public sealed class LaunchController
     /// starting it: the caller awaits <see cref="LaunchTask.RunAsync"/>.</summary>
     private LaunchTask? BuildInstance(MinecraftInstance instance)
     {
-        var launcher = instance.CreateLaunchTask(_session, TargetToJoin, Services);
+        var launcher = factory.CreateTask(instance, _session, TargetToJoin);
 
         _launcher = launcher;
 

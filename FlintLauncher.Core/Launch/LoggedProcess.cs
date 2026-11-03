@@ -97,7 +97,7 @@ public sealed class LoggedProcess : IDisposable
     private TaskCompletionSource<LoggedProcessState>? _terminatedTcs;
 
     /// <summary>The injected diagnostics factory (the launch pipeline passes the host's
-    /// LaunchServices.LoggerFactory); null keeps the silent-by-default library behavior.</summary>
+    /// ILoggerFactory); null keeps the silent-by-default library behavior.</summary>
     private readonly ILoggerFactory? _loggerFactory;
 
     /// <summary>Diagnostics logger (flint.process category). Resolved per call from the

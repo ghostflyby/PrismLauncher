@@ -571,7 +571,7 @@ public class FlintApiIntegrationTests
                     "--urls", "http://127.0.0.1:0",
                 ],
                 // the launch pipeline's jar lookups resolve against this install root (the former
-                // JavaUtils.LauncherRootPath static test hook, now LaunchServices.Paths.InstallRoot)
+                // JavaUtils.LauncherRootPath static test hook, now the LaunchFactory paths's InstallRoot)
                 paths: FlintPaths.FromHomeDir(new AbsolutePath(dataDir)) with { InstallRoot = launcherRoot });
             await app.StartAsync();
             using var client = new HttpClient();

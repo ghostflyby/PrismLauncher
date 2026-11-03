@@ -38,10 +38,11 @@ public static class StoreCompleteness
 {
     /// <summary>The libraries status of one meta version. versionRef is the meta version
     /// descriptor of net.minecraft (e.g. "1.21.4"); the manifest is read from the meta
-    /// cache base (cache/meta/net.minecraft/&lt;versionRef&gt;.json) — the derivation is a
-    /// pure view, it never triggers a meta download.</summary>
-    public static StoreStatusReport? LibrariesStatus(FlintPaths paths, HttpMetaCache metaCache,
-        string versionRef, RuntimeContext runtimeContext)
+    /// cache base (meta/net.minecraft/&lt;versionRef&gt;.json) — the derivation is a pure
+    /// view, it never triggers a meta download. The two roots are the only layout the
+    /// derivation reads.</summary>
+    public static StoreStatusReport? LibrariesStatus(AbsolutePath metaDir, AbsolutePath librariesRoot,
+        HttpMetaCache metaCache, string versionRef, RuntimeContext runtimeContext)
     {
         if (IsUnsafeRef(versionRef))
         {
@@ -49,7 +50,7 @@ public static class StoreCompleteness
         }
 
         string a2 = versionRef + ".json";
-        var manifestPath = paths.MetaDir / "net.minecraft" / a2;
+        var manifestPath = metaDir / "net.minecraft" / a2;
         if (!manifestPath.ExistsFile())
         {
             return null;
@@ -88,7 +89,7 @@ public static class StoreCompleteness
                     continue;
                 }
 
-                var file = new FileInfo((paths.LibrariesRoot / storage).Value);
+                var file = new FileInfo((librariesRoot / storage).Value);
                 var entry = metaCache.GetEntry("libraries", storage);
                 if (!file.Exists || entry is null || entry.IsStale)
                 {
@@ -105,9 +106,10 @@ public static class StoreCompleteness
     }
 
     /// <summary>The assets status of one asset index. assetsId is the asset index id (e.g.
-    /// "17"); the index is read from the store's indexes dir
-    /// (store/assets/indexes/&lt;assetsId&gt;.json).</summary>
-    public static StoreStatusReport? AssetsStatus(FlintPaths paths, string assetsId)
+    /// "17"); the index is read under the injected assets root's indexes dir
+    /// (store/assets/indexes/&lt;assetsId&gt;.json) and the objects under the root itself —
+    /// the only layout the derivation reads.</summary>
+    public static StoreStatusReport? AssetsStatus(AbsolutePath assetsRoot, string assetsId)
     {
         if (IsUnsafeRef(assetsId))
         {
@@ -115,7 +117,7 @@ public static class StoreCompleteness
         }
 
         string a1 = assetsId + ".json";
-        var indexPath = paths.AssetIndexesDir / a1;
+        var indexPath = assetsRoot / "indexes" / a1;
         if (!indexPath.ExistsFile())
         {
             return null;
@@ -131,7 +133,7 @@ public static class StoreCompleteness
         long bytes = 0;
         foreach (var (objectName, assetObject) in index.Objects)
         {
-            var file = new FileInfo(assetObject.GetAbsolutePath(paths.AssetsRoot));
+            var file = new FileInfo(assetObject.GetAbsolutePath(assetsRoot));
             // the GetDownloadAction re-download condition: absent OR wrong size
             if (!file.Exists || file.Length != assetObject.Size)
             {

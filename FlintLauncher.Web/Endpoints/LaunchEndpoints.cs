@@ -22,7 +22,7 @@ public static class LaunchEndpoints
             InstanceList instances,
             InstanceMutationLock instanceLock,
             AccountList accounts,
-            LaunchServices services,
+            LaunchFactory factory,
             FlintTaskRegistry registry) =>
         {
             var mode = (request.Mode ?? "normal").ToLowerInvariant() switch
@@ -107,19 +107,13 @@ public static class LaunchEndpoints
                     account = accounts.At(index);
                 }
 
-                var controller = new LaunchController
-                {
-                    Instance = instance,
-                    WantedLaunchMode = mode.Value,
-                    OfflineName = request.OfflineName ?? "",
-                    AccountToUse = account,
-                    AccountsProvider = () => accounts,
-                    AutoProceed = false,
-                    TargetToJoin = targetToJoin,
-                    // injected launch dependencies (C++ APPLICATION->settings()/logger),
-                    // built by the composition root (WebHostBuilder) for this app
-                    Services = services,
-                };
+                // the composition point builds the controller: the auth environment and the
+                // diagnostics logger are the factory's injected globals (C++
+                // APPLICATION->settings()/logger), AutoProceed=false — the client drives the
+                // ReadyForLaunch gate through POST /tasks/{id}/proceed
+                var controller = factory.CreateController(instance, mode.Value,
+                    request.OfflineName ?? "", account, () => accounts, autoProceed: false,
+                    targetToJoin);
 
                 // claim the instance before the work can start and finish: the launch runs off
                 // the request thread, and a second request in between would otherwise pass

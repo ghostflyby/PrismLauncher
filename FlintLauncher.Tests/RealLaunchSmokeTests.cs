@@ -5,10 +5,12 @@
 // entry point) with a fake java that speaks the EntryPoint stdin protocol — no network, no
 // real Minecraft. Also assembles the launch task of a real Prism instance (read-only).
 
+using FlintLauncher.Core;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Net;
+using Microsoft.Extensions.Logging.Abstractions;
 using TruePath;
 using Xunit;
 
@@ -57,15 +59,11 @@ public class RealLaunchSmokeTests
         var postExitMarker = Path.Combine(root, "post-exit-ran");
         fixture.Global.StubSet("PostExitCommand", $"/usr/bin/touch '{postExitMarker}'");
 
-        var controller = new LaunchController
-        {
-            Instance = instance,
-            WantedLaunchMode = LaunchMode.Offline,
-            OfflineName = "SmokeTester",
-            // the jar/jar-check lookups resolve against this install root (the former
-            // JavaUtils.LauncherRootPath static test hook)
-            Services = fixture.CreateServices(installRoot: launcherRoot),
-        };
+        // the jar/jar-check lookups resolve against this install root (the former
+        // JavaUtils.LauncherRootPath static test hook); the factory is the composition point
+        var controller = fixture.CreateFactory(installRoot: launcherRoot).CreateController(
+            instance, LaunchMode.Offline, offlineName: "SmokeTester", accountToUse: null,
+            accountsProvider: null, autoProceed: true, targetToJoin: null);
 
         // the controller's run covers the whole session, the game included
         var outcome = await controller.RunToCompletionAsync(TestContext.Current.CancellationToken);
@@ -131,7 +129,21 @@ public class RealLaunchSmokeTests
             return; // meta cache unavailable in this test layout; covered by fixture-based tests
         }
 
-        var launchTask = instance.CreateLaunchTask(null, null);
+        // assembly is explicit (no headless fallback): a CWD-anchored bare factory over a
+        // null logger and a throwaway client stands in for the host's composition point
+        var cwd = AbsolutePath.CurrentWorkingDirectory;
+        var launchTask = new LaunchFactory(
+            new FlintPaths
+            {
+                ConfigRoot = cwd / "config",
+                DataRoot = cwd,
+                StoreRoot = cwd / "store",
+                CacheRoot = cwd / "cache",
+                StateRoot = cwd / "state",
+                HomeRoot = cwd,
+            },
+            NullLoggerFactory.Instance, NetPrimaryHandler.CreateClient())
+            .CreateTask(instance, null, null);
         Assert.NotNull(launchTask);
         Assert.True(launchTask.IsMultiStep, "real instance launch task should contain the full step chain");
     }

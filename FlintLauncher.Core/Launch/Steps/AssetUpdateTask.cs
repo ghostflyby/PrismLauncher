@@ -6,8 +6,9 @@
 // the profile's asset version, then fetch the asset objects into assets/objects/<first2>/<hash>.
 //
 // APPLICATION->metacache() reaches the task through the instance (MinecraftInstance.MetaCache,
-// stamped by the composition root); the ResourceURLOverride setting comes from the
-// instance-stamped LaunchServices (Services.ResourceUrlOverride).
+// stamped by the composition root); the ResourceURLOverride setting arrives as the explicit
+// resourceUrlOverride parameter (LaunchFactory.Options.ResourceUrlOverride, threaded through
+// the update task closures).
 
 using System.Security.Cryptography;
 using FlintLauncher.Core.Instances;
@@ -20,7 +21,8 @@ public static class AssetUpdateTask
 {
     /// <summary>Downloads the assets index and the objects it lists. Returning is success;
     /// any other exception is a failure whose message is the reason.</summary>
-    public static async Task RunAsync(MinecraftInstance inst, CancellationToken cancellationToken)
+    public static async Task RunAsync(MinecraftInstance inst, string? resourceUrlOverride,
+        CancellationToken cancellationToken)
     {
         var components = inst.GetPackProfile();
         var profile = components.GetProfile();
@@ -49,10 +51,11 @@ public static class AssetUpdateTask
 
         await dl.DownloadAsync(null, cancellationToken).ConfigureAwait(false);
 
-        await AssetIndexFinished(inst, cancellationToken).ConfigureAwait(false);
+        await AssetIndexFinished(inst, resourceUrlOverride, cancellationToken).ConfigureAwait(false);
     }
 
-    private static async Task AssetIndexFinished(MinecraftInstance inst, CancellationToken cancellationToken)
+    private static async Task AssetIndexFinished(MinecraftInstance inst, string? resourceUrlOverride,
+        CancellationToken cancellationToken)
     {
         var components = inst.GetPackProfile();
         var profile = components.GetProfile();
@@ -80,7 +83,7 @@ public static class AssetUpdateTask
         // came through
         var cache = inst.MetaCache ?? throw new InvalidOperationException(
             $"no meta cache stamped on instance '{inst.Name()}' — the composition root must inject it");
-        var downloads = index.GetDownloadJob(ResourceUrl(inst), inst.AssetsRoot, cache.Http);
+        var downloads = index.GetDownloadJob(ResourceUrl(resourceUrlOverride), inst.AssetsRoot, cache.Http);
         if (downloads is not null)
         {
             await TaskWork.RunAllAsync(downloads,
@@ -91,9 +94,8 @@ public static class AssetUpdateTask
     }
 
     /// <summary>Port of resourceUrl().</summary>
-    private static string ResourceUrl(MinecraftInstance inst)
+    private static string ResourceUrl(string? urlOverride)
     {
-        var urlOverride = inst.LaunchServices?.ResourceUrlOverride;
         if (!string.IsNullOrEmpty(urlOverride))
         {
             return urlOverride;

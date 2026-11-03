@@ -29,11 +29,11 @@
 //    m_detectedOpenALPath/m_detectedGLFWPath/
 //    m_detectedSDLPath -> the Detected*Path properties; APPLICATION->metacache() ->
 //    <see cref="MetaCache"/> (library_directory defaults to "" while unset); APPLICATION->
-//    icons()->saveIcon -> <see cref="LaunchServices.Ui"/>.SaveIcon; the QGuiApplication
-//    screen geometry of the launch script -> <see cref="LaunchServices.Ui"/>.PrimaryScreenSize.
+//    icons()->saveIcon -> the <see cref="LaunchUiHooks"/>.SaveIcon hook the LaunchFactory
+//    invokes; the QGuiApplication screen geometry of the launch script ->
+//    the <see cref="LaunchUiHooks"/>.PrimaryScreenSize hook the ctor injects.
 //    The launch pipeline's full dependency set (logger factory, global settings, install
-//    root, UI hooks) travels through the instance-stamped <see cref="LaunchServices"/> /
-//    the per-launch services CreateLaunchTask builds. The global settings object
+//    root, UI hooks) lives on the LaunchFactory. The global settings object
 //    (APPLICATION->settings()) is the injected BaseInstance global settings.
 //  - The Q_OS_* ifdef'ed bits port to OperatingSystem checks. switcherooSetupGPU() (DBus)
 //    and LibraryUtils::findMangoHud() are system-probing process-launch helpers and are
@@ -74,7 +74,6 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.State;
 using FlintLauncher.Core.Versioning;
-using Microsoft.Extensions.Logging.Abstractions;
 using TruePath;
 using TruePath.SystemIo;
 
@@ -84,9 +83,20 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 {
     private static readonly Regex TokenRegex = new(@"\$\{(.+?)\}", RegexOptions.CultureInvariant); // InvertedGreediness
 
-    public MinecraftInstance(SettingsObject settings, AbsolutePath rootDir)
+    private readonly AbsolutePath? _storeRoot;
+    private readonly LaunchUiHooks? _ui;
+
+    /// <summary>Constructs one instance. The injected store root anchors the layout reads
+    /// (assets/libraries hang off it) and the injected UI hooks answer the maximized-launch
+    /// screen-size query; null keeps the bare-fixture degrades (the CWD shape and the
+    /// configured window size). The composition root (InstanceList) or the test fixture
+    /// passes them; there is no post-construction stamp.</summary>
+    public MinecraftInstance(SettingsObject settings, AbsolutePath rootDir,
+        AbsolutePath? storeRoot = null, LaunchUiHooks? ui = null)
         : base(settings, rootDir)
     {
+        _storeRoot = storeRoot;
+        _ui = ui;
         Components = new PackProfile(this);
     }
 
@@ -117,26 +127,17 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         }
     }
 
-    /// <summary>The store anchors the instance's launch-time flows read (assets/libraries/
-    /// store): resolved through the injected LaunchServices. Bare fixtures without one
-    /// anchor on the process CWD (the legacy default layout's shape). The instance carries
-    /// no layout type — the composition root owns it.</summary>
-    public AbsolutePath AssetsRoot => LaunchServices?.AssetsRoot
-                                      ?? AbsolutePath.CurrentWorkingDirectory / "assets";
+    /// <summary>The store root anchors the instance's launch-time flows read (assets and
+    /// libraries hang off it): the injected value, else the process CWD shape (the legacy
+    /// default layout's anchor). The instance carries no layout type — the composition root
+    /// owns it.</summary>
+    public AbsolutePath StoreRoot => _storeRoot ?? AbsolutePath.CurrentWorkingDirectory / "store";
+
+    public AbsolutePath AssetsRoot => StoreRoot / "assets";
 
     public AbsolutePath AssetIndexesDir => AssetsRoot / "indexes";
 
-    public AbsolutePath LibrariesRoot => LaunchServices?.LibrariesRoot
-                                         ?? AbsolutePath.CurrentWorkingDirectory / "libraries";
-
-    public AbsolutePath StoreRoot => LaunchServices?.StoreRoot
-                                     ?? AbsolutePath.CurrentWorkingDirectory / "store";
-
-    /// <summary>Injected launch-pipeline dependencies (paths, logger factory, global settings,
-    /// install root, UI hooks — the former static hooks). Stamped by the composition root
-    /// (InstanceList) or set directly by tests; CreateLaunchTask uses it as the base for the
-    /// per-launch services and falls back to headless defaults while null.</summary>
-    public LaunchServices? LaunchServices { get; set; }
+    public AbsolutePath LibrariesRoot => StoreRoot / "libraries";
 
     public override void SaveNow()
     {
@@ -345,7 +346,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     // TODO: the C++ assembles the folder creation, LibrariesTask, LegacyFMLLibrariesTask and
     // AssetUpdateTask here (the update pipeline). Ported in Launch/LaunchController and the
     // Launch/Steps/* tasks below.
-    public override List<Func<CancellationToken, Task>> CreateUpdateTask() =>
+    public override List<Func<CancellationToken, Task>> CreateUpdateTask(string? resourceUrlOverride = null) =>
     [
         // create folders
         cancellationToken =>
@@ -370,186 +371,10 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // FML libraries download and copy into the instance
         cancellationToken => LegacyFmlLibrariesTask.RunAsync(this, null, cancellationToken),
         // assets update
-        cancellationToken => AssetUpdateTask.RunAsync(this, cancellationToken),
+        cancellationToken => AssetUpdateTask.RunAsync(this, resourceUrlOverride, cancellationToken),
     ];
 
-    /// <summary>Port of createLaunchTask() (2-arg form): builds the per-launch services from
-    /// the instance-stamped LaunchServices (or headless defaults).</summary>
-    public override LaunchTask CreateLaunchTask(AuthSession? session, MinecraftTarget? targetToJoin) =>
-        CreateLaunchTask(session, targetToJoin, services: null);
-
-    /// <summary>Port of createLaunchTask(): builds the <see cref="Launch.LaunchServices"/> for
-    /// this launch (the explicit <paramref name="services"/> wins, then the instance-stamped
-    /// ones, then headless defaults), hands it to the LaunchTask (every step reads its
-    /// environment from Parent.Services) and invokes the UI's saveIcon (C++
-    /// APPLICATION->icons()->saveIcon) — the former SaveIconHook static.</summary>
-    public LaunchTask CreateLaunchTask(AuthSession? session, MinecraftTarget? targetToJoin,
-        LaunchServices? services)
-    {
-        var launchServices = services ?? LaunchServices ?? BuildLaunchServices();
-        UpdateRuntimeContext();
-        var process = LaunchTask.Create(this, launchServices);
-
-        launchServices.Ui.SaveIcon?.Invoke(IconKey(), GameRoot / "icon.png");
-
-        // print a header
-        process.AppendStep(new TextPrint(process, "Minecraft folder is:\n  " + GameRoot + "\n",
-            MessageLevel.Launcher));
-
-        // create the .minecraft folder and server-resource-packs (workaround for Minecraft bug MCL-3732)
-        process.AppendStep(new CreateGameFolders(process));
-
-        if (targetToJoin is null && Variant.AsBool(Settings.Get("JoinServerOnLaunch")))
-        {
-            var fullAddress = Variant.AsString(Settings.Get("JoinServerOnLaunchAddress"));
-            if (fullAddress.Length != 0)
-            {
-                targetToJoin = MinecraftTarget.Parse(fullAddress, false);
-            }
-            else
-            {
-                var world = Variant.AsString(Settings.Get("JoinWorldOnLaunch"));
-                if (world.Length != 0)
-                {
-                    targetToJoin = MinecraftTarget.Parse(world, true);
-                }
-            }
-        }
-
-        if (targetToJoin is not null && targetToJoin.Port == 25565)
-        {
-            // Resolve server address to join on launch
-            var step = new LookupServerAddress(process, targetToJoin)
-            {
-                LookupAddress = targetToJoin.Address
-            };
-            process.AppendStep(step);
-        }
-
-        // run pre-load command if that's needed, before the metadata is loaded
-        if (GetPreLoadCommand().Length != 0)
-        {
-            var step = new LaunchCommand(process, GetPreLoadCommand(), "Pre-Load");
-            step.SetWorkingDirectory(GameRoot);
-            process.AppendStep(step);
-        }
-
-        // load meta
-        {
-            var mode = session?.LaunchMode != LaunchMode.Offline ? NetMode.Online : NetMode.Offline;
-            process.AppendStep(new TaskStepWrapper(process,
-                cancellationToken => MinecraftLoadAndCheck.RunAsync(this, mode, cancellationToken)));
-        }
-
-        // check java
-        {
-            process.AppendStep(new AutoInstallJava(process));
-            process.AppendStep(new CheckJava(process));
-            // verify that minimum Java requirements are met
-            process.AppendStep(new VerifyJavaInstall(process));
-        }
-
-        // run pre-launch command if that's needed
-        if (GetPreLaunchCommand().Length != 0)
-        {
-            var step = new LaunchCommand(process, GetPreLaunchCommand(), "Pre-Launch");
-            step.SetWorkingDirectory(GameRoot);
-            process.AppendStep(step);
-        }
-
-        // if we aren't in offline mode
-        if (session?.LaunchMode != LaunchMode.Offline)
-        {
-            process.AppendStep(new ClaimAccount(process));
-            foreach (var t in CreateUpdateTask())
-            {
-                process.AppendStep(new TaskStepWrapper(process, t));
-            }
-        }
-        else
-        {
-            process.AppendStep(new EnsureOfflineLibraries(process, this));
-        }
-
-        // if there are any jar mods
-        process.AppendStep(new ModMinecraftJar(process));
-
-        // Scan mods folders for mods
-        process.AppendStep(new ScanModFolders(process));
-
-        // make sure we have enough RAM, warn the user if we don't
-        process.AppendStep(new EnsureAvailableMemory(process, this));
-
-        // print some instance info here...
-        process.AppendStep(new PrintInstanceInfo(process, session, targetToJoin));
-
-        // extract native jars if needed
-        process.AppendStep(new ExtractNatives(process));
-
-        // reconstruct assets if needed
-        process.AppendStep(new ReconstructAssets(process));
-
-        {
-            // actually launch the game
-            var step = new LauncherPartLaunch(process);
-            step.SetWorkingDirectory(GameRoot);
-            step.Session = session;
-            step.TargetToJoin = targetToJoin;
-            process.AppendStep(step);
-        }
-
-        // run post-exit command if that's needed
-        if (GetPostExitCommand().Length != 0)
-        {
-            var step = new LaunchCommand(process, GetPostExitCommand(), "Post-Launch");
-            step.SetWorkingDirectory(GameRoot);
-            process.AppendStep(step);
-        }
-
-        if (session is not null)
-        {
-            process.SetCensorFilter(CreateCensorFilterFromSession(session));
-        }
-
-        if (Variant.AsBool(InstanceSettings.Get("QuitAfterGameStop")))
-        {
-            process.AppendStep(new QuitAfterGameStop(process));
-        }
-
-        LaunchProcess = process;
-        RaiseLaunchTaskChanged();
-        return process;
-    }
-
-    /// <summary>Headless LaunchServices for bare fixtures (no stamped services, no explicit
-    /// per-launch override): CWD-anchored paths, a null logger and the injected instance
-    /// settings — the same behavior the former unset static hooks produced.</summary>
-    private LaunchServices BuildLaunchServices()
-    {
-        // the headless fallback layout: the CWD shape the former default Paths carried
-        var cwd = AbsolutePath.CurrentWorkingDirectory;
-        return new()
-        {
-            Paths = new()
-            {
-                ConfigRoot = cwd / "config",
-                DataRoot = cwd,
-                StoreRoot = cwd / "store",
-                CacheRoot = cwd / "cache",
-                StateRoot = cwd / "state",
-                HomeRoot = cwd,
-            },
-            LoggerFactory = NullLoggerFactory.Instance,
-            Http = MetaCache?.Http ?? NetPrimaryHandler.CreateClient(),
-            Config = UserConfigStore,
-        };
-    }
-
-    public string CreateLaunchScript(AuthSession? session, MinecraftTarget? targetToJoin) =>
-        CreateLaunchScript(session, targetToJoin, services: null);
-
-    public string CreateLaunchScript(AuthSession? session, MinecraftTarget? targetToJoin,
-        LaunchServices? services)
+    public string CreateLaunchScript(AuthSession? session, MinecraftTarget? targetToJoin)
     {
         var launchScript = "";
 
@@ -601,7 +426,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                     // C++ computes the primary screen's available size shrunk by the main
                     // window frame margins; the headless core has no screen, so the injected
                     // UI hook (or the configured window size) fills in
-                    var (width, height) = (services ?? LaunchServices)?.Ui.PrimaryScreenSize?.Invoke() ??
+                    var (width, height) = _ui?.PrimaryScreenSize?.Invoke() ??
                                           (Variant.AsInt(Settings.Get("MinecraftWinWidth")),
                                               Variant.AsInt(Settings.Get("MinecraftWinHeight")));
                     windowParams = FormattableString.Invariant($"{width}x{height}");
@@ -1178,7 +1003,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         return outList;
     }
 
-    protected SortedDictionary<string, string> CreateCensorFilterFromSession(AuthSession? session)
+    public SortedDictionary<string, string> CreateCensorFilterFromSession(AuthSession? session)
     {
         var filter = new SortedDictionary<string, string>(StringComparer.Ordinal);
         if (session is null)
@@ -1345,8 +1170,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     /// JavaDetectState.Detections), or null when that binary has not been probed (or no state
     /// store is wired). Goes through Settings so the specific settings (and the JavaPath
     /// override) are loaded like every other reader, and reads the INSTANCE-stamped state
-    /// store — instances discovered at startup carry it from InstanceList, while their
-    /// LaunchServices may still be null (it is stamped later by the composition root).</summary>
+    /// store — instances discovered at startup carry it from InstanceList.</summary>
     public JavaDetectEntry? JavaDetection()
     {
         var key = JavaDetectKey(Variant.AsString(Settings.Get("JavaPath")));

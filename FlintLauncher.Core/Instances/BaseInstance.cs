@@ -591,12 +591,15 @@ public abstract class BaseInstance : INotifyPropertyChanged
     public abstract void LoadSpecificSettings();
 
     /// <summary>returns a valid update task</summary>
-    public abstract List<Func<CancellationToken, Task>> CreateUpdateTask();
+    public abstract List<Func<CancellationToken, Task>> CreateUpdateTask(string? resourceUrlOverride = null);
 
-    /// <summary>
-    /// returns a valid launcher (the step chain for one launch).
-    /// </summary>
-    public abstract LaunchTask? CreateLaunchTask(AuthSession? account, MinecraftTarget? targetToJoin);
+    /// <summary>Registers the built launch task and raises the change notification — the
+    /// hook <see cref="Launch.LaunchFactory.CreateTask"/> completes a chain with.</summary>
+    internal void SetLaunchTask(LaunchTask task)
+    {
+        LaunchProcess = task;
+        RaiseLaunchTaskChanged();
+    }
 
     /// <summary>returns the current launch task (if any)</summary>
     public LaunchTask? GetLaunchTask() => LaunchProcess;
@@ -735,7 +738,7 @@ public abstract class BaseInstance : INotifyPropertyChanged
         (InstanceSettings as InstanceJsonSettingsObject)?.UserLayer ?? FlintConfigFile.Default();
 
     /// <summary>The live user-layer store (flint.json) when the settings object is the typed
-    /// adapter — handed to LaunchServices so the launch pipeline reads the same stack.</summary>
+    /// adapter — handed to the LaunchFactory so the launch pipeline reads the same stack.</summary>
     protected FlintConfigStore? UserConfigStore =>
         (InstanceSettings as InstanceJsonSettingsObject)?.UserConfig;
 

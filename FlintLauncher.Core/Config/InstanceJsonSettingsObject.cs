@@ -36,7 +36,7 @@ public sealed class InstanceJsonSettingsObject(AbsolutePath instanceRoot, Instan
     public InstanceStateStore StateStore { get; } = new(instanceRoot, environment.StateInfo);
 
     /// <summary>The live user-layer store (flint.json) when one is wired, for hosts that
-    /// hand the same stack onward (LaunchServices) — null on bare fixtures.</summary>
+    /// hand the same stack onward (the LaunchFactory) — null on bare fixtures.</summary>
     public FlintConfigStore? UserConfig => _userConfig;
 
     /// <summary>The live user layer (flint.json), or the record defaults when the host has no

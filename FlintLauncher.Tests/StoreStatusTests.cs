@@ -104,7 +104,7 @@ public class StoreCompletenessTests : IDisposable
                                             """);
         // dfu: neither file nor entry → missing
 
-        var report = StoreCompleteness.LibrariesStatus(paths, cache, "1.21.4", Context());
+        var report = StoreCompleteness.LibrariesStatus(paths.MetaDir, paths.LibrariesRoot, cache, "1.21.4", Context());
 
         Assert.NotNull(report);
         Assert.False(report.Complete);
@@ -123,7 +123,7 @@ public class StoreCompletenessTests : IDisposable
         WriteFile((paths.LibrariesRoot / brigadier), "jar!");
         using var cache = CacheWithLedger("""{"version":"1","entries":[]}""");
 
-        var report = StoreCompleteness.LibrariesStatus(paths, cache, "1.21.4", Context());
+        var report = StoreCompleteness.LibrariesStatus(paths.MetaDir, paths.LibrariesRoot, cache, "1.21.4", Context());
 
         Assert.NotNull(report);
         Assert.Equal([brigadier], report.Missing);
@@ -139,7 +139,7 @@ public class StoreCompletenessTests : IDisposable
             """[{"name":"local:thing:1.0","MMC-hint":"local"}]""");
         using var cache = CacheWithLedger("""{"version":"1","entries":[]}""");
 
-        var report = StoreCompleteness.LibrariesStatus(paths, cache, "1.21.4", Context());
+        var report = StoreCompleteness.LibrariesStatus(paths.MetaDir, paths.LibrariesRoot, cache, "1.21.4", Context());
 
         Assert.NotNull(report);
         Assert.True(report.Complete);
@@ -153,9 +153,9 @@ public class StoreCompletenessTests : IDisposable
         var paths = Paths();
         using var cache = CacheWithLedger("""{"version":"1","entries":[]}""");
 
-        Assert.Null(StoreCompleteness.LibrariesStatus(paths, cache, "9.99.9", Context()));
-        Assert.Null(StoreCompleteness.LibrariesStatus(paths, cache, "../evil", Context()));
-        Assert.Null(StoreCompleteness.AssetsStatus(paths, "../evil"));
+        Assert.Null(StoreCompleteness.LibrariesStatus(paths.MetaDir, paths.LibrariesRoot, cache, "9.99.9", Context()));
+        Assert.Null(StoreCompleteness.LibrariesStatus(paths.MetaDir, paths.LibrariesRoot, cache, "../evil", Context()));
+        Assert.Null(StoreCompleteness.AssetsStatus(paths.AssetsRoot, "../evil"));
     }
 
     [Fact]
@@ -173,7 +173,7 @@ public class StoreCompletenessTests : IDisposable
         // GetDownloadAction re-download condition)
         WriteFile(paths.AssetsRoot / "objects" / hash2[..2] / hash2, "too small");
 
-        var report = StoreCompleteness.AssetsStatus(paths, "17");
+        var report = StoreCompleteness.AssetsStatus(paths.AssetsRoot, "17");
 
         Assert.NotNull(report);
         Assert.False(report.Complete);

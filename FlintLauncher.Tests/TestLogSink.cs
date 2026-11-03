@@ -52,7 +52,7 @@ public static class FlintLogTest
     private static ILoggerFactory? _factory;
 
     /// <summary>The factory backing the attached sink — inject it into the object under test
-    /// (LoggedProcess, LaunchServices, ...).</summary>
+    /// (LoggedProcess, LaunchTask, ...).</summary>
     public static ILoggerFactory? Factory => _factory;
 
     /// <summary>Build a fresh in-memory sink factory (Trace level) for direct injection.</summary>

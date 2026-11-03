@@ -192,7 +192,7 @@ public class LoggedProcessTests
         var sink = FlintLogTest.Attach();
         try
         {
-            // the diagnostics factory is injected (the pipeline passes LaunchServices.LoggerFactory)
+            // the diagnostics factory is injected (the pipeline passes the injected ILoggerFactory)
             using var process = new LoggedProcess(loggerFactory: FlintLogTest.Factory);
             var completion = RunAsync(process, "/bin/sh", "-c", "read line; echo \"$line\"");
             await Task.Delay(200);

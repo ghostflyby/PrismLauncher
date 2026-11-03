@@ -160,7 +160,7 @@ public static class MiscEndpoints
 /// legacy/launcher fallback, so the launcher-managed java root — the JavaDir setting under
 /// store semantics — is covered like the system-wide sources. Wire shape unchanged:
 /// invalid fallback candidates list as ("unknown", "unknown").</summary>
-public sealed class JavaScanService(LaunchServices services)
+public sealed class JavaScanService(ConfiguredDirs dirs)
 {
     private readonly SemaphoreSlim _lock = new(1, 1);
     private volatile IReadOnlyList<JavaView>? _cache;
@@ -207,7 +207,7 @@ public sealed class JavaScanService(LaunchServices services)
     /// this must stay lock-free because both entry points already hold it.</summary>
     private async Task<IReadOnlyList<JavaView>> ScanCoreAsync()
     {
-        var candidates = await JavaDetection.DetectAsync(services.JavaRoot);
+        var candidates = await JavaDetection.DetectAsync(dirs.JavaRoot);
         var scanned = candidates
             .Select(candidate => new JavaView(candidate.Path, candidate.Version.Original, candidate.Architecture))
             .ToArray();

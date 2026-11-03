@@ -66,7 +66,7 @@ public class StepEngineTests
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
         var order = new List<string>();
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
         task.AppendStep(new RecordingStep(task, "one", order));
         task.AppendStep(new RecordingStep(task, "two", order));
         task.AppendStep(new RecordingStep(task, "three", order));
@@ -84,7 +84,7 @@ public class StepEngineTests
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
         var order = new List<string>();
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
         task.AppendStep(new RecordingStep(task, "one", order));
         task.AppendStep(new RecordingStep(task, "boom", order, fail: true));
         task.AppendStep(new RecordingStep(task, "never", order));
@@ -105,7 +105,7 @@ public class StepEngineTests
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
         var finalized = new List<string>();
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
 
         task.AppendStep(new RecordingStep(task, "one", [], onFinalize: () => finalized.Add("one")));
         task.AppendStep(new RecordingStep(task, "two", [], onFinalize: () => finalized.Add("two")));
@@ -120,7 +120,7 @@ public class StepEngineTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
         var waiting = new WaitingStep(task);
         task.AppendStep(waiting);
 
@@ -147,7 +147,7 @@ public class StepEngineTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
         task.AppendStep(new RecordingStep(task, "never", []));
 
         task.Abort(); // before start: the C++ emits aborted() straight away
@@ -159,15 +159,14 @@ public class StepEngineTests
     [Fact]
     public async Task ProceedGate_ReadyForLaunch_ThenProceed()
     {
-        // attach first: the logger factory is injected at construction (LaunchServices), so
-        // the task must be built with the sink's factory to observe the gate edges
+        // attach first: the logger factory is injected at construction, so the task must be
+        // built with the sink's factory to observe the gate edges
         var sink = FlintLogTest.Attach();
         try
         {
             using var fixture = new LaunchFixture();
             var instance = await fixture.CreateInstance();
-            var task = LaunchTask.Create(instance,
-                fixture.CreateServices(loggerFactory: FlintLogTest.Factory));
+            var task = fixture.CreateTask(instance, loggerFactory: FlintLogTest.Factory);
             var gate = new GatedStep(task);
             task.AppendStep(gate);
 
@@ -230,13 +229,13 @@ public class StepEngineTests
 
         // TaskStepWrapper gates on progressReportingRequest; the controller answers with
         // proceed() — mirror the LaunchController.OnProgressRequested behavior here.
-        var success = LaunchTask.Create(instance, fixture.CreateServices());
+        var success = fixture.CreateTask(instance);
         success.RequestProgress += _ => success.Proceed();
         success.AppendStep(new TaskStepWrapper(success, _ => NoopUnit()));
         var successOutcome = await success.RunToCompletionAsync(TestContext.Current.CancellationToken);
         Assert.True(successOutcome.Succeeded, successOutcome.FailReason);
 
-        var failure = LaunchTask.Create(instance, fixture.CreateServices());
+        var failure = fixture.CreateTask(instance);
         failure.RequestProgress += _ => failure.Proceed();
         failure.AppendStep(new TaskStepWrapper(failure, _ => FailingUnit("no libraries today")));
         var failureOutcome = await failure.RunToCompletionAsync(TestContext.Current.CancellationToken);
@@ -250,7 +249,7 @@ public class StepEngineTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
         var bodyReturned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var wrapper = new TaskStepWrapper(task, async _ =>
@@ -286,7 +285,7 @@ public class StepEngineTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
 
         // The launch environment builds on the base one: INST_* vars exist in both.
         var baseArgs = task.SubstituteVariables("${INST_ID}");
@@ -306,7 +305,7 @@ public class StepEngineTests
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
         instance.GameRoot.CreateDirectory(); // normally created by CreateGameFolders
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
         var step = new LaunchCommand(task, "/bin/echo hello-from-echo", "Pre-Load");
         step.SetWorkingDirectory(instance.GameRoot);
         task.AppendStep(step);
@@ -332,7 +331,7 @@ public class StepEngineTests
 
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
         task.AppendStep(new LaunchCommand(task, "/bin/sh -c 'echo boom >&2; exit 3'", "Pre-Load"));
 
         var outcome = await task.RunToCompletionAsync(TestContext.Current.CancellationToken);
@@ -349,7 +348,7 @@ public class StepEngineTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
         task.AppendStep(new LaunchCommand(task, "", "Pre-Load"));
 
         var outcome = await task.RunToCompletionAsync(TestContext.Current.CancellationToken);
@@ -364,7 +363,7 @@ public class StepEngineTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
         task.AppendStep(new TextPrint(task, "hello\nworld\n", MessageLevel.Launcher));
 
         await task.RunToCompletionAsync(TestContext.Current.CancellationToken);
@@ -380,7 +379,7 @@ public class StepEngineTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var bothStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var started = 0;
@@ -423,7 +422,7 @@ public class StepEngineTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
         var ran = new List<string>();
         var boom = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -446,7 +445,7 @@ public class StepEngineTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
         var ran = new List<string>();
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -473,7 +472,7 @@ public class StepEngineTests
     {
         using var fixture = new LaunchFixture();
         var instance = await fixture.CreateInstance();
-        var task = LaunchTask.Create(instance, fixture.CreateServices());
+        var task = fixture.CreateTask(instance);
         var finalized = new List<string>();
 
         task.AppendStep(new ThrowingFinalizeStep(task));

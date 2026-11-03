@@ -186,12 +186,9 @@ public class LaunchControllerOfflineNameStateTests
         // The controller task only terminates with the game session, so poll for the name
         // decision (it happens before the launch task is built) and abort the pipeline.
         var instance = await fixture.CreateInstance();
-        var first = new LaunchController
-        {
-            Instance = instance,
-            WantedLaunchMode = LaunchMode.Offline,
-            Services = fixture.CreateServices(),
-        };
+        var first = fixture.CreateFactory().CreateController(instance, LaunchMode.Offline,
+            offlineName: "", accountToUse: null, accountsProvider: null, autoProceed: true,
+            targetToJoin: null);
         using var firstRun = new CancellationTokenSource();
         var firstTask = first.RunAsync(firstRun.Token);
         Assert.Equal("Player", await WaitForOfflineName(fixture, expected: "Player"));
@@ -202,17 +199,13 @@ public class LaunchControllerOfflineNameStateTests
         // the handler (dialog) path: the suggestion prefills from the stored name (C++
         // LastOfflinePlayerName parity) and the picked name is written back
         string? capturedSuggestion = null;
-        var second = new LaunchController
-        {
-            Instance = instance,
-            WantedLaunchMode = LaunchMode.Offline,
-            Services = fixture.CreateServices(),
-            AskOfflineNameHandler = (_, _, suggestion) =>
+        var second = fixture.CreateFactory().CreateController(instance, LaunchMode.Offline,
+            offlineName: "", accountToUse: null, accountsProvider: null, autoProceed: true,
+            targetToJoin: null, askOfflineName: (_, _, suggestion) =>
             {
                 capturedSuggestion = suggestion;
                 return "HandlerPicked";
-            },
-        };
+            });
         using var secondRun = new CancellationTokenSource();
         var secondTask = second.RunAsync(secondRun.Token);
         Assert.Equal("Player", capturedSuggestion);

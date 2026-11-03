@@ -36,7 +36,7 @@
 // that step (AbortStep) and cancels the chain's token; the stages after it never start.
 //
 // parseXmlLogs(): the log4j XML event parser (LogParser) runs behind the
-// <see cref="LaunchServices.XmlLogParsing"/> opt-in gate, since pure-core consumers should keep
+// <see cref="LaunchOptions.XmlLogParsing"/> opt-in gate, since pure-core consumers should keep
 // the simple path. When enabled, StdOut/StdErr lines feed the per-level LogParser instances
 // first: complete log4j events become structured "[HH:mm:ss] [thread/LEVEL] [logger]: message"
 // entries, and everything else falls through the plain-text level heuristics.
@@ -75,7 +75,8 @@ public sealed class LaunchTask
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private readonly MinecraftInstance _instance;
-    private readonly LaunchServices _services;
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly bool _xmlLogParsing;
     private readonly List<List<LaunchStep>> _stages = [];
     private readonly LogParser _stdoutParser = new();
     private readonly LogParser _stderrParser = new();
@@ -90,10 +91,14 @@ public sealed class LaunchTask
     private LaunchState _state = LaunchState.NotStarted;
     private LogModel? _logModel;
 
-    internal LaunchTask(MinecraftInstance instance, LaunchServices services)
+    /// <summary>The engine for one launch; the composition point is
+    /// <see cref="LaunchFactory"/>. A bare task (no steps yet) is a valid test/host shape.</summary>
+    public LaunchTask(MinecraftInstance instance, ILoggerFactory loggerFactory,
+        bool xmlLogParsing = false)
     {
         _instance = instance;
-        _services = services;
+        _loggerFactory = loggerFactory;
+        _xmlLogParsing = xmlLogParsing;
         Init();
     }
 
@@ -137,13 +142,9 @@ public sealed class LaunchTask
 
     public MinecraftInstance Instance => _instance;
 
-    /// <summary>The injected launch dependencies (paths, logger factory, settings, UI hooks).
-    /// Every LaunchStep reads its environment from here instead of the former static hooks.</summary>
-    public LaunchServices Services => _services;
-
     /// <summary>Diagnostics logger (flint.launch category). Resolved per call from the
     /// injected factory — a disposed host's factory degrades to silence, never throws.</summary>
-    private ILogger Log => Diagnostics.Log.For(_services.LoggerFactory, LogCategories.Launch);
+    private ILogger Log => Diagnostics.Log.For(_loggerFactory, LogCategories.Launch);
 
     public long Pid { get; set; } = -1;
 
@@ -216,9 +217,6 @@ public sealed class LaunchTask
     public void PrependStep(LaunchStep step) => _stages.Insert(0, [step]);
 
     public void SetCensorFilter(SortedDictionary<string, string> filter) => _censorFilter = filter;
-
-    /// <summary>Port of LaunchTask::create().</summary>
-    public static LaunchTask Create(MinecraftInstance instance, LaunchServices services) => new(instance, services);
 
     // ------------------------------------------------------------------- step engine
 
@@ -553,7 +551,7 @@ public sealed class LaunchTask
     /// </summary>
     private bool ParseXmlLogs(string line, MessageLevel level)
     {
-        if (!_services.XmlLogParsing)
+        if (!_xmlLogParsing)
         {
             return false;
         }
