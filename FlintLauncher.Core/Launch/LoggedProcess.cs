@@ -155,12 +155,12 @@ public sealed class LoggedProcess : IDisposable
         _process.StartInfo.WorkingDirectory = directory.Value;
     }
 
-    /// <summary>Port of QProcess::setProcessEnvironment (the instance ProcessEnvironment).</summary>
-    public void SetProcessEnvironment(ProcessEnvironment environment)
+    /// <summary>Port of QProcess::setProcessEnvironment.</summary>
+    public void SetProcessEnvironment(SortedDictionary<string, string> environment)
     {
         var env = _process.StartInfo.Environment;
         env.Clear();
-        foreach (var (key, value) in environment.Vars)
+        foreach (var (key, value) in environment)
         {
             env[key] = value;
         }

@@ -263,11 +263,11 @@ public class JavaUtilsTests : IDisposable
 
         var env = JavaUtils.CleanEnvironment();
 
-        Assert.False(env.Contains("JAVA_HOME"));
-        Assert.False(env.Contains("_JAVA_OPTIONS"));
-        Assert.False(env.Contains("JAVA_TOOL_OPTIONS"));
-        Assert.True(env.Contains("FLINT_TEST_KEEP_ME"));
-        Assert.Equal("kept", env.Value("FLINT_TEST_KEEP_ME"));
+        Assert.False(env.ContainsKey("JAVA_HOME"));
+        Assert.False(env.ContainsKey("_JAVA_OPTIONS"));
+        Assert.False(env.ContainsKey("JAVA_TOOL_OPTIONS"));
+        Assert.True(env.ContainsKey("FLINT_TEST_KEEP_ME"));
+        Assert.Equal("kept", env["FLINT_TEST_KEEP_ME"]);
     }
 
     [Fact]
@@ -277,7 +277,7 @@ public class JavaUtilsTests : IDisposable
 
         var env = JavaUtils.CleanEnvironment();
 
-        Assert.False(env.Contains("LAUNCHER_WHATEVER"));
+        Assert.False(env.ContainsKey("LAUNCHER_WHATEVER"));
     }
 
     [Fact]

@@ -628,7 +628,7 @@ public sealed class LaunchTask
     public List<string> SubstituteVariables(string cmd, bool isLaunch = false)
     {
         var env = isLaunch ? _instance.CreateLaunchEnvironment() : _instance.CreateEnvironment();
-        return Commandline.Process(cmd, env.Vars);
+        return Commandline.Process(cmd, env);
     }
 
     /// <summary>Port of censorPrivateInfo().</summary>

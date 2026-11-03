@@ -100,12 +100,14 @@ public static class JavaUtils
     /// (JAVA_ARGS/CLASSPATH/... ) removed, LAUNCHER_* mirrors dropped and the stripped list
     /// (LD_LIBRARY_PATH/LD_PRELOAD on Linux/BSD, QT_PLUGIN_PATH/QT_FONTPATH everywhere)
     /// filtered by the corresponding LAUNCHER_* variable. Consumed by the game process
-    /// environment (MinecraftInstance.createEnvironment).
+    /// environment (MinecraftInstance.createEnvironment). Variable names compare
+    /// case-insensitively on Windows and ordinally on other platforms.
     /// </summary>
-    public static ProcessEnvironment CleanEnvironment()
+    public static SortedDictionary<string, string> CleanEnvironment()
     {
         var rawenv = Environment.GetEnvironmentVariables();
-        var env = new ProcessEnvironment();
+        var env = new SortedDictionary<string, string>(
+            OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
         var ignored = new List<string>
         {
@@ -152,15 +154,15 @@ public static class JavaUtils
                 }
             }
 
-            env.Insert(key, value);
+            env[key] = value;
         }
 
         if (OperatingSystem.IsLinux())
         {
             // HACK: Workaround for QTBUG-42500
-            if (!env.Contains("LD_LIBRARY_PATH"))
+            if (!env.ContainsKey("LD_LIBRARY_PATH"))
             {
-                env.Insert("LD_LIBRARY_PATH", "");
+                env["LD_LIBRARY_PATH"] = "";
             }
         }
 

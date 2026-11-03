@@ -601,10 +601,11 @@ public abstract class BaseInstance : INotifyPropertyChanged
     /// <summary>returns the current launch task (if any)</summary>
     public LaunchTask? GetLaunchTask() => LaunchProcess;
 
-    /// <summary>Create environment variables for running the instance.</summary>
-    public abstract ProcessEnvironment CreateEnvironment();
+    /// <summary>Create environment variables for running the instance. Variable names
+    /// compare case-insensitively on Windows and ordinally on other platforms.</summary>
+    public abstract SortedDictionary<string, string> CreateEnvironment();
 
-    public abstract ProcessEnvironment CreateLaunchEnvironment();
+    public abstract SortedDictionary<string, string> CreateLaunchEnvironment();
 
     /// <summary>Returns the root folder to use for looking up log files.</summary>
     public abstract IReadOnlyList<AbsolutePath> GetLogFileSearchPaths();

@@ -51,9 +51,11 @@ public class NullInstance : BaseInstance
 
     public override List<Func<CancellationToken, Task>> CreateUpdateTask() => [];
 
-    public override ProcessEnvironment CreateEnvironment() => new();
+    public override SortedDictionary<string, string> CreateEnvironment() =>
+        new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
-    public override ProcessEnvironment CreateLaunchEnvironment() => new();
+    public override SortedDictionary<string, string> CreateLaunchEnvironment() =>
+        new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
     public override SortedDictionary<string, string> GetVariables() => [];
 

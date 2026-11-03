@@ -856,7 +856,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         return outVars;
     }
 
-    public override ProcessEnvironment CreateEnvironment()
+    public override SortedDictionary<string, string> CreateEnvironment()
     {
         // prepare the process environment (C++ starts from CleanEnviroment(); the sanitized
         // OS environment is the JavaUtils.CleanEnvironment port)
@@ -865,7 +865,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // export some infos
         foreach (var (key, value) in GetVariables())
         {
-            env.Insert(key, value);
+            env[key] = value;
         }
 
         // custom env
@@ -873,7 +873,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         return env;
     }
 
-    public override ProcessEnvironment CreateLaunchEnvironment()
+    public override SortedDictionary<string, string> CreateLaunchEnvironment()
     {
         // prepare the process environment
         var env = CreateEnvironment();
@@ -885,14 +885,14 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                 // TODO: the C++ also checks APPLICATION->capabilities() and probes the
                 // MangoHud libraries with LibraryUtils::findMangoHud().
                 var preloadList = new List<string>();
-                var value = env.Value("LD_PRELOAD");
+                var value = env.GetValueOrDefault("LD_PRELOAD", "");
                 if (value.Length != 0)
                 {
                     preloadList = value.Split(':').ToList();
                 }
 
-                env.Insert("LD_PRELOAD", string.Join(":", preloadList));
-                env.Insert("MANGOHUD", "1");
+                env["LD_PRELOAD"] = string.Join(":", preloadList);
+                env["MANGOHUD"] = "1";
             }
 
             if (Variant.AsBool(Settings.Get("UseDiscreteGpu")))
@@ -900,20 +900,20 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
                 // TODO: the C++ first tries switcheroo-control via DBus; without it the
                 // open/proprietary driver fallbacks below apply.
                 // Open Source Drivers
-                env.Insert("DRI_PRIME", "1");
+                env["DRI_PRIME"] = "1";
                 // Proprietary Nvidia Drivers
-                env.Insert("__NV_PRIME_RENDER_OFFLOAD", "1");
-                env.Insert("__VK_LAYER_NV_optimus", "NVIDIA_only");
-                env.Insert("__GLX_VENDOR_LIBRARY_NAME", "nvidia");
+                env["__NV_PRIME_RENDER_OFFLOAD"] = "1";
+                env["__VK_LAYER_NV_optimus"] = "NVIDIA_only";
+                env["__GLX_VENDOR_LIBRARY_NAME"] = "nvidia";
             }
 
             if (Variant.AsBool(Settings.Get("UseZink")))
             {
                 // taken from https://wiki.archlinux.org/title/OpenGL#OpenGL_over_Vulkan_(Zink)
-                env.Insert("__GLX_VENDOR_LIBRARY_NAME", "mesa");
-                env.Insert("MESA_LOADER_DRIVER_OVERRIDE", "zink");
-                env.Insert("GALLIUM_DRIVER", "zink");
-                env.Insert("LIBGL_KOPPER_DRI2", "1");
+                env["__GLX_VENDOR_LIBRARY_NAME"] = "mesa";
+                env["MESA_LOADER_DRIVER_OVERRIDE"] = "zink";
+                env["GALLIUM_DRIVER"] = "zink";
+                env["LIBGL_KOPPER_DRI2"] = "1";
             }
         }
 
@@ -1497,7 +1497,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     // ------------------------------------------------------------------------ helpers
 
-    private static void InsertCustomEnv(ProcessEnvironment env, string value)
+    private static void InsertCustomEnv(SortedDictionary<string, string> env, string value)
     {
         var envMap = SettingsJson.ToMap(value);
         if (envMap.Count == 0)
@@ -1507,7 +1507,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
         foreach (var (key, varValue) in envMap)
         {
-            env.Insert(key, varValue);
+            env[key] = varValue;
         }
     }
 
