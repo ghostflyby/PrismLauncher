@@ -210,7 +210,7 @@ public class MetaJsonFormatTests
         var index = new FluentIndex();
         MetaJsonFormat.ParseIndex(obj, index);
 
-        Assert.Equal(2, index.Lists().Count);
+        Assert.Equal(2, index.Count);
         Assert.True(index.HasUid("net.minecraft"));
         Assert.Equal("Minecraft", index.Get("net.minecraft").Name);
         Assert.Equal("LWJGL 3", index.Get("org.lwjgl3").Name);
@@ -269,7 +269,7 @@ public class MetaJsonFormatTests
         MetaJsonFormat.ParseVersionList(obj, list);
 
         Assert.Equal("Minecraft", list.Name);
-        Assert.Equal(2, list.Versions().Count);
+        Assert.Equal(2, list.Count);
         var recommended = list.GetVersion("1.12.2");
         Assert.Equal("release", recommended.Type);
         // versions coming from a list provide recommendations (SetProvidesRecommendations)

@@ -308,4 +308,16 @@ public class PackwizTests
         Assert.Equal("x.pw.toml", Packwiz.IndexFileName("x"));
         Assert.Equal("x.pw.toml", Packwiz.IndexFileName("x.pw.toml"));
     }
+
+    [Fact]
+    public void TomlTable_KeysPreserveInsertionOrder()
+    {
+        var table = MiniToml.Parse("zeta = \"z\"\nalpha = 1\nmiddle = true\n");
+
+        Assert.Equal(new[] { "zeta", "alpha", "middle" }, table.Keys.ToArray());
+        Assert.Equal(3, table.Count);
+        Assert.True(table.TryGetValue("alpha", out var alpha) && alpha is long value && value == 1);
+        Assert.Equal("z", table["zeta"]);
+        Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(table);
+    }
 }

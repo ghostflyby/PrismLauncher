@@ -54,23 +54,23 @@ public class WatchTenancyWiringTests : IDisposable
         var list = CreateList(instances);
         list.AttachWatcher(_space);
         Assert.Equal(InstListError.NoError, list.LoadList());
-        Assert.Equal(1, list.Count);
+        Assert.Single(list);
 
         var moved = _root / "instances-elsewhere";
         Assert.True(_space.Move(instances, moved));
 
-        Assert.Equal([moved], list.InstanceDirs());
+        Assert.Equal([moved], list.InstanceDirs);
         Assert.True(_space.IsRegistered(moved));
         Assert.False(_space.IsRegistered(instances));
 
         Assert.Equal(InstListError.NoError, list.LoadList());
-        Assert.Equal(1, list.Count);
+        Assert.Single(list);
         // the kept object must read the NEW location — a stale InstanceRoot would send
         // every launch/read against the dead path
         var inst = list.GetInstanceById("aaa");
         Assert.NotNull(inst);
         Assert.Equal(moved / "aaa", inst.InstanceRoot);
-        Assert.Equal(1, list.Count);
+        Assert.Single(list);
     }
 
     // a deleted instance must not leave its folder-model watches retrying against the
@@ -91,7 +91,7 @@ public class WatchTenancyWiringTests : IDisposable
         list.DeleteInstance("gone");
 
         Assert.False(_space.IsRegistered(mods.Dir));
-        Assert.Equal(0, list.Count);
+        Assert.Empty(list);
     }
 
     // the same release on the discovery path: an externally deleted instance vanishes on
@@ -112,7 +112,7 @@ public class WatchTenancyWiringTests : IDisposable
         (instances / "vanished").DeleteDirectoryRecursively();
         _space.Pulse(instances);
 
-        Assert.Equal(0, list.Count);
+        Assert.Empty(list);
         Assert.False(_space.IsRegistered(worlds.Dir));
     }
 
@@ -128,13 +128,13 @@ public class WatchTenancyWiringTests : IDisposable
 
         var list = new WorldList(saves);
         list.AttachWatcher(_space);
-        Assert.Equal(1, list.Count);
+        Assert.Single(list);
 
         var moved = _root / "saves-elsewhere";
         Assert.True(_space.Move(saves.Path, moved));
 
         Assert.Equal(moved, list.Dir);
-        Assert.Equal(1, list.Count);
+        Assert.Single(list);
         Assert.Equal("New World", list[0].FolderName);
     }
 
@@ -147,13 +147,13 @@ public class WatchTenancyWiringTests : IDisposable
         var model = new ModFolderModel(mods, isIndexed: false);
         model.AttachWatcher(_space);
         model.Update();
-        Assert.Equal(1, model.Size);
+        Assert.Single(model);
 
         var moved = _root / "mods-elsewhere";
         Assert.True(_space.Move(mods.Path, moved));
 
         Assert.Equal(moved, model.Dir);
-        Assert.Equal(1, model.Size);
+        Assert.Single(model);
     }
 
     // a failing moved announcement is swallowed at the notification boundary — it must

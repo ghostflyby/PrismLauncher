@@ -11,11 +11,12 @@
 //    overflow handling, suspend/clear/previousLevel and the plain-text dump.
 //  - setLineWrap/setColorLines are pure view options and are not ported.
 
+using System.Collections;
 using System.Text;
 
 namespace FlintLauncher.Core.Launch;
 
-public sealed class LogModel
+public sealed class LogModel : IReadOnlyList<(MessageLevel Level, string Line)>
 {
     private (MessageLevel Level, string Line)[] _content;
 
@@ -77,7 +78,30 @@ public sealed class LogModel
         _content = new (MessageLevel, string)[MaxLines];
     }
 
-    public int RowCount => _numLines;
+    public int Count => _numLines;
+
+    public (MessageLevel Level, string Line) this[int index]
+    {
+        get
+        {
+            if ((uint)index >= (uint)_numLines)
+            {
+                throw new ArgumentOutOfRangeException(nameof(index));
+            }
+
+            return _content[(_firstLine + index) % MaxLines];
+        }
+    }
+
+    public IEnumerator<(MessageLevel Level, string Line)> GetEnumerator()
+    {
+        for (var i = 0; i < _numLines; i++)
+        {
+            yield return _content[(_firstLine + i) % MaxLines];
+        }
+    }
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     /// <summary>The (level, line) entries in chronological order.</summary>
     public IReadOnlyList<(MessageLevel Level, string Line)> Entries
@@ -94,7 +118,7 @@ public sealed class LogModel
         }
     }
 
-    public bool IsOverFlow => _numLines >= MaxLines && StopOnOverflow;
+    public bool IsOverflow => _numLines >= MaxLines && StopOnOverflow;
 
     public void Append(MessageLevel level, string line)
     {

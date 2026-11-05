@@ -129,4 +129,29 @@ public class IniFileGoldenTests
             File.Delete(path);
         }
     }
+
+    [Fact]
+    public void DictionarySurface_ReadsByKey()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"flint-ini-{Guid.NewGuid():N}.ini");
+        try
+        {
+            File.WriteAllText(path, "ConfigVersion=1.3\na=1\nb=hello\n");
+            var ini = new IniFile();
+            Assert.True(ini.LoadFile(new AbsolutePath(path)));
+
+            Assert.Equal(3, ini.Count);
+            Assert.True(ini.ContainsKey("a"));
+            Assert.False(ini.ContainsKey("missing"));
+            Assert.True(ini.TryGetValue("b", out var b));
+            Assert.Equal("hello", b.String);
+            Assert.Contains("a", ini.Keys);
+            Assert.Contains("b", ini.Keys);
+            Assert.Equal("1", ini["a"].String);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
 }

@@ -104,7 +104,7 @@ public static class LaunchEndpoints
                         return ApiJson.Error("unknown_account", $"no account with profile id '{profileId}'", 400);
                     }
 
-                    account = accounts.At(index);
+                    account = accounts[index];
                 }
 
                 // the composition point builds the controller: the auth environment and the

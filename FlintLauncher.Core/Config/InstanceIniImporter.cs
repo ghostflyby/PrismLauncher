@@ -66,7 +66,7 @@ public static class InstanceIniImporter
         {
             if (InstanceConfigKeys.GateIniSpellings.TryGetValue(key, out var family))
             {
-                gates[family] = Variant.AsBool(Variant.FromIniValue(ini.Get(key) ?? IniValue.Invalid));
+                gates[family] = Variant.AsBool(Variant.FromIniValue(ini.GetValueOrDefault(key) ?? IniValue.Invalid));
             }
         }
 
@@ -90,7 +90,7 @@ public static class InstanceIniImporter
                 continue; // the instance value is treated as unset — inherit
             }
 
-            var value = ini.Get(key);
+            var value = ini.GetValueOrDefault(key);
             if (value is null || value.ValueKind == IniValue.Kind.Invalid)
             {
                 continue;

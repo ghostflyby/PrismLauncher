@@ -843,10 +843,10 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         // mods and core mods
         void PrintModList(string label, ModFolderModel model)
         {
-            if (model.Size != 0)
+            if (model.Count != 0)
             {
                 outList.Add($"{label}:");
-                var modList = model.AllMods();
+                var modList = model.Mods.ToList();
                 modList.Sort((a, b) =>
                 {
                     // localeAwareCompare maps to the current-culture comparison

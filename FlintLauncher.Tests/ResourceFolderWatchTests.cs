@@ -49,13 +49,13 @@ public class ResourceFolderWatchTests : IDisposable
     {
         var (model, space) = CreateWatched();
         model.Update();
-        Assert.Equal(0, model.Size);
+        Assert.Empty(model);
 
         (model.Dir / "coolmod.jar").WriteAllBytes(EmptyZip);
         space.Pulse(model.Dir);
 
-        Assert.Equal(1, model.Size);
-        Assert.Equal("coolmod.jar", model.At(0).Fileinfo.Name);
+        Assert.Single(model);
+        Assert.Equal("coolmod.jar", model[0].Fileinfo.Name);
     }
 
     [Fact]
@@ -64,12 +64,12 @@ public class ResourceFolderWatchTests : IDisposable
         var (model, space) = CreateWatched();
         (model.Dir / "coolmod.jar").WriteAllBytes(EmptyZip);
         model.Update();
-        Assert.Equal(1, model.Size);
+        Assert.Single(model);
 
         (model.Dir / "coolmod.jar").Delete();
         space.Pulse(model.Dir);
 
-        Assert.Equal(0, model.Size);
+        Assert.Empty(model);
     }
 
     // the C++ IsWatching parity: with the watcher attached, install does not run a
@@ -84,11 +84,11 @@ public class ResourceFolderWatchTests : IDisposable
         jar.WriteAllBytes(EmptyZip);
 
         Assert.True(model.InstallResource(jar.Value));
-        Assert.Equal(0, model.Size); // no synchronous refresh while watching
+        Assert.Empty(model); // no synchronous refresh while watching
 
         space.Pulse(model.Dir);
-        Assert.Equal(1, model.Size);
-        Assert.Equal("installed.jar", model.At(0).Fileinfo.Name);
+        Assert.Single(model);
+        Assert.Equal("installed.jar", model[0].Fileinfo.Name);
     }
 
     // the m_lock parity: background reconciles racing endpoint reads/writes must not tear
@@ -108,8 +108,8 @@ public class ResourceFolderWatchTests : IDisposable
         {
             for (var i = 0; i < rounds; i++)
             {
-                _ = model.Size;
-                _ = model.AllResources();
+                _ = model.Count;
+                _ = model.Resources;
                 _ = model.Find("mod0");
             }
         });
@@ -123,6 +123,6 @@ public class ResourceFolderWatchTests : IDisposable
 
         await Task.WhenAll(reader, mutator);
         space.Pulse(model.Dir);
-        Assert.Equal(8, model.Size);
+        Assert.Equal(8, model.Count);
     }
 }

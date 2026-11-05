@@ -34,12 +34,13 @@
 //  - The APPLICATION->settings()->get("NumberOfConcurrentTasks") lookup died with the
 //    JavaCheck fan-out: the JdkFind pipeline manages its own parallelism.
 
+using System.Collections;
 using JdkFind;
 using TruePath;
 
 namespace FlintLauncher.Core.Java;
 
-public sealed class JavaInstallList
+public sealed class JavaInstallList : IReadOnlyList<JavaInstall>
 {
     private enum Status
     {
@@ -77,13 +78,17 @@ public sealed class JavaInstallList
         return _loadTask;
     }
 
-    public bool IsLoaded() => _status == Status.Done;
-
-    public JavaInstall At(int i) => _vlist[i];
+    public bool IsLoaded => _status == Status.Done;
 
     public int Count => _vlist.Count;
 
-    public IReadOnlyList<JavaInstall> Versions() => _vlist;
+    public JavaInstall this[int index] => _vlist[index];
+
+    public IReadOnlyList<JavaInstall> Versions => _vlist;
+
+    public IEnumerator<JavaInstall> GetEnumerator() => _vlist.GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     /// <summary>Port of JavaInstallList::updateListData().</summary>
     public void UpdateListData(IReadOnlyList<JavaInstall> versions)

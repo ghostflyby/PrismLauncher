@@ -107,7 +107,7 @@ public static class ModrinthPackExportTask
 
                 var sha512 = HashUtils.Hash(data, Algorithm.Sha512);
 
-                var mod = modList.AllMods().Find(m => string.Equals(m.Fileinfo.FullName, file, StringComparison.Ordinal));
+                var mod = modList.Mods.FirstOrDefault(m => string.Equals(m.Fileinfo.FullName, file, StringComparison.Ordinal));
                 if (mod is not null)
                 {
                     var metadata = modList.GetMetadata(mod);

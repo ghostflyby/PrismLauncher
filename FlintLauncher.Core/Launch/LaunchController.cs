@@ -221,7 +221,7 @@ public sealed class LaunchController(ILoggerFactory loggerFactory, AuthEndpoints
         }
         else
         {
-            AccountToUse = accounts.At(instanceAccountIndex);
+            AccountToUse = accounts[instanceAccountIndex];
         }
 
         // (the "no accounts" hint and the account picker are UI; see the header note)
@@ -259,9 +259,9 @@ public sealed class LaunchController(ILoggerFactory loggerFactory, AuthEndpoints
             {
                 for (var i = 0; i < accounts.Count; i++)
                 {
-                    if (accounts.At(i).OwnsMinecraft())
+                    if (accounts[i].OwnsMinecraft())
                     {
-                        accountToCheck = accounts.At(i);
+                        accountToCheck = accounts[i];
                         break;
                     }
                 }

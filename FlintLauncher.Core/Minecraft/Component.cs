@@ -302,7 +302,7 @@ public class Component : ProblemProvider
             // NOTE: the C++ wait=true path blocks in VersionList::waitToLoad(); the port has no
             // blocking wait, so callers must make sure the version list is loaded beforehand
             // (for the Resolution flow it always is).
-            return list.Versions().Count != 0;
+            return list.Count != 0;
         }
 
         return false;

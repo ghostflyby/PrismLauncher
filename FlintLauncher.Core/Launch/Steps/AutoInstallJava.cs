@@ -97,7 +97,7 @@ public sealed class AutoInstallJava(LaunchTask parent, HttpClient http, Absolute
                 var compatibleMajors = packProfile.GetProfile()?.GetCompatibleJavaMajors() ?? [];
                 for (var i = 0; i < javas.Count; i++)
                 {
-                    var java = javas.At(i);
+                    var java = javas[i];
                     if (java.LanguageVersion is { } languageVersion && compatibleMajors.Contains(languageVersion))
                     {
                         if (!java.Is64Bit)

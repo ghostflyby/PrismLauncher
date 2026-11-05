@@ -60,11 +60,11 @@ public sealed class InstanceStateStore
             {
                 StateVersion = InstanceStateFile.CurrentVersion,
                 LastLaunchTime = Variant.AsLong(Variant.FromIniValue(
-                    ini.Get("lastLaunchTime") ?? IniValue.Invalid)),
+                    ini.GetValueOrDefault("lastLaunchTime") ?? IniValue.Invalid)),
                 LastTimePlayed = Variant.AsLong(Variant.FromIniValue(
-                    ini.Get("lastTimePlayed") ?? IniValue.Invalid)),
+                    ini.GetValueOrDefault("lastTimePlayed") ?? IniValue.Invalid)),
                 TotalTimePlayed = Variant.AsLong(Variant.FromIniValue(
-                    ini.Get("totalTimePlayed") ?? IniValue.Invalid)),
+                    ini.GetValueOrDefault("totalTimePlayed") ?? IniValue.Invalid)),
             }
             : CurrentDefault();
     }

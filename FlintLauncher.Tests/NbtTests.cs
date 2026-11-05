@@ -105,7 +105,7 @@ public class NbtTests
         var (_, read) = NbtIo.ReadCompound(new MemoryStream(bytes));
 
         var undetermined = (NbtList)read["undetermined"];
-        Assert.Equal(0, undetermined.Count);
+        Assert.Empty(undetermined);
         Assert.Equal(NbtTagType.Null, undetermined.ElementType);
         Assert.Equal(NbtTagType.Int, ((NbtList)read["ints"]).ElementType);
         Assert.Equal(-1, ((NbtInt)((NbtList)read["ints"])[1]).Value);

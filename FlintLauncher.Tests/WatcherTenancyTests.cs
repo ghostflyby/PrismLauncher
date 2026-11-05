@@ -94,14 +94,14 @@ public class WatcherTenancyTests : IDisposable
         var list = new WorldList(saves);
         list.AttachWatcher(_space);
         list.Update();
-        Assert.Equal(0, list.Count);
+        Assert.Empty(list);
 
         var world = saves.Path / "New World";
         world.CreateDirectory();
         (world / "level.dat").WriteAllBytes([1, 2, 3]);
         _space.Pulse(saves.Path);
 
-        Assert.Equal(1, list.Count);
+        Assert.Single(list);
         Assert.Equal("New World", list[0].FolderName);
     }
 }

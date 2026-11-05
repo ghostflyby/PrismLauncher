@@ -19,6 +19,7 @@
 // ported; the item list is exposed directly plus small additive helpers (Find/Set/Remove) that
 // operate on the same in-memory list save() writes.
 
+using System.Collections;
 using System.Globalization;
 using System.Security;
 using System.Text;
@@ -29,7 +30,7 @@ namespace FlintLauncher.Core.Minecraft.GameOptions;
 
 public sealed record GameOptionItem(string Key, string Value);
 
-public sealed class GameOptions
+public sealed class GameOptions : IReadOnlyList<GameOptionItem>
 {
     private readonly List<GameOptionItem> _contents = [];
 
@@ -51,11 +52,13 @@ public sealed class GameOptions
     /// <summary>The loaded key/value pairs (contents), version line excluded.</summary>
     public IReadOnlyList<GameOptionItem> Contents => _contents;
 
-    /// <summary>Port of rowCount().</summary>
-    public int RowCount() => _contents.Count;
+    public int Count => _contents.Count;
 
-    /// <summary>Port of data() column access: key of the row, or null when out of range.</summary>
-    public GameOptionItem? At(int row) => row >= 0 && row < _contents.Count ? _contents[row] : null;
+    public GameOptionItem this[int index] => _contents[index];
+
+    public IEnumerator<GameOptionItem> GetEnumerator() => _contents.GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     /// <summary>Port of reload(): clears and re-reads the file; keeps the old contents cleared
     /// even when the file cannot be opened (but keeps the previous Version in that case,

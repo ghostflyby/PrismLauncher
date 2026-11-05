@@ -120,13 +120,13 @@ public class AccountListTests : IDisposable
         var defaultAccount = list.DefaultAccount;
         Assert.NotNull(defaultAccount);
         Assert.Equal("PlayerOne", defaultAccount.ProfileName());
-        Assert.Equal("b50ad385829d3141a2167e7d7539ba7f", list.At(0).ProfileId());
-        Assert.Equal("cb7ecbf7173e39428f9fb92995eab3d0", list.At(1).ProfileId());
+        Assert.Equal("b50ad385829d3141a2167e7d7539ba7f", list[0].ProfileId());
+        Assert.Equal("cb7ecbf7173e39428f9fb92995eab3d0", list[1].ProfileId());
 
-        Assert.Equal("YGG_TOKEN", list.At(0).AccessToken());
-        Assert.True(list.At(0).OwnsMinecraft());
-        Assert.False(list.At(1).OwnsMinecraft()); // offline accounts never own
-        Assert.Equal("offline", list.At(1).TypeString());
+        Assert.Equal("YGG_TOKEN", list[0].AccessToken());
+        Assert.True(list[0].OwnsMinecraft());
+        Assert.False(list[1].OwnsMinecraft()); // offline accounts never own
+        Assert.Equal("offline", list[1].TypeString());
     }
 
     [Fact]
@@ -179,10 +179,10 @@ public class AccountListTests : IDisposable
         Assert.Equal(list.DefaultAccount?.ProfileId(), reloaded.DefaultAccount?.ProfileId());
         for (var i = 0; i < list.Count; i++)
         {
-            Assert.Equal(list.At(i).ProfileId(), reloaded.At(i).ProfileId());
-            Assert.Equal(list.At(i).AccessToken(), reloaded.At(i).AccessToken());
-            Assert.Equal(list.At(i).ProfileName(), reloaded.At(i).ProfileName());
-            Assert.Equal(list.At(i).AccountType, reloaded.At(i).AccountType);
+            Assert.Equal(list[i].ProfileId(), reloaded[i].ProfileId());
+            Assert.Equal(list[i].AccessToken(), reloaded[i].AccessToken());
+            Assert.Equal(list[i].ProfileName(), reloaded[i].ProfileName());
+            Assert.Equal(list[i].AccountType, reloaded[i].AccountType);
         }
     }
 
@@ -229,8 +229,8 @@ public class AccountListTests : IDisposable
         var list = new AccountList();
         list.SetListFilePath(new AbsolutePath(path));
         Assert.True(list.LoadList());
-        Assert.Equal(1, list.Count);
-        Assert.Equal("Fine", list.At(0).ProfileName());
+        Assert.Single(list);
+        Assert.Equal("Fine", list[0].ProfileName());
     }
 
     [Fact]
@@ -250,7 +250,7 @@ public class AccountListTests : IDisposable
         var list = new AccountList();
         list.SetListFilePath(new AbsolutePath(path));
         Assert.True(list.LoadList());
-        Assert.Equal(1, list.Count);
+        Assert.Single(list);
         Assert.Null(list.DefaultAccount); // junk flag is simply not the default marker
     }
 
@@ -286,8 +286,8 @@ public class AccountListTests : IDisposable
         var list = new AccountList();
         list.SetListFilePath(new AbsolutePath(path));
         Assert.True(list.LoadList());
-        Assert.Equal(1, list.Count);
-        Assert.Equal("First", list.At(0).ProfileName());
+        Assert.Single(list);
+        Assert.Equal("First", list[0].ProfileName());
     }
 
     [Fact]
@@ -296,12 +296,12 @@ public class AccountListTests : IDisposable
         var list = LoadedList();
         var replacement = MinecraftAccount.CreateOffline("OfflinePlayer");
         // same profile id (deterministic offline uuid), so it replaces At(1)
-        Assert.Equal(list.At(1).ProfileId(), replacement.ProfileId());
+        Assert.Equal(list[1].ProfileId(), replacement.ProfileId());
 
         list.AddAccount(replacement);
         Assert.Equal(2, list.Count);
-        Assert.Equal("OfflinePlayer", list.At(1).ProfileName());
-        Assert.Same(replacement, list.At(1));
+        Assert.Equal("OfflinePlayer", list[1].ProfileName());
+        Assert.Same(replacement, list[1]);
         // the default account is untouched
         var defaultAccount = list.DefaultAccount;
         Assert.NotNull(defaultAccount);
@@ -311,7 +311,7 @@ public class AccountListTests : IDisposable
         var fresh = MinecraftAccount.CreateOffline("SomeoneElse");
         list.AddAccount(fresh);
         Assert.Equal(3, list.Count);
-        Assert.Same(fresh, list.At(2));
+        Assert.Same(fresh, list[2]);
 
         // adding the same instance again is a no-op
         list.AddAccount(fresh);
@@ -324,11 +324,11 @@ public class AccountListTests : IDisposable
         var list = LoadedList();
 
         list.RemoveAccount(0);
-        Assert.Equal(1, list.Count);
+        Assert.Single(list);
         Assert.Null(list.DefaultAccount); // removing the default clears it
 
-        list.SetDefaultAccount(list.At(0));
-        Assert.Same(list.At(0), list.DefaultAccount);
+        list.SetDefaultAccount(list[0]);
+        Assert.Same(list[0], list.DefaultAccount);
 
         // a non-listed account cannot become the default (upstream ignores it)
         var stranger = MinecraftAccount.CreateOffline("Stranger");
@@ -343,12 +343,12 @@ public class AccountListTests : IDisposable
     public void MoveAccount()
     {
         var list = LoadedList();
-        var first = list.At(0);
+        var first = list[0];
         list.MoveAccount(0, 1);
-        Assert.Same(first, list.At(1));
+        Assert.Same(first, list[1]);
 
         list.MoveAccount(1, -5); // out of range: no-op
-        Assert.Same(first, list.At(1));
+        Assert.Same(first, list[1]);
     }
 
     [Fact]
@@ -357,7 +357,7 @@ public class AccountListTests : IDisposable
         var list = LoadedList();
         Assert.True(list.AnyAccountIsValid()); // PlayerOne owns minecraft
 
-        list.At(0).AccountData.MinecraftEntitlement.OwnsMinecraft = false;
+        list[0].AccountData.MinecraftEntitlement.OwnsMinecraft = false;
         Assert.False(list.AnyAccountIsValid());
     }
 

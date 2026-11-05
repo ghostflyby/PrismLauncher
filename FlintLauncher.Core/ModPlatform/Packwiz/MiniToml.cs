@@ -17,6 +17,7 @@
 // Everything else (floats, datetimes, multiline strings, nested brackets in keys, ...)
 // is rejected with a parse error, like the C++ callers would see from toml++'s parse_error.
 
+using System.Collections;
 using System.Globalization;
 using System.Text;
 using TruePath;
@@ -34,20 +35,33 @@ public sealed class TomlParseException(string message) : Exception(message)
 /// <see cref="string"/>, <see cref="long"/>, <see cref="bool"/>, <see cref="List{T}"/>
 /// (of values) or a nested <see cref="TomlTable"/>.
 /// </summary>
-public sealed class TomlTable
+public sealed class TomlTable : IReadOnlyDictionary<string, object?>
 {
-    private readonly Dictionary<string, object?> _entries = new(StringComparer.Ordinal);
+    private readonly OrderedDictionary<string, object?> _entries = new(StringComparer.Ordinal);
 
     public int Count => _entries.Count;
+
+    public IReadOnlyCollection<string> Keys => _entries.Keys;
+
+    public IReadOnlyCollection<object?> Values => _entries.Values;
+
+    IEnumerable<string> IReadOnlyDictionary<string, object?>.Keys => Keys;
+
+    IEnumerable<object?> IReadOnlyDictionary<string, object?>.Values => Values;
+
+    public object? this[string key]
+    {
+        get => _entries[key];
+        set => _entries[key] = value;
+    }
 
     public bool ContainsKey(string key) => _entries.ContainsKey(key);
 
     public bool TryGetValue(string key, out object? value) => _entries.TryGetValue(key, out value);
 
-    /// <summary>The keys of the table, in insertion order (toml++ table iteration).</summary>
-    public IReadOnlyCollection<string> Keys() => _entries.Keys;
+    public IEnumerator<KeyValuePair<string, object?>> GetEnumerator() => _entries.GetEnumerator();
 
-    public void Set(string key, object? value) => _entries[key] = value;
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     /// <summary>The string value at key, or "" when missing/not a string (node->value_or("")).</summary>
     public string GetString(string key)
@@ -270,7 +284,7 @@ public static class MiniToml
                     }
 
                     existing = new TomlTable();
-                    table.Set(part, existing);
+                    table[part] = existing;
                 }
 
                 table = existing;
@@ -325,7 +339,7 @@ public static class MiniToml
                     }
 
                     existing = new TomlTable();
-                    parent.Set(path[i], existing);
+                    parent[path[i]] = existing;
                 }
 
                 parent = existing;
@@ -345,7 +359,7 @@ public static class MiniToml
             else
             {
                 array = [];
-                parent.Set(lastKey, array);
+                parent[lastKey] = array;
             }
 
             var element = new TomlTable();
@@ -373,7 +387,7 @@ public static class MiniToml
                         }
 
                         sub = new TomlTable();
-                        target.Set(part, sub);
+                        target[part] = sub;
                     }
 
                     target = sub;
@@ -397,7 +411,7 @@ public static class MiniToml
                     throw new TomlParseException($"Unexpected trailing characters after value for key '{part}'");
                 }
 
-                target.Set(part, value);
+                target[part] = value;
                 return;
             }
         }

@@ -135,7 +135,7 @@ public static class FlintConfigImporter
                 continue;
             }
 
-            var value = ini.Get(iniKey);
+            var value = ini.GetValueOrDefault(iniKey);
             if (value is null || value.ValueKind == IniValue.Kind.Invalid)
             {
                 continue;
@@ -145,7 +145,7 @@ public static class FlintConfigImporter
             // carries BOTH spellings the primary wins regardless of file order — the C++
             // retrieveValue walks configKeys() primary-first.
             var key = FlintConfigKeys.Canonical(iniKey);
-            if (key != iniKey && ini.Contains(key))
+            if (key != iniKey && ini.ContainsKey(key))
             {
                 continue;
             }
@@ -316,13 +316,13 @@ public static class FlintConfigImporter
         }
 
         long? total = null;
-        if (ini.Get("TotalPlayTime") is { ValueKind: not IniValue.Kind.Invalid } totalValue)
+        if (ini.GetValueOrDefault("TotalPlayTime") is { ValueKind: not IniValue.Kind.Invalid } totalValue)
         {
             total = Variant.AsLong(Variant.FromIniValue(totalValue));
         }
 
         bool? migrated = null;
-        if (ini.Get("TotalPlayTimeMigrated") is { ValueKind: not IniValue.Kind.Invalid } migratedValue)
+        if (ini.GetValueOrDefault("TotalPlayTimeMigrated") is { ValueKind: not IniValue.Kind.Invalid } migratedValue)
         {
             migrated = Variant.AsBool(Variant.FromIniValue(migratedValue));
         }

@@ -228,11 +228,11 @@ public class JavaMetadataSortTests
         list.UpdateListData(installs);
 
         Assert.Equal(3, list.Count);
-        Assert.True(list.IsLoaded());
+        Assert.True(list.IsLoaded);
         // JavaInstallList::sortVersions() sorts ASCENDING by JavaInstall::CompareTo (the
         // operator< trichotomy). Architecture compares first (aarch64 < x86_64), then the
         // version id ascending, then the path.
-        var versions = list.Versions();
+        var versions = list.Versions;
         Assert.Equal("21.0.3", versions[0].Id.ToString());
         Assert.Equal("1.8.0_402", versions[1].Id.ToString());
         Assert.Equal("17.0.9", versions[2].Id.ToString());

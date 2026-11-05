@@ -36,6 +36,7 @@
 //    account document is skipped instead of half-loaded; the format version also accepts
 //    the QVariant digit-string form).
 
+using System.Collections;
 using System.Text.Json;
 using FlintLauncher.Core.IO;
 using TruePath;
@@ -44,7 +45,7 @@ using TruePath.SystemIo;
 namespace FlintLauncher.Core.Auth;
 
 /// <summary>List of available Mojang accounts.</summary>
-public sealed class AccountList
+public sealed class AccountList : IReadOnlyList<MinecraftAccount>
 {
     private enum AccountListVersion
     {
@@ -53,13 +54,17 @@ public sealed class AccountList
 
     public int Count => _accounts.Count;
 
-    public MinecraftAccount At(int i) => _accounts[i];
+    public MinecraftAccount this[int index] => _accounts[index];
+
+    public IEnumerator<MinecraftAccount> GetEnumerator() => _accounts.GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     public int FindAccountByProfileId(string profileId)
     {
         for (var i = 0; i < Count; i++)
         {
-            if (At(i).ProfileId() == profileId)
+            if (this[i].ProfileId() == profileId)
             {
                 return i;
             }
@@ -131,30 +136,30 @@ public sealed class AccountList
         OnListChanged();
     }
 
-    public void RemoveAccount(int row)
+    public void RemoveAccount(int index)
     {
-        if (row >= 0 && row < _accounts.Count)
+        if (index >= 0 && index < _accounts.Count)
         {
-            var account = _accounts[row];
+            var account = _accounts[index];
             if (ReferenceEquals(account, _defaultAccount))
             {
                 _defaultAccount = null;
                 OnDefaultAccountChanged();
             }
 
-            _accounts.RemoveAt(row);
+            _accounts.RemoveAt(index);
             OnListChanged();
         }
     }
 
-    public void MoveAccount(int row, int delta)
+    public void MoveAccount(int index, int delta)
     {
-        var newRow = row + delta;
-        if (row < _accounts.Count && newRow >= 0 && newRow < _accounts.Count)
+        var newIndex = index + delta;
+        if (index < _accounts.Count && newIndex >= 0 && newIndex < _accounts.Count)
         {
-            var moved = _accounts[row];
-            _accounts.RemoveAt(row);
-            _accounts.Insert(newRow, moved);
+            var moved = _accounts[index];
+            _accounts.RemoveAt(index);
+            _accounts.Insert(newIndex, moved);
             OnListChanged();
         }
     }

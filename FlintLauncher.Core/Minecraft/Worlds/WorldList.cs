@@ -35,6 +35,7 @@
 //  - BaseInstance coupling: the list is constructed from a directory path only
 //    (instDirPath() was purely instance-model glue)
 
+using System.Collections;
 using FlintLauncher.Core.IO;
 using TruePath;
 using TruePath.SystemIo;
@@ -42,7 +43,7 @@ using TruePath.SystemIo;
 namespace FlintLauncher.Core.Minecraft.Worlds;
 
 /// <summary>The worlds of one instance's "saves" directory (launcher/minecraft/WorldList.h).</summary>
-public sealed class WorldList
+public sealed class WorldList : IReadOnlyList<World>
 {
     private readonly List<World> _worlds = [];
 
@@ -63,6 +64,10 @@ public sealed class WorldList
     public bool IsEmpty => _worlds.Count == 0;
 
     public World this[int index] => _worlds[index];
+
+    public IEnumerator<World> GetEnumerator() => _worlds.GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     private DirectorySpace? _watchSpace;
     private int _reconcileRunning;

@@ -226,7 +226,7 @@ public class JavaUtilsTests : IDisposable
         var list = new JavaInstallList();
         await JavaListLoadTask.RunAsync(list, TestContext.Current.CancellationToken, providers: [provider]);
 
-        var install = Assert.Single(list.Versions(), j => j.Path == Path.Combine(home, "bin", JavaUtils.JavaExecutable));
+        var install = Assert.Single(list.Versions, j => j.Path == Path.Combine(home, "bin", JavaUtils.JavaExecutable));
         Assert.Equal("21.0.5", install.Id.ToString());
         Assert.Equal(21, install.LanguageVersion);
         Assert.Equal("x86_64", install.Arch);

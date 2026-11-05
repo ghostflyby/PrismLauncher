@@ -338,7 +338,7 @@ public static class ModPlatformEndpoints
 
                 var folder = instance.LoaderModList();
                 folder.Update();
-                var mods = folder.AllMods()
+                var mods = folder.Mods
                     .Where(mod => !mod.Fileinfo.Name.StartsWith('.'))
                     .Select(mod =>
                     {

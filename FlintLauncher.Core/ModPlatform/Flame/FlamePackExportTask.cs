@@ -116,7 +116,7 @@ public static class FlamePackExportTask
             // instance->loaderModList()->update()
             var modList = new ModFolderModel(MaterializedDirectory.Ensure(options.Instance.ModsRoot)!);
             modList.Update();
-            var allMods = modList.AllMods();
+            var allMods = modList.Mods;
 
             foreach (var file in files)
             {
@@ -146,7 +146,7 @@ public static class FlamePackExportTask
                     continue;
                 }
 
-                var mod = allMods.Find(m => string.Equals(m.Fileinfo.FullName, file, StringComparison.Ordinal));
+                var mod = allMods.FirstOrDefault(m => string.Equals(m.Fileinfo.FullName, file, StringComparison.Ordinal));
                 if (mod is not null)
                 {
                     if (mod.Type == ResourceFolderType.Folder)

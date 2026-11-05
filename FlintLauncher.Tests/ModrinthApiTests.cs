@@ -252,7 +252,7 @@ public class ModrinthApiTests : IDisposable
         var modList = new ModFolderModel(MaterializedDirectory.Ensure(
             new AbsolutePath(Path.Combine(staging, "minecraft", "mods")))!);
         modList.Update();
-        var mod = Assert.Single(modList.AllMods(),
+        var mod = Assert.Single(modList.Mods,
             m => m.Type == Core.Minecraft.Resources.ResourceType.ZipFile);
         Assert.Equal(ResourceStatus.Installed, mod.Status);
         var metadata = modList.GetMetadata(mod);

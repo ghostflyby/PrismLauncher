@@ -137,7 +137,7 @@ public static class SkinLibraryEndpoints
                     $"no account with profile id '{request.ProfileId}'", 400);
             }
 
-            var account = accounts.At(index);
+            var account = accounts[index];
             var variant = ParseVariant(request.Model) ?? (skin.Model == SkinModelKind.Slim ? "slim" : "classic");
             var upload = SkinUpload.Make(account.AccessToken(), texture, variant, auth, http);
             try

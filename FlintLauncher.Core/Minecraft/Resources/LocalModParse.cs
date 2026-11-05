@@ -951,7 +951,7 @@ internal static class LocalModParseExtensions
     /// <summary>The first key of the table (toml++ table iteration), or null when empty.</summary>
     public static string? FirstKey(this TomlTable table)
     {
-        foreach (var key in table.Keys())
+        foreach (var key in table.Keys)
         {
             return key;
         }

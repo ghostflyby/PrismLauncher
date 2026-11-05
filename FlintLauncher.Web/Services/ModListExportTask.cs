@@ -59,7 +59,7 @@ public static class ModListExportTask
         var folder = instance.LoaderModList();
         folder.Update();
         var mods = new List<ModListMod>();
-        foreach (var mod in folder.AllMods())
+        foreach (var mod in folder.Mods)
         {
             if (mod.Fileinfo.Name.StartsWith('.'))
             {

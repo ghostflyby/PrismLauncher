@@ -42,7 +42,7 @@ public class RealAccountSmokeTests : IDisposable
         Assert.True(list.Count >= 0);
         for (var i = 0; i < list.Count; i++)
         {
-            var account = list.At(i);
+            var account = list[i];
             // every account gets a runtime Id128 internal id
             Assert.Matches("^[0-9a-f]{32}$", account.InternalId);
             Assert.True(Enum.IsDefined(account.AccountType));

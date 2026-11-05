@@ -72,6 +72,7 @@
 //  - CommitStagedInstance's override path re-implements FS::overrideFolder as an
 //    overwrite-copy of the staging folder over the destination.
 
+using System.Collections;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
@@ -94,7 +95,7 @@ public enum InstListError : byte
     UnknownError,
 }
 
-public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged
+public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged, IReadOnlyList<BaseInstance>
 {
     private const int MinBackoff = 1;
     private const int MaxBackoff = 16;
@@ -216,12 +217,18 @@ public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged
     public AbsolutePath PrimaryDir() => _instDirs.FirstOrDefault();
 
     /// <summary>Port of InstanceList::instanceDirs (all configured instance roots).</summary>
-    public IReadOnlyList<AbsolutePath> InstanceDirs() => _instDirs;
+    public IReadOnlyList<AbsolutePath> InstanceDirs => _instDirs;
 
     /// <summary>C++ m_instances (in list order).</summary>
     public IReadOnlyList<BaseInstance> Instances => _instances;
 
     public int Count => _instances.Count;
+
+    public BaseInstance this[int index] => _instances[index];
+
+    public IEnumerator<BaseInstance> GetEnumerator() => _instances.GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     public InstListError LoadList()
     {

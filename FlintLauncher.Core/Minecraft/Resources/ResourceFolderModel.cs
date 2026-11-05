@@ -51,6 +51,7 @@
 //    (getFromMetadata), the orphan-metadata cleanup and the NotInstalled status never
 //    trigger; m_isIndexed/firstFolderLoad are kept for structure.
 
+using System.Collections;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using FlintLauncher.Core.IO;
@@ -63,7 +64,7 @@ namespace FlintLauncher.Core.Minecraft.Resources;
 /// users of such resources do not own them, and the resource's lifetime is contingent on
 /// the model's lifetime.
 /// </summary>
-public class ResourceFolderModel : INotifyCollectionChanged, INotifyPropertyChanged
+public class ResourceFolderModel : INotifyCollectionChanged, INotifyPropertyChanged, IReadOnlyList<Resource>
 {
     private readonly bool _isIndexed;
     private bool _firstFolderLoad = true;
@@ -87,14 +88,14 @@ public class ResourceFolderModel : INotifyCollectionChanged, INotifyPropertyChan
     /// re-enter the model synchronously, and consumers marshal threads.</summary>
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
 
-    /// <summary>INPC for <see cref="Size"/> (raised together with Reset, only on real
+    /// <summary>INPC for <see cref="Count"/> (raised together with Reset, only on real
     /// changes).</summary>
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    private void RaiseResetAndSize()
+    private void RaiseResetAndCount()
     {
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Size)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Count)));
     }
 
     public ResourceFolderModel(MaterializedDirectory dir, bool isIndexed)
@@ -113,7 +114,7 @@ public class ResourceFolderModel : INotifyCollectionChanged, INotifyPropertyChan
     /// <summary>Port of ResourceFolderModel::indexDir.</summary>
     public virtual AbsolutePath IndexDir => Dir / ".index";
 
-    public int Size
+    public int Count
     {
         get
         {
@@ -124,15 +125,22 @@ public class ResourceFolderModel : INotifyCollectionChanged, INotifyPropertyChan
         }
     }
 
-    public bool Empty => Size == 0;
+    public bool IsEmpty => Count == 0;
 
-    public Resource At(int index)
+    public Resource this[int index]
     {
-        lock (_lock)
+        get
         {
-            return _resources[index];
+            lock (_lock)
+            {
+                return _resources[index];
+            }
         }
     }
+
+    public IEnumerator<Resource> GetEnumerator() => Resources.GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     public IReadOnlyList<Resource> Resources
     {
@@ -142,14 +150,6 @@ public class ResourceFolderModel : INotifyCollectionChanged, INotifyPropertyChan
             {
                 return [.. _resources];
             }
-        }
-    }
-
-    public List<Resource> AllResources()
-    {
-        lock (_lock)
-        {
-            return [.. _resources];
         }
     }
 
@@ -307,7 +307,7 @@ public class ResourceFolderModel : INotifyCollectionChanged, INotifyPropertyChan
 
             if (ApplyUpdates(currentSet, newSet, newResources))
             {
-                RaiseResetAndSize();
+                RaiseResetAndCount();
             }
 
             return true;

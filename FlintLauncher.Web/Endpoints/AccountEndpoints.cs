@@ -22,7 +22,7 @@ public static class AccountEndpoints
 
         api.MapGet("/accounts", (AccountList accounts) =>
                 Results.Ok(Enumerable.Range(0, accounts.Count)
-                    .Select(i => View(accounts.At(i), accounts))
+                    .Select(i => View(accounts[i], accounts))
                     .ToArray()))
             .Produces<AccountView[]>();
 
@@ -59,7 +59,7 @@ public static class AccountEndpoints
                 return ApiJson.NotFound("account_not_found", $"no account with profile id '{profileId}'");
             }
 
-            accounts.SetDefaultAccount(accounts.At(index));
+            accounts.SetDefaultAccount(accounts[index]);
             return Results.NoContent();
         }).Produces(204);
 

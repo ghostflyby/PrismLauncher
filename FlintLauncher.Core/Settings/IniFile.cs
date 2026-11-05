@@ -26,6 +26,8 @@
 // are flint.json and instance.json (TypedJsonFile). Reads legacy formats (no ConfigVersion,
 // 1.1, 1.2), staying byte-compatible with PrismLauncher.
 
+using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -35,34 +37,38 @@ using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Settings;
 
-public sealed class IniFile
+public sealed class IniFile : IReadOnlyDictionary<string, IniValue>
 {
     private readonly Dictionary<string, IniValue> _map = new(StringComparer.Ordinal);
 
     // ------------------------------------------------------------------ access
 
-    public IniValue? Get(string key)
-    {
-        return _map.GetValueOrDefault(key);
-    }
+    public int Count => _map.Count;
 
-    public IniValue Get(string key, IniValue def) => Get(key) ?? def;
+    public IReadOnlyCollection<string> Keys => _map.Keys;
+
+    public IReadOnlyCollection<IniValue> Values => _map.Values;
+
+    IEnumerable<string> IReadOnlyDictionary<string, IniValue>.Keys => Keys;
+
+    IEnumerable<IniValue> IReadOnlyDictionary<string, IniValue>.Values => Values;
+
+    public IniValue this[string key] => _map[key];
+
+    public bool ContainsKey(string key) => _map.ContainsKey(key);
+
+    public bool TryGetValue(string key, [MaybeNullWhen(false)] out IniValue value) => _map.TryGetValue(key, out value);
 
     public string GetString(string key, string def)
     {
-        var value = Get(key);
-        return value is { ValueKind: IniValue.Kind.String } ? value.String : def;
+        return _map.TryGetValue(key, out var value) && value.ValueKind == IniValue.Kind.String
+            ? value.String
+            : def;
     }
 
-    public void Set(string key, IniValue value) => _map[key] = value;
+    public IEnumerator<KeyValuePair<string, IniValue>> GetEnumerator() => _map.GetEnumerator();
 
-    public void Set(string key, string value) => _map[key] = IniValue.From(value);
-
-    public void Remove(string key) => _map.Remove(key);
-
-    public bool Contains(string key) => _map.ContainsKey(key);
-
-    public IReadOnlyCollection<string> Keys => _map.Keys;
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     // ------------------------------------------------------------------- file io
 

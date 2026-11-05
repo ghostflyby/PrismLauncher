@@ -63,7 +63,7 @@ public class GetModDependenciesTask
         _modrinth = modrinth;
         _http = http;
 
-        foreach (var mod in folder.AllMods())
+        foreach (var mod in folder.Mods)
         {
             _modsFileNames.Add(mod.Fileinfo.Name);
             var meta = folder.GetMetadata(mod);

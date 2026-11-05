@@ -63,7 +63,7 @@ public sealed class AccountRefreshService(
                 return;
             }
 
-            var account = accounts.At(i);
+            var account = accounts[i];
             if (account.AccountType == AccountType.Offline || !account.ShouldRefresh())
             {
                 continue;

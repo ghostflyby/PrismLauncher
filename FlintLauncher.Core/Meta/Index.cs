@@ -22,12 +22,13 @@
 // (data()/rowCount()/headerData()), the Qt dataChanged wiring of connectVersionList() and the
 // blocking getLoadedVersion() QEventLoop are UI plumbing and are not ported.
 
+using System.Collections;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Net;
 
 namespace FlintLauncher.Core.Meta;
 
-public sealed class Index : MetaEntity
+public sealed class Index : MetaEntity, IReadOnlyList<VersionList>
 {
     private readonly List<VersionList> _lists = [];
     private readonly Dictionary<string, VersionList> _uids = new(StringComparer.Ordinal);
@@ -72,7 +73,15 @@ public sealed class Index : MetaEntity
         return list.GetVersion(version);
     }
 
-    public IReadOnlyList<VersionList> Lists() => _lists;
+    public IReadOnlyList<VersionList> Lists => _lists;
+
+    public int Count => _lists.Count;
+
+    public VersionList this[int index] => _lists[index];
+
+    public IEnumerator<VersionList> GetEnumerator() => _lists.GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     // ------------------------------------------------------------------ for parsers
 

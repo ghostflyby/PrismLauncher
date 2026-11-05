@@ -127,7 +127,7 @@ public class ResourceDownloadTaskTests : IDisposable
 
     /// <summary>The folder scan also lists the hidden .index dir (QDir would not); look up by name.</summary>
     private static Mod? FindMod(ModFolderModel model, string fileName) =>
-        model.AllMods().FirstOrDefault(m => m.Fileinfo.Name == fileName);
+        model.Mods.FirstOrDefault(m => m.Fileinfo.Name == fileName);
 
     [Fact]
     public async Task Download_ShaMismatch_FailsCleanly()

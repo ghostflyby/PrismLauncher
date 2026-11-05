@@ -118,7 +118,7 @@ public class ModelNotificationTests : IDisposable
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ]);
         model.Update(); // baseline snapshot: one resource
-        Assert.Equal(1, model.Size);
+        Assert.Single(model);
 
         var resets = 0;
         model.CollectionChanged += (_, e) =>
@@ -135,6 +135,6 @@ public class ModelNotificationTests : IDisposable
         (mods.Path / "a.jar").Delete();
         model.Update();
         Assert.Equal(1, resets);
-        Assert.Equal(0, model.Size);
+        Assert.Empty(model);
     }
 }

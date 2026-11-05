@@ -73,7 +73,7 @@ public class ModUpdateTaskTests : IDisposable
 
         var model = new ModFolderModel(MaterializedDirectory.Ensure(new AbsolutePath(ModsDir))!, isIndexed: true);
         model.Update();
-        var mod = model.AllMods().First(m => m.Fileinfo.Name == "test.jar");
+        var mod = model.Mods.First(m => m.Fileinfo.Name == "test.jar");
         var instance = _env.CreateInstance("1.18.2", ModLoaderType.Forge, "40.1.0");
         return (instance, model, mod);
     }
@@ -125,7 +125,7 @@ public class ModUpdateTaskTests : IDisposable
         Assert.Equal(Sha1(newBytes), refreshed.Hash);
 
         // the ModUpdateTask's folder refresh re-attached the new metadata to the model
-        var installed = model.AllMods().First(m => m.Fileinfo.Name == "test.jar");
+        var installed = model.Mods.First(m => m.Fileinfo.Name == "test.jar");
         var attached = model.GetMetadata(installed);
         Assert.NotNull(attached);
         Assert.Equal("789", attached.FileId);
@@ -174,7 +174,7 @@ public class ModUpdateTaskTests : IDisposable
 
         // ...but the sibling still installed, and the model refresh still ran
         Assert.Equal(goodBytes, await File.ReadAllBytesAsync(Path.Combine(ModsDir, "good.jar")));
-        var installed = model.AllMods().FirstOrDefault(m => m.Fileinfo.Name == "good.jar");
+        var installed = model.Mods.FirstOrDefault(m => m.Fileinfo.Name == "good.jar");
         Assert.NotNull(installed);
     }
 
@@ -184,6 +184,6 @@ public class ModUpdateTaskTests : IDisposable
         var (_, model, _) = SetupInstalledMod("jar content"u8.ToArray());
 
         await ModUpdateTask.ApplyAsync(model, [], CancellationToken.None);
-        Assert.NotNull(model.AllMods().FirstOrDefault(m => m.Fileinfo.Name == "test.jar"));
+        Assert.NotNull(model.Mods.FirstOrDefault(m => m.Fileinfo.Name == "test.jar"));
     }
 }

@@ -538,8 +538,8 @@ public class LocalModParseTests : IDisposable
         var model = new ModFolderModel(MaterializedDirectory.Ensure(new AbsolutePath(modsDir))!, isIndexed: false);
         Assert.True(model.Update());
 
-        Assert.Equal(2, model.Size);
-        var byName = model.AllMods().ToDictionary(m => m.Fileinfo.Name);
+        Assert.Equal(2, model.Count);
+        var byName = model.Mods.ToDictionary(m => m.Fileinfo.Name);
         var scanned = byName["scanned.jar"];
         var folder = byName["folder-mod"];
 
@@ -555,7 +555,7 @@ public class LocalModParseTests : IDisposable
 
         // a second update must keep the resolved details (unchanged resources are not re-parsed)
         Assert.True(model.Update());
-        var rescanned = model.AllMods().First(m => m.Fileinfo.Name == "scanned.jar");
+        var rescanned = model.Mods.First(m => m.Fileinfo.Name == "scanned.jar");
         Assert.Equal("testmod", rescanned.Details.ModId);
     }
 }

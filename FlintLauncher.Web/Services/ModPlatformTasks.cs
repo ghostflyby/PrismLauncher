@@ -401,7 +401,7 @@ public sealed class ModsUpdateTask(
         var gameVersions = new List<McVersion> { new(profile.GetComponentVersion("net.minecraft")) };
         var loadersList = profile.GetModLoadersList();
 
-        var candidates = folder.AllMods().Where(m => !m.Fileinfo.Name.StartsWith('.'));
+        var candidates = folder.Mods.Where(m => !m.Fileinfo.Name.StartsWith('.'));
         if (filter is { Count: > 0 })
         {
             var wanted = filter.ToHashSet(StringComparer.Ordinal);

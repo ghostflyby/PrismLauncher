@@ -43,7 +43,7 @@ public class GameOptionsTests : IDisposable
 
         Assert.True(options.IsLoaded);
         Assert.Equal(3583, options.Version);
-        Assert.Equal(3, options.RowCount());
+        Assert.Equal(3, options.Count);
         Assert.Equal("lang", options.Contents[0].Key);
         Assert.Equal("en_us", options.Contents[0].Value);
         Assert.Equal("fov", options.Contents[1].Key);
@@ -189,7 +189,7 @@ public class GameOptionsTests : IDisposable
         Assert.Single(options.Contents);
 
         options.Set("fov", "0.75");
-        Assert.Equal(2, options.RowCount());
+        Assert.Equal(2, options.Count);
         Assert.True(options.Save());
         Assert.Equal("lang:de_de\nfov:0.75\n", path.ReadAllText());
     }

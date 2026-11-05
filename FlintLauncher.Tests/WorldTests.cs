@@ -382,7 +382,7 @@ public class WorldTests : IDisposable
         var list = new WorldList(MaterializedDirectory.Ensure(new AbsolutePath(saves))!);
         list.Update();
         Assert.True(list.DeleteWorlds(0, 1));
-        Assert.Equal(1, list.Count);
+        Assert.Single(list);
         // culture-sorted order is one, three, two — so "two" survives
         Assert.Equal("two", list[0].FolderName);
         Assert.False(Directory.Exists(Path.Combine(saves, "one")));

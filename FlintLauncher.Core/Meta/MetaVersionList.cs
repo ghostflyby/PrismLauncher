@@ -22,11 +22,12 @@
 // machinery (data()/roles/roleNames/waitToLoad/QEventLoop), the BaseVersionList interface and
 // the change signals are UI-layer plumbing and are not ported; everything metadata-related is.
 
+using System.Collections;
 using System.Text.Json.Nodes;
 
 namespace FlintLauncher.Core.Meta;
 
-public sealed class VersionList(string uid) : MetaEntity
+public sealed class VersionList(string uid) : MetaEntity, IReadOnlyList<MetaVersion>
 {
     private readonly List<MetaVersion> _versions = [];
     private readonly Dictionary<string, MetaVersion> _lookup = new(StringComparer.Ordinal);
@@ -42,7 +43,15 @@ public sealed class VersionList(string uid) : MetaEntity
 
     public string HumanReadable() => Name.Length == 0 ? Uid : Name;
 
-    public IReadOnlyList<MetaVersion> Versions() => _versions;
+    public IReadOnlyList<MetaVersion> Versions => _versions;
+
+    public int Count => _versions.Count;
+
+    public MetaVersion this[int index] => _versions[index];
+
+    public IEnumerator<MetaVersion> GetEnumerator() => _versions.GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     public MetaVersion GetVersion(string version)
     {
@@ -61,7 +70,7 @@ public sealed class VersionList(string uid) : MetaEntity
 
     public bool HasVersion(string version)
     {
-        return _versions.Exists(a => a.Version == version);
+        return _lookup.ContainsKey(version);
     }
 
     /// <summary>

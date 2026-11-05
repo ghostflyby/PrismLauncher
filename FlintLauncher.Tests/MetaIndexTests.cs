@@ -37,22 +37,22 @@ public class MetaIndexTests
             new VersionList("list2"),
             new VersionList("list3"),
         ]);
-        Assert.Equal(3, windex.Lists().Count);
+        Assert.Equal(3, windex.Count);
         windex.Merge(new FluentIndex(
         [
             new VersionList("list1"),
             new VersionList("list2"),
             new VersionList("list3"),
         ]));
-        Assert.Equal(3, windex.Lists().Count);
+        Assert.Equal(3, windex.Count);
         windex.Merge(new FluentIndex(
         [
             new VersionList("list4"),
             new VersionList("list2"),
             new VersionList("list5"),
         ]));
-        Assert.Equal(5, windex.Lists().Count);
+        Assert.Equal(5, windex.Count);
         windex.Merge(new FluentIndex([new VersionList("list6")]));
-        Assert.Equal(6, windex.Lists().Count);
+        Assert.Equal(6, windex.Count);
     }
 }

@@ -179,7 +179,7 @@ public static class SkinEndpoints
             return false;
         }
 
-        account = accounts.At(index);
+        account = accounts[index];
         notFound = null;
         return true;
     }

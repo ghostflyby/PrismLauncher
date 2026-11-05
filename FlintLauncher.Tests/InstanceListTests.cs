@@ -842,7 +842,7 @@ public class InstanceListTests : IDisposable
         MakeInstanceDir("in-old", name: "Old");
         var list = CreateList();
         list.LoadList();
-        Assert.Equal(1, list.Count);
+        Assert.Single(list);
 
         var otherDir = Path.Combine(_root, "other-instances");
         Directory.CreateDirectory(otherDir);
@@ -852,7 +852,7 @@ public class InstanceListTests : IDisposable
         list.SetInstanceDirs([new AbsolutePath(otherDir)]);
 
         Assert.Equal(otherDir, list.PrimaryDir().Value);
-        Assert.Equal(1, list.Count);
+        Assert.Single(list);
         Assert.Null(list.GetInstanceById("in-old"));
         Assert.NotNull(list.GetInstanceById("in-new"));
     }

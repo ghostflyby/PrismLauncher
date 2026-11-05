@@ -57,18 +57,21 @@ public class ModFolderModel(MaterializedDirectory dir, bool isIndexed = false) :
     protected override Resource CreateResource(FileInfo file) => new Mod(file);
 
     /// <summary>Port of the RESOURCE_HELPERS allMods accessor.</summary>
-    public List<Mod> AllMods()
+    public IReadOnlyList<Mod> Mods
     {
-        var result = new List<Mod>(Size);
-        foreach (var resource in Resources)
+        get
         {
-            result.Add((Mod)resource);
-        }
+            var result = new List<Mod>(Count);
+            foreach (var resource in Resources)
+            {
+                result.Add((Mod)resource);
+            }
 
-        return result;
+            return result;
+        }
     }
 
-    public new Mod At(int index) => (Mod)base.At(index);
+    public new Mod this[int index] => (Mod)base[index];
 
     /// <summary>
     /// The packwiz metadata attached during Update (indexed scan); null when the mod has no
@@ -95,7 +98,7 @@ public class ModFolderModel(MaterializedDirectory dir, bool isIndexed = false) :
     /// </summary>
     private void ResolveMods()
     {
-        foreach (var mod in AllMods())
+        foreach (var mod in Mods)
         {
             if (!mod.ShouldResolve)
             {

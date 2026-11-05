@@ -63,7 +63,7 @@ public class InstanceWatchTests : IDisposable
         Directory.Move((_instancesDir / "in-a").Value, (_instancesDir / "in-b").Value);
         space.Pulse();
 
-        Assert.Equal(1, list.Count);
+        Assert.Single(list);
         Assert.Null(list.GetInstanceById("in-a"));
         var moved = list.GetInstanceById("in-b");
         Assert.NotNull(moved);
@@ -85,7 +85,7 @@ public class InstanceWatchTests : IDisposable
         (_instancesDir / "doomed").DeleteDirectoryRecursively();
         space.Pulse();
 
-        Assert.Equal(1, list.Count);
+        Assert.Single(list);
         Assert.Null(list.GetInstanceById("doomed"));
         Assert.NotNull(list.GetInstanceById("stay"));
     }
@@ -104,7 +104,7 @@ public class InstanceWatchTests : IDisposable
         MakeInstanceDir(second.Path, "in-second", "Second");
         list.SetInstanceDirs([second.Path]);
 
-        Assert.Equal(1, list.Count); // SetInstanceDirs reloads right away
+        Assert.Single(list); // SetInstanceDirs reloads right away
         Assert.NotNull(list.GetInstanceById("in-second"));
 
         // the new root is watched: external changes there pulse-reload, the abandoned

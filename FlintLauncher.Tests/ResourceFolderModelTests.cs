@@ -108,12 +108,12 @@ public class ResourceFolderModelTests : IDisposable
         var source = TestDataDir();
         var model = new ModFolderModel(MaterializedDirectory.Ensure(new AbsolutePath(source))!, isIndexed: false);
 
-        Assert.Equal(0, model.Size);
+        Assert.Empty(model);
 
         // startWatching() only schedules an update() on the C++ side; run it directly.
         model.Update();
 
-        Assert.Equal(4, model.Size);
+        Assert.Equal(4, model.Count);
     }
 
     [Fact]
@@ -125,31 +125,31 @@ public class ResourceFolderModelTests : IDisposable
         var tmp = NewTempDir("remove_resource");
         var model = new ResourceFolderModel(MaterializedDirectory.Ensure(new AbsolutePath(tmp))!, isIndexed: false);
 
-        Assert.Equal(0, model.Size);
+        Assert.Empty(model);
 
         Assert.True(model.InstallResource(fileMod));
 
-        Assert.Equal(1, model.Size);
+        Assert.Single(model);
 
         // startWatching() on the C++ side; a plain update keeps the same single resource.
         model.Update();
 
-        Assert.Equal(1, model.Size);
+        Assert.Single(model);
 
         Assert.True(model.InstallResource(folderResource));
 
-        Assert.Equal(2, model.Size);
+        Assert.Equal(2, model.Count);
 
         Assert.True(model.UninstallResource("supercoolmod.jar"));
 
-        Assert.Equal(1, model.Size);
+        Assert.Single(model);
 
-        var modFileName = model.At(0).Fileinfo.Name;
+        var modFileName = model[0].Fileinfo.Name;
         Assert.False(modFileName.Length == 0);
 
         Assert.True(model.UninstallResource(modFileName));
 
-        Assert.Equal(0, model.Size);
+        Assert.Empty(model);
     }
 
     [Fact]
@@ -161,15 +161,15 @@ public class ResourceFolderModelTests : IDisposable
         var tmp = NewTempDir("enable_disable");
         var model = new ResourceFolderModel(MaterializedDirectory.Ensure(new AbsolutePath(tmp))!, isIndexed: false);
 
-        Assert.Equal(0, model.Size);
+        Assert.Empty(model);
 
         Assert.True(model.InstallResource(folderResource));
         Assert.True(model.InstallResource(fileMod));
 
-        Assert.Equal(2, model.Size);
+        Assert.Equal(2, model.Count);
 
-        var res1 = model.At(0).Type != ResourceType.Folder ? model.At(0) : model.At(1);
-        var res2 = model.At(0).Type == ResourceType.Folder ? model.At(0) : model.At(1);
+        var res1 = model[0].Type != ResourceType.Folder ? model[0] : model[1];
+        var res2 = model[0].Type == ResourceType.Folder ? model[0] : model[1];
         var id1 = res1.InternalId;
         var id2 = res2.InternalId;
         var initialEnabledRes2 = res2.Enabled;

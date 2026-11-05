@@ -8,9 +8,11 @@
 // undetermined element type NbtTagType.Null; it is serialized with element type End
 // (and its length, which libnbt++ also ignores when reading End, is written as 0).
 
+using System.Collections;
+
 namespace FlintLauncher.Nbt;
 
-public sealed class NbtList : NbtTag
+public sealed class NbtList : NbtTag, IReadOnlyList<NbtTag>
 {
     private readonly List<NbtTag> _tags = [];
 
@@ -37,6 +39,10 @@ public sealed class NbtList : NbtTag
 
     /// <summary>The elements in order.</summary>
     public IReadOnlyList<NbtTag> Tags => _tags;
+
+    public IEnumerator<NbtTag> GetEnumerator() => _tags.GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     /// <summary>Port of tag_list::push_back: appends, setting the element type if undetermined.</summary>
     /// <exception cref="ArgumentException">If the tag type does not match the element type.</exception>
