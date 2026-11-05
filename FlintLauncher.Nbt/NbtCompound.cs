@@ -7,151 +7,129 @@
 //
 // Deviation from libnbt++: tag_compound stores its tags in a std::map<std::string, value>
 // keyed map, so payload iteration is sorted lexicographically by key. This port keeps
-// INSERTION ORDER instead (a list-of-pairs plus a lookup dictionary): tags are written
+// INSERTION ORDER instead (an OrderedDictionary keyed by tag name): tags are written
 // back out in the order they were read or inserted. Minecraft clients accept any order
 // and preserving it keeps rewritten files (e.g. World::rename's level.dat) byte-diffable
 // apart from the edited value.
 
+using System.Collections;
+using System.Diagnostics.CodeAnalysis;
+
 namespace FlintLauncher.Nbt;
 
-public sealed class NbtCompound : NbtTag
+public sealed class NbtCompound : NbtTag, IDictionary<string, NbtTag>, IReadOnlyDictionary<string, NbtTag>
 {
-    private readonly List<KeyValuePair<string, NbtTag>> _entries = [];
-    private readonly Dictionary<string, NbtTag> _map = new(StringComparer.Ordinal);
+    private readonly OrderedDictionary<string, NbtTag> _tags = new(StringComparer.Ordinal);
 
     public override NbtTagType Type => NbtTagType.Compound;
 
-    public int Count => _entries.Count;
+    public int Count => _tags.Count;
+
+    public bool IsReadOnly => false;
 
     /// <summary>
-    /// Port of tag_compound::at: bounds-checked access. Throws KeyNotFoundException
-    /// when the key does not exist (the C++ throws std::out_of_range).
+    /// Gets or sets the tag under <paramref name="key"/>. Setting an existing key keeps
+    /// its position; getting a missing key throws <see cref="KeyNotFoundException"/>.
     /// </summary>
     public NbtTag this[string key]
     {
         get
         {
-            if (_map.TryGetValue(key, out var value))
+            if (_tags.TryGetValue(key, out var value))
             {
                 return value;
             }
 
             throw new KeyNotFoundException($"No NBT tag with key \"{key}\"");
         }
+
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            _tags[key] = value;
+        }
     }
 
-    /// <summary>Lookup that reports presence instead of throwing.</summary>
-    public bool TryGet(string key, out NbtTag? value)
-    {
-        return _map.TryGetValue(key, out value);
-    }
+    public ICollection<string> Keys => _tags.Keys;
 
-    /// <summary>
-    /// Typed lookup: returns the tag under <paramref name="key"/> cast to
-    /// <typeparamref name="T"/>, or null when the key is missing or of another type.
-    /// Replaces the C++ try { at(name).as&lt;T&gt;() } catch(...) idiom.
-    /// </summary>
-    public T? TryGet<T>(string key) where T : NbtTag
-    {
-        return _map.TryGetValue(key, out var value) && value is T typed ? typed : null;
-    }
+    public ICollection<NbtTag> Values => _tags.Values;
 
-    /// <summary>Port of tag_compound::has_key(key).</summary>
-    public bool HasKey(string key) => _map.ContainsKey(key);
-
-    /// <summary>Port of tag_compound::has_key(key, type).</summary>
-    public bool HasKey(string key, NbtTagType type)
-    {
-        return _map.TryGetValue(key, out var value) && value.Type == type;
-    }
-
-    /// <summary>
-    /// Port of tag_compound::put: inserts or assigns. Assigning an existing key keeps
-    /// its original insertion position (like assigning to a map slot).
-    /// </summary>
-    public void Put(string key, NbtTag value)
+    /// <summary>Adds a tag under <paramref name="key"/>; throws when the key already exists.</summary>
+    public void Add(string key, NbtTag value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        if (_map.TryGetValue(key, out var existing))
-        {
-            if (ReferenceEquals(existing, value))
-            {
-                return;
-            }
-
-            _map[key] = value;
-            var index = _entries.FindIndex(kv => kv.Key == key);
-            _entries[index] = new KeyValuePair<string, NbtTag>(key, value);
-        }
-        else
-        {
-            _map.Add(key, value);
-            _entries.Add(new KeyValuePair<string, NbtTag>(key, value));
-        }
+        _tags.Add(key, value);
     }
 
-    /// <summary>
-    /// Port of tag_compound::insert: inserts only when the key is absent.
-    /// Returns true when the value was inserted.
-    /// </summary>
-    public bool Insert(string key, NbtTag value)
+    /// <summary>Adds the tag only when the key is absent. Returns true when it was added.</summary>
+    public bool TryAdd(string key, NbtTag value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        if (_map.ContainsKey(key))
-        {
-            return false;
-        }
-
-        _map.Add(key, value);
-        _entries.Add(new KeyValuePair<string, NbtTag>(key, value));
-        return true;
+        return _tags.TryAdd(key, value);
     }
 
-    /// <summary>Port of tag_compound::erase. Returns true when a tag was removed.</summary>
-    public bool Remove(string key)
+    public bool ContainsKey(string key) => _tags.ContainsKey(key);
+
+    public bool TryGetValue(string key, [MaybeNullWhen(false)] out NbtTag value)
     {
-        if (!_map.Remove(key))
-        {
-            return false;
-        }
-
-        _entries.RemoveAll(kv => kv.Key == key);
-        return true;
+        return _tags.TryGetValue(key, out value);
     }
 
-    /// <summary>Port of tag_compound::clear.</summary>
-    public void Clear()
+    public bool Remove(string key) => _tags.Remove(key);
+
+    public void Clear() => _tags.Clear();
+
+    public IEnumerator<KeyValuePair<string, NbtTag>> GetEnumerator() => _tags.GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+    IEnumerable<string> IReadOnlyDictionary<string, NbtTag>.Keys => Keys;
+
+    IEnumerable<NbtTag> IReadOnlyDictionary<string, NbtTag>.Values => Values;
+
+    void ICollection<KeyValuePair<string, NbtTag>>.Add(KeyValuePair<string, NbtTag> item)
     {
-        _map.Clear();
-        _entries.Clear();
+        Add(item.Key, item.Value);
     }
 
-    /// <summary>The tags in insertion order (only iteration that guarantees order).</summary>
-    public IEnumerable<KeyValuePair<string, NbtTag>> Entries => _entries;
+    bool ICollection<KeyValuePair<string, NbtTag>>.Contains(KeyValuePair<string, NbtTag> item)
+    {
+        return ((ICollection<KeyValuePair<string, NbtTag>>)_tags).Contains(item);
+    }
+
+    void ICollection<KeyValuePair<string, NbtTag>>.CopyTo(KeyValuePair<string, NbtTag>[] array, int arrayIndex)
+    {
+        ((ICollection<KeyValuePair<string, NbtTag>>)_tags).CopyTo(array, arrayIndex);
+    }
+
+    bool ICollection<KeyValuePair<string, NbtTag>>.Remove(KeyValuePair<string, NbtTag> item)
+    {
+        return ((ICollection<KeyValuePair<string, NbtTag>>)_tags).Remove(item);
+    }
 
     public override NbtTag Clone()
     {
         var copy = new NbtCompound();
-        foreach (var (key, value) in _entries)
+        foreach (var (key, value) in _tags)
         {
-            copy.Put(key, value.Clone());
+            copy[key] = value.Clone();
         }
 
         return copy;
     }
 
-    public override string ToString() => $"tag_compound(size={_entries.Count})";
+    public override string ToString() => $"tag_compound(size={_tags.Count})";
 
     public override bool Equals(object? obj)
     {
-        if (obj is not NbtCompound other || _entries.Count != other._entries.Count)
+        if (obj is not NbtCompound other || _tags.Count != other._tags.Count)
         {
             return false;
         }
 
-        foreach (var (key, value) in _entries)
+        foreach (var (key, value) in _tags)
         {
-            if (!other._map.TryGetValue(key, out var otherValue) || !NbtList.NbtTagEquals(value, otherValue))
+            if (!other._tags.TryGetValue(key, out var otherValue) || !NbtList.NbtTagEquals(value, otherValue))
             {
                 return false;
             }
@@ -162,13 +140,12 @@ public sealed class NbtCompound : NbtTag
 
     public override int GetHashCode()
     {
-        var hash = new HashCode();
-        foreach (var (key, value) in _entries)
+        var entryHash = 0;
+        foreach (var (key, value) in _tags)
         {
-            hash.Add(key);
-            hash.Add(value);
+            entryHash ^= HashCode.Combine(key, NbtList.NbtTagHash(value));
         }
 
-        return hash.ToHashCode();
+        return HashCode.Combine(_tags.Count, entryHash);
     }
 }

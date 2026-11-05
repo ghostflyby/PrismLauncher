@@ -251,12 +251,12 @@ public sealed class World
             return false;
         }
 
-        if (!worldData.TryGet("Data", out var val) || val is not NbtCompound dataCompound)
+        if (!worldData.TryGetValue("Data", out var val) || val is not NbtCompound dataCompound)
         {
             return false;
         }
 
-        dataCompound.Put("LevelName", new NbtString(newName));
+        dataCompound["LevelName"] = new NbtString(newName);
 
         try
         {
@@ -462,7 +462,7 @@ public sealed class World
             return;
         }
 
-        if (!levelData.TryGet("Data", out var val) || val is not NbtCompound dataCompound)
+        if (!levelData.TryGetValue("Data", out var val) || val is not NbtCompound dataCompound)
         {
             IsValid = false;
             return;
@@ -479,7 +479,7 @@ public sealed class World
         GameType = new GameType(ReadInt(dataCompound, "GameType"));
 
         long? randomSeed = null;
-        if (dataCompound.TryGet("WorldGenSettings", out var worldGenVal) && worldGenVal is NbtCompound worldGen)
+        if (dataCompound.TryGetValue("WorldGenSettings", out var worldGenVal) && worldGenVal is NbtCompound worldGen)
         {
             randomSeed = ReadLong(worldGen, "seed");
         }
@@ -491,19 +491,19 @@ public sealed class World
     /// <summary>Port of read_string: null when the tag is missing or not a string.</summary>
     private static string? ReadString(NbtCompound parent, string name)
     {
-        return parent.TryGet<NbtString>(name)?.Value;
+        return parent.TryGetValue(name, out var tag) && tag is NbtString value ? value.Value : null;
     }
 
     /// <summary>Port of read_long: null when the tag is missing or not a long.</summary>
     private static long? ReadLong(NbtCompound parent, string name)
     {
-        return parent.TryGet<NbtLong>(name)?.Value;
+        return parent.TryGetValue(name, out var tag) && tag is NbtLong value ? value.Value : null;
     }
 
     /// <summary>Port of read_int: null when the tag is missing or not an int.</summary>
     private static int? ReadInt(NbtCompound parent, string name)
     {
-        return parent.TryGet<NbtInt>(name)?.Value;
+        return parent.TryGetValue(name, out var tag) && tag is NbtInt value ? value.Value : null;
     }
 
     /// <summary>Port of loadSeed: the seed inside world_gen_settings.dat's "data" compound.</summary>
@@ -515,7 +515,7 @@ public sealed class World
             return 0;
         }
 
-        if (!levelData.TryGet("data", out var val) || val is not NbtCompound dataCompound)
+        if (!levelData.TryGetValue("data", out var val) || val is not NbtCompound dataCompound)
         {
             return 0;
         }

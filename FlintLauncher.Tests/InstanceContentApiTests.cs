@@ -158,11 +158,11 @@ internal static class WaveSeed
     {
         Directory.CreateDirectory(worldDir);
         var data = new NbtCompound();
-        data.Put("LevelName", new NbtString(name));
-        data.Put("LastPlayed", new NbtLong(lastPlayed));
-        data.Put("GameType", new NbtInt(gameType));
+        data["LevelName"] = new NbtString(name);
+        data["LastPlayed"] = new NbtLong(lastPlayed);
+        data["GameType"] = new NbtInt(gameType);
         var root = new NbtCompound();
-        root.Put("Data", data);
+        root["Data"] = data;
         File.WriteAllBytes(Path.Combine(worldDir, "level.dat"), NbtIo.WriteCompoundGzip(root));
     }
 
@@ -172,10 +172,10 @@ internal static class WaveSeed
         using var zip = ZipFile.Open(path, ZipArchiveMode.Create);
         var entry = zip.CreateEntry("level.dat");
         var data = new NbtCompound();
-        data.Put("LevelName", new NbtString(name));
-        data.Put("LastPlayed", new NbtLong(1700000000000));
+        data["LevelName"] = new NbtString(name);
+        data["LastPlayed"] = new NbtLong(1700000000000);
         var root = new NbtCompound();
-        root.Put("Data", data);
+        root["Data"] = data;
         using var stream = entry.Open();
         var bytes = NbtIo.WriteCompoundGzip(root);
         stream.Write(bytes, 0, bytes.Length);

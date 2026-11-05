@@ -98,8 +98,8 @@ public class ServersDatTests : IDisposable
         var root = NbtIo.TryReadCompound(bytes);
         Assert.NotNull(root);
         var serverTag = (NbtCompound)((NbtList)root["servers"])[0];
-        Assert.False(serverTag.HasKey("icon"));
-        Assert.False(serverTag.HasKey("acceptTextures"));
+        Assert.False(serverTag.ContainsKey("icon"));
+        Assert.False(serverTag.ContainsKey("acceptTextures"));
         Assert.Equal(2, serverTag.Count); // only name and ip
     }
 
@@ -108,19 +108,19 @@ public class ServersDatTests : IDisposable
     {
         // hand-built entry like the C++ parser reads it
         var server = new NbtCompound();
-        server.Put("name", new NbtString("tex"));
-        server.Put("ip", new NbtString("tex.example.com"));
-        server.Put("acceptTextures", new NbtByte(1));
+        server["name"] = new NbtString("tex");
+        server["ip"] = new NbtString("tex.example.com");
+        server["acceptTextures"] = new NbtByte(1);
         var root = new NbtCompound();
         var list = new NbtList();
         list.Add(server);
-        root.Put("servers", list);
+        root["servers"] = list;
 
         var parsed = ServersDat.FromCompound(root);
         var entry = Assert.Single(parsed);
         Assert.Equal(AcceptsTextures.Always, entry.AcceptsTextures);
 
-        server.Put("acceptTextures", new NbtByte(0));
+        server["acceptTextures"] = new NbtByte(0);
         Assert.Equal(AcceptsTextures.Never, new ServerEntry(server).AcceptsTextures);
     }
 
@@ -135,7 +135,7 @@ public class ServersDatTests : IDisposable
     public void Parse_MissingServersTag_ReturnsEmpty()
     {
         var root = new NbtCompound();
-        root.Put("something", new NbtInt(3));
+        root["something"] = new NbtInt(3);
         Assert.Empty(ServersDat.FromCompound(root));
     }
 
@@ -145,7 +145,7 @@ public class ServersDatTests : IDisposable
         var root = new NbtCompound();
         var list = new NbtList();
         list.Add(new NbtString("not a compound"));
-        root.Put("servers", list);
+        root["servers"] = list;
 
         Assert.Empty(ServersDat.FromCompound(root));
     }

@@ -107,7 +107,7 @@ public sealed class NbtList : NbtTag
         hash.Add(ElementType);
         foreach (var tag in _tags)
         {
-            hash.Add(tag);
+            hash.Add(NbtTagHash(tag));
         }
 
         return hash.ToHashCode();
@@ -120,26 +120,8 @@ public sealed class NbtList : NbtTag
             return true;
         }
 
-        if (a is null || b is null || a.Type != b.Type)
-        {
-            return false;
-        }
-
-        return a switch
-        {
-            NbtByte t => t.Value == ((NbtByte)b).Value,
-            NbtShort t => t.Value == ((NbtShort)b).Value,
-            NbtInt t => t.Value == ((NbtInt)b).Value,
-            NbtLong t => t.Value == ((NbtLong)b).Value,
-            NbtFloat t => t.Equals(b),
-            NbtDouble t => t.Equals(b),
-            NbtString t => t.Equals(b),
-            NbtByteArray t => t.Equals(b),
-            NbtIntArray t => t.Equals(b),
-            NbtLongArray t => t.Equals(b),
-            NbtList t => t.Equals(b),
-            NbtCompound t => t.Equals(b),
-            _ => false,
-        };
+        return a is not null && b is not null && a.Type == b.Type && a.Equals(b);
     }
+
+    internal static int NbtTagHash(NbtTag? tag) => tag?.GetHashCode() ?? 0;
 }

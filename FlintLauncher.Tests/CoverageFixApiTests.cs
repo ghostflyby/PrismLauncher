@@ -287,14 +287,14 @@ public class CoverageFixWorldsApiTests : IAsyncDisposable
     {
         Directory.CreateDirectory(worldDir);
         var data = new NbtCompound();
-        data.Put("LevelName", new NbtString(name));
-        data.Put("LastPlayed", new NbtLong(1700000000000));
-        data.Put("GameType", new NbtInt(1));
+        data["LevelName"] = new NbtString(name);
+        data["LastPlayed"] = new NbtLong(1700000000000);
+        data["GameType"] = new NbtInt(1);
         var worldGen = new NbtCompound();
-        worldGen.Put("seed", new NbtLong(seed));
-        data.Put("WorldGenSettings", worldGen);
+        worldGen["seed"] = new NbtLong(seed);
+        data["WorldGenSettings"] = worldGen;
         var root = new NbtCompound();
-        root.Put("Data", data);
+        root["Data"] = data;
         File.WriteAllBytes(Path.Combine(worldDir, "level.dat"), NbtIo.WriteCompoundGzip(root));
     }
 

@@ -46,7 +46,7 @@ public class NbtTests
     public void Read_AutoDetects_RawAndGzip()
     {
         var root = new NbtCompound();
-        root.Put("value", new NbtInt(42));
+        root["value"] = new NbtInt(42);
 
         var raw = NbtIo.WriteTagToBytes("", root, gzip: false);
         var gzip = NbtIo.WriteTagToBytes("", root, gzip: true);
@@ -73,13 +73,13 @@ public class NbtTests
         foreach (var i in new[] { 0, 1, 2 })
         {
             var entry = new NbtCompound();
-            entry.Put("index", new NbtInt(i));
-            entry.Put("name", new NbtString($"item {i}"));
+            entry["index"] = new NbtInt(i);
+            entry["name"] = new NbtString($"item {i}");
             list.Add(entry);
         }
 
         var root = new NbtCompound();
-        root.Put("entries", list);
+        root["entries"] = list;
 
         var bytes = NbtIo.WriteTagToBytes("", root, gzip: false);
         var (_, read) = NbtIo.ReadCompound(new MemoryStream(bytes));
@@ -95,11 +95,11 @@ public class NbtTests
     public void RoundTrip_EmptyList_And_TypedLists()
     {
         var root = new NbtCompound();
-        root.Put("undetermined", new NbtList());
+        root["undetermined"] = new NbtList();
         var ints = new NbtList();
         ints.Add(new NbtInt(1));
         ints.Add(new NbtInt(-1));
-        root.Put("ints", ints);
+        root["ints"] = ints;
 
         var bytes = NbtIo.WriteTagToBytes("", root, gzip: false);
         var (_, read) = NbtIo.ReadCompound(new MemoryStream(bytes));
@@ -116,40 +116,141 @@ public class NbtTests
     {
         // Deviation from libnbt++ (std::map ordering): insertion order is kept.
         var root = new NbtCompound();
-        root.Put("zeta", new NbtInt(1));
-        root.Put("alpha", new NbtInt(2));
-        root.Put("middle", new NbtInt(3));
+        root["zeta"] = new NbtInt(1);
+        root["alpha"] = new NbtInt(2);
+        root["middle"] = new NbtInt(3);
 
         var bytes = NbtIo.WriteTagToBytes("", root, gzip: false);
         var (_, read) = NbtIo.ReadCompound(new MemoryStream(bytes));
 
-        Assert.Equal(new[] { "zeta", "alpha", "middle" }, read.Entries.Select(e => e.Key).ToArray());
+        Assert.Equal(new[] { "zeta", "alpha", "middle" }, read.Keys.ToArray());
     }
 
     [Fact]
-    public void Compound_Put_KeepsPositionOnReplace()
+    public void Compound_Indexer_KeepsPositionOnReplace()
     {
         var root = new NbtCompound();
-        root.Put("first", new NbtString("one"));
-        root.Put("second", new NbtString("two"));
-        root.Put("first", new NbtString("uno"));
+        root["first"] = new NbtString("one");
+        root["second"] = new NbtString("two");
+        root["first"] = new NbtString("uno");
 
-        Assert.Equal(new[] { "first", "second" }, root.Entries.Select(e => e.Key).ToArray());
+        Assert.Equal(new[] { "first", "second" }, root.Keys.ToArray());
         Assert.Equal("uno", ((NbtString)root["first"]).Value);
-        Assert.True(!root.Insert("second", new NbtString("nope"))); // insert never replaces
+        Assert.False(root.TryAdd("second", new NbtString("nope"))); // insert never replaces
+    }
+
+    [Fact]
+    public void Compound_DictionaryApi()
+    {
+        var root = new NbtCompound();
+        Assert.False(root.IsReadOnly);
+
+        root.Add("a", new NbtInt(1));
+        root["b"] = new NbtInt(2);
+        Assert.True(root.TryAdd("c", new NbtInt(3)));
+        Assert.False(root.TryAdd("c", new NbtInt(30)));
+        Assert.Throws<ArgumentException>(() => root.Add("a", new NbtInt(10)));
+
+        Assert.Equal(3, root.Count);
+        Assert.Equal(new[] { "a", "b", "c" }, root.Keys.ToArray());
+        Assert.Equal(3, root.Values.Count);
+        Assert.True(root.ContainsKey("a"));
+        Assert.False(root.ContainsKey("missing"));
+        Assert.True(root.TryGetValue("b", out var b) && b is NbtInt { Value: 2 });
+        Assert.Equal(new[] { "a", "b", "c" }, root.Select(e => e.Key).ToArray());
+
+        IReadOnlyDictionary<string, NbtTag> readOnly = root;
+        Assert.Equal(3, readOnly.Count);
+        Assert.Equal(new[] { "a", "b", "c" }, readOnly.Keys.ToArray());
+        Assert.Equal(2, ((NbtInt)readOnly["b"]).Value);
+
+        Assert.True(root.Remove("b"));
+        Assert.False(root.Remove("missing"));
+        Assert.Equal(new[] { "a", "c" }, root.Keys.ToArray());
+
+        root.Clear();
+        Assert.Empty(root);
+    }
+
+    [Fact]
+    public void Compound_Equality_IgnoresInsertionOrder_AndHashesConsistently()
+    {
+        var first = new NbtCompound();
+        first["a"] = new NbtInt(1);
+        first["b"] = new NbtString("two");
+
+        var second = new NbtCompound();
+        second["b"] = new NbtString("two");
+        second["a"] = new NbtInt(1);
+
+        Assert.True(first.Equals(second));
+        Assert.Equal(first.GetHashCode(), second.GetHashCode());
+        Assert.Single(new HashSet<NbtCompound> { first, second });
+    }
+
+    [Fact]
+    public void Compound_AndList_HashPrimitiveValuesNotInstances()
+    {
+        var firstCompound = new NbtCompound();
+        firstCompound["byte"] = new NbtByte(1);
+        firstCompound["short"] = new NbtShort(2);
+        firstCompound["int"] = new NbtInt(3);
+        firstCompound["long"] = new NbtLong(4);
+
+        var secondCompound = new NbtCompound();
+        secondCompound["byte"] = new NbtByte(1);
+        secondCompound["short"] = new NbtShort(2);
+        secondCompound["int"] = new NbtInt(3);
+        secondCompound["long"] = new NbtLong(4);
+
+        Assert.True(firstCompound.Equals(secondCompound));
+        Assert.Equal(firstCompound.GetHashCode(), secondCompound.GetHashCode());
+        Assert.Single(new HashSet<NbtCompound> { firstCompound, secondCompound });
+
+        var firstList = new NbtList();
+        firstList.Add(new NbtInt(1));
+        firstList.Add(new NbtInt(2));
+
+        var secondList = new NbtList();
+        secondList.Add(new NbtInt(1));
+        secondList.Add(new NbtInt(2));
+
+        Assert.True(firstList.Equals(secondList));
+        Assert.Equal(firstList.GetHashCode(), secondList.GetHashCode());
+        Assert.Single(new HashSet<NbtList> { firstList, secondList });
+    }
+
+    [Fact]
+    public void Compound_PairMembers_UseStructuralTagEquality()
+    {
+        var root = new NbtCompound();
+        root["k"] = new NbtInt(1);
+        var clone = (NbtCompound)root.Clone();
+        var pair = new KeyValuePair<string, NbtTag>("k", clone["k"]);
+
+        Assert.True(root.Equals(clone));
+        Assert.True(((ICollection<KeyValuePair<string, NbtTag>>)root).Contains(pair));
+        Assert.True(root.Values.Contains(clone["k"]));
+
+        var copied = new KeyValuePair<string, NbtTag>[root.Count];
+        ((ICollection<KeyValuePair<string, NbtTag>>)root).CopyTo(copied, 0);
+        Assert.Equal("k", Assert.Single(copied).Key);
+
+        Assert.True(((ICollection<KeyValuePair<string, NbtTag>>)root).Remove(pair));
+        Assert.False(root.ContainsKey("k"));
     }
 
     [Fact]
     public void RoundTrip_PrimitiveExtremes()
     {
         var root = new NbtCompound();
-        root.Put("b", new NbtByte(-128));
-        root.Put("s", new NbtShort(short.MinValue));
-        root.Put("i", new NbtInt(int.MinValue));
-        root.Put("l", new NbtLong(long.MinValue));
-        root.Put("l2", new NbtLong(long.MaxValue));
-        root.Put("f", new NbtFloat(1.0f / 3.0f));
-        root.Put("d", new NbtDouble(1.0 / 3.0));
+        root["b"] = new NbtByte(-128);
+        root["s"] = new NbtShort(short.MinValue);
+        root["i"] = new NbtInt(int.MinValue);
+        root["l"] = new NbtLong(long.MinValue);
+        root["l2"] = new NbtLong(long.MaxValue);
+        root["f"] = new NbtFloat(1.0f / 3.0f);
+        root["d"] = new NbtDouble(1.0 / 3.0);
 
         var bytes = NbtIo.WriteTagToBytes("", root, gzip: false);
         var (_, read) = NbtIo.ReadCompound(new MemoryStream(bytes));
@@ -256,7 +357,7 @@ public class NbtTests
     public void NbtString_UsesModifiedUtf8_OnTheWire()
     {
         var root = new NbtCompound();
-        root.Put("nul", new NbtString("a\0b"));
+        root["nul"] = new NbtString("a\0b");
 
         var bytes = NbtIo.WriteTagToBytes("", root, gzip: false);
         // the wire bytes must contain C0 80 for the embedded NUL
@@ -388,13 +489,13 @@ public class NbtTests
     {
         var tooLong = new string('a', 65536);
         var root = new NbtCompound();
-        root.Put("big", new NbtString(tooLong));
+        root["big"] = new NbtString(tooLong);
         Assert.Throws<ArgumentOutOfRangeException>(() => NbtIo.WriteTagToBytes("", root, gzip: false));
 
         // exactly at the limit is fine (65535 ASCII bytes == 65535 encoded bytes)
         var atLimit = new string('a', 65535);
         var ok = new NbtCompound();
-        ok.Put("big", new NbtString(atLimit));
+        ok["big"] = new NbtString(atLimit);
         var bytes = NbtIo.WriteTagToBytes("", ok, gzip: false);
         var (_, read) = NbtIo.ReadCompound(new MemoryStream(bytes));
         Assert.Equal(65535, ((NbtString)read["big"]).Value.Length);
@@ -413,29 +514,29 @@ public class NbtTests
     private static NbtCompound MakeAllTypesCompound()
     {
         var root = new NbtCompound();
-        root.Put("byte", new NbtByte(42));
-        root.Put("short", new NbtShort(1337));
-        root.Put("int", new NbtInt(123456));
-        root.Put("long", new NbtLong(1234567890123L));
-        root.Put("float", new NbtFloat(1.5f));
-        root.Put("double", new NbtDouble(2.5));
-        root.Put("string", new NbtString("héllo wörld"));
-        root.Put("bytearray", new NbtByteArray([1, 2, 3, 4, 255]));
-        root.Put("intarray", new NbtIntArray([int.MinValue, 0, int.MaxValue]));
-        root.Put("longarray", new NbtLongArray([long.MinValue, 0, long.MaxValue]));
+        root["byte"] = new NbtByte(42);
+        root["short"] = new NbtShort(1337);
+        root["int"] = new NbtInt(123456);
+        root["long"] = new NbtLong(1234567890123L);
+        root["float"] = new NbtFloat(1.5f);
+        root["double"] = new NbtDouble(2.5);
+        root["string"] = new NbtString("héllo wörld");
+        root["bytearray"] = new NbtByteArray([1, 2, 3, 4, 255]);
+        root["intarray"] = new NbtIntArray([int.MinValue, 0, int.MaxValue]);
+        root["longarray"] = new NbtLongArray([long.MinValue, 0, long.MaxValue]);
 
         var inner = new NbtCompound();
-        inner.Put("flag", new NbtByte(1));
-        inner.Put("text", new NbtString("nested"));
-        root.Put("compound", inner);
+        inner["flag"] = new NbtByte(1);
+        inner["text"] = new NbtString("nested");
+        root["compound"] = inner;
 
         var list = new NbtList();
         list.Add(new NbtShort(7));
         list.Add(new NbtShort(8));
-        root.Put("shorts", list);
+        root["shorts"] = list;
 
         var emptyList = new NbtList();
-        root.Put("empty", emptyList);
+        root["empty"] = emptyList;
         return root;
     }
 
@@ -446,11 +547,11 @@ public class NbtTests
         for (var i = 0; i < depth; i++)
         {
             var next = new NbtCompound();
-            current.Put("child", next);
+            current["child"] = next;
             current = next;
         }
 
-        current.Put("leaf", new NbtInt(1));
+        current["leaf"] = new NbtInt(1);
         return root;
     }
 
@@ -458,7 +559,7 @@ public class NbtTests
     {
         var depth = 0;
         var current = root;
-        while (current.TryGet<NbtCompound>("child") is { } child)
+        while (current.TryGetValue("child", out var tag) && tag is NbtCompound child)
         {
             depth++;
             current = child;

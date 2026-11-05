@@ -38,16 +38,16 @@ public class WorldTests : IDisposable
     {
         var root = new NbtCompound();
         var data = new NbtCompound();
-        data.Put("LevelName", new NbtString(name));
-        data.Put("LastPlayed", new NbtLong(lastPlayed));
-        data.Put("GameType", new NbtInt(gameType));
+        data["LevelName"] = new NbtString(name);
+        data["LastPlayed"] = new NbtLong(lastPlayed);
+        data["GameType"] = new NbtInt(gameType);
         if (randomSeed != 0)
         {
-            data.Put("RandomSeed", new NbtLong(randomSeed));
+            data["RandomSeed"] = new NbtLong(randomSeed);
         }
 
-        data.Put("Difficulty", new NbtInt(2));
-        root.Put("Data", data);
+        data["Difficulty"] = new NbtInt(2);
+        root["Data"] = data;
         return root;
     }
 
@@ -248,8 +248,8 @@ public class WorldTests : IDisposable
 
         var wgRoot = new NbtCompound();
         var data = new NbtCompound();
-        data.Put("seed", new NbtLong(987654321));
-        wgRoot.Put("data", data);
+        data["seed"] = new NbtLong(987654321);
+        wgRoot["data"] = data;
         File.WriteAllBytes(Path.Combine(dir, "data", "minecraft", "world_gen_settings.dat"),
             NbtIo.WriteCompoundGzip(wgRoot));
 

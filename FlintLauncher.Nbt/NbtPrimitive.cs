@@ -28,6 +28,10 @@ public sealed class NbtByte(sbyte value) : NbtPrimitive
     public static implicit operator bool(NbtByte tag) => tag.Value != 0;
 
     public override string ToString() => $"tag_byte({Value})";
+
+    public override bool Equals(object? obj) => obj is NbtByte other && Value == other.Value;
+
+    public override int GetHashCode() => Value.GetHashCode();
 }
 
 /// <summary>Port of nbt::tag_short (signed 16-bit).</summary>
@@ -44,6 +48,10 @@ public sealed class NbtShort(short value) : NbtPrimitive
     public static implicit operator NbtShort(short value) => new(value);
 
     public override string ToString() => $"tag_short({Value})";
+
+    public override bool Equals(object? obj) => obj is NbtShort other && Value == other.Value;
+
+    public override int GetHashCode() => Value.GetHashCode();
 }
 
 /// <summary>Port of nbt::tag_int (signed 32-bit).</summary>
@@ -60,6 +68,10 @@ public sealed class NbtInt(int value) : NbtPrimitive
     public static implicit operator NbtInt(int value) => new(value);
 
     public override string ToString() => $"tag_int({Value})";
+
+    public override bool Equals(object? obj) => obj is NbtInt other && Value == other.Value;
+
+    public override int GetHashCode() => Value.GetHashCode();
 }
 
 /// <summary>Port of nbt::tag_long (signed 64-bit).</summary>
@@ -76,6 +88,10 @@ public sealed class NbtLong(long value) : NbtPrimitive
     public static implicit operator NbtLong(long value) => new(value);
 
     public override string ToString() => $"tag_long({Value})";
+
+    public override bool Equals(object? obj) => obj is NbtLong other && Value == other.Value;
+
+    public override int GetHashCode() => Value.GetHashCode();
 }
 
 /// <summary>Port of nbt::tag_float (IEEE 754 single precision, bit-exact round trip).</summary>

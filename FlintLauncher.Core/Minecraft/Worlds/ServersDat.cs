@@ -73,9 +73,9 @@ public sealed class ServerEntry
     /// <summary>Port of Server(nbt::tag_compound& server).</summary>
     public ServerEntry(NbtCompound server)
     {
-        Address = server.TryGet<NbtString>("ip")?.Value ?? "";
-        Name = server.TryGet<NbtString>("name")?.Value ?? "";
-        var icon = server.TryGet<NbtString>("icon")?.Value;
+        Address = server.TryGetValue("ip", out var ip) && ip is NbtString ipString ? ipString.Value : "";
+        Name = server.TryGetValue("name", out var name) && name is NbtString nameString ? nameString.Value : "";
+        var icon = server.TryGetValue("icon", out var iconTag) && iconTag is NbtString iconString ? iconString.Value : null;
         if (!string.IsNullOrEmpty(icon))
         {
             try
@@ -88,8 +88,7 @@ public sealed class ServerEntry
             }
         }
 
-        if (server.HasKey("acceptTextures", NbtTagType.Byte) &&
-            server.TryGet<NbtByte>("acceptTextures") is { } acceptTextures)
+        if (server.TryGetValue("acceptTextures", out var acceptTag) && acceptTag is NbtByte acceptTextures)
         {
             AcceptsTextures = acceptTextures.Value != 0 ? AcceptsTextures.Always : AcceptsTextures.Never;
         }
@@ -98,16 +97,16 @@ public sealed class ServerEntry
     /// <summary>Port of Server::serialize(nbt::tag_compound& server).</summary>
     public void Serialize(NbtCompound server)
     {
-        server.Put("name", new NbtString(Name.Trim()));
-        server.Put("ip", new NbtString(Address.Trim()));
+        server["name"] = new NbtString(Name.Trim());
+        server["ip"] = new NbtString(Address.Trim());
         if (Icon is { Length: > 0 })
         {
-            server.Put("icon", new NbtString(Convert.ToBase64String(Icon)));
+            server["icon"] = new NbtString(Convert.ToBase64String(Icon));
         }
 
         if (AcceptsTextures != AcceptsTextures.Ask)
         {
-            server.Put("acceptTextures", new NbtByte(AcceptsTextures == AcceptsTextures.Always ? (sbyte)1 : (sbyte)0));
+            server["acceptTextures"] = new NbtByte(AcceptsTextures == AcceptsTextures.Always ? (sbyte)1 : (sbyte)0);
         }
     }
 
@@ -160,7 +159,7 @@ public static class ServersDat
     public static List<ServerEntry> FromCompound(NbtCompound root)
     {
         var servers = new List<ServerEntry>();
-        if (root.TryGet<NbtList>("servers") is not { } list)
+        if (!root.TryGetValue("servers", out var serversTag) || serversTag is not NbtList list)
         {
             return servers; // missing or not a list: empty (see deviations note)
         }
@@ -196,7 +195,7 @@ public static class ServersDat
             list.Add(server.ToNbt());
         }
 
-        outTag.Put("servers", list);
+        outTag["servers"] = list;
         return NbtIo.WriteCompoundRaw(outTag);
     }
 }

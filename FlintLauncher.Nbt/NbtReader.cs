@@ -141,7 +141,7 @@ public sealed class NbtReader(Stream input)
                 throw new NbtParseException($"Error reading key of tag_{tt}");
             }
 
-            compound.Put(key, ReadPayload(tt));
+            compound[key] = ReadPayload(tt);
         }
 
         return compound;

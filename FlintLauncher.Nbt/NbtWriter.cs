@@ -111,7 +111,7 @@ public sealed class NbtWriter(Stream output)
 
     private void WriteCompound(NbtCompound compound)
     {
-        foreach (var (key, value) in compound.Entries)
+        foreach (var (key, value) in compound)
         {
             WriteTag(key, value);
         }
