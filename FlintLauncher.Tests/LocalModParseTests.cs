@@ -272,6 +272,81 @@ public class LocalModParseTests : IDisposable
     }
 
     [Fact]
+    public void ForgeModsToml_ArrayDependencies_Parses()
+    {
+        var jar = TempFile("forge-array-deps.jar");
+        WriteJar(jar, ("META-INF/mods.toml", """
+                                             [[dependencies]]
+                                             modId = "required_lib"
+                                             mandatory = true
+
+                                             [[dependencies]]
+                                             modId = "optional_lib"
+                                             mandatory = false
+
+                                             [[mods]]
+                                             modId = "arraydeps"
+                                             version = "1.0.0"
+                                             displayName = "Array Deps"
+                                             """));
+
+        var mod = Parsed(jar);
+
+        Assert.Equal("arraydeps", mod.Details.ModId);
+        // the array-of-tables dependency shape is read like the table-keyed shape
+        Assert.Equal(["required_lib"], mod.Details.Dependencies);
+    }
+
+    [Fact]
+    public void ForgeModsToml_InvalidDependencies_AreIgnored()
+    {
+        var jar = TempFile("forge-bad-deps.jar");
+        WriteJar(jar, ("META-INF/mods.toml", """
+                                             dependencies = "not a table"
+                                             [[mods]]
+                                             modId = "baddeps"
+                                             version = "1.0.0"
+                                             displayName = "Bad Deps"
+                                             """));
+
+        var mod = Parsed(jar);
+
+        Assert.Equal("baddeps", mod.Details.ModId);
+        Assert.Equal("Bad Deps", mod.Details.Name);
+        Assert.Empty(mod.Details.Dependencies);
+    }
+
+    [Fact]
+    public void ForgeModsToml_DependencyKeyDifferentFromModId_UsesFirstKey()
+    {
+        var jar = TempFile("forge-other-dep-key.jar");
+        WriteJar(jar, ("META-INF/mods.toml", """
+                                             [[mods]]
+                                             modId = "actualmod"
+                                             version = "1.0.0"
+                                             displayName = "Actual"
+
+                                             [[dependencies.othermod]]
+                                             modId = "required_lib"
+                                             mandatory = true
+                                             """));
+
+        var mod = Parsed(jar);
+
+        Assert.Equal("actualmod", mod.Details.ModId);
+        Assert.Equal(["required_lib"], mod.Details.Dependencies);
+    }
+
+    [Fact]
+    public void ForgeModsToml_MalformedToml_YieldsEmptyDetails()
+    {
+        var details = ModUtils.ReadMcModToml("name =");
+
+        Assert.Equal("", details.ModId);
+        Assert.Empty(details.Dependencies);
+    }
+
+    [Fact]
     public void ForgeModsToml_JarVersionPlaceholder_FallsBackToManifest()
     {
         // the mods.toml entry comes first; the version placeholder is only resolved once the

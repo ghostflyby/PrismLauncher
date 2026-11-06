@@ -18,7 +18,7 @@
 //  - The INIFile (QSettings IniFormat) reader of ReadForgeInfo is approximated with a minimal
 //    "key=value" properties parse (sections/comments skipped); forgeversion.properties only
 //    needs the flat forge.*.*.number keys.
-//  - The toml++ read of ReadMCModTOML goes through MiniToml (extended with [[array of
+//  - The toml++ read of ReadMCModTOML goes through Tomlyn's typed DTOs (including [[array of
 //    tables]] for [[mods]] / [[dependencies.<modId>]]); a parse failure yields empty details
 //    like the caught toml++ parse_error.
 
@@ -27,6 +27,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.ModPlatform.Packwiz;
+using FlintLauncher.Core.Toml;
+using Tomlyn;
 using TruePath;
 
 namespace FlintLauncher.Core.Minecraft.Resources;
@@ -411,11 +413,12 @@ public static class ModUtils
     {
         var details = new ModDetails();
 
-        TomlTable tomlData;
+        ModsTomlFile file;
         try
         {
             // toml++ skips a leading UTF-8 BOM, like the JSON reader above
-            tomlData = MiniToml.Parse(contents.TrimStart('\uFEFF'));
+            file = TomlSerializer.Deserialize<ModsTomlFile>(
+                contents.TrimStart('\uFEFF'), FlintTomlContext.Default) ?? new ModsTomlFile();
         }
         catch (Exception) // upstream #6047: malformed mod metadata must not crash the scan
         {
@@ -423,39 +426,30 @@ public static class ModUtils
         }
 
         // array defined by [[mods]]
-        var tomlModsArr = tomlData.GetTableArray("mods");
-        if (tomlModsArr is not { Count: > 0 })
+        var tomlMods = file.Mods;
+        if (tomlMods is not { Count: > 0 })
         {
             // qWarning() << "Corrupted mods.toml? Couldn't find [[mods]] array!";
             return new ModDetails();
         }
 
         // we only really care about the first element, since multiple mods in one file is not supported by us at the moment
-        var modsTable = tomlModsArr[0];
+        var modsTable = tomlMods[0];
 
         // mandatory properties - always in [[mods]]
-        details.ModId = modsTable.GetString("modId");
-        details.Version = modsTable.GetString("version");
-        details.Name = modsTable.GetString("displayName");
-        details.Description = modsTable.GetString("description");
+        details.ModId = modsTable.ModId ?? "";
+        details.Version = modsTable.Version ?? "";
+        details.Name = modsTable.DisplayName ?? "";
+        details.Description = modsTable.Description ?? "";
 
         // optional properties - can be in the root table or [[mods]]
-        var authors = tomlData.GetString("authors");
-        if (authors.Length == 0)
-        {
-            authors = modsTable.GetString("authors");
-        }
-
-        if (authors.Length != 0)
+        var authors = !string.IsNullOrEmpty(file.Authors) ? file.Authors : modsTable.Authors;
+        if (!string.IsNullOrEmpty(authors))
         {
             details.Authors.Add(authors);
         }
 
-        var homeurl = tomlData.GetString("displayURL");
-        if (homeurl.Length == 0)
-        {
-            homeurl = modsTable.GetString("displayURL");
-        }
+        var homeurl = !string.IsNullOrEmpty(file.DisplayUrl) ? file.DisplayUrl : modsTable.DisplayUrl ?? "";
 
         // fix up url.
         if (homeurl.Length != 0 && !homeurl.StartsWith("http://", StringComparison.Ordinal)
@@ -467,34 +461,19 @@ public static class ModUtils
 
         details.Homeurl = homeurl;
 
-        var issueTrackerUrl = tomlData.GetString("issueTrackerURL");
-        if (issueTrackerUrl.Length == 0)
-        {
-            issueTrackerUrl = modsTable.GetString("issueTrackerURL");
-        }
+        details.IssueTracker = !string.IsNullOrEmpty(file.IssueTrackerUrl)
+            ? file.IssueTrackerUrl
+            : modsTable.IssueTrackerUrl ?? "";
 
-        details.IssueTracker = issueTrackerUrl;
-
-        var license = tomlData.GetString("license");
-        if (license.Length == 0)
-        {
-            license = modsTable.GetString("license");
-        }
-
+        var license = !string.IsNullOrEmpty(file.License) ? file.License : modsTable.License ?? "";
         if (license.Length != 0)
         {
             details.Licenses.Add(new ModLicense(license));
         }
 
-        var logoFile = tomlData.GetString("logoFile");
-        if (logoFile.Length == 0)
-        {
-            logoFile = modsTable.GetString("logoFile");
-        }
+        details.IconFile = !string.IsNullOrEmpty(file.LogoFile) ? file.LogoFile : modsTable.LogoFile ?? "";
 
-        details.IconFile = logoFile;
-
-        void ParseDep(IReadOnlyList<TomlTable>? dependencies)
+        void ParseDep(IReadOnlyList<ModsTomlDependency>? dependencies)
         {
             string[] ignoreModIds = ["", "forge", "neoforge", "minecraft"];
             if (dependencies is null)
@@ -502,16 +481,16 @@ public static class ModUtils
                 return;
             }
 
-            foreach (var depTable in dependencies)
+            foreach (var dep in dependencies)
             {
-                var modId = depTable.GetString("modId");
+                var modId = dep.ModId ?? "";
                 if (ignoreModIds.Contains(modId))
                 {
                     continue;
                 }
 
-                var isNeoForgeDep = depTable.GetString("type") == "required";
-                var isForgeDep = depTable.GetBoolean("mandatory");
+                var isNeoForgeDep = dep.Type == "required";
+                var isForgeDep = dep.Mandatory;
                 if (isNeoForgeDep || isForgeDep)
                 {
                     details.Dependencies.Add(modId);
@@ -519,25 +498,28 @@ public static class ModUtils
             }
         }
 
-        if (tomlData.TryGetValue("dependencies", out var depValue))
+        if (file.Dependencies is { } dependencies)
         {
-            if (depValue is List<object?> depArray)
+            if (dependencies.Array is { } depArray)
             {
-                ParseDep(depArray.OfType<TomlTable>().ToList());
+                ParseDep(depArray);
             }
-            else if (depValue is TomlTable depTable)
+            else if (dependencies.Table is { } depTable)
             {
                 var expectedKey = details.ModId;
                 if (!depTable.ContainsKey(expectedKey))
                 {
-                    var firstKey = depTable.FirstKey();
+                    var firstKey = depTable.Keys.FirstOrDefault();
                     if (firstKey is not null)
                     {
                         expectedKey = firstKey;
                     }
                 }
 
-                ParseDep(depTable.GetTableArray(expectedKey));
+                if (depTable.TryGetValue(expectedKey, out var entries))
+                {
+                    ParseDep(entries);
+                }
             }
         }
 
@@ -942,20 +924,5 @@ public static class ModUtils
         using var output = new MemoryStream();
         stream.CopyTo(output);
         return output.ToArray();
-    }
-}
-
-/// <summary>Small helpers for the TomlTable lookups of the readers.</summary>
-internal static class LocalModParseExtensions
-{
-    /// <summary>The first key of the table (toml++ table iteration), or null when empty.</summary>
-    public static string? FirstKey(this TomlTable table)
-    {
-        foreach (var key in table.Keys)
-        {
-            return key;
-        }
-
-        return null;
     }
 }

@@ -4,7 +4,7 @@
 // SPDX-FileCopyrightText: 2022 Sefa Eyeoglu <contact@scrumplex.net>
 //
 // Port of tests/Packwiz_test.cpp (fixtures: tests/testdata/Packwiz -> TestData/Packwiz),
-// plus coverage for the create/update/delete/by-id paths and the MiniToml subset parser.
+// plus coverage for the create/update/delete/by-id paths and the Tomlyn TOML reader.
 
 using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.ModPlatform;
@@ -171,7 +171,7 @@ public class PackwizTests
         var indexFile = Path.Combine(dir, "borderless-mining.pw.toml");
         Assert.True(File.Exists(indexFile));
 
-        // the written file parses through the MiniToml subset and round-trips
+        // the written file parses through Tomlyn and round-trips
         var loaded = Packwiz.GetIndexForMod(new AbsolutePath(dir), "borderless-mining");
         Assert.True(loaded.IsValid);
         Assert.Equal(mod.Name, loaded.Name);
@@ -310,14 +310,68 @@ public class PackwizTests
     }
 
     [Fact]
-    public void TomlTable_KeysPreserveInsertionOrder()
+    public void Read_AcceptsToml11InlineTables()
     {
-        var table = MiniToml.Parse("zeta = \"z\"\nalpha = 1\nmiddle = true\n");
+        var dir = Path.Combine(Path.GetTempPath(), $"flint-packwiz-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "toml11.pw.toml"), """
+                name = "toml11"
+                filename = "toml11.jar"
+                side = "both"
+                x-prismlauncher-loaders = ["fabric"]
+                x-prismlauncher-mc-versions = ["1.21"]
+                x-prismlauncher-release-type = "release"
+                x-prismlauncher-version-number = "1"
+                x-prismlauncher-lock-update = false
+                unknownField = "ignored"
+                x-prismlauncher-dependencies = [
+                  {
+                    addonId = "P7dR8mSH",
+                    type = "required",
+                  },
+                ]
+                [download]
+                mode = "metadata:curseforge"
+                url = "https://example.invalid/toml11.jar"
+                hash-format = "sha1"
+                hash = "00"
+                [update]
+                [update.curseforge]
+                file-id = 1
+                project-id = 2
+                """);
 
-        Assert.Equal(new[] { "zeta", "alpha", "middle" }, table.Keys.ToArray());
-        Assert.Equal(3, table.Count);
-        Assert.True(table.TryGetValue("alpha", out var alpha) && alpha is long value && value == 1);
-        Assert.Equal("z", table["zeta"]);
-        Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(table);
+            var mod = Packwiz.GetIndexForMod(new AbsolutePath(dir), "toml11");
+
+            Assert.True(mod.IsValid);
+            Assert.Equal("toml11", mod.Name);
+            var dep = Assert.Single(mod.Dependencies);
+            Assert.Equal("P7dR8mSH", dep.AddonId);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Read_MalformedToml_ReturnsInvalidMod()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"flint-packwiz-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "broken.pw.toml"), "name =");
+
+            var mod = Packwiz.GetIndexForMod(new AbsolutePath(dir), "broken");
+
+            Assert.False(mod.IsValid);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
     }
 }

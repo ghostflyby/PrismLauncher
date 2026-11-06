@@ -115,7 +115,7 @@
 | `modplatform/ModIndex.h` `ResourceAPI.h` | `ModPlatform/ModIndex.cs` `ResourceAPI.cs` | ported | |
 | `modplatform/modrinth/*` | `ModPlatform/Modrinth/*` | ported | 搜索/版本/按哈希更新/.mrpack 导入导出往返 |
 | `modplatform/flame/*` | `ModPlatform/Flame/*` | ported | 指纹批量解析、blocked-mods 数据语义、导入导出往返；API key 用户自备 |
-| `modplatform/packwiz/*` + MetadataHandler | `ModPlatform/Packwiz/*` `MetadataHandler.cs` `EnsureMetadataTask.cs` | ported | 自研 MiniToml 子集（上游 Packwiz_test 原样通过） |
+| `modplatform/packwiz/*` + MetadataHandler | `ModPlatform/Packwiz/*` `MetadataHandler.cs` `EnsureMetadataTask.cs` | ported | Tomlyn 类型化 DTO（上游 Packwiz_test 原样通过） |
 | `modplatform/atlauncher/*` | `ModPlatform/AtLauncher/*` | ported | 可选 mod 选择、per-type 目录布局、组件 patch |
 | `modplatform/technic/*` | `ModPlatform/Technic/*` | ported | ZIP/Solder 双路径 + 三种 flavor 侦测 |
 | `modplatform/ftb/*` `legacy_ftb/*` `import_ftb/*` | `ModPlatform/Ftb*/` | ported | 目标->组件映射、legacy XML 修复规则、FTB App 布局钩子 |
@@ -155,7 +155,7 @@
 |---|---|---|
 | `javacheck`(JavaCheck.jar 源码) | 原样复用，内嵌资源 | todo |
 | `quazip` | System.IO.Compression 替代 | n/a |
-| `tomlplusplus` | Tomlyn 或自写子集 | todo |
+| `tomlplusplus` | Tomlyn 2.10 类型化 DTO（source-gen context） | ported |
 | `katabasis` | 自写 OAuth（P4） | n/a |
 | `rainbow`（颜色工具） | GUI-bound | n/a |
 | `QJsonModel` | GUI-bound | n/a |

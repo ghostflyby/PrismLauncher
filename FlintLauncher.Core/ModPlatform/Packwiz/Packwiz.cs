@@ -4,9 +4,8 @@
 // SPDX-FileCopyrightText: 2023 Trial97 <alexandru.tripon97@gmail.com>
 //
 // Port of modplatform/packwiz/Packwiz.{h,cpp} (the MetadataHandler storage backend): the
-// .pw.toml per-mod metadata index. The toml++ dependency is replaced by MiniToml (see the
-// subset documentation there); the writer emits the same key layout toml++ produces for
-// the equivalent table.
+// .pw.toml per-mod metadata index. The toml++ read path is replaced by Tomlyn's typed DTOs
+// (TOML 1.1 on input); the writer still emits TOML 1.0 syntax for the same key layout.
 //
 // Deviations:
 //  - QDir/QFile become string paths + System.IO; the C++ qWarning/qCritical paths become
@@ -18,7 +17,9 @@ using System.Globalization;
 using System.Text;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Minecraft;
+using FlintLauncher.Core.Toml;
 using FlintLauncher.Core.Versioning;
+using Tomlyn;
 using TruePath;
 using TruePath.SystemIo;
 
@@ -266,10 +267,11 @@ public static class Packwiz
         }
 
         var path = indexDir / realFname;
-        TomlTable table;
+        PackwizTomlFile file;
         try
         {
-            table = MiniToml.ParseFile(path);
+            file = TomlSerializer.Deserialize<PackwizTomlFile>(
+                path.ReadAllText().TrimStart('\uFEFF'), FlintTomlContext.Default) ?? new PackwizTomlFile();
         }
         catch (Exception e) // upstream #6047: any failure here means "no usable metadata", not a crash
         {
@@ -282,86 +284,76 @@ public static class Packwiz
 
         // Basic info
         {
-            mod.Name = table.GetString("name");
-            mod.Filename = table.GetString("filename");
-            mod.Side = SideType.FromString(table.GetString("side"));
-            mod.ReleaseType = IndexedVersionType.FromString(table.GetString("x-prismlauncher-release-type"));
-            foreach (var loader in table.GetStringArray("x-prismlauncher-loaders"))
+            mod.Name = file.Name ?? "";
+            mod.Filename = file.Filename ?? "";
+            mod.Side = SideType.FromString(file.Side ?? "");
+            mod.ReleaseType = IndexedVersionType.FromString(file.ReleaseType ?? "");
+            foreach (var loader in file.Loaders ?? [])
             {
                 mod.Loaders |= ModIndex.GetModLoaderFromString(loader);
             }
 
-            var versions = table.GetStringArray("x-prismlauncher-mc-versions");
+            var versions = file.McVersions ?? [];
             mod.McVersions.AddRange(versions.Where(v => v.Length != 0));
             RemoveDuplicates(mod.McVersions);
             mod.McVersions.Sort(SortMcVersions);
         }
-        mod.VersionNumber = table.GetString("x-prismlauncher-version-number");
-        mod.LockUpdate = table.GetBoolean("x-prismlauncher-lock-update");
+        mod.VersionNumber = file.VersionNumber ?? "";
+        mod.LockUpdate = file.LockUpdate;
 
         // [download] info
         {
-            var downloadTable = table.GetTable("download");
-            if (downloadTable is null)
+            var download = file.Download;
+            if (download is null)
             {
                 // "No [download] section found on mod metadata!"
                 return new Mod();
             }
 
-            mod.Mode = downloadTable.GetString("mode");
-            mod.Url = downloadTable.GetString("url");
-            mod.HashFormat = downloadTable.GetString("hash-format");
-            mod.Hash = downloadTable.GetString("hash");
+            mod.Mode = download.Mode ?? "";
+            mod.Url = download.Url ?? "";
+            mod.HashFormat = download.HashFormat ?? "";
+            mod.Hash = download.Hash ?? "";
         }
 
         // [update] info
         {
-            var updateTable = table.GetTable("update");
-            if (updateTable is null)
+            var update = file.Update;
+            if (update is null)
             {
                 // "No [update] section found on mod metadata!"
                 return new Mod();
             }
 
-            var flameTable = updateTable.GetTable(ProviderCapabilities.Name(ResourceProvider.Flame));
-            if (flameTable is not null)
+            if (update.CurseForge is { } flame)
             {
                 mod.Provider = ResourceProvider.Flame;
-                mod.FileId = flameTable.GetInteger("file-id").ToString(CultureInfo.InvariantCulture);
-                mod.ProjectId = flameTable.GetInteger("project-id").ToString(CultureInfo.InvariantCulture);
+                mod.FileId = flame.FileId.ToString(CultureInfo.InvariantCulture);
+                mod.ProjectId = flame.ProjectId.ToString(CultureInfo.InvariantCulture);
+            }
+            else if (update.Modrinth is { } modrinth)
+            {
+                mod.Provider = ResourceProvider.Modrinth;
+                mod.ProjectId = modrinth.ModId ?? "";
+                mod.FileId = modrinth.Version ?? "";
             }
             else
             {
-                var modrinthTable = updateTable.GetTable(ProviderCapabilities.Name(ResourceProvider.Modrinth));
-                if (modrinthTable is not null)
-                {
-                    mod.Provider = ResourceProvider.Modrinth;
-                    mod.ProjectId = modrinthTable.GetString("mod-id");
-                    mod.FileId = modrinthTable.GetString("version");
-                }
-                else
-                {
-                    // "No mod provider on mod metadata!"
-                    return new Mod();
-                }
+                // "No mod provider on mod metadata!"
+                return new Mod();
             }
         }
 
         // dependencies
         {
-            foreach (var depTable in table.GetTableArray("x-prismlauncher-dependencies"))
+            foreach (var depFile in file.Dependencies ?? [])
             {
-                var dep = new Dependency
+                mod.Dependencies.Add(new Dependency
                 {
-                    AddonId = depTable.GetString("addonId"),
-                };
-                if (depTable.ContainsKey("version"))
-                {
-                    dep.Version = depTable.GetString("version");
-                }
-
-                dep.Type = DependencyType.FromString(depTable.GetString("type"));
-                mod.Dependencies.Add(dep);
+                    AddonId = depFile.AddonId ?? "",
+                    Version = depFile.Version ?? "",
+                    Type = DependencyType.FromString(depFile.Type ?? ""),
+                });
             }
         }
 

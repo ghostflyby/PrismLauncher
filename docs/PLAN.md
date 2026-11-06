@@ -54,7 +54,7 @@ FlintLauncher.Tests/                # xUnit；夹具复制自原 tests/testdata
 | 风险 | 应对 |
 |---|---|
 | QSettings INI 兼容细节（转义/引号/base64 迁移） | 以原 INIFile_test.cpp + 真实 instance.cfg 样本做夹具；读三格式、写 1.3 |
-| Tomlyn AOT 兼容性 | P6 初先写 AOT publish 探针；不行手写 packwiz 子集 |
+| Tomlyn AOT 兼容性 | 已用类型化 DTO + source-gen context 迁移，AOT 分析器 0 警告 |
 | NewLaunch.java 构建链（需 JDK） | 开发期编译产物入 resources；CI 补 javac 步骤；备选：直发 classpath 启动（放弃 EntryPoint 注入语义需评估 legacy jarmod 影响） |
 | Xbox/XSTS 鉴权细节（设备码流、token 刷新窗口） | 以原 AuthStep 请求/响应字段为准逐字段移植；先用真账号走通 |
 | 进程树终止（Windows） | P5 末补 Job Object；macOS/Linux process group |
