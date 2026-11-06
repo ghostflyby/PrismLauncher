@@ -30,10 +30,10 @@ namespace FlintLauncher.Core.Minecraft.Resources;
 /// <summary>Port of the ModLicense struct.</summary>
 public sealed class ModLicense
 {
-    public string Name { get; set; } = "";
-    public string Id { get; set; } = "";
-    public string Url { get; set; } = "";
-    public string Description { get; set; } = "";
+    public string? Name { get; set; }
+    public string? Id { get; set; }
+    public string? Url { get; set; }
+    public string? Description { get; set; }
 
     public ModLicense() { }
 
@@ -74,7 +74,7 @@ public sealed class ModLicense
         }
     }
 
-    public ModLicense(string name, string id, string url, string description)
+    public ModLicense(string? name, string? id, string? url, string? description)
     {
         Name = name;
         Id = id;
@@ -82,7 +82,8 @@ public sealed class ModLicense
         Description = description;
     }
 
-    public bool IsEmpty() => Name.Length == 0 && Id.Length == 0 && Url.Length == 0 && Description.Length == 0;
+    public bool IsEmpty() => string.IsNullOrEmpty(Name) && string.IsNullOrEmpty(Id)
+                             && string.IsNullOrEmpty(Url) && string.IsNullOrEmpty(Description);
 }
 
 /// <summary>Port of the ModDetails struct: the mod-specific details resolved by a parse task.</summary>

@@ -462,7 +462,7 @@ public class FlameApiTests : IDisposable
 
         // the resolve succeeds; the blocked state is the *missing download URL*
         var version = manifest.Files[456].Version;
-        Assert.Equal("", version.DownloadUrl);
+        Assert.Null(version.DownloadUrl);
         Assert.Equal("456", version.FileId);
     }
 

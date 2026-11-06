@@ -121,7 +121,7 @@ public class GetModDependenciesTask
                 // when on quilt, a fabric dep id is overridden with the quilt one, and vice versa
                 if (o.Provider == providerName && dep.AddonId == (isQuilt ? o.Fabric : o.Quilt))
                 {
-                    return new Dependency { AddonId = isQuilt ? o.Quilt : o.Fabric, Type = dep.Type, Version = "" };
+                    return new Dependency { AddonId = isQuilt ? o.Quilt : o.Fabric, Type = dep.Type, Version = null };
                 }
             }
         }
@@ -273,11 +273,11 @@ public class GetModDependenciesTask
             {
                 // the pinned dependency names a file; the rest list the project's files
                 // for the instance's game version and single selected loader
-                files = dep.Version.Length != 0
+                files = dep.Version is { } pinnedFile
                     ?
                     [
                         (
-                            await _flame.Files.ById(dep.AddonId, dep.Version).SendTo(_http, cancellationToken)).Data
+                            await _flame.Files.ById(dep.AddonId, pinnedFile).SendTo(_http, cancellationToken)).Data
                         ?? throw new JsonException("'data' is not an object"),
                     ]
                     : (await _flame.Files.List(dep.AddonId,
@@ -318,8 +318,8 @@ public class GetModDependenciesTask
             List<ModrinthVersion> dtos;
             try
             {
-                dtos = dep.Version.Length != 0
-                    ? [await _modrinth.Versions.ById(dep.Version).SendTo(_http, cancellationToken)]
+                dtos = dep.Version is { } pinnedVersion
+                    ? [await _modrinth.Versions.ById(pinnedVersion).SendTo(_http, cancellationToken)]
                     : await _modrinth.Versions.Query(dep.AddonId,
                         [ModrinthVersionFormat.ToWire(_version)],
                         ModIndex.ModLoaderTypesToList(_loaderType).Select(ModIndex.GetModLoaderAsString).ToList(),
@@ -367,7 +367,7 @@ public class GetModDependenciesTask
                     {
                         RemovePack(dep.AddonId);
                         await PrepareDependencyAsync(
-                            new Dependency { AddonId = o.Fabric, Type = dep.Type, Version = "" },
+                            new Dependency { AddonId = o.Fabric, Type = dep.Type, Version = null },
                             provider, level, cancellationToken).ConfigureAwait(false);
                         return;
                     }
@@ -393,7 +393,7 @@ public class GetModDependenciesTask
         if (dep.AddonId.Length == 0 && pDep.Version.AddonId.Length != 0 && pDep.Dependency is { } discovered)
         {
             pDep.Pack.AddonId = pDep.Version.AddonId;
-            var overrideDep = GetOverride(new Dependency { AddonId = pDep.Version.AddonId, Type = discovered.Type, Version = "" },
+            var overrideDep = GetOverride(new Dependency { AddonId = pDep.Version.AddonId, Type = discovered.Type, Version = null },
                 provider);
             if (overrideDep.AddonId != pDep.Version.AddonId)
             {

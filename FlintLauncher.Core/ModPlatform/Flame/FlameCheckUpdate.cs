@@ -149,14 +149,14 @@ public sealed class FlameCheckUpdate(
             return;
         }
 
-        if (latestVer.DownloadUrl.Length == 0 && latestVer.FileId != metadata.FileId)
+        if (latestVer.DownloadUrl is null && latestVer.FileId != metadata.FileId)
         {
             _blocked[resource] = latestVer.FileId;
             return;
         }
 
-        if (latestVer.Hash.Length != 0
-            && (metadata.Hash != latestVer.Hash || resource.Status == ResourceStatus.NotInstalled))
+        if (latestVer.Hash is { } hash
+            && (metadata.Hash != hash || resource.Status == ResourceStatus.NotInstalled))
         {
             var oldVersion = metadata.VersionNumber
                              ?? (resource.Status == ResourceStatus.NotInstalled ? "Not installed" : "Unknown");

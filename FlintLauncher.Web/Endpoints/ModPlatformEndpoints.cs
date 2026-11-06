@@ -776,10 +776,10 @@ public static class ModPlatformEndpoints
         version.FileId,
         // CurseForge has no version numbers — fall back to the display name (the
         // Packwiz::createModFormat rule)
-        version.VersionNumber.Length != 0 ? version.VersionNumber : version.Version,
+        version.VersionNumber ?? version.Version,
         version.Date,
         version.FileName,
-        version.DownloadUrl,
+        version.DownloadUrl ?? "",
         ModIndex.ModLoaderTypesToList(version.Loaders).Select(ModIndex.GetModLoaderAsString).ToArray(),
         version.McVersion.Distinct().ToArray());
 }

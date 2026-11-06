@@ -86,17 +86,17 @@ public static class FlameMod
     /// <summary>Port of FlameMod::loadURLs.</summary>
     private static void MapUrls(FlameLinks? links, IndexedPack pack)
     {
-        pack.ExtraData.IssuesUrl = ChopTrailingSlash(links?.IssuesUrl ?? "");
-        pack.ExtraData.SourceUrl = ChopTrailingSlash(links?.SourceUrl ?? "");
-        pack.ExtraData.WikiUrl = ChopTrailingSlash(links?.WikiUrl ?? "");
+        pack.ExtraData.IssuesUrl = ChopTrailingSlash(links?.IssuesUrl);
+        pack.ExtraData.SourceUrl = ChopTrailingSlash(links?.SourceUrl);
+        pack.ExtraData.WikiUrl = ChopTrailingSlash(links?.WikiUrl);
 
-        if (pack.ExtraData.Body.Length != 0)
+        if (pack.ExtraData.Body is { Length: > 0 })
         {
             pack.ExtraDataLoaded = true;
         }
     }
 
-    private static string ChopTrailingSlash(string url) => url.EndsWith('/') ? url[..^1] : url;
+    private static string? ChopTrailingSlash(string? url) => url?.EndsWith('/') == true ? url[..^1] : url;
 
     // --------------------------------------------------------------- version loading
 
@@ -210,7 +210,7 @@ public static class FlameMod
         file.FileId = Require(dto.Id, "id").ToString(CultureInfo.InvariantCulture);
         file.Date = Require(dto.FileDate, "fileDate");
         file.Version = Require(dto.DisplayName, "displayName");
-        file.DownloadUrl = dto.DownloadUrl ?? "";
+        file.DownloadUrl = dto.DownloadUrl;
         file.FileName = FileNaming.RemoveInvalidPathChars(Require(dto.FileName, "fileName"));
 
         file.VersionType = Require(dto.ReleaseType, "releaseType") switch

@@ -144,7 +144,7 @@ public sealed class ModSelectionResolver(
             ? await FetchPinnedVersionAsync(provider, projectId, versionId, cancellationToken)
             : await FetchLatestVersionAsync(provider, pack, cancellationToken);
 
-        if (version is null || version.FileId.Length == 0 || version.DownloadUrl.Length == 0)
+        if (version is null || version.FileId.Length == 0 || version.DownloadUrl is null)
         {
             throw new ModResolveException(
                 $"no downloadable {(versionId.Length != 0 ? $"version '{versionId}' " : "version ")}of {projectId}" +
@@ -343,7 +343,7 @@ public sealed class ModInstallTask(
 
             planned.Add((entry, isDependency, requiredBy));
 
-            if (entry.Version.DownloadUrl.Length == 0)
+            if (entry.Version.DownloadUrl is null)
             {
                 throw new InvalidOperationException(
                     $"no downloadable version of {entry.Pack.AddonId} was resolved");

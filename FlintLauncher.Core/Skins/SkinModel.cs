@@ -65,7 +65,7 @@ public sealed class SkinModel
 {
     public SkinModel() { }
 
-    public SkinModel(AbsolutePath skinsDir, string name, string capeId = "", string url = "",
+    public SkinModel(AbsolutePath skinsDir, string name, string? capeId = null, string? url = null,
         SkinModelKind model = SkinModelKind.Classic)
     {
         Path = (skinsDir / $"{name}.png");
@@ -77,7 +77,7 @@ public sealed class SkinModel
     /// <summary>The wire entry → model (the C++ SkinModel(QJsonObject) read).</summary>
     internal static SkinModel FromWire(AbsolutePath skinsDir, SkinEntryJson entry)
     {
-        return new SkinModel(skinsDir, entry.Name ?? "", entry.CapeId ?? "", entry.Url ?? "",
+        return new SkinModel(skinsDir, entry.Name ?? "", entry.CapeId, entry.Url,
             entry.Model == "SLIM" ? SkinModelKind.Slim : SkinModelKind.Classic);
     }
 
@@ -95,11 +95,11 @@ public sealed class SkinModel
 
     public AbsolutePath Path;
 
-    public string CapeId { get; init; } = "";
+    public string? CapeId { get; init; }
 
     public SkinModelKind Model { get; init; } = SkinModelKind.Classic;
 
-    public string Url { get; init; } = "";
+    public string? Url { get; init; }
 
     /// <summary>QFileInfo::completeBaseName of the path.</summary>
     public string Name()

@@ -228,7 +228,7 @@ public static class MetaJsonFormat
         // QDateTime contributes 0
         var releaseTime = ParseUtils.TimeFromS3Time(RequireStringOf(dto.ReleaseTime, "releaseTime"));
         version.RawTime = releaseTime?.ToUnixTimeMilliseconds() / 1000 ?? 0;
-        version.Type = dto.Type ?? "";
+        version.Type = dto.Type;
         version.IsRecommended = dto.Recommended ?? false;
         version.Volatile = dto.Volatile ?? false;
         var reqs = new SortedSet<Require>();

@@ -43,7 +43,7 @@ public sealed class MetaVersion(string uid, string version) : MetaEntity
 
     public string Version { get; } = version;
 
-    public string Type { get; set; } = "";
+    public string? Type { get; set; }
 
     /// <summary>QDateTime::fromMSecsSinceEpoch(m_time * 1000, Qt::UTC).</summary>
     public DateTimeOffset Time() => DateTimeOffset.FromUnixTimeMilliseconds(RawTime * 1000);

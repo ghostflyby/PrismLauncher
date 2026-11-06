@@ -214,7 +214,7 @@ public sealed class ModrinthCheckUpdate
                 // - The version reported by the JAR is different from the version reported by the
                 //   indexed version (it's usually the case)
                 var projectVer = ModrinthPackIndex.LoadIndexedPackVersion(projectVersion, _hashType, loaderFilter);
-                if (projectVer.DownloadUrl.Length == 0)
+                if (projectVer.DownloadUrl is null)
                 {
                     // "Modrinth mod without download url!"
                     continue;
@@ -224,17 +224,14 @@ public sealed class ModrinthCheckUpdate
                 var status = resource.Status;
                 if ((projectVer.Hash != hash && projectVer.IsPreferred) || status == ResourceStatus.NotInstalled)
                 {
-                    var oldVersion = metadata?.VersionNumber ?? "";
-                    if (oldVersion.Length == 0)
-                    {
-                        oldVersion = status == ResourceStatus.NotInstalled ? "Not installed" : "Unknown";
-                    }
+                    var oldVersion = metadata?.VersionNumber
+                                     ?? (status == ResourceStatus.NotInstalled ? "Not installed" : "Unknown");
 
                     _updates.Add(new Update
                     {
                         Name = metadata?.Name ?? resource.Name,
                         OldVersion = oldVersion,
-                        NewVersion = projectVer.VersionNumber,
+                        NewVersion = projectVer.VersionNumber ?? projectVer.Version,
                         Provider = ResourceProvider.Modrinth,
                         Version = projectVer,
                     });

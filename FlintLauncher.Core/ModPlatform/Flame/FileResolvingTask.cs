@@ -99,9 +99,9 @@ public static class FileResolvingTask
 
                     manifestFile.Version = version;
                     var urlValid = Uri.TryCreate(version.DownloadUrl, UriKind.Absolute, out _);
-                    if (!urlValid && "sha1" == version.HashType && version.Hash.Length != 0)
+                    if (!urlValid && "sha1" == version.HashType && version.Hash is { } hash)
                     {
-                        hashes.Add(version.Hash);
+                        hashes.Add(hash);
                     }
                 }
                 catch (Exception e) when (e is JsonException or FormatException)
@@ -135,8 +135,8 @@ public static class FileResolvingTask
                     {
                         var urlValid = Uri.TryCreate(outFile.Version.DownloadUrl, UriKind.Absolute, out _);
                         if (!urlValid && "sha1" == outFile.Version.HashType
-                                      && outFile.Version.Hash.Length != 0
-                                      && entries.TryGetValue(outFile.Version.Hash, out var entry))
+                                      && outFile.Version.Hash is { } fileHash
+                                      && entries.TryGetValue(fileHash, out var entry))
                         {
                             try
                             {

@@ -183,7 +183,7 @@ public sealed class FtbPackInstallTask(
             var localFile = Manifest.Files[index];
 
             // First check for blocked mods
-            if (resultsFile.Version.DownloadUrl.Length == 0)
+            if (resultsFile.Version.DownloadUrl is null)
             {
                 _blockedMods.Add(new BlockedMod
                 {

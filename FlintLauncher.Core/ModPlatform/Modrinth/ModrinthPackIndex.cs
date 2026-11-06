@@ -136,7 +136,7 @@ public static class ModrinthPackIndex
             var dependency = new Dependency
             {
                 AddonId = d.ProjectId ?? "",
-                Version = d.VersionId ?? "",
+                Version = d.VersionId,
             };
 
             dependency.Type = d.DependencyType switch

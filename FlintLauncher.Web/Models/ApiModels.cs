@@ -172,7 +172,7 @@ public sealed record FlameSearchResult(
     string Slug,
     string Name,
     string IconUrl,
-    string Author,
+    string? Author,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     long? Downloads);
 
@@ -551,9 +551,9 @@ public sealed record AccountSkinView(string Url, string Variant);
 // ------------------------------------------------- skins (local skin library)
 
 /// <summary>One entry of the local skin library (GET /skins). model is CLASSIC/SLIM;
-/// capeId/url are the stored metadata (empty when unknown); fileExists reports whether the
+/// capeId/url are the stored metadata (null when unknown); fileExists reports whether the
 /// texture png is present in the skins dir.</summary>
-public sealed record SkinView(string Name, string Model, string CapeId, string Url, bool FileExists);
+public sealed record SkinView(string Name, string Model, string? CapeId, string? Url, bool FileExists);
 
 /// <summary>POST /skins/{name}/apply body: which account wears the stored skin. model
 /// overrides the stored variant ("classic"/"slim"); omitted = the stored one.</summary>

@@ -83,11 +83,14 @@ public class ResourceDownloadTask
                 cancellationToken).ConfigureAwait(false)
             : null;
 
-        await _modrinth.Downloads.File(_packVersion.DownloadUrl,
+        if (_packVersion.DownloadUrl is not { } downloadUrl)
+        {
+            throw new InvalidOperationException($"The version {_packVersion.FileId} has no download URL.");
+        }
+
+        await _modrinth.Downloads.File(downloadUrl,
                 CreateModrinthMeta(_instance, _downloadReason, _dependentOn),
-                HashUtils.VerifiedChecksum(
-                    _packVersion.HashType.Length != 0 ? _packVersion.HashType : null,
-                    _packVersion.Hash.Length != 0 ? _packVersion.Hash : null))
+                HashUtils.VerifiedChecksum(_packVersion.HashType, _packVersion.Hash))
             .SendTo(_http, HttpCompletionOption.ResponseHeadersRead,
                 (_packModel.Dir / GetFilename()).Value, cancellationToken)
             .ConfigureAwait(false);

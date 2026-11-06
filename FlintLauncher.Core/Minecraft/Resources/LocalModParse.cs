@@ -638,7 +638,7 @@ public static class ModUtils
         foreach (var license in licenses ?? [])
         {
             details.Licenses.Add(license.IsObjectForm
-                ? new ModLicense(license.Name, license.Id ?? "", license.Url ?? "", license.Description ?? "")
+                ? new ModLicense(license.Name, license.Id, license.Url, license.Description)
                 : new ModLicense(license.Name));
         }
     }

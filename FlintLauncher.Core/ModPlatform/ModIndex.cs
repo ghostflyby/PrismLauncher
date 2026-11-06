@@ -260,7 +260,7 @@ public static class ProviderCapabilities
 /// <summary>Port of ModPlatform::ModpackAuthor (the never-read author url is not ported).</summary>
 public sealed class ModpackAuthor
 {
-    public string Name { get; init; } = "";
+    public string? Name { get; init; }
 }
 
 /// <summary>Port of ModPlatform::Dependency.</summary>
@@ -270,7 +270,7 @@ public sealed class Dependency
     public string AddonId { get; init; } = "";
 
     public DependencyType Type { get; set; } = DependencyType.Invalid;
-    public string Version { get; set; } = "";
+    public string? Version { get; set; }
 }
 
 /// <summary>Port of ModPlatform::IndexedVersion.</summary>
@@ -279,15 +279,15 @@ public sealed class IndexedVersion
     public string AddonId { get; set; } = "";
     public string FileId { get; set; } = "";
     public string Version { get; set; } = "";
-    public string VersionNumber { get; set; } = "";
+    public string? VersionNumber { get; set; }
     public IndexedVersionType VersionType { get; set; } = IndexedVersionType.Invalid;
     public List<string> McVersion { get; init; } = [];
-    public string DownloadUrl { get; set; } = "";
+    public string? DownloadUrl { get; set; }
     public string Date { get; set; } = "";
     public string FileName { get; set; } = "";
     public ModLoaderType Loaders { get; set; } = ModLoaderType.None;
-    public string HashType { get; set; } = "";
-    public string Hash { get; set; } = "";
+    public string? HashType { get; set; }
+    public string? Hash { get; set; }
     public bool IsPreferred { get; set; } = true;
     public List<Dependency> Dependencies { get; init; } = [];
     public SideType Side { get; set; } = SideType.Invalid; // this is for flame API
@@ -298,7 +298,10 @@ public sealed class IndexedVersion
     public string GetVersionDisplayString()
     {
         var releaseType = VersionType.IsValid ? $" [{VersionType}]" : "";
-        var versionStr = !Version.Contains(VersionNumber, StringComparison.Ordinal) ? VersionNumber : "";
+        var versionStr = VersionNumber is { } versionNumber
+                         && !Version.Contains(versionNumber, StringComparison.Ordinal)
+            ? versionNumber
+            : "";
         var gameVersion = "";
         foreach (var v in McVersion)
         {
@@ -322,11 +325,11 @@ public sealed class IndexedVersion
 /// and status members are not ported).</summary>
 public sealed class ExtraPackData
 {
-    public string IssuesUrl { get; set; } = "";
-    public string SourceUrl { get; set; } = "";
-    public string WikiUrl { get; set; } = "";
+    public string? IssuesUrl { get; set; }
+    public string? SourceUrl { get; set; }
+    public string? WikiUrl { get; set; }
 
-    public string Body { get; set; } = "";
+    public string? Body { get; set; }
 }
 
 /// <summary>Port of ModPlatform::IndexedPack.</summary>

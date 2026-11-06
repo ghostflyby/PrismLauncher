@@ -188,9 +188,9 @@ public static class Packwiz
 
             deps.Append("{ addonId = ").Append(T(dep.AddonId));
             deps.Append(", type = ").Append(T(dep.Type.ToString()));
-            if (dep.Version.Length != 0)
+            if (dep.Version is { } depVersion)
             {
-                deps.Append(", version = ").Append(T(dep.Version));
+                deps.Append(", version = ").Append(T(depVersion));
             }
 
             deps.Append(" }");
@@ -368,7 +368,7 @@ public static class Packwiz
             mod.Dependencies.Add(new Dependency
             {
                 AddonId = depFile.AddonId,
-                Version = depFile.Version ?? "",
+                Version = depFile.Version,
                 Type = depFile.Type is { } type ? DependencyType.FromString(type) : DependencyType.Invalid,
             });
         }

@@ -461,7 +461,7 @@ public sealed partial class FlameCreationTask : InstanceTask
             }
 
             // skip optional mods that were not selected
-            if (result.Version.DownloadUrl.Length == 0)
+            if (result.Version.DownloadUrl is null)
             {
                 var blockedMod = new BlockedMod
                 {
@@ -528,9 +528,9 @@ public sealed partial class FlameCreationTask : InstanceTask
 
             var path = StagingPath / "minecraft" / relpath;
 
-            if (result.Version.DownloadUrl.Length != 0)
+            if (result.Version.DownloadUrl is { } downloadUrl)
             {
-                downloads.Add(HttpDownloadTask.ToFile(new Uri(result.Version.DownloadUrl), path, _http));
+                downloads.Add(HttpDownloadTask.ToFile(new Uri(downloadUrl), path, _http));
             }
         }
 
