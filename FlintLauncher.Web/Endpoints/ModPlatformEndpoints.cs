@@ -350,8 +350,8 @@ public static class ModPlatformEndpoints
                         return new InstalledModView(
                             fileName,
                             name,
-                            metadata is { } m && m.VersionNumber.Length != 0 ? m.VersionNumber : null,
-                            metadata is { } provider ? ModPlatformTasks.ProviderKey(provider.Provider) : null,
+                            metadata is { VersionNumber: { Length: > 0 } versionNumber } ? versionNumber : null,
+                            metadata is { Provider: { } provider } ? ModPlatformTasks.ProviderKey(provider) : null,
                             mod.Enabled);
                     })
                     .ToArray();

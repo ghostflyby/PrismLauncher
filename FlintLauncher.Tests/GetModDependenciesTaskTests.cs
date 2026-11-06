@@ -66,6 +66,9 @@ public class GetModDependenciesTaskTests : IDisposable
                 FileId = "verC1",
                 VersionNumber = "3.0.0",
                 Mode = "url",
+                Url = "https://example.invalid/c.jar",
+                HashFormat = "sha1",
+                Hash = "00",
             });
         }
 

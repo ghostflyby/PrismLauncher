@@ -493,11 +493,16 @@ public sealed class ModsUpdateTask(
     private static void Collect(List<PendingUpdate> updates, ResourceProvider provider,
         ModrinthCheckUpdate.Update update, MetadataHandler.ModStruct metadata)
     {
+        if (metadata.ProjectId is not { } projectId)
+        {
+            return;
+        }
+
         updates.Add(new PendingUpdate(
             new ModUpdateEntryView(metadata.Filename, update.OldVersion, update.NewVersion,
                 ModPlatformTasks.ProviderKey(provider)),
             update.Version,
-            metadata.ProjectId,
+            projectId,
             metadata.Slug,
             update.Name));
     }
@@ -505,11 +510,16 @@ public sealed class ModsUpdateTask(
     private static void Collect(List<PendingUpdate> updates, ResourceProvider provider,
         FlameCheckUpdate.Update update, MetadataHandler.ModStruct metadata)
     {
+        if (metadata.ProjectId is not { } projectId)
+        {
+            return;
+        }
+
         updates.Add(new PendingUpdate(
             new ModUpdateEntryView(metadata.Filename, update.OldVersion, update.NewVersion,
                 ModPlatformTasks.ProviderKey(provider)),
             update.Version,
-            metadata.ProjectId,
+            projectId,
             metadata.Slug,
             update.Name));
     }
@@ -520,9 +530,9 @@ public sealed class ModsUpdateTask(
         foreach (var resource in resources)
         {
             var metadata = folder.GetMetadata(resource);
-            if (metadata is { } value && !map.ContainsKey(value.ProjectId))
+            if (metadata is { ProjectId: { } projectId } value && !map.ContainsKey(projectId))
             {
-                map[value.ProjectId] = value;
+                map[projectId] = value;
             }
         }
 

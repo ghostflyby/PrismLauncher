@@ -157,10 +157,15 @@ public static class FlamePackExportTask
                     var metadata = modList.GetMetadata(mod);
                     if (metadata is not null && metadata.Provider == ResourceProvider.Flame)
                     {
+                        if (metadata.ProjectId is not { } projectId || metadata.FileId is not { } fileId)
+                        {
+                            continue;
+                        }
+
                         resolvedFiles[file] = new ResolvedFile
                         {
-                            AddonId = ParseLong(metadata.ProjectId),
-                            Version = ParseLong(metadata.FileId),
+                            AddonId = ParseLong(projectId),
+                            Version = ParseLong(fileId),
                             Enabled = mod.Enabled,
                             IsMod = true,
                             Name = metadata.Name,

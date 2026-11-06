@@ -303,16 +303,13 @@ public sealed class EnsureMetadataTask(
         }
 
         var oldMetadata = MetadataHandler.Get(indexDir, pack.AddonId);
-        if (oldMetadata.IsValid)
+        if (oldMetadata is { IsValid: true } && pack.Slug.Length == 0)
         {
-            if (pack.Slug.Length == 0)
-            {
-                pack.Slug = oldMetadata.Slug;
-            }
+            pack.Slug = oldMetadata.Slug;
         }
 
         var pwMod = MetadataHandler.Create(indexDir, pack, ver);
-        if (pwMod.IsValid)
+        if (pwMod is { IsValid: true })
         {
             pwMod.LockUpdate = LockUpdate;
             MetadataHandler.Update(indexDir, pwMod);

@@ -104,9 +104,12 @@ public class ModUpdateTaskTests : IDisposable
 
         // 2. apply: the fake pack of the C++ check task + a ResourceDownloadTask per update
         var metadata = MetadataHandler.Get(new AbsolutePath(IndexDir), "test-mod");
+        Assert.NotNull(metadata);
+        var projectId = metadata.ProjectId;
+        Assert.NotNull(projectId);
         var pack = new IndexedPack
         {
-            AddonId = metadata.ProjectId,
+            AddonId = projectId,
             Slug = metadata.Slug,
             Name = update.Name,
             Provider = ResourceProvider.Flame,
@@ -119,6 +122,7 @@ public class ModUpdateTaskTests : IDisposable
 
         // the metadata was refreshed to the new file id/version
         var refreshed = MetadataHandler.Get(new AbsolutePath(IndexDir), "test-mod");
+        Assert.NotNull(refreshed);
         Assert.True(refreshed.IsValid);
         Assert.Equal("789", refreshed.FileId);
         Assert.Equal("Test Mod 2.0", refreshed.VersionNumber);

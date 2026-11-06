@@ -80,10 +80,15 @@ public sealed class FlameCheckUpdate(
                     $"Resource {resource.Name} has no metadata to check against.");
             }
 
+            if (metadata.ProjectId is not { } projectId)
+            {
+                continue; // no update provider id means there is nothing to query
+            }
+
             // Fake pack with the necessary info to pass to the download task :)
             var project = new IndexedPack
             {
-                AddonId = metadata.ProjectId,
+                AddonId = projectId,
             };
 
             FlameFileList versionsDoc;
@@ -108,12 +113,18 @@ public sealed class FlameCheckUpdate(
     private async Task GetLatestVersionCallback(Resource resource, MetadataHandler.ModStruct metadata,
         FlameFileList versionsDoc, CancellationToken cancellationToken)
     {
+        if (metadata.ProjectId is not { } projectId)
+        {
+            _failures.Add((resource, "No project id in metadata.", ""));
+            return;
+        }
+
         // Fake pack with the necessary info to pass to the download task :)
         var pack = new IndexedPack
         {
             Name = resource.Name,
             Slug = metadata.Slug,
-            AddonId = metadata.ProjectId,
+            AddonId = projectId,
             Provider = ResourceProvider.Flame,
         };
         try
@@ -147,11 +158,8 @@ public sealed class FlameCheckUpdate(
         if (latestVer.Hash.Length != 0
             && (metadata.Hash != latestVer.Hash || resource.Status == ResourceStatus.NotInstalled))
         {
-            var oldVersion = metadata.VersionNumber;
-            if (oldVersion.Length == 0)
-            {
-                oldVersion = resource.Status == ResourceStatus.NotInstalled ? "Not installed" : "Unknown";
-            }
+            var oldVersion = metadata.VersionNumber
+                             ?? (resource.Status == ResourceStatus.NotInstalled ? "Not installed" : "Unknown");
 
             var changelog = "";
             try
@@ -193,7 +201,11 @@ public sealed class FlameCheckUpdate(
                 continue;
             }
 
-            var addonId = metadata.ProjectId;
+            if (metadata.ProjectId is not { } addonId)
+            {
+                continue;
+            }
+
             addonIds.Add(addonId);
             quickSearch[addonId] = resource;
         }

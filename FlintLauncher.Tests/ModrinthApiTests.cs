@@ -546,6 +546,7 @@ public class ModrinthApiTests : IDisposable
             HashFormat = "sha512",
             Hash = pack.ModSha512, // same as the API's latest
             Mode = "url",
+            Url = "https://example.invalid/test.jar",
             Loaders = ModLoaderType.Fabric,
         };
         PackwizModel.UpdateModIndex(new AbsolutePath(Path.Combine(modsDir, ".index")), metadata);

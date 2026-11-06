@@ -25,9 +25,10 @@ public static class MetadataHandler
     }
 
     /// <summary>Port of Metadata::create.</summary>
-    public static ModStruct Create(AbsolutePath indexDir, IndexedPack modPack, IndexedVersion modVersion)
+    public static ModStruct? Create(AbsolutePath indexDir, IndexedPack modPack, IndexedVersion modVersion)
     {
-        return Copy(PackwizModel.CreateModFormat(modPack, modVersion));
+        var mod = PackwizModel.CreateModFormat(modPack, modVersion);
+        return mod is null ? null : Copy(mod);
     }
 
     /// <summary>Port of Metadata::update.</summary>
@@ -43,15 +44,17 @@ public static class MetadataHandler
     }
 
     /// <summary>Port of Metadata::get(index_dir, mod_slug).</summary>
-    public static ModStruct Get(AbsolutePath indexDir, string modSlug)
+    public static ModStruct? Get(AbsolutePath indexDir, string modSlug)
     {
-        return Copy(PackwizModel.GetIndexForMod(indexDir, modSlug));
+        var mod = PackwizModel.GetIndexForMod(indexDir, modSlug);
+        return mod is null ? null : Copy(mod);
     }
 
     /// <summary>Port of Metadata::get(index_dir, mod_id).</summary>
-    public static ModStruct Get(AbsolutePath indexDir, object modId)
+    public static ModStruct? Get(AbsolutePath indexDir, object modId)
     {
-        return Copy(PackwizModel.GetIndexForModById(indexDir, modId.ToString() ?? ""));
+        var mod = PackwizModel.GetIndexForModById(indexDir, modId.ToString() ?? "");
+        return mod is null ? null : Copy(mod);
     }
 
     private static ModStruct Copy(PackwizModel.Mod mod)

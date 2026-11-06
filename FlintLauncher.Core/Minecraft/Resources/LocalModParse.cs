@@ -413,17 +413,24 @@ public static class ModUtils
     {
         var details = new ModDetails();
 
-        ModsTomlFile file;
+        ModsTomlFile? parsed;
         try
         {
             // toml++ skips a leading UTF-8 BOM, like the JSON reader above
-            file = TomlSerializer.Deserialize<ModsTomlFile>(
-                contents.TrimStart('\uFEFF'), FlintTomlContext.Default) ?? new ModsTomlFile();
+            parsed = TomlSerializer.Deserialize<ModsTomlFile>(
+                contents.TrimStart('\uFEFF'), FlintTomlContext.Default);
         }
         catch (Exception) // upstream #6047: malformed mod metadata must not crash the scan
         {
             return new ModDetails();
         }
+
+        if (parsed is null)
+        {
+            return new ModDetails();
+        }
+
+        var file = parsed;
 
         // array defined by [[mods]]
         var tomlMods = file.Mods;

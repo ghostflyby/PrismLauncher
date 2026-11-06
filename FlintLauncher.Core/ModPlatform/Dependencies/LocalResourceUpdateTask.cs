@@ -46,7 +46,7 @@ public static class LocalResourceUpdateTask
         // overload over the by-slug one, since AddonId is a plain string here)
         var oldMetadata = MetadataHandler.Get(indexDir, (object)target.AddonId);
         (string Name, string Filename)? previous = null;
-        if (oldMetadata.IsValid)
+        if (oldMetadata is { IsValid: true })
         {
             previous = (oldMetadata.Name, oldMetadata.Filename);
             if (target.Slug.Length == 0)
@@ -56,7 +56,7 @@ public static class LocalResourceUpdateTask
         }
 
         var pwMod = MetadataHandler.Create(indexDir, target, version);
-        if (pwMod.IsValid)
+        if (pwMod is { IsValid: true })
         {
             pwMod.LockUpdate = lockUpdate;
             MetadataHandler.Update(indexDir, pwMod);

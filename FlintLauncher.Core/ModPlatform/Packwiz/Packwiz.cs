@@ -10,8 +10,8 @@
 // Deviations:
 //  - QDir/QFile become string paths + System.IO; the C++ qWarning/qCritical paths become
 //    no-ops except where they change control flow (they only log upstream).
-//  - QVariant ids are strings ("" = null); the Flame write path parses them back to
-//    integers exactly like the C++ toInt() checks.
+//  - QVariant ids are nullable strings; absence is null, and the Flame write path parses
+//    present ids back to integers exactly like the C++ toInt() checks.
 
 using System.Globalization;
 using System.Text;
@@ -30,25 +30,25 @@ public static class Packwiz
     /// <summary>Port of Packwiz::V1::Mod.</summary>
     public class Mod
     {
-        public string Slug { get; set; } = "";
-        public string Name { get; set; } = "";
-        public string Filename { get; set; } = "";
+        public required string Slug { get; init; }
+        public required string Name { get; init; }
+        public required string Filename { get; init; }
         public SideType Side { get; set; } = new(SideTypeValue.UniversalSide);
         public ModLoaderType Loaders { get; set; } = ModLoaderType.None;
         public List<string> McVersions { get; } = [];
         public IndexedVersionType ReleaseType { get; set; } = IndexedVersionType.Invalid;
 
         // [download]
-        public string Mode { get; set; } = "";
-        public string Url { get; set; } = "";
-        public string HashFormat { get; set; } = "";
-        public string Hash { get; set; } = "";
+        public string? Mode { get; set; }
+        public string? Url { get; set; }
+        public string? HashFormat { get; set; }
+        public string? Hash { get; set; }
 
-        // [update]
-        public ResourceProvider Provider { get; set; }
-        public string FileId { get; set; } = "";
-        public string ProjectId { get; set; } = "";
-        public string VersionNumber { get; set; } = "";
+        // [update] — absent when the metadata has no update provider
+        public ResourceProvider? Provider { get; set; }
+        public string? FileId { get; set; }
+        public string? ProjectId { get; set; }
+        public string? VersionNumber { get; set; }
 
         public List<Dependency> Dependencies { get; } = [];
 
@@ -56,26 +56,40 @@ public static class Packwiz
         // update-lock column)
         public bool LockUpdate { get; set; }
 
-        // This is a totally heuristic, but should work for now.
-        public bool IsValid => Slug.Length != 0 && ProjectId.Length != 0;
+        public bool IsValid => Slug.Length != 0 && Name.Length != 0 && Filename.Length != 0
+                               && (Mode == "metadata:curseforge" || Url is not null);
 
         // Different providers can use different names for the same thing — Modrinth-specific
-        public string ModId() => ProjectId;
+        public string? ModId() => ProjectId;
 
-        public string Version() => FileId;
+        public string? Version() => FileId;
     }
 
     /// <summary>
     /// Port of V1::createModFormat: generates the object representing a mod's .pw.toml file
     /// from its common in-launcher representation.
     /// </summary>
-    public static Mod CreateModFormat(IndexedPack modPack, IndexedVersion modVersion)
+    public static Mod? CreateModFormat(IndexedPack modPack, IndexedVersion modVersion)
     {
+        var slug = NullIfEmpty(modPack.Slug);
+        var name = NullIfEmpty(modPack.Name);
+        var filename = NullIfEmpty(modVersion.FileName);
+        if (slug is null || name is null || filename is null)
+        {
+            return null;
+        }
+
         var mod = new Mod
         {
-            Slug = modPack.Slug,
-            Name = modPack.Name,
-            Filename = modVersion.FileName,
+            Slug = slug,
+            Name = name,
+            Filename = filename,
+            HashFormat = NullIfEmpty(modVersion.HashType),
+            Hash = NullIfEmpty(modVersion.Hash),
+            Provider = modPack.Provider,
+            FileId = NullIfEmpty(modVersion.FileId),
+            ProjectId = NullIfEmpty(modPack.AddonId),
+            VersionNumber = NullIfEmpty(modVersion.VersionNumber) ?? NullIfEmpty(modVersion.Version),
         };
 
         if (modPack.Provider == ResourceProvider.Flame)
@@ -85,28 +99,19 @@ public static class Packwiz
         else
         {
             mod.Mode = "url";
-            mod.Url = modVersion.DownloadUrl;
+            mod.Url = NullIfEmpty(modVersion.DownloadUrl);
+            if (mod.Url is null)
+            {
+                return null;
+            }
         }
 
-        mod.HashFormat = modVersion.HashType;
-        mod.Hash = modVersion.Hash;
-
-        mod.Provider = modPack.Provider;
-        mod.FileId = modVersion.FileId;
-        mod.ProjectId = modPack.AddonId;
         mod.Side = modVersion.Side.IsValid ? modVersion.Side : modPack.Side;
         mod.Loaders = modVersion.Loaders;
         mod.McVersions.AddRange(modVersion.McVersion);
         RemoveDuplicates(mod.McVersions);
         mod.McVersions.Sort(SortMcVersions);
         mod.ReleaseType = modVersion.VersionType;
-
-        mod.VersionNumber = modVersion.VersionNumber;
-        if (mod.VersionNumber.Length == 0) // on CurseForge, there is only a version name - not a version number
-        {
-            mod.VersionNumber = modVersion.Version;
-        }
-
         mod.Dependencies.AddRange(modVersion.Dependencies);
         return mod;
     }
@@ -146,37 +151,26 @@ public static class Packwiz
             FileOps.EnsureFilePathExists(new AbsolutePath(normalizedPath));
         }
 
-        string update;
+        string? update = null;
         switch (mod.Provider)
         {
             case ResourceProvider.Flame:
-                if (long.TryParse(mod.FileId, out var fileId) && long.TryParse(mod.ProjectId, out var projectId))
+                if (mod.FileId is { } fileIdText && mod.ProjectId is { } projectIdText
+                    && long.TryParse(fileIdText, out var fileId)
+                    && long.TryParse(projectIdText, out var projectId)
+                    && fileId != 0 && projectId != 0)
                 {
-                    if (fileId == 0 || projectId == 0)
-                    {
-                        // "Did not write file {name} because missing information!"
-                        return;
-                    }
-                }
-                else
-                {
-                    // "Did not write file {name} because missing information!"
-                    return;
+                    update = $"file-id = {fileIdText}\nproject-id = {projectIdText}";
                 }
 
-                update = $"file-id = {mod.FileId}\nproject-id = {mod.ProjectId}";
                 break;
             case ResourceProvider.Modrinth:
-                if (mod.ModId().Length == 0 || mod.Version().Length == 0)
+                if (mod.ProjectId is { } modId && mod.FileId is { } version)
                 {
-                    // "Did not write file {name} because missing information!"
-                    return;
+                    update = $"mod-id = {T(modId)}\nversion = {T(version)}";
                 }
 
-                update = $"mod-id = {T(mod.ModId())}\nversion = {T(mod.Version())}";
                 break;
-            default:
-                return;
         }
 
         var loaders = ModIndex.ModLoaderTypesToList(mod.Loaders).Select(l => T(ModIndex.GetModLoaderAsString(l)));
@@ -207,21 +201,51 @@ public static class Packwiz
         var toml = new StringBuilder();
         toml.Append("name = ").AppendLine(T(mod.Name));
         toml.Append("filename = ").AppendLine(T(mod.Filename));
-        toml.Append("side = ").AppendLine(T(SideType.ToString(mod.Side.Value)));
+        if (mod.Side.IsValid)
+        {
+            toml.Append("side = ").AppendLine(T(SideType.ToString(mod.Side.Value)));
+        }
+
         toml.Append("x-prismlauncher-loaders = [").Append(string.Join(", ", loaders)).AppendLine("]");
         toml.Append("x-prismlauncher-mc-versions = [").Append(string.Join(", ", mcVersions)).AppendLine("]");
-        toml.Append("x-prismlauncher-release-type = ").AppendLine(T(IndexedVersionType.ToString(mod.ReleaseType.Value)));
-        toml.Append("x-prismlauncher-version-number = ").AppendLine(T(mod.VersionNumber));
+        if (mod.ReleaseType.IsValid)
+        {
+            toml.Append("x-prismlauncher-release-type = ").AppendLine(T(IndexedVersionType.ToString(mod.ReleaseType.Value)));
+        }
+        if (mod.VersionNumber is { } versionNumber)
+        {
+            toml.Append("x-prismlauncher-version-number = ").AppendLine(T(versionNumber));
+        }
+
         toml.Append("x-prismlauncher-dependencies = ").AppendLine(deps.ToString());
         toml.Append("x-prismlauncher-lock-update = ").AppendLine(mod.LockUpdate ? "true" : "false");
         toml.AppendLine("[download]");
-        toml.Append("mode = ").AppendLine(T(mod.Mode));
-        toml.Append("url = ").AppendLine(T(mod.Url));
-        toml.Append("hash-format = ").AppendLine(T(mod.HashFormat));
-        toml.Append("hash = ").AppendLine(T(mod.Hash));
-        toml.AppendLine("[update]");
-        toml.Append('[').Append("update.").Append(ProviderCapabilities.Name(mod.Provider)).AppendLine("]");
-        toml.AppendLine(update);
+        if (mod.Mode is { } mode)
+        {
+            toml.Append("mode = ").AppendLine(T(mode));
+        }
+
+        if (mod.Url is { } url)
+        {
+            toml.Append("url = ").AppendLine(T(url));
+        }
+
+        if (mod.HashFormat is { } hashFormat)
+        {
+            toml.Append("hash-format = ").AppendLine(T(hashFormat));
+        }
+
+        if (mod.Hash is { } hash)
+        {
+            toml.Append("hash = ").AppendLine(T(hash));
+        }
+
+        if (update is not null && mod.Provider is { } provider)
+        {
+            toml.AppendLine("[update]");
+            toml.Append('[').Append("update.").Append(ProviderCapabilities.Name(provider)).AppendLine("]");
+            toml.AppendLine(update);
+        }
         // trailing newline like toml++'s formatted output
         toml.AppendLine("");
 
@@ -252,79 +276,79 @@ public static class Packwiz
     }
 
     /// <summary>
-    /// Port of V1::getIndexForMod(index_dir, slug): gets the metadata for a mod with a
-    /// particular slug. If the mod doesn't have metadata, an empty Mod is returned.
+    /// Port of V1::getIndexForMod(index_dir, slug): the metadata for a mod with the given
+    /// slug, or null when the file is missing or is not usable metadata.
     /// </summary>
-    public static Mod GetIndexForMod(AbsolutePath indexDir, string slug)
+    public static Mod? GetIndexForMod(AbsolutePath indexDir, string slug)
     {
-        var mod = new Mod();
-
         var normalizedFname = IndexFileName(slug);
         var realFname = GetRealIndexName(indexDir, normalizedFname, shouldFindMatch: true);
         if (realFname.Length == 0)
         {
-            return mod;
+            return null;
         }
 
         var path = indexDir / realFname;
-        PackwizTomlFile file;
+        PackwizTomlFile? parsed;
         try
         {
-            file = TomlSerializer.Deserialize<PackwizTomlFile>(
-                path.ReadAllText().TrimStart('\uFEFF'), FlintTomlContext.Default) ?? new PackwizTomlFile();
+            parsed = TomlSerializer.Deserialize<PackwizTomlFile>(
+                path.ReadAllText().TrimStart('\uFEFF'), FlintTomlContext.Default);
         }
         catch (Exception e) // upstream #6047: any failure here means "no usable metadata", not a crash
         {
             // "Could not open file {name}!" + reason
             _ = e;
-            return mod;
+            return null;
         }
 
-        mod.Slug = slug;
-
-        // Basic info
+        if (parsed is null)
         {
-            mod.Name = file.Name ?? "";
-            mod.Filename = file.Filename ?? "";
-            mod.Side = SideType.FromString(file.Side ?? "");
-            mod.ReleaseType = IndexedVersionType.FromString(file.ReleaseType ?? "");
-            foreach (var loader in file.Loaders ?? [])
-            {
-                mod.Loaders |= ModIndex.GetModLoaderFromString(loader);
-            }
-
-            var versions = file.McVersions ?? [];
-            mod.McVersions.AddRange(versions.Where(v => v.Length != 0));
-            RemoveDuplicates(mod.McVersions);
-            mod.McVersions.Sort(SortMcVersions);
-        }
-        mod.VersionNumber = file.VersionNumber ?? "";
-        mod.LockUpdate = file.LockUpdate;
-
-        // [download] info
-        {
-            var download = file.Download;
-            if (download is null)
-            {
-                // "No [download] section found on mod metadata!"
-                return new Mod();
-            }
-
-            mod.Mode = download.Mode ?? "";
-            mod.Url = download.Url ?? "";
-            mod.HashFormat = download.HashFormat ?? "";
-            mod.Hash = download.Hash ?? "";
+            return null;
         }
 
-        // [update] info
+        var name = NullIfEmpty(parsed.Name);
+        var filename = NullIfEmpty(parsed.Filename);
+        var mode = NullIfEmpty(parsed.Download.Mode);
+        var url = NullIfEmpty(parsed.Download.Url);
+        // metadata:curseforge is a Prism extension mode: the URL is resolved at download
+        // time, so only the normal url mode requires the download.url key.
+        if (name is null || filename is null || (mode != "metadata:curseforge" && url is null))
         {
-            var update = file.Update;
-            if (update is null)
-            {
-                // "No [update] section found on mod metadata!"
-                return new Mod();
-            }
+            return null;
+        }
 
+        var mod = new Mod
+        {
+            Slug = slug,
+            Name = name,
+            Filename = filename,
+            HashFormat = NullIfEmpty(parsed.Download.HashFormat),
+            Hash = NullIfEmpty(parsed.Download.Hash),
+            Mode = mode,
+            Url = url,
+            VersionNumber = NullIfEmpty(parsed.VersionNumber),
+            LockUpdate = parsed.LockUpdate,
+        };
+
+        mod.Side = parsed.Side is { } side ? SideType.FromString(side) : SideType.Invalid;
+        mod.ReleaseType = parsed.ReleaseType is { } releaseType
+            ? IndexedVersionType.FromString(releaseType)
+            : IndexedVersionType.Invalid;
+        foreach (var loader in parsed.Loaders ?? [])
+        {
+            mod.Loaders |= ModIndex.GetModLoaderFromString(loader);
+        }
+
+        var versions = parsed.McVersions ?? [];
+        mod.McVersions.AddRange(versions.Where(v => v.Length != 0));
+        RemoveDuplicates(mod.McVersions);
+        mod.McVersions.Sort(SortMcVersions);
+
+        // [update] info: optional in packwiz; a metadata file without a provider simply
+        // has no update source, so the download fields above stay usable.
+        if (parsed.Update is { } update)
+        {
             if (update.CurseForge is { } flame)
             {
                 mod.Provider = ResourceProvider.Flame;
@@ -334,27 +358,19 @@ public static class Packwiz
             else if (update.Modrinth is { } modrinth)
             {
                 mod.Provider = ResourceProvider.Modrinth;
-                mod.ProjectId = modrinth.ModId ?? "";
-                mod.FileId = modrinth.Version ?? "";
-            }
-            else
-            {
-                // "No mod provider on mod metadata!"
-                return new Mod();
+                mod.ProjectId = NullIfEmpty(modrinth.ModId);
+                mod.FileId = NullIfEmpty(modrinth.Version);
             }
         }
 
-        // dependencies
+        foreach (var depFile in parsed.Dependencies ?? [])
         {
-            foreach (var depFile in file.Dependencies ?? [])
+            mod.Dependencies.Add(new Dependency
             {
-                mod.Dependencies.Add(new Dependency
-                {
-                    AddonId = depFile.AddonId ?? "",
-                    Version = depFile.Version ?? "",
-                    Type = DependencyType.FromString(depFile.Type ?? ""),
-                });
-            }
+                AddonId = depFile.AddonId,
+                Version = depFile.Version ?? "",
+                Type = depFile.Type is { } type ? DependencyType.FromString(type) : DependencyType.Invalid,
+            });
         }
 
         return mod;
@@ -362,23 +378,25 @@ public static class Packwiz
 
     /// <summary>
     /// Port of V1::getIndexForMod(index_dir, mod_id): scans the index directory for the
-    /// metadata of a mod with the given provider id. Empty Mod when not found.
+    /// metadata of a mod with the given provider id, or null when not found.
     /// </summary>
-    public static Mod GetIndexForModById(AbsolutePath indexDir, string modId)
+    public static Mod? GetIndexForModById(AbsolutePath indexDir, string modId)
     {
         foreach (var fileName in ListFiles(indexDir))
         {
             var mod = GetIndexForMod(indexDir, fileName);
-            if (mod.ModId() == modId)
+            if (mod?.ModId() == modId)
             {
                 return mod;
             }
         }
 
-        return new Mod();
+        return null;
     }
 
     // ------------------------------------------------------------------ helpers
+
+    private static string? NullIfEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;
 
     /// <summary>Port of the indexFileName helper.</summary>
     public static string IndexFileName(string modSlug)

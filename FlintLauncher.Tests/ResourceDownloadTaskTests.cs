@@ -104,6 +104,7 @@ public class ResourceDownloadTaskTests : IDisposable
 
         // the per-mod metadata was written before the download ran
         var metadata = MetadataHandler.Get(new AbsolutePath(IndexDir), "test-mod");
+        Assert.NotNull(metadata);
         Assert.True(metadata.IsValid);
         Assert.Equal("test-mod", metadata.Slug);
         Assert.Equal("test.jar", metadata.Filename);
@@ -168,6 +169,9 @@ public class ResourceDownloadTaskTests : IDisposable
             FileId = "verOld",
             VersionNumber = "0.9.0",
             Mode = "url",
+            Url = "https://example.invalid/old.jar",
+            HashFormat = "sha1",
+            Hash = "00",
         });
         var model = CreateModel();
         model.Update();
@@ -182,6 +186,7 @@ public class ResourceDownloadTaskTests : IDisposable
 
         // the metadata now points at the new file (same slug -> same index entry, refreshed)
         var metadata = MetadataHandler.Get(new AbsolutePath(IndexDir), "test-mod");
+        Assert.NotNull(metadata);
         Assert.True(metadata.IsValid);
         Assert.Equal("new.jar", metadata.Filename);
         Assert.Equal("verId1", metadata.FileId);

@@ -173,7 +173,7 @@ public class ModFolderModel(MaterializedDirectory dir, bool isIndexed = false) :
             }
 
             var metadata = MetadataHandler.Get(IndexDir, Path.GetFileName(file));
-            if (!metadata.IsValid)
+            if (metadata is not { IsValid: true })
             {
                 continue;
             }

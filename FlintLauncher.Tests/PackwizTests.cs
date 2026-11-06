@@ -36,6 +36,7 @@ public class PackwizTests
 
         var metadata = Packwiz.GetIndexForMod(new AbsolutePath(indexDir), slugMod);
 
+        Assert.NotNull(metadata);
         Assert.True(metadata.IsValid);
 
         Assert.Equal("Borderless Mining", metadata.Name);
@@ -65,6 +66,7 @@ public class PackwizTests
 
         var metadata = Packwiz.GetIndexForMod(new AbsolutePath(indexDir), nameMod);
 
+        Assert.NotNull(metadata);
         Assert.True(metadata.IsValid);
 
         Assert.Equal("Screenshot to Clipboard (Fabric)", metadata.Name);
@@ -112,6 +114,7 @@ public class PackwizTests
     {
         var (pack, version) = ModrinthSample();
         var mod = Packwiz.CreateModFormat(pack, version);
+        Assert.NotNull(mod);
 
         Assert.True(mod.IsValid);
         Assert.Equal("borderless-mining", mod.Slug);
@@ -149,9 +152,10 @@ public class PackwizTests
             Version = "1.0.7",
         };
         var mod = Packwiz.CreateModFormat(pack, version);
+        Assert.NotNull(mod);
 
         Assert.Equal("metadata:curseforge", mod.Mode);
-        Assert.Equal("", mod.Url);
+        Assert.Null(mod.Url);
         // on CurseForge, there is only a version name - not a version number
         Assert.Equal("1.0.7", mod.VersionNumber);
     }
@@ -164,6 +168,7 @@ public class PackwizTests
 
         var (pack, version) = ModrinthSample();
         var mod = Packwiz.CreateModFormat(pack, version);
+        Assert.NotNull(mod);
         mod.Dependencies.Add(new Dependency { AddonId = "P7dR8mSH", Type = DependencyType.FromString("REQUIRED") });
 
         Packwiz.UpdateModIndex(new AbsolutePath(dir), mod);
@@ -173,6 +178,7 @@ public class PackwizTests
 
         // the written file parses through Tomlyn and round-trips
         var loaded = Packwiz.GetIndexForMod(new AbsolutePath(dir), "borderless-mining");
+        Assert.NotNull(loaded);
         Assert.True(loaded.IsValid);
         Assert.Equal(mod.Name, loaded.Name);
         Assert.Equal(mod.Filename, loaded.Filename);
@@ -201,6 +207,7 @@ public class PackwizTests
 
         var (pack, version) = ModrinthSample();
         var mod = Packwiz.CreateModFormat(pack, version);
+        Assert.NotNull(mod);
         mod.LockUpdate = true;
         Packwiz.UpdateModIndex(new AbsolutePath(dir), mod);
 
@@ -208,6 +215,7 @@ public class PackwizTests
         Assert.Contains("x-prismlauncher-lock-update = true", toml);
 
         var loaded = Packwiz.GetIndexForMod(new AbsolutePath(dir), "borderless-mining");
+        Assert.NotNull(loaded);
         Assert.True(loaded.IsValid);
         Assert.True(loaded.LockUpdate);
 
@@ -240,10 +248,64 @@ public class PackwizTests
         Packwiz.UpdateModIndex(new AbsolutePath(dir), mod);
 
         var loaded = Packwiz.GetIndexForMod(new AbsolutePath(dir), "screenshot-to-clipboard-fabric");
+        Assert.NotNull(loaded);
         Assert.True(loaded.IsValid);
         Assert.Equal(ResourceProvider.Flame, loaded.Provider);
         Assert.Equal("3509043", loaded.FileId);
         Assert.Equal("327154", loaded.ProjectId);
+    }
+
+    [Fact]
+    public void CreateModFormat_RejectsMissingRequiredFields()
+    {
+        Assert.Null(Packwiz.CreateModFormat(new IndexedPack(), new IndexedVersion()));
+    }
+
+    [Fact]
+    public void UpdateModIndex_HashlessVersion_RoundTrips()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"flint-packwiz-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+
+        var (pack, version) = ModrinthSample();
+        version.HashType = "";
+        version.Hash = "";
+        var mod = Packwiz.CreateModFormat(pack, version);
+        Assert.NotNull(mod);
+        Assert.Null(mod.HashFormat);
+        Assert.Null(mod.Hash);
+
+        Packwiz.UpdateModIndex(new AbsolutePath(dir), mod);
+
+        var loaded = Packwiz.GetIndexForMod(new AbsolutePath(dir), "borderless-mining");
+        Assert.NotNull(loaded);
+        Assert.True(loaded.IsValid);
+        Assert.Null(loaded.HashFormat);
+        Assert.Null(loaded.Hash);
+    }
+
+    [Fact]
+    public void UpdateModIndex_NoProvider_WritesAndReadsWithoutUpdate()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"flint-packwiz-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+
+        var mod = new Packwiz.Mod
+        {
+            Slug = "no-provider",
+            Name = "No Provider",
+            Filename = "no-provider.jar",
+            Mode = "url",
+            Url = "https://example.invalid/no-provider.jar",
+        };
+        Packwiz.UpdateModIndex(new AbsolutePath(dir), mod);
+
+        var loaded = Packwiz.GetIndexForMod(new AbsolutePath(dir), "no-provider");
+        Assert.NotNull(loaded);
+        Assert.True(loaded.IsValid);
+        Assert.Null(loaded.Provider);
+        Assert.Null(loaded.ProjectId);
+        Assert.Null(loaded.FileId);
     }
 
     [Fact]
@@ -252,7 +314,13 @@ public class PackwizTests
         var dir = Path.Combine(Path.GetTempPath(), $"flint-packwiz-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
 
-        Packwiz.UpdateModIndex(new AbsolutePath(dir), new Packwiz.Mod()); // no slug/project id: silently dropped
+        var invalid = new Packwiz.Mod
+        {
+            Slug = "invalid",
+            Name = "Invalid",
+            Filename = "invalid.jar",
+        };
+        Packwiz.UpdateModIndex(new AbsolutePath(dir), invalid);
 
         Assert.Empty(Directory.GetFiles(dir));
     }
@@ -264,7 +332,9 @@ public class PackwizTests
         Directory.CreateDirectory(dir);
 
         var (pack, version) = ModrinthSample();
-        Packwiz.UpdateModIndex(new AbsolutePath(dir), Packwiz.CreateModFormat(pack, version));
+        var mod = Packwiz.CreateModFormat(pack, version);
+        Assert.NotNull(mod);
+        Packwiz.UpdateModIndex(new AbsolutePath(dir), mod);
         Assert.True(File.Exists(Path.Combine(dir, "borderless-mining.pw.toml")));
 
         Packwiz.DeleteModIndex(new AbsolutePath(dir), "borderless-mining");
@@ -281,25 +351,28 @@ public class PackwizTests
         Directory.CreateDirectory(dir);
 
         var (pack, version) = ModrinthSample();
-        Packwiz.UpdateModIndex(new AbsolutePath(dir), Packwiz.CreateModFormat(pack, version));
+        var mod = Packwiz.CreateModFormat(pack, version);
+        Assert.NotNull(mod);
+        Packwiz.UpdateModIndex(new AbsolutePath(dir), mod);
 
         var byId = Packwiz.GetIndexForModById(new AbsolutePath(dir), "kYq5qkSL");
+        Assert.NotNull(byId);
         Assert.True(byId.IsValid);
         // (upstream quirk kept: the by-id scan passes the file name as the slug)
         Assert.Equal("kYq5qkSL", byId.ModId());
         Assert.Equal("Borderless Mining", byId.Name);
 
-        Assert.False(Packwiz.GetIndexForModById(new AbsolutePath(dir), "unknown-id").IsValid);
+        Assert.Null(Packwiz.GetIndexForModById(new AbsolutePath(dir), "unknown-id"));
     }
 
     [Fact]
-    public void GetIndexForMod_MissingFile_ReturnsInvalid()
+    public void GetIndexForMod_MissingFile_ReturnsNull()
     {
         var dir = Path.Combine(Path.GetTempPath(), $"flint-packwiz-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
 
-        Assert.False(Packwiz.GetIndexForMod(new AbsolutePath(dir), "nope").IsValid);
-        Assert.False(Packwiz.GetIndexForMod(new AbsolutePath(dir), "alsonope.pw.toml").IsValid);
+        Assert.Null(Packwiz.GetIndexForMod(new AbsolutePath(dir), "nope"));
+        Assert.Null(Packwiz.GetIndexForMod(new AbsolutePath(dir), "alsonope.pw.toml"));
     }
 
     [Fact]
@@ -345,6 +418,7 @@ public class PackwizTests
 
             var mod = Packwiz.GetIndexForMod(new AbsolutePath(dir), "toml11");
 
+            Assert.NotNull(mod);
             Assert.True(mod.IsValid);
             Assert.Equal("toml11", mod.Name);
             var dep = Assert.Single(mod.Dependencies);
@@ -357,7 +431,7 @@ public class PackwizTests
     }
 
     [Fact]
-    public void Read_MalformedToml_ReturnsInvalidMod()
+    public void Read_MalformedToml_ReturnsNull()
     {
         var dir = Path.Combine(Path.GetTempPath(), $"flint-packwiz-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
@@ -365,9 +439,59 @@ public class PackwizTests
         {
             File.WriteAllText(Path.Combine(dir, "broken.pw.toml"), "name =");
 
-            var mod = Packwiz.GetIndexForMod(new AbsolutePath(dir), "broken");
+            Assert.Null(Packwiz.GetIndexForMod(new AbsolutePath(dir), "broken"));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
 
-            Assert.False(mod.IsValid);
+    [Fact]
+    public void Read_RequiredFieldsFollowPackwizSpec()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"flint-packwiz-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "no-update.pw.toml"), """
+                name = "no-update"
+                filename = "no-update.jar"
+                [download]
+                url = "https://example.invalid/no-update.jar"
+                hash-format = "sha1"
+                hash = "00"
+                """);
+            File.WriteAllText(Path.Combine(dir, "missing-name.pw.toml"), """
+                filename = "missing-name.jar"
+                [download]
+                url = "https://example.invalid/missing-name.jar"
+                hash-format = "sha1"
+                hash = "00"
+                """);
+            File.WriteAllText(Path.Combine(dir, "missing-url.pw.toml"), """
+                name = "missing-url"
+                filename = "missing-url.jar"
+                [download]
+                hash-format = "sha1"
+                hash = "00"
+                """);
+            File.WriteAllText(Path.Combine(dir, "missing-download.pw.toml"), """
+                name = "missing-download"
+                filename = "missing-download.jar"
+                """);
+
+            var noUpdate = Packwiz.GetIndexForMod(new AbsolutePath(dir), "no-update");
+            Assert.NotNull(noUpdate);
+            Assert.Equal("no-update", noUpdate.Name);
+            Assert.Equal("no-update.jar", noUpdate.Filename);
+            Assert.Equal("https://example.invalid/no-update.jar", noUpdate.Url);
+            Assert.Null(noUpdate.ProjectId); // no update provider
+            Assert.True(noUpdate.IsValid);
+
+            Assert.Null(Packwiz.GetIndexForMod(new AbsolutePath(dir), "missing-name"));
+            Assert.Null(Packwiz.GetIndexForMod(new AbsolutePath(dir), "missing-url"));
+            Assert.Null(Packwiz.GetIndexForMod(new AbsolutePath(dir), "missing-download"));
         }
         finally
         {

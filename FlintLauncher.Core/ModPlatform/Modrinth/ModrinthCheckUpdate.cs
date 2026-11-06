@@ -110,7 +110,7 @@ public sealed class ModrinthCheckUpdate
 
             var hash = metadata.Hash;
 
-            if (metadata.HashFormat != _hashType)
+            if (metadata.HashFormat != _hashType || string.IsNullOrEmpty(hash))
             {
                 hash = HashUtils.HashFile(resource.Fileinfo.FullName, HashUtils.HasherAlgorithm(ResourceProvider.Modrinth));
                 if (hash.Length == 0)

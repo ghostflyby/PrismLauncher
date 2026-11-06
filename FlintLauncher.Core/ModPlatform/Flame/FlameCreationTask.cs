@@ -649,7 +649,7 @@ public sealed partial class FlameCreationTask : InstanceTask
             var ver = file.Version;
             ver.FileName = FileNaming.RemoveInvalidPathChars(ver.FileName);
             var pwMod = MetadataHandler.Create(folder, file.Pack, ver);
-            if (pwMod.IsValid)
+            if (pwMod is { IsValid: true })
             {
                 MetadataHandler.Update(folder, pwMod);
             }

@@ -8,11 +8,13 @@ namespace FlintLauncher.Core.ModPlatform.Packwiz;
 /// <summary>The .pw.toml document read by <see cref="Packwiz.GetIndexForMod"/>.</summary>
 internal sealed class PackwizTomlFile
 {
+    [TomlRequired]
     [TomlPropertyName("name")]
-    public string? Name { get; set; }
+    public required string Name { get; set; }
 
+    [TomlRequired]
     [TomlPropertyName("filename")]
-    public string? Filename { get; set; }
+    public required string Filename { get; set; }
 
     [TomlPropertyName("side")]
     public string? Side { get; set; }
@@ -35,8 +37,9 @@ internal sealed class PackwizTomlFile
     [TomlPropertyName("x-prismlauncher-dependencies")]
     public List<PackwizTomlDependency>? Dependencies { get; set; }
 
+    [TomlRequired]
     [TomlPropertyName("download")]
-    public PackwizTomlDownload? Download { get; set; }
+    public required PackwizTomlDownload Download { get; set; }
 
     [TomlPropertyName("update")]
     public PackwizTomlUpdate? Update { get; set; }
@@ -68,26 +71,31 @@ internal sealed class PackwizTomlUpdate
 
 internal sealed class PackwizTomlFlameUpdate
 {
+    [TomlRequired]
     [TomlPropertyName("file-id")]
-    public long FileId { get; set; }
+    public required long FileId { get; set; }
 
+    [TomlRequired]
     [TomlPropertyName("project-id")]
-    public long ProjectId { get; set; }
+    public required long ProjectId { get; set; }
 }
 
 internal sealed class PackwizTomlModrinthUpdate
 {
+    [TomlRequired]
     [TomlPropertyName("mod-id")]
-    public string? ModId { get; set; }
+    public required string ModId { get; set; }
 
+    [TomlRequired]
     [TomlPropertyName("version")]
-    public string? Version { get; set; }
+    public required string Version { get; set; }
 }
 
 internal sealed class PackwizTomlDependency
 {
+    [TomlRequired]
     [TomlPropertyName("addonId")]
-    public string? AddonId { get; set; }
+    public required string AddonId { get; set; }
 
     [TomlPropertyName("version")]
     public string? Version { get; set; }
