@@ -27,7 +27,7 @@
 | `tasks/Task*` | `FlintLauncher.Core/Tasks/*` | partial | C# 有协程，任务基类不移植：每个操作直接是 `async Task`（返回即成功、抛出即失败、取消走 token）；`ConcurrentTask` 语义保留在 `TaskWork.RunAllAsync`（子项失败不中断兄弟、排空后聚合） |
 | `net/Request*` | `FlintLauncher.Core/Net/NetRequest.cs` | partial | HttpClient 底座；429/503 自动重试；HeaderProxy 简化为 AddHeader |
 | `net/Sink*` `FileSink` `ByteArraySink` `MetaCacheSink` | `FlintLauncher.Core/Net/Sink.cs` `FileSink.cs` | ported | PSaveFile→临时文件+原子替换 |
-| `net/Validator*` `ChecksumValidator` | `FlintLauncher.Core/Net/Validator.cs` | ported | IncrementalHash |
+| `net/Validator*` `ChecksumValidator` | 折叠进 `FlintLauncher.Core/Net/HttpDownloadTask.cs` | replaced | 下载完成校验：BCL HashData 对 temp 文件，通过才提交 |
 | `net/HttpMetaCache*` | `FlintLauncher.Core/Net/HttpMetaCache.cs` | ported | metacache JSON 格式（version "1"）与原版互通；挂载表（baseId→根）+ 账本分离（E4），账本落 cache 根（E3），启动 Load()（E6） |
 | `net/NetJob*` | —（不移植） | dropped | C# 有协程：一批下载就是 `TaskWork.RunAllAsync` 或 `SequenceAsync` 的项列表 |
 | `net/Mode.h` `ApiRequest.h` `HeaderProxy*` | `FlintLauncher.Core/Net/Mode.cs`；头机制简化 | partial | 头注入按需在 P2/P6 恢复 |
@@ -42,7 +42,7 @@
 | 原文件 | C# 目标 | 状态 | 备注 |
 |---|---|---|---|
 | `meta/JsonFormat*` | `FlintLauncher.Core/Meta/MetaJsonFormat.cs` | ported | Require/RequireSet（uid 相等语义） |
-| `meta/BaseEntity*` + BaseEntityLoadTask | `FlintLauncher.Core/Meta/MetaEntity.cs` | ported | sha256 校验、本地缓存优先、ParsingValidator 防坏提交；注入盖章的 HttpMetaCache(base "meta"，无静态兜底，E6) |
+| `meta/BaseEntity*` + BaseEntityLoadTask | `FlintLauncher.Core/Meta/MetaEntity.cs` | ported | sha256 校验、本地缓存优先、下载完成解析门禁防坏提交；注入盖章的 HttpMetaCache(base "meta"，无静态兜底，E6) |
 | `meta/Index*` `VersionList*` `Version*` | `FlintLauncher.Core/Meta/Index.cs` `MetaVersionList.cs` `MetaVersion.cs` | ported | recommended/latest 逻辑 |
 | `minecraft/GradleSpecifier.h` | `FlintLauncher.Core/Minecraft/GradleSpecifier.cs` | ported | readonly struct 保值拷贝语义 |
 | `minecraft/Rule.*` `RuntimeContext.h` `SysInfo`(部分) | `FlintLauncher.Core/Minecraft/Rule.cs` `RuntimeContext.cs` | ported | |

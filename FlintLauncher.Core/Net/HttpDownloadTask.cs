@@ -5,7 +5,8 @@
 // Port of launcher/net/Request.{h,cpp}'s download half plus net/FileSink.h/.cpp and
 // net/MetaCacheSink.h/.cpp, fused into one task: the transfer (idle timeout, the transport's
 // retry gates, status gate with the truncated error body), the atomic temp-file commit
-// (PSaveFile), the incremental validators, the throttled progress, and the cached plane's
+// (PSaveFile), the download-completion verification (checksum + gate against the finished
+// temp file, before the commit), the throttled progress, and the cached plane's
 // If-None-Match revalidation with the full etag/Last-Modified/max-age/Age entry bookkeeping
 // (the C++ MetaCacheSink::finalizeCache table, 7-day default expiry included).
 
@@ -44,7 +45,10 @@ public sealed class HttpDownloadTask(
     AbsolutePath target,
     RequestOptions options = RequestOptions.NoOptions)
 {
-    private readonly List<Validator> _validators = [];
+    private (HashAlgorithmName Algorithm, byte[] Expected)? _checksum;
+    private Func<AbsolutePath, bool>? _verify;
+    private bool _md5Bookkeeping;
+    private string? _downloadedMd5Hex;
     private AbsolutePath? _tempFile;
     private bool _wroteAnyData;
 
@@ -62,27 +66,40 @@ public sealed class HttpDownloadTask(
 
     public AbsolutePath Target => target;
 
-    public void AddValidator(Validator validator) => _validators.Add(validator);
+    /// <summary>Requires the downloaded body to hash to <paramref name="expectedHex"/>
+    /// (hex, case-insensitive) under <paramref name="algorithm"/>. Checked against the
+    /// completed temp file before it is committed to <see cref="Target"/>.</summary>
+    public void RequireChecksum(HashAlgorithmName algorithm, string expectedHex)
+    {
+        _checksum = (algorithm,
+            expectedHex.Length == 0 ? [] : Convert.FromHexString(expectedHex));
+    }
+
+    /// <summary>The byte-array overload (expected hashes that arrived as raw bytes).</summary>
+    public void RequireChecksum(HashAlgorithmName algorithm, byte[]? expected)
+    {
+        _checksum = (algorithm, expected ?? []);
+    }
+
+    /// <summary>Registers a post-download gate run against the completed temp file before
+    /// the commit; false fails the transfer, so rejected bodies never reach
+    /// <see cref="Target"/> (or, on the cached plane, the ledger).</summary>
+    public void Verify(Func<AbsolutePath, bool> gate) => _verify = gate;
 
     /// <summary>Port of Net::Request::makeCached: the cached plane — the transfer writes the
     /// entry's file, revalidates with the entry's etag and re-registers the entry after
-    /// success. The MD5 validator (the entry bookkeeping's own) is wired here; callers add
-    /// their content validators on top.</summary>
+    /// success. The downloaded body's MD5 is recorded in the entry (bookkeeping only, the
+    /// former sink's no-expected-value md5 node).</summary>
     public static HttpDownloadTask Cached(HttpMetaCache cache, Uri url, MetaEntry entry,
         RequestOptions options = RequestOptions.NoOptions, HttpClient? http = null)
     {
-        // the md5 node is bookkeeping only (the C++ MetaCacheSink created it with no
-        // expected value): seeding it from the ledger would fail every refresh of changed
-        // content and consume the hash before the bookkeeping can record the new sum
-        var checksum = new ChecksumValidator(HashAlgorithmName.MD5);
         var task = new HttpDownloadTask(url, http ?? cache.Http,
             entry.GetFullPath(), options | RequestOptions.AcceptLocalFiles)
         {
             MetaCache = cache,
             CachedEntry = entry,
+            _md5Bookkeeping = true,
         };
-        task.AddValidator(checksum);
-        task._md5 = checksum;
         return task;
     }
 
@@ -91,7 +108,13 @@ public sealed class HttpDownloadTask(
         RequestOptions options = RequestOptions.NoOptions) =>
         new(url, http, path, options);
 
-    private ChecksumValidator? _md5;
+    private static byte[] HashFile(AbsolutePath path, HashAlgorithmName algorithm)
+    {
+        using var stream = path.OpenRead();
+        return algorithm == HashAlgorithmName.MD5
+            ? MD5.HashData(stream)
+            : CryptographicOperations.HashData(algorithm, stream);
+    }
 
     // ---------------------------------------------------------------- execution
 
@@ -216,11 +239,6 @@ public sealed class HttpDownloadTask(
     private void Fail(string reason)
     {
         CancelWriting();
-        foreach (var validator in _validators)
-        {
-            validator.Abort();
-        }
-
         throw new InvalidOperationException(reason);
     }
 
@@ -255,18 +273,6 @@ public sealed class HttpDownloadTask(
             return false;
         }
 
-        var spec = new NetRequestSpec();
-        foreach (var validator in _validators)
-        {
-            if (validator.Init(spec))
-            {
-                continue;
-            }
-
-            _failReason = "Failed to initialize validators";
-            return false;
-        }
-
         return true;
     }
 
@@ -291,19 +297,6 @@ public sealed class HttpDownloadTask(
             return false;
         }
 
-        foreach (var validator in _validators)
-        {
-            if (validator.Write(data))
-            {
-                continue;
-            }
-
-            _failReason = $"Failed writing into {target}: validators failed";
-            CancelWriting();
-            _wroteAnyData = false;
-            return false;
-        }
-
         _wroteAnyData = true;
         return true;
     }
@@ -317,25 +310,43 @@ public sealed class HttpDownloadTask(
         // file response is committed even when it was empty
         if (gotFile || _wroteAnyData)
         {
-            var responseInfo = new NetResponseInfo { StatusCode = statusCode };
-            foreach (var header in headers)
-            {
-                responseInfo.Headers[header.Key] = string.Join(", ", header.Value);
-            }
-
-            foreach (var validator in _validators)
-            {
-                if (validator.Validate(responseInfo))
-                {
-                    continue;
-                }
-
-                _failReason = "Failed to finalize validators";
-                return false;
-            }
-
             if (_tempFile is { } tempFile)
             {
+                // download-complete verification: the BCL one-shot hash of the finished
+                // temp file, checked (plus any registered gate) before the commit — a
+                // rejected body never reaches the target or the ledger. An IO error in
+                // this phase is a transfer failure like any other, not a crash.
+                try
+                {
+                    if (_checksum is { } checksum && checksum.Expected.Length > 0)
+                    {
+                        var actual = HashFile(tempFile, checksum.Algorithm);
+                        if (!checksum.Expected.AsSpan().SequenceEqual(actual))
+                        {
+                            _failReason = $"Checksum mismatch for {target}";
+                            return false;
+                        }
+                    }
+
+                    if (_verify is { } gate && !gate(tempFile))
+                    {
+                        _failReason = "Failed to finalize validators";
+                        return false;
+                    }
+
+                    if (_md5Bookkeeping && _wroteAnyData)
+                    {
+                        _downloadedMd5Hex =
+                            Convert.ToHexStringLower(HashFile(tempFile, HashAlgorithmName.MD5));
+                    }
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    _failReason = $"Failed to verify {target}: {e.Message}";
+                    CancelWriting();
+                    return false;
+                }
+
                 try
                 {
                     tempFile.Move(target, overwrite: true);
@@ -375,13 +386,9 @@ public sealed class HttpDownloadTask(
             ? string.Join(", ", values)
             : "";
 
-        if (wroteAnyData && _md5 is { } md5)
+        if (wroteAnyData && _downloadedMd5Hex is { } md5Sum)
         {
-            var hash = md5.Hash();
-            if (hash.Length > 0)
-            {
-                entry.Md5Sum = Convert.ToHexStringLower(hash);
-            }
+            entry.Md5Sum = md5Sum;
         }
 
         entry.Etag = Header("ETag");

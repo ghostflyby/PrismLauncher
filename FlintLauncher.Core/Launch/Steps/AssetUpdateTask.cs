@@ -46,7 +46,7 @@ public static class AssetUpdateTask
         var dl = HttpDownloadTask.Cached(metacache, new Uri(indexUrl), entry);
         if (assets.Sha1.Length != 0)
         {
-            dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, assets.Sha1));
+            dl.RequireChecksum(HashAlgorithmName.SHA1, assets.Sha1);
         }
 
         await dl.DownloadAsync(null, cancellationToken).ConfigureAwait(false);

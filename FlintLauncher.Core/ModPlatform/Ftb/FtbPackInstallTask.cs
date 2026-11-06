@@ -310,7 +310,7 @@ public sealed class FtbPackInstallTask(
             var dl = HttpDownloadTask.ToFile(new Uri(file.Url), path, _ftb.Http);
             if (file.Sha1.Length != 0)
             {
-                dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, file.Sha1));
+                dl.RequireChecksum(HashAlgorithmName.SHA1, file.Sha1);
             }
 
             downloads.Add(dl);

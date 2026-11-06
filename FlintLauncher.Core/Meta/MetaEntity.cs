@@ -18,8 +18,9 @@
 //     See the License for the specific language governing permissions and
 //     limitations under the License.
 //
-// Port of launcher/meta/BaseEntity.{h,cpp} (BaseEntity, ParsingValidator and
-// BaseEntityLoadTask). Deviations from the C++ original:
+// Port of launcher/meta/BaseEntity.{h,cpp} (BaseEntity and BaseEntityLoadTask; the
+// ParsingValidator becomes the download-completion parse gate in MetaEntityLoadTask).
+// Deviations from the C++ original:
 //  - The C++ code reaches the shared cache through APPLICATION->metacache() (base "meta");
 //    the port stamps that cache onto the entity chain at adoption (SetMetaCache — the
 //    composition root's HttpMetaCache, base "meta" under the cache root). There is
@@ -31,8 +32,8 @@
 //    status and details signal propagation from the inner request is not ported.
 //  - The QFile/CSRF-era details (partial downloads, etag bookkeeping beyond the cache entry)
 //    follow the current upstream implementation: local-cache-first with sha256 verification,
-//    checksummed re-download, and a ParsingValidator so unparseable bodies are never
-//    committed to the cache (the entry goes stale on failure).
+//    checksummed re-download, and a parse gate on the downloaded body so unparseable bodies
+//    are never committed to the cache (the entry goes stale on failure).
 
 using System.Security.Cryptography;
 using System.Text;
@@ -139,44 +140,22 @@ public abstract class MetaEntity
     }
 
     /// <summary>
-    /// Port of Meta::ParsingValidator: buffers the response body, parses it into the entity and
-    /// fails the download when the body is not valid metadata (so it never reaches the cache).
+    /// Port of Meta::ParsingValidator (as a download-completion gate): parses the downloaded
+    /// body into the entity and fails the transfer when it is not valid metadata (so it
+    /// never reaches the cache).
     /// </summary>
-    private sealed class ParsingValidator(MetaEntity entity) : Validator
+    private static bool ParseDownloadedBody(MetaEntity entity, AbsolutePath tempFile)
     {
-        private readonly List<byte> _data = [];
-
-        public override bool Init(NetRequestSpec request)
+        var fname = entity.LocalFilename;
+        try
         {
-            _data.Clear();
+            entity.Parse(MetaDocumentParse.ParseDocument(File.ReadAllBytes(tempFile.Value), fname));
             return true;
         }
-
-        public override bool Write(byte[] data)
+        catch (Exception e) when (e is JsonException or MetaParseException or FormatException)
         {
-            _data.AddRange(data);
-            return true;
-        }
-
-        public override bool Abort()
-        {
-            _data.Clear();
-            return true;
-        }
-
-        public override bool Validate(NetResponseInfo response)
-        {
-            var fname = entity.LocalFilename;
-            try
-            {
-                entity.Parse(MetaDocumentParse.ParseDocument([.. _data], fname));
-                return true;
-            }
-            catch (Exception e) when (e is JsonException or MetaParseException or FormatException)
-            {
-                // qWarning() << "Unable to parse response:" << e.cause();
-                return false;
-            }
+            // qWarning() << "Unable to parse response:" << e.cause();
+            return false;
         }
     }
 
@@ -244,7 +223,7 @@ public abstract class MetaEntity
             var entry = cache.ResolveEntry("meta", entity.LocalFilename);
             if (forceReload)
             {
-                // clear validators so manual refreshes fetch a fresh body
+                // clear the revalidation state so manual refreshes fetch a fresh body
                 entry.Etag = "";
                 entry.RemoteChangedTimestamp = "";
             }
@@ -253,15 +232,15 @@ public abstract class MetaEntity
             // Net::ApiRequest::makeCached == makeCached + AddAPIHeaders
             var dl = HttpDownloadTask.Cached(cache, entity.Url(), entry, RequestOptions.AddApiHeaders);
             /*
-             * The validator parses the file and loads it into the object.
+             * The gate parses the downloaded file and loads it into the object.
              * If that fails, the file is not written to storage.
              */
             if (entity.Sha256.Length != 0)
             {
-                dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA256, entity.Sha256));
+                dl.RequireChecksum(HashAlgorithmName.SHA256, entity.Sha256);
             }
 
-            dl.AddValidator(new ParsingValidator(entity));
+            dl.Verify(tempFile => ParseDownloadedBody(entity, tempFile));
 
             await dl.DownloadAsync(null, cancellationToken).ConfigureAwait(false);
             entity._loadStatus = LoadStatus.Remote;

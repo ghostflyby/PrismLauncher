@@ -31,24 +31,103 @@ public class NetRequestTests : IDisposable
 
     private string TempPath(string name) => Path.Combine(_dir, name);
 
-    // ---------------------------------------------------------------- sinks/validators
+    // ---------------------------------------------------------------- checksum gate
 
     [Fact]
-    public void ChecksumValidator_Matches_And_Mismatches()
+    public async Task Download_WrongChecksum_FailsAndLeavesNoTarget()
     {
-        var data = "hello world"u8.ToArray();
-        var expected = Convert.ToHexString(SHA1.HashData(data)).ToLowerInvariant();
+        using var server = new TestHttpServer(ctx =>
+        {
+            var body = "hello world"u8.ToArray();
+            ctx.Response.StatusCode = 200;
+            ctx.Response.ContentLength64 = body.Length;
+            ctx.Response.OutputStream.Write(body);
+        });
 
-        var ok = ChecksumValidator.FromHex(HashAlgorithmName.SHA1, expected);
-        var spec = new NetRequestSpec();
-        Assert.True(ok.Init(spec));
-        Assert.True(ok.Write(data));
-        Assert.True(ok.Validate(new NetResponseInfo { StatusCode = 200 }));
+        var target = TempPath("checksum.bin");
+        var request = HttpDownloadTask.ToFile(new Uri(server.Url + "/file"), new AbsolutePath(target), TestNet.Http);
+        request.RequireChecksum(HashAlgorithmName.SHA1, new string('0', 40));
 
-        var bad = ChecksumValidator.FromHex(HashAlgorithmName.SHA1, new string('0', 40));
-        Assert.True(bad.Init(spec));
-        Assert.True(bad.Write(data));
-        Assert.False(bad.Validate(new NetResponseInfo { StatusCode = 200 }));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => request.DownloadAsync(null, CancellationToken.None));
+        Assert.False(File.Exists(target));
+    }
+
+    [Fact]
+    public async Task Download_ChecksumHex_IsCaseInsensitive()
+    {
+        using var server = new TestHttpServer(ctx =>
+        {
+            var body = "hello world"u8.ToArray();
+            ctx.Response.StatusCode = 200;
+            ctx.Response.ContentLength64 = body.Length;
+            ctx.Response.OutputStream.Write(body);
+        });
+
+        var target = TempPath("checksum-case.bin");
+        var request = HttpDownloadTask.ToFile(new Uri(server.Url + "/file"), new AbsolutePath(target), TestNet.Http);
+        request.RequireChecksum(HashAlgorithmName.SHA1,
+            Convert.ToHexString(SHA1.HashData("hello world"u8.ToArray())).ToUpperInvariant());
+
+        await request.DownloadAsync(null, CancellationToken.None);
+        Assert.Equal("hello world", await File.ReadAllTextAsync(target));
+    }
+
+    [Fact]
+    public async Task Download_VerifyGate_Rejection_FailsAndLeavesNoTarget()
+    {
+        using var server = new TestHttpServer(ctx =>
+        {
+            var body = "unparseable-body"u8.ToArray();
+            ctx.Response.StatusCode = 200;
+            ctx.Response.ContentLength64 = body.Length;
+            ctx.Response.OutputStream.Write(body);
+        });
+
+        var target = TempPath("gate.bin");
+        var request = HttpDownloadTask.ToFile(new Uri(server.Url + "/file"), new AbsolutePath(target), TestNet.Http);
+        request.Verify(_ => false);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => request.DownloadAsync(null, CancellationToken.None));
+        Assert.False(File.Exists(target));
+    }
+
+    [Fact]
+    public async Task Download_EmptyBody_WithChecksumOfEmpty_Commits()
+    {
+        using var server = new TestHttpServer(ctx =>
+        {
+            ctx.Response.StatusCode = 200;
+            ctx.Response.ContentLength64 = 0;
+        });
+
+        var target = TempPath("empty.bin");
+        var request = HttpDownloadTask.ToFile(new Uri(server.Url + "/file"), new AbsolutePath(target), TestNet.Http);
+        request.RequireChecksum(HashAlgorithmName.SHA1,
+            Convert.ToHexString(SHA1.HashData([])).ToLowerInvariant());
+
+        await request.DownloadAsync(null, CancellationToken.None);
+        Assert.True(File.Exists(target));
+        Assert.Equal(0, new FileInfo(target).Length);
+    }
+
+    [Fact]
+    public async Task Download_EmptyBody_WithNonEmptyChecksum_Fails()
+    {
+        using var server = new TestHttpServer(ctx =>
+        {
+            ctx.Response.StatusCode = 200;
+            ctx.Response.ContentLength64 = 0;
+        });
+
+        var target = TempPath("empty-bad.bin");
+        var request = HttpDownloadTask.ToFile(new Uri(server.Url + "/file"), new AbsolutePath(target), TestNet.Http);
+        request.RequireChecksum(HashAlgorithmName.SHA1, new string('0', 40));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => request.DownloadAsync(null, CancellationToken.None));
+        Assert.False(File.Exists(target));
     }
 
     // ---------------------------------------------------------------- HttpMetaCache
@@ -289,9 +368,9 @@ public class NetRequestTests : IDisposable
 
         var target = TempPath("download.bin");
         var request = HttpDownloadTask.ToFile(new Uri(server.Url + "/file"), new AbsolutePath(target), TestNet.Http);
-        request.AddValidator(ChecksumValidator.FromHex(
+        request.RequireChecksum(
             HashAlgorithmName.SHA1,
-            Convert.ToHexString(SHA1.HashData("file-content-0123456789"u8.ToArray())).ToLowerInvariant()));
+            Convert.ToHexString(SHA1.HashData("file-content-0123456789"u8.ToArray())).ToLowerInvariant());
 
         await request.DownloadAsync(null, CancellationToken.None);
         Assert.Equal("file-content-0123456789", await File.ReadAllTextAsync(target));
@@ -466,6 +545,81 @@ public class NetRequestTests : IDisposable
         Assert.Equal("\"v2\"", entry2.Etag);
         Assert.Equal(Convert.ToHexString(MD5.HashData("content-v2-updated"u8.ToArray())).ToLowerInvariant(),
             entry2.Md5Sum);
+    }
+
+    [Fact]
+    public async Task CachedDownload_RejectedBody_NeverTouchesTheLedger()
+    {
+        // a body that fails verification is not committed and leaves the ledger entry
+        // exactly as it was (old md5/etag preserved for the next resolve)
+        var requestCount = 0;
+        using var server = new TestHttpServer(ctx =>
+        {
+            requestCount++;
+            var (etag, body) = requestCount == 1
+                ? ("\"v1\"", "content-v1"u8.ToArray())
+                : ("\"v2\"", "content-v2-poisoned"u8.ToArray());
+            ctx.Response.StatusCode = 200;
+            ctx.Response.Headers["ETag"] = etag;
+            ctx.Response.ContentLength64 = body.Length;
+            ctx.Response.OutputStream.Write(body);
+        });
+
+        var indexPath = TempPath("metacache");
+        var basePath = TempPath("cache");
+        Directory.CreateDirectory(basePath);
+        var cache = new HttpMetaCache(new AbsolutePath(indexPath));
+        cache.AddBase("general", new AbsolutePath(basePath));
+
+        var entry = cache.ResolveEntry("general", "thing.txt");
+        var first = HttpDownloadTask.Cached(cache, new Uri(server.Url + "/thing.txt"), entry);
+        await first.DownloadAsync(null, CancellationToken.None);
+        Assert.Equal(Convert.ToHexString(MD5.HashData("content-v1"u8.ToArray())).ToLowerInvariant(),
+            entry.Md5Sum);
+
+        // the refresh is checksummed against the old body: the poisoned new body fails and
+        // must not commit over the target or update the entry
+        var entry2 = cache.ResolveEntry("general", "thing.txt");
+        Assert.False(entry2.IsStale);
+        var second = HttpDownloadTask.Cached(cache, new Uri(server.Url + "/thing.txt"), entry2);
+        second.RequireChecksum(HashAlgorithmName.SHA1,
+            Convert.ToHexString(SHA1.HashData("content-v1"u8.ToArray())).ToLowerInvariant());
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => second.DownloadAsync(null, CancellationToken.None));
+        Assert.Equal("content-v1", await entry2.GetFullPath().ReadAllTextAsync());
+        Assert.Equal("\"v1\"", entry2.Etag);
+        Assert.Equal(Convert.ToHexString(MD5.HashData("content-v1"u8.ToArray())).ToLowerInvariant(),
+            entry2.Md5Sum);
+    }
+
+    [Fact]
+    public async Task CachedDownload_ChecksumAndMd5Bookkeeping_Coexist()
+    {
+        // the sha256 gate and the ledger md5 bookkeeping ride one download: verification
+        // consumes the temp-file hash, the ledger records the downloaded body's own md5
+        using var server = new TestHttpServer(ctx =>
+        {
+            var body = "verified-content"u8.ToArray();
+            ctx.Response.StatusCode = 200;
+            ctx.Response.ContentLength64 = body.Length;
+            ctx.Response.OutputStream.Write(body);
+        });
+
+        var indexPath = TempPath("metacache");
+        var basePath = TempPath("cache");
+        Directory.CreateDirectory(basePath);
+        var cache = new HttpMetaCache(new AbsolutePath(indexPath));
+        cache.AddBase("general", new AbsolutePath(basePath));
+
+        var entry = cache.ResolveEntry("general", "verified.txt");
+        var dl = HttpDownloadTask.Cached(cache, new Uri(server.Url + "/verified.txt"), entry);
+        dl.RequireChecksum(HashAlgorithmName.SHA256,
+            Convert.ToHexString(SHA256.HashData("verified-content"u8.ToArray())).ToLowerInvariant());
+        await dl.DownloadAsync(null, CancellationToken.None);
+
+        Assert.Equal("verified-content", await entry.GetFullPath().ReadAllTextAsync());
+        Assert.Equal(Convert.ToHexStringLower(MD5.HashData("verified-content"u8.ToArray())),
+            entry.Md5Sum);
     }
 
     [Fact]

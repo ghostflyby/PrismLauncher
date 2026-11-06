@@ -324,7 +324,7 @@ public class Library
             var dl = HttpDownloadTask.Cached(cache, new Uri(url), entry, options);
             if (sha1.Length != 0)
             {
-                dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, sha1));
+                dl.RequireChecksum(HashAlgorithmName.SHA1, sha1);
             }
 
             result.Add(dl);

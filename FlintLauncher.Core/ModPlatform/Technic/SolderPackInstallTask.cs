@@ -100,7 +100,7 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
                 var dl = HttpDownloadTask.ToFile(new Uri(modUrl), path, http);
                 if (mod.Md5.Length != 0)
                 {
-                    dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.MD5, mod.Md5));
+                    dl.RequireChecksum(HashAlgorithmName.MD5, mod.Md5);
                 }
 
                 downloads.Add(dl);

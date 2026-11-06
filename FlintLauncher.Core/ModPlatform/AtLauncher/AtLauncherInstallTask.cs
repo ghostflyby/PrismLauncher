@@ -704,7 +704,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
         if (Configs.Configs.Sha1.Length != 0)
         {
-            dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, Configs.Configs.Sha1));
+            dl.RequireChecksum(HashAlgorithmName.SHA1, Configs.Configs.Sha1);
         }
 
         await dl.DownloadAsync(null, cancellationToken);
@@ -943,7 +943,7 @@ public sealed partial class AtLauncherPackInstallTask(
 
         if (mod.Md5.Length != 0)
         {
-            dl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.MD5, mod.Md5));
+            dl.RequireChecksum(HashAlgorithmName.MD5, mod.Md5);
         }
 
         downloads.Add(dl);

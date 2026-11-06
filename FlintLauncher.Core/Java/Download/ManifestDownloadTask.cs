@@ -68,10 +68,9 @@ public static class ManifestDownloadTask
 
         if (checksumHash.Length != 0 && checksumType.Length != 0)
         {
-            var validator = new ChecksumValidator(HashType(checksumType), Convert.FromHexString(checksumHash));
-            var spec = new NetRequestSpec();
-            if (!validator.Init(spec) || !validator.Write(manifestBytes) ||
-                !validator.Validate(new NetResponseInfo { StatusCode = 200 }))
+            var actual = Convert.ToHexStringLower(
+                CryptographicOperations.HashData(HashType(checksumType), manifestBytes));
+            if (actual != checksumHash.ToLowerInvariant())
             {
                 throw new InvalidOperationException($"checksum verification failed for {url}");
             }
@@ -154,7 +153,7 @@ public static class ManifestDownloadTask
             var dl = HttpDownloadTask.ToFile(file.Url, file.Path, http);
             if (file.Hash.Length != 0)
             {
-                dl.AddValidator(new ChecksumValidator(HashAlgorithmName.SHA1, file.Hash));
+                dl.RequireChecksum(HashAlgorithmName.SHA1, file.Hash);
             }
 
             downloads.Add((dl, file.IsExec));

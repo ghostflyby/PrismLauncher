@@ -57,7 +57,7 @@ public static class ArchiveDownloadTask
 
         if (checksumHash.Length != 0 && checksumType.Length != 0)
         {
-            action.AddValidator(new ChecksumValidator(HashType(checksumType), Convert.FromHexString(checksumHash)));
+            action.RequireChecksum(HashType(checksumType), checksumHash);
         }
 
         try

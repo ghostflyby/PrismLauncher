@@ -48,7 +48,7 @@ public enum MetadataVersion
 }
 
 /// <summary>Port of Meta::ParseException. Routed to the same refetch path as
-/// JsonException by the metadata-document consumers (see MetaEntity.ParsingValidator,
+/// JsonException by the metadata-document consumers (see the MetaEntity parse gate,
 /// whose filter used to miss this type); derives directly from Exception like the upstream
 /// ::Exception root.</summary>
 public sealed class MetaParseException(string message) : Exception(message)

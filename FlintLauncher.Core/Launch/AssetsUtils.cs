@@ -80,7 +80,7 @@ public sealed class AssetObject
                 new AbsolutePath(objectFile.FullName), http);
             if (Hash.Length != 0)
             {
-                objectDl.AddValidator(ChecksumValidator.FromHex(HashAlgorithmName.SHA1, Hash));
+                objectDl.RequireChecksum(HashAlgorithmName.SHA1, Hash);
             }
 
             return objectDl;
