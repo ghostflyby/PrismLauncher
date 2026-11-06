@@ -8,7 +8,6 @@
 
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.State;
 using FlintLauncher.Web;
 using TruePath;

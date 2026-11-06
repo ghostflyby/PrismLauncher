@@ -24,7 +24,6 @@ using FlintLauncher.Core.ModPlatform.Dependencies;
 using FlintLauncher.Core.ModPlatform.Hashing;
 using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Modrinth;
-using TruePath;
 
 namespace FlintLauncher.Core.ModPlatform;
 

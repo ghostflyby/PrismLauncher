@@ -16,7 +16,6 @@ using FlintLauncher.Core.Diagnostics;
 using FlintLauncher.Core.Icons;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.ModPlatform.AtLauncher;

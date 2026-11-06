@@ -6,7 +6,6 @@
 // (including the auth tokens) and LaunchTask's censorPrivateInfo session filter.
 
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Launch;
 using Xunit;
 
 namespace FlintLauncher.Tests;

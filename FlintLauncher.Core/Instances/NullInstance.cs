@@ -23,7 +23,6 @@
 // Port of launcher/NullInstance.h: the placeholder instance used when an instance folder
 // exists but its type cannot be instantiated.
 
-using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Settings;
 using TruePath;
 

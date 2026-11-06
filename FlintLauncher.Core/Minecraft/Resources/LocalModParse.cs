@@ -26,7 +26,6 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using FlintLauncher.Core.ModPlatform.Packwiz;
 using FlintLauncher.Core.Toml;
 using Tomlyn;
 using TruePath;

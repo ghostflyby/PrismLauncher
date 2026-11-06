@@ -418,7 +418,7 @@ public class AtLauncherTests : IDisposable
     {
         var fixture = AtlPackFixture.Create("""{"type":"forge","metadata":{"version":"","recommended":true,"latest":false}}""");
         // the lookup hook is per-task (DI): set through RunInstall's initializer below
-        var (_, _) = await RunInstall(fixture, name: "ATL Recommended2", recommendedLookup: (uid, loaderType, mcVersion) =>
+        await RunInstall(fixture, name: "ATL Recommended2", recommendedLookup: (uid, loaderType, mcVersion) =>
         {
             Assert.Equal("net.minecraftforge", uid);
             Assert.Equal("forge", loaderType);

@@ -6,7 +6,6 @@
 // factory that seeds a complete net.minecraft patch so PackProfile::getProfile() builds a
 // LaunchProfile offline (no network, no real Mojang metadata).
 
-using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;

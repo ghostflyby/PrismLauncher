@@ -44,7 +44,6 @@
 // The fallback and launcher-owned candidates flow through JavaDetection.DetectAsync, which
 // checker-validates whatever the primary layer did not already cover.
 
-using FlintLauncher.Core.Instances;
 using TruePath;
 using TruePath.SystemIo;
 

@@ -6,7 +6,6 @@
 // upgrade) and the idempotency decision tree.
 
 using FlintLauncher.Core.Migration;
-using FlintLauncher.Core.Tasks;
 using FlintLauncher.Web;
 using TruePath;
 using Xunit;

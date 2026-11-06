@@ -9,7 +9,6 @@ using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using Microsoft.Extensions.Logging;
-using TruePath;
 
 namespace FlintLauncher.Core.Launch;
 
@@ -25,9 +24,15 @@ namespace FlintLauncher.Core.Launch;
 /// <param name="dirs">The dir-kind settings: the JavaDir resolution for the java root, and
 /// the managed-versions javalist scans that root — both resolve per launch.</param>
 /// <param name="auth">The auth environment for the pre-launch account refresh.</param>
-public sealed class LaunchFactory(FlintPaths paths, ILoggerFactory loggerFactory, HttpClient http,
-    LaunchOptions? options = null, LaunchUiHooks? ui = null, FlintConfigStore? config = null,
-    ConfiguredDirs? dirs = null, AuthEndpointsOptions? auth = null)
+public sealed class LaunchFactory(
+    FlintPaths paths,
+    ILoggerFactory loggerFactory,
+    HttpClient http,
+    LaunchOptions? options = null,
+    LaunchUiHooks? ui = null,
+    FlintConfigStore? config = null,
+    ConfiguredDirs? dirs = null,
+    AuthEndpointsOptions? auth = null)
 {
     /// <summary>The host-level toggles, normalized to the gates-off record.</summary>
     private readonly LaunchOptions _options = options ?? new LaunchOptions();

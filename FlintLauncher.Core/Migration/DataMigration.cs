@@ -19,8 +19,6 @@
 
 using System.Security;
 using System.Text.RegularExpressions;
-using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Tasks;
 using TruePath;
 using TruePath.SystemIo;
 

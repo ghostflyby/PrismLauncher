@@ -55,7 +55,6 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 using FlintLauncher.Core.Diagnostics;
-using FlintLauncher.Core.Instances;
 using Microsoft.Extensions.Logging;
 using TruePath;
 

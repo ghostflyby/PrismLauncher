@@ -12,7 +12,7 @@ namespace FlintLauncher.Core.Toml;
 /// </summary>
 internal sealed class ModsTomlDependenciesConverter : TomlConverter<ModsTomlDependencies>
 {
-    public override ModsTomlDependencies? Read(TomlReader reader)
+    public override ModsTomlDependencies Read(TomlReader reader)
     {
         var resolver = reader.Options.TypeInfoResolver!;
         if (reader.TokenType == TomlTokenType.StartArray)

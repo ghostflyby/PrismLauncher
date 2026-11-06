@@ -10,7 +10,6 @@
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.ExternalApi.Flame;

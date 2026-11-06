@@ -132,8 +132,6 @@ public sealed partial class DirectoryAnchor : IDisposable
         {
             Close(fd);
         }
-
-        GC.SuppressFinalize(this);
     }
 
     private static DirectoryAnchor? Kill(int fd)
@@ -148,7 +146,7 @@ public sealed partial class DirectoryAnchor : IDisposable
     private static partial int Open(string path, int flags);
 
     [LibraryImport("libc", EntryPoint = "close", SetLastError = true)]
-    private static partial int Close(int fd);
+    private static partial void Close(int fd);
 
     [LibraryImport("libc", EntryPoint = "readlink", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
     private static partial long ReadLink(string path, Span<byte> buf, ulong size);
