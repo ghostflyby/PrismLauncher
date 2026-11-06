@@ -30,7 +30,7 @@ namespace FlintLauncher.Core.Skins;
 public static class SkinDelete
 {
     /// <summary>Port of SkinDelete::delete(token); failures surface as
-    /// <see cref="FlintHttpException"/> (the old NetRequest status gate).</summary>
+    /// <see cref="FlintHttpException"/> (the C++ NetRequest status gate).</summary>
     public static Task DeleteAsync(string token, AuthEndpointsOptions? auth = null,
         CancellationToken cancellationToken = default)
     {

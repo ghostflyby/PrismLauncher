@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
-// The one-shot fetch helpers over the persistent client: they carry the semantics the
-// retired NetRequest gave every plain query — the RequestTimeout inactivity window, the
+// The one-shot fetch helpers over the persistent client: they carry the semantics the C++
+// NetRequest gave every plain query — the RequestTimeout inactivity window, the
 // network-level manual retry gate, and the uniform failure shape ("HTTP status <code> for
 // <url>" plus the truncated response body) as a <see cref="FlintHttpException"/>. The
 // download-plane tasks (cached/file transfers with progress and validators) live elsewhere;
@@ -12,7 +12,7 @@ using System.Text;
 
 namespace FlintLauncher.Core.Net;
 
-/// <summary>The uniform query failure: the status-gate text of the old NetRequest
+/// <summary>The uniform query failure: the status-gate text of the C++ NetRequest
 /// ("HTTP status &lt;code&gt; for &lt;url&gt;" plus up to 4 KiB of the response body).</summary>
 public sealed class FlintHttpException(string reason) : Exception(reason)
 {
@@ -65,7 +65,7 @@ public static class FlintHttp
             var statusCode = (int)response.StatusCode;
             if (statusCode is not (>= 200 and < 300))
             {
-                // the error body is best-effort (the old NetRequest read it defensively too)
+                // the error body is best-effort (the C++ NetRequest read it defensively too)
                 var body = "";
                 try
                 {

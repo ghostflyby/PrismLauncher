@@ -25,7 +25,7 @@
 | `settings/INIFile.{h,cpp}` | `FlintLauncher.Core/Settings/IniFile.cs` + `QSettingsIniCodec.cs` | ported | 黄金对拍：真 QSettings 6.11 生成 golden 文件，读写字节级一致（docs/tools/qt-ini-golden） |
 | `settings/SettingsObject*` `Setting*` `INISettingsObject` `OverrideSetting` `PassthroughSetting` | `FlintLauncher.Core/Settings/*.cs` | ported | QVariant→object?+`Variant` 转换层 |
 | `tasks/Task*` | `FlintLauncher.Core/Tasks/*` | partial | C# 有协程，任务基类不移植：每个操作直接是 `async Task`（返回即成功、抛出即失败、取消走 token）；`ConcurrentTask` 语义保留在 `TaskWork.RunAllAsync`（子项失败不中断兄弟、排空后聚合） |
-| `net/Request*` | `FlintLauncher.Core/Net/NetRequest.cs` | partial | HttpClient 底座；429/503 自动重试；HeaderProxy 简化为 AddHeader |
+| `net/Request*` | `FlintLauncher.Core/Net/FlintHttp.cs`（查询半边）+ `HttpDownloadTask.cs`（下载半边） | ported | 429/503 自动重试在 `RetryHandler.cs`；状态门+截断错误体在 `FlintHttpException`；HeaderProxy 简化为按需加头 |
 | `net/Sink*` `FileSink` `ByteArraySink` `MetaCacheSink` | `FlintLauncher.Core/Net/Sink.cs` `FileSink.cs` | ported | PSaveFile→临时文件+原子替换 |
 | `net/Validator*` `ChecksumValidator` | 折叠进 `FlintLauncher.Core/Net/HttpDownloadTask.cs` | replaced | 下载完成校验：BCL HashData 对 temp 文件，通过才提交 |
 | `net/HttpMetaCache*` | `FlintLauncher.Core/Net/HttpMetaCache.cs` | ported | metacache JSON 格式（version "1"）与原版互通；挂载表（baseId→根）+ 账本分离（E4），账本落 cache 根（E3），启动 Load()（E6） |

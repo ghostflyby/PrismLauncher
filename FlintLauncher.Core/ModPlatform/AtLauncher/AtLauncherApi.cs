@@ -66,7 +66,7 @@ public sealed class AtLauncherApi(HttpClient http)
     // ------------------------------------------------------------------ requests
 
     /// <summary>makeByteArray(packsnew.json); failures surface as
-    /// <see cref="FlintHttpException"/> (the old NetRequest status gate).</summary>
+    /// <see cref="FlintHttpException"/> (the C++ NetRequest status gate).</summary>
     public Task<string> FetchPackIndexAsync(CancellationToken cancellationToken = default) =>
         FlintHttp.GetStringAsync(Http,
             new HttpRequestMessage(HttpMethod.Get, PackIndexUrl()), cancellationToken);

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
 // In-process HttpListener stub for the peripheral-feature tests (Imgur upload/album, news feed,
-// paste uploads) — the same free-port pattern as AuthStubServer/NetRequestTests' TestHttpServer.
+// paste uploads) — the same free-port pattern as AuthStubServer/NetTests' TestHttpServer.
 // Every request is recorded with its raw body bytes (multipart bodies are binary) and the
 // response is driven by the Responder delegate.
 

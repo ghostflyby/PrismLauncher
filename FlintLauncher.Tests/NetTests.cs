@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
-// Tests for the Net stack: sinks/validators offline, HttpMetaCache persistence (Prism-compatible
-// JSON index), and live requests against a local HTTP server (304 revalidation, checksums, retry).
+// Tests for the Net stack: download-completion checksum/verify gates, HttpMetaCache
+// persistence (Prism-compatible JSON index), and live requests against a local HTTP server
+// (304 revalidation, checksums, retry).
 
 using System.Net;
 using System.Net.Http.Headers;
@@ -16,7 +17,7 @@ using Xunit;
 
 namespace FlintLauncher.Tests;
 
-public class NetRequestTests : IDisposable
+public class NetTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), $"flint-net-{Guid.NewGuid():N}");
 
@@ -356,7 +357,7 @@ public class NetRequestTests : IDisposable
     // ---------------------------------------------------------------- live requests
 
     [Fact]
-    public async Task NetRequest_DownloadsToFile_WithChecksum()
+    public async Task Download_ToFile_WithChecksum()
     {
         using var server = new TestHttpServer(ctx =>
         {
@@ -377,7 +378,7 @@ public class NetRequestTests : IDisposable
     }
 
     [Fact]
-    public async Task NetRequest_MetaCacheSink_Uses304Revalidation()
+    public async Task CachedDownload_Uses304Revalidation()
     {
         var servedBody = "cached-body"u8.ToArray();
         var requestCount = 0;
@@ -475,7 +476,7 @@ public class NetRequestTests : IDisposable
     }
 
     [Fact]
-    public async Task NetRequest_AutoRetry_On429()
+    public async Task Download_AutoRetry_On429()
     {
         var attempts = 0;
         using var server = new TestHttpServer(ctx =>
@@ -652,7 +653,7 @@ public class NetRequestTests : IDisposable
     }
 
     [Fact]
-    public async Task NetRequest_Fails_On404_WithStatus()
+    public async Task Download_Fails_On404_WithStatus()
     {
         using var server = new TestHttpServer(ctx => { ctx.Response.StatusCode = 404; });
 

@@ -33,7 +33,7 @@ public static class CapeChange
 {
     /// <summary>Port of CapeChange::change(token, capeId): PUT applies the cape, an empty id
     /// is the bare DELETE that removes it; failures surface as <see cref="FlintHttpException"/>
-    /// (the old NetRequest status gate).</summary>
+    /// (the C++ NetRequest status gate).</summary>
     public static Task ChangeAsync(string token, string capeId, AuthEndpointsOptions? auth = null,
         CancellationToken cancellationToken = default)
     {

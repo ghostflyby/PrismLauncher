@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
 // End-to-end tests for the Java download tasks against a local HTTP server (TestHttpServer
-// pattern from NetRequestTests): archive installs (zip + a hand-built ustar tar.gz), manifest
+// pattern from NetTests): archive installs (zip + a hand-built ustar tar.gz), manifest
 // installs (files/directories/symlinks with sha1 validation) and the macOS SymlinkTask.
 
 using System.IO.Compression;

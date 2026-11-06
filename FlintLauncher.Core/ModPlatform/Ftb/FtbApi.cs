@@ -60,7 +60,7 @@ public sealed class FtbApi(HttpClient http)
     // ---------------------------------------------------------------------- requests
 
     /// <summary>makeByteArray(/modpack/all): the raw index payload; failures surface as
-    /// <see cref="FlintHttpException"/> (the old NetRequest status gate).</summary>
+    /// <see cref="FlintHttpException"/> (the C++ NetRequest status gate).</summary>
     public Task<string> FetchModpacksAsync(CancellationToken cancellationToken = default) =>
         FlintHttp.GetStringAsync(Http,
             new HttpRequestMessage(HttpMethod.Get, ModpacksUrl()), cancellationToken);
