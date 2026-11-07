@@ -31,6 +31,7 @@ public static class FileNaming
     {
         var num = 0;
         var baseName = RemoveChars(str, '-', "\\/"); // FS::RemoveInvalidFilenameChars
+        var dirs = inDirs.ToArray(); // materialized once: the dedupe loop re-enumerates
         string dirName;
         do
         {
@@ -43,7 +44,7 @@ public static class FileNaming
             }
 
             num++;
-        } while (inDirs.Any(dir => Path.Exists((dir / dirName).Value)));
+        } while (dirs.Any(dir => Path.Exists((dir / dirName).Value)));
 
         return dirName;
     }

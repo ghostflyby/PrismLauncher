@@ -976,6 +976,7 @@ public class ApiAuthTests
             await app.StartAsync();
             // one-shot request against the hosted stub; a single throwaway client here is
             // the honest shape (IHttpClientFactory is not registered in the test host)
+            // ReSharper disable once ShortLivedHttpClient
             using var client = new HttpClient();
             client.BaseAddress = new Uri(app.Urls.First());
             Assert.True((await client.GetAsync("/api/v1/instances")).IsSuccessStatusCode);

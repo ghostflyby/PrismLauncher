@@ -76,6 +76,9 @@ public static class FlintHttp
                 {
                     throw new FlintHttpException(window.TimeoutMessage);
                 }
+                // best effort: a body read that fails (or is cancelled mid-read) contributes
+                // an empty body — the status line below is the message
+                // ReSharper disable once EmptyGeneralCatchClause
                 catch (Exception)
                 {
                 }

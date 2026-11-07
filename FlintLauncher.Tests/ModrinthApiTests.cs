@@ -38,7 +38,6 @@ public class ModrinthApiTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-modrinth-{Guid.NewGuid():N}");
     private readonly TestGlobalSettings _global = new();
     private readonly StubModrinthServer _server = new();
-    private readonly string _baseUrl;
 
     private readonly ModrinthClient _modrinth;
     private readonly HttpClient _http;
@@ -46,8 +45,7 @@ public class ModrinthApiTests : IDisposable
     public ModrinthApiTests()
     {
         Directory.CreateDirectory(_root);
-        _baseUrl = _server.Url;
-        (_modrinth, _http) = TestModrinthApi.At(_baseUrl);
+        (_modrinth, _http) = TestModrinthApi.At(_server.Url);
         // make the download host match the stub so the modrinth-download-meta header path is used
         _modrinth.DownloadHost = "127.0.0.1";
     }

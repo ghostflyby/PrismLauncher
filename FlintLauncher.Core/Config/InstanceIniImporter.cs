@@ -26,7 +26,6 @@
 
 using FlintLauncher.Core.Settings;
 using TruePath;
-using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Config;
 

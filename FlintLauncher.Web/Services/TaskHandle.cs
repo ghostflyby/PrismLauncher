@@ -43,6 +43,7 @@ public sealed class TaskHandle : IProgress<TaskProgress>
 
     /// <summary>The running work. Set once the operation starts; awaiting it is optional —
     /// the client observes the window, not the task.</summary>
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global
     public Task? Run { get; set; }
 
     /// <summary>The token the work observes. Abort() cancels it.</summary>

@@ -160,7 +160,7 @@ public static class ModrinthPackExportTask
 
                 foreach (var file in v.Files)
                 {
-                    if (file.Hashes?.TryGetValue("sha512", out var hash) != true || hash != sha512)
+                    if (file.Hashes.TryGetValue("sha512", out var hash) != true || hash != sha512)
                     {
                         continue;
                     }

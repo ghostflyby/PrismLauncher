@@ -429,6 +429,8 @@ public class NetTests : IDisposable
         // setAskRetry(false) — gets exactly one attempt
         using var inner = new CountingHandler(_ =>
             throw new HttpRequestException("connection reset"));
+        // per-test client lifetime is deliberate: the handler graph under test is fresh
+        // ReSharper disable once ShortLivedHttpClient
         using var http = new HttpClient(new RetryHandler { MaxManualRetries = 2, InnerHandler = inner });
 
         using (var message = new HttpRequestMessage(HttpMethod.Get, new Uri("http://stub/x")))
@@ -453,6 +455,8 @@ public class NetTests : IDisposable
         {
             Headers = { RetryAfter = new RetryConditionHeaderValue(TimeSpan.Zero) },
         });
+        // per-test client lifetime is deliberate: the handler graph under test is fresh
+        // ReSharper disable once ShortLivedHttpClient
         using var http = new HttpClient(new RetryHandler { InnerHandler = inner });
 
         using var message = new HttpRequestMessage(HttpMethod.Get, new Uri("http://stub/x"));

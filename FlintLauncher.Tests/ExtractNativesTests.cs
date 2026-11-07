@@ -346,6 +346,9 @@ public class ExtractNativesTests
             // the explicit parameter (the former AssetUpdateTask.ResourceUrlOverride static
             // hook, today LaunchFactory.Options.ResourceUrlOverride)
             task.RequestProgress += _ => task.Proceed();
+            // the closure cannot outlive the fixture scope: RunToCompletionAsync is awaited
+            // before the using-vars dispose
+            // ReSharper disable once AccessToDisposedClosure
             task.AppendStep(new TaskStepWrapper(task,
                 cancellationToken => AssetUpdateTask.RunAsync(instance, server.Url + "/objects/",
                     cancellationToken)));

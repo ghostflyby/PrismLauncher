@@ -349,7 +349,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
     public override List<Func<CancellationToken, Task>> CreateUpdateTask(string? resourceUrlOverride = null) =>
     [
         // create folders
-        cancellationToken =>
+        _ =>
         {
             var mcDir = GameRoot;
             if (!mcDir.ExistsDirectory())

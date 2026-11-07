@@ -25,12 +25,6 @@ public class DirectoryAnchorTests : IDisposable
         catch (DirectoryNotFoundException) { }
     }
 
-    private DirectoryAnchor? Acquire(string name = "watched")
-    {
-        var dir = MaterializedDirectory.Ensure(_root / name)!;
-        return DirectoryAnchor.TryAcquire(dir.Path);
-    }
-
     [Fact]
     public void Identity_IsStable_AcrossARename()
     {
@@ -43,6 +37,8 @@ public class DirectoryAnchorTests : IDisposable
         using var anchor = DirectoryAnchor.TryAcquire(dir.Path);
         Assert.NotNull(anchor);
         Assert.True(anchor.Identity.IsAvailable);
+        // the acquire-time path is pinned verbatim (TryCurrentPath is the live one)
+        Assert.Equal(dir.Path, anchor.AcquiredAt);
 
         var moved = _root / "b";
         Directory.Move(dir.Path.Value, moved.Value);

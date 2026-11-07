@@ -218,7 +218,7 @@ public sealed class FlintConfigStore : IOptionsFactory<FlintConfigFile>, IOption
     public IChangeToken GetChangeToken() =>
         new CancellationChangeToken(Volatile.Read(ref _changeSource).Token);
 
-    string? IOptionsChangeTokenSource<FlintConfigFile>.Name => Options.DefaultName;
+    string IOptionsChangeTokenSource<FlintConfigFile>.Name => Options.DefaultName;
 
     // The factory face: the resolved snapshot itself, for every read face (IOptions,
     // IOptionsSnapshot, the monitor). The user layer has no named variants — and the monitor

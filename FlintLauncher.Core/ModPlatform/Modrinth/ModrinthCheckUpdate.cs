@@ -38,9 +38,12 @@ public sealed class ModrinthCheckUpdate
 
     /// <summary>The check's outcome: the updates found, plus one entry per resource the API
     /// could not resolve.</summary>
+    // both halves surface with the check-update API/UI; the headless port only composes them
+    // ReSharper disable NotAccessedPositionalProperty.Global
     public sealed record CheckResult(
         IReadOnlyList<Update> Updates,
         IReadOnlyList<(Resource Resource, string Reason)> Failures);
+    // ReSharper restore NotAccessedPositionalProperty.Global
 
     private readonly IReadOnlyList<Resource> _resources;
     private readonly IReadOnlyList<McVersion> _gameVersions;

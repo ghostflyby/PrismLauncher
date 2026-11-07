@@ -187,7 +187,7 @@ public sealed class DirectorySpace : IDisposable
 
             targets = root is { } one
                 ? _watches.TryGetValue(one, out var tenant) ? [tenant.Watch] : []
-                : [.. _watches.Values.Select(tenant => tenant.Watch)];
+                : [.. _watches.Values.Select(tenantEntry => tenantEntry.Watch)];
         }
 
         foreach (var watch in targets)

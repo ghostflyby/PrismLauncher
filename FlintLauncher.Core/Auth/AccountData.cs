@@ -346,6 +346,8 @@ public sealed class AccountData
         if (IsNumber(node))
         {
             var d = GetNumber(node);
+            // the exact integral check IS the QJsonValue::toInt contract (0 for anything else)
+            // ReSharper disable once CompareOfFloatsByEqualityOperator
             return (int)d == d ? (int)d : 0;
         }
 

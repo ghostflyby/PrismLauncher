@@ -107,6 +107,9 @@ public sealed class NbtList : NbtTag, IReadOnlyList<NbtTag>
         return true;
     }
 
+    // content hash over the live tag list: lists are append-only in practice, and the
+    // hash/equality contract is content-based by NBT semantics
+    // ReSharper disable once NonReadonlyMemberInGetHashCode
     public override int GetHashCode()
     {
         var hash = new HashCode();

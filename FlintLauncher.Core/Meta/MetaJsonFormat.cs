@@ -157,6 +157,8 @@ public static class MetaJsonFormat
         if (formatVersion is { ValueKind: JsonValueKind.Number } raw)
         {
             var value = raw.GetDouble();
+            // exact comparison is the point: the gate accepts precisely the numbers 0 and 1
+            // ReSharper disable once CompareOfFloatsByEqualityOperator
             if (value == 0 || value == 1)
             {
                 return MetadataVersion.InitialRelease;

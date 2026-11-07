@@ -50,6 +50,8 @@ public class RollingFileLoggerProviderTests : IDisposable
         using (var factory = LoggerFactory.Create(builder =>
                {
                    builder.SetMinimumLevel(LogLevel.Information);
+                   // the factory-using closes first — the provider outlives it by design
+                   // ReSharper disable once AccessToDisposedClosure
                    builder.AddProvider(provider);
                }))
         {

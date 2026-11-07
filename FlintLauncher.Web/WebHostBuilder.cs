@@ -411,12 +411,12 @@ public static class WebHostBuilder
 
         var api = app.MapGroup("/api/v1");
         api.AddApiAuth(apiAuth);
-        api.MapGet("/info", (FlintConfig config) => new InfoResponse(
-                config.LauncherDisplayName,
-                config.PrintableVersionString(),
-                config.UserAgent,
-                config.MetaUrl,
-                config.JavaDownloaderEnabled))
+        api.MapGet("/info", (FlintConfig activeConfig) => new InfoResponse(
+                activeConfig.LauncherDisplayName,
+                activeConfig.PrintableVersionString(),
+                activeConfig.UserAgent,
+                activeConfig.MetaUrl,
+                activeConfig.JavaDownloaderEnabled))
             .WithTags("Meta");
 
         api.MapInstances();
