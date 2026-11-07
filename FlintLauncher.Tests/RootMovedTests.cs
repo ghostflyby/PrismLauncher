@@ -68,9 +68,8 @@ public class RootMovedTests : IDisposable
         Assert.Equal(renamed, movedEvents[0].New);
     }
 
-    // The production recovery chain, WITHOUT the test-driven RearmAll — and with the
-    // platform question settled by CI: on linux the FSW never reports the rename (the
-    // first CI run timed out after 10s with nothing pending), so the production trigger is
+    // The production recovery chain, WITHOUT the test-driven RearmAll: on linux the FSW
+    // never reports the rename of the watched root itself, so the production trigger is
     // the watch's own existence sweep — DirectorySpace threads the cadence down, the sweep
     // takes the lost state, and the anchor re-derives the move. The 100ms cadence here is
     // the test seam for what runs at 5s in production.

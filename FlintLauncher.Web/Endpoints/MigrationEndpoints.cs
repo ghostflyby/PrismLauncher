@@ -65,6 +65,11 @@ public static class MigrationEndpoints
             // the plan view enumerates a directory's full inventory — a raw path here is an
             // arbitrary-directory probe primitive, so the source must be one of the detected
             // candidates (see /candidates)
+            if (string.IsNullOrWhiteSpace(source))
+            {
+                return ApiJson.Error("invalid_source", "the source directory is required", 400);
+            }
+
             if (!catalog.IsKnownSource(source))
             {
                 return ApiJson.Error("invalid_source",

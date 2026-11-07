@@ -61,10 +61,13 @@ public sealed class DirectoryWatch : IDisposable
         _currentPath = root.Path;
         _onChanged = onChanged;
         _debounce = debounce ?? TimeSpan.FromMilliseconds(DebounceMsDefault);
+        // the sweep timer starts only after a successful Bind: a Bind that threw (the
+        // Ensure→Register TOCTOU window) must leave nothing running behind the half-built
+        // watch
+        Bind();
         _sweepTimer = new Timer(_ => Rearm(), null,
             sweepInterval ?? TimeSpan.FromMilliseconds(SweepMsDefault),
             sweepInterval ?? TimeSpan.FromMilliseconds(SweepMsDefault));
-        Bind();
     }
 
     /// <summary>Where the watch is currently pointed (follows renames/moves detected
