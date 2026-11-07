@@ -36,7 +36,7 @@ jobs:
       # The build below executes Core's javac/jar targets; pin the JDK the same
       # way CI does.
       - name: Setup JDK
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'

@@ -45,7 +45,7 @@ jobs:
       # instead of relying on whatever the runner happens to have on PATH:
       # temurin 21 still accepts the targets' --release 8.
       - name: Setup JDK
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
