@@ -104,6 +104,14 @@ public class RootMovedTests : IDisposable
         var winner = await Task.WhenAny(moved.Task, Task.Delay(TimeSpan.FromSeconds(10)));
         Assert.True(winner == moved.Task,
             "the rename never surfaced through the watch layer within 10s — production recovery is blind to it");
+        // the task completes at TenantMoved, before the post-rebind reconcile has rescanned
+        // the pool at the new path — wait for the reconcile instead of racing it
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (!pool.IconFileExists("keep") && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(50);
+        }
+
         Assert.Equal(renamed, pool.IconsDir);
         Assert.True(pool.IconFileExists("keep"));
     }
